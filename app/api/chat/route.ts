@@ -5,7 +5,7 @@ export const maxDuration = 30
 
 const minimax = createOpenAICompatible({
   name: "minimax",
-  baseURL: process.env.MINIMAX_BASE_URL ?? "https://api.minimax.io/v1",
+  baseURL: process.env.MINIMAX_BASE_URL ?? "https://api.minimaxi.com/v1",
   apiKey: process.env.MINIMAX_API_KEY,
 })
 
