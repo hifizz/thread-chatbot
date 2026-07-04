@@ -387,7 +387,7 @@ const SUGGESTION_GROUPS: SuggestionGroup[] = [
       {
         label: "a birthday card message",
         prompt:
-          "Help me write a birthday card message for a friend in the notepad",
+          "Write a birthday card message for a friend and save it to the notepad",
       },
       {
         label: "a product announcement",
@@ -411,7 +411,7 @@ const SUGGESTION_GROUPS: SuggestionGroup[] = [
     options: [
       {
         label: "React vs Vue vs Svelte",
-        prompt: "Compare React, Vue, and Svelte in a table",
+        prompt: "Compare npm weekly downloads of React, Vue, and Svelte in a table",
       },
       {
         label: "GDP of US, China, Japan",
