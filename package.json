@@ -13,7 +13,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "openspec:validate": "openspec validate --all --strict"
   },
   "dependencies": {
     "@ai-sdk/openai-compatible": "^3.0.5",
@@ -64,6 +65,7 @@
     "zustand": "^5.0.14"
   },
   "devDependencies": {
+    "@fission-ai/openspec": "1.5.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

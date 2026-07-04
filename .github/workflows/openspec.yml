@@ -1,0 +1,43 @@
+name: OpenSpec
+
+on:
+  pull_request:
+    paths:
+      - "openspec/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+  push:
+    branches: [main]
+    paths:
+      - "openspec/**"
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Prefer a globally installed OpenSpec CLI (e.g. a self-hosted runner
+      # image with it baked in); fall back to the pinned devDependency so
+      # the check still runs, reproducibly, on plain runners.
+      - name: Resolve OpenSpec CLI
+        id: openspec
+        run: |
+          if command -v openspec >/dev/null 2>&1; then
+            echo "cmd=openspec" >> "$GITHUB_OUTPUT"
+          else
+            echo "cmd=pnpm exec openspec" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Validate specs and changes
+        run: ${{ steps.openspec.outputs.cmd }} validate --all --strict

@@ -19,6 +19,7 @@ Package manager is **pnpm** (pnpm-lock.yaml / pnpm-workspace.yaml).
 - `pnpm db:migrate` — apply pending migrations to `DATABASE_URL`
 - `pnpm db:push` — push schema directly without a migration file (quick local iteration)
 - `pnpm db:studio` — Drizzle Studio
+- `pnpm openspec:validate` — validate OpenSpec changes/specs (`@fission-ai/openspec`, pinned as a devDependency so CI works without a global install; see `.github/workflows/openspec.yml`)
 
 There is no test framework configured.
 
