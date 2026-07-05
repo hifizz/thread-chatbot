@@ -157,9 +157,12 @@ const defaultComponents = memoizeMarkdownComponents({
         </a>
       );
     }
+    // 外部链接（深度研究的引用来源等）在新标签打开
+    const isExternal = /^https?:\/\//i.test(href ?? "");
     return (
       <a
         href={href}
+        {...(isExternal ? { target: "_blank", rel: "noreferrer" } : {})}
         className={cn(
           "aui-md-a text-primary hover:text-primary/80 underline underline-offset-2",
           className,

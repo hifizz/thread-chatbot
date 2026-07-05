@@ -6,6 +6,7 @@ import {
   UserMessageAttachments,
 } from "@/components/assistant-ui/attachment";
 import { ComposerPdfInsights } from "@/components/assistant-ui/pdf-insights";
+import { DeepResearchToggle } from "@/components/assistant-ui/deep-research-toggle";
 import { MarkdownText } from "@/components/assistant-ui/markdown-text";
 import {
   Reasoning,
@@ -226,7 +227,10 @@ const Composer: FC = () => {
 const ComposerAction: FC = () => {
   return (
     <div className="aui-composer-action-wrapper relative flex items-center justify-between">
-      <ComposerAddAttachment />
+      <div className="flex items-center gap-1">
+        <ComposerAddAttachment />
+        <DeepResearchToggle />
+      </div>
       <div className="flex items-center gap-1.5">
         <AuiIf condition={(s) => s.thread.capabilities.dictation}>
           <AuiIf condition={(s) => s.composer.dictation == null}>

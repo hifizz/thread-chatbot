@@ -61,3 +61,11 @@ import { Button } from "@/components/ui/button";
 - **RAG 向量检索（可选）**：配置 `EMBEDDINGS_*` 后，超出上下文预算的超大 PDF 会改走向量检索——只把与问题最相关的片段喂给模型，而非全文截断。单文档且体量不大时仍走全文注入（依据调研结论：小文档不必 RAG）。未配置 embeddings 时自动降级为全文截断注入。
 
 RAG 依赖 Postgres 的 pgvector 扩展（迁移会自动 `CREATE EXTENSION vector`，需数据库允许创建扩展）。检索路线的设计取舍见 `docs/chatpdf/02-设计方案.md`。
+
+## 深度研究（Deep Research）
+
+输入框左下角的「深度研究」开关：开启后，模型会**联网多步检索、按需深读网页**，最终产出一份基于真实来源、带内联引用的结构化报告；检索了什么、读了哪些来源，**过程对用户可见**（渲染为检索卡片与来源链接）。
+
+- 配置 `SEARCH_API_KEY`（默认 [Tavily](https://tavily.com)，`SEARCH_BASE_URL` 可换兼容服务）即可启用；未配置时开关会提示不可用，普通对话不受影响。
+- 编排走 AI SDK v7 多步工具循环（`streamText` + `webSearch`/`readUrl` 工具 + `stopWhen` 步数上限），与现有 chat 链路同源。
+- 设计与调研结论见 `docs/deep-research/设计说明.md`。
