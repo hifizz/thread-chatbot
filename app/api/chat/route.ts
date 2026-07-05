@@ -11,6 +11,7 @@ import {
 import { frontendTools } from "@assistant-ui/react-ai-sdk"
 import type { ToolJSONSchema } from "assistant-stream"
 import { z } from "zod"
+import { MARKDOWN_DOCUMENT_TOOL_NAME } from "@/constants/tools"
 
 export const maxDuration = 30
 
@@ -36,7 +37,13 @@ const getWeather = tool({
   }),
   execute: async ({ location }) => {
     // Deterministic mock reading (hashed from the city name) - no real weather API/key involved.
-    const conditions = ["Sunny", "Partly Cloudy", "Cloudy", "Light Rain", "Clear"]
+    const conditions = [
+      "Sunny",
+      "Partly Cloudy",
+      "Cloudy",
+      "Light Rain",
+      "Clear",
+    ]
     const seed = [...location].reduce((acc, c) => acc + c.charCodeAt(0), 0)
     return {
       location,
@@ -54,13 +61,33 @@ const compareTable = tool({
   inputSchema: z.object({
     title: z.string(),
     unit: z.string().optional(),
-    columns: z.array(z.string()).describe("Category labels, e.g. country names"),
+    columns: z
+      .array(z.string())
+      .describe("Category labels, e.g. country names"),
     series: z.array(
       z.object({
         name: z.string(),
-        values: z.array(z.number()).describe("One value per column, same order as columns"),
-      }),
+        values: z
+          .array(z.number())
+          .describe("One value per column, same order as columns"),
+      })
     ),
+  }),
+  execute: async (input) => input,
+})
+
+const createMarkdownDocument = tool({
+  description:
+    "Create a standalone Markdown document (report, guide, README, article, plan, etc.). " +
+    "Use this whenever the user asks for long-form writing or a document they will save, share, or reuse. " +
+    "The document opens in a side preview panel, so keep the chat reply to a brief summary and do not repeat the document content in it.",
+  inputSchema: z.object({
+    title: z
+      .string()
+      .describe("Short document title, shown in the preview panel header"),
+    content: z
+      .string()
+      .describe("The complete document, in GitHub-flavored Markdown"),
   }),
   execute: async (input) => input,
 })
@@ -69,11 +96,13 @@ export async function POST(req: Request) {
   const {
     messages,
     tools,
-  }: { messages: UIMessage[]; tools?: Record<string, ToolJSONSchema> } = await req.json()
+  }: { messages: UIMessage[]; tools?: Record<string, ToolJSONSchema> } =
+    await req.json()
 
   const allTools = {
     getWeather,
     compareTable,
+    [MARKDOWN_DOCUMENT_TOOL_NAME]: createMarkdownDocument,
     ...frontendTools(tools ?? {}),
   }
 
