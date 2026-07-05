@@ -51,6 +51,7 @@ This project uses assistant-ui for chat interfaces.
 Documentation: https://www.assistant-ui.com/llms-full.txt (thin/incomplete on tool-UI and version-compat details — when in doubt, read the real signatures in `node_modules/@assistant-ui/*/dist/*.d.ts` or the shipped `.ts` sources under `node_modules/@assistant-ui/core/src/`, which are more reliable than the docs for this fast-moving pre-1.0 package).
 
 Key patterns:
+
 - Use AssistantRuntimeProvider at the app root
 - Thread component for full chat interface
 - AssistantModal for floating chat widget
@@ -63,10 +64,21 @@ Key patterns:
 MiniMax emits chain-of-thought as literal `<think>...</think>` text rather than a dedicated reasoning stream part. The model is wrapped with `wrapLanguageModel` + `extractReasoningMiddleware({ tagName: "think" })` so it renders as a collapsible reasoning block instead of raw text in the message.
 
 Three tools are wired end-to-end as a reference for adding more:
+
 - `getWeather` and `compareTable` — **backend** tools (mock data; `compareTable` uses `display: "standalone"` for its generative-UI table), defined server-side only in `route.ts`.
 - `writeNote` — a **frontend** tool that actually executes in the browser (saves to `localStorage`), defined client-side and forwarded to the model via `@assistant-ui/react-ai-sdk`'s `frontendTools()`.
 
 Each tool's custom UI is registered with the `useAssistantTool({ toolName, type, render, ... })` hook from `@assistant-ui/react`, in `components/assistant-ui/{weather,notepad,compare-table}-tool.tsx`. These are null-returning components mounted via `<AssistantTools />` (`components/assistant-ui/tools.tsx`) inside `AssistantRuntimeProvider` in `app/page.tsx`. `useAssistantTool` is marked `@deprecated` in favor of `defineToolkit`/`Tools({ toolkit })` + `useAui({ tools })`, but that path assumes assistant-ui's "use generative" compiler, which isn't set up in this project — keep using `useAssistantTool` for new tools unless that changes.
+
+## Skills（slash command）
+
+输入框中键入 `/` 可唤起 skill 菜单，选中后以 directive 语法 `:skill[label]{name=id}` 插入消息、随正文发送，**单条消息生效**。分三层：
+
+- **定义层（服务端资产）**：`skills/<id>/SKILL.md` = YAML frontmatter（`id`/`label`/`description`，可选 `icon`/`tools`）+ Markdown 正文（注入 system prompt 的内容）。`id` 必须与目录名一致（kebab-case）。加载器在 `lib/skills/registry.ts`，模块级缓存——**改 SKILL.md 后需重启 dev server**。`GET /api/skills` 只暴露元数据，不下发正文。
+- **触发层（前端）**：`components/assistant-ui/skill-trigger.tsx` 基于 assistant-ui 的 `Unstable_TriggerPopover`（pre-1.0 不稳定 API，升级 `@assistant-ui/*` 时此功能要回归测试）。消息中的 directive 由 `DirectiveText` 渲染为 chip；线程标题经 `lib/skills/directive-display.ts` 清洗。
+- **执行层（`app/api/chat/route.ts`）**：`lib/skills/resolve.ts` 只解析最后一条 user message 的第一个 skill directive，经注册表白名单校验后把正文追加到 `BASE_SYSTEM_PROMPT`（`constants/chat.ts`）之后；frontmatter `tools` 只能引用 route.ts 中 `skillTools` 映射注册的服务端工具。发给模型的文本中 directive 会被替换为 `/id`，数据库持久化保持原始文本。
+
+新增 skill：建 `skills/<id>/SKILL.md` 即可，无需改代码（除非要声明新工具）。
 
 ## Database & thread persistence
 

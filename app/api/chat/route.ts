@@ -11,6 +11,11 @@ import {
 import { frontendTools } from "@assistant-ui/react-ai-sdk"
 import type { ToolJSONSchema } from "assistant-stream"
 import { z } from "zod"
+import { BASE_SYSTEM_PROMPT } from "@/constants/chat"
+import {
+  resolveSkillFromMessages,
+  sanitizeSkillDirectives,
+} from "@/lib/skills/resolve"
 
 export const maxDuration = 30
 
@@ -36,7 +41,13 @@ const getWeather = tool({
   }),
   execute: async ({ location }) => {
     // Deterministic mock reading (hashed from the city name) - no real weather API/key involved.
-    const conditions = ["Sunny", "Partly Cloudy", "Cloudy", "Light Rain", "Clear"]
+    const conditions = [
+      "Sunny",
+      "Partly Cloudy",
+      "Cloudy",
+      "Light Rain",
+      "Clear",
+    ]
     const seed = [...location].reduce((acc, c) => acc + c.charCodeAt(0), 0)
     return {
       location,
@@ -54,32 +65,59 @@ const compareTable = tool({
   inputSchema: z.object({
     title: z.string(),
     unit: z.string().optional(),
-    columns: z.array(z.string()).describe("Category labels, e.g. country names"),
+    columns: z
+      .array(z.string())
+      .describe("Category labels, e.g. country names"),
     series: z.array(
       z.object({
         name: z.string(),
-        values: z.array(z.number()).describe("One value per column, same order as columns"),
-      }),
+        values: z
+          .array(z.number())
+          .describe("One value per column, same order as columns"),
+      })
     ),
   }),
   execute: async (input) => input,
 })
 
+// skill frontmatter 的 `tools` 只能引用这里注册的服务端工具（增量启用）。
+const skillTools: Record<string, ReturnType<typeof tool>> = {}
+
 export async function POST(req: Request) {
   const {
     messages,
     tools,
-  }: { messages: UIMessage[]; tools?: Record<string, ToolJSONSchema> } = await req.json()
+  }: { messages: UIMessage[]; tools?: Record<string, ToolJSONSchema> } =
+    await req.json()
+
+  const skill = resolveSkillFromMessages(messages)
+  const extraTools = Object.fromEntries(
+    (skill?.tools ?? []).flatMap((name) => {
+      if (!skillTools[name]) {
+        console.warn(
+          `[skills] skill "${skill?.id}" 声明了未注册的工具 "${name}"，已忽略`
+        )
+        return []
+      }
+      return [[name, skillTools[name]]]
+    })
+  )
 
   const allTools = {
     getWeather,
     compareTable,
+    ...extraTools,
     ...frontendTools(tools ?? {}),
   }
 
   const result = streamText({
     model: minimax(process.env.LLM_MODEL_ID ?? "MiniMax-M2"),
-    messages: await convertToModelMessages(messages, { tools: allTools }),
+    system: skill
+      ? `${BASE_SYSTEM_PROMPT}\n\n${skill.body}`
+      : BASE_SYSTEM_PROMPT,
+    messages: await convertToModelMessages(sanitizeSkillDirectives(messages), {
+      tools: allTools,
+    }),
     tools: allTools,
     stopWhen: isStepCount(5),
   })

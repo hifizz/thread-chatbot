@@ -1,6 +1,7 @@
 import type { RemoteThreadListAdapter } from "@assistant-ui/react"
 import type { RemoteThreadMetadata } from "@assistant-ui/core"
 import { createAssistantStream } from "assistant-stream"
+import { directiveTextToPlain } from "@/lib/skills/directive-display"
 
 type ThreadRow = {
   id: string
@@ -14,7 +15,8 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
     ...init,
     headers: { "Content-Type": "application/json", ...init?.headers },
   })
-  if (!res.ok) throw new Error(`${init?.method ?? "GET"} ${path} failed: ${res.status}`)
+  if (!res.ok)
+    throw new Error(`${init?.method ?? "GET"} ${path} failed: ${res.status}`)
   return res.json() as Promise<T>
 }
 
@@ -77,8 +79,9 @@ export const postgresThreadListAdapter: RemoteThreadListAdapter = {
       .find((m) => m.role === "user")
       ?.content.find((part) => part.type === "text")
 
-    const title = ((firstUserText as { text?: string } | undefined)?.text ?? "New Chat")
-      .slice(0, 60)
+    const title = directiveTextToPlain(
+      (firstUserText as { text?: string } | undefined)?.text ?? "New Chat"
+    ).slice(0, 60)
 
     await api(`/api/threads/${remoteId}`, {
       method: "PATCH",
