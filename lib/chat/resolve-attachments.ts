@@ -71,9 +71,14 @@ function renderPdf(
   const suffix = truncated
     ? `\n\n[已截断：全文共 ${pages.length} 页，以上仅包含前 ${includedPages} 页内容]`
     : ""
+  // 引用溯源：让模型引用文档内容时用可点击的 markdown 链接标注来源页码。
+  // attachment://{id}#page=N 由前端 markdown 渲染器改写为打开原 PDF 对应页的链接。
+  const citeHint =
+    `\n\n【引用要求】回答中凡是引用了本文档的内容，都要在句末用如下格式标注来源页码，` +
+    `方便用户核对原文：[第N页](attachment://${row.id}#page=N)（N 换成真实页码）。`
   return {
     type: "text",
-    text: `<attachment name="${row.filename}" pages="${row.pageCount ?? pages.length}">\n${body}${suffix}\n</attachment>`,
+    text: `<attachment name="${row.filename}" pages="${row.pageCount ?? pages.length}">\n${body}${suffix}${citeHint}\n</attachment>`,
   }
 }
 

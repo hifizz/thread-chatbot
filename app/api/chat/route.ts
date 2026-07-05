@@ -1,34 +1,17 @@
-import { createOpenAICompatible } from "@ai-sdk/openai-compatible"
 import {
   convertToModelMessages,
-  extractReasoningMiddleware,
   isStepCount,
   streamText,
   tool,
-  wrapLanguageModel,
   type UIMessage,
 } from "ai"
 import { frontendTools } from "@assistant-ui/react-ai-sdk"
 import type { ToolJSONSchema } from "assistant-stream"
 import { z } from "zod"
 import { resolveAttachmentParts } from "@/lib/chat/resolve-attachments"
+import { minimaxChatModel } from "@/lib/ai/minimax"
 
 export const maxDuration = 30
-
-const minimaxProvider = createOpenAICompatible({
-  name: "minimax",
-  baseURL: process.env.MINIMAX_BASE_URL ?? "https://api.minimaxi.com/v1",
-  apiKey: process.env.MINIMAX_API_KEY,
-})
-
-// MiniMax emits its reasoning as plain <think>...</think> text rather than a
-// dedicated reasoning stream part; extract it so the UI renders it as
-// collapsible reasoning instead of literal text.
-const minimax = (modelId: string) =>
-  wrapLanguageModel({
-    model: minimaxProvider(modelId),
-    middleware: extractReasoningMiddleware({ tagName: "think" }),
-  })
 
 const getWeather = tool({
   description: "Get the current weather for a city.",
@@ -82,7 +65,7 @@ export async function POST(req: Request) {
   const resolvedMessages = await resolveAttachmentParts(messages)
 
   const result = streamText({
-    model: minimax(process.env.LLM_MODEL_ID ?? "MiniMax-M2"),
+    model: minimaxChatModel(),
     messages: await convertToModelMessages(resolvedMessages, { tools: allTools }),
     tools: allTools,
     stopWhen: isStepCount(5),

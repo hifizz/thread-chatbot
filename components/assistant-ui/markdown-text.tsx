@@ -140,15 +140,36 @@ const defaultComponents = memoizeMarkdownComponents({
       {...props}
     />
   ),
-  a: ({ className, ...props }) => (
-    <a
-      className={cn(
-        "aui-md-a text-primary hover:text-primary/80 underline underline-offset-2",
-        className,
-      )}
-      {...props}
-    />
-  ),
+  a: ({ className, href, children, ...props }) => {
+    // 引用溯源：把模型输出的 attachment://{id}#page=N 改写为打开原 PDF 对应页的链接，
+    // 渲染成可点击的页码徽标。native PDF 查看器支持 #page=N 片段跳转。
+    const citation = href?.match(/^attachment:\/\/([0-9a-f-]{36})(#page=\d+)?$/i);
+    if (citation) {
+      const [, id, fragment = ""] = citation;
+      return (
+        <a
+          href={`/api/attachments/${id}${fragment}`}
+          target="_blank"
+          rel="noreferrer"
+          className="aui-md-citation bg-primary/10 text-primary hover:bg-primary/20 mx-0.5 inline-flex items-center rounded px-1.5 py-0.5 align-baseline text-xs font-medium no-underline"
+        >
+          {children}
+        </a>
+      );
+    }
+    return (
+      <a
+        href={href}
+        className={cn(
+          "aui-md-a text-primary hover:text-primary/80 underline underline-offset-2",
+          className,
+        )}
+        {...props}
+      >
+        {children}
+      </a>
+    );
+  },
   blockquote: ({ className, ...props }) => (
     <blockquote
       className={cn(

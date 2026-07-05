@@ -46,3 +46,9 @@ export const ATTACHMENT_CONTEXT_CHAR_BUDGET = 120_000
 /** 附件状态机：uploading（已建行/直传中）→ ready（可用）/ failed（不可用，error 里给原因） */
 export const ATTACHMENT_STATUSES = ["uploading", "ready", "failed"] as const
 export type AttachmentStatus = (typeof ATTACHMENT_STATUSES)[number]
+
+// === 附件洞察（自动摘要 + 建议问题，冷启动引导） ===
+/** 生成摘要/建议问题时喂给模型的最大字符数（控制成本与延迟；取文档前若干页） */
+export const INSIGHTS_INPUT_CHAR_LIMIT = 20_000
+/** 建议问题数量 */
+export const SUGGESTED_QUESTION_COUNT = 3

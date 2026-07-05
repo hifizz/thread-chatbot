@@ -39,6 +39,8 @@ export const attachments = pgTable("attachments", {
     .default("uploading"),
   pageCount: integer("page_count"), // PDF 专用
   pages: jsonb("pages").$type<string[]>(), // PDF 专用：pages[i] = 第 i+1 页文本，按页存储为二期 RAG/引用跳转铺路
+  summary: text("summary"), // PDF 专用：上传后生成的内容摘要（冷启动引导）
+  suggestedQuestions: jsonb("suggested_questions").$type<string[]>(), // PDF 专用：建议问题
   error: text("error"), // 失败原因（用户可见）
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 })
