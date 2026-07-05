@@ -5,7 +5,7 @@ import {
   useAssistantTool,
   type ToolCallMessagePartComponent,
 } from "@assistant-ui/react"
-import { FileTextIcon, LoaderCircleIcon } from "lucide-react"
+import { LoaderCircleIcon } from "lucide-react"
 import { artifactRenderers } from "@/components/artifact/renderers"
 import { MARKDOWN_DOCUMENT_TOOL_NAME } from "@/constants/tools"
 import { useArtifactStore } from "@/lib/artifact/artifact-store"
@@ -14,6 +14,7 @@ type MarkdownDocumentArgs = { title?: string; content?: string }
 type MarkdownDocumentResult = { title: string; content: string }
 
 const ARTIFACT_TYPE = "markdown" as const
+const ArtifactIcon = artifactRenderers[ARTIFACT_TYPE].Icon
 
 const MarkdownDocumentToolUI: ToolCallMessagePartComponent<
   MarkdownDocumentArgs,
@@ -62,7 +63,7 @@ const MarkdownDocumentToolUI: ToolCallMessagePartComponent<
         {isRunning ? (
           <LoaderCircleIcon className="size-5 animate-spin text-muted-foreground" />
         ) : (
-          <FileTextIcon className="size-5 text-muted-foreground" />
+          <ArtifactIcon className="w-5 text-muted-foreground" />
         )}
       </div>
       <div className="min-w-0">
