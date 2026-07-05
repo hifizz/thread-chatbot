@@ -970,6 +970,11 @@ export const Base: FC = () => {
           </ResizablePanel>
           {artifactOpen && (
             <>
+              {/* Divider between the chat and the Markdown Preview. The drag
+                  affordance comes from react-resizable-panels itself: hovering
+                  the pointer-based hit region around this line switches the
+                  cursor to ew-resize (via an injected !important rule), so no
+                  color change and no cursor utility class is needed here. */}
               <ResizableHandle className="mx-0.5 bg-transparent" />
               <ResizablePanel id="artifact" defaultSize="45%" minSize="320px">
                 <div className="h-full overflow-hidden rounded-lg bg-background">
