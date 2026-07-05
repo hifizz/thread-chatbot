@@ -102,8 +102,8 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable"
-import { MarkdownArtifactPanel } from "@/components/assistant-ui/markdown-artifact-panel"
-import { useMarkdownArtifactStore } from "@/lib/artifact/markdown-artifact-store"
+import { ArtifactPanel } from "@/components/artifact/artifact-panel"
+import { useArtifactStore } from "@/lib/artifact/artifact-store"
 const Logo: FC = () => {
   return (
     <div className="flex items-center gap-2 px-2 text-sm font-medium">
@@ -932,42 +932,53 @@ const BranchPicker: FC<BranchPickerPrimitive.Root.Props> = ({
     </BranchPickerPrimitive.Root>
   )
 }
+// The chat shell: everything conversation-related (header incl. share/sidebar
+// controls, thread, composer) lives in this card. The artifact preview is a
+// framework-level sibling panel, not something nested inside the shell.
+const ChatShell: FC<{
+  sidebarCollapsed: boolean
+  onToggleSidebar: () => void
+}> = ({ sidebarCollapsed, onToggleSidebar }) => {
+  return (
+    <div className="flex h-full flex-col overflow-hidden rounded-lg bg-background">
+      <Header
+        sidebarCollapsed={sidebarCollapsed}
+        onToggleSidebar={onToggleSidebar}
+      />
+      <main className="flex-1 overflow-hidden">
+        <Thread />
+      </main>
+    </div>
+  )
+}
+
 export const Base: FC = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
-  const artifactOpen = useMarkdownArtifactStore(
-    (s) => s.open && s.artifact !== null
-  )
+  const artifactOpen = useArtifactStore((s) => s.open && s.artifact !== null)
   return (
     <div className="flex h-full w-full bg-muted/30">
       <div className="hidden md:block">
         <Sidebar collapsed={sidebarCollapsed} />
       </div>
       <div className="flex flex-1 flex-col overflow-hidden p-2 md:pl-0">
-        <div className="flex flex-1 flex-col overflow-hidden rounded-lg bg-background">
-          <Header
-            sidebarCollapsed={sidebarCollapsed}
-            onToggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)}
-          />
-          <main className="flex-1 overflow-hidden">
-            <ResizablePanelGroup orientation="horizontal">
-              <ResizablePanel id="thread" minSize="320px">
-                <Thread />
+        <ResizablePanelGroup orientation="horizontal">
+          <ResizablePanel id="chat-shell" minSize="360px">
+            <ChatShell
+              sidebarCollapsed={sidebarCollapsed}
+              onToggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)}
+            />
+          </ResizablePanel>
+          {artifactOpen && (
+            <>
+              <ResizableHandle className="mx-0.5 bg-transparent" />
+              <ResizablePanel id="artifact" defaultSize="45%" minSize="320px">
+                <div className="h-full overflow-hidden rounded-lg bg-background">
+                  <ArtifactPanel />
+                </div>
               </ResizablePanel>
-              {artifactOpen && (
-                <>
-                  <ResizableHandle />
-                  <ResizablePanel
-                    id="markdown-artifact"
-                    defaultSize="45%"
-                    minSize="280px"
-                  >
-                    <MarkdownArtifactPanel />
-                  </ResizablePanel>
-                </>
-              )}
-            </ResizablePanelGroup>
-          </main>
-        </div>
+            </>
+          )}
+        </ResizablePanelGroup>
       </div>
     </div>
   )
