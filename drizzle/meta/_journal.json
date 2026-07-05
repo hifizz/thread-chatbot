@@ -8,6 +8,13 @@
       "when": 1783169620389,
       "tag": "0000_normal_wendell_vaughn",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1783271723535,
+      "tag": "0001_noisy_black_widow",
+      "breakpoints": true
     }
   ]
 }

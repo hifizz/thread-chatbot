@@ -1,4 +1,4 @@
-import { pgTable, text, jsonb, timestamp, index } from "drizzle-orm/pg-core"
+import { pgTable, text, jsonb, timestamp, index, integer } from "drizzle-orm/pg-core"
 
 export const threads = pgTable("threads", {
   id: text("id").primaryKey(), // == RemoteThreadMetadata.remoteId; reused as-is from the client-generated local thread id
@@ -26,3 +26,19 @@ export const messages = pgTable(
   },
   (table) => [index("messages_thread_id_idx").on(table.threadId)],
 )
+
+export const attachments = pgTable("attachments", {
+  id: text("id").primaryKey(), // crypto.randomUUID()；同时是应用内 URL /api/attachments/{id} 的路径段
+  key: text("key").notNull().unique(), // R2 对象 key：attachments/{uuid}.{白名单扩展名}，不含用户文件名
+  filename: text("filename").notNull(), // 原始文件名，仅展示用
+  mimeType: text("mime_type").notNull(),
+  size: integer("size").notNull(), // 字节；ingest 时与 R2 实际大小复验
+  kind: text("kind", { enum: ["document", "image", "archive", "video"] }).notNull(),
+  status: text("status", { enum: ["uploading", "ready", "failed"] })
+    .notNull()
+    .default("uploading"),
+  pageCount: integer("page_count"), // PDF 专用
+  pages: jsonb("pages").$type<string[]>(), // PDF 专用：pages[i] = 第 i+1 页文本，按页存储为二期 RAG/引用跳转铺路
+  error: text("error"), // 失败原因（用户可见）
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+})

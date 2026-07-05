@@ -11,6 +11,7 @@ import {
 import { frontendTools } from "@assistant-ui/react-ai-sdk"
 import type { ToolJSONSchema } from "assistant-stream"
 import { z } from "zod"
+import { resolveAttachmentParts } from "@/lib/chat/resolve-attachments"
 
 export const maxDuration = 30
 
@@ -77,9 +78,12 @@ export async function POST(req: Request) {
     ...frontendTools(tools ?? {}),
   }
 
+  // MiniMax 不接受 file part：先把附件（PDF→提取文本，其余→占位说明）转换为 text part
+  const resolvedMessages = await resolveAttachmentParts(messages)
+
   const result = streamText({
     model: minimax(process.env.LLM_MODEL_ID ?? "MiniMax-M2"),
-    messages: await convertToModelMessages(messages, { tools: allTools }),
+    messages: await convertToModelMessages(resolvedMessages, { tools: allTools }),
     tools: allTools,
     stopWhen: isStepCount(5),
   })
