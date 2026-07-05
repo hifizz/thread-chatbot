@@ -12,6 +12,7 @@ import {
   hasTextLayer,
   looksLikePdf,
 } from "@/lib/attachments/pdf"
+import { indexAttachment } from "@/lib/attachments/index-chunks"
 import { ATTACHMENT_POLICIES } from "@/constants/attachment"
 
 type RouteContext = { params: Promise<{ id: string }> }
@@ -86,6 +87,15 @@ export async function POST(_req: Request, { params }: RouteContext) {
         pages: extraction.pages,
       })
       .where(eq(attachments.id, id))
+
+    // 建立向量索引（配置了 embeddings 时）。失败不影响附件可用性——
+    // 对话时若无索引会自动回退到全文注入。
+    try {
+      await indexAttachment(id, extraction.pages)
+    } catch {
+      // 索引失败静默降级，PDF 仍可用
+    }
+
     return Response.json({ status: "ready", pageCount: extraction.pageCount })
   }
 
