@@ -1,14 +1,21 @@
 "use client"
 
 import { useMemo } from "react"
-import { AssistantRuntimeProvider, useRemoteThreadListRuntime } from "@assistant-ui/react"
-import { AssistantChatTransport, useChatRuntime } from "@assistant-ui/react-ai-sdk"
+import {
+  AssistantRuntimeProvider,
+  useRemoteThreadListRuntime,
+} from "@assistant-ui/react"
+import {
+  AssistantChatTransport,
+  useChatRuntime,
+} from "@assistant-ui/react-ai-sdk"
 import { Base } from "@/components/examples/base"
 import { AssistantTools } from "@/components/assistant-ui/tools"
 import { postgresThreadListAdapter } from "@/lib/chat/thread-list-adapter"
 import { usePostgresThreadHistoryAdapter } from "@/lib/chat/use-thread-history-adapter"
 import { r2AttachmentAdapter } from "@/lib/chat/attachment-adapter"
 import { useResearchMode } from "@/lib/chat/research-mode"
+import { useModelMode } from "@/lib/chat/model-mode"
 
 function useMyChatRuntime() {
   const history = usePostgresThreadHistoryAdapter()
@@ -17,7 +24,13 @@ function useMyChatRuntime() {
   const transport = useMemo(
     () =>
       new AssistantChatTransport({
-        prepareSendMessagesRequest: ({ id, messages, trigger, messageId, body }) => ({
+        prepareSendMessagesRequest: ({
+          id,
+          messages,
+          trigger,
+          messageId,
+          body,
+        }) => ({
           body: {
             ...body,
             id,
@@ -25,12 +38,17 @@ function useMyChatRuntime() {
             trigger,
             messageId,
             deepResearch: useResearchMode.getState().enabled,
+            // 随每条消息带上当前选中的模型（同「深度研究」开关的做法，读发送时的最新值）
+            modelId: useModelMode.getState().modelId,
           },
         }),
       }),
-    [],
+    []
   )
-  return useChatRuntime({ transport, adapters: { history, attachments: r2AttachmentAdapter } })
+  return useChatRuntime({
+    transport,
+    adapters: { history, attachments: r2AttachmentAdapter },
+  })
 }
 
 export default function Page() {

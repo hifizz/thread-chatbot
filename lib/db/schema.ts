@@ -8,9 +8,16 @@ import {
   vector,
 } from "drizzle-orm/pg-core"
 import { EMBEDDING_DIMENSIONS } from "@/constants/rag"
+import { user } from "./auth-schema"
+
+// 认证与计费表在独立文件中定义，这里统一 re-export，使 drizzle 客户端与迁移能感知它们。
+export * from "./auth-schema"
+export * from "./billing-schema"
 
 export const threads = pgTable("threads", {
   id: text("id").primaryKey(), // == RemoteThreadMetadata.remoteId; reused as-is from the client-generated local thread id
+  // 归属用户；历史数据可能为空，新建对话会写入当前登录用户。
+  userId: text("user_id").references(() => user.id, { onDelete: "cascade" }),
   title: text("title"),
   status: text("status", { enum: ["regular", "archived"] })
     .notNull()
