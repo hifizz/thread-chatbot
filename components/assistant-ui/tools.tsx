@@ -3,7 +3,6 @@
 import { WeatherTool } from "@/components/assistant-ui/weather-tool"
 import { NotepadTool } from "@/components/assistant-ui/notepad-tool"
 import { CompareTableTool } from "@/components/assistant-ui/compare-table-tool"
-import { ResearchTools } from "@/components/assistant-ui/research-tool"
 
 export function AssistantTools() {
   return (
@@ -11,7 +10,6 @@ export function AssistantTools() {
       <WeatherTool />
       <NotepadTool />
       <CompareTableTool />
-      <ResearchTools />
     </>
   )
 }
