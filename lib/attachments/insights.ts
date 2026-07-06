@@ -4,6 +4,7 @@ import {
   INSIGHTS_INPUT_CHAR_LIMIT,
   SUGGESTED_QUESTION_COUNT,
 } from "@/constants/attachment"
+import { TELEMETRY_FUNCTION_IDS } from "@/constants/observability"
 
 // 上传后基于 PDF 文本生成「摘要 + 建议问题」，解决用户面对空白输入框的冷启动问题。
 // 用 generateText + 容错 JSON 解析（而非 generateObject），以兼容任意 OpenAI 兼容端点。
@@ -65,6 +66,7 @@ export async function generateInsights(
   const { text: raw } = await generateText({
     model: minimaxModel(),
     prompt: buildPrompt(text),
+    telemetry: { functionId: TELEMETRY_FUNCTION_IDS.attachmentInsights },
   })
   return parseInsights(raw)
 }
