@@ -4,6 +4,7 @@ import {
   ComposerAttachments,
   UserMessageAttachments,
 } from "@/components/assistant-ui/attachment";
+import { ComposerPdfInsights } from "@/components/assistant-ui/pdf-insights";
 import { MarkdownText } from "@/components/assistant-ui/markdown-text";
 import { DotMatrix } from "@/components/assistant-ui/dot-matrix";
 import { MessageTiming } from "@/components/assistant-ui/message-timing";
@@ -571,6 +572,7 @@ const Composer: FC = () => {
           >
             <ComposerQuotePreview />
             <ComposerAttachments />
+            <ComposerPdfInsights />
             <LexicalComposerInput
               directiveChip={DirectiveChip}
               placeholder="Send a message... (@ to mention, / for commands)"
