@@ -1,8 +1,7 @@
 "use client"
 
-import { type FC, type ReactNode, useState } from "react"
+import { type FC, type ReactNode, useMemo, useState } from "react"
 import { useAuiState } from "@assistant-ui/react"
-import { useShallow } from "zustand/shallow"
 import {
   TelescopeIcon,
   SearchIcon,
@@ -50,36 +49,42 @@ function hostOf(url: string): string {
   }
 }
 
-/** 从当前消息的 parts 里按顺序抽取研究步骤 */
+/**
+ * 从当前消息的 parts 里按顺序抽取研究步骤。
+ *
+ * 关键点：selector 只取消息状态里的原始 content 数组引用（在内容未变时引用稳定），
+ * 派生的 steps 数组放到 useMemo 里、以该引用为依赖计算。绝不能让 selector 本身
+ * 返回一个每次都新建的数组/对象——那样 useSyncExternalStore 每次都会判定"变化了"，
+ * 触发无限重渲染（Maximum update depth exceeded）。
+ */
 function useResearchSteps(): { steps: Step[]; anyRunning: boolean } {
-  return useAuiState(
-    useShallow((s) => {
-      const content = (s.message.content ?? []) as unknown as ToolPart[]
-      const steps: Step[] = []
-      let anyRunning = false
-      for (const part of content) {
-        if (part.type !== "tool-call" || !part.toolName) continue
-        if (!RESEARCH_TOOL_NAMES.has(part.toolName)) continue
-        const running = part.status?.type === "running" || part.result == null
-        if (running) anyRunning = true
-        if (part.toolName === "webSearch") {
-          steps.push({
-            kind: "search",
-            query: part.result?.query ?? part.args?.query ?? "",
-            sources: part.result?.results ?? [],
-            running,
-          })
-        } else {
-          steps.push({
-            kind: "read",
-            url: part.result?.url ?? part.args?.url ?? "",
-            running,
-          })
-        }
+  const content = useAuiState((s) => s.message.content) as unknown as ToolPart[]
+
+  return useMemo(() => {
+    const steps: Step[] = []
+    let anyRunning = false
+    for (const part of content) {
+      if (part.type !== "tool-call" || !part.toolName) continue
+      if (!RESEARCH_TOOL_NAMES.has(part.toolName)) continue
+      const running = part.status?.type === "running" || part.result == null
+      if (running) anyRunning = true
+      if (part.toolName === "webSearch") {
+        steps.push({
+          kind: "search",
+          query: part.result?.query ?? part.args?.query ?? "",
+          sources: part.result?.results ?? [],
+          running,
+        })
+      } else {
+        steps.push({
+          kind: "read",
+          url: part.result?.url ?? part.args?.url ?? "",
+          running,
+        })
       }
-      return { steps, anyRunning }
-    })
-  )
+    }
+    return { steps, anyRunning }
+  }, [content])
 }
 
 const SourceChip: FC<{ item: SearchResultItem }> = ({ item }) => {

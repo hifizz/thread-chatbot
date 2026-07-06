@@ -17,8 +17,15 @@ function useMyChatRuntime() {
   const transport = useMemo(
     () =>
       new AssistantChatTransport({
-        prepareSendMessagesRequest: ({ body }) => ({
-          body: { ...body, deepResearch: useResearchMode.getState().enabled },
+        prepareSendMessagesRequest: ({ id, messages, trigger, messageId, body }) => ({
+          body: {
+            ...body,
+            id,
+            messages,
+            trigger,
+            messageId,
+            deepResearch: useResearchMode.getState().enabled,
+          },
         }),
       }),
     [],
