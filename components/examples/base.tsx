@@ -100,9 +100,15 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { ModelSelector } from "@/components/assistant-ui/model-selector";
-import { docsModelOptions } from "@/components/docs/assistant/docs-model-options";
-import { DEFAULT_MODEL_ID } from "@/constants/model";
+import {
+  ModelSelector,
+  type ModelOption,
+} from "@/components/assistant-ui/model-selector";
+import { UsageMeter } from "@/components/assistant-ui/usage-meter";
+import { UserMenu } from "@/components/auth/user-menu";
+import { CHAT_MODELS, DEFAULT_MODEL_ID } from "@/constants/model";
+import { sellPricePerMillionYuan } from "@/constants/pricing";
+import { useModelMode } from "@/lib/chat/model-mode";
 const Logo: FC = () => {
   return (
     <div className="flex items-center gap-2 px-2 text-sm font-medium">
@@ -181,6 +187,9 @@ const Sidebar: FC<{ collapsed?: boolean }> = ({ collapsed }) => {
           )}
         />
       </ThreadListRoot>
+      <div className="border-border/60 shrink-0 border-t p-2">
+        <UserMenu collapsed={collapsed} />
+      </div>
     </aside>
   );
 };
@@ -210,12 +219,25 @@ const MobileSidebar: FC = () => {
     </Sheet>
   );
 };
-const models = docsModelOptions();
+// 从模型注册表派生选择器选项，描述里带上对用户的售价（元/百万 token）。
+const models: ModelOption[] = CHAT_MODELS.map((m) => {
+  const price = sellPricePerMillionYuan(m.id);
+  return {
+    id: m.id,
+    name: m.name,
+    description: `${m.description ?? ""} · 入 ¥${price.input}/M · 出 ¥${price.output}/M`,
+  };
+});
 const ModelPicker: FC = () => {
+  // 受控于全局 model store：选择器改动 → 随下一条消息发给后端 → 决定计费单价
+  const modelId = useModelMode((s) => s.modelId);
+  const setModel = useModelMode((s) => s.setModel);
   return (
     <ModelSelector
       models={models}
+      value={modelId}
       defaultValue={DEFAULT_MODEL_ID}
+      onValueChange={setModel}
       variant="ghost"
       size="sm"
       className="h-7 rounded-full"
@@ -314,6 +336,7 @@ const Thread: FC = () => {
         >
           <ThreadScrollToBottom />
           <Composer />
+          <UsageMeter />
           <AuiIf condition={isNewChatView}>
             <div className="aui-thread-welcome-suggestions-shell min-h-19">
               <AuiIf condition={(s) => s.composer.isEmpty}>

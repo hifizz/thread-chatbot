@@ -9,7 +9,6 @@ import { frontendTools } from "@assistant-ui/react-ai-sdk"
 import type { ToolJSONSchema } from "assistant-stream"
 import { z } from "zod"
 import { resolveAttachmentParts } from "@/lib/chat/resolve-attachments"
-import { minimaxChatModel } from "@/lib/ai/minimax"
 import { researchTools } from "@/lib/chat/research-tools"
 import { isSearchConfigured } from "@/lib/ai/search"
 import {
@@ -17,6 +16,11 @@ import {
   RESEARCH_SYSTEM_PROMPT,
 } from "@/constants/research"
 import { buildThreadChatSystem } from "@/lib/chat/thread-chat-prompt"
+import { getCurrentUserId } from "@/lib/auth/server"
+import { getChatModel, resolveModelId } from "@/constants/model"
+import { resolveChatModel, isModelConfigured } from "@/lib/ai/provider"
+import { hasPositiveBalance, chargeUsage } from "@/lib/billing/credits"
+import { buildUsageMetadata } from "@/lib/billing/usage-meta"
 
 // 深度研究可能多步循环，耗时较长，放宽单次请求时长上限
 export const maxDuration = 120
@@ -68,18 +72,48 @@ const compareTable = tool({
 })
 
 export async function POST(req: Request) {
+  // 1) 鉴权：未登录直接拒绝
+  const userId = await getCurrentUserId()
+  if (!userId) {
+    return Response.json(
+      { error: "请先登录后再使用对话功能。" },
+      { status: 401 }
+    )
+  }
+
   const {
     messages,
     tools,
     deepResearch,
     threadChat,
+    modelId: rawModelId,
+    id: threadId,
   }: {
     messages: UIMessage[]
     tools?: Record<string, ToolJSONSchema>
     deepResearch?: boolean
     /** thread-chat 分支对话页的模式标记：system 由服务端按锚点原文构造 */
     threadChat?: { anchorText?: string | null }
+    modelId?: string
+    id?: string
   } = await req.json()
+
+  // 2) 解析并校验所选模型
+  const modelId = resolveModelId(rawModelId)
+  const model = getChatModel(modelId)!
+  if (!isModelConfigured(model)) {
+    return Response.json(
+      {
+        error: `模型「${model.name}」未配置，请联系管理员在服务端配置对应 API Key 或 CF AI 网关。`,
+      },
+      { status: 400 }
+    )
+  }
+
+  // 3) 计费拦截：余额不足不允许发起新对话
+  if (!(await hasPositiveBalance(userId))) {
+    return Response.json({ error: "额度不足，请充值后再试。" }, { status: 402 })
+  }
 
   // 研究模式：加入联网检索/深读工具、放宽步数、注入研究系统提示
   const research = deepResearch === true
@@ -106,7 +140,7 @@ export async function POST(req: Request) {
       : undefined
 
   const result = streamText({
-    model: minimaxChatModel(),
+    model: resolveChatModel(modelId),
     system,
     messages: await convertToModelMessages(resolvedMessages, {
       tools: allTools,
@@ -114,6 +148,16 @@ export async function POST(req: Request) {
     tools: allTools,
     // 研究模式允许更多工具轮次；普通对话维持原来的小步数
     stopWhen: isStepCount(research && searchReady ? RESEARCH_MAX_STEPS : 5),
+    // 4) 生成结束后按 token 用量扣费并写入流水（利润率 ≥30%，见 constants/pricing.ts）
+    onFinish: async ({ usage }) => {
+      await chargeUsage({
+        userId,
+        model: modelId,
+        inputTokens: usage.inputTokens ?? 0,
+        outputTokens: usage.outputTokens ?? 0,
+        threadId: threadId ?? null,
+      })
+    },
   })
 
   return result.toUIMessageStreamResponse({
@@ -122,5 +166,10 @@ export async function POST(req: Request) {
       console.error("[chat] 流内错误:", error)
       return "An error occurred."
     },
+    // 把本次用量与费用附到 assistant 消息 metadata，随消息持久化，供输入框下方 token 统计展示
+    messageMetadata: ({ part }) =>
+      part.type === "finish"
+        ? buildUsageMetadata(modelId, part.totalUsage)
+        : undefined,
   })
 }
