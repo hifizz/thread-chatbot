@@ -4,6 +4,12 @@ import {
   ComposerAttachments,
   UserMessageAttachments,
 } from "@/components/assistant-ui/attachment";
+import { ComposerPdfInsights } from "@/components/assistant-ui/pdf-insights";
+import { DeepResearchToggle } from "@/components/assistant-ui/deep-research-toggle";
+import {
+  ResearchProgress,
+  RESEARCH_TOOL_NAMES,
+} from "@/components/assistant-ui/research-panel";
 import { MarkdownText } from "@/components/assistant-ui/markdown-text";
 import { DotMatrix } from "@/components/assistant-ui/dot-matrix";
 import { MessageTiming } from "@/components/assistant-ui/message-timing";
@@ -571,6 +577,7 @@ const Composer: FC = () => {
           >
             <ComposerQuotePreview />
             <ComposerAttachments />
+            <ComposerPdfInsights />
             <LexicalComposerInput
               directiveChip={DirectiveChip}
               placeholder="Send a message... (@ to mention, / for commands)"
@@ -594,6 +601,7 @@ const ComposerAction: FC = () => {
     <div className="aui-composer-action-wrapper relative flex items-center justify-between">
       <div className="flex items-center gap-1">
         <ComposerAddAttachment />
+        <DeepResearchToggle />
         <ModelPicker />
       </div>
       <div className="flex items-center gap-1.5">
@@ -693,6 +701,38 @@ const AssistantWorkingIndicator: FC = () => {
     </span>
   );
 };
+// 工具组渲染：纯研究工具组不再单独展示（由 ResearchProgress 面板统一呈现），
+// 其余工具组沿用默认的可折叠分组。
+const ToolGroupBlock: FC<{
+  part: { indices: readonly number[]; status: { type: string } };
+  children: ReactNode;
+}> = ({ part, children }) => {
+  const allResearch = useAuiState((s) => {
+    const content = s.message.content as unknown as {
+      type: string;
+      toolName?: string;
+    }[];
+    return part.indices.every((i) => {
+      const p = content[i];
+      return (
+        p?.type === "tool-call" &&
+        !!p.toolName &&
+        RESEARCH_TOOL_NAMES.has(p.toolName)
+      );
+    });
+  });
+  if (allResearch) return null;
+  return (
+    <ToolGroupRoot variant="ghost">
+      <ToolGroupTrigger
+        count={part.indices.length}
+        active={part.status.type === "running"}
+      />
+      <ToolGroupContent>{children}</ToolGroupContent>
+    </ToolGroupRoot>
+  );
+};
+
 const AssistantMessage: FC = () => {
   // reserves space for action bar and compensates with `-mb` for consistent msg spacing
   // keeps hovered action bar from shifting layout (autohide doesn't support absolute positioning well)
@@ -709,6 +749,8 @@ const AssistantMessage: FC = () => {
         data-slot="aui_assistant-message-content"
         className="text-foreground px-2 leading-relaxed wrap-break-word"
       >
+        {/* grok 风格研究面板：把本条消息的联网检索/深读聚成一个可折叠时间线 */}
+        <ResearchProgress />
         <MessagePrimitive.GroupedParts
           groupBy={groupPartByType({
             reasoning: ["group-chainOfThought", "group-reasoning"],
@@ -721,15 +763,7 @@ const AssistantMessage: FC = () => {
               case "group-chainOfThought":
                 return <div data-slot="aui_chain-of-thought">{children}</div>;
               case "group-tool":
-                return (
-                  <ToolGroupRoot variant="ghost">
-                    <ToolGroupTrigger
-                      count={part.indices.length}
-                      active={part.status.type === "running"}
-                    />
-                    <ToolGroupContent>{children}</ToolGroupContent>
-                  </ToolGroupRoot>
-                );
+                return <ToolGroupBlock part={part}>{children}</ToolGroupBlock>;
               case "group-reasoning": {
                 const running = part.status.type === "running";
                 return (
@@ -746,6 +780,9 @@ const AssistantMessage: FC = () => {
               case "reasoning":
                 return <Reasoning {...part} />;
               case "tool-call":
+                // 研究工具（webSearch/readUrl）统一由 ResearchProgress 面板展示，
+                // 这里不再单独渲染，避免重复
+                if (RESEARCH_TOOL_NAMES.has(part.toolName)) return null;
                 return part.toolUI ?? <ToolFallback {...part} />;
               case "indicator":
                 return <AssistantWorkingIndicator />;

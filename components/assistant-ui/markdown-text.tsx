@@ -140,15 +140,39 @@ const defaultComponents = memoizeMarkdownComponents({
       {...props}
     />
   ),
-  a: ({ className, ...props }) => (
-    <a
-      className={cn(
-        "aui-md-a text-primary hover:text-primary/80 underline underline-offset-2",
-        className,
-      )}
-      {...props}
-    />
-  ),
+  a: ({ className, href, children, ...props }) => {
+    // 引用溯源：模型输出 /api/attachments/{id}#page=N 格式的链接，渲染成可点击的
+    // 页码徽标。用普通相对路径而非自定义协议——react-markdown 出于 XSS 防护会清空
+    // 非白名单协议（http/https/mailto 等）的 href，相对路径不受影响。
+    const citation = href?.match(/^\/api\/attachments\/[0-9a-f-]{36}(#page=\d+)?$/i);
+    if (citation) {
+      return (
+        <a
+          href={href}
+          target="_blank"
+          rel="noreferrer"
+          className="aui-md-citation bg-primary/10 text-primary hover:bg-primary/20 mx-0.5 inline-flex items-center rounded px-1.5 py-0.5 align-baseline text-xs font-medium no-underline"
+        >
+          {children}
+        </a>
+      );
+    }
+    // 外部链接（深度研究的引用来源等）在新标签打开
+    const isExternal = /^https?:\/\//i.test(href ?? "");
+    return (
+      <a
+        href={href}
+        {...(isExternal ? { target: "_blank", rel: "noreferrer" } : {})}
+        className={cn(
+          "aui-md-a text-primary hover:text-primary/80 underline underline-offset-2",
+          className,
+        )}
+        {...props}
+      >
+        {children}
+      </a>
+    );
+  },
   blockquote: ({ className, ...props }) => (
     <blockquote
       className={cn(
