@@ -141,14 +141,14 @@ const defaultComponents = memoizeMarkdownComponents({
     />
   ),
   a: ({ className, href, children, ...props }) => {
-    // 引用溯源：把模型输出的 attachment://{id}#page=N 改写为打开原 PDF 对应页的链接，
-    // 渲染成可点击的页码徽标。native PDF 查看器支持 #page=N 片段跳转。
-    const citation = href?.match(/^attachment:\/\/([0-9a-f-]{36})(#page=\d+)?$/i);
+    // 引用溯源：模型输出 /api/attachments/{id}#page=N 格式的链接，渲染成可点击的
+    // 页码徽标。用普通相对路径而非自定义协议——react-markdown 出于 XSS 防护会清空
+    // 非白名单协议（http/https/mailto 等）的 href，相对路径不受影响。
+    const citation = href?.match(/^\/api\/attachments\/[0-9a-f-]{36}(#page=\d+)?$/i);
     if (citation) {
-      const [, id, fragment = ""] = citation;
       return (
         <a
-          href={`/api/attachments/${id}${fragment}`}
+          href={href}
           target="_blank"
           rel="noreferrer"
           className="aui-md-citation bg-primary/10 text-primary hover:bg-primary/20 mx-0.5 inline-flex items-center rounded px-1.5 py-0.5 align-baseline text-xs font-medium no-underline"
@@ -157,9 +157,12 @@ const defaultComponents = memoizeMarkdownComponents({
         </a>
       );
     }
+    // 外部链接（深度研究的引用来源等）在新标签打开
+    const isExternal = /^https?:\/\//i.test(href ?? "");
     return (
       <a
         href={href}
+        {...(isExternal ? { target: "_blank", rel: "noreferrer" } : {})}
         className={cn(
           "aui-md-a text-primary hover:text-primary/80 underline underline-offset-2",
           className,

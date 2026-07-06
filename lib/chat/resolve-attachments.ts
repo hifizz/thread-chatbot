@@ -46,11 +46,15 @@ function placeholder(part: FilePart, note: string): TextPart {
   }
 }
 
-/** 引用要求：让模型引用文档内容时用可点击的 markdown 链接标注来源页码 */
+/**
+ * 引用要求：让模型引用文档内容时用可点击的 markdown 链接标注来源页码。
+ * 用普通的相对路径（而非自定义协议 attachment://）——react-markdown 出于 XSS
+ * 防护会清空非白名单协议（http/https/mailto 等）的 href，导致链接点击无效。
+ */
 function citeHint(attachmentId: string): string {
   return (
     `\n\n【引用要求】回答中凡是引用了本文档的内容，都要在句末用如下格式标注来源页码，` +
-    `方便用户核对原文：[第N页](attachment://${attachmentId}#page=N)（N 换成真实页码）。`
+    `方便用户核对原文：[第N页](/api/attachments/${attachmentId}#page=N)（N 换成真实页码）。`
   )
 }
 

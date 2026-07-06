@@ -15,7 +15,9 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
     headers: { "Content-Type": "application/json", ...init?.headers },
   })
   if (!res.ok) throw new Error(`${init?.method ?? "GET"} ${path} failed: ${res.status}`)
-  return res.json() as Promise<T>
+  // DELETE 返回 204 No Content（空 body），res.json() 对空 body 会抛 SyntaxError
+  const text = await res.text()
+  return (text ? JSON.parse(text) : undefined) as T
 }
 
 const toMetadata = (row: ThreadRow): RemoteThreadMetadata => ({
