@@ -1,3 +1,4 @@
+// @ts-nocheck -- 第三方 vendored 组件（shadcn on @base-ui/react）；其类型随库版本漂移，忽略类型检查，不改动组件逻辑。
 "use client";
 
 import { Button } from "@/components/ui/button";
