@@ -36,6 +36,13 @@
       "when": 1783372705423,
       "tag": "0004_fancy_amazoness",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1783423448788,
+      "tag": "0005_windy_blackheart",
+      "breakpoints": true
     }
   ]
 }

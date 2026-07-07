@@ -13,6 +13,7 @@ import { user } from "./auth-schema"
 // 认证与计费表在独立文件中定义，这里统一 re-export，使 drizzle 客户端与迁移能感知它们。
 export * from "./auth-schema"
 export * from "./billing-schema"
+export * from "./payment-schema"
 
 export const threads = pgTable("threads", {
   id: text("id").primaryKey(), // == RemoteThreadMetadata.remoteId; reused as-is from the client-generated local thread id

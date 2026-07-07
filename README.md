@@ -46,7 +46,23 @@ import { Button } from "@/components/ui/button";
 - 每轮对话结束后（`app/api/chat/route.ts` 的 `onFinish`）按 token 用量扣减余额并写入 `usage_records` 流水；本次用量与费用同时附到 assistant 消息 metadata。余额不足会在发起对话前拦截（HTTP 402）。
 - 输入框右下角实时显示「本次 token / 累计 token / 余额」，数据来自 `/api/billing/summary`。
 
-> 支付充值（Creem）为后续接入项：现阶段靠注册赠额跑通计费闭环，充值到位后把入账写进 `user_credits.balance_micros` 即可无缝衔接。
+### Creem 支付（充值 / 订阅）与账户页
+
+充值走 [Creem](https://creem.io)（Merchant of Record，托管支付页 + webhook）。用户在 `/account` 页选择充值包，支付成功后由 webhook 幂等到账。
+
+配置步骤：
+
+1. 在 Creem 后台为每个充值包创建「一次性产品」，把产品 id 填到 `.env.local` 的 `CREEM_PRODUCT_TOPUP_20/50/100`（价格需与 `constants/creem.ts` 里各包的展示价一致；到账额度 `creditMicros` 也在该文件配置）。
+2. 填 `CREEM_API_KEY`（测试期把 `CREEM_API_URL` 指向 `https://test-api.creem.io/v1`）。
+3. 在 Creem 后台 Developers → Webhook 配置回调地址 `https://你的域名/api/webhooks/creem`，把签名密钥填到 `CREEM_WEBHOOK_SECRET`。
+4. `pnpm db:migrate`（新增 `payments`、`subscriptions` 表）。
+
+流程与要点：
+
+- **发起充值**：`/account` 点充值包 → `POST /api/billing/checkout` 创建 Creem checkout（metadata 透传 `userId`/`packId`）→ 前端跳转 Creem 托管支付页。
+- **到账**：`POST /api/webhooks/creem` 先用 `creem-signature`（HMAC-SHA256 原始请求体）校验签名，再处理 `checkout.completed` → 按 `(provider, order_id)` **幂等**增加 `user_credits.balance_micros` 并写 `payments` 流水；`refund.created` 扣回额度；`subscription.*` 同步订阅状态到 `subscriptions`。
+- **账户页 `/account`**：余额、累计充值/消耗、充值包购买、订阅状态、充值记录与按 token 计费的消耗记录。侧栏底部账户区点击进入。
+- 说明：本项目直接对接 Creem REST（对 `user_credits` 微元额度体系控制更直接）；如需订阅态用户会话，也可改用 better-auth 的 Creem 插件。
 
 ## 附件上传与 ChatPDF
 

@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto"
 import { eq, sql } from "drizzle-orm"
 import { db } from "@/lib/db"
-import { userCredits, usageRecords } from "@/lib/db/schema"
+import { userCredits, usageRecords, payments } from "@/lib/db/schema"
 import {
   INITIAL_CREDIT_MICROS,
   costMicros,
@@ -83,4 +83,72 @@ export async function chargeUsage(input: UsageInput): Promise<ChargeResult> {
     priceMicros: price,
     balanceMicros: row?.balance ?? 0,
   }
+}
+
+/** 给用户增加额度（充值到账）。确保额度行存在后原子累加，返回新余额。 */
+export async function addCreditsMicros(
+  userId: string,
+  micros: number
+): Promise<number> {
+  if (micros <= 0) return getBalanceMicros(userId)
+  await ensureUserCredits(userId)
+  const [row] = await db
+    .update(userCredits)
+    .set({
+      balanceMicros: sql`${userCredits.balanceMicros} + ${micros}`,
+      updatedAt: new Date(),
+    })
+    .where(eq(userCredits.userId, userId))
+    .returning({ balance: userCredits.balanceMicros })
+  return row?.balance ?? 0
+}
+
+export type CreemTopupInput = {
+  userId: string
+  orderId: string
+  checkoutId?: string | null
+  productId?: string | null
+  packId?: string | null
+  creditMicros: number
+  priceLabel?: string | null
+  raw?: unknown
+}
+
+/**
+ * 记录一笔 Creem 充值并到账，按 (provider, orderId) 幂等：
+ * webhook 重放/重复投递时只会到账一次。返回是否本次到账及最新余额。
+ */
+export async function recordCreemTopup(
+  input: CreemTopupInput
+): Promise<{ granted: boolean; balanceMicros: number }> {
+  // 幂等插入：同一订单已存在则不返回行 → 说明此前已处理，直接跳过到账
+  const [inserted] = await db
+    .insert(payments)
+    .values({
+      id: randomUUID(),
+      userId: input.userId,
+      provider: "creem",
+      type: "topup",
+      packId: input.packId ?? null,
+      productId: input.productId ?? null,
+      checkoutId: input.checkoutId ?? null,
+      orderId: input.orderId,
+      status: "paid",
+      creditMicros: input.creditMicros,
+      priceLabel: input.priceLabel ?? null,
+      paidAt: new Date(),
+      raw: input.raw ?? null,
+    })
+    .onConflictDoNothing({ target: [payments.provider, payments.orderId] })
+    .returning({ id: payments.id })
+
+  if (!inserted) {
+    return {
+      granted: false,
+      balanceMicros: await getBalanceMicros(input.userId),
+    }
+  }
+
+  const balanceMicros = await addCreditsMicros(input.userId, input.creditMicros)
+  return { granted: true, balanceMicros }
 }
