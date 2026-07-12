@@ -14,7 +14,8 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
     ...init,
     headers: { "Content-Type": "application/json", ...init?.headers },
   })
-  if (!res.ok) throw new Error(`${init?.method ?? "GET"} ${path} failed: ${res.status}`)
+  if (!res.ok)
+    throw new Error(`${init?.method ?? "GET"} ${path} failed: ${res.status}`)
   // DELETE 返回 204 No Content（空 body），res.json() 对空 body 会抛 SyntaxError
   const text = await res.text()
   return (text ? JSON.parse(text) : undefined) as T
@@ -79,8 +80,9 @@ export const postgresThreadListAdapter: RemoteThreadListAdapter = {
       .find((m) => m.role === "user")
       ?.content.find((part) => part.type === "text")
 
-    const title = ((firstUserText as { text?: string } | undefined)?.text ?? "New Chat")
-      .slice(0, 60)
+    const title = (
+      (firstUserText as { text?: string } | undefined)?.text ?? "New Chat"
+    ).slice(0, 60)
 
     await api(`/api/threads/${remoteId}`, {
       method: "PATCH",

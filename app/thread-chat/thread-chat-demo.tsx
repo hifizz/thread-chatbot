@@ -89,7 +89,7 @@ export function ThreadChatDemo() {
   useThreadStore(store)
   const state = store.getState()
 
-  /* ---------- 聊天控制器：发送 / 分支首答 / 重试 / 中止（阶段一为本地模拟流式） ---------- */
+  /* ---------- 聊天控制器：发送 / 分支首答 / 重试 / 停止（真实 /api/chat SSE 流式） ---------- */
   const [chat] = useState(() => createChatController(store))
   useEffect(() => () => chat.abortAll(), [chat])
 
@@ -170,6 +170,9 @@ export function ThreadChatDemo() {
       sourceThreadId: s.threadId,
       sourceMsgId: s.msgId,
       anchorText: s.text,
+      // 划选处前后的源文本上下文：锚点在重复文字中的精确定位依据（采集失败时为 undefined）
+      prefix: s.prefix,
+      suffix: s.suffix,
     })
     if (!r) return
     const eff = cols.openThread(r.threadId, s.threadId, hint)
@@ -424,6 +427,7 @@ export function ThreadChatDemo() {
               onCollapse={() => cols.closeColumn(vpIndex)}
               busy={isThreadBusy(threadId)}
               onRetry={(msg: Message) => chat.retry(threadId, msg.id)}
+              onStop={() => chat.abort(threadId)}
               onSend={(text) => chat.send(threadId, text)}
             />
           )}

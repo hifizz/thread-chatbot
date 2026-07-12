@@ -1,1 +1,1 @@
-export const DEFAULT_MODEL_ID = "minimax-m2";
+export const DEFAULT_MODEL_ID = "minimax-m2"

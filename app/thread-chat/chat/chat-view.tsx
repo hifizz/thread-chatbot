@@ -49,10 +49,12 @@ export interface ChatViewProps {
   renderAssistantBody?: (msg: Message) => React.ReactNode
   /** 注入 assistant 消息气泡之后的附加内容（artifact 卡片） */
   renderAfterMessage?: (msg: Message) => React.ReactNode
-  /** 流式生成中：composer 发送键禁用（textarea 仍可输入） */
+  /** 流式生成中：发送键变「停止」（textarea 仍可输入，Enter 提交被拦） */
   busy?: boolean
   /** 错误消息下的「重试」按钮回调 */
   onRetry?: (msg: Message) => void
+  /** busy 时点「停止」的回调（中止本会话在飞的流式请求） */
+  onStop?: () => void
   onSend: (text: string) => void
 }
 
@@ -67,6 +69,7 @@ export function ChatView({
   renderAfterMessage,
   busy = false,
   onRetry,
+  onStop,
   onSend,
 }: ChatViewProps) {
   const listRef = useRef<HTMLDivElement | null>(null)
@@ -178,9 +181,19 @@ export function ChatView({
                 }
               }}
             />
-            <button className="send" onClick={doSend} disabled={busy}>
-              发送
-            </button>
+            {busy ? (
+              <button
+                className="send stop"
+                title="停止生成（已收到的内容会保留）"
+                onClick={onStop}
+              >
+                停止
+              </button>
+            ) : (
+              <button className="send" onClick={doSend}>
+                发送
+              </button>
+            )}
           </div>
         </div>
       </div>

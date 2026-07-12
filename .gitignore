@@ -36,3 +36,6 @@ pnpm-debug.log*
 *.tsbuildinfo
 next-env.d.ts
 .gstack/
+
+# thread-chat e2e 验收脚本的截图输出
+e2e/thread-chat/shots/

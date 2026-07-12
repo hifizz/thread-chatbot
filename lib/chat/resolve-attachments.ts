@@ -71,7 +71,7 @@ function renderPdfFull(row: AttachmentRow, charBudget: number): TextPart {
     chunks.push(
       used + pageText.length > charBudget
         ? pageText.slice(0, charBudget - used)
-        : pageText,
+        : pageText
     )
     used += pageText.length
     includedPages++
@@ -91,9 +91,11 @@ function renderPdfFull(row: AttachmentRow, charBudget: number): TextPart {
 /** RAG 注入：只放检索到的相关片段（带页码），大幅压缩超大文档的上下文占用 */
 function renderPdfRetrieved(
   row: AttachmentRow,
-  excerpts: { page: number; content: string }[],
+  excerpts: { page: number; content: string }[]
 ): TextPart {
-  const body = excerpts.map((e) => `[第 ${e.page} 页]\n${e.content}`).join("\n\n")
+  const body = excerpts
+    .map((e) => `[第 ${e.page} 页]\n${e.content}`)
+    .join("\n\n")
   return {
     type: "text",
     text:
@@ -117,7 +119,7 @@ function latestUserQuery(messages: UIMessage[]): string {
 }
 
 export async function resolveAttachmentParts(
-  messages: UIMessage[],
+  messages: UIMessage[]
 ): Promise<UIMessage[]> {
   // 1) 收集本次请求引用的全部附件 id，一次批量查库
   const ids = new Set<string>()
@@ -130,7 +132,10 @@ export async function resolveAttachmentParts(
     }
   }
   const rows = ids.size
-    ? await db.select().from(attachments).where(inArray(attachments.id, [...ids]))
+    ? await db
+        .select()
+        .from(attachments)
+        .where(inArray(attachments.id, [...ids]))
     : []
   const rowById = new Map(rows.map((row) => [row.id, row]))
 
@@ -139,7 +144,7 @@ export async function resolveAttachmentParts(
     (row) =>
       row.mimeType === "application/pdf" &&
       row.status === "ready" &&
-      row.pages?.length,
+      row.pages?.length
   ).length
   const perPdfBudget = readyPdfCount
     ? Math.floor(ATTACHMENT_CONTEXT_CHAR_BUDGET / readyPdfCount)
@@ -147,7 +152,9 @@ export async function resolveAttachmentParts(
   const query = latestUserQuery(messages)
 
   // 3) 逐 part 转换（含可能的向量检索，故为异步）
-  const resolveFilePart = async (part: FilePart): Promise<FilePart | TextPart> => {
+  const resolveFilePart = async (
+    part: FilePart
+  ): Promise<FilePart | TextPart> => {
     const id = attachmentIdFromUrl(part.url)
     const row = id ? rowById.get(id) : undefined
 
@@ -183,9 +190,9 @@ export async function resolveAttachmentParts(
       ...message,
       parts: await Promise.all(
         message.parts.map((part) =>
-          isFilePart(part) ? resolveFilePart(part) : Promise.resolve(part),
-        ),
+          isFilePart(part) ? resolveFilePart(part) : Promise.resolve(part)
+        )
       ),
-    })),
+    }))
   ) as Promise<UIMessage[]>
 }
