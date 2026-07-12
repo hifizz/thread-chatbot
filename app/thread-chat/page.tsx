@@ -1,12 +1,9 @@
-import type { Metadata } from "next"
-import { ThreadChatDemo } from "./thread-chat-demo"
+import { TreeRedirect } from "./tree-redirect"
+import { threadChatMetadata } from "./page-metadata"
 
-export const metadata: Metadata = {
-  title: "Thread Chat · 分支对话",
-  description:
-    "划选 AI 回复文字即可开分支的树状对话，接入 MiniMax 实时流式回复。",
-}
+export const metadata = threadChatMetadata
 
+/** 裸路径入口跳板：replace 到「最近一棵」或新生成的 /thread-chat/{treeId} */
 export default function ThreadChatPage() {
-  return <ThreadChatDemo />
+  return <TreeRedirect />
 }
