@@ -1,4 +1,4 @@
-"use client";
+"use client"
 /**
  * orchestration/thread-canvas —— 画布视图层（与 thread-columns 平级的第二个编排层）。
  *
@@ -11,7 +11,7 @@
  * 模式时才落地（首屏与列模式不背这份体积；RF 也依赖 DOM，天然需要跳过 SSR）。
  */
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react"
 import {
   Background,
   BackgroundVariant,
@@ -23,58 +23,64 @@ import {
   useReactFlow,
   type FitViewOptions,
   type NodeMouseHandler,
-} from "@xyflow/react";
-import "@xyflow/react/dist/style.css";
-import { RotateCcw } from "lucide-react";
-import type { ThreadStore } from "../core/store";
-import { useThreadStore } from "../core/use-thread-store";
-import { dc } from "../theme";
-import { CanvasCard, type CanvasCardNode } from "./canvas-node";
-import { useCanvasLayout, type CanvasViewState } from "./use-canvas-layout";
+} from "@xyflow/react"
+import "@xyflow/react/dist/style.css"
+import { RotateCcw } from "lucide-react"
+import type { ThreadStore } from "../core/store"
+import { useThreadStore } from "../core/use-thread-store"
+import { dc } from "../theme"
+import { CanvasCard, type CanvasCardNode } from "./canvas-node"
+import { useCanvasLayout, type CanvasViewState } from "./use-canvas-layout"
 
 /** nodeTypes 稳定引用：模块级定义，避免 React Flow 整树重挂（skill 契约 #4） */
-const nodeTypes = { threadCard: CanvasCard };
+const nodeTypes = { threadCard: CanvasCard }
 
-const fitViewOptions: FitViewOptions = { padding: 0.18, maxZoom: 1 };
+const fitViewOptions: FitViewOptions = { padding: 0.18, maxZoom: 1 }
 
 /** MiniMap 节点深度色走 .fc-N 类 + CSS fill（SVG 的 fill 属性不解析 var()，只能经 CSS） */
 const minimapNodeClass = (n: CanvasCardNode) =>
-  n.data.depth > 0 ? `fc-${dc(n.data.depth)}` : "";
+  n.data.depth > 0 ? `fc-${dc(n.data.depth)}` : ""
 
 export interface ThreadCanvasProps {
-  store: ThreadStore;
+  store: ThreadStore
   /** 主线卡的主题副标题（与列模式主线副标题同源） */
-  mainSubtitle?: string;
+  mainSubtitle?: string
   /** 画布视图状态宿主（pin 表跨「列 ⇄ 画布」切换存活），壳层持有的稳定对象 */
-  viewState: CanvasViewState;
+  viewState: CanvasViewState
   /** 统一意图：双击节点 = 回列模式打开该会话（壳层 openBranchUI） */
-  onOpenThread: (threadId: string) => void;
+  onOpenThread: (threadId: string) => void
 }
 
-function CanvasFlow({ store, mainSubtitle, viewState, onOpenThread }: ThreadCanvasProps) {
-  const version = useThreadStore(store);
-  const { nodes, edges, onNodesChange, resetLayout, pinCount } = useCanvasLayout({
-    store,
-    version,
-    mainSubtitle,
-    viewState,
-  });
-  const { fitView } = useReactFlow();
+function CanvasFlow({
+  store,
+  mainSubtitle,
+  viewState,
+  onOpenThread,
+}: ThreadCanvasProps) {
+  const version = useThreadStore(store)
+  const { nodes, edges, onNodesChange, resetLayout, pinCount } =
+    useCanvasLayout({
+      store,
+      version,
+      mainSubtitle,
+      viewState,
+    })
+  const { fitView } = useReactFlow()
 
   /* 重新排列：清 pin → 全量 dagre 重排；坐标 commit 之后再 fitView 动画跟上 */
-  const [relayoutN, setRelayoutN] = useState(0);
+  const [relayoutN, setRelayoutN] = useState(0)
   const onRelayout = () => {
-    resetLayout();
-    setRelayoutN((n) => n + 1);
-  };
+    resetLayout()
+    setRelayoutN((n) => n + 1)
+  }
   useEffect(() => {
-    if (relayoutN > 0) void fitView({ ...fitViewOptions, duration: 320 });
-  }, [relayoutN, fitView]);
+    if (relayoutN > 0) void fitView({ ...fitViewOptions, duration: 320 })
+  }, [relayoutN, fitView])
 
   const onNodeDoubleClick = useCallback<NodeMouseHandler<CanvasCardNode>>(
     (_, node) => onOpenThread(node.id),
-    [onOpenThread],
-  );
+    [onOpenThread]
+  )
 
   return (
     /* React Flow 父容器必须有确定宽高：flex:1 + min-height:0 + width:100%（skill 契约 #3） */
@@ -107,14 +113,19 @@ function CanvasFlow({ store, mainSubtitle, viewState, onOpenThread }: ThreadCanv
             title="清除手动固定的节点位置，重新自动布局并适配视口"
             onClick={onRelayout}
           >
-            <RotateCcw size={11} style={{ verticalAlign: "-1px", marginRight: 4 }} />
+            <RotateCcw
+              size={11}
+              style={{ verticalAlign: "-1px", marginRight: 4 }}
+            />
             重新排列{pinCount > 0 ? ` · 已固定 ${pinCount}` : ""}
           </button>
-          <span className="canvas-tip">拖动节点可固定位置 · 双击节点回到列模式打开</span>
+          <span className="canvas-tip">
+            拖动节点可固定位置 · 双击节点回到列模式打开
+          </span>
         </Panel>
       </ReactFlow>
     </div>
-  );
+  )
 }
 
 export function ThreadCanvas(props: ThreadCanvasProps) {
@@ -122,5 +133,5 @@ export function ThreadCanvas(props: ThreadCanvasProps) {
     <ReactFlowProvider>
       <CanvasFlow {...props} />
     </ReactFlowProvider>
-  );
+  )
 }
