@@ -1,21 +1,21 @@
-"use client";
+"use client"
 
-import { memo, useState, type ComponentProps } from "react";
-import { FileTextIcon } from "lucide-react";
-import type { SourceMessagePartComponent } from "@assistant-ui/react";
-import { cn } from "@/lib/utils";
-import { Badge, badgeVariants, type BadgeProps } from "./badge";
+import { memo, useState, type ComponentProps } from "react"
+import { FileTextIcon } from "lucide-react"
+import type { SourceMessagePartComponent } from "@assistant-ui/react"
+import { cn } from "@/lib/utils"
+import { Badge, badgeVariants, type BadgeProps } from "./badge"
 
 const extractDomain = (url: string): string => {
   try {
-    return new URL(url).hostname.replace(/^www\./, "");
+    return new URL(url).hostname.replace(/^www\./, "")
   } catch {
-    return url;
+    return url
   }
-};
+}
 
 const defaultFaviconUrl = (domain: string) =>
-  `https://icons.duckduckgo.com/ip3/${domain}.ico`;
+  `https://icons.duckduckgo.com/ip3/${domain}.ico`
 
 function SourceIcon({
   url,
@@ -23,27 +23,27 @@ function SourceIcon({
   faviconUrl = defaultFaviconUrl,
   ...props
 }: ComponentProps<"span"> & {
-  url: string;
-  faviconUrl?: (domain: string) => string;
+  url: string
+  faviconUrl?: (domain: string) => string
 }) {
-  const domain = extractDomain(url);
-  const src = faviconUrl(domain);
-  const [errorSrc, setErrorSrc] = useState<string | undefined>(undefined);
-  const hasError = errorSrc === src;
+  const domain = extractDomain(url)
+  const src = faviconUrl(domain)
+  const [errorSrc, setErrorSrc] = useState<string | undefined>(undefined)
+  const hasError = errorSrc === src
 
   if (hasError) {
     return (
       <span
         data-slot="source-icon-fallback"
         className={cn(
-          "bg-muted flex size-3 shrink-0 items-center justify-center rounded-sm text-[10px] font-medium",
-          className,
+          "flex size-3 shrink-0 items-center justify-center rounded-sm bg-muted text-[10px] font-medium",
+          className
         )}
         {...props}
       >
         {domain.charAt(0).toUpperCase() || "?"}
       </span>
-    );
+    )
   }
 
   return (
@@ -55,7 +55,7 @@ function SourceIcon({
       onError={() => setErrorSrc(src)}
       {...(props as ComponentProps<"img">)}
     />
-  );
+  )
 }
 
 function SourceTitle({ className, ...props }: ComponentProps<"span">) {
@@ -65,7 +65,7 @@ function SourceTitle({ className, ...props }: ComponentProps<"span">) {
       className={cn("max-w-37.5 truncate", className)}
       {...props}
     />
-  );
+  )
 }
 
 function DocumentSourceIcon({ className, ...props }: ComponentProps<"span">) {
@@ -73,20 +73,20 @@ function DocumentSourceIcon({ className, ...props }: ComponentProps<"span">) {
     <span
       data-slot="source-document-icon"
       className={cn(
-        "text-muted-foreground flex size-3 shrink-0 items-center justify-center",
-        className,
+        "flex size-3 shrink-0 items-center justify-center text-muted-foreground",
+        className
       )}
       {...props}
     >
       <FileTextIcon className="size-3" />
     </span>
-  );
+  )
 }
 
 export type SourceProps = Omit<BadgeProps, "asChild"> &
   ComponentProps<"a"> & {
-    asChild?: boolean;
-  };
+    asChild?: boolean
+  }
 
 function Source({
   className,
@@ -98,53 +98,66 @@ function Source({
   ...props
 }: SourceProps) {
   return (
-    <Badge variant={variant} size={size} className={cn(
-              "focus-visible:border-ring focus-visible:ring-ring/50 cursor-pointer outline-none focus-visible:ring-[3px]",
-              className,
-            )} render={<a data-slot="source" target={target} rel={rel} {...(props as ComponentProps<"a">)} />}></Badge>
-  );
+    // 本地 badge 是 Radix Slot 风格：把 Badge 渲染为 <a> 用 asChild（不支持 render prop）
+    <Badge
+      variant={variant}
+      size={size}
+      asChild
+      className={cn(
+        "cursor-pointer outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50",
+        className
+      )}
+    >
+      <a
+        data-slot="source"
+        target={target}
+        rel={rel}
+        {...(props as ComponentProps<"a">)}
+      />
+    </Badge>
+  )
 }
 
 const SourcesImpl: SourceMessagePartComponent = (part) => {
   if (part.sourceType === "url" && part.url) {
-    const domain = extractDomain(part.url);
-    const displayTitle = part.title || domain;
+    const domain = extractDomain(part.url)
+    const displayTitle = part.title || domain
 
     return (
       <Source href={part.url}>
         <SourceIcon url={part.url} />
         <SourceTitle>{displayTitle}</SourceTitle>
       </Source>
-    );
+    )
   }
 
   if (part.sourceType === "document") {
     return (
       <Badge
         variant="secondary"
-        className="focus-visible:border-ring focus-visible:ring-ring/50 outline-none focus-visible:ring-[3px]"
+        className="outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
       >
         <span data-slot="source" className="inline-flex items-center gap-1.5">
           <DocumentSourceIcon />
           <SourceTitle>{part.title}</SourceTitle>
         </span>
       </Badge>
-    );
+    )
   }
 
-  return null;
-};
+  return null
+}
 
 const Sources = memo(SourcesImpl) as unknown as SourceMessagePartComponent & {
-  Root: typeof Source;
-  Icon: typeof SourceIcon;
-  Title: typeof SourceTitle;
-};
+  Root: typeof Source
+  Icon: typeof SourceIcon
+  Title: typeof SourceTitle
+}
 
-Sources.displayName = "Sources";
-Sources.Root = Source;
-Sources.Icon = SourceIcon;
-Sources.Title = SourceTitle;
+Sources.displayName = "Sources"
+Sources.Root = Source
+Sources.Icon = SourceIcon
+Sources.Title = SourceTitle
 
 export {
   Sources,
@@ -152,4 +165,4 @@ export {
   SourceIcon,
   SourceTitle,
   badgeVariants as sourceVariants,
-};
+}
