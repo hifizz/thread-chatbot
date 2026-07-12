@@ -68,6 +68,8 @@ Three tools are wired end-to-end as a reference for adding more:
 
 Each tool's custom UI is registered with the `useAssistantTool({ toolName, type, render, ... })` hook from `@assistant-ui/react`, in `components/assistant-ui/{weather,notepad,compare-table}-tool.tsx`. These are null-returning components mounted via `<AssistantTools />` (`components/assistant-ui/tools.tsx`) inside `AssistantRuntimeProvider` in `app/page.tsx`. `useAssistantTool` is marked `@deprecated` in favor of `defineToolkit`/`Tools({ toolkit })` + `useAui({ tools })`, but that path assumes assistant-ui's "use generative" compiler, which isn't set up in this project — keep using `useAssistantTool` for new tools unless that changes.
 
+`/api/chat` also has a **threadChat mode** for the branch-chat page (`app/thread-chat/`): the client sends `threadChat: { anchorText }` in the body (AI SDK v7's `streamText` rejects system-role messages from the client, so system prompts are server-owned), and the route builds a plain-text system prompt via `buildThreadChatSystem()` (`lib/chat/thread-chat-prompt.ts`, templates in `constants/thread-chat.ts`). In this mode the backend tools (`getWeather`/`compareTable`) are **not** attached. Additionally, `toUIMessageStreamResponse({ onError })` logs in-stream errors server-side (`[chat] 流内错误:`) for all modes while still masking them to the client.
+
 ## Database & thread persistence
 
 Drizzle ORM + Postgres backs chat history so threads survive page reloads (previously in-memory only, lost on refresh).
