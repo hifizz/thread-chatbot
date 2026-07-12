@@ -81,6 +81,12 @@ await page.waitForFunction(
   undefined,
   { timeout: 120000 }
 )
+// 平滑打字（useSmoothText）与「busy 解除」判据存在一帧级竞态：assistant.status 转为完成态、
+// display 尚未从追赶态 snap 到完整 target 的那一帧里，「发送键回到『发送』」就已经为真——
+// snap 发生在下一个 passive effect + 重渲染里，通常 <1 帧但不为 0。直接断言裸 Markdown 记号
+// 会偶发命中这个半途文本（截断处若正落在 "**" 中间会误判成"未渲染"）。这里加一小段静置，
+// 等 snap 的重渲染落地，不是掩盖真实回归——最终必然收敛到与 msg.text 完全一致的完整正文。
+await page.waitForTimeout(150)
 const mainReply = await page
   .locator(".column")
   .first()
