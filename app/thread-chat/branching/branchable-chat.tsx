@@ -43,6 +43,8 @@ export interface BranchableChatProps {
   onRetry?: (msg: Message) => void
   /** busy 时发送键变「停止」的回调，透传给 ChatView */
   onStop?: () => void
+  /** composer 预填文案（新开分支的代拟首问，待用户回车确认），透传给 ChatView */
+  composerPrefill?: string
   onSend: (text: string) => void
 }
 
@@ -60,6 +62,7 @@ export function BranchableChat({
   busy,
   onRetry,
   onStop,
+  composerPrefill,
   onSend,
 }: BranchableChatProps) {
   const thread = state.threads[threadId]
@@ -267,6 +270,7 @@ export function BranchableChat({
       busy={busy}
       onRetry={onRetry}
       onStop={onStop}
+      composerPrefill={composerPrefill}
       onSend={onSend}
     />
   )

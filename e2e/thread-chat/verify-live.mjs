@@ -8,9 +8,11 @@
  * 运行：
  *   CHROMIUM_PATH=/opt/pw-browsers/chromium node e2e/thread-chat/verify-live.mjs
  *
- * 断言覆盖：页面加载 → 主线真实流式回复 → 划选开分支（气泡）→ 分支流式首答 →
- * 分支请求 payload 契约（继承上文 / kickoff / threadChat.anchorText / 无 system 角色 /
- * 无指令前缀折叠 / 无空 assistant）→ 主线锚点脚注出现 → 分支内追问二轮流式。
+ * 断言覆盖：页面加载 → 主线真实流式回复 → 划选开分支（气泡）→ 分支列打开但
+ * 不自动发请求（composer 预填代拟问题 / 消息区为空 / 2 秒内无新 /api/chat POST）→
+ * 回车确认后 kickoff 成为真实 user 气泡 + assistant 流式首答 → payload 契约
+ * （继承上文 / kickoff 以真实 user 消息在 messages 里 / threadChat.anchorText /
+ * 无 system 角色 / 无指令前缀折叠 / 无空 assistant）→ 主线锚点脚注 → 分支内追问二轮流式。
  * 走真实模型，回复内容非确定，断言只卡结构与契约。截图输出到同目录 shots/（已 gitignore）。
  */
 import { mkdirSync } from "node:fs"
@@ -118,9 +120,10 @@ ok("成功划选「贝尔不等式」", selected)
 await page.waitForSelector(".tc .sel-bubble", { timeout: 5000 })
 ok("划选气泡浮出", true)
 await page.screenshot({ path: SHOT("2-selection-bubble") })
+const postsBeforeFork = payloads.length
 await page.getByText("开启分支讨论").click()
 
-// ---- 分支列出现并等流式首答完成 ----
+// ---- 分支列出现：不自动发请求，composer 预填代拟问题等用户确认 ----
 await page.waitForFunction(
   () => document.querySelectorAll(".column").length >= 2,
   undefined,
@@ -129,6 +132,37 @@ await page.waitForFunction(
   }
 )
 ok("分支列已打开", true)
+
+const kickoffExpected =
+  `请围绕我划选的这段话展开讲解：「${anchor}」。` +
+  "先解释它本身的含义，再讲清楚它为什么重要或常见误区/延伸，控制在三段以内。"
+const branchCol = page.locator(".column").last()
+const prefillValue = await branchCol.locator("textarea").inputValue()
+ok("分支 composer 预填代拟问题（含锚点原文）", prefillValue === kickoffExpected)
+ok(
+  "分支消息区为空（未自动生成首答）",
+  (await branchCol.locator(".message").count()) === 0
+)
+await page.waitForTimeout(2000)
+ok(
+  "开分支后 2 秒内无新的 /api/chat POST（不再自动发请求）",
+  payloads.length === postsBeforeFork
+)
+await page.screenshot({ path: SHOT("3-branch-prefilled") })
+
+// ---- 回车确认：kickoff 成为真实 user 消息，assistant 流式首答 ----
+await branchCol.locator("textarea").press("Enter")
+await page.waitForFunction(
+  (expected) => {
+    const cols = document.querySelectorAll(".column")
+    const col = cols[cols.length - 1]
+    const userBubble = col?.querySelector(".message.user .bubble")
+    return userBubble && userBubble.textContent.trim() === expected
+  },
+  kickoffExpected,
+  { timeout: 10000 }
+)
+ok("回车后代拟问题成为真实 user 气泡", true)
 await page.waitForFunction(
   () => {
     const cols = document.querySelectorAll(".column")
@@ -161,7 +195,7 @@ const fnCount = await page
   .locator(".message.assistant sup.fnote")
   .count()
 ok(`主线出现锚点脚注标记（当前 ${fnCount} 个）`, fnCount >= 1)
-await page.screenshot({ path: SHOT("3-branch-streamed") })
+await page.screenshot({ path: SHOT("4-branch-streamed") })
 
 // ---- 3. 校验分支请求 payload 契约 ----
 const branchPayload = payloads[payloads.length - 1]
@@ -172,8 +206,8 @@ ok(
   texts.some((t) => t.includes("量子纠缠"))
 )
 ok(
-  "分支请求含 kickoff 代拟首问（围绕划选文字）",
-  texts.some((t) => t.includes("请围绕我划选的这段话展开讲解"))
+  "kickoff 以真实 user 消息形式在 messages 里（用户确认后入 store）",
+  msgs.some((m) => m.role === "user" && m.parts?.[0]?.text === kickoffExpected)
 )
 ok(
   "分支请求带 threadChat.anchorText（system 归服务端构造）",
@@ -215,7 +249,7 @@ await page.waitForFunction(
   { timeout: 120000 }
 )
 ok("分支内追问收到第二条流式回复", true)
-await page.screenshot({ path: SHOT("4-branch-followup") })
+await page.screenshot({ path: SHOT("5-branch-followup") })
 
 console.log("\n--- 主线回复节选 ---\n" + mainReply.slice(0, 160))
 console.log("\n--- 分支首答节选 ---\n" + branchReply.slice(0, 160))

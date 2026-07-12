@@ -33,6 +33,7 @@ import { useThreadStore } from "./core/use-thread-store"
 import { threadTitle, type TreeRow } from "./core/selectors"
 import type { Message } from "./core/types"
 import { createChatController } from "./net/chat-controller"
+import { kickoffQuestion } from "./net/prompt"
 import { BranchableChat } from "./branching/branchable-chat"
 import {
   SelectionBubble,
@@ -164,7 +165,8 @@ export function ThreadChatDemo() {
     }
   }
 
-  /* ---------- 开分支：store.fork + 放置，随后触发分支首答的流式生成（hint 来自气泡：⌘ / 列条点选） ---------- */
+  /* ---------- 开分支：store.fork + 放置（hint 来自气泡：⌘ / 列条点选）。
+       不自动发请求：新分支 composer 预填代拟问题，用户改写或回车确认后才走 chat.send ---------- */
   function handleFork(s: SelectionInfo, hint?: PlacementHint) {
     const r = store.fork({
       sourceThreadId: s.threadId,
@@ -191,7 +193,6 @@ export function ThreadChatDemo() {
     } else {
       showToast(`已开启分支 · ${r.title}`)
     }
-    chat.startBranch(r.threadId)
   }
 
   /* ---------- 列满策略切换（fold → replace 时展开全部细条并裁掉超限列） ---------- */
@@ -264,13 +265,22 @@ export function ThreadChatDemo() {
     )
   }
 
+  /** 分支 composer 的预填文案：仅「还没有任何消息的分支」预填代拟首问，待用户回车确认 */
+  function composerPrefillFor(threadId: string): string | undefined {
+    const t = state.threads[threadId]
+    return t?.anchorText && t.messages.length === 0
+      ? kickoffQuestion(t.anchorText)
+      : undefined
+  }
+
   /* ---------- 主线 hint 卡片 ---------- */
   const hintNode = hintOn ? (
     <div className="hint">
       <Highlighter size={15} color="#b07d2e" />
       <div>
-        <b>划选 AI 回复里的文字</b>即可开分支，列数随屏宽自适应（2–4
-        列）。列满后继续深入默认
+        <b>划选 AI 回复里的文字</b>即可开分支——新分支的输入框会
+        <b>预填一条围绕划选内容的问题</b>
+        ，可改写后回车确认提问。列数随屏宽自适应（2–4 列）。列满后继续深入默认
         <b>替换来源列</b>（提示条可撤销），顶栏切到<b>细条⑤</b>
         则改为把最久未用的列折成竖直细条。 按住 <span className="kbd">⌘</span>
         /Ctrl 划选开分支或点脚注 = <b>保留本列</b>
@@ -426,6 +436,7 @@ export function ThreadChatDemo() {
               onOpenSubtree={(btn) => openSubtree(threadId, btn)}
               onCollapse={() => cols.closeColumn(vpIndex)}
               busy={isThreadBusy(threadId)}
+              composerPrefill={composerPrefillFor(threadId)}
               onRetry={(msg: Message) => chat.retry(threadId, msg.id)}
               onStop={() => chat.abort(threadId)}
               onSend={(text) => chat.send(threadId, text)}

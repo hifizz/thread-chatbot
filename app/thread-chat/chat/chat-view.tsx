@@ -55,6 +55,8 @@ export interface ChatViewProps {
   onRetry?: (msg: Message) => void
   /** busy 时点「停止」的回调（中止本会话在飞的流式请求） */
   onStop?: () => void
+  /** composer 预填文案（新开分支的代拟首问）：仅在输入框为空时写入，待用户改写或回车确认 */
+  composerPrefill?: string
   onSend: (text: string) => void
 }
 
@@ -70,6 +72,7 @@ export function ChatView({
   busy = false,
   onRetry,
   onStop,
+  composerPrefill,
   onSend,
 }: ChatViewProps) {
   const listRef = useRef<HTMLDivElement | null>(null)
@@ -106,6 +109,18 @@ export function ChatView({
     stickBottomRef.current =
       el.scrollTop + el.clientHeight >= el.scrollHeight - STICK_BOTTOM_THRESHOLD
   }
+
+  // composer 预填：新开分支时把代拟首问写进输入框并聚焦（光标移到末尾），待用户回车确认。
+  // textarea 是 uncontrolled 且列内 ⇄ 切换会话不一定重挂载，故不用 defaultValue，
+  // 用 effect 命令式写入；只在输入框为空时写，避免覆盖用户已敲的内容。
+  useEffect(() => {
+    const ta = taRef.current
+    if (!ta || !composerPrefill || ta.value !== "") return
+    ta.value = composerPrefill
+    autoGrow(ta)
+    ta.focus()
+    ta.setSelectionRange(ta.value.length, ta.value.length)
+  }, [threadId, composerPrefill])
 
   // 黏底自动滚动：每次渲染（含流式 delta 追加）后，若之前处于贴底状态则滚到最新
   useEffect(() => {
