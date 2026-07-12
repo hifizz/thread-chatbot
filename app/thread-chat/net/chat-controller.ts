@@ -22,7 +22,7 @@
  */
 
 import type { ThreadStore } from "../core/store"
-import { buildRequestMessages } from "./prompt"
+import { buildRequestBody } from "./prompt"
 import { consumeUIMessageStream, type UIStreamHandlers } from "./ui-stream"
 
 /** 页面不可见 / 无 requestAnimationFrame 时的降级刷新间隔（毫秒） */
@@ -157,11 +157,11 @@ export function createChatController(store: ThreadStore) {
           return
         }
 
-        const messages = buildRequestMessages(state, thread, msgId)
+        const body = buildRequestBody(state, thread, msgId)
         const res = await fetch("/api/chat", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ messages }),
+          body: JSON.stringify(body),
           signal,
         })
 

@@ -12,7 +12,11 @@ import { resolveAttachmentParts } from "@/lib/chat/resolve-attachments"
 import { minimaxChatModel } from "@/lib/ai/minimax"
 import { researchTools } from "@/lib/chat/research-tools"
 import { isSearchConfigured } from "@/lib/ai/search"
-import { RESEARCH_MAX_STEPS, RESEARCH_SYSTEM_PROMPT } from "@/constants/research"
+import {
+  RESEARCH_MAX_STEPS,
+  RESEARCH_SYSTEM_PROMPT,
+} from "@/constants/research"
+import { buildThreadChatSystem } from "@/lib/chat/thread-chat-prompt"
 
 // 深度研究可能多步循环，耗时较长，放宽单次请求时长上限
 export const maxDuration = 120
@@ -24,7 +28,13 @@ const getWeather = tool({
   }),
   execute: async ({ location }) => {
     // Deterministic mock reading (hashed from the city name) - no real weather API/key involved.
-    const conditions = ["Sunny", "Partly Cloudy", "Cloudy", "Light Rain", "Clear"]
+    const conditions = [
+      "Sunny",
+      "Partly Cloudy",
+      "Cloudy",
+      "Light Rain",
+      "Clear",
+    ]
     const seed = [...location].reduce((acc, c) => acc + c.charCodeAt(0), 0)
     return {
       location,
@@ -42,12 +52,16 @@ const compareTable = tool({
   inputSchema: z.object({
     title: z.string(),
     unit: z.string().optional(),
-    columns: z.array(z.string()).describe("Category labels, e.g. country names"),
+    columns: z
+      .array(z.string())
+      .describe("Category labels, e.g. country names"),
     series: z.array(
       z.object({
         name: z.string(),
-        values: z.array(z.number()).describe("One value per column, same order as columns"),
-      }),
+        values: z
+          .array(z.number())
+          .describe("One value per column, same order as columns"),
+      })
     ),
   }),
   execute: async (input) => input,
@@ -58,19 +72,24 @@ export async function POST(req: Request) {
     messages,
     tools,
     deepResearch,
+    threadChat,
   }: {
     messages: UIMessage[]
     tools?: Record<string, ToolJSONSchema>
     deepResearch?: boolean
+    /** thread-chat 分支对话页的模式标记：system 由服务端按锚点原文构造 */
+    threadChat?: { anchorText?: string | null }
   } = await req.json()
 
   // 研究模式：加入联网检索/深读工具、放宽步数、注入研究系统提示
   const research = deepResearch === true
   const searchReady = isSearchConfigured()
+  // thread-chat 模式：纯文本 system + 不挂后端工具（研究模式优先级更高）
+  const isThreadChat = !research && threadChat != null
 
   const allTools = {
-    getWeather,
-    compareTable,
+    // thread-chat 模式不挂后端工具：该页面是纯文本对话，直接不给工具比在 prompt 里劝阻更可靠
+    ...(isThreadChat ? {} : { getWeather, compareTable }),
     ...(research && searchReady ? researchTools : {}),
     ...frontendTools(tools ?? {}),
   }
@@ -82,16 +101,26 @@ export async function POST(req: Request) {
     ? searchReady
       ? RESEARCH_SYSTEM_PROMPT
       : "用户开启了深度研究，但服务端未配置搜索服务（SEARCH_API_KEY），请如实告知该功能暂不可用，并基于已有知识尽力回答。"
-    : undefined
+    : isThreadChat
+      ? buildThreadChatSystem(threadChat.anchorText)
+      : undefined
 
   const result = streamText({
     model: minimaxChatModel(),
     system,
-    messages: await convertToModelMessages(resolvedMessages, { tools: allTools }),
+    messages: await convertToModelMessages(resolvedMessages, {
+      tools: allTools,
+    }),
     tools: allTools,
     // 研究模式允许更多工具轮次；普通对话维持原来的小步数
     stopWhen: isStepCount(research && searchReady ? RESEARCH_MAX_STEPS : 5),
   })
 
-  return result.toUIMessageStreamResponse()
+  return result.toUIMessageStreamResponse({
+    // 流内错误在服务端留日志便于排查；返回值仍是发给客户端的掩码文案（默认行为不变）
+    onError: (error) => {
+      console.error("[chat] 流内错误:", error)
+      return "An error occurred."
+    },
+  })
 }
