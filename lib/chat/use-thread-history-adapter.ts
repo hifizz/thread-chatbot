@@ -37,7 +37,7 @@ export function usePostgresThreadHistoryAdapter(): ThreadHistoryAdapter {
                 parent_id: row.parentId,
                 format: row.format,
                 content: row.content as never,
-              }),
+              })
             )
             return { headId: rows.at(-1)?.id ?? null, messages }
           },
@@ -61,6 +61,6 @@ export function usePostgresThreadHistoryAdapter(): ThreadHistoryAdapter {
         }
       },
     }),
-    [aui],
+    [aui]
   )
 }

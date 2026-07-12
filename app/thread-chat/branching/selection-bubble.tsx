@@ -18,6 +18,8 @@ import React, { useEffect, useState } from "react"
 import { GitFork } from "lucide-react"
 import type { ThreadTreeState } from "../core/types"
 import { threadTitle } from "../core/selectors"
+import { ANCHOR_CONTEXT_CHARS } from "./anchor-ranges"
+import { resolveSelectionOffsets } from "./selection-offset"
 import {
   previewPlacement,
   type PlacementHint,
@@ -33,6 +35,10 @@ export interface SelectionInfo {
   y: number
   /** 划选结束（mouseup）那一刻是否按着 ⌘/Ctrl：作为修饰键跟踪的初值 */
   meta?: boolean
+  /** 划选处之前的源文本上下文（精确换算成功时才有，锚点定位用） */
+  prefix?: string
+  /** 划选处之后的源文本上下文，同上 */
+  suffix?: string
 }
 
 export interface SelectionBubbleProps {
@@ -101,20 +107,62 @@ export function SelectionBubble({
         const threadId = listEl?.dataset.list
         const msgId = msgEl?.dataset.msgId
         if (!threadId || !msgId) return
-        // 校验划选文字确实是这条消息的连续原文（跨消息 / 跨段选择不弹气泡）
         const msg = state.threads[threadId]?.messages.find(
           (m) => m.id === msgId
         )
-        if (!msg || msg.text.indexOf(txt) === -1) {
+        if (!msg) {
           onSelChange(null)
           return
         }
+
+        /* —— 精确采集：把 DOM 选区换算成 msg.text 的偏移（TextQuoteSelector 思路）——
+           成功则以源文本切片为准（跨段选择的 \n\n 也与源文本一致），并记录前后各
+           ANCHOR_CONTEXT_CHARS 字的上下文；换算失败（端点在 sup 内 / 渲染不吻合等）
+           回退旧行为：只验证 indexOf 存在，不带上下文 */
+        let text: string
+        let prefix: string | undefined
+        let suffix: string | undefined
+        const resolved = resolveSelectionOffsets(
+          host as HTMLElement,
+          s.getRangeAt(0)
+        )
+        if (resolved && resolved.rebuilt === msg.text) {
+          let { start, end } = resolved
+          // 掐掉选区两端空白（与 sel.toString().trim() 的旧行为一致）
+          while (start < end && /\s/.test(msg.text[start])) start++
+          while (end > start && /\s/.test(msg.text[end - 1])) end--
+          if (end - start < 2) {
+            onSelChange(null)
+            return
+          }
+          text = msg.text.slice(start, end)
+          prefix = msg.text.slice(
+            Math.max(0, start - ANCHOR_CONTEXT_CHARS),
+            start
+          )
+          suffix = msg.text.slice(end, end + ANCHOR_CONTEXT_CHARS)
+        } else if (msg.text.indexOf(txt) !== -1) {
+          text = txt
+        } else {
+          onSelChange(null)
+          return
+        }
+
         const rect = s.getRangeAt(0).getBoundingClientRect()
         const left = Math.max(10, Math.min(rect.left, window.innerWidth - 244))
         let top = rect.bottom + 9
         if (top > window.innerHeight - (150 + extraH))
           top = Math.max(10, rect.top - (132 + extraH))
-        onSelChange({ text: txt, threadId, msgId, x: left, y: top, meta })
+        onSelChange({
+          text,
+          threadId,
+          msgId,
+          x: left,
+          y: top,
+          meta,
+          prefix,
+          suffix,
+        })
       }, 10)
     }
     const onMouseDown = (e: MouseEvent) => {

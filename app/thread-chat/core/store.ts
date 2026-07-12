@@ -16,6 +16,10 @@ export interface ForkInput {
   sourceMsgId: string
   /** 被划选的原文（同时决定新会话标题与脚注锚点） */
   anchorText: string
+  /** 划选处之前的源文本上下文（最多 24 字，锚点精确定位用；采集失败时可缺省） */
+  prefix?: string
+  /** 划选处之后的源文本上下文（最多 24 字），同上 */
+  suffix?: string
 }
 
 export interface ForkResult {
@@ -116,6 +120,8 @@ export function createThreadStore(seed: ThreadTreeState) {
         num: state.footnoteCounter,
         threadId: id,
         depth,
+        prefix: input.prefix,
+        suffix: input.suffix,
       })
 
       notify()

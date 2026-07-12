@@ -2,8 +2,7 @@
  * net/chat-controller —— 会话的「发送 / 分支首答 / 重试 / 中止」统一入口。
  *
  * 消费真实 /api/chat SSE（见 ui-stream.ts），把正文增量喂回 store 的细粒度
- * mutator（pending → streaming → done/error）。公共 API（send / startBranch /
- * retry / abort / abortAll）与语义在阶段一已定稿，这里只替换内部实现。
+ * mutator（pending → streaming → done/error）。
  *
  * 关键机制：
  *  - inflight：per-thread 的 AbortController，同一会话同时只允许一路在飞。
@@ -17,8 +16,10 @@
  *    toUIMessageStreamResponse 掩码为 "An error occurred." 后发出），之后正文
  *    text-delta 继续到达并正常 finish。因此 onError 不立即判死：只记录 lastError
  *    （后到覆盖先到）并继续收流；终态统一裁决——收到过任何正文即按成功 finish
- *    （瞬时 error 忽略并 console.warn 留痕），零正文且有 error 才 fail，
- *    零正文且无 error 照旧 finish（空回复，留观察）。abort 与网络失败分支语义不变。
+ *    （瞬时 error 忽略并 console.warn 留痕），零正文且有 error 用 lastError fail，
+ *    零正文且无 error 也 fail（「未收到任何回复」：空回复应可重试而非静默完成）。
+ *  - 中止（停止按钮 / 卸载 / retry 顶替）：已有正文 → 保留文本 finish；
+ *    零正文 → fail（「已停止生成」，可重试），不留空的 done 气泡。网络失败照旧 fail。
  */
 
 import type { ThreadStore } from "../core/store"
@@ -29,6 +30,10 @@ import { consumeUIMessageStream, type UIStreamHandlers } from "./ui-stream"
 const FALLBACK_FLUSH_MS = 50
 /** 网络异常（非中止）的兜底错误文案 */
 const NETWORK_ERROR = "网络请求失败，请重试"
+/** 流正常结束但一个正文字符都没收到时的错误文案（空回复转正为可重试错误） */
+const EMPTY_REPLY_ERROR = "未收到任何回复，请重试"
+/** 零正文时被中止（停止按钮 / 卸载）的错误文案 */
+const ABORTED_ERROR = "已停止生成"
 
 export type ChatController = ReturnType<typeof createChatController>
 
@@ -112,7 +117,7 @@ export function createChatController(store: ThreadStore) {
     /** 本次流累计收到的正文字符数（含尚在 pending 缓冲里的） */
     let receivedChars = 0
 
-    /** 流「正常走完」时的终态裁决：有正文即成功；零正文且有 error 才失败 */
+    /** 流「正常走完」时的终态裁决：有正文即成功；零正文一律 fail（可重试） */
     const settleByOutcome = () => {
       settle(() => {
         if (receivedChars > 0) {
@@ -125,8 +130,17 @@ export function createChatController(store: ThreadStore) {
         } else if (lastError !== null) {
           store.failAssistantMessage(threadId, msgId, lastError)
         } else {
-          store.finishAssistantMessage(threadId, msgId) // 空回复：照旧 finish，留观察
+          // 空回复转正为错误：可点「重试」，而不是留一个静默完成的空气泡
+          store.failAssistantMessage(threadId, msgId, EMPTY_REPLY_ERROR)
         }
+      })
+    }
+
+    /** 中止时的终态裁决：已有正文保留文本 finish；零正文 fail（可重试） */
+    const settleByAbort = () => {
+      settle(() => {
+        if (receivedChars > 0) store.finishAssistantMessage(threadId, msgId)
+        else store.failAssistantMessage(threadId, msgId, ABORTED_ERROR)
       })
     }
 
@@ -178,15 +192,15 @@ export function createChatController(store: ThreadStore) {
 
         await consumeUIMessageStream(res, handlers, signal)
         if (signal.aborted) {
-          // 被 abort：consume 静默返回、onFinish 不触发——保留已收文本 + finish，不标 error
-          settle(() => store.finishAssistantMessage(threadId, msgId))
+          // 被 abort：consume 静默返回、onFinish 不触发——有正文保留 finish，零正文标可重试错误
+          settleByAbort()
         } else {
           // 正常结束时 handlers.onFinish 已 settle（幂等）；这里兜底走同一套终态裁决
           settleByOutcome()
         }
       } catch (err) {
         if (signal.aborted || isAbortError(err)) {
-          settle(() => store.finishAssistantMessage(threadId, msgId)) // 中止：保留文本 + 收尾
+          settleByAbort() // 中止：有正文保留 finish，零正文标可重试错误
         } else {
           settle(() =>
             store.failAssistantMessage(threadId, msgId, NETWORK_ERROR)
@@ -200,7 +214,8 @@ export function createChatController(store: ThreadStore) {
     })()
   }
 
-  /** 中止某会话在飞的流式请求（不从 inflight 删除：交由该流的 finally 收尾并保留已收文本） */
+  /** 中止某会话在飞的流式请求（不从 inflight 删除：交由该流的 finally 收尾；
+      有正文保留 finish，零正文标「已停止生成」可重试） */
   function abortThread(threadId: string): void {
     inflight.get(threadId)?.abort()
   }
@@ -230,7 +245,7 @@ export function createChatController(store: ThreadStore) {
       startAssistant(threadId, msgId)
     },
 
-    /** 中止某会话在飞的流式请求（已收到的文本保留在消息上） */
+    /** 中止某会话在飞的流式请求（有正文保留 finish；零正文标「已停止生成」可重试） */
     abort(threadId: string): void {
       abortThread(threadId)
     },

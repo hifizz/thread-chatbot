@@ -27,6 +27,10 @@ export interface Fork {
   num: number
   threadId: string
   depth: number
+  /** 划选处之前的源文本上下文（最多 24 字）：TextQuoteSelector 式精确定位用，可缺省（回退顺延匹配） */
+  prefix?: string
+  /** 划选处之后的源文本上下文（最多 24 字），同上 */
+  suffix?: string
 }
 
 /** 消息的流式生命周期状态；undefined 视为 "done"（历史消息 / 非流式消息） */

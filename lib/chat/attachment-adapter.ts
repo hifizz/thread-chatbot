@@ -26,7 +26,9 @@ const uploads = new Map<string, Promise<UploadResult>>()
  * 由 composer 附件的客户端 id 解析出服务端附件 id（用于发送前拉取洞察等）。
  * 上传未完成/失败时返回 undefined。
  */
-export async function resolveServerId(clientAttachmentId: string): Promise<string | undefined> {
+export async function resolveServerId(
+  clientAttachmentId: string
+): Promise<string | undefined> {
   const upload = uploads.get(clientAttachmentId)
   if (!upload) return undefined
   try {

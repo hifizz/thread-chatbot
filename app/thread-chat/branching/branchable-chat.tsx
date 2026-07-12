@@ -12,34 +12,12 @@
 
 import React from "react"
 import { FileCode2, FileText, ListTree } from "lucide-react"
-import type { Fork, Message, ThreadTreeState } from "../core/types"
+import type { Message, ThreadTreeState } from "../core/types"
 import { collectInherited, lineage, threadTitle } from "../core/selectors"
 import { dc } from "../theme"
 import { ChatView, withBreaks } from "../chat/chat-view"
-
-/* ---------------- 划选锚点 → 高亮区间 ---------------- */
-interface AnchorRange {
-  start: number
-  end: number
-  fork: Fork
-}
-
-/** 把消息上的 forks 换算成互不重叠的原文区间（同文重复出现时向后顺延） */
-function computeRanges(msg: Message): AnchorRange[] {
-  const t = msg.text
-  const ranges: AnchorRange[] = []
-  msg.forks.forEach((f) => {
-    let i = t.indexOf(f.text)
-    while (
-      i !== -1 &&
-      ranges.some((r) => !(i + f.text.length <= r.start || i >= r.end))
-    )
-      i = t.indexOf(f.text, i + 1)
-    if (i !== -1) ranges.push({ start: i, end: i + f.text.length, fork: f })
-  })
-  ranges.sort((a, b) => a.start - b.start)
-  return ranges
-}
+// 划选锚点 → 高亮区间：TextQuoteSelector 式上下文定位（纯函数，独立模块便于用例验证）
+import { computeRanges } from "./anchor-ranges"
 
 export interface BranchableChatProps {
   state: ThreadTreeState
@@ -63,6 +41,8 @@ export interface BranchableChatProps {
   busy?: boolean
   /** 错误消息下的「重试」按钮回调，透传给 ChatView */
   onRetry?: (msg: Message) => void
+  /** busy 时发送键变「停止」的回调，透传给 ChatView */
+  onStop?: () => void
   onSend: (text: string) => void
 }
 
@@ -79,6 +59,7 @@ export function BranchableChat({
   onCollapse,
   busy,
   onRetry,
+  onStop,
   onSend,
 }: BranchableChatProps) {
   const thread = state.threads[threadId]
@@ -285,6 +266,7 @@ export function BranchableChat({
       renderAfterMessage={renderAfterMessage}
       busy={busy}
       onRetry={onRetry}
+      onStop={onStop}
       onSend={onSend}
     />
   )
