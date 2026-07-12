@@ -20,8 +20,10 @@ node --experimental-strip-types e2e/thread-chat/anchor-ranges.test.mjs
 CHROMIUM_PATH=/opt/pw-browsers/chromium node e2e/thread-chat/verify-live.mjs
 ```
 
-断言覆盖（15 项）：页面加载、主线真实流式回复、划选开分支气泡、分支流式首答、
-主线锚点脚注出现、分支请求 payload 契约（继承上文 / kickoff 代拟首问 /
+断言覆盖（19 项）：页面加载、主线真实流式回复、划选开分支气泡、分支列打开但
+**不自动发请求**（composer 预填代拟问题、消息区为空、2 秒内无新 /api/chat POST）、
+回车确认后代拟问题成为真实 user 气泡、分支流式首答、主线锚点脚注出现、
+分支请求 payload 契约（继承上文 / kickoff 以真实 user 消息在 messages 里 /
 `threadChat.anchorText` / 无 system 角色 / user 消息无指令前缀 / 无空 assistant 消息）、
 分支内追问二轮流式。走真实模型，回复内容非确定，断言只卡结构与契约；
 截图输出到本目录 `shots/`（已 gitignore）。

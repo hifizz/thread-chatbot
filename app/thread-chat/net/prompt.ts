@@ -3,9 +3,9 @@
  *
  * 消息序：
  *   1. collectInherited：沿 lineage 向上继承的上文（映射为 user/assistant）。
- *   2. 分支代拟首问（kickoff）：围绕锚点让模型开讲——只进请求 payload，不进 store，
- *      每次请求都重建，分支的后续轮次同样带上，保证模型视角「有问才有答」。
- *   3. 当前会话已有消息（排除本次流式占位、error 消息、空正文的 assistant 消息）。
+ *   2. 当前会话已有消息（排除本次流式占位、error 消息、空正文的 assistant 消息）。
+ * 分支的首问不在这里合成：开分支时壳层把 kickoffQuestion 预填进 composer，
+ * 用户回车确认后作为真实 user 消息进入 store，随消息列表自然进入 payload。
  *
  * system 归服务端所有：AI SDK v7 的 streamText 不允许 messages 里出现 system 角色
  * （安全默认值，防客户端注入任意 system 指令）。因此客户端只在请求体上带
@@ -35,8 +35,8 @@ export interface ThreadChatRequestBody {
   threadChat: { anchorText: string | null }
 }
 
-/** 分支代拟首问：让模型对着锚点开讲（确定性函数，不落 store） */
-function kickoffText(anchorText: string): string {
+/** 分支代拟首问：开分支时预填进 composer，由用户改写或直接回车确认（不自动发送） */
+export function kickoffQuestion(anchorText: string): string {
   return (
     `请围绕我划选的这段话展开讲解：「${anchorText}」。` +
     "先解释它本身的含义，再讲清楚它为什么重要或常见误区/延伸，控制在三段以内。"
@@ -78,16 +78,7 @@ export function buildRequestBody(
     })
   }
 
-  // 2. 分支代拟首问（每次都重建，不进 store）
-  if (anchor !== null) {
-    messages.push({
-      id: `kickoff-${thread.id}`,
-      role: "user",
-      parts: [{ type: "text", text: kickoffText(anchor) }],
-    })
-  }
-
-  // 3. 当前会话已有消息（排除流式占位 / error / 空 assistant）
+  // 2. 当前会话已有消息（排除流式占位 / error / 空 assistant）
   for (const m of thread.messages) {
     if (m.id === excludeMsgId) continue
     if (!includable(m.role, m.text, m.status)) continue

@@ -1,5 +1,6 @@
 /**
- * net/chat-controller —— 会话的「发送 / 分支首答 / 重试 / 中止」统一入口。
+ * net/chat-controller —— 会话的「发送 / 重试 / 中止」统一入口。
+ * （分支首答不再由这里触发：开分支只预填 composer，用户回车确认后走普通 send。）
  *
  * 消费真实 /api/chat SSE（见 ui-stream.ts），把正文增量喂回 store 的细粒度
  * mutator（pending → streaming → done/error）。
@@ -225,14 +226,6 @@ export function createChatController(store: ThreadStore) {
     send(threadId: string, text: string): void {
       if (inflight.has(threadId)) return
       if (!store.appendUserMessage(threadId, text)) return
-      const msgId = store.beginAssistantMessage(threadId)
-      if (!msgId) return
-      startAssistant(threadId, msgId)
-    },
-
-    /** 分支首答：不追加用户消息，直接触发新分支的第一条流式回复 */
-    startBranch(threadId: string): void {
-      if (inflight.has(threadId)) return
       const msgId = store.beginAssistantMessage(threadId)
       if (!msgId) return
       startAssistant(threadId, msgId)
