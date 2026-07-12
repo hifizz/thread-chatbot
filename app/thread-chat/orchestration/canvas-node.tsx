@@ -1,4 +1,4 @@
-"use client";
+"use client"
 /**
  * orchestration/canvas-node —— 画布模式的自定义节点：一个 thread 一张「手稿纸质」卡。
  *
@@ -11,30 +11,32 @@
  * 不能 display:none，会破坏 React Flow 的边坐标计算，skill 契约 #8）。
  */
 
-import React, { memo } from "react";
-import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
+import React, { memo } from "react"
+import { Handle, Position, type Node, type NodeProps } from "@xyflow/react"
 
 export interface CanvasCardData extends Record<string, unknown> {
-  isMain: boolean;
-  title: string;
+  isMain: boolean
+  title: string
   /** 主线卡的主题副标题（与列模式主线副标题同源，由壳层传入） */
-  subtitle: string | null;
-  depth: number;
-  footnote: number | null;
+  subtitle: string | null
+  depth: number
+  footnote: number | null
   /** 讨论焦点（划选原文，已截断；主线为 null） */
-  anchor: string | null;
+  anchor: string | null
   /** 末条消息摘要（~90 字，已截断） */
-  summary: string;
-  msgCount: number;
-  artifactCount: number;
+  summary: string
+  msgCount: number
+  artifactCount: number
   /** 深度强调色 / 圆点色（theme.ts 的 accentOf / dotColorOf） */
-  accent: string;
-  dot: string;
+  accent: string
+  dot: string
 }
 
-export type CanvasCardNode = Node<CanvasCardData, "threadCard">;
+export type CanvasCardNode = Node<CanvasCardData, "threadCard">
 
-export const CanvasCard = memo(function CanvasCard({ data }: NodeProps<CanvasCardNode>) {
+export const CanvasCard = memo(function CanvasCard({
+  data,
+}: NodeProps<CanvasCardNode>) {
   return (
     <div
       className="canvas-card"
@@ -64,5 +66,5 @@ export const CanvasCard = memo(function CanvasCard({ data }: NodeProps<CanvasCar
       </div>
       <Handle type="source" position={Position.Bottom} isConnectable={false} />
     </div>
-  );
-});
+  )
+})

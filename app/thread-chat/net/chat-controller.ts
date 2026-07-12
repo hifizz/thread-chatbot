@@ -1,80 +1,243 @@
 /**
  * net/chat-controller —— 会话的「发送 / 分支首答 / 重试 / 中止」统一入口。
  *
- * 阶段一：fakeStream 用本地 setInterval 模拟逐片吐字，验证消息状态机
- * （pending → streaming → done/error）与 UI（打字指示 / 光标 / 错误条）先跑通。
- * 阶段二将把 fakeStream 替换为真实 /api/chat SSE 消费，这里导出的公共 API
- * （send / startBranch / retry / abort / abortAll）保持不变。
+ * 消费真实 /api/chat SSE（见 ui-stream.ts），把正文增量喂回 store 的细粒度
+ * mutator（pending → streaming → done/error）。公共 API（send / startBranch /
+ * retry / abort / abortAll）与语义在阶段一已定稿，这里只替换内部实现。
+ *
+ * 关键机制：
+ *  - inflight：per-thread 的 AbortController，同一会话同时只允许一路在飞。
+ *  - 合帧缓冲：text-delta 不直接进 store，先攒进 buffer，用 rAF 合帧后每帧至多
+ *    一次 appendAssistantDelta（即每帧至多一次 version++），避免高频 delta 全树重渲卡顿；
+ *    页面不可见 / 无 rAF 环境降级为 setTimeout(50ms)。finish/error/abort 前强制 flush 残余。
+ *  - 归属校验（isOwner）：所有对目标消息的写入都要求「inflight 仍指向本次 controller」，
+ *    使 retry（先 abort 旧流、复位、再起新流）时，旧流的残余 delta / 收尾不会误写新流的消息。
+ *  - error chunk 的容错语义：实测 /api/chat 的流中会夹杂零星「瞬时」error chunk
+ *    （疑似 MiniMax 个别 chunk 经 @ai-sdk/openai-compatible 解析失败，被
+ *    toUIMessageStreamResponse 掩码为 "An error occurred." 后发出），之后正文
+ *    text-delta 继续到达并正常 finish。因此 onError 不立即判死：只记录 lastError
+ *    （后到覆盖先到）并继续收流；终态统一裁决——收到过任何正文即按成功 finish
+ *    （瞬时 error 忽略并 console.warn 留痕），零正文且有 error 才 fail，
+ *    零正文且无 error 照旧 finish（空回复，留观察）。abort 与网络失败分支语义不变。
  */
 
-import type { ThreadStore } from "../core/store";
+import type { ThreadStore } from "../core/store"
+import { buildRequestMessages } from "./prompt"
+import { consumeUIMessageStream, type UIStreamHandlers } from "./ui-stream"
 
-const FAKE_REPLY =
-  "这是阶段一的本地模拟流式回复，用于验证消息状态机与 UI。真实 MiniMax 接入在阶段二完成。";
-const FAKE_STEP_MS = 30;
-const FAKE_CHUNK_MIN = 2;
-const FAKE_CHUNK_MAX = 3;
+/** 页面不可见 / 无 requestAnimationFrame 时的降级刷新间隔（毫秒） */
+const FALLBACK_FLUSH_MS = 50
+/** 网络异常（非中止）的兜底错误文案 */
+const NETWORK_ERROR = "网络请求失败，请重试"
 
-export type ChatController = ReturnType<typeof createChatController>;
+export type ChatController = ReturnType<typeof createChatController>
+
+/** 判断是否为「中止」类异常 */
+function isAbortError(err: unknown): boolean {
+  return (
+    typeof err === "object" &&
+    err !== null &&
+    (err as { name?: string }).name === "AbortError"
+  )
+}
 
 export function createChatController(store: ThreadStore) {
-  /** 每个会话同一时间只允许一路在飞的流式请求；值为可调用的中止函数 */
-  const inflight = new Map<string, () => void>();
+  /** 每个会话同一时间只允许一路在飞的流式请求 */
+  const inflight = new Map<string, AbortController>()
 
-  /** 用本地定时器模拟逐片吐字，结束后 finish 并清理 inflight（阶段二替换为真实 SSE 消费） */
-  function fakeStream(threadId: string, msgId: string) {
-    let pos = 0;
-    const timer = setInterval(() => {
-      const step = Math.floor(Math.random() * (FAKE_CHUNK_MAX - FAKE_CHUNK_MIN + 1)) + FAKE_CHUNK_MIN;
-      const delta = FAKE_REPLY.slice(pos, pos + step);
-      pos += step;
-      if (delta) store.appendAssistantDelta(threadId, msgId, delta);
-      if (pos >= FAKE_REPLY.length) {
-        clearInterval(timer);
-        inflight.delete(threadId);
-        store.finishAssistantMessage(threadId, msgId);
+  /**
+   * 对某会话的某条 assistant 消息发起真实流式请求。
+   * 调用前必须已通过 beginAssistantMessage / resetAssistantMessage 备好目标消息。
+   */
+  function startAssistant(threadId: string, msgId: string): void {
+    const controller = new AbortController()
+    inflight.set(threadId, controller)
+    const { signal } = controller
+
+    /** 本次流是否仍是该会话的当前在飞流（retry 会用新 controller 顶替旧的） */
+    const isOwner = () => inflight.get(threadId) === controller
+
+    // ---- 合帧缓冲 ----
+    let pending = ""
+    let frame: number | null = null
+    let usingRAF = false
+
+    const doFlush = () => {
+      if (!pending) return
+      if (!isOwner()) {
+        pending = "" // 已被新流顶替：丢弃残余，不写旧消息
+        return
       }
-    }, FAKE_STEP_MS);
-    inflight.set(threadId, () => clearInterval(timer));
+      const delta = pending
+      pending = ""
+      store.appendAssistantDelta(threadId, msgId, delta)
+    }
+    const onFrame = () => {
+      frame = null
+      doFlush()
+    }
+    const canUseRAF = () =>
+      typeof requestAnimationFrame !== "undefined" &&
+      !(typeof document !== "undefined" && document.hidden)
+    const schedule = () => {
+      if (frame !== null) return
+      if (canUseRAF()) {
+        usingRAF = true
+        frame = requestAnimationFrame(onFrame)
+      } else {
+        usingRAF = false
+        frame = setTimeout(onFrame, FALLBACK_FLUSH_MS) as unknown as number
+      }
+    }
+    const cancelFrame = () => {
+      if (frame === null) return
+      if (usingRAF) cancelAnimationFrame(frame)
+      else clearTimeout(frame)
+      frame = null
+    }
+
+    // ---- 终态收敛（只结算一次；非归属者只清理不写消息）----
+    let settled = false
+    const settle = (apply: () => void) => {
+      if (settled) return
+      settled = true
+      cancelFrame()
+      if (!isOwner()) return // 已被 retry 顶替：不触碰新流的消息
+      doFlush() // 先 flush 残余文本，再落终态
+      apply()
+    }
+
+    // ---- error chunk 容错：只记录不判死，终态统一裁决（见文件头说明）----
+    let lastError: string | null = null
+    /** 本次流累计收到的正文字符数（含尚在 pending 缓冲里的） */
+    let receivedChars = 0
+
+    /** 流「正常走完」时的终态裁决：有正文即成功；零正文且有 error 才失败 */
+    const settleByOutcome = () => {
+      settle(() => {
+        if (receivedChars > 0) {
+          if (lastError !== null)
+            console.warn(
+              "[thread-chat] 流中出现瞬时 error chunk（已忽略）:",
+              lastError
+            )
+          store.finishAssistantMessage(threadId, msgId)
+        } else if (lastError !== null) {
+          store.failAssistantMessage(threadId, msgId, lastError)
+        } else {
+          store.finishAssistantMessage(threadId, msgId) // 空回复：照旧 finish，留观察
+        }
+      })
+    }
+
+    const handlers: UIStreamHandlers = {
+      onTextDelta(delta) {
+        if (settled) return
+        receivedChars += delta.length
+        pending += delta
+        schedule()
+      },
+      onError(message) {
+        if (settled) return
+        lastError = message // 不立即 settle：可能是瞬时噪声，正文还会继续到达（后到覆盖先到）
+      },
+      onFinish() {
+        settleByOutcome()
+      },
+    }
+
+    void (async () => {
+      try {
+        const state = store.getState()
+        const thread = state.threads[threadId]
+        if (!thread) {
+          settle(() =>
+            store.failAssistantMessage(threadId, msgId, "会话不存在")
+          )
+          return
+        }
+
+        const messages = buildRequestMessages(state, thread, msgId)
+        const res = await fetch("/api/chat", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ messages }),
+          signal,
+        })
+
+        if (!res.ok || !res.body) {
+          settle(() =>
+            store.failAssistantMessage(
+              threadId,
+              msgId,
+              `请求失败（HTTP ${res.status}）`
+            )
+          )
+          return
+        }
+
+        await consumeUIMessageStream(res, handlers, signal)
+        if (signal.aborted) {
+          // 被 abort：consume 静默返回、onFinish 不触发——保留已收文本 + finish，不标 error
+          settle(() => store.finishAssistantMessage(threadId, msgId))
+        } else {
+          // 正常结束时 handlers.onFinish 已 settle（幂等）；这里兜底走同一套终态裁决
+          settleByOutcome()
+        }
+      } catch (err) {
+        if (signal.aborted || isAbortError(err)) {
+          settle(() => store.finishAssistantMessage(threadId, msgId)) // 中止：保留文本 + 收尾
+        } else {
+          settle(() =>
+            store.failAssistantMessage(threadId, msgId, NETWORK_ERROR)
+          ) // fetch reject 等
+        }
+      } finally {
+        cancelFrame()
+        // 仅当 inflight 仍指向本次 controller 时才清除，避免 retry 竞态误删新流的条目
+        if (inflight.get(threadId) === controller) inflight.delete(threadId)
+      }
+    })()
+  }
+
+  /** 中止某会话在飞的流式请求（不从 inflight 删除：交由该流的 finally 收尾并保留已收文本） */
+  function abortThread(threadId: string): void {
+    inflight.get(threadId)?.abort()
   }
 
   return {
     /** 在会话里发一条用户消息并触发流式回复；同会话已有在飞请求时直接忽略 */
     send(threadId: string, text: string): void {
-      if (inflight.has(threadId)) return;
-      if (!store.appendUserMessage(threadId, text)) return;
-      const msgId = store.beginAssistantMessage(threadId);
-      if (!msgId) return;
-      fakeStream(threadId, msgId);
+      if (inflight.has(threadId)) return
+      if (!store.appendUserMessage(threadId, text)) return
+      const msgId = store.beginAssistantMessage(threadId)
+      if (!msgId) return
+      startAssistant(threadId, msgId)
     },
 
     /** 分支首答：不追加用户消息，直接触发新分支的第一条流式回复 */
     startBranch(threadId: string): void {
-      if (inflight.has(threadId)) return;
-      const msgId = store.beginAssistantMessage(threadId);
-      if (!msgId) return;
-      fakeStream(threadId, msgId);
+      if (inflight.has(threadId)) return
+      const msgId = store.beginAssistantMessage(threadId)
+      if (!msgId) return
+      startAssistant(threadId, msgId)
     },
 
-    /** 重试：复位同一条消息（清空正文与错误、回到 pending），重新触发流式 */
+    /** 重试：先中止在飞的旧流，复位同一条消息（清空正文/错误、回到 pending），再起新流复用该 msgId */
     retry(threadId: string, msgId: string): void {
-      if (inflight.has(threadId)) return;
-      store.resetAssistantMessage(threadId, msgId);
-      fakeStream(threadId, msgId);
+      abortThread(threadId)
+      store.resetAssistantMessage(threadId, msgId)
+      startAssistant(threadId, msgId)
     },
 
     /** 中止某会话在飞的流式请求（已收到的文本保留在消息上） */
     abort(threadId: string): void {
-      const stop = inflight.get(threadId);
-      if (!stop) return;
-      stop();
-      inflight.delete(threadId);
+      abortThread(threadId)
     },
 
     /** 中止所有会话在飞的流式请求（壳层卸载时调用） */
     abortAll(): void {
-      inflight.forEach((stop) => stop());
-      inflight.clear();
+      inflight.forEach((c) => c.abort())
     },
-  };
+  }
 }

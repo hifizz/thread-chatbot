@@ -3,7 +3,7 @@
  * 取代原 demo 的 data.ts（canned 数据），供 thread-chat-demo.tsx 初始化 store 使用。
  */
 
-import type { ThreadTreeState } from "./types";
+import type { ThreadTreeState } from "./types"
 
 export function emptySeedState(): ThreadTreeState {
   return {
@@ -27,5 +27,5 @@ export function emptySeedState(): ThreadTreeState {
     footnoteCounter: 0,
     seq: 1,
     tick: 1,
-  };
+  }
 }

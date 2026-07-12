@@ -7,9 +7,13 @@
  * 与客户端首渲一致，不会产生 hydration mismatch。
  */
 
-import { useSyncExternalStore } from "react";
-import type { ThreadStore } from "./store";
+import { useSyncExternalStore } from "react"
+import type { ThreadStore } from "./store"
 
 export function useThreadStore(store: ThreadStore): number {
-  return useSyncExternalStore(store.subscribe, store.getVersion, store.getVersion);
+  return useSyncExternalStore(
+    store.subscribe,
+    store.getVersion,
+    store.getVersion
+  )
 }
