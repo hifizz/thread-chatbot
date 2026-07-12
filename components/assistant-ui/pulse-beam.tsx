@@ -20,12 +20,14 @@ function useHydrated() {
  * 彩色光晕贴着元素内侧四周弥散、缓慢呼吸（裁剪在边框以内）。
  * 跟随 next-themes 的明暗主题；圆角默认自动探测子元素，
  * 子元素圆角探测不到时（如首子元素是无圆角的内部布局）可显式传 borderRadius。
+ * active 控制光晕开关（带淡入/淡出过渡），用于绑定 AI 回复中等运行状态。
  */
 export const PulseBeam: FC<{
   children: ReactNode
   className?: string
   borderRadius?: number
-}> = ({ children, className, borderRadius }) => {
+  active?: boolean
+}> = ({ children, className, borderRadius, active = true }) => {
   const { resolvedTheme } = useTheme()
 
   // SSR 时 resolvedTheme 为 undefined，客户端首帧可能已解析出 light，
@@ -39,6 +41,7 @@ export const PulseBeam: FC<{
       colorVariant="colorful"
       theme={hydrated && resolvedTheme === "light" ? "light" : "dark"}
       borderRadius={borderRadius}
+      active={active}
       className={className}
     >
       {children}
