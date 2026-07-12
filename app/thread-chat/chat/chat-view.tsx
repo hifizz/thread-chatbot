@@ -11,10 +11,8 @@
  */
 
 import React, { useEffect, useRef } from "react"
+import { MessageScroller } from "@shadcn/react/message-scroller"
 import type { Message } from "../core/types"
-
-/** 判断列表容器是否已贴底（容差 40px，见 onScroll / 自动滚动 effect） */
-const STICK_BOTTOM_THRESHOLD = 40
 
 /** 把 \n 转成 <br/>（assistant 正文按段落渲染时的行内换行） */
 export function withBreaks(s: string, keyBase: string): React.ReactNode[] {
@@ -75,10 +73,7 @@ export function ChatView({
   composerPrefill,
   onSend,
 }: ChatViewProps) {
-  const listRef = useRef<HTMLDivElement | null>(null)
   const taRef = useRef<HTMLTextAreaElement | null>(null)
-  /** 是否贴底：onScroll 里写，渲染后 effect 里读——不在渲染期读写，遵守 react-hooks 纪律 */
-  const stickBottomRef = useRef(true)
 
   const autoGrow = (ta: HTMLTextAreaElement) => {
     ta.style.height = "auto"
@@ -95,19 +90,7 @@ export function ChatView({
     ta.style.height = "auto"
     onSend(v)
     ta.focus()
-    // 等新消息渲染完成后滚到底
-    stickBottomRef.current = true
-    requestAnimationFrame(() => {
-      const el = listRef.current
-      if (el) el.scrollTop = el.scrollHeight
-    })
-  }
-
-  const onListScroll = () => {
-    const el = listRef.current
-    if (!el) return
-    stickBottomRef.current =
-      el.scrollTop + el.clientHeight >= el.scrollHeight - STICK_BOTTOM_THRESHOLD
+    // 发送后不再手动滚——MessageScroller.Provider 的 autoScroll 接管贴底
   }
 
   // composer 预填：新开分支时把代拟首问写进输入框并聚焦（光标移到末尾），待用户回车确认。
@@ -121,13 +104,6 @@ export function ChatView({
     ta.focus()
     ta.setSelectionRange(ta.value.length, ta.value.length)
   }, [threadId, composerPrefill])
-
-  // 黏底自动滚动：每次渲染（含流式 delta 追加）后，若之前处于贴底状态则滚到最新
-  useEffect(() => {
-    const el = listRef.current
-    if (!el || !stickBottomRef.current) return
-    el.scrollTop = el.scrollHeight
-  })
 
   const renderMessage = (msg: Message) => (
     <div key={msg.id} className={`message ${msg.role}`} data-msg-id={msg.id}>
@@ -170,17 +146,28 @@ export function ChatView({
     <>
       {header}
       {banner}
-      <div
-        className="msg-list"
-        data-list={threadId}
-        ref={listRef}
-        onScroll={onListScroll}
-      >
-        <div className="lane">
-          {intro}
-          {messages.map(renderMessage)}
-        </div>
-      </div>
+      {/* 滚动：交给 headless MessageScroller 接管「流式贴底 / 上滑释放 / 滚到底按钮」，
+          见 §5 注释（下方 Provider）。.msg-list + data-list 必须保留——划选气泡靠
+          .closest(".msg-list") + data-list 反查会话。 */}
+      <MessageScroller.Provider autoScroll defaultScrollPosition="end">
+        <MessageScroller.Root className="msg-scroll-root">
+          <MessageScroller.Viewport className="msg-list" data-list={threadId}>
+            <MessageScroller.Content>
+              <div className="lane">
+                {intro}
+                {messages.map((msg) => (
+                  <MessageScroller.Item key={msg.id} messageId={msg.id}>
+                    {renderMessage(msg)}
+                  </MessageScroller.Item>
+                ))}
+              </div>
+            </MessageScroller.Content>
+          </MessageScroller.Viewport>
+          <MessageScroller.Button direction="end" className="scroll-end-btn">
+            ↓
+          </MessageScroller.Button>
+        </MessageScroller.Root>
+      </MessageScroller.Provider>
       <div className={`composer ${isMain ? "" : "branch"}`}>
         <div className="lane">
           <div className="box">

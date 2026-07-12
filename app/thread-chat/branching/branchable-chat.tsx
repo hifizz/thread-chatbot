@@ -17,6 +17,7 @@ import { collectInherited, lineage, threadTitle } from "../core/selectors"
 import { dc } from "../theme"
 import { ChatView } from "../chat/chat-view"
 import { MarkdownBody } from "../chat/markdown-body"
+import { useSmoothText } from "../chat/smooth-text"
 // 锚点在「渲染后的 Markdown DOM」上模糊恢复定位（position→exact→fuzzy），与纯文本解耦
 import { clearHighlights, locateAnchor, paintRange } from "./text-anchor"
 
@@ -245,6 +246,12 @@ export function BranchableChat({
  * · 只在 commit 后的 effect 里绘制（deps = [msg.text, forksKey]），绝不在 render / setState 里绘。
  * · 定位失败（locateAnchor 返回 null 或 fuzzy 低于阈值）静默跳过该 fork——不高亮，
  *   但分支本体 / 脚注列表 / ⌘K 不受影响。
+ *
+ * 平滑打字（useSmoothText）与锚点 effect 的不变式：
+ * · display 是 msg.text 的「追赶态」，deps 仍是 [msg.text, forksKey]（原文，非 display）——
+ *   锚点定位坐标系必须是渲染后的完整正文，不能跟着平滑的中间态重绘；
+ * · fork 只在已完成消息（active=false）上创建，此时 useSmoothText 已把 display snap 到
+ *   与 msg.text 完全一致，二者恒等，故锚点效果不受平滑影响，无需改锚点代码。
  */
 function AnchoredMarkdown({
   state,
@@ -258,6 +265,8 @@ function AnchoredMarkdown({
   const hostRef = useRef<HTMLDivElement | null>(null)
   // forksKey 只随 fork 的增删与编号变化——source 未变、仅新增 fork 时也能触发重绘
   const forksKey = msg.forks.map((f) => `${f.threadId}:${f.num}`).join("|")
+  const active = msg.status === "streaming" || msg.status === "pending"
+  const display = useSmoothText(msg.text, active)
 
   useEffect(() => {
     const host = hostRef.current
@@ -314,7 +323,7 @@ function AnchoredMarkdown({
 
   return (
     <div ref={hostRef} onClick={onClick}>
-      <MarkdownBody source={msg.text} />
+      <MarkdownBody source={display} />
     </div>
   )
 }
