@@ -5,6 +5,8 @@
  * 整棵树 + Artifact 登记表构成 ThreadTreeState，由 core/store.ts 统一变更。
  */
 
+import type { TextAnchor } from "../branching/text-anchor"
+
 export type Role = "user" | "assistant"
 export type ArtifactKind = "code" | "note"
 
@@ -23,14 +25,17 @@ export type ArtifactSeed = Omit<Artifact, "id" | "sourceThreadId">
 
 /** 挂在消息原文上的分支锚点：一段被划选的文字 + 对应脚注号 + 目标会话 */
 export interface Fork {
+  /** 被划选的文字（= anchor.quote.exact），标题 / system 提示仍用它 */
   text: string
   num: number
   threadId: string
   depth: number
-  /** 划选处之前的源文本上下文（最多 24 字）：TextQuoteSelector 式精确定位用，可缺省（回退顺延匹配） */
-  prefix?: string
-  /** 划选处之后的源文本上下文（最多 24 字），同上 */
-  suffix?: string
+  /**
+   * 文本锚点（TextQuoteSelector + TextPositionSelector）：在渲染后的 Markdown DOM 上
+   * 三层降级（position → exact → fuzzy）重新定位高亮，对 DOM 结构与文本漂移免疫。
+   * 采集失败（选区无法描述）时可缺省，此时该 fork 不高亮，但分支本体 / 脚注列表不受影响。
+   */
+  anchor?: TextAnchor
 }
 
 /** 消息的流式生命周期状态；undefined 视为 "done"（历史消息 / 非流式消息） */

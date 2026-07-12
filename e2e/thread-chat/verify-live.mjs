@@ -5,14 +5,15 @@
  *   1. dev server 已在 localhost:3000 跑着（pnpm dev）；
  *   2. .env.local 配好 MiniMax（MINIMAX_API_KEY / MINIMAX_BASE_URL / LLM_MODEL_ID）；
  *   3. 本机有 Chromium：优先取环境变量 CHROMIUM_PATH，否则用 playwright-core 默认发现逻辑。
- * 运行：
+ * 运行（默认 http://localhost:3000，可用 BASE_URL 覆盖）：
  *   CHROMIUM_PATH=/opt/pw-browsers/chromium node e2e/thread-chat/verify-live.mjs
  *
- * 断言覆盖：页面加载 → 主线真实流式回复 → 划选开分支（气泡）→ 分支列打开但
- * 不自动发请求（composer 预填代拟问题 / 消息区为空 / 2 秒内无新 /api/chat POST）→
- * 回车确认后 kickoff 成为真实 user 气泡 + assistant 流式首答 → payload 契约
- * （继承上文 / kickoff 以真实 user 消息在 messages 里 / threadChat.anchorText /
- * 无 system 角色 / 无指令前缀折叠 / 无空 assistant）→ 主线锚点脚注 → 分支内追问二轮流式。
+ * 断言覆盖：页面加载 → 主线真实流式回复（富文本 Markdown：.md-body 渲染出结构化元素、
+ * 无裸 Markdown 记号）→ 划选渲染后的正文开分支（气泡）→ 分支列打开但不自动发请求
+ * （composer 预填代拟问题 / 消息区为空 / 2 秒内无新 /api/chat POST）→ 回车确认后 kickoff
+ * 成为真实 user 气泡 + assistant 流式首答 → payload 契约（继承上文 / kickoff 以真实 user
+ * 消息在 messages 里 / threadChat.anchorText / 无 system 角色 / 无指令前缀折叠 /
+ * 无空 assistant）→ 主线源消息出现锚点高亮 / 脚注 → 分支内追问二轮流式。
  * 走真实模型，回复内容非确定，断言只卡结构与契约。截图输出到同目录 shots/（已 gitignore）。
  */
 import { mkdirSync } from "node:fs"
@@ -48,7 +49,8 @@ page.on("request", (req) => {
 })
 page.on("pageerror", (e) => console.log("PAGEERROR:", e.message))
 
-await page.goto("http://localhost:3000/thread-chat", {
+const BASE_URL = process.env.BASE_URL || "http://localhost:3000"
+await page.goto(`${BASE_URL}/thread-chat`, {
   waitUntil: "networkidle",
 })
 ok("页面加载：.tc 壳存在", (await page.locator(".tc").count()) === 1)
@@ -56,7 +58,8 @@ ok("页面加载：.tc 壳存在", (await page.locator(".tc").count()) === 1)
 // ---- 1. 主线发消息，等真实流式回复完成 ----
 const composer = page.locator(".column").first().locator("textarea")
 await composer.fill(
-  "用不超过五句话介绍一下量子纠缠，其中请务必包含「贝尔不等式」这个词。"
+  "请用小标题和分点列表，较详细地讲解量子纠缠（至少列 4 个要点），" +
+    "并务必在正文中出现「贝尔不等式」这个词。"
 )
 await composer.press("Enter")
 
@@ -89,11 +92,40 @@ ok(
   "回复包含「贝尔不等式」（可校验上下文真实来自模型）",
   mainReply.includes("贝尔不等式")
 )
+
+// 富文本断言：.md-body 存在、渲染出结构化元素、且正文无裸 Markdown 记号
+const mdInfo = await page.evaluate(() => {
+  const col = document.querySelector(".column")
+  const bubbles = col?.querySelectorAll(".message.assistant .bubble")
+  const last = bubbles?.[bubbles.length - 1]
+  const md = last?.querySelector(".md-body")
+  if (!md) return { hasMd: false }
+  const structural = md.querySelector(
+    "strong, em, ul, ol, h1, h2, h3, h4, code, table, blockquote"
+  )
+  // 裸记号只在【代码块之外】检测——<code>/<pre> 的 textContent 合法保留 ** 与 #
+  // （如 Python 注释 # 或 shell 的 **），把它们算作未渲染记号会造成非确定性误报。
+  const clone = md.cloneNode(true)
+  clone.querySelectorAll("code, pre").forEach((n) => n.remove())
+  const prose = clone.textContent || ""
+  return {
+    hasMd: true,
+    structured: !!structural,
+    // 正文（非代码）里出现 **加粗** 或行首 # 标题，才说明 Markdown 没被渲染
+    raw: /\*\*/.test(prose) || /(^|\n)#{1,6}\s/.test(prose),
+  }
+})
+ok("assistant 正文进入 .md-body（Markdown 渲染容器）", mdInfo.hasMd)
+ok(
+  "assistant 正文渲染出结构化元素（strong / 列表 / 标题 / 代码等）",
+  mdInfo.structured === true
+)
+ok("assistant 正文无裸 Markdown 记号（** / 行首 #）", mdInfo.raw === false)
 await page.screenshot({ path: SHOT("1-main-reply") })
 
 // ---- 2. 划选回复文字 → 气泡 → 开分支 ----
 const anchor = "贝尔不等式"
-const selected = await page.evaluate((needle) => {
+const selected = await page.evaluate(async (needle) => {
   const bubbles = document.querySelectorAll(
     ".column .message.assistant .bubble"
   )
@@ -103,6 +135,9 @@ const selected = await page.evaluate((needle) => {
   while ((node = walker.nextNode())) {
     const i = node.textContent.indexOf(needle)
     if (i >= 0) {
+      // 先把命中处滚进视口（模拟真实用户看着划选），气泡定位才落在可视区
+      node.parentElement?.scrollIntoView({ block: "center" })
+      await new Promise((r) => setTimeout(r, 120))
       const range = document.createRange()
       range.setStart(node, i)
       range.setEnd(node, i + needle.length)
@@ -135,7 +170,7 @@ ok("分支列已打开", true)
 
 const kickoffExpected =
   `请围绕我划选的这段话展开讲解：「${anchor}」。` +
-  "先解释它本身的含义，再讲清楚它为什么重要或常见误区/延伸，控制在三段以内。"
+  "先解释它本身的含义，再讲清楚它为什么重要、常见误区与延伸，自然充分地展开。"
 const branchCol = page.locator(".column").last()
 const prefillValue = await branchCol.locator("textarea").inputValue()
 ok("分支 composer 预填代拟问题（含锚点原文）", prefillValue === kickoffExpected)
@@ -188,13 +223,20 @@ const branchReply = await page
   .innerText()
 ok("分支首答已流式完成（>20 字）", branchReply.trim().length > 20)
 
-// 锚点定位生效：主线回复里出现 fork 脚注上标
-const fnCount = await page
-  .locator(".column")
+// 锚点定位生效：主线源消息在渲染后的 .md-body 上出现高亮或脚注（手绘 DOM）
+await page
+  .locator(
+    ".column .message.assistant .md-body [data-text-anchor-mark], .column .message.assistant .md-body sup.fn-mark"
+  )
   .first()
-  .locator(".message.assistant sup.fnote")
+  .waitFor({ timeout: 5000 })
+  .catch(() => {})
+const markCount = await page
+  .locator(
+    ".column .message.assistant .md-body [data-text-anchor-mark], .column .message.assistant .md-body sup.fn-mark"
+  )
   .count()
-ok(`主线出现锚点脚注标记（当前 ${fnCount} 个）`, fnCount >= 1)
+ok(`主线源消息出现锚点高亮 / 脚注（当前 ${markCount} 个标记）`, markCount >= 1)
 await page.screenshot({ path: SHOT("4-branch-streamed") })
 
 // ---- 3. 校验分支请求 payload 契约 ----

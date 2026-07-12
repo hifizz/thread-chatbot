@@ -84,11 +84,11 @@ export async function POST(req: Request) {
   // 研究模式：加入联网检索/深读工具、放宽步数、注入研究系统提示
   const research = deepResearch === true
   const searchReady = isSearchConfigured()
-  // thread-chat 模式：纯文本 system + 不挂后端工具（研究模式优先级更高）
+  // thread-chat 模式：结构化风格 system + 不挂后端工具（研究模式优先级更高）
   const isThreadChat = !research && threadChat != null
 
   const allTools = {
-    // thread-chat 模式不挂后端工具：该页面是纯文本对话，直接不给工具比在 prompt 里劝阻更可靠
+    // thread-chat 模式不挂后端工具：该页面是分支讲解对话，直接不给工具比在 prompt 里劝阻更可靠
     ...(isThreadChat ? {} : { getWeather, compareTable }),
     ...(research && searchReady ? researchTools : {}),
     ...frontendTools(tools ?? {}),

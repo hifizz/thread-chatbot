@@ -172,9 +172,8 @@ export function ThreadChatDemo() {
       sourceThreadId: s.threadId,
       sourceMsgId: s.msgId,
       anchorText: s.text,
-      // 划选处前后的源文本上下文：锚点在重复文字中的精确定位依据（采集失败时为 undefined）
-      prefix: s.prefix,
-      suffix: s.suffix,
+      // 文本锚点：渲染后 Markdown DOM 上的模糊恢复定位依据
+      anchor: s.anchor,
     })
     if (!r) return
     const eff = cols.openThread(r.threadId, s.threadId, hint)

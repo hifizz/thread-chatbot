@@ -6,15 +6,15 @@
 import {
   THREAD_CHAT_BRANCH_PREFIX,
   THREAD_CHAT_BRANCH_SUFFIX,
-  THREAD_CHAT_PLAIN_TEXT_SYSTEM,
+  THREAD_CHAT_SYSTEM,
 } from "@/constants/thread-chat"
 
 /**
  * 构造 thread-chat 模式的 system 提示：
- * 通用纯文本风格段 +（anchorText 非空时）分支焦点段（锚点原文作为数据嵌入「」内）。
+ * 通用结构化风格段 +（anchorText 非空时）分支焦点段（锚点原文作为数据嵌入「」内）。
  */
 export function buildThreadChatSystem(anchorText?: string | null): string {
   const anchor = anchorText?.trim()
-  if (!anchor) return THREAD_CHAT_PLAIN_TEXT_SYSTEM
-  return `${THREAD_CHAT_PLAIN_TEXT_SYSTEM}\n\n${THREAD_CHAT_BRANCH_PREFIX}「${anchor}」。${THREAD_CHAT_BRANCH_SUFFIX}`
+  if (!anchor) return THREAD_CHAT_SYSTEM
+  return `${THREAD_CHAT_SYSTEM}\n\n${THREAD_CHAT_BRANCH_PREFIX}「${anchor}」。${THREAD_CHAT_BRANCH_SUFFIX}`
 }
