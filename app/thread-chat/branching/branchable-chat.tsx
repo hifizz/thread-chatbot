@@ -10,14 +10,15 @@
  * 本层只发出意图回调（打开会话 / 回退 / 收起…），列槽的增删换由 orchestration 决定。
  */
 
-import React from "react"
+import React, { useEffect, useRef } from "react"
 import { FileCode2, FileText, ListTree } from "lucide-react"
 import type { Message, ThreadTreeState } from "../core/types"
 import { collectInherited, lineage, threadTitle } from "../core/selectors"
 import { dc } from "../theme"
-import { ChatView, withBreaks } from "../chat/chat-view"
-// 划选锚点 → 高亮区间：TextQuoteSelector 式上下文定位（纯函数，独立模块便于用例验证）
-import { computeRanges } from "./anchor-ranges"
+import { ChatView } from "../chat/chat-view"
+import { MarkdownBody } from "../chat/markdown-body"
+// 锚点在「渲染后的 Markdown DOM」上模糊恢复定位（position→exact→fuzzy），与纯文本解耦
+import { clearHighlights, locateAnchor, paintRange } from "./text-anchor"
 
 export interface BranchableChatProps {
   state: ThreadTreeState
@@ -72,56 +73,10 @@ export function BranchableChat({
   const inherited = isMain ? [] : collectInherited(state, thread)
   const childCount = thread.children.length
 
-  /* ---------- 注入：assistant 正文（锚点高亮 + 脚注上标） ---------- */
-  const renderAssistantBody = (msg: Message) => {
-    const ranges = computeRanges(msg)
-    const t = msg.text
-    const paras: { start: number; text: string }[] = []
-    let off = 0
-    t.split("\n\n").forEach((pt) => {
-      paras.push({ start: off, text: pt })
-      off += pt.length + 2
-    })
-
-    return paras.map((p) => {
-      const pEnd = p.start + p.text.length
-      const nodes: React.ReactNode[] = []
-      let pos = p.start
-      ranges.forEach((r, ri) => {
-        if (r.end <= p.start || r.start >= pEnd) return
-        const s0 = Math.max(r.start, p.start)
-        const e0 = Math.min(r.end, pEnd)
-        if (s0 > pos) nodes.push(...withBreaks(t.slice(pos, s0), `t${pos}`))
-        const forkTitle = `分支「${threadTitle(state, r.fork.threadId)}」· 点击打开 · ⌘点击保留本列在右侧打开`
-        const openFork = (e: React.MouseEvent) =>
-          onOpenThread(r.fork.threadId, { keepSource: e.metaKey || e.ctrlKey })
-        nodes.push(
-          <span
-            key={`a${ri}-${s0}`}
-            className={`anchored fc-${dc(r.fork.depth)}`}
-            title={forkTitle}
-            onClick={openFork}
-          >
-            {withBreaks(t.slice(s0, e0), `at${s0}`)}
-          </span>
-        )
-        if (r.end <= pEnd)
-          nodes.push(
-            <sup
-              key={`f${ri}`}
-              className={`fnote fc-${dc(r.fork.depth)}`}
-              title={forkTitle}
-              onClick={openFork}
-            >
-              {r.fork.num}
-            </sup>
-          )
-        pos = e0
-      })
-      if (pos < pEnd) nodes.push(...withBreaks(t.slice(pos, pEnd), `t${pos}`))
-      return <p key={p.start}>{nodes}</p>
-    })
-  }
+  /* ---------- 注入：assistant 正文（Markdown 渲染 + 渲染后手绘锚点高亮/脚注） ---------- */
+  const renderAssistantBody = (msg: Message) => (
+    <AnchoredMarkdown state={state} msg={msg} onOpenThread={onOpenThread} />
+  )
 
   /* ---------- 注入：消息下方的 artifact 卡片 ---------- */
   const renderAfterMessage = (msg: Message) => {
@@ -274,4 +229,99 @@ export function BranchableChat({
       onSend={onSend}
     />
   )
+}
+
+/* -------------------------------------------------------------------------- */
+/* assistant 正文：Markdown 渲染 + 渲染后手绘锚点高亮 / 脚注上标                  */
+/* -------------------------------------------------------------------------- */
+/**
+ * 为什么「手绘」而非 React 渲染高亮：锚点定位发生在**渲染后的真实 DOM**上
+ * （locateAnchor 三层降级），坐标系 = .md-body 的 textContent，对 Markdown 结构免疫。
+ *
+ * React 与手绘 DOM 的冲突规避：
+ * · MarkdownBody 按 source 用 memo——source 不变则不重渲染，手绘的高亮/脚注不被 reconcile 抹掉；
+ * · source 变化只发生在流式增量时，而流式中的消息尚无 fork（fork 只在已完成消息上创建），
+ *   故无高亮与 React 更新的冲突；
+ * · 只在 commit 后的 effect 里绘制（deps = [msg.text, forksKey]），绝不在 render / setState 里绘。
+ * · 定位失败（locateAnchor 返回 null 或 fuzzy 低于阈值）静默跳过该 fork——不高亮，
+ *   但分支本体 / 脚注列表 / ⌘K 不受影响。
+ */
+function AnchoredMarkdown({
+  state,
+  msg,
+  onOpenThread,
+}: {
+  state: ThreadTreeState
+  msg: Message
+  onOpenThread: (targetId: string, opts?: { keepSource?: boolean }) => void
+}) {
+  const hostRef = useRef<HTMLDivElement | null>(null)
+  // forksKey 只随 fork 的增删与编号变化——source 未变、仅新增 fork 时也能触发重绘
+  const forksKey = msg.forks.map((f) => `${f.threadId}:${f.num}`).join("|")
+
+  useEffect(() => {
+    const host = hostRef.current
+    if (!host) return
+    const md = host.querySelector<HTMLElement>(".md-body")
+    if (!md) return
+
+    const wipe = () => {
+      clearHighlights(md)
+      md.querySelectorAll("sup.fn-mark").forEach((n) => n.remove())
+    }
+    wipe()
+
+    for (const fork of msg.forks) {
+      if (!fork.anchor) continue
+      const located = locateAnchor(md, fork.anchor)
+      if (!located) continue // 定位失败：静默跳过（fuzzy 默认阈值 0.7）
+      const color = `color-mix(in srgb, var(--d${dc(fork.depth)}) 20%, transparent)`
+      paintRange(located.range, fork.threadId, color)
+      // 高亮 span 补上 data-fork-id + 深度色类，使点击高亮亦能打开分支
+      const marks = md.querySelectorAll<HTMLElement>(
+        `[data-text-anchor-mark="${cssEscape(fork.threadId)}"]`
+      )
+      marks.forEach((m) => {
+        m.setAttribute("data-fork-id", fork.threadId)
+        m.classList.add("anchored-mark", `fc-${dc(fork.depth)}`)
+        m.title = `分支「${threadTitle(state, fork.threadId)}」· 点击打开 · ⌘点击保留本列在右侧打开`
+      })
+      // range 末尾插入脚注上标（同样带 data-fork-id）
+      const last = marks[marks.length - 1]
+      if (last) {
+        const sup = document.createElement("sup")
+        sup.className = `fn-mark fc-${dc(fork.depth)}`
+        sup.setAttribute("data-fork-id", fork.threadId)
+        sup.textContent = String(fork.num)
+        last.after(sup)
+      }
+    }
+
+    return wipe
+    // state 仅用于 title 文案，不参与重绘时机；有意省略以免每次 version 变动都重绘
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [msg.text, forksKey])
+
+  // 点击冒泡到稳定容器：命中高亮 / 脚注（data-fork-id）即打开对应分支。
+  // 高亮与脚注是手绘 DOM，但事件冒泡到此 React onClick，重绘不丢 handler。
+  const onClick = (e: React.MouseEvent) => {
+    const el = (e.target as HTMLElement).closest?.("[data-fork-id]")
+    if (!el) return
+    const id = el.getAttribute("data-fork-id")
+    if (!id) return
+    onOpenThread(id, { keepSource: e.metaKey || e.ctrlKey })
+  }
+
+  return (
+    <div ref={hostRef} onClick={onClick}>
+      <MarkdownBody source={msg.text} />
+    </div>
+  )
+}
+
+/** querySelector 属性值转义（thread id 形如 b1，仍走标准转义以防特殊字符） */
+function cssEscape(value: string): string {
+  if (typeof CSS !== "undefined" && typeof CSS.escape === "function")
+    return CSS.escape(value)
+  return value.replace(/"/g, '\\"')
 }

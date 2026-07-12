@@ -1632,3 +1632,185 @@
 .tc .send.stop:hover {
   background: #fbeae7;
 }
+
+/* ==========================================================================
+   assistant 正文 Markdown 排版（.md-body）+ 手绘锚点高亮 / 脚注上标
+   沿用 .tc 的 paper/ink 暖色 token，与 demo 手稿批注风一致。
+   用户消息仍是纯文本（不过 Markdown），样式见 .message.user .bubble。
+   ========================================================================== */
+.tc .md-body {
+  font-family: var(--font-read);
+  font-size: 15px;
+  line-height: 1.72;
+  color: var(--ink);
+}
+.tc .md-body > *:first-child {
+  margin-top: 0;
+}
+.tc .md-body > *:last-child {
+  margin-bottom: 0;
+}
+.tc .md-body p {
+  margin: 0 0 12px;
+}
+.tc .md-body h1,
+.tc .md-body h2,
+.tc .md-body h3,
+.tc .md-body h4 {
+  font-family: var(--font-ui);
+  color: var(--ink);
+  font-weight: 700;
+  line-height: 1.35;
+  margin: 20px 0 9px;
+}
+.tc .md-body h1 {
+  font-size: 20px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid var(--rule);
+}
+.tc .md-body h2 {
+  font-size: 17px;
+}
+.tc .md-body h3 {
+  font-size: 15.5px;
+}
+.tc .md-body h4 {
+  font-size: 14px;
+  color: var(--ink-soft);
+}
+.tc .md-body ul,
+.tc .md-body ol {
+  margin: 0 0 12px;
+  padding-left: 22px;
+}
+.tc .md-body li {
+  margin: 3px 0;
+}
+.tc .md-body li::marker {
+  color: var(--ink-faint);
+}
+.tc .md-body blockquote {
+  margin: 0 0 12px;
+  padding: 2px 0 2px 13px;
+  border-left: 3px solid var(--rule-strong);
+  color: var(--ink-soft);
+}
+.tc .md-body a {
+  color: var(--d1);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.tc .md-body hr {
+  border: none;
+  border-top: 1px solid var(--rule);
+  margin: 18px 0;
+}
+.tc .md-body strong {
+  font-weight: 700;
+  color: var(--ink);
+}
+.tc .md-body em {
+  font-style: italic;
+}
+.tc .md-body .md-inline-code {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  background: var(--paper-2);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+/* 表格 */
+.tc .md-body table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0 0 12px;
+  font-size: 13.5px;
+  font-family: var(--font-ui);
+}
+.tc .md-body th,
+.tc .md-body td {
+  border: 1px solid var(--rule);
+  padding: 6px 10px;
+  text-align: left;
+  vertical-align: top;
+}
+.tc .md-body th {
+  background: var(--paper-2);
+  font-weight: 600;
+  color: var(--ink);
+}
+/* 代码块：语言标签 + 复制按钮 + 代码体 */
+.tc .md-body .md-code {
+  margin: 0 0 12px;
+  border: 1px solid var(--rule-strong);
+  border-radius: 8px;
+  overflow: hidden;
+  background: #2b2822;
+}
+.tc .md-body .md-code-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 10px;
+  background: #35312a;
+  border-bottom: 1px solid #453f36;
+  font-family: var(--font-mono);
+}
+.tc .md-body .md-code-head .lang {
+  font-size: 10.5px;
+  letter-spacing: 0.5px;
+  text-transform: lowercase;
+  color: #b8ad98;
+}
+.tc .md-body .md-code-head .copy {
+  display: inline-flex;
+  align-items: center;
+  background: transparent;
+  border: none;
+  color: #b8ad98;
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 4px;
+}
+.tc .md-body .md-code-head .copy:hover {
+  color: #f0e9d8;
+  background: rgba(255, 255, 255, 0.08);
+}
+.tc .md-body .md-code pre {
+  margin: 0;
+  padding: 11px 13px;
+  overflow-x: auto;
+}
+.tc .md-body .md-code code {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: #ece3d1;
+  white-space: pre;
+}
+
+/* 手绘锚点高亮（data-text-anchor-mark 由 paintRange 绘制，背景色内联）+ 脚注上标 */
+.tc .md-body [data-text-anchor-mark] {
+  cursor: pointer;
+  border-radius: 2px;
+  padding: 0 1px;
+  border-bottom: 2px solid color-mix(in srgb, var(--fc, var(--d1)) 55%, transparent);
+}
+.tc .md-body sup.fn-mark {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  color: #fff;
+  cursor: pointer;
+  background: var(--fc, var(--d1));
+  border-radius: 4px;
+  padding: 1px 4px;
+  margin: 0 1px 0 2px;
+  vertical-align: super;
+  line-height: 1;
+  user-select: none;
+}
+.tc .md-body sup.fn-mark:hover {
+  filter: brightness(1.1);
+}

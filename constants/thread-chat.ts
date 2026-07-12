@@ -1,9 +1,15 @@
 // thread-chat 分支对话页（app/thread-chat）的服务端 system 提示模板常量。
 
-/** 通用纯文本风格段：该模式渲染层依赖 indexOf 锚点匹配，必须压制 Markdown 记号 */
-export const THREAD_CHAT_PLAIN_TEXT_SYSTEM =
-  "请始终使用纯文本回答：不要使用任何 Markdown 语法（**、#、`、代码块、- 或 1. 列表、表格、链接标记），" +
-  "用空行分隔段落。回答保持聚焦、适度精炼。"
+/**
+ * 通用风格段：鼓励深入、结构化的回答。
+ * 锚点已改由渲染后的 Markdown DOM 上模糊恢复定位（text-anchor），与纯文本彻底解耦，
+ * 故不再压制 Markdown——放开让模型充分发挥。
+ */
+export const THREAD_CHAT_SYSTEM =
+  "你是一位乐于深入讲解的助手。回答要结构清晰、有层次、尽量讲透：" +
+  "善用 Markdown 组织内容——用标题分段、用有序 / 无序列表罗列要点、" +
+  "用代码块承载代码或公式、用表格对比、用**加粗**突出关键概念。" +
+  "在有价值处展开细节、举例、说明常见误区或延伸，不必刻意压缩篇幅。"
 
 /** 分支焦点段的前半：后接被划选的锚点原文（见 lib/chat/thread-chat-prompt.ts） */
 export const THREAD_CHAT_BRANCH_PREFIX =

@@ -7,6 +7,7 @@
  * react-hooks/immutability 等规则的关键：mutation 全部收敛在非 React 代码里。
  */
 
+import type { TextAnchor } from "../branching/text-anchor"
 import type { ArtifactSeed, Message, ThreadTreeState } from "./types"
 
 export interface ForkInput {
@@ -14,12 +15,10 @@ export interface ForkInput {
   sourceThreadId: string
   /** 划选的是哪条消息 */
   sourceMsgId: string
-  /** 被划选的原文（同时决定新会话标题与脚注锚点） */
+  /** 被划选的原文（同时决定新会话标题与脚注锚点，= anchor.quote.exact） */
   anchorText: string
-  /** 划选处之前的源文本上下文（最多 24 字，锚点精确定位用；采集失败时可缺省） */
-  prefix?: string
-  /** 划选处之后的源文本上下文（最多 24 字），同上 */
-  suffix?: string
+  /** 文本锚点：渲染后 Markdown DOM 上的模糊恢复定位依据（采集失败时可缺省） */
+  anchor?: TextAnchor
 }
 
 export interface ForkResult {
@@ -120,8 +119,7 @@ export function createThreadStore(seed: ThreadTreeState) {
         num: state.footnoteCounter,
         threadId: id,
         depth,
-        prefix: input.prefix,
-        suffix: input.suffix,
+        anchor: input.anchor,
       })
 
       notify()

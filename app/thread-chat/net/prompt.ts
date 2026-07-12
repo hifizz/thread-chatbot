@@ -9,7 +9,7 @@
  *
  * system 归服务端所有：AI SDK v7 的 streamText 不允许 messages 里出现 system 角色
  * （安全默认值，防客户端注入任意 system 指令）。因此客户端只在请求体上带
- * `threadChat: { anchorText }` 模式标记，纯文本风格段与分支焦点段由
+ * `threadChat: { anchorText }` 模式标记，结构化风格段与分支焦点段由
  * /api/chat 服务端的 buildThreadChatSystem（lib/chat/thread-chat-prompt.ts）统一构造。
  *
  * 关于类型：这里自定义了轻量的 UIMessageLike，而不 `import type { UIMessage } from "ai"`。
@@ -39,7 +39,7 @@ export interface ThreadChatRequestBody {
 export function kickoffQuestion(anchorText: string): string {
   return (
     `请围绕我划选的这段话展开讲解：「${anchorText}」。` +
-    "先解释它本身的含义，再讲清楚它为什么重要或常见误区/延伸，控制在三段以内。"
+    "先解释它本身的含义，再讲清楚它为什么重要、常见误区与延伸，自然充分地展开。"
   )
 }
 
@@ -57,7 +57,7 @@ function includable(
 /**
  * 组装本次请求的完整 body（messages + threadChat 模式标记）。
  * 主线 anchorText 为 null 时也照发 threadChat 字段——有意为之：
- * 让主线同样吃到服务端的纯文本 system（锚点/划选渲染依赖纯文本），只是不带分支焦点段。
+ * 让主线同样吃到服务端的结构化风格 system，只是不带分支焦点段。
  * @param excludeMsgId 本次流式回复的占位消息 id（当前 pending/streaming 的空 assistant），需排除
  */
 export function buildRequestBody(
