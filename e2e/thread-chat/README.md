@@ -29,3 +29,32 @@ CHROMIUM_PATH=/opt/pw-browsers/chromium node e2e/thread-chat/verify-live.mjs
 kickoff 以真实 user 消息在 messages 里 / `threadChat.anchorText` / 无 system 角色 /
 user 消息无指令前缀 / 无空 assistant 消息）、分支内追问二轮流式。走真实模型，
 回复内容非确定，断言只卡结构与契约；截图输出到本目录 `shots/`（已 gitignore）。
+
+注：页面已改为「URL 即树身份」——脚本访问 `/thread-chat` 会被 replace 到
+`/thread-chat/{uuid}`；每次跑在全新 browser context（干净 localStorage）里新生成
+treeId、写入 DB 新行，与既有数据互不污染（本地开发库会积累测试树行，必要时手动清）。
+
+## 持久化验收（openspec: add-branch-tree-persistence）
+
+入库脚本 `verify-persist.mjs`（17 断言，playwright-core + `postgres` 直连 DB 断言，
+测试树行跑完自动清理）。前提与 verify-live 相同，另需 `DATABASE_URL` 可连
+（`pnpm db:migrate` 已应用 `branch_trees` 表）。运行：
+
+```bash
+CHROMIUM_PATH=... BASE_URL=http://localhost:4040 node e2e/thread-chat/verify-persist.mjs
+```
+
+断言覆盖三条链（首次实现时另做过 25+4+5 断言的一次性全量验收，见 openspec change）：
+
+- **端到端恢复（25 断言）**：裸路径 replace 到 `/thread-chat/{uuid}`（回退不弹回跳板）→
+  主线流式 + 划选开分支 + 回车首答 → 过 1.5s 防抖观测到整树 PUT → 同 context 重载：
+  消息 / 分支列（工作台记忆，非只剩主线）/ 锚点高亮脚注全恢复、无 `.typing`/`.caret`
+  残留 → **全新 context（无 localStorage）直访同 URL 同样恢复**（URL 即身份的真验证，
+  默认布局只开主线，点锚点可打开分支列）→「新对话」跳新 UUID 空树、原 URL 回访原树
+  仍在 → DB 行断言（state.threads 含 main+分支、派生标题非空、空树不写库）。
+  截图 `shots/persist-restored.png`。
+- **sanitize（4 断言）**：node 直接往 `branch_trees` 写含 `streaming` 半截正文 +
+  `pending` 空占位的脏快照 → 加载后半截消息以正文显示为 done、空占位被删、无转圈、
+  composer 非忙碌（测试行随后清理）。
+- **降级（5 断言）**：playwright 拦截 `/api/branch-trees/**` 返回 500 → 页面仍以
+  空树打开、console.warn 留痕、真实聊天照常、PUT 失败仅警告不打断。

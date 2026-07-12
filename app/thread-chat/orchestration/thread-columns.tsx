@@ -50,6 +50,10 @@ export interface UseColumnSlotsArgs {
   maxExpanded: number
   /** 列满策略：替换⑥ / 细条⑤ */
   mode: PlacementMode
+  /** 可选初始槽位（工作台记忆恢复用，调用方已校验 threadId 存在性）；不传 = 空槽位（既有行为） */
+  initialSlots?: Slot[]
+  /** 可选初始列宽映射（同上）；不传 = 全部自动均分（既有行为） */
+  initialWidths?: Record<string, number>
 }
 
 /** 从宽度映射里删掉若干条目（纯函数；全都不存在时原样返回，避免无谓重渲） */
@@ -67,13 +71,17 @@ export function useColumnSlots({
   store,
   maxExpanded,
   mode,
+  initialSlots,
+  initialWidths,
 }: UseColumnSlotsArgs) {
-  const [slots, setSlots] = useState<Slot[]>([])
+  const [slots, setSlots] = useState<Slot[]>(initialSlots ?? [])
   /** 显式列宽（px，threadId → width）：有值的列以 flex-basis 承载宽度，无值 = 自动均分。
       拖拽/键盘 commit 以整行为单位落条目（fill 模型下 basis 总和==容器才无跳动），
       双击复位删除整行条目。条目跟随「槽位空间」走：替换/原地切换会话时转移给新 id；
       收起/裁掉清条目；fold/unfold 保留条目（细条固定 30px 不参与）。 */
-  const [widths, setWidths] = useState<Record<string, number>>({})
+  const [widths, setWidths] = useState<Record<string, number>>(
+    initialWidths ?? {}
+  )
   const [flash, setFlash] = useState<{ id: string; n: number } | null>(null)
   const flashSeq = useRef(0)
   const colsRef = useRef<HTMLDivElement | null>(null)

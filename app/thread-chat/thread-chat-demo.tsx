@@ -13,11 +13,18 @@
  * 「打开某会话」的统一意图入口是 openBranchUI：脚注 / ⌘K / 每列 ⇄ / 子树弹层 /
  * Artifact 定位来源 / 画布双击节点全部走它——画布模式下先切回列视图（打开 = 去列里读），
  * 列满时按当前策略替换（可撤销）或折叠细条。
+ *
+ * 持久化（loader + inner 拆分）：默认导出 ThreadChatDemo 是 loader——挂载后
+ * loadTree(treeId) → sanitize → 读工作台记忆，加载完才渲染 ThreadChatDemoInner
+ * （store 以已存状态为种子一次性创建，内部编排逻辑零改动）。inner 里订阅 store
+ * version，防抖 1.5s 整树 PUT（流式高频跳变合并为结束后一次写）+ 卸载 flush；
+ * 工作台状态（列槽/列宽/列数/策略/视图）按 treeId 分键防抖写 localStorage。
  * --------------------------------------------------------------------------
  */
 
 import Link from "next/link"
 import dynamic from "next/dynamic"
+import { useRouter } from "next/navigation"
 import React, { useCallback, useEffect, useRef, useState } from "react"
 import {
   Columns3,
@@ -27,13 +34,28 @@ import {
   Waypoints,
 } from "lucide-react"
 import "./thread-chat.css"
+import {
+  TREE_SAVE_DEBOUNCE_MS,
+  UI_SAVE_DEBOUNCE_MS,
+} from "@/constants/thread-chat"
 import { emptySeedState } from "./core/seed"
 import { createThreadStore } from "./core/store"
 import { useThreadStore } from "./core/use-thread-store"
 import { threadTitle, type TreeRow } from "./core/selectors"
-import type { Message } from "./core/types"
+import type { Message, ThreadTreeState } from "./core/types"
 import { createChatController } from "./net/chat-controller"
 import { kickoffQuestion } from "./net/prompt"
+import {
+  deriveTreeTitle,
+  loadTree,
+  loadUiState,
+  rememberTreeId,
+  sanitizeLoadedState,
+  saveTree,
+  saveUiState,
+  type TreeUiState,
+  type ViewMode,
+} from "./net/persist"
 import { BranchableChat } from "./branching/branchable-chat"
 import {
   SelectionBubble,
@@ -65,8 +87,6 @@ const ThreadCanvas = dynamic(
   }
 )
 
-type ViewMode = "columns" | "canvas"
-
 const MAIN_SUBTITLE = "接入 MiniMax 的流式对话"
 
 interface ToastState {
@@ -84,30 +104,139 @@ function anchoredPos(btn: HTMLElement, w: number, h: number) {
   return { x, y }
 }
 
-export function ThreadChatDemo() {
+/**
+ * 默认导出的 loader：先完成远端加载（GET → sanitize → 读工作台记忆）再渲染 inner。
+ * 加载失败 / 未命中都以空树降级（loadTree 内部已 console.warn），不阻塞页面。
+ * treeId 变化由上层路由的 key={treeId} 整体重挂，不在此处处理切树。
+ */
+export function ThreadChatDemo({ treeId }: { treeId: string }) {
+  const [boot, setBoot] = useState<{
+    seed: ThreadTreeState
+    ui: TreeUiState | null
+  } | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      const loaded = await loadTree(treeId)
+      // sanitize：收敛流式中途落盘的非终态 assistant 残留（见 persist.ts 头注）
+      const seed = loaded ? sanitizeLoadedState(loaded) : emptySeedState()
+      // 工作台记忆按加载回来的树校验（列引用的 thread 必须存在）
+      const ui = loadUiState(treeId, seed)
+      if (cancelled) return
+      rememberTreeId(treeId) // 成功打开即记为「最近一棵」（裸路径的跳转目标）
+      setBoot({ seed, ui })
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [treeId])
+
+  if (!boot) {
+    return (
+      <div className="tc">
+        <div className="boot-loading">对话加载中…</div>
+      </div>
+    )
+  }
+  return (
+    <ThreadChatDemoInner
+      treeId={treeId}
+      initialState={boot.seed}
+      initialUi={boot.ui}
+    />
+  )
+}
+
+interface ThreadChatDemoInnerProps {
+  treeId: string
+  /** store 种子：已 sanitize 的持久化状态，或空树 */
+  initialState: ThreadTreeState
+  /** 该树的工作台记忆（loader 已校验），null = 默认布局（只开主线） */
+  initialUi: TreeUiState | null
+}
+
+export function ThreadChatDemoInner({
+  treeId,
+  initialState,
+  initialUi,
+}: ThreadChatDemoInnerProps) {
+  const router = useRouter()
+
   /* ---------- 会话树：外部可变 store，version 快照驱动重渲 ---------- */
-  const [store] = useState(() => createThreadStore(emptySeedState()))
-  useThreadStore(store)
+  const [store] = useState(() => createThreadStore(initialState))
+  const version = useThreadStore(store)
   const state = store.getState()
 
   /* ---------- 聊天控制器：发送 / 分支首答 / 重试 / 停止（真实 /api/chat SSE 流式） ---------- */
   const [chat] = useState(() => createChatController(store))
   useEffect(() => () => chat.abortAll(), [chat])
 
+  /* ---------- 防抖存库：version 变化后 1.5s 静默才整树 PUT（流式期间合并为一次写）。
+       首屏（version 未变过）不写；卸载时若有 pending 定时器则立即 flush（尽力而为）。 ---------- */
+  const initialVersionRef = useRef(version)
+  const savePendingRef = useRef(false)
+  useEffect(() => {
+    if (version === initialVersionRef.current) return
+    savePendingRef.current = true
+    const t = setTimeout(() => {
+      savePendingRef.current = false
+      const s = store.getState()
+      void saveTree(treeId, s, deriveTreeTitle(s))
+    }, TREE_SAVE_DEBOUNCE_MS)
+    return () => clearTimeout(t)
+  }, [version, treeId, store])
+  useEffect(
+    () => () => {
+      // 仅卸载时执行：防抖窗口内未落盘的变更立即补一次写
+      if (savePendingRef.current) {
+        savePendingRef.current = false
+        const s = store.getState()
+        void saveTree(treeId, s, deriveTreeTitle(s))
+      }
+    },
+    [treeId, store]
+  )
+
   /* ---------- 自适应列数（SSR 阶段 winW=null，顶栏显示「列数」占位） ---------- */
   const winW = useWindowWidth()
-  const [forceCols, setForceCols] = useState<number | null>(null)
+  const [forceCols, setForceCols] = useState<number | null>(
+    initialUi?.forceCols ?? null
+  )
   const autoCols =
     winW === null ? 3 : Math.max(2, Math.min(4, Math.floor(winW / COL_MIN_W)))
   const totalCols = forceCols ?? autoCols
   const maxExpanded = totalCols - 1
 
   /* ---------- 列槽编排：放置策略（替换⑥ / 细条⑤）+ 槽位状态 ---------- */
-  const [mode, setMode] = useState<PlacementMode>("replace")
-  const cols = useColumnSlots({ store, maxExpanded, mode })
+  const [mode, setMode] = useState<PlacementMode>(initialUi?.mode ?? "replace")
+  const cols = useColumnSlots({
+    store,
+    maxExpanded,
+    mode,
+    initialSlots: initialUi?.slots,
+    initialWidths: initialUi?.widths,
+  })
 
   /* ---------- 视图形态：列（深读）| 画布（纵览全树） ---------- */
-  const [viewMode, setViewMode] = useState<ViewMode>("columns")
+  const [viewMode, setViewMode] = useState<ViewMode>(
+    initialUi?.viewMode ?? "columns"
+  )
+
+  /* ---------- 工作台状态记忆（D7）：五项变化 ~300ms 轻防抖写 localStorage（按 treeId 分键）。
+       首帧也会写一次，但内容 == 恢复出的初值，幂等无伤。 ---------- */
+  useEffect(() => {
+    const t = setTimeout(() => {
+      saveUiState(treeId, {
+        slots: cols.slots,
+        widths: cols.widths,
+        forceCols,
+        mode,
+        viewMode,
+      })
+    }, UI_SAVE_DEBOUNCE_MS)
+    return () => clearTimeout(t)
+  }, [treeId, cols.slots, cols.widths, forceCols, mode, viewMode])
   /** 画布视图状态宿主（节点 pin 表）：跨「列 ⇄ 画布」切换存活，属视口状态不进 core store。
       与上面的 store 同一模式：useState(初始化函数) 造出的长寿可变对象（type-only import，
       不把画布模块拖进首屏 bundle） */
@@ -290,7 +419,7 @@ export function ThreadChatDemo() {
         把该列切换成任意会话，<b>⑂</b> 查看该会话的子分支。分支里产出的 Artifact
         会从右侧抽屉弹出。顶栏可切换<b>画布视图</b>
         ，纵览整棵会话树，双击节点回到列模式。
-        当前为纯内存演示，刷新后对话不保留。
+        对话会自动保存到本机数据库——刷新或经同一链接重开都能恢复，顶栏「新对话」可另起一棵树。
       </div>
       <span className="close" onClick={() => setHintOn(false)}>
         ✕
@@ -311,6 +440,13 @@ export function ThreadChatDemo() {
         <Link className="home" href="/" title="返回主聊天">
           ←
         </Link>
+        <button
+          className="tbtn"
+          title="开启一棵全新的分支对话树（当前对话已自动保存，可经其 URL 随时回访）"
+          onClick={() => router.push(`/thread-chat/${crypto.randomUUID()}`)}
+        >
+          新对话
+        </button>
         <div className="brand">
           <span className="mark">
             Thread<em>·</em>

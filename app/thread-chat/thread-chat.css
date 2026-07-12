@@ -1396,6 +1396,17 @@
   width: 100%;
   position: relative;
 }
+/* 首屏加载 / 跳板占位（loader 与 tree-redirect 共用）：与 canvas-loading 同款的一行轻量提示 */
+.tc .boot-loading {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink-faint);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
 .tc .canvas-loading {
   flex: 1;
   display: flex;
@@ -1846,7 +1857,8 @@
   cursor: pointer;
   border-radius: 2px;
   padding: 0 1px;
-  border-bottom: 2px solid color-mix(in srgb, var(--fc, var(--d1)) 55%, transparent);
+  border-bottom: 2px solid
+    color-mix(in srgb, var(--fc, var(--d1)) 55%, transparent);
 }
 .tc .md-body sup.fn-mark {
   font-family: var(--font-mono);

@@ -1,4 +1,5 @@
-// thread-chat 分支对话页（app/thread-chat）的服务端 system 提示模板常量。
+// thread-chat 分支对话页（app/thread-chat）的常量：
+// 服务端 system 提示模板 + 分支树持久化（DB / localStorage）相关常量。
 
 /**
  * 通用风格段：鼓励深入、结构化的回答。
@@ -19,3 +20,23 @@ export const THREAD_CHAT_BRANCH_PREFIX =
 /** 分支焦点段的后半：跟在锚点原文之后 */
 export const THREAD_CHAT_BRANCH_SUFFIX =
   "请围绕这个焦点结合上文展开，除非用户把话题引向别处。"
+
+/* ---------------- 分支树持久化（DB + localStorage） ---------------- */
+
+/** localStorage：裸路径 /thread-chat 的跳转目标——最近打开的一棵树的 treeId */
+export const LAST_TREE_ID_KEY = "thread-chat:last-tree-id"
+
+/** localStorage：每棵树的工作台状态（列槽/列宽/列数/放置策略/视图），按 treeId 分键 */
+export const TREE_UI_KEY_PREFIX = "thread-chat:ui:"
+
+/** store version 变化后的整树存库防抖（毫秒）：流式高频跳变合并为结束后一次 PUT */
+export const TREE_SAVE_DEBOUNCE_MS = 1500
+
+/** 工作台状态写 localStorage 的轻防抖（毫秒，纯本地写很便宜） */
+export const UI_SAVE_DEBOUNCE_MS = 300
+
+/** 派生树标题：取 main 首条 user 消息的前多少个字符 */
+export const TREE_TITLE_MAX_LEN = 20
+
+/** 无法派生标题（主线还没有 user 消息）时的兜底标题 */
+export const TREE_TITLE_FALLBACK = "未命名对话"
