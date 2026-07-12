@@ -4,6 +4,7 @@ import {
   ComposerAttachments,
   UserMessageAttachments,
 } from "@/components/assistant-ui/attachment";
+import { ComposerBeam } from "@/components/assistant-ui/composer-beam";
 import { ComposerPdfInsights } from "@/components/assistant-ui/pdf-insights";
 import { DeepResearchToggle } from "@/components/assistant-ui/deep-research-toggle";
 import {
@@ -570,6 +571,7 @@ const Composer: FC = () => {
   return (
     <ComposerPrimitive.Unstable_TriggerPopoverRoot>
       <ComposerPrimitive.Root className="aui-composer-root relative flex w-full flex-col">
+        <ComposerBeam>
         <ComposerPrimitive.AttachmentDropzone asChild>
           <div
             data-slot="aui_composer-shell"
@@ -586,6 +588,7 @@ const Composer: FC = () => {
             <ComposerAction />
           </div>
         </ComposerPrimitive.AttachmentDropzone>
+        </ComposerBeam>
         <ComposerTriggerPopover char="@" {...mention} />
         <ComposerTriggerPopover
           char="/"
