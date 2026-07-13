@@ -81,6 +81,58 @@ export async function saveTree(
   }
 }
 
+/* ---------------- 树列表 / 重命名 / 删除（会话列表 UI，openspec: add-tree-list-ui） ---------------- */
+
+/** GET /api/branch-trees 的条目形状（轻量列表，无 state） */
+export interface TreeListItem {
+  id: string
+  /** 展示标题：服务端已做 coalesce(custom_title, title, 兜底) */
+  title: string
+  /** ISO 时间字符串（JSON 序列化后的 timestamp） */
+  updatedAt: string
+  threadCount: number
+}
+
+/** GET 树列表：失败返回空数组并 console.warn（弹层显示空态，不打断页面） */
+export async function listTrees(): Promise<TreeListItem[]> {
+  try {
+    const res = await fetch("/api/branch-trees")
+    if (!res.ok) throw new Error(`GET /api/branch-trees ${res.status}`)
+    const data = (await res.json()) as { trees: TreeListItem[] }
+    return data.trees
+  } catch (err) {
+    console.warn("[thread-chat] 拉取树列表失败：", err)
+    return []
+  }
+}
+
+/** PATCH 重命名（只写 custom_title）：失败抛错——调用方做乐观更新回滚 + toast */
+export async function renameTree(id: string, title: string): Promise<void> {
+  const res = await fetch(`/api/branch-trees/${id}`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ title }),
+  })
+  if (!res.ok) throw new Error(`PATCH /api/branch-trees ${res.status}`)
+}
+
+/** DELETE 树（幂等）：失败抛错——调用方保留条目 + toast */
+export async function deleteTree(id: string): Promise<void> {
+  const res = await fetch(`/api/branch-trees/${id}`, { method: "DELETE" })
+  if (!res.ok) throw new Error(`DELETE /api/branch-trees ${res.status}`)
+}
+
+/** 删除某棵树后的本地善后（design D4）：清工作台记忆；「最近一棵」若指向它则清除 */
+export function cleanupAfterTreeDelete(id: string): void {
+  try {
+    localStorage.removeItem(uiKeyOf(id))
+    if (localStorage.getItem(LAST_TREE_ID_KEY) === id)
+      localStorage.removeItem(LAST_TREE_ID_KEY)
+  } catch {
+    /* localStorage 不可用：孤儿键无伤，忽略 */
+  }
+}
+
 /** 派生树标题：main 首条 user 消息前 TREE_TITLE_MAX_LEN 字，无则兜底文案 */
 export function deriveTreeTitle(state: ThreadTreeState): string {
   const firstUser = state.threads.main?.messages.find((m) => m.role === "user")

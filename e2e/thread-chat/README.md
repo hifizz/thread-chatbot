@@ -58,3 +58,20 @@ CHROMIUM_PATH=... BASE_URL=http://localhost:4040 node e2e/thread-chat/verify-per
   composer 非忙碌（测试行随后清理）。
 - **降级（5 断言）**：playwright 拦截 `/api/branch-trees/**` 返回 500 → 页面仍以
   空树打开、console.warn 留痕、真实聊天照常、PUT 失败仅警告不打断。
+
+## 会话列表验收（openspec: add-tree-list-ui）
+
+入库脚本 `verify-tree-list.mjs`（28 断言，前提同 verify-persist；SQL 直插种子树，
+测试行 finally 清理——含被用例本身删除的行，重复删除幂等）。运行：
+
+```bash
+CHROMIUM_PATH=... BASE_URL=http://localhost:4040 node e2e/thread-chat/verify-tree-list.mjs
+```
+
+断言覆盖：空树上 ⌘⇧K 打开弹层（当前树置顶标注「未保存」、种子按 updated_at 降序、
+分支数徽标、相对时间、点当前树仅关闭）→ 点击条目切换恢复 → 内联重命名（Esc 取消 /
+Enter 乐观提交 + DB `custom_title` 落列）→ **继续聊天触发防抖 PUT 后自定义名不被
+派生标题覆盖（双轨标题 design D1 的关键路径）** → 二段删除非当前树（Esc / 点它处
+复位确认态、DB 行删除、`thread-chat:ui:{id}` 清理）→ 删除当前树跳转剩余最近一棵
+（被删行不被卸载 flush 复活、「最近一棵」指针善后）。开发库可能存有真实树，
+断言只卡种子的存在与相对顺序，不假设库里只有测试数据。

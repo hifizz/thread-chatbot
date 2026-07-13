@@ -18,14 +18,17 @@ export async function GET(_req: Request, { params }: RouteContext) {
       parentId: row.parentId,
       format: row.format,
       content: row.content,
-    })),
+    }))
   )
 }
 
 export async function POST(req: Request, { params }: RouteContext) {
   const { threadId } = await params
-  const body: { id: string; parentId: string | null; content: { role: string } & Record<string, unknown> } =
-    await req.json()
+  const body: {
+    id: string
+    parentId: string | null
+    content: { role: string } & Record<string, unknown>
+  } = await req.json()
 
   const [row] = await db
     .insert(messages)

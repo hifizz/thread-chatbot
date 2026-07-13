@@ -301,4 +301,12 @@ await page.screenshot({ path: SHOT("5-branch-followup") })
 
 console.log("\n--- 主线回复节选 ---\n" + mainReply.slice(0, 160))
 console.log("\n--- 分支首答节选 ---\n" + branchReply.slice(0, 160))
+
+// 自清理：持久化上线后本脚本每次跑都会经防抖存下一棵测试树，删掉避免污染开发库
+// （DELETE 幂等；treeId 从当前 URL 取——裸路径已被 replace 到 /thread-chat/{uuid}）
+const ownTreeId = page.url().split("/").pop()
+if (/^[0-9a-f-]{36}$/.test(ownTreeId)) {
+  await page.request.delete(`${BASE_URL}/api/branch-trees/${ownTreeId}`)
+  console.log(`已清理本次测试树 ${ownTreeId.slice(0, 8)}…`)
+}
 await browser.close()

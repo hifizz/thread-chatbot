@@ -70,7 +70,10 @@ export const attachments = pgTable("attachments", {
 // （crypto.randomUUID()），URL 路径段承载（/thread-chat/{treeId}），URL 即树身份。
 export const branchTrees = pgTable("branch_trees", {
   id: text("id").primaryKey(), // 客户端生成的 treeId（UUID，URL 路径段承载）
-  title: text("title"), // 可空：取 main 首条 user 文本前若干字，纯展示
+  title: text("title"), // 可空：取 main 首条 user 文本前若干字，纯展示（机器派生轨）
+  // 双轨标题（design D1）：用户重命名只写这列（PATCH），防抖整树 PUT 只写上面的派生
+  // title——两条写路径互不踩踏；对外展示一律 coalesce(custom_title, title)。
+  customTitle: text("custom_title"),
   state: jsonb("state").notNull(), // 完整 ThreadTreeState
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()

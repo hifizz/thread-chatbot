@@ -1877,3 +1877,118 @@
 .tc .md-body sup.fn-mark:hover {
   filter: brightness(1.1);
 }
+
+/* ---------------- 会话列表弹层（tlx，复用 .swx 体系；openspec: add-tree-list-ui） ---------------- */
+.tc .swx.tlx {
+  width: min(460px, 94vw);
+}
+.tc .swx-title .kbd {
+  margin-left: auto;
+}
+.tc .tlx-row {
+  gap: 8px;
+}
+.tc .tlx-row:hover {
+  background: var(--paper-2);
+}
+.tc .tlx-row.cur {
+  background: color-mix(in srgb, var(--d1, #b07d2e) 9%, transparent);
+}
+.tc .tlx-row.cur .dot {
+  background: var(--d1, #b07d2e);
+}
+.tc .tlx-row .t {
+  flex: 1;
+  min-width: 0;
+  font-size: 13.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* 元信息（分支徽标 + 相对时间）：悬停让位给操作按钮 */
+.tc .tlx-meta {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.tc .tlx-badge {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-soft);
+  border: 1px solid var(--rule-strong);
+  border-radius: 5px;
+  padding: 1px 6px;
+  background: var(--paper-2);
+}
+.tc .tlx-time {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--ink-faint);
+}
+.tc .tlx-unsaved {
+  color: #b07d2e;
+  border-color: color-mix(in srgb, #b07d2e 45%, transparent);
+  background: color-mix(in srgb, #b07d2e 8%, transparent);
+}
+/* 悬停操作（铅笔 / 垃圾桶）：默认隐藏，行悬停或确认态浮现 */
+.tc .tlx-acts {
+  flex: none;
+  display: none;
+  align-items: center;
+  gap: 4px;
+}
+.tc .tlx-row:hover .tlx-acts,
+.tc .tlx-acts:has(.confirm) {
+  display: inline-flex;
+}
+.tc .tlx-row:hover:has(.tlx-acts) .tlx-meta {
+  display: none;
+}
+.tc .tlx-act {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--rule-strong);
+  background: #fff;
+  border-radius: 6px;
+  padding: 3px 6px;
+  font-size: 11px;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+.tc .tlx-act:hover {
+  color: var(--ink);
+  border-color: var(--ink-faint);
+}
+.tc .tlx-act.danger:hover {
+  color: #b03a2e;
+  border-color: color-mix(in srgb, #b03a2e 50%, transparent);
+}
+/* 二段删除的确认态：醒目但不弹全局 modal */
+.tc .tlx-act.danger.confirm {
+  color: #fff;
+  background: #b03a2e;
+  border-color: #b03a2e;
+  font-weight: 600;
+}
+.tc .tlx-act.danger.confirm:hover {
+  filter: brightness(1.08);
+}
+.tc .tlx-act:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+/* 内联重命名输入框 */
+.tc .tlx-edit {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--d1, #b07d2e);
+  border-radius: 6px;
+  padding: 3px 7px;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  color: var(--ink);
+  background: #fff;
+  outline: none;
+}
