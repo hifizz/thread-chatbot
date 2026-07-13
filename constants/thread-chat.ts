@@ -38,5 +38,8 @@ export const UI_SAVE_DEBOUNCE_MS = 300
 /** 派生树标题：取 main 首条 user 消息的前多少个字符 */
 export const TREE_TITLE_MAX_LEN = 20
 
+/** 用户自定义标题（重命名，写 custom_title 列）的最大长度：trim 后超过即 400 */
+export const CUSTOM_TITLE_MAX_LEN = 60
+
 /** 无法派生标题（主线还没有 user 消息）时的兜底标题 */
 export const TREE_TITLE_FALLBACK = "未命名对话"

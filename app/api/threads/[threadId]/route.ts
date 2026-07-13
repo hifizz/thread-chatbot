@@ -13,7 +13,8 @@ export async function GET(_req: Request, { params }: RouteContext) {
 
 export async function PATCH(req: Request, { params }: RouteContext) {
   const { threadId } = await params
-  const body: { title?: string; status?: "regular" | "archived" } = await req.json()
+  const body: { title?: string; status?: "regular" | "archived" } =
+    await req.json()
 
   const [row] = await db
     .update(threads)

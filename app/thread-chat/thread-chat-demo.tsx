@@ -29,6 +29,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react"
 import {
   Columns3,
   Highlighter,
+  ListTodo,
   Network,
   PanelRightOpen,
   Waypoints,
@@ -75,6 +76,7 @@ import {
   ThreadSwitcher,
   type SwitcherMode,
 } from "./orchestration/thread-switcher"
+import { TreeList } from "./orchestration/tree-list"
 import { ArtifactDrawer } from "./orchestration/artifact-drawer"
 import type { CanvasViewState } from "./orchestration/use-canvas-layout"
 
@@ -173,14 +175,18 @@ export function ThreadChatDemoInner({
   useEffect(() => () => chat.abortAll(), [chat])
 
   /* ---------- 防抖存库：version 变化后 1.5s 静默才整树 PUT（流式期间合并为一次写）。
-       首屏（version 未变过）不写；卸载时若有 pending 定时器则立即 flush（尽力而为）。 ---------- */
+       首屏（version 未变过）不写；卸载时若有 pending 定时器则立即 flush（尽力而为）。
+       suppressSaveRef：当前树被用户从列表里删除后置真——否则跳转离开时的卸载 flush
+       / 防抖窗口尾巴会把刚删的 DB 行原样复活（工作台 localStorage 同理）。 ---------- */
   const initialVersionRef = useRef(version)
   const savePendingRef = useRef(false)
+  const suppressSaveRef = useRef(false)
   useEffect(() => {
     if (version === initialVersionRef.current) return
     savePendingRef.current = true
     const t = setTimeout(() => {
       savePendingRef.current = false
+      if (suppressSaveRef.current) return
       const s = store.getState()
       void saveTree(treeId, s, deriveTreeTitle(s))
     }, TREE_SAVE_DEBOUNCE_MS)
@@ -189,7 +195,7 @@ export function ThreadChatDemoInner({
   useEffect(
     () => () => {
       // 仅卸载时执行：防抖窗口内未落盘的变更立即补一次写
-      if (savePendingRef.current) {
+      if (savePendingRef.current && !suppressSaveRef.current) {
         savePendingRef.current = false
         const s = store.getState()
         void saveTree(treeId, s, deriveTreeTitle(s))
@@ -227,6 +233,7 @@ export function ThreadChatDemoInner({
        首帧也会写一次，但内容 == 恢复出的初值，幂等无伤。 ---------- */
   useEffect(() => {
     const t = setTimeout(() => {
+      if (suppressSaveRef.current) return // 树已被删除：别把刚清掉的工作台记忆写回去
       saveUiState(treeId, {
         slots: cols.slots,
         widths: cols.widths,
@@ -251,6 +258,9 @@ export function ThreadChatDemoInner({
     (SwitcherMode & { n: number }) | null
   >(null)
   const swSeq = useRef(0)
+  /** 会话列表弹层：非 null = 打开（值为重挂 key，每次打开归零内部状态并现拉数据） */
+  const [treeListN, setTreeListN] = useState<number | null>(null)
+  const tlSeq = useRef(0)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [activeArt, setActiveArt] = useState<string | null>(null)
   const [toast, setToast] = useState<ToastState | null>(null)
@@ -364,23 +374,38 @@ export function ThreadChatDemoInner({
     }
   }
 
-  /* ---------- 快捷键：⌘K 会话树 / Esc 逐层关闭（气泡 → 面板 → 抽屉） ---------- */
+  const toggleTreeList = useCallback(() => {
+    const n = ++tlSeq.current
+    setTreeListN((v) => (v === null ? n : null))
+  }, [])
+
+  /* ---------- 快捷键：⌘⇧K 对话列表 / ⌘K 会话树 / Esc 逐层关闭
+       （对话列表弹层在关闭链最外层：列表 → 气泡 → 面板 → 抽屉） ---------- */
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault()
-        toggleGlobalSwitcher()
+        if (e.shiftKey) toggleTreeList()
+        else toggleGlobalSwitcher()
         return
       }
       if (e.key === "Escape") {
-        if (sel) setSel(null)
+        if (treeListN !== null) setTreeListN(null)
+        else if (sel) setSel(null)
         else if (switcher) setSwitcher(null)
         else if (drawerOpen) setDrawerOpen(false)
       }
     }
     document.addEventListener("keydown", onKey)
     return () => document.removeEventListener("keydown", onKey)
-  }, [sel, switcher, drawerOpen, toggleGlobalSwitcher])
+  }, [
+    sel,
+    switcher,
+    drawerOpen,
+    treeListN,
+    toggleGlobalSwitcher,
+    toggleTreeList,
+  ])
 
   /** 会话是否忙碌：末条消息是 assistant 且仍在 pending/streaming（派生自 state，version 快照天然驱动） */
   function isThreadBusy(threadId: string): boolean {
@@ -446,6 +471,15 @@ export function ThreadChatDemoInner({
           onClick={() => router.push(`/thread-chat/${crypto.randomUUID()}`)}
         >
           新对话
+        </button>
+        <button
+          className="tbtn"
+          title="查看全部对话，可切换 / 重命名 / 删除（⌘⇧K）"
+          onClick={toggleTreeList}
+        >
+          <ListTodo size={13} />
+          对话列表
+          <span className="kbd">⌘⇧K</span>
         </button>
         <div className="brand">
           <span className="mark">
@@ -599,6 +633,25 @@ export function ThreadChatDemoInner({
           mode={mode}
           maxExpanded={maxExpanded}
           lastActiveOf={(id) => state.threads[id]?.lastActive ?? 0}
+        />
+      )}
+
+      {treeListN !== null && (
+        <TreeList
+          key={treeListN}
+          currentTreeId={treeId}
+          currentTitle={deriveTreeTitle(state)}
+          currentThreadCount={Object.keys(state.threads).length}
+          onClose={() => setTreeListN(null)}
+          onSwitch={(id) => router.push(`/thread-chat/${id}`)}
+          onDeleteCurrent={(nextId) => {
+            // 当前树已被删除：抑制卸载 flush / 防抖尾巴的回写（否则 DB 行复活），
+            // 再跳剩余最近一棵；一棵不剩则开新 UUID。replace 不给被删 URL 留历史。
+            suppressSaveRef.current = true
+            setTreeListN(null)
+            router.replace(`/thread-chat/${nextId ?? crypto.randomUUID()}`)
+          }}
+          onToast={showToast}
         />
       )}
 
