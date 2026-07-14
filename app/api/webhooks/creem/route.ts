@@ -100,28 +100,30 @@ export async function POST(req: Request) {
       }
 
       case "refund.created": {
-        // 退款：把对应订单标记为已退款并扣回额度（幂等：仅当当前为 paid 时执行一次）
+        // 退款：标记订单已退款并扣回额度，放进同一事务（幂等：仅当前为 paid 时执行一次）
         const orderId = readOrderId(object)
         if (!orderId) break
-        const [row] = await db
-          .update(payments)
-          .set({ status: "refunded" })
-          .where(
-            and(eq(payments.orderId, orderId), eq(payments.status, "paid"))
-          )
-          .returning({
-            userId: payments.userId,
-            creditMicros: payments.creditMicros,
-          })
-        if (row) {
-          await db
-            .update(userCredits)
-            .set({
-              balanceMicros: sql`${userCredits.balanceMicros} - ${row.creditMicros}`,
-              updatedAt: new Date(),
+        await db.transaction(async (tx) => {
+          const [row] = await tx
+            .update(payments)
+            .set({ status: "refunded" })
+            .where(
+              and(eq(payments.orderId, orderId), eq(payments.status, "paid"))
+            )
+            .returning({
+              userId: payments.userId,
+              creditMicros: payments.creditMicros,
             })
-            .where(eq(userCredits.userId, row.userId))
-        }
+          if (row) {
+            await tx
+              .update(userCredits)
+              .set({
+                balanceMicros: sql`${userCredits.balanceMicros} - ${row.creditMicros}`,
+                updatedAt: new Date(),
+              })
+              .where(eq(userCredits.userId, row.userId))
+          }
+        })
         break
       }
 

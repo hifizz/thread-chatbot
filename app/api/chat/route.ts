@@ -5,6 +5,7 @@ import {
   tool,
   type UIMessage,
 } from "ai"
+import { after } from "next/server"
 import { frontendTools } from "@assistant-ui/react-ai-sdk"
 import type { ToolJSONSchema } from "assistant-stream"
 import { z } from "zod"
@@ -17,7 +18,11 @@ import {
 } from "@/constants/research"
 import { buildThreadChatSystem } from "@/lib/chat/thread-chat-prompt"
 import { getCurrentUserId } from "@/lib/auth/server"
-import { getChatModel, resolveModelId } from "@/constants/model"
+import {
+  getChatModel,
+  resolveModelId,
+  MAX_OUTPUT_TOKENS,
+} from "@/constants/model"
 import { resolveChatModel, isModelConfigured } from "@/lib/ai/provider"
 import { hasPositiveBalance, chargeUsage } from "@/lib/billing/credits"
 import { buildUsageMetadata } from "@/lib/billing/usage-meta"
@@ -146,6 +151,8 @@ export async function POST(req: Request) {
       tools: allTools,
     }),
     tools: allTools,
+    // 单请求输出封顶：收敛并发竞态下的最大超支敞口，并防异常长输出打爆供应商账单
+    maxOutputTokens: MAX_OUTPUT_TOKENS,
     // 研究模式允许更多工具轮次；普通对话维持原来的小步数
     stopWhen: isStepCount(research && searchReady ? RESEARCH_MAX_STEPS : 5),
     // 4) 生成结束后按 token 用量即时扣费并写入流水（价目表估算，利润率 ≥30%）。
@@ -164,6 +171,16 @@ export async function POST(req: Request) {
         generationId,
       })
     },
+  })
+
+  // 即使客户端中途断连，也在服务端把整条流消费完，保证 onFinish（计费）必然触发，
+  // 避免「已产生供应商成本却漏计费」。after 让 Serverless 保活到消费结束。
+  after(async () => {
+    try {
+      await result.consumeStream()
+    } catch {
+      // 生成出错时不计费（onFinish 不触发），忽略消费错误即可
+    }
   })
 
   return result.toUIMessageStreamResponse({

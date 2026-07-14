@@ -58,6 +58,12 @@ import { Button } from "@/components/ui/button";
 - 每轮对话结束（`app/api/chat/route.ts` 的 `onFinish`）按 token 即时扣费并写 `usage_records`（`cost_source='estimate'`）；本次用量/费用同时附到 assistant 消息 metadata。余额不足在发起前拦截（HTTP 402）。
 - 输入框右下角实时显示「本次 token / 累计 token / 余额」，数据来自 `/api/billing/summary`。
 
+**健壮性（并发 / 幂等 / 断连）**：
+- 所有「余额变动 + 流水」用数据库事务包成原子（`chargeUsage` / 充值到账 / 退款 / 对账修正），不会扣了钱没记账或反之。
+- `after(result.consumeStream())`：即使客户端中途断连，服务端也会消费完整条流、触发 `onFinish` 计费，避免「已产生供应商成本却漏计费」。
+- `MAX_OUTPUT_TOKENS` 封顶单请求输出，收敛「后付费并发竞态」下的最大超支敞口，并防异常长输出打爆供应商账单。
+- 余额采用**后付费**：发起前 `balance > 0` 拦截、允许最后一条扣至小额负数；高并发下的超支被单请求成本上限约束（非分布式锁，Serverless 友好）。
+
 ### 真实成本对账（Vercel AI 网关，可选，两段式计费）
 
 痛点：手填价目表会过时、跟不上供应商调价。解决：配置 **Vercel AI 网关**（`AI_GATEWAY_API_KEY`）后，非 MiniMax 模型经其转发，响应带 `providerMetadata.gateway.generationId`。
