@@ -6,7 +6,7 @@
  */
 
 import React from "react"
-import { LocateFixed, PanelRightOpen, X } from "lucide-react"
+import { LocateFixed, Package, X } from "lucide-react"
 import type { Artifact, ThreadTreeState } from "../core/types"
 import { dotColorOf } from "../theme"
 
@@ -38,10 +38,9 @@ export function ArtifactDrawer({
   return (
     <div className={`art-drawer ${open ? "open" : ""}`} aria-hidden={!open}>
       <div className="art-head">
-        <PanelRightOpen size={16} color="#6a6357" />
-        <h3>
-          Artifact 舞台 <span className="sub">全局唯一 · 标签页管理</span>
-        </h3>
+        {/* Package：贴合「产出物」语义（打包好的交付物），与顶栏 Artifact 按钮同图标 */}
+        <Package size={16} color="#6a6357" />
+        <h3>Artifact 舞台</h3>
         <button className="art-x" title="收起抽屉" onClick={onClose}>
           <X size={13} />
         </button>

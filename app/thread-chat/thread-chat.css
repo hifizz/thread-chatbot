@@ -51,18 +51,6 @@
   background: linear-gradient(180deg, #faf8f2, var(--paper));
   flex-wrap: wrap;
 }
-.tc .home {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--ink-faint);
-  text-decoration: none;
-  padding: 5px 8px;
-  border-radius: 7px;
-}
-.tc .home:hover {
-  color: var(--ink);
-  background: var(--paper-2);
-}
 .tc .brand {
   display: flex;
   align-items: baseline;
@@ -78,11 +66,6 @@
   font-style: italic;
   color: var(--d1);
 }
-.tc .brand .tag {
-  font-size: 12px;
-  color: var(--ink-faint);
-  font-family: var(--font-mono);
-}
 .tc .spacer {
   flex: 1;
 }
@@ -93,15 +76,6 @@
   border-radius: 8px;
   overflow: hidden;
   background: #fff;
-}
-.tc .seg .lbl {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--ink-faint);
-  padding: 6px 8px;
-  border-right: 1px solid var(--rule);
-  display: flex;
-  align-items: center;
 }
 .tc .seg button {
   border: none;
@@ -154,15 +128,6 @@
   background: var(--d2);
   border-radius: 999px;
   padding: 1px 6px;
-}
-.tc .demo-pill {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--ink-soft);
-  border: 1px solid var(--rule-strong);
-  border-radius: 999px;
-  padding: 4px 10px;
-  background: #fff8;
 }
 .tc .kbd {
   font-family: var(--font-mono);
@@ -537,6 +502,19 @@
 .tc .hint b {
   color: var(--ink);
 }
+/* 功能要点列表：每个要点独占一行，行距略松、缩进克制（小圆点标记居外侧） */
+.tc .hint ul {
+  flex: 1;
+  margin: 0;
+  padding-left: 16px;
+  list-style: disc;
+}
+.tc .hint li {
+  margin: 3px 0;
+}
+.tc .hint li::marker {
+  color: var(--ink-faint);
+}
 .tc .hint .close {
   margin-left: auto;
   cursor: pointer;
@@ -696,7 +674,10 @@
 }
 .tc .composer .box {
   display: flex;
-  align-items: flex-end;
+  /* 单行态垂直居中：textarea（一行 21px）矮于发送键（32px），若沿用 flex-end
+     文字会贴底（上留白 19px / 下留白 8px）；改 center 让文字在上下边框间光学居中。
+     多行态 textarea autoGrow 后自己成为最高项，文字天然顶对齐，不受影响。 */
+  align-items: center;
   gap: 8px;
   background: #fff;
   border: 1px solid var(--rule-strong);
@@ -721,6 +702,8 @@
 }
 .tc .send {
   flex: none;
+  /* 多行态发送键仍贴底（.box 已改 align-items:center，单独把按钮钉回下缘） */
+  align-self: flex-end;
   border: none;
   cursor: pointer;
   border-radius: 9px;
@@ -1142,7 +1125,8 @@
   right: 0;
   bottom: 0;
   z-index: 65;
-  width: min(460px, 92vw);
+  /* 半屏宽：50vw 为主，窄屏兜底不小于 420px、且始终不超过 92vw（min 兜住极小视口） */
+  width: min(max(50vw, 420px), 92vw);
   background: var(--paper);
   border-left: 1px solid var(--rule-strong);
   box-shadow: -18px 0 44px -18px rgba(30, 26, 20, 0.35);
@@ -1172,12 +1156,6 @@
   display: flex;
   align-items: baseline;
   gap: 8px;
-}
-.tc .art-head h3 .sub {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--ink-faint);
-  font-weight: 400;
 }
 .tc .art-x {
   cursor: pointer;
@@ -2048,4 +2026,14 @@
   color: var(--ink);
   background: #fff;
   outline: none;
+}
+
+/* 顶栏「帮助」icon 按钮：hint 面板关闭后出现在视图切换左侧，点击重开提示 */
+.tc .tbtn.help {
+  padding: 5px 7px;
+  line-height: 0;
+  color: var(--ink-soft);
+}
+.tc .tbtn.help:hover {
+  color: var(--ink);
 }

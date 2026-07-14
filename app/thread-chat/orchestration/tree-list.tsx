@@ -46,6 +46,8 @@ export interface TreeListProps {
   onDeleteCurrent: (nextTreeId: string | null) => void
   /** 删除当前树前抑制其存盘（true），失败时恢复（false）——防 DELETE 期间防抖 PUT 复活 */
   onSuppressCurrentSave?: (suppressed: boolean) => void
+  /** 重命名成功且改的是当前树时回调新标题——壳层用它同步主线列头副标题 */
+  onRenamedCurrent?: (title: string) => void
   onClose: () => void
   /** 轻提示（沿用壳层 toast） */
   onToast: (msg: string) => void
@@ -78,6 +80,7 @@ export function TreeList({
   onSwitch,
   onDeleteCurrent,
   onSuppressCurrentSave,
+  onRenamedCurrent,
   onClose,
   onToast,
   closing = false,
@@ -161,12 +164,17 @@ export function TreeList({
     setItems((list) =>
       (list ?? []).map((t) => (t.id === id ? { ...t, title: next } : t))
     )
-    renameTree(id, next).catch(() => {
-      setItems((list) =>
-        (list ?? []).map((t) => (t.id === id ? { ...t, title: prev } : t))
-      )
-      onToast("重命名失败，已恢复原名")
-    })
+    renameTree(id, next)
+      .then(() => {
+        // 改的是当前树：通知壳层同步本地 customTitle（主线列头副标题即时更新）
+        if (id === currentTreeId) onRenamedCurrent?.(next)
+      })
+      .catch(() => {
+        setItems((list) =>
+          (list ?? []).map((t) => (t.id === id ? { ...t, title: prev } : t))
+        )
+        onToast("重命名失败，已恢复原名")
+      })
   }
 
   /* ---------- 二段删除 + 善后（design D4） ---------- */

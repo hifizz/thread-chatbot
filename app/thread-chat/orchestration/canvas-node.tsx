@@ -43,7 +43,8 @@ export const CanvasCard = memo(function CanvasCard({
       style={{ "--accent": data.accent } as React.CSSProperties}
       title="双击：回到列模式打开此会话"
     >
-      <Handle type="target" position={Position.Top} isConnectable={false} />
+      {/* LR 横向树：入边锚在左缘、出边锚在右缘（与 dagre rankdir:LR 对应） */}
+      <Handle type="target" position={Position.Left} isConnectable={false} />
       <div className="chead">
         {data.isMain ? (
           <span className="anchor-tag">锚定</span>
@@ -64,7 +65,7 @@ export const CanvasCard = memo(function CanvasCard({
           </span>
         )}
       </div>
-      <Handle type="source" position={Position.Bottom} isConnectable={false} />
+      <Handle type="source" position={Position.Right} isConnectable={false} />
     </div>
   )
 })

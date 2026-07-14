@@ -22,16 +22,16 @@
  * --------------------------------------------------------------------------
  */
 
-import Link from "next/link"
 import dynamic from "next/dynamic"
 import { useRouter } from "next/navigation"
 import React, { useCallback, useEffect, useRef, useState } from "react"
 import {
+  CircleHelp,
   Columns3,
   Highlighter,
   ListTodo,
   Network,
-  PanelRightOpen,
+  Package,
   Waypoints,
 } from "lucide-react"
 import "./thread-chat.css"
@@ -90,7 +90,8 @@ const ThreadCanvas = dynamic(
   }
 )
 
-const MAIN_SUBTITLE = "接入 MiniMax 的流式对话"
+/** 主线列头副标题的兜底：整棵树还没有任何用户消息（也没被重命名）时展示 */
+const SUBTITLE_FALLBACK = "新对话"
 
 interface ToastState {
   msg: string
@@ -116,6 +117,8 @@ export function ThreadChatDemo({ treeId }: { treeId: string }) {
   const [boot, setBoot] = useState<{
     seed: ThreadTreeState
     ui: TreeUiState | null
+    /** 用户重命名过的标题（未改过为 null）——主线列头副标题优先展示 */
+    customTitle: string | null
   } | null>(null)
 
   useEffect(() => {
@@ -123,12 +126,14 @@ export function ThreadChatDemo({ treeId }: { treeId: string }) {
     ;(async () => {
       const loaded = await loadTree(treeId)
       // sanitize：收敛流式中途落盘的非终态 assistant 残留（见 persist.ts 头注）
-      const seed = loaded ? sanitizeLoadedState(loaded) : emptySeedState()
+      const seed = loaded.state
+        ? sanitizeLoadedState(loaded.state)
+        : emptySeedState()
       // 工作台记忆按加载回来的树校验（列引用的 thread 必须存在）
       const ui = loadUiState(treeId, seed)
       if (cancelled) return
       rememberTreeId(treeId) // 成功打开即记为「最近一棵」（裸路径的跳转目标）
-      setBoot({ seed, ui })
+      setBoot({ seed, ui, customTitle: loaded.customTitle })
     })()
     return () => {
       cancelled = true
@@ -147,6 +152,7 @@ export function ThreadChatDemo({ treeId }: { treeId: string }) {
       treeId={treeId}
       initialState={boot.seed}
       initialUi={boot.ui}
+      initialCustomTitle={boot.customTitle}
     />
   )
 }
@@ -157,12 +163,15 @@ interface ThreadChatDemoInnerProps {
   initialState: ThreadTreeState
   /** 该树的工作台记忆（loader 已校验），null = 默认布局（只开主线） */
   initialUi: TreeUiState | null
+  /** 用户重命名过的标题（未改过为 null）——主线列头副标题优先展示 */
+  initialCustomTitle?: string | null
 }
 
 export function ThreadChatDemoInner({
   treeId,
   initialState,
   initialUi,
+  initialCustomTitle = null,
 }: ThreadChatDemoInnerProps) {
   const router = useRouter()
 
@@ -252,8 +261,20 @@ export function ThreadChatDemoInner({
     pins: new Map(),
   }))
 
+  /* ---------- 主线列头副标题：customTitle（用户重命名）→ 派生标题（首条消息即更新）→ 兜底 ----------
+       customTitle 本地态由对话列表的 onRenamedCurrent 同步（重命名当前树立即生效，无需重载） */
+  const [customTitle, setCustomTitle] = useState<string | null>(
+    initialCustomTitle
+  )
+  const mainHasMessage = (state.threads.main?.messages.length ?? 0) > 0
+  const mainSubtitle =
+    customTitle ?? (mainHasMessage ? deriveTreeTitle(state) : SUBTITLE_FALLBACK)
+
   /* ---------- 其余 UI 状态 ---------- */
-  const [hintOn, setHintOn] = useState(true)
+  /* hint 双态：dismissed = 用户 × 关过；manual = 经顶栏「帮助」重开（开聊后也能看）。
+     可见性纯派生：手动打开恒可见；否则仅「未关过 && 还没开始聊」时可见。 */
+  const [hintDismissed, setHintDismissed] = useState(false)
+  const [hintManual, setHintManual] = useState(false)
   const [sel, setSel] = useState<SelectionInfo | null>(null)
   /** closing = 正在播放退场动画（Dialog 置 open=false / local 面板加 .closing），
       到点（POPUP_EXIT_MS）由下方 effect 真正卸载 */
@@ -462,27 +483,40 @@ export function ThreadChatDemoInner({
       : undefined
   }
 
-  /* ---------- 主线 hint 卡片 ---------- */
-  const hintNode = hintOn ? (
+  /* ---------- 主线 hint 卡片：仅整棵树还没有任何消息时展示（判 main 即可——
+       分支必经主线产生），首条消息一出现即随派生状态消失；× 可提前手动关。 ---------- */
+  const hintVisible = hintManual || (!hintDismissed && !mainHasMessage)
+  const hintNode = hintVisible ? (
     <div className="hint">
       <Highlighter size={15} color="#b07d2e" />
-      <div>
-        <b>划选 AI 回复里的文字</b>即可开分支——新分支的输入框会
-        <b>预填一条围绕划选内容的问题</b>
-        ，可改写后回车确认提问。列数随屏宽自适应（2–4 列）。列满后继续深入默认
-        <b>替换来源列</b>（提示条可撤销），顶栏切到<b>细条⑤</b>
-        则改为把最久未用的列折成竖直细条。 按住 <span className="kbd">⌘</span>
-        /Ctrl 划选开分支或点脚注 = <b>保留本列</b>
-        、新会话开在紧邻右侧；气泡底部的迷你列条会预览将替换 /
-        折叠哪一列，点小格可改选让位目标。
-        <b>拖动列间分割线可调宽度，双击恢复均分</b>。面包屑可就地回退；按{" "}
-        <span className="kbd">⌘K</span> 搜会话树，点列头 <b>⇄</b>{" "}
-        把该列切换成任意会话，<b>⑂</b> 查看该会话的子分支。分支里产出的 Artifact
-        会从右侧抽屉弹出。顶栏可切换<b>画布视图</b>
-        ，纵览整棵会话树，双击节点回到列模式。
-        对话会自动保存到本机数据库——刷新或经同一链接重开都能恢复，顶栏「新对话」可另起一棵树。
-      </div>
-      <span className="close" onClick={() => setHintOn(false)}>
+      <ul>
+        <li>
+          <b>划选 AI 回复里的文字</b>开分支，输入框预填相关问题，改写后回车确认
+        </li>
+        <li>列数随屏宽自适应（2–4 列），列满默认替换来源列（可撤销）</li>
+        <li>
+          按住 <span className="kbd">⌘</span>/Ctrl 划选或点脚注 ={" "}
+          <b>保留本列</b>，新会话开在紧邻右侧
+        </li>
+        <li>拖动列间分割线调宽度，双击恢复均分</li>
+        <li>面包屑可就地回退到上游会话</li>
+        <li>
+          <span className="kbd">⌘K</span> 搜索并打开任意会话
+        </li>
+        <li>
+          点列头 <b>⇄</b> 把该列切换成任意会话，<b>⑂</b> 查看子分支
+        </li>
+        <li>分支里产出的 Artifact 从右侧抽屉弹出</li>
+        <li>顶栏可切换画布视图纵览全树，双击节点回到列模式</li>
+        <li>对话自动保存，刷新或同链接重开可恢复；「新对话」另起一棵树</li>
+      </ul>
+      <span
+        className="close"
+        onClick={() => {
+          setHintManual(false)
+          setHintDismissed(true)
+        }}
+      >
         ✕
       </span>
     </div>
@@ -490,17 +524,10 @@ export function ThreadChatDemoInner({
 
   /* ---------- 顶栏数据 ---------- */
   const branchCount = Object.keys(state.threads).length - 1
-  const segLabel =
-    winW === null
-      ? "列数"
-      : `列数 ${totalCols}${forceCols === null ? " · auto" : ""}`
 
   return (
     <div className="tc" ref={tcRootRef}>
       <div className="topbar">
-        <Link className="home" href="/" title="返回主聊天">
-          ←
-        </Link>
         <button
           className="tbtn"
           title="开启一棵全新的分支对话树（当前对话已自动保存，可经其 URL 随时回访）"
@@ -519,15 +546,20 @@ export function ThreadChatDemoInner({
         </button>
         <div className="brand">
           <span className="mark">
-            Thread<em>·</em>
+            Thread Chat<em>·</em>
           </span>
-          <span className="tag">方案⑥ 自适应列 + 面包屑替换 · 优化版</span>
         </div>
         <div className="spacer" />
-        <div className="seg">
-          <span className="lbl" title="列 = 并排深读；画布 = 纵览整棵会话树">
-            视图
-          </span>
+        {!hintVisible && (
+          <button
+            className="tbtn help"
+            title="使用提示"
+            onClick={() => setHintManual(true)}
+          >
+            <CircleHelp size={14} />
+          </button>
+        )}
+        <div className="seg" title="列 = 并排深读；画布 = 纵览整棵会话树">
           <button
             className={`mode ${viewMode === "columns" ? "on" : ""}`}
             title="列视图：并排深读多个会话"
@@ -546,17 +578,14 @@ export function ThreadChatDemoInner({
         </div>
         {viewMode === "columns" && (
           <>
-            <div className="seg">
-              <span
-                className="lbl"
-                title={
-                  winW === null
-                    ? undefined
-                    : `视口 ${winW}px，约每 ${COL_MIN_W}px 一列`
-                }
-              >
-                {segLabel}
-              </span>
+            <div
+              className="seg"
+              title={
+                winW === null
+                  ? undefined
+                  : `列数：视口 ${winW}px，约每 ${COL_MIN_W}px 一列`
+              }
+            >
               {(["auto", 2, 3, 4] as const).map((v) => (
                 <button
                   key={v}
@@ -571,10 +600,7 @@ export function ThreadChatDemoInner({
                 </button>
               ))}
             </div>
-            <div className="seg">
-              <span className="lbl" title="列满时的放置策略">
-                列满
-              </span>
+            <div className="seg" title="列满时的放置策略">
               <button
                 className={mode === "replace" ? "on" : ""}
                 onClick={() => changeMode("replace")}
@@ -604,11 +630,11 @@ export function ThreadChatDemoInner({
           title="打开 / 收起 Artifact 抽屉"
           onClick={() => setDrawerOpen((v) => !v)}
         >
-          <PanelRightOpen size={13} />
+          {/* Package：贴合「产出物」语义，与抽屉头部图标一致 */}
+          <Package size={13} />
           Artifact
           <span className="cnt">{state.artifactOrder.length}</span>
         </button>
-        <span className="demo-pill">MiniMax</span>
       </div>
 
       {viewMode === "columns" ? (
@@ -625,7 +651,7 @@ export function ThreadChatDemoInner({
             <BranchableChat
               state={state}
               threadId={threadId}
-              subtitle={threadId === "main" ? MAIN_SUBTITLE : undefined}
+              subtitle={threadId === "main" ? mainSubtitle : undefined}
               intro={threadId === "main" ? hintNode : undefined}
               onOpenThread={(target, opts) =>
                 openBranchUI(target, threadId, opts)
@@ -651,7 +677,7 @@ export function ThreadChatDemoInner({
       ) : (
         <ThreadCanvas
           store={store}
-          mainSubtitle={MAIN_SUBTITLE}
+          mainSubtitle={mainSubtitle}
           viewState={canvasViewState}
           onOpenThread={(id) => openBranchUI(id, null)}
         />
@@ -676,7 +702,7 @@ export function ThreadChatDemoInner({
         <TreeList
           key={treeList.n}
           currentTreeId={treeId}
-          currentTitle={deriveTreeTitle(state)}
+          currentTitle={customTitle ?? deriveTreeTitle(state)}
           currentThreadCount={Object.keys(state.threads).length}
           closing={treeList.closing}
           container={tcRootRef}
@@ -695,6 +721,7 @@ export function ThreadChatDemoInner({
             closeTreeList()
             router.replace(`/thread-chat/${nextId ?? crypto.randomUUID()}`)
           }}
+          onRenamedCurrent={setCustomTitle}
           onToast={showToast}
         />
       )}
