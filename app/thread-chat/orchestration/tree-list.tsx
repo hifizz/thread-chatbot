@@ -13,11 +13,19 @@
  *
  * Esc 语义：编辑态 / 确认态先被本组件的捕获期监听消费（stopPropagation），
  * 其余 Esc 冒泡到壳层关闭链（弹层在链的最外层，先关它）。
+ *
+ * 外壳是 shadcn/ui Dialog（Base UI）：借它的 data-starting/ending-style 过渡状态机
+ * 做进出双向动效（样式仍是 .tc 纸面 token，见 thread-chat.css）。Esc 的内建关闭被
+ * dialogCloseToShell 取消并放行冒泡——上面这条捕获期 stopPropagation 的 Esc 链依然
+ * 先于 Dialog 与壳层生效，行为不变。
  */
 
 import React, { useEffect, useState } from "react"
 import { Check, ListTodo, Pencil, Trash2, X } from "lucide-react"
+import { Dialog as DialogPrimitive } from "@base-ui/react/dialog"
+import { Dialog, DialogPortal } from "@/components/ui/dialog"
 import { CUSTOM_TITLE_MAX_LEN } from "@/constants/thread-chat"
+import { dialogCloseToShell } from "./thread-switcher"
 import {
   cleanupAfterTreeDelete,
   deleteTree,
@@ -36,9 +44,15 @@ export interface TreeListProps {
   onSwitch: (treeId: string) => void
   /** 删除的是当前树：nextTreeId = 剩余最近一棵（null = 一棵不剩，开新树） */
   onDeleteCurrent: (nextTreeId: string | null) => void
+  /** 删除当前树前抑制其存盘（true），失败时恢复（false）——防 DELETE 期间防抖 PUT 复活 */
+  onSuppressCurrentSave?: (suppressed: boolean) => void
   onClose: () => void
   /** 轻提示（沿用壳层 toast） */
   onToast: (msg: string) => void
+  /** 壳层的退场标记：true = Dialog 置 open=false 播放关闭动画（随后壳层卸载本组件） */
+  closing?: boolean
+  /** Dialog Portal 的挂载点（.tc 根）：保证 .swx / .tlx 选择器与纸面 CSS 变量继续生效 */
+  container?: React.RefObject<HTMLElement | null>
 }
 
 /** 相对时间：「刚刚 / N 分钟前 / N 小时前 / N 天前 / M月D日」 */
@@ -63,8 +77,11 @@ export function TreeList({
   currentThreadCount,
   onSwitch,
   onDeleteCurrent,
+  onSuppressCurrentSave,
   onClose,
   onToast,
+  closing = false,
+  container,
 }: TreeListProps) {
   /** null = 拉取中 */
   const [items, setItems] = useState<TreeListItem[] | null>(null)
@@ -156,9 +173,13 @@ export function TreeList({
   async function doDelete(id: string) {
     setConfirmId(null)
     setDeletingId(id)
+    // 删的是当前树：先行抑制存盘（codex review：DELETE 往返期间防抖定时器可能触发 PUT，
+    // 晚到的 upsert 会复活刚删的行——抑制位挡新写，persist 写链保证在飞旧写先于 DELETE 落库）
+    if (id === currentTreeId) onSuppressCurrentSave?.(true)
     try {
       await deleteTree(id)
     } catch {
+      if (id === currentTreeId) onSuppressCurrentSave?.(false) // 删除失败：树还在，恢复存盘
       setDeletingId(null)
       onToast("删除失败，请重试")
       return
@@ -177,141 +198,157 @@ export function TreeList({
   }
 
   return (
-    <>
-      <div className="swx-scrim" onMouseDown={onClose} />
-      {/* 面板内任意处 mousedown 复位删除确认态（确认按钮自身已 stopPropagation） */}
-      <div className="swx global tlx" onMouseDown={() => setConfirmId(null)}>
-        <div className="swx-title">
-          <ListTodo size={14} />
-          对话列表
-          <span className="kbd">⌘⇧K</span>
-        </div>
-        <div className="swx-list">
-          {items === null && <div className="swx-empty">加载中…</div>}
-          {items !== null &&
-            rows.map(({ item, isCurrent, unsaved }) => {
-              const editing = editingId === item.id
-              const confirming = confirmId === item.id
-              return (
-                <div
-                  key={item.id}
-                  className={`swx-row tlx-row ${isCurrent ? "cur" : ""}`}
-                  onClick={() => {
-                    if (editing || confirming || deletingId === item.id) return
-                    onClose()
-                    if (!isCurrent) onSwitch(item.id)
-                  }}
-                >
-                  <span className="dot" />
-                  {editing ? (
-                    <input
-                      className="tlx-edit"
-                      autoFocus
-                      value={draft}
-                      maxLength={CUSTOM_TITLE_MAX_LEN}
-                      onFocus={(e) => e.currentTarget.select()}
-                      onChange={(e) => setDraft(e.target.value)}
-                      onClick={(e) => e.stopPropagation()}
-                      onBlur={() => setEditingId(null)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault()
-                          commitEdit(item.id)
-                        }
-                        // Esc 由上面的捕获期监听统一处理（取消编辑并拦下冒泡）
-                      }}
-                    />
-                  ) : (
-                    <>
-                      <span className="t">{item.title}</span>
-                      {unsaved && (
-                        <span className="st tlx-unsaved">未保存</span>
-                      )}
-                      {isCurrent && !unsaved && (
-                        <span className="st">当前</span>
-                      )}
-                      <span className="tlx-meta">
-                        {item.threadCount > 1 && (
-                          <span
-                            className="tlx-badge"
-                            title={`${item.threadCount - 1} 个分支`}
-                          >
-                            ⑂ {item.threadCount - 1}
-                          </span>
-                        )}
-                        {item.updatedAt && (
-                          <span className="tlx-time">
-                            {relativeTime(item.updatedAt)}
-                          </span>
-                        )}
-                      </span>
-                      <span
-                        className="tlx-acts"
+    // Dialog 受控 open：closing 期间置 false 触发 data-ending-style 退场（Base UI 保持
+    // Popup 挂载到 transition 结束）。modal=false + disablePointerDismissal 复刻旧行为：
+    // 不锁滚动 / 不困焦点 / 点外关闭由 Backdrop 的 onMouseDown 自己接；initialFocus=false
+    // 保持「打开不夺焦点」的旧语义（重命名输入框的 autoFocus 不受影响）。
+    <Dialog
+      open={!closing}
+      onOpenChange={dialogCloseToShell(onClose)}
+      modal={false}
+      disablePointerDismissal
+    >
+      <DialogPortal container={container}>
+        <DialogPrimitive.Backdrop className="swx-scrim" onMouseDown={onClose} />
+        {/* 面板内任意处 mousedown 复位删除确认态（确认按钮自身已 stopPropagation） */}
+        <DialogPrimitive.Popup
+          className="swx global tlx"
+          initialFocus={false}
+          onMouseDown={() => setConfirmId(null)}
+        >
+          <div className="swx-title">
+            <ListTodo size={14} />
+            对话列表
+            <span className="kbd">⌘⇧K</span>
+          </div>
+          <div className="swx-list">
+            {items === null && <div className="swx-empty">加载中…</div>}
+            {items !== null &&
+              rows.map(({ item, isCurrent, unsaved }) => {
+                const editing = editingId === item.id
+                const confirming = confirmId === item.id
+                return (
+                  <div
+                    key={item.id}
+                    className={`swx-row tlx-row ${isCurrent ? "cur" : ""}`}
+                    onClick={() => {
+                      if (editing || confirming || deletingId === item.id)
+                        return
+                      onClose()
+                      if (!isCurrent) onSwitch(item.id)
+                    }}
+                  >
+                    <span className="dot" />
+                    {editing ? (
+                      <input
+                        className="tlx-edit"
+                        autoFocus
+                        value={draft}
+                        maxLength={CUSTOM_TITLE_MAX_LEN}
+                        onFocus={(e) => e.currentTarget.select()}
+                        onChange={(e) => setDraft(e.target.value)}
                         onClick={(e) => e.stopPropagation()}
-                        onMouseDown={(e) => e.stopPropagation()}
-                      >
-                        {confirming ? (
-                          <>
-                            <button
-                              className="tlx-act danger confirm"
-                              title="确认删除（不可撤销）"
-                              onClick={() => void doDelete(item.id)}
+                        onBlur={() => setEditingId(null)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault()
+                            commitEdit(item.id)
+                          }
+                          // Esc 由上面的捕获期监听统一处理（取消编辑并拦下冒泡）
+                        }}
+                      />
+                    ) : (
+                      <>
+                        <span className="t">{item.title}</span>
+                        {unsaved && (
+                          <span className="st tlx-unsaved">未保存</span>
+                        )}
+                        {isCurrent && !unsaved && (
+                          <span className="st">当前</span>
+                        )}
+                        <span className="tlx-meta">
+                          {item.threadCount > 1 && (
+                            <span
+                              className="tlx-badge"
+                              title={`${item.threadCount - 1} 个分支`}
                             >
-                              <Check size={12} />
-                              确认删除
-                            </button>
-                            <button
-                              className="tlx-act"
-                              title="取消"
-                              onClick={() => setConfirmId(null)}
-                            >
-                              <X size={12} />
-                            </button>
-                          </>
-                        ) : (
-                          <>
-                            {!unsaved && (
+                              ⑂ {item.threadCount - 1}
+                            </span>
+                          )}
+                          {item.updatedAt && (
+                            <span className="tlx-time">
+                              {relativeTime(item.updatedAt)}
+                            </span>
+                          )}
+                        </span>
+                        <span
+                          className="tlx-acts"
+                          onClick={(e) => e.stopPropagation()}
+                          onMouseDown={(e) => e.stopPropagation()}
+                        >
+                          {confirming ? (
+                            <>
+                              <button
+                                className="tlx-act danger confirm"
+                                title="确认删除（不可撤销）"
+                                onClick={() => void doDelete(item.id)}
+                              >
+                                <Check size={12} />
+                                确认删除
+                              </button>
                               <button
                                 className="tlx-act"
-                                title="重命名"
-                                onClick={() => startEdit(item)}
+                                title="取消"
+                                onClick={() => setConfirmId(null)}
                               >
-                                <Pencil size={12} />
+                                <X size={12} />
                               </button>
-                            )}
-                            {!unsaved && (
-                              <button
-                                className="tlx-act danger"
-                                title="删除此对话"
-                                disabled={deletingId === item.id}
-                                onClick={() => {
-                                  setEditingId(null)
-                                  setConfirmId(item.id)
-                                }}
-                              >
-                                <Trash2 size={12} />
-                              </button>
-                            )}
-                          </>
-                        )}
-                      </span>
-                    </>
-                  )}
-                </div>
-              )
-            })}
-          {items !== null && rows.length === 1 && rows[0].unsaved && (
-            <div className="swx-empty">
-              还没有保存过的对话——发出第一条消息即自动保存
-            </div>
-          )}
-        </div>
-        <div className="swx-foot">
-          <span>点击切换</span>
-          <span>悬停条目可重命名 / 删除</span>
-          <span>esc 关闭</span>
-        </div>
-      </div>
-    </>
+                            </>
+                          ) : (
+                            <>
+                              {!unsaved && (
+                                <button
+                                  className="tlx-act"
+                                  title="重命名"
+                                  onClick={() => startEdit(item)}
+                                >
+                                  <Pencil size={12} />
+                                </button>
+                              )}
+                              {!unsaved && (
+                                <button
+                                  className="tlx-act danger"
+                                  title="删除此对话"
+                                  disabled={deletingId === item.id}
+                                  onClick={() => {
+                                    setEditingId(null)
+                                    setConfirmId(item.id)
+                                  }}
+                                >
+                                  <Trash2 size={12} />
+                                </button>
+                              )}
+                            </>
+                          )}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                )
+              })}
+            {items !== null && rows.length === 1 && rows[0].unsaved && (
+              <div className="swx-empty">
+                还没有保存过的对话——发出第一条消息即自动保存
+              </div>
+            )}
+          </div>
+          <div className="swx-foot">
+            <span>点击切换</span>
+            <span>悬停条目可重命名 / 删除</span>
+            <span>esc 关闭</span>
+          </div>
+        </DialogPrimitive.Popup>
+      </DialogPortal>
+    </Dialog>
   )
 }

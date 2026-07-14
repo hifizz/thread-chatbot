@@ -47,6 +47,11 @@ export async function PUT(req: Request, { params }: RouteContext) {
   const { state } = body
   if (typeof state !== "object" || state === null || Array.isArray(state))
     return new Response("state 缺失或不是对象", { status: 400 })
+  // threads 必须是普通对象（codex review：数组/标量会让列表接口的 jsonb_object_keys
+  // 对这一行永久抛错，一行毒数据打挂整个 GET /api/branch-trees）
+  const threads = (state as Record<string, unknown>).threads
+  if (typeof threads !== "object" || threads === null || Array.isArray(threads))
+    return new Response("state.threads 必须是对象", { status: 400 })
 
   const title = typeof body.title === "string" ? body.title : null
   const now = new Date()

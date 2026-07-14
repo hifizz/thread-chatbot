@@ -64,21 +64,42 @@ export async function loadTree(id: string): Promise<ThreadTreeState | null> {
 }
 
 /** PUT 整树 upsert：失败只 console.warn 不抛——持久化失败不能打断对话 */
+/* 每棵树一条客户端写链：saveTree / deleteTree 串行执行（codex review 两条 P2 的修复）——
+   ① 慢的旧快照 PUT 不会后到覆盖新快照（同树写操作严格按入队序落库）；
+   ② 删除总排在已入队/在飞的存盘之后，配合壳层「删除前置抑制位」堵死 DB 行复活竞态。
+   链上任务失败不断链（下一个任务照常执行）；链清空后从 Map 摘除防泄漏。 */
+const writeChains = new Map<string, Promise<void>>()
+function enqueueTreeWrite<T>(id: string, task: () => Promise<T>): Promise<T> {
+  const prev = writeChains.get(id) ?? Promise.resolve()
+  const run = prev.then(task, task)
+  const settled = run.then(
+    () => undefined,
+    () => undefined
+  )
+  writeChains.set(id, settled)
+  void settled.then(() => {
+    if (writeChains.get(id) === settled) writeChains.delete(id)
+  })
+  return run
+}
+
 export async function saveTree(
   id: string,
   state: ThreadTreeState,
   title?: string
 ): Promise<void> {
-  try {
-    const res = await fetch(`/api/branch-trees/${id}`, {
-      method: "PUT",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ state, title }),
-    })
-    if (!res.ok) throw new Error(`PUT /api/branch-trees ${res.status}`)
-  } catch (err) {
-    console.warn("[thread-chat] 分支树存盘失败（下次变更会再试）：", err)
-  }
+  return enqueueTreeWrite(id, async () => {
+    try {
+      const res = await fetch(`/api/branch-trees/${id}`, {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ state, title }),
+      })
+      if (!res.ok) throw new Error(`PUT /api/branch-trees ${res.status}`)
+    } catch (err) {
+      console.warn("[thread-chat] 分支树存盘失败（下次变更会再试）：", err)
+    }
+  })
 }
 
 /* ---------------- 树列表 / 重命名 / 删除（会话列表 UI，openspec: add-tree-list-ui） ---------------- */
@@ -118,8 +139,10 @@ export async function renameTree(id: string, title: string): Promise<void> {
 
 /** DELETE 树（幂等）：失败抛错——调用方保留条目 + toast */
 export async function deleteTree(id: string): Promise<void> {
-  const res = await fetch(`/api/branch-trees/${id}`, { method: "DELETE" })
-  if (!res.ok) throw new Error(`DELETE /api/branch-trees ${res.status}`)
+  return enqueueTreeWrite(id, async () => {
+    const res = await fetch(`/api/branch-trees/${id}`, { method: "DELETE" })
+    if (!res.ok) throw new Error(`DELETE /api/branch-trees ${res.status}`)
+  })
 }
 
 /** 删除某棵树后的本地善后（design D4）：清工作台记忆；「最近一棵」若指向它则清除 */

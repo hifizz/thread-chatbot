@@ -19,7 +19,8 @@ export async function GET() {
       id: branchTrees.id,
       title: sql<string>`coalesce(${branchTrees.customTitle}, ${branchTrees.title}, ${TREE_TITLE_FALLBACK})`,
       updatedAt: branchTrees.updatedAt,
-      threadCount: sql<number>`(select count(*) from jsonb_object_keys(${branchTrees.state} -> 'threads'))::int`,
+      // jsonb_typeof 防御：threads 非对象的历史毒行不再让整个列表 500（写入侧已校验，此处兜底）
+      threadCount: sql<number>`(case when jsonb_typeof(${branchTrees.state} -> 'threads') = 'object' then (select count(*) from jsonb_object_keys(${branchTrees.state} -> 'threads')) else 0 end)::int`,
     })
     .from(branchTrees)
     .orderBy(desc(branchTrees.updatedAt))

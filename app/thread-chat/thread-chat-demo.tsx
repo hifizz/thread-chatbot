@@ -36,6 +36,7 @@ import {
 } from "lucide-react"
 import "./thread-chat.css"
 import {
+  POPUP_EXIT_MS,
   TREE_SAVE_DEBOUNCE_MS,
   UI_SAVE_DEBOUNCE_MS,
 } from "@/constants/thread-chat"
@@ -254,13 +255,20 @@ export function ThreadChatDemoInner({
   /* ---------- 其余 UI 状态 ---------- */
   const [hintOn, setHintOn] = useState(true)
   const [sel, setSel] = useState<SelectionInfo | null>(null)
+  /** closing = 正在播放退场动画（Dialog 置 open=false / local 面板加 .closing），
+      到点（POPUP_EXIT_MS）由下方 effect 真正卸载 */
   const [switcher, setSwitcher] = useState<
-    (SwitcherMode & { n: number }) | null
+    (SwitcherMode & { n: number; closing?: boolean }) | null
   >(null)
   const swSeq = useRef(0)
-  /** 会话列表弹层：非 null = 打开（值为重挂 key，每次打开归零内部状态并现拉数据） */
-  const [treeListN, setTreeListN] = useState<number | null>(null)
+  /** 会话列表弹层：非 null = 打开（n 为重挂 key，每次打开归零内部状态并现拉数据） */
+  const [treeList, setTreeList] = useState<{
+    n: number
+    closing?: boolean
+  } | null>(null)
   const tlSeq = useRef(0)
+  /** .tc 根元素：两个 Dialog 弹层的 Portal 挂载点（保住 .tc 作用域的选择器与 CSS 变量） */
+  const tcRootRef = useRef<HTMLDivElement | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [activeArt, setActiveArt] = useState<string | null>(null)
   const [toast, setToast] = useState<ToastState | null>(null)
@@ -346,10 +354,33 @@ export function ThreadChatDemoInner({
     }
   }
 
-  /* ---------- 切换器 / 子树面板（互斥：同一时间只开一个；每次打开重挂归零） ---------- */
+  /* ---------- 切换器 / 子树面板（互斥：同一时间只开一个；每次打开重挂归零）
+       关闭不再直接卸载：先置 closing 播放退场动画，POPUP_EXIT_MS 后由 effect 卸载。
+       重开会换成新对象（closing 归零），旧计时器被 effect cleanup 自动清掉。 ---------- */
+  const closeSwitcher = useCallback(() => {
+    setSwitcher((sw) => (sw && !sw.closing ? { ...sw, closing: true } : sw))
+  }, [])
+  const closeTreeList = useCallback(() => {
+    setTreeList((v) => (v && !v.closing ? { ...v, closing: true } : v))
+  }, [])
+  useEffect(() => {
+    if (!switcher?.closing) return
+    const t = setTimeout(() => setSwitcher(null), POPUP_EXIT_MS)
+    return () => clearTimeout(t)
+  }, [switcher])
+  useEffect(() => {
+    if (!treeList?.closing) return
+    const t = setTimeout(() => setTreeList(null), POPUP_EXIT_MS)
+    return () => clearTimeout(t)
+  }, [treeList])
+
   const toggleGlobalSwitcher = useCallback(() => {
-    const n = ++swSeq.current
-    setSwitcher((sw) => (sw?.kind === "global" ? null : { kind: "global", n }))
+    setSwitcher((sw) =>
+      // 全局面板开着 → 动画关闭；关着 / 关闭中 / 开的是局部面板 → （重新）打开全局
+      sw?.kind === "global" && !sw.closing
+        ? { ...sw, closing: true }
+        : { kind: "global", n: ++swSeq.current }
+    )
   }, [])
   function openColumnSwitcher(vpIndex: number, btn: HTMLElement) {
     const { x, y } = anchoredPos(btn, 330, 420)
@@ -360,7 +391,7 @@ export function ThreadChatDemoInner({
     setSwitcher({ kind: "subtree", rootId, x, y, n: ++swSeq.current })
   }
   function pickRow(row: TreeRow, m: SwitcherMode) {
-    setSwitcher(null)
+    closeSwitcher()
     if (m.kind === "column") {
       if (cols.slots[m.vpIndex]?.id === row.id) {
         cols.flashThread(row.id)
@@ -375,8 +406,9 @@ export function ThreadChatDemoInner({
   }
 
   const toggleTreeList = useCallback(() => {
-    const n = ++tlSeq.current
-    setTreeListN((v) => (v === null ? n : null))
+    setTreeList((v) =>
+      v && !v.closing ? { ...v, closing: true } : { n: ++tlSeq.current }
+    )
   }, [])
 
   /* ---------- 快捷键：⌘⇧K 对话列表 / ⌘K 会话树 / Esc 逐层关闭
@@ -390,9 +422,11 @@ export function ThreadChatDemoInner({
         return
       }
       if (e.key === "Escape") {
-        if (treeListN !== null) setTreeListN(null)
+        // 逐层关闭链的唯一权威：Dialog 内建的 Esc 关闭已在 dialogCloseToShell 里
+        // 取消并放行冒泡，事件最终只在这里被消费（closing 中的弹层视同已关闭）
+        if (treeList && !treeList.closing) closeTreeList()
         else if (sel) setSel(null)
-        else if (switcher) setSwitcher(null)
+        else if (switcher && !switcher.closing) closeSwitcher()
         else if (drawerOpen) setDrawerOpen(false)
       }
     }
@@ -402,9 +436,11 @@ export function ThreadChatDemoInner({
     sel,
     switcher,
     drawerOpen,
-    treeListN,
+    treeList,
     toggleGlobalSwitcher,
     toggleTreeList,
+    closeSwitcher,
+    closeTreeList,
   ])
 
   /** 会话是否忙碌：末条消息是 assistant 且仍在 pending/streaming（派生自 state，version 快照天然驱动） */
@@ -460,7 +496,7 @@ export function ThreadChatDemoInner({
       : `列数 ${totalCols}${forceCols === null ? " · auto" : ""}`
 
   return (
-    <div className="tc">
+    <div className="tc" ref={tcRootRef}>
       <div className="topbar">
         <Link className="home" href="/" title="返回主聊天">
           ←
@@ -636,19 +672,27 @@ export function ThreadChatDemoInner({
         />
       )}
 
-      {treeListN !== null && (
+      {treeList !== null && (
         <TreeList
-          key={treeListN}
+          key={treeList.n}
           currentTreeId={treeId}
           currentTitle={deriveTreeTitle(state)}
           currentThreadCount={Object.keys(state.threads).length}
-          onClose={() => setTreeListN(null)}
+          closing={treeList.closing}
+          container={tcRootRef}
+          onClose={closeTreeList}
           onSwitch={(id) => router.push(`/thread-chat/${id}`)}
+          onSuppressCurrentSave={(v) => {
+            // 删除前置位（失败恢复）：挡住防抖回调与卸载 flush 的新写；
+            // 已在飞的 PUT 由 persist 写链保证先于 DELETE 落库，两头闭环
+            suppressSaveRef.current = v
+            if (v) savePendingRef.current = false
+          }}
           onDeleteCurrent={(nextId) => {
             // 当前树已被删除：抑制卸载 flush / 防抖尾巴的回写（否则 DB 行复活），
             // 再跳剩余最近一棵；一棵不剩则开新 UUID。replace 不给被删 URL 留历史。
             suppressSaveRef.current = true
-            setTreeListN(null)
+            closeTreeList()
             router.replace(`/thread-chat/${nextId ?? crypto.randomUUID()}`)
           }}
           onToast={showToast}
@@ -662,8 +706,10 @@ export function ThreadChatDemoInner({
           mode={switcher}
           slots={cols.slots}
           recents={state.recents}
+          closing={switcher.closing}
+          container={tcRootRef}
           onPick={pickRow}
-          onClose={() => setSwitcher(null)}
+          onClose={closeSwitcher}
         />
       )}
 
