@@ -1,18 +1,12 @@
-import {
-  pgTable,
-  text,
-  timestamp,
-  integer,
-  bigint,
-  index,
-} from "drizzle-orm/pg-core"
+import { text, timestamp, integer, bigint, index } from "drizzle-orm/pg-core"
+import { dbSchema } from "./pg-schema"
 import { user } from "./auth-schema"
 
 // 计费相关表。金额一律用「微元」整数存储（1 元 = 1_000_000 微元），
 // 避免浮点误差；换算与展示见 constants/pricing.ts 与 lib/billing/*。
 
 // 用户余额（预付费额度）。注册时按 constants/pricing.ts 的初始额度赠送。
-export const userCredits = pgTable("user_credits", {
+export const userCredits = dbSchema.table("user_credits", {
   userId: text("user_id")
     .primaryKey()
     .references(() => user.id, { onDelete: "cascade" }),
@@ -25,7 +19,7 @@ export const userCredits = pgTable("user_credits", {
 })
 
 // 逐次调用的用量与费用流水，用于账单、对账与前端 token 统计。
-export const usageRecords = pgTable(
+export const usageRecords = dbSchema.table(
   "usage_records",
   {
     id: text("id").primaryKey(), // crypto.randomUUID()

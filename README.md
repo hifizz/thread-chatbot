@@ -30,8 +30,17 @@ import { Button } from "@/components/ui/button";
    - `DATABASE_URL`
    - `BETTER_AUTH_SECRET`（`openssl rand -base64 32`）、`BETTER_AUTH_URL`（本地 `http://localhost:3000`）
    - 任一可用模型的凭据（`MINIMAX_API_KEY` 直连，或 `DEEPSEEK_API_KEY`/`OPENAI_API_KEY` 经网关）。
-2. `pnpm db:migrate`（新增 `user/session/account/verification` 与 `user_credits/usage_records` 表，并给 `threads` 加 `user_id`）。
+2. `pnpm db:migrate`（在独立 schema `thread_chat` 下建全部表）。
 3. `pnpm dev`，访问首页会被重定向到 `/sign-in`。
+
+### 数据库 / Supabase（独立 schema + 连接池）
+
+本项目所有表都建在独立 Postgres schema **`thread_chat`**（`lib/db/pg-schema.ts` 的 `dbSchema`）下，与同一个数据库里其他 project 的表隔离——适合多项目共用一个 Supabase 库。查询全程 schema 限定，无需依赖 `search_path`。
+
+- **连接串**：`DATABASE_URL` 用 Supabase「事务连接池」(6543)，代码已设 `prepare:false`（事务池不支持预处理语句）；`DIRECT_URL` 用「直连」(5432) 供 `pnpm db:migrate` 跑 DDL。
+- **pgvector（可选 RAG）**：在 Supabase 后台启用 `vector` 扩展（通常装在 `extensions` schema）。迁移会 `CREATE EXTENSION IF NOT EXISTS vector` 兜底；连接的 `search_path` 已含 `extensions` 以便向量类型/运算符解析。
+- **改 schema 名**：改 `lib/db/pg-schema.ts` 的 `DB_SCHEMA`，删掉 `drizzle/` 迁移与 `meta/` 后 `pnpm db:generate` 重建即可。
+- 迁移的 `0000` 已手动补上 `CREATE SCHEMA IF NOT EXISTS "thread_chat"` 与 `CREATE EXTENSION`（drizzle-kit 不总会生成）。
 
 ### 邮箱验证 / 找回密码 / 防白嫖
 

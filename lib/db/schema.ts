@@ -1,5 +1,4 @@
 import {
-  pgTable,
   text,
   jsonb,
   timestamp,
@@ -7,6 +6,7 @@ import {
   integer,
   vector,
 } from "drizzle-orm/pg-core"
+import { dbSchema } from "./pg-schema"
 import { EMBEDDING_DIMENSIONS } from "@/constants/rag"
 import { user } from "./auth-schema"
 
@@ -15,7 +15,7 @@ export * from "./auth-schema"
 export * from "./billing-schema"
 export * from "./payment-schema"
 
-export const threads = pgTable("threads", {
+export const threads = dbSchema.table("threads", {
   id: text("id").primaryKey(), // == RemoteThreadMetadata.remoteId; reused as-is from the client-generated local thread id
   // 归属用户；历史数据可能为空，新建对话会写入当前登录用户。
   userId: text("user_id").references(() => user.id, { onDelete: "cascade" }),
@@ -32,7 +32,7 @@ export const threads = pgTable("threads", {
   lastMessageAt: timestamp("last_message_at", { withTimezone: true }),
 })
 
-export const messages = pgTable(
+export const messages = dbSchema.table(
   "messages",
   {
     id: text("id").primaryKey(), // == AI SDK UIMessage.id
@@ -50,7 +50,7 @@ export const messages = pgTable(
   (table) => [index("messages_thread_id_idx").on(table.threadId)]
 )
 
-export const attachments = pgTable("attachments", {
+export const attachments = dbSchema.table("attachments", {
   id: text("id").primaryKey(), // crypto.randomUUID()；同时是应用内 URL /api/attachments/{id} 的路径段
   key: text("key").notNull().unique(), // R2 对象 key：attachments/{uuid}.{白名单扩展名}，不含用户文件名
   filename: text("filename").notNull(), // 原始文件名，仅展示用
@@ -92,7 +92,7 @@ export const branchTrees = pgTable("branch_trees", {
 })
 
 // RAG 向量索引：超大文档改走检索而非全文注入时，存分块及其 embedding。
-export const attachmentChunks = pgTable(
+export const attachmentChunks = dbSchema.table(
   "attachment_chunks",
   {
     id: text("id").primaryKey(), // crypto.randomUUID()

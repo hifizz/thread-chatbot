@@ -5,50 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1783169620389,
-      "tag": "0000_normal_wendell_vaughn",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1783271723535,
-      "tag": "0001_noisy_black_widow",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1783278364138,
-      "tag": "0002_clammy_matthew_murdock",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1783278895156,
-      "tag": "0003_typical_prism",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1783372705423,
-      "tag": "0004_fancy_amazoness",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "7",
-      "when": 1783423448788,
-      "tag": "0005_windy_blackheart",
-      "breakpoints": true
-    },
-    {
-      "idx": 6,
-      "version": "7",
-      "when": 1784052960561,
-      "tag": "0006_ordinary_typhoid_mary",
+      "when": 1784058830720,
+      "tag": "0000_optimal_unicorn",
       "breakpoints": true
     }
   ]

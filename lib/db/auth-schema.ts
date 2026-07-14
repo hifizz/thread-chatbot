@@ -1,9 +1,10 @@
-import { pgTable, text, timestamp, boolean } from "drizzle-orm/pg-core"
+import { text, timestamp, boolean } from "drizzle-orm/pg-core"
+import { dbSchema } from "./pg-schema"
 
 // better-auth 核心表（邮箱/密码 + 会话）。字段与列名遵循 better-auth 官方
 // drizzle 生成结果，改动需同步 better-auth 适配器映射。
 
-export const user = pgTable("user", {
+export const user = dbSchema.table("user", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
@@ -19,7 +20,7 @@ export const user = pgTable("user", {
     .notNull(),
 })
 
-export const session = pgTable("session", {
+export const session = dbSchema.table("session", {
   id: text("id").primaryKey(),
   expiresAt: timestamp("expires_at").notNull(),
   token: text("token").notNull().unique(),
@@ -32,7 +33,7 @@ export const session = pgTable("session", {
     .references(() => user.id, { onDelete: "cascade" }),
 })
 
-export const account = pgTable("account", {
+export const account = dbSchema.table("account", {
   id: text("id").primaryKey(),
   accountId: text("account_id").notNull(),
   providerId: text("provider_id").notNull(),
@@ -50,7 +51,7 @@ export const account = pgTable("account", {
   updatedAt: timestamp("updated_at").notNull(),
 })
 
-export const verification = pgTable("verification", {
+export const verification = dbSchema.table("verification", {
   id: text("id").primaryKey(),
   identifier: text("identifier").notNull(),
   value: text("value").notNull(),
