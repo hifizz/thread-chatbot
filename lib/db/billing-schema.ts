@@ -41,6 +41,12 @@ export const usageRecords = pgTable(
     priceMicros: bigint("price_micros", { mode: "number" })
       .notNull()
       .default(0), // 向用户收取（微元）
+    // Vercel AI 网关的 generation id（gen_...）；用于事后拉取真实成本对账。直连/CF 时为空。
+    generationId: text("generation_id"),
+    // 成本口径：estimate=价目表估算（即时扣费用）；gateway=已用网关真实成本对账修正。
+    costSource: text("cost_source", { enum: ["estimate", "gateway"] })
+      .notNull()
+      .default("estimate"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -48,5 +54,7 @@ export const usageRecords = pgTable(
   (table) => [
     index("usage_records_user_id_idx").on(table.userId),
     index("usage_records_thread_id_idx").on(table.threadId),
+    // 对账扫描：按来源筛未对账 + 有 generationId 的行
+    index("usage_records_cost_source_idx").on(table.costSource),
   ]
 )

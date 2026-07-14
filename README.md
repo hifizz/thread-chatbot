@@ -42,9 +42,19 @@ import { Button } from "@/components/ui/button";
 ### 计费口径
 
 - 金额统一用「微元」整数存储（1 元 = 1_000_000 微元），避免浮点误差。
-- 售价 = 供应商成本 ÷ (1 − 利润率)，`PROFIT_MARGIN=0.3` 时利润率恰为 30%，微元向上取整保证不低于目标。各模型成本价见 `constants/pricing.ts` 的 `MODEL_COST`（**业务数字，请按供应商实际计费页核对**；只要此处成本 ≥ 真实成本，加价即保证 ≥30% 利润）。
-- 每轮对话结束后（`app/api/chat/route.ts` 的 `onFinish`）按 token 用量扣减余额并写入 `usage_records` 流水；本次用量与费用同时附到 assistant 消息 metadata。余额不足会在发起对话前拦截（HTTP 402）。
+- 售价 = 供应商成本 ÷ (1 − 利润率)，`PROFIT_MARGIN=0.3` 时利润率恰为 30%，微元向上取整保证不低于目标。
+- 成本价按模型**原生币种**填在 `constants/pricing.ts` 的 `MODEL_COST`（MiniMax 用 CNY，DeepSeek/OpenAI 用 USD），美元价由 `USD_TO_CNY` 汇率折算——不用再手动近似（**仍是业务数字，请按供应商计费页核对；汇率建议留缓冲**）。
+- 每轮对话结束（`app/api/chat/route.ts` 的 `onFinish`）按 token 即时扣费并写 `usage_records`（`cost_source='estimate'`）；本次用量/费用同时附到 assistant 消息 metadata。余额不足在发起前拦截（HTTP 402）。
 - 输入框右下角实时显示「本次 token / 累计 token / 余额」，数据来自 `/api/billing/summary`。
+
+### 真实成本对账（Vercel AI 网关，可选，两段式计费）
+
+痛点：手填价目表会过时、跟不上供应商调价。解决：配置 **Vercel AI 网关**（`AI_GATEWAY_API_KEY`）后，非 MiniMax 模型经其转发，响应带 `providerMetadata.gateway.generationId`。
+
+- **即时段**：`onFinish` 先用价目表估算扣费（保证响应，不阻塞），并把 `generationId` 记入 `usage_records`。
+- **对账段**：`/api/billing/reconcile`（`CRON_SECRET` 鉴权，`vercel.json` 已配 15 分钟一次的 Cron）用 `generationId` 调网关 `getGenerationInfo` 取**真实成本(USD)** → 按 `USD_TO_CNY` 折微元 → 按 ≥30% 利润重算售价 → **按差额修正用户余额**，并把该行标记为 `cost_source='gateway'`。
+- **幂等**：只处理 `estimate` 行，处理后翻成 `gateway`，重复触发不会重复扣。
+- 未配 Vercel 网关时，此机制休眠，计费仍走币种精确的价目表。路由优先级：Vercel 网关 → Cloudflare 网关 → 供应商直连。
 
 ### Creem 支付（充值 / 订阅）与账户页
 

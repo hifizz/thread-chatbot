@@ -2,13 +2,18 @@ import { createOpenAICompatible } from "@ai-sdk/openai-compatible"
 import {
   extractReasoningMiddleware,
   wrapLanguageModel,
+  gateway,
   type LanguageModel,
 } from "ai"
 import { minimaxChatModel, isMinimaxConfigured } from "@/lib/ai/minimax"
+import { isVercelGatewayConfigured } from "@/lib/payments/vercel-gateway"
 import { getChatModel, type ChatModel } from "@/constants/model"
 
-// 统一的对话模型解析层：MiniMax 直连；DeepSeek / OpenAI 经 Cloudflare AI 网关的
-// OpenAI 兼容 compat 端点转发（CF 网关不支持 MiniMax，故 MiniMax 保持直连）。
+// 统一的对话模型解析层，非 MiniMax 模型按优先级路由：
+//   1) Vercel AI 网关（配 AI_GATEWAY_API_KEY）—— 会回传 generationId，供真实成本对账；
+//   2) Cloudflare AI 网关 compat 端点（配 CF_AI_GATEWAY_*）；
+//   3) 供应商直连。
+// MiniMax 两家网关都不支持，始终直连。
 
 const CF_ACCOUNT = process.env.CF_AI_GATEWAY_ACCOUNT_ID
 const CF_GATEWAY = process.env.CF_AI_GATEWAY_ID
@@ -42,6 +47,8 @@ const PROVIDER_ENV: Record<
 /** 该模型是否具备可用配置（有对应 key / 网关）。用于给出友好报错。 */
 export function isModelConfigured(model: ChatModel): boolean {
   if (model.provider === "minimax") return isMinimaxConfigured()
+  // Vercel 网关配了就能用（它自带各家凭据）；否则需要该供应商的直连/CF key。
+  if (isVercelGatewayConfigured()) return true
   return Boolean(PROVIDER_ENV[model.provider].key)
 }
 
@@ -55,6 +62,20 @@ export function resolveChatModel(modelId: string): LanguageModel {
 
   if (model.provider === "minimax") {
     return minimaxChatModel(model.upstreamModel)
+  }
+
+  // 优先 Vercel AI 网关：用 "creator/model" 标识（复用 gatewayModel），响应带 generationId。
+  // Vercel 网关自带鉴权/计费，无需各供应商的 key。
+  if (isVercelGatewayConfigured()) {
+    const base = gateway(
+      model.gatewayModel ?? `${model.provider}/${model.upstreamModel}`
+    )
+    return model.reasoning
+      ? wrapLanguageModel({
+          model: base,
+          middleware: extractReasoningMiddleware({ tagName: "think" }),
+        })
+      : base
   }
 
   const env = PROVIDER_ENV[model.provider]
