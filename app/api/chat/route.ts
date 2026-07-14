@@ -148,14 +148,20 @@ export async function POST(req: Request) {
     tools: allTools,
     // 研究模式允许更多工具轮次；普通对话维持原来的小步数
     stopWhen: isStepCount(research && searchReady ? RESEARCH_MAX_STEPS : 5),
-    // 4) 生成结束后按 token 用量扣费并写入流水（利润率 ≥30%，见 constants/pricing.ts）
-    onFinish: async ({ usage }) => {
+    // 4) 生成结束后按 token 用量即时扣费并写入流水（价目表估算，利润率 ≥30%）。
+    //    若经 Vercel 网关，采集 generationId，稍后由 /api/billing/reconcile 拉真实成本对账。
+    onFinish: async ({ usage, providerMetadata }) => {
+      const generationId =
+        typeof providerMetadata?.gateway?.generationId === "string"
+          ? providerMetadata.gateway.generationId
+          : null
       await chargeUsage({
         userId,
         model: modelId,
         inputTokens: usage.inputTokens ?? 0,
         outputTokens: usage.outputTokens ?? 0,
         threadId: threadId ?? null,
+        generationId,
       })
     },
   })

@@ -1,12 +1,15 @@
 import { randomUUID } from "node:crypto"
-import { eq, sql } from "drizzle-orm"
+import { and, desc, eq, isNotNull, sql } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { userCredits, usageRecords, payments } from "@/lib/db/schema"
 import {
   INITIAL_CREDIT_MICROS,
   costMicros,
   priceMicros,
+  priceFromCost,
+  usdToMicros,
 } from "@/constants/pricing"
+import { getGenerationCostUsd } from "@/lib/payments/vercel-gateway"
 
 // 用户额度与用量记账。金额单位为「微元」（见 constants/pricing.ts）。
 
@@ -39,6 +42,8 @@ export type UsageInput = {
   outputTokens: number
   threadId?: string | null
   messageId?: string | null
+  /** Vercel 网关 generation id（有则供事后真实成本对账） */
+  generationId?: string | null
 }
 
 export type ChargeResult = {
@@ -76,6 +81,8 @@ export async function chargeUsage(input: UsageInput): Promise<ChargeResult> {
     outputTokens: input.outputTokens,
     costMicros: cost,
     priceMicros: price,
+    generationId: input.generationId ?? null,
+    costSource: "estimate",
   })
 
   return {
@@ -151,4 +158,78 @@ export async function recordCreemTopup(
 
   const balanceMicros = await addCreditsMicros(input.userId, input.creditMicros)
   return { granted: true, balanceMicros }
+}
+
+// ---- 真实成本对账（Vercel AI 网关）----
+// 即时扣费用的是价目表「估算」成本；随后按 generationId 拉取网关真实 USD 成本，
+// 折算微元 → 按 ≥30% 利润重算售价 → 用差额修正用户余额，并把该行标记为 gateway。
+// 幂等：只处理 cost_source='estimate' 的行；处理成功后翻成 'gateway'。
+
+export type ReconcileResult = {
+  scanned: number
+  reconciled: number
+  failed: number
+}
+
+/**
+ * 对账最近若干条「有 generationId 且仍是 estimate」的用量行。
+ * limit 控制单次批量；查不到真实成本（未就绪）的行保持 estimate，下次再试。
+ */
+export async function reconcilePendingCosts(
+  limit = 50
+): Promise<ReconcileResult> {
+  const rows = await db
+    .select({
+      id: usageRecords.id,
+      userId: usageRecords.userId,
+      generationId: usageRecords.generationId,
+      priceMicros: usageRecords.priceMicros,
+    })
+    .from(usageRecords)
+    .where(
+      and(
+        eq(usageRecords.costSource, "estimate"),
+        isNotNull(usageRecords.generationId)
+      )
+    )
+    .orderBy(desc(usageRecords.createdAt))
+    .limit(limit)
+
+  let reconciled = 0
+  let failed = 0
+
+  for (const row of rows) {
+    const usd = await getGenerationCostUsd(row.generationId as string)
+    if (usd == null) {
+      failed++
+      continue
+    }
+
+    const realCost = usdToMicros(usd)
+    const newPrice = priceFromCost(realCost)
+    const delta = newPrice - row.priceMicros // >0 需补扣，<0 需退回
+
+    // 修正流水 + 按差额调整余额（差额可正可负）
+    await db
+      .update(usageRecords)
+      .set({
+        costMicros: realCost,
+        priceMicros: newPrice,
+        costSource: "gateway",
+      })
+      .where(eq(usageRecords.id, row.id))
+
+    if (delta !== 0) {
+      await db
+        .update(userCredits)
+        .set({
+          balanceMicros: sql`${userCredits.balanceMicros} - ${delta}`,
+          updatedAt: new Date(),
+        })
+        .where(eq(userCredits.userId, row.userId))
+    }
+    reconciled++
+  }
+
+  return { scanned: rows.length, reconciled, failed }
 }
