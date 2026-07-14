@@ -1,5 +1,4 @@
 import {
-  pgTable,
   text,
   timestamp,
   bigint,
@@ -7,12 +6,13 @@ import {
   index,
   uniqueIndex,
 } from "drizzle-orm/pg-core"
+import { dbSchema } from "./pg-schema"
 import { user } from "./auth-schema"
 
 // 支付/订阅相关表。金额一律用「微元」整数（1 元 = 1_000_000 微元）。
 
 // 充值/一次性订单流水。以 (provider, orderId) 唯一保证 webhook 重放时幂等，只到账一次。
-export const payments = pgTable(
+export const payments = dbSchema.table(
   "payments",
   {
     id: text("id").primaryKey(), // crypto.randomUUID()
@@ -49,7 +49,7 @@ export const payments = pgTable(
 )
 
 // 订阅状态镜像（以 Creem 为准，webhook 同步）。一个用户可有多条历史订阅，以 subscriptionId 唯一。
-export const subscriptions = pgTable(
+export const subscriptions = dbSchema.table(
   "subscriptions",
   {
     id: text("id").primaryKey(), // crypto.randomUUID()
