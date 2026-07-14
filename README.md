@@ -31,7 +31,18 @@ import { Button } from "@/components/ui/button";
    - `BETTER_AUTH_SECRET`（`openssl rand -base64 32`）、`BETTER_AUTH_URL`（本地 `http://localhost:3000`）
    - 任一可用模型的凭据（`MINIMAX_API_KEY` 直连，或 `DEEPSEEK_API_KEY`/`OPENAI_API_KEY` 经网关）。
 2. `pnpm db:migrate`（新增 `user/session/account/verification` 与 `user_credits/usage_records` 表，并给 `threads` 加 `user_id`）。
-3. `pnpm dev`，访问首页会被重定向到 `/sign-in`；注册后即赠送初始额度（默认 ¥5，见 `constants/pricing.ts`）。
+3. `pnpm dev`，访问首页会被重定向到 `/sign-in`。
+
+### 邮箱验证 / 找回密码 / 防白嫖
+
+免费初始额度 + 无门槛注册 = 容易被批量注册薅走。为此接了 **Resend**（邮件）+ **Cloudflare Turnstile**（人机验证），三道闸都**按环境变量门控，未配置则自动降级**：
+
+- **邮箱验证（Resend）**：配了 `RESEND_API_KEY` 后，注册**必须验证邮箱**才能登录；验证/找回密码邮件由 Resend 发送（`lib/email/*`）。未配置则降级为「注册即用」（开发友好）。
+- **初始额度改到「验证后」发放**：关键防薅——`emailVerification.afterEmailVerification` 里才 `ensureUserCredits`（默认 ¥5）。未验证的账号拿不到额度，逼真实邮箱。（未启用邮件时退回「注册即赠」。）
+- **人机验证（Turnstile）**：配了 `TURNSTILE_SECRET_KEY` + `NEXT_PUBLIC_TURNSTILE_SITE_KEY` 后，注册/登录接口要求通过 Turnstile（token 走 `x-captcha-response` 头）。
+- **找回密码**：`/forgot-password` 发重置邮件 → `/reset-password?token=...` 设新密码。
+
+上线建议三者都开。本地开发可都不配，流程仍可跑通（注册即用、无验证码）。
 
 ### 大模型与 Cloudflare AI 网关
 

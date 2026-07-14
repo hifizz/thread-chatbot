@@ -8,10 +8,17 @@ export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
   const hasSession = getSessionCookie(request) != null
 
-  const isAuthPage = pathname === "/sign-in" || pathname === "/sign-up"
+  // 无需登录即可访问的页面（登录/注册/找回密码）
+  const publicPages = new Set([
+    "/sign-in",
+    "/sign-up",
+    "/forgot-password",
+    "/reset-password",
+  ])
+  const isAuthPage = publicPages.has(pathname)
 
-  // 已登录用户访问登录/注册页 → 回到首页
-  if (hasSession && isAuthPage) {
+  // 已登录用户访问登录/注册页 → 回到首页（找回/重置密码页不强制跳转）
+  if (hasSession && (pathname === "/sign-in" || pathname === "/sign-up")) {
     return NextResponse.redirect(new URL("/", request.url))
   }
 
