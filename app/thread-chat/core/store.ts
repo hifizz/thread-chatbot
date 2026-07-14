@@ -26,6 +26,14 @@ export interface ForkResult {
   title: string
 }
 
+/**
+ * 分支的默认标题：锚点原文截 13 字（fork 时的初始标题；异步语义标题
+ * 生成前 / 失败时的兜底展示，也是壳层判断「还没生成过标题」的比对基准）。
+ */
+export function defaultBranchTitle(anchorText: string): string {
+  return anchorText.length > 13 ? anchorText.slice(0, 13) + "…" : anchorText
+}
+
 export type ThreadStore = ReturnType<typeof createThreadStore>
 
 export function createThreadStore(seed: ThreadTreeState) {
@@ -96,10 +104,7 @@ export function createThreadStore(seed: ThreadTreeState) {
       state.footnoteCounter++
       const id = "b" + state.seq++
       const depth = parent.depth + 1
-      const title =
-        input.anchorText.length > 13
-          ? input.anchorText.slice(0, 13) + "…"
-          : input.anchorText
+      const title = defaultBranchTitle(input.anchorText)
 
       state.threads[id] = {
         id,
@@ -199,6 +204,18 @@ export function createThreadStore(seed: ThreadTreeState) {
       msg.text = ""
       msg.status = "pending"
       msg.error = undefined
+      notify()
+    },
+
+    /** 替换某会话的标题（异步分支标题 D7：首答完成后由模型生成语义标题）。
+        原子更新 + notify，列头 / ⌘K / 画布 / 面包屑随 version 重渲同步；
+        随整树防抖存盘自然持久化。空白或未变化时不通知。 */
+    setThreadTitle(threadId: string, title: string): void {
+      const t = state.threads[threadId]
+      if (!t) return
+      const v = title.trim()
+      if (!v || t.title === v) return
+      t.title = v
       notify()
     },
 

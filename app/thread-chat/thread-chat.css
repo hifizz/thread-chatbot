@@ -762,6 +762,37 @@
   position: relative;
   color: #f3efe6;
 }
+/* 可选首问输入框（Phase A 气泡输入框）：深底提亮，单行起步自增高，
+   max-height 68px 与 selection-bubble.tsx 的 JS clamp 同步，超出转内滚 */
+.tc .sel-bubble .ask {
+  margin: 0 0 9px;
+  position: relative;
+}
+.tc .sel-bubble .ask textarea {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  resize: none;
+  overflow-y: auto;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.1);
+  color: #f3efe6;
+  border-radius: 8px;
+  padding: 6px 8px;
+  font-family: var(--font-ui);
+  font-size: 12.5px;
+  line-height: 1.45;
+  max-height: 68px;
+  min-height: 30px;
+}
+.tc .sel-bubble .ask textarea::placeholder {
+  color: #a9a294;
+}
+.tc .sel-bubble .ask textarea:focus {
+  outline: 1.5px solid rgba(255, 255, 255, 0.55);
+  outline-offset: 0;
+  background: rgba(255, 255, 255, 0.14);
+}
 .tc .sel-bubble button {
   width: 100%;
   border: none;
