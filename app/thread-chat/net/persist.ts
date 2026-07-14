@@ -47,19 +47,25 @@ export function getLastTreeId(): string | null {
 
 /* ---------------- 整树加载 / 存盘（DB） ---------------- */
 
-/** GET 整树：未保存过返回 null（正常首访路径）；请求失败也返回 null 并 console.warn（降级空树） */
-export async function loadTree(id: string): Promise<ThreadTreeState | null> {
+/** loadTree 的返回：state = 整树（未保存过为 null）；customTitle = 用户重命名过的标题（未改过为 null） */
+export interface LoadedTree {
+  state: ThreadTreeState | null
+  customTitle: string | null
+}
+
+/** GET 整树：未保存过 state 为 null（正常首访路径）；请求失败也降级为空并 console.warn（空树启动） */
+export async function loadTree(id: string): Promise<LoadedTree> {
   try {
     const res = await fetch(`/api/branch-trees/${id}`)
     if (!res.ok) throw new Error(`GET /api/branch-trees ${res.status}`)
-    const data = (await res.json()) as { state: ThreadTreeState | null }
-    return data.state
+    const data = (await res.json()) as LoadedTree
+    return { state: data.state, customTitle: data.customTitle ?? null }
   } catch (err) {
     console.warn(
       "[thread-chat] 加载分支树失败，以空树降级启动（本次不恢复历史）：",
       err
     )
-    return null
+    return { state: null, customTitle: null }
   }
 }
 

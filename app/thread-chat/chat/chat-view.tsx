@@ -178,6 +178,14 @@ export function ChatView({
               onInput={(e) => autoGrow(e.currentTarget)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
+                  // IME 守卫：输入法组合态（中文选词中）按 Enter 只做「上屏」，
+                  // 不发送、也不 preventDefault——否则会把已上屏部分发出去，
+                  // 组合中的文字残留在输入框。isComposing 覆盖 Chrome/Firefox
+                  // （组合期间 keydown.isComposing 为 true）；keyCode 229 兜底
+                  // Safari——它在 compositionend 之后才派发这次 Enter keydown，
+                  // isComposing 已是 false，但 keyCode 仍报 229。
+                  const ne = e.nativeEvent
+                  if (ne.isComposing || ne.keyCode === 229) return
                   e.preventDefault()
                   doSend()
                 }

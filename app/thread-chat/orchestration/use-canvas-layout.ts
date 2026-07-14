@@ -6,7 +6,7 @@
  * 派生链（skill 契约 #11/#12：受控 nodes/edges、永不原地改对象）：
  * · base（结构 + 展示数据 + 尺寸估算）仅随 store version 重派生——state 对象原地
  *   修改、引用永不变化（见 core/use-thread-store 头注），必须以 version 为 memo key；
- * · autoPos（dagre TB 自动布局）只依赖 base，拖拽 / 选中不会重跑 dagre；
+ * · autoPos（dagre LR 自动布局，根在左、分支向右）只依赖 base，拖拽 / 选中不会重跑 dagre；
  * · nodes = base × (pin 覆盖坐标 ?? dagre 坐标) × 选中态，三层 useMemo 逐级缓存。
  *
  * pin 语义：节点一旦被手动拖动即写入 pins 覆盖表；树变化重新布局时只有未 pin
@@ -66,7 +66,7 @@ function estLines(text: string, fontPx: number, maxLines: number): number {
   return Math.min(maxLines, Math.max(1, Math.ceil(units / perLine)))
 }
 
-/** 估算卡高喂给 dagre：与实测高相差几个像素，误差由 ranksep 吸收（skill layouting 做法） */
+/** 估算卡高喂给 dagre：与实测高相差几个像素，LR 布局下误差由 nodesep（垂直间距）吸收 */
 function estimateCardHeight(d: CanvasCardData): number {
   let h = 24 // 上下 padding 11×2 + 上下边框
   h += 26 // chead：徽章 + 标题一行
@@ -169,15 +169,16 @@ function buildBaseGraph(
   return { nodes, edges, sizes }
 }
 
-/* ---------------- dagre TB 自动布局（兄弟横向铺开的 tidy tree） ---------------- */
+/* ---------------- dagre LR 自动布局（思维导图形态：根在左、层级向右铺开） ---------------- */
 
 function layoutPositions(base: BaseGraph): Map<string, XYPosition> {
   const g = new graphlib.Graph<GraphLabel, NodeLabel, EdgeLabel>()
-  // nodesep：兄弟卡间距；ranksep：层间距（容纳边 label 徽章 + 吸收卡高估算误差）
+  // LR 横向布局下语义对调：ranksep = 水平层距（容纳边 label 徽章，卡宽 280 固定、
+  // 无估算误差故不必留太宽）；nodesep = 兄弟卡垂直间距（卡高有估算误差，由它吸收）
   g.setGraph({
-    rankdir: "TB",
-    nodesep: 48,
-    ranksep: 96,
+    rankdir: "LR",
+    nodesep: 40,
+    ranksep: 110,
     marginx: 24,
     marginy: 24,
   })
