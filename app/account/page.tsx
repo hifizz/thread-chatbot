@@ -233,6 +233,19 @@ export default async function AccountPage() {
             )}
           </CardContent>
         </Card>
+
+        {/* 法务链接 */}
+        <div className="flex justify-center gap-4 text-xs text-muted-foreground">
+          <Link href="/terms" className="hover:text-foreground">
+            服务条款
+          </Link>
+          <Link href="/privacy" className="hover:text-foreground">
+            隐私政策
+          </Link>
+          <Link href="/refund" className="hover:text-foreground">
+            退款政策
+          </Link>
+        </div>
       </div>
     </div>
   )
