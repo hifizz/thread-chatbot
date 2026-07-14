@@ -1,6 +1,10 @@
 # thread-chat e2e 验收脚本
 
-`/thread-chat`（分支对话页）的两套验收脚本，均无需测试框架。
+`/thread-chat`（分支对话页）的验收脚本，均无需测试框架。
+
+注：verify-live / verify-bubble-composer 直接 import 产品代码（`.ts`）生成断言
+期望值（kickoff 预填文案、默认分支标题等——文案改一处，测试期望自动跟随），
+因此需要带 `--experimental-strip-types` 运行（与 text-anchor.test.mjs 同一机制）。
 
 ## text-anchor.test.mjs — 锚点定位纯函数用例（无需 dev server）
 
@@ -13,12 +17,23 @@ node --experimental-strip-types e2e/thread-chat/text-anchor.test.mjs
 上下文消歧、**fuzzy 原文被改几个字后仍以 score≥阈值 命中正确区间**、
 阈值抬高 / 彻底无关锚点判定丢失（返回 null）、fuzzySubstring 单字错漏容忍。
 
+## prompt-budget.test.mjs — 继承段字符预算纯函数用例（无需 dev server）
+
+```bash
+node --experimental-strip-types e2e/thread-chat/prompt-budget.test.mjs
+```
+
+覆盖 `app/thread-chat/net/prompt-pure.ts` 的继承段预算截断（openspec:
+add-bubble-composer D8）：预算内不截断、超预算从最旧整条丢弃（顺序保持）、
+恰好等于预算的边界、**最新 1 条独超预算仍保留（保底 1 条）**、省略说明与
+kickoff 文案形状。
+
 ## verify-live.mjs — 真实后端端到端验收
 
 前提：dev server 已在 3000 端口（`pnpm dev`）、`.env.local` 配好 MiniMax key、本机有 Chromium。
 
 ```bash
-CHROMIUM_PATH=/opt/pw-browsers/chromium node e2e/thread-chat/verify-live.mjs
+CHROMIUM_PATH=/opt/pw-browsers/chromium node --experimental-strip-types e2e/thread-chat/verify-live.mjs
 ```
 
 断言覆盖：页面加载、主线真实流式回复、**富文本 Markdown**（`.md-body` 渲染出
@@ -58,6 +73,30 @@ CHROMIUM_PATH=... BASE_URL=http://localhost:4040 node e2e/thread-chat/verify-per
   composer 非忙碌（测试行随后清理）。
 - **降级（5 断言）**：playwright 拦截 `/api/branch-trees/**` 返回 500 → 页面仍以
   空树打开、console.warn 留痕、真实聊天照常、PUT 失败仅警告不打断。
+
+## 气泡输入框验收（openspec: add-bubble-composer）
+
+入库脚本 `verify-bubble-composer.mjs`（前提同 verify-live；走真实模型，
+测试树跑完自动清理）。运行：
+
+```bash
+CHROMIUM_PATH=... BASE_URL=http://localhost:4040 \
+  node --experimental-strip-types e2e/thread-chat/verify-bubble-composer.mjs
+```
+
+断言覆盖（断言面参考 playground verify6 + 本仓 IME / 异步标题关注点）：
+划选气泡含输入框（placeholder 提示可留空、弹出即聚焦）→ 按钮文案四态
+（默认 / 有输入 / ⌘ 按住 / 列条 override，含优先级与复位）→ Shift+Enter 换行
+不提交 → **长问题自增高 + textarea 内滚不自毁气泡（capture scroll 放行修复）、
+页面真实滚动仍关气泡（无回归）** → 输入中 Esc 关气泡且无消息入树 →
+**CDP IME 组合态（imeSetComposition + keyCode 229 的 Enter）不提交，insertText
+上屏后真实 Enter 才提交** → 带问 Enter：新列第 1 条 = 该 user 消息原文、第 2 条
+assistant 流式首答、composer 无预填、payload 契约（threadChat.anchorText /
+user 原文入 messages）→ 留空 Enter：composer 预填 `kickoffQuestion()` 期望值、
+消息区为空、2 秒内无 /api/chat POST → ⌘Enter keepSource：来源列保留、新列开在
+紧邻右侧 → **分支首答完成后标题异步变为 ≤8 字语义标题（非锚点截断）、刷新后
+仍在（随树持久化）、全程 /api/branch-title 恰好一次**。深树继承段预算的纯函数
+用例见上方 prompt-budget.test.mjs。截图 `shots/bc-*.png`。
 
 ## 会话列表验收（openspec: add-tree-list-ui）
 

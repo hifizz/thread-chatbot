@@ -12,9 +12,16 @@
  * · 点非主线小格 = 显式指定让位列（override，再点同格取消）；
  * · 按住 ⌘/Ctrl = 保留来源列、新列开在其紧邻右侧（气泡实时跟踪修饰键，按钮文案
  *   与列条目标同步切换）。生效目标 = override > 修饰键 > 默认规则。
+ *
+ * 可选输入框（Phase A，openspec: add-bubble-composer）：
+ * · 输入后提交 = 带问开分支：问题经 onFork 第三参传给壳层，fork 后直接 chat.send
+ *   成为新分支第 1 条 user 消息（不进 composer 预填流）；
+ * · 留空提交 = 现有预填流原样保留（空分支 + composer 预填代拟问题 + 回车确认）；
+ * · 键位：Enter 提交 / Shift+Enter 换行 / ⌘Ctrl+Enter 提交且保留来源列 /
+ *   Esc 交由壳层关闭链关气泡；Enter 有 IME 守卫（isComposing / keyCode 229）。
  */
 
-import React, { useEffect, useState } from "react"
+import React, { useEffect, useRef, useState } from "react"
 import { GitFork } from "lucide-react"
 import type { ThreadTreeState } from "../core/types"
 import { threadTitle } from "../core/selectors"
@@ -42,8 +49,9 @@ export interface SelectionBubbleProps {
   state: ThreadTreeState
   sel: SelectionInfo | null
   onSelChange: (s: SelectionInfo | null) => void
-  /** 点「开启分支讨论」：上层负责真正 fork + 放置；hint 见 placement.ts */
-  onFork: (s: SelectionInfo, hint?: PlacementHint) => void
+  /** 提交开分支：上层负责真正 fork + 放置；hint 见 placement.ts；
+      question = 气泡输入框里的可选首问（trim 后非空才传，成为新分支第 1 条 user 消息） */
+  onFork: (s: SelectionInfo, hint?: PlacementHint, question?: string) => void
   /* —— 迷你列条的放置上下文（与提交走同一套 placement 规则）—— */
   slots: Slot[]
   mode: PlacementMode
@@ -65,13 +73,26 @@ export function SelectionBubble({
   const [override, setOverride] = useState<string | null>(null)
   /** ⌘/Ctrl 是否按住（实时跟踪，目标与按钮文案随之切换） */
   const [metaHeld, setMetaHeld] = useState(false)
-  /** 渲染期间的派生状态调整（React 官方写法）：sel 变化 = 新一次划选，重置两态 */
+  /** 可选首问（受控 textarea）：留空提交 = 现有预填流；非空提交 = 带问开分支 */
+  const [question, setQuestion] = useState("")
+  const taRef = useRef<HTMLTextAreaElement | null>(null)
+  /** 渲染期间的派生状态调整（React 官方写法）：sel 变化 = 新一次划选，重置各态 */
   const [forSel, setForSel] = useState<SelectionInfo | null>(sel)
   if (forSel !== sel) {
     setForSel(sel)
     setOverride(null)
     setMetaHeld(sel?.meta ?? false)
+    setQuestion("")
   }
+
+  /* 气泡弹出即聚焦输入框（preventScroll：气泡定位刚结算完，不能再引发滚动）；
+     顺手清掉上一次自增高留下的行内高度（textarea 跨划选不重挂载） */
+  useEffect(() => {
+    const ta = taRef.current
+    if (!sel || !ta) return
+    ta.style.height = ""
+    ta.focus({ preventScroll: true })
+  }, [sel])
 
   /* 划选监听：mouseup 结算选区并定位气泡；mousedown / 滚动 / resize 隐藏 */
   useEffect(() => {
@@ -126,8 +147,9 @@ export function SelectionBubble({
         const rect = s.getRangeAt(0).getBoundingClientRect()
         const left = Math.max(10, Math.min(rect.left, window.innerWidth - 244))
         let top = rect.bottom + 9
-        if (top > window.innerHeight - (150 + extraH))
-          top = Math.max(10, rect.top - (132 + extraH))
+        // 贴底翻转阈值：150/132 → 190/172，多出的 ~40px 是输入框一行的高度（D5）
+        if (top > window.innerHeight - (190 + extraH))
+          top = Math.max(10, rect.top - (172 + extraH))
         onSelChange({
           text,
           threadId,
@@ -142,7 +164,14 @@ export function SelectionBubble({
     const onMouseDown = (e: MouseEvent) => {
       if (!(e.target as HTMLElement).closest?.(".sel-bubble")) onSelChange(null)
     }
-    const onScroll = () => onSelChange(null)
+    const onScroll = (e: Event) => {
+      // 气泡内部的滚动（输入长问题时 textarea 自增高 / 内滚）不算「用户离开」——
+      // capture 监听会先于一切收到它，必须放行，否则打字打到换行气泡就自毁丢输入（D4）。
+      // resize 事件的 target 是 window（无 closest），自然落到关闭分支。
+      const t = e.target as Partial<HTMLElement> | null
+      if (t?.closest?.(".sel-bubble")) return
+      onSelChange(null)
+    }
     document.addEventListener("mouseup", onMouseUp)
     document.addEventListener("mousedown", onMouseDown)
     document.addEventListener("scroll", onScroll, true)
@@ -192,11 +221,29 @@ export function SelectionBubble({
       })
     : null
 
+  /* —— 按钮文案四态（优先级）：列条 override > ⌘ 按住 > 有输入 > 默认 —— */
+  const hasQuestion = question.trim().length > 0
   const btnLabel = ov
     ? `开启并${mode === "replace" ? "替换" : "折叠"}『${threadTitle(state, ov)}』`
     : metaHeld
       ? "在右侧新列打开"
-      : "开启分支讨论"
+      : hasQuestion
+        ? "带着问题开分支"
+        : "开启分支讨论"
+
+  /** 统一提交：按钮点击与输入框 Enter 共用（事件瞬时修饰键与跟踪态任一为真即 keepSource）。
+      question trim 后非空 = 带问开分支；留空 = 现有预填流（上层据第三参分流） */
+  const submit = (metaFromEvent: boolean) => {
+    const h: PlacementHint | undefined = ov
+      ? { targetId: ov }
+      : metaFromEvent || metaHeld
+        ? { keepSource: true }
+        : undefined
+    const q = question.trim()
+    window.getSelection()?.removeAllRanges()
+    onSelChange(null)
+    onFork(sel, h, q || undefined)
+  }
 
   /* —— 迷你列条：主线 + 各槽位（+ 插入位置的幽灵格），标注将替换 / 将折叠 / 本列 —— */
   const ghost = (
@@ -274,6 +321,33 @@ export function SelectionBubble({
     <div className="sel-bubble" style={{ left: sel.x, top: sel.y }}>
       <div className="lbl">在新分支中讨论这段</div>
       <div className="quote">{sel.text}</div>
+      <div className="ask">
+        <textarea
+          ref={taRef}
+          rows={1}
+          value={question}
+          placeholder="就这段问点什么…（可留空）"
+          aria-label="就这段划选文字提出你的问题（可留空，留空则预填代拟问题待确认）"
+          onChange={(e) => {
+            setQuestion(e.target.value)
+            // 自增高：clamp 68px（与 CSS 的 max-height 同步），超出转内滚
+            const ta = e.currentTarget
+            ta.style.height = "auto"
+            ta.style.height = Math.min(ta.scrollHeight, 68) + "px"
+          }}
+          onKeyDown={(e) => {
+            if (e.key !== "Enter") return
+            // IME 守卫（同 chat-view composer）：输入法组合态按 Enter 只做「上屏」，
+            // 不提交、也不 preventDefault。isComposing 覆盖 Chrome/Firefox；
+            // keyCode 229 兜底 Safari（compositionend 后才派发的 Enter keydown）。
+            const ne = e.nativeEvent
+            if (ne.isComposing || ne.keyCode === 229) return
+            if (e.shiftKey) return // Shift+Enter = 换行（浏览器默认行为）
+            e.preventDefault()
+            submit(e.metaKey || e.ctrlKey)
+          }}
+        />
+      </div>
       {hasMap && (
         <div
           className="slotmap"
@@ -283,18 +357,7 @@ export function SelectionBubble({
           {cells}
         </div>
       )}
-      <button
-        onClick={(e) => {
-          const h: PlacementHint | undefined = ov
-            ? { targetId: ov }
-            : e.metaKey || e.ctrlKey
-              ? { keepSource: true }
-              : undefined
-          window.getSelection()?.removeAllRanges()
-          onSelChange(null)
-          onFork(sel, h)
-        }}
-      >
+      <button onClick={(e) => submit(e.metaKey || e.ctrlKey)}>
         <GitFork size={14} />
         {btnLabel}
       </button>

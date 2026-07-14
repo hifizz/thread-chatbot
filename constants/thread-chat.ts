@@ -21,6 +21,19 @@ export const THREAD_CHAT_BRANCH_PREFIX =
 export const THREAD_CHAT_BRANCH_SUFFIX =
   "请围绕这个焦点结合上文展开，除非用户把话题引向别处。"
 
+/**
+ * 继承段上下文字符总预算（openspec: add-bubble-composer D8）：
+ * buildRequestBody 组继承段时从最新往回累计正文字符，超预算即以完整消息为单位
+ * 丢弃更旧的部分（最少保 1 条），深树请求不再上下文爆炸。当前会话消息不受此限。
+ */
+export const INHERITED_CHAR_BUDGET = 6000
+
+/**
+ * 异步分支标题（openspec: add-bubble-composer D7）的生成长度上限（字符）：
+ * 提示词要求 4–8 字，服务端对超长输出按此截断兜底。
+ */
+export const BRANCH_TITLE_GEN_MAX_LEN = 8
+
 /* ---------------- 分支树持久化（DB + localStorage） ---------------- */
 
 /** localStorage：裸路径 /thread-chat 的跳转目标——最近打开的一棵树的 treeId */

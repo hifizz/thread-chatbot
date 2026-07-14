@@ -41,10 +41,11 @@ import {
   UI_SAVE_DEBOUNCE_MS,
 } from "@/constants/thread-chat"
 import { emptySeedState } from "./core/seed"
-import { createThreadStore } from "./core/store"
+import { createThreadStore, defaultBranchTitle } from "./core/store"
 import { useThreadStore } from "./core/use-thread-store"
 import { threadTitle, type TreeRow } from "./core/selectors"
 import type { Message, ThreadTreeState } from "./core/types"
+import { requestBranchTitle } from "./net/branch-title"
 import { createChatController } from "./net/chat-controller"
 import { kickoffQuestion } from "./net/prompt"
 import {
@@ -214,6 +215,40 @@ export function ThreadChatDemoInner({
     [treeId, store]
   )
 
+  /* ---------- 异步分支标题（D7）：分支首答完成后请求一次 4–8 字语义标题。
+       触发条件：非主线、标题仍是默认（锚点截 13 字——已生成过 / 重命名过则跳过，
+       重载后靠这一条天然防重）、首条 user + 首条 done 且非空的 assistant 都已就位。
+       Set ref 防同会话内重复请求；成功走 setThreadTitle（随整树防抖存盘持久化），
+       失败 console.warn 静默保留默认标题。 ---------- */
+  const titleReqRef = useRef<Set<string>>(new Set())
+  useEffect(() => {
+    const s = store.getState()
+    for (const t of Object.values(s.threads)) {
+      if (!t.parentId || !t.anchorText) continue
+      if (titleReqRef.current.has(t.id)) continue
+      if (t.title !== defaultBranchTitle(t.anchorText)) continue
+      const q = t.messages.find((m) => m.role === "user")
+      const a = t.messages.find(
+        (m) =>
+          m.role === "assistant" && m.status === "done" && m.text.trim() !== ""
+      )
+      if (!q || !a) continue
+      titleReqRef.current.add(t.id)
+      const threadId = t.id
+      void requestBranchTitle({
+        anchorText: t.anchorText,
+        question: q.text,
+        answer: a.text,
+      })
+        .then((title) => {
+          if (title) store.setThreadTitle(threadId, title)
+        })
+        .catch((err) => {
+          console.warn("[thread-chat] 分支标题生成失败（保留默认标题）：", err)
+        })
+    }
+  }, [version, store])
+
   /* ---------- 自适应列数（SSR 阶段 winW=null，顶栏显示「列数」占位） ---------- */
   const winW = useWindowWidth()
   const [forceCols, setForceCols] = useState<number | null>(
@@ -334,8 +369,15 @@ export function ThreadChatDemoInner({
   }
 
   /* ---------- 开分支：store.fork + 放置（hint 来自气泡：⌘ / 列条点选）。
-       不自动发请求：新分支 composer 预填代拟问题，用户改写或回车确认后才走 chat.send ---------- */
-  function handleFork(s: SelectionInfo, hint?: PlacementHint) {
+       留空路径不自动发请求：新分支 composer 预填代拟问题，用户改写或回车确认后才走 chat.send；
+       带问路径（气泡输入框 question 非空）：fork + 放置后直接 chat.send——问题成为
+       新分支第 1 条 user 消息并触发流式首答（D1：复用发送链路，store 无 firstQuestion 字段；
+       消息一入树，composerPrefillFor 的「空分支才预填」条件即失效，两条路径互不串扰） ---------- */
+  function handleFork(
+    s: SelectionInfo,
+    hint?: PlacementHint,
+    question?: string
+  ) {
     const r = store.fork({
       sourceThreadId: s.threadId,
       sourceMsgId: s.msgId,
@@ -344,6 +386,8 @@ export function ThreadChatDemoInner({
       anchor: s.anchor,
     })
     if (!r) return
+    const q = question?.trim()
+    if (q) chat.send(r.threadId, q)
     const eff = cols.openThread(r.threadId, s.threadId, hint)
     if (eff.kind === "replaced") {
       showToast(
