@@ -894,15 +894,35 @@
   color: color-mix(in srgb, var(--d2) 55%, #fff);
 }
 
-/* ---------------- 会话切换器（⌘K 全局 / 每列局部） ---------------- */
+/* ---------------- 会话切换器（⌘K 全局 / 每列局部） ----------------
+   进出双向动效（对齐 shadcn Dialog 的体系，但配色仍是 .tc 纸面 token）：
+   · 进场用 keyframe（元素只在打开时挂载，动画天然只播一次）。不用
+     [data-starting-style] + transition：Base UI 在首帧 rAF 里就摘掉该属性，
+     早于浏览器对新插入节点的首次样式计算，transition 根本不会启动——
+     这也是 shadcn 自家 dialog.tsx 用 animate-in 动画而非过渡做进场的原因；
+   · 退场用 transition：Dialog 面板（.swx.global / .tlx）关闭期间带
+     [data-ending-style]（Base UI 会等 transition 播完才卸载 Popup），
+     锚定小面板（.swx.local / .subtree）由壳层加 .closing 类走同一条
+     transition，到点后延时卸载（见 POPUP_EXIT_MS）。 */
 .tc .swx-scrim {
   position: fixed;
   inset: 0;
   z-index: 72;
   background: rgba(30, 26, 20, 0.18);
+  animation: tc-fade-in 150ms ease;
+  transition: opacity 150ms ease;
 }
 .tc .swx-scrim.clear {
   background: transparent;
+}
+.tc .swx-scrim[data-ending-style],
+.tc .swx-scrim.closing {
+  opacity: 0;
+}
+@keyframes tc-fade-in {
+  from {
+    opacity: 0;
+  }
 }
 .tc .swx {
   position: fixed;
@@ -914,7 +934,44 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  animation: tc-pop 0.14s ease;
+  transition:
+    opacity 150ms ease,
+    transform 150ms ease;
+}
+/* 锚定小面板进场 */
+.tc .swx.local,
+.tc .swx.subtree {
+  animation: tc-pop 0.15s ease;
+}
+/* 锚定小面板退场：壳层置 .closing 后滑向消失（reduced-motion 下 transition 被剥掉 = 立即隐去） */
+.tc .swx.closing {
+  opacity: 0;
+  transform: translateY(4px) scale(0.97);
+}
+/* 居中 Dialog 面板：进场 keyframe 与退场目标态都要复写整个 transform（保住水平居中的 translateX） */
+.tc .swx.global {
+  animation: tc-pop-center 150ms ease;
+}
+.tc .swx.global[data-ending-style] {
+  opacity: 0;
+  transform: translateX(-50%) translateY(6px) scale(0.97);
+}
+@keyframes tc-pop-center {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(6px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%);
+  }
+}
+/* 退场期间（Dialog 的 data-closed / local 的 .closing）不再吃点击 */
+.tc .swx[data-closed],
+.tc .swx.closing,
+.tc .swx-scrim[data-closed],
+.tc .swx-scrim.closing {
+  pointer-events: none;
 }
 .tc .swx.global {
   left: 50%;

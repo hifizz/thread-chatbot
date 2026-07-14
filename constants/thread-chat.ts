@@ -43,3 +43,12 @@ export const CUSTOM_TITLE_MAX_LEN = 60
 
 /** 无法派生标题（主线还没有 user 消息）时的兜底标题 */
 export const TREE_TITLE_FALLBACK = "未命名对话"
+
+/* ---------------- 弹层动效 ---------------- */
+
+/**
+ * 弹层（⌘K 会话树 / ⌘⇧K 对话列表 / 列锚定小面板）关闭动画后的卸载延时（毫秒）。
+ * 要比 thread-chat.css 里 .swx 的 150ms 退场过渡略长：壳层先置 closing 播放退场，
+ * 到点再真正卸载组件（Dialog 面板由 Base UI 在过渡结束时先行卸掉 Popup，这里只是兜底）。
+ */
+export const POPUP_EXIT_MS = 200
