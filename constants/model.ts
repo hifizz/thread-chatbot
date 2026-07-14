@@ -53,6 +53,14 @@ export const CHAT_MODELS: readonly ChatModel[] = [
 
 export const DEFAULT_MODEL_ID = "minimax-m2"
 
+/**
+ * 单次生成的输出 token 上限（安全阀）。
+ * 作用：① 封顶单请求成本，收敛「并发扣费竞态」下的最大超支敞口（后付费模型）；
+ * ② 防止异常长输出打爆供应商账单。研究模式多步循环时对「每步」输出生效。
+ * 可按业务放宽/收紧。
+ */
+export const MAX_OUTPUT_TOKENS = 8192
+
 export function getChatModel(id: string | undefined): ChatModel | undefined {
   return CHAT_MODELS.find((m) => m.id === id)
 }

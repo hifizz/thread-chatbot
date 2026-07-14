@@ -62,34 +62,35 @@ export async function chargeUsage(input: UsageInput): Promise<ChargeResult> {
 
   await ensureUserCredits(input.userId)
 
-  const [row] = await db
-    .update(userCredits)
-    .set({
-      balanceMicros: sql`${userCredits.balanceMicros} - ${price}`,
-      updatedAt: new Date(),
-    })
-    .where(eq(userCredits.userId, input.userId))
-    .returning({ balance: userCredits.balanceMicros })
+  // 扣余额 + 写流水放进同一事务：避免「扣了钱没记账」或「记了账没扣钱」。
+  const balanceMicros = await db.transaction(async (tx) => {
+    const [row] = await tx
+      .update(userCredits)
+      .set({
+        balanceMicros: sql`${userCredits.balanceMicros} - ${price}`,
+        updatedAt: new Date(),
+      })
+      .where(eq(userCredits.userId, input.userId))
+      .returning({ balance: userCredits.balanceMicros })
 
-  await db.insert(usageRecords).values({
-    id: randomUUID(),
-    userId: input.userId,
-    threadId: input.threadId ?? null,
-    messageId: input.messageId ?? null,
-    model: input.model,
-    inputTokens: input.inputTokens,
-    outputTokens: input.outputTokens,
-    costMicros: cost,
-    priceMicros: price,
-    generationId: input.generationId ?? null,
-    costSource: "estimate",
+    await tx.insert(usageRecords).values({
+      id: randomUUID(),
+      userId: input.userId,
+      threadId: input.threadId ?? null,
+      messageId: input.messageId ?? null,
+      model: input.model,
+      inputTokens: input.inputTokens,
+      outputTokens: input.outputTokens,
+      costMicros: cost,
+      priceMicros: price,
+      generationId: input.generationId ?? null,
+      costSource: "estimate",
+    })
+
+    return row?.balance ?? 0
   })
 
-  return {
-    costMicros: cost,
-    priceMicros: price,
-    balanceMicros: row?.balance ?? 0,
-  }
+  return { costMicros: cost, priceMicros: price, balanceMicros }
 }
 
 /** 给用户增加额度（充值到账）。确保额度行存在后原子累加，返回新余额。 */
@@ -128,36 +129,51 @@ export type CreemTopupInput = {
 export async function recordCreemTopup(
   input: CreemTopupInput
 ): Promise<{ granted: boolean; balanceMicros: number }> {
-  // 幂等插入：同一订单已存在则不返回行 → 说明此前已处理，直接跳过到账
-  const [inserted] = await db
-    .insert(payments)
-    .values({
-      id: randomUUID(),
-      userId: input.userId,
-      provider: "creem",
-      type: "topup",
-      packId: input.packId ?? null,
-      productId: input.productId ?? null,
-      checkoutId: input.checkoutId ?? null,
-      orderId: input.orderId,
-      status: "paid",
-      creditMicros: input.creditMicros,
-      priceLabel: input.priceLabel ?? null,
-      paidAt: new Date(),
-      raw: input.raw ?? null,
-    })
-    .onConflictDoNothing({ target: [payments.provider, payments.orderId] })
-    .returning({ id: payments.id })
+  await ensureUserCredits(input.userId)
 
-  if (!inserted) {
-    return {
-      granted: false,
-      balanceMicros: await getBalanceMicros(input.userId),
+  // 幂等插入 + 到账放进同一事务：要么「记订单且加余额」，要么都不发生。
+  return await db.transaction(async (tx) => {
+    // 同一订单已存在则不返回行 → 说明此前已处理，直接跳过到账
+    const [inserted] = await tx
+      .insert(payments)
+      .values({
+        id: randomUUID(),
+        userId: input.userId,
+        provider: "creem",
+        type: "topup",
+        packId: input.packId ?? null,
+        productId: input.productId ?? null,
+        checkoutId: input.checkoutId ?? null,
+        orderId: input.orderId,
+        status: "paid",
+        creditMicros: input.creditMicros,
+        priceLabel: input.priceLabel ?? null,
+        paidAt: new Date(),
+        raw: input.raw ?? null,
+      })
+      .onConflictDoNothing({ target: [payments.provider, payments.orderId] })
+      .returning({ id: payments.id })
+
+    const [current] = await tx
+      .select({ balance: userCredits.balanceMicros })
+      .from(userCredits)
+      .where(eq(userCredits.userId, input.userId))
+
+    if (!inserted) {
+      return { granted: false, balanceMicros: current?.balance ?? 0 }
     }
-  }
 
-  const balanceMicros = await addCreditsMicros(input.userId, input.creditMicros)
-  return { granted: true, balanceMicros }
+    const [row] = await tx
+      .update(userCredits)
+      .set({
+        balanceMicros: sql`${userCredits.balanceMicros} + ${input.creditMicros}`,
+        updatedAt: new Date(),
+      })
+      .where(eq(userCredits.userId, input.userId))
+      .returning({ balance: userCredits.balanceMicros })
+
+    return { granted: true, balanceMicros: row?.balance ?? 0 }
+  })
 }
 
 // ---- 真实成本对账（Vercel AI 网关）----
@@ -209,25 +225,27 @@ export async function reconcilePendingCosts(
     const newPrice = priceFromCost(realCost)
     const delta = newPrice - row.priceMicros // >0 需补扣，<0 需退回
 
-    // 修正流水 + 按差额调整余额（差额可正可负）
-    await db
-      .update(usageRecords)
-      .set({
-        costMicros: realCost,
-        priceMicros: newPrice,
-        costSource: "gateway",
-      })
-      .where(eq(usageRecords.id, row.id))
-
-    if (delta !== 0) {
-      await db
-        .update(userCredits)
+    // 修正流水 + 按差额调整余额放进同一事务，保持一致
+    await db.transaction(async (tx) => {
+      await tx
+        .update(usageRecords)
         .set({
-          balanceMicros: sql`${userCredits.balanceMicros} - ${delta}`,
-          updatedAt: new Date(),
+          costMicros: realCost,
+          priceMicros: newPrice,
+          costSource: "gateway",
         })
-        .where(eq(userCredits.userId, row.userId))
-    }
+        .where(eq(usageRecords.id, row.id))
+
+      if (delta !== 0) {
+        await tx
+          .update(userCredits)
+          .set({
+            balanceMicros: sql`${userCredits.balanceMicros} - ${delta}`,
+            updatedAt: new Date(),
+          })
+          .where(eq(userCredits.userId, row.userId))
+      }
+    })
     reconciled++
   }
 
