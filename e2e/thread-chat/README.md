@@ -98,6 +98,31 @@ user 原文入 messages）→ 留空 Enter：composer 预填 `kickoffQuestion()`
 仍在（随树持久化）、全程 /api/branch-title 恰好一次**。深树继承段预算的纯函数
 用例见上方 prompt-budget.test.mjs。截图 `shots/bc-*.png`。
 
+## 画布节点内对话验收（openspec: add-canvas-conversations）
+
+入库脚本 `verify-canvas-chat.mjs`（前提同 verify-live；走真实模型，测试树跑完
+自动清理）。直接 import 产品代码的 `kickoffQuestion` 生成预填期望值，需带
+`--experimental-strip-types` 运行：
+
+```bash
+CHROMIUM_PATH=... BASE_URL=http://localhost:4040 \
+  node --experimental-strip-types e2e/thread-chat/verify-canvas-chat.mjs
+```
+
+断言覆盖（断言面参考 playground verify10 + 本仓富文本 / LR / zoom 关注点）：
+单击节点展开外挂面板（消息列表 + mini composer、卡片摘要收起）→ **展开/收起
+零重排（其余节点 transform 逐一相等——外挂面板不参与 dagre）** → 面板内追问
+真实流式（user + 占位立即入树、busy 时发送键变「停止」、完成后 `.md-body`
+Markdown 结构断言）→ 手势共处（面板内滚轮列表内滚且 zoom 不变、空白处滚轮
+正常缩放）→ **zoom 0.75 / 1.5 两档面板内划选：气泡按选区视口坐标定位正确
+（fixed 免疫 zoom）、画布气泡无迷你列条** → 带问提交：新节点 + 边长出、
+focusNode 跟随（setCenter 后新节点整卡在视口内、zoom 不缩小）、新节点选中
+展开、面板首条 = 所提问题、首答面板内流式完成 → 留空提交：新节点面板
+composer 预填 `kickoffQuestion()` → 选中节点 zIndex 抬升（LR 下面板盖过兄弟
+卡）→ **列槽隔离：回列视图仅主线一列（画布 fork 不占槽）、主线正文可见
+fork 脚注** → 面板内双击不误触回列、双击节点卡回列模式。
+截图 `shots/cc-*.png`。
+
 ## 会话列表验收（openspec: add-tree-list-ui）
 
 入库脚本 `verify-tree-list.mjs`（28 断言，前提同 verify-persist；SQL 直插种子树，

@@ -32,6 +32,7 @@ import {
 import type { ThreadTreeState } from "../core/types"
 import type { ThreadStore } from "../core/store"
 import { accentOf, dotColorOf, dvar } from "../theme"
+import { kickoffQuestion } from "../net/prompt-pure"
 import type { CanvasCardData, CanvasCardNode } from "./canvas-node"
 
 /**
@@ -125,6 +126,13 @@ function buildBaseGraph(
       artifactCount: artifactCountOf.get(t.id) ?? 0,
       accent: accentOf(t),
       dot: dotColorOf(t),
+      // 外挂面板（Phase 2）：完整消息引用 + 空分支的 composer 预填（语义同列模式
+      // composerPrefillFor——消息一入树条件即失效，带问 / 预填两路互不串扰）
+      messages: t.messages,
+      prefill:
+        t.anchorText && t.messages.length === 0
+          ? kickoffQuestion(t.anchorText)
+          : null,
     }
     const size = { width: CARD_W, height: estimateCardHeight(data) }
     nodes.push({
@@ -278,11 +286,16 @@ export function useCanvasLayout({
     setPins(empty)
   }, [viewState])
 
+  /** 程序化单选某节点（画布 fork 跟随 / 面板内点锚点聚焦）：与点选走同一 selectedId，
+      展开外挂面板；受控 nodes 的 selected 由它派生，React Flow 侧随渲染同步 */
+  const selectNode = useCallback((id: string | null) => setSelectedId(id), [])
+
   return {
     nodes,
     edges: base.edges,
     onNodesChange,
     resetLayout,
+    selectNode,
     pinCount: pins.size,
   }
 }
