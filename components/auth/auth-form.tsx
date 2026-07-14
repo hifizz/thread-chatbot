@@ -62,6 +62,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
   // 强制重挂 Turnstile 以获取新 token（token 单次有效，失败后需刷新）
   const [captchaKey, setCaptchaKey] = useState(0)
   const [awaitingVerify, setAwaitingVerify] = useState(false)
+  const [agreed, setAgreed] = useState(false)
 
   function resetCaptcha() {
     setCaptchaToken("")
@@ -84,6 +85,10 @@ export function AuthForm({ mode }: { mode: Mode }) {
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (mode === "sign-up" && !agreed) {
+      toast.error("请先阅读并同意服务条款与隐私政策")
+      return
+    }
     if (turnstileEnabled && !captchaToken) {
       toast.error("请先完成人机验证")
       return
@@ -207,6 +212,34 @@ export function AuthForm({ mode }: { mode: Mode }) {
               }
             />
           </div>
+          {mode === "sign-up" && (
+            <label className="flex items-start gap-2 text-xs leading-5 text-muted-foreground">
+              <input
+                type="checkbox"
+                checked={agreed}
+                onChange={(e) => setAgreed(e.target.checked)}
+                className="mt-0.5 size-3.5 shrink-0"
+              />
+              <span>
+                我已阅读并同意{" "}
+                <Link
+                  href="/terms"
+                  target="_blank"
+                  className="text-foreground underline underline-offset-4"
+                >
+                  服务条款
+                </Link>{" "}
+                与{" "}
+                <Link
+                  href="/privacy"
+                  target="_blank"
+                  className="text-foreground underline underline-offset-4"
+                >
+                  隐私政策
+                </Link>
+              </span>
+            </label>
+          )}
           {turnstileEnabled && (
             <TurnstileWidget key={captchaKey} onToken={setCaptchaToken} />
           )}
@@ -223,6 +256,17 @@ export function AuthForm({ mode }: { mode: Mode }) {
             {copy.altLabel}
           </Link>
         </p>
+        <div className="mt-4 flex justify-center gap-3 text-xs text-muted-foreground">
+          <Link href="/terms" className="hover:text-foreground">
+            服务条款
+          </Link>
+          <Link href="/privacy" className="hover:text-foreground">
+            隐私政策
+          </Link>
+          <Link href="/refund" className="hover:text-foreground">
+            退款政策
+          </Link>
+        </div>
       </CardContent>
     </Card>
   )

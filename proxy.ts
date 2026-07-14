@@ -8,12 +8,15 @@ export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
   const hasSession = getSessionCookie(request) != null
 
-  // 无需登录即可访问的页面（登录/注册/找回密码）
+  // 无需登录即可访问的页面（登录/注册/找回密码 + 法务页）
   const publicPages = new Set([
     "/sign-in",
     "/sign-up",
     "/forgot-password",
     "/reset-password",
+    "/terms",
+    "/privacy",
+    "/refund",
   ])
   const isAuthPage = publicPages.has(pathname)
 
