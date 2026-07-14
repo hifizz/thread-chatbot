@@ -1,5 +1,6 @@
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible"
 import { embed, embedMany } from "ai"
+import { TELEMETRY_FUNCTION_IDS } from "@/constants/observability"
 
 // Embedding 模型走独立的、可配置的 OpenAI 兼容 provider。
 // MiniMax 国际站没有可用的 embeddings，因此 RAG 的向量化交给任意 OpenAI 兼容服务
@@ -22,12 +23,17 @@ export async function embedTexts(texts: string[]): Promise<number[][]> {
   const { embeddings } = await embedMany({
     model: embeddingModel(),
     values: texts,
+    telemetry: { functionId: TELEMETRY_FUNCTION_IDS.ragEmbedTexts },
   })
   return embeddings
 }
 
 /** 单条向量化（查询时用） */
 export async function embedQuery(text: string): Promise<number[]> {
-  const { embedding } = await embed({ model: embeddingModel(), value: text })
+  const { embedding } = await embed({
+    model: embeddingModel(),
+    value: text,
+    telemetry: { functionId: TELEMETRY_FUNCTION_IDS.ragEmbedQuery },
+  })
   return embedding
 }

@@ -69,3 +69,11 @@ RAG 依赖 Postgres 的 pgvector 扩展（迁移会自动 `CREATE EXTENSION vect
 - 配置 `SEARCH_API_KEY`（默认 [Tavily](https://tavily.com)，`SEARCH_BASE_URL` 可换兼容服务）即可启用；未配置时开关会提示不可用，普通对话不受影响。
 - 编排走 AI SDK v7 多步工具循环（`streamText` + `webSearch`/`readUrl` 工具 + `stopWhen` 步数上限），与现有 chat 链路同源。
 - 设计与调研结论见 `docs/deep-research/设计说明.md`。
+
+## 遥测与评测（Langfuse）
+
+AI SDK v7 原生遥测（OpenTelemetry）+ [Langfuse](https://langfuse.com)：每轮对话一条 trace（含每步 LLM 调用、工具执行、token 用量与耗时），线程聚合为 session；assistant 消息下的 👍/👎 作为 score 回写到对应 trace。
+
+- 配置 `LANGFUSE_PUBLIC_KEY` / `LANGFUSE_SECRET_KEY` / `LANGFUSE_BASE_URL`（云端免费额度或 docker compose 自托管均可）即可启用；未配置时遥测整体停用、零开销，点赞/点踩被静默丢弃。
+- `pnpm eval` 跑离线评测（规则断言 + LLM-as-a-judge），结果作为 experiment run 上报，可在 Langfuse UI 跨 run 对比；设 `LANGFUSE_EVAL_DATASET` 可改用远端 dataset。
+- 调研对比（AI SDK 遥测现状、Langfuse vs LangSmith）与设计取舍见 `docs/observability/`。
