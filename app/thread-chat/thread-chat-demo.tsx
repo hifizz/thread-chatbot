@@ -67,6 +67,7 @@ import {
 import {
   type PlacementHint,
   type PlacementMode,
+  type Slot,
 } from "./orchestration/placement"
 import {
   COL_MIN_W,
@@ -80,6 +81,8 @@ import {
 } from "./orchestration/thread-switcher"
 import { TreeList } from "./orchestration/tree-list"
 import { ArtifactDrawer } from "./orchestration/artifact-drawer"
+// type-only：不把画布模块（React Flow）拖进首屏 bundle
+import type { CanvasChatActions } from "./orchestration/canvas-node"
 import type { CanvasViewState } from "./orchestration/use-canvas-layout"
 
 /** 画布视图层懒加载：React Flow 只在首次进入画布模式时才落地（且跳过 SSR） */
@@ -93,6 +96,10 @@ const ThreadCanvas = dynamic(
 
 /** 主线列头副标题的兜底：整棵树还没有任何用户消息（也没被重命名）时展示 */
 const SUBTITLE_FALLBACK = "新对话"
+
+/** 画布模式喂给划选气泡的空列槽（稳定引用）：画布 fork 不占列槽（D4），
+    气泡据此不渲染迷你列条（hasMap=false），提交路径由 handleFork 按视图分流 */
+const EMPTY_SLOTS: Slot[] = []
 
 interface ToastState {
   msg: string
@@ -269,10 +276,28 @@ export function ThreadChatDemoInner({
     initialWidths: initialUi?.widths,
   })
 
-  /* ---------- 视图形态：列（深读）| 画布（纵览全树） ---------- */
+  /* ---------- 视图形态：列（深读）| 画布（纵览全树 + 节点内对话） ---------- */
   const [viewMode, setViewMode] = useState<ViewMode>(
     initialUi?.viewMode ?? "columns"
   )
+  /* 画布内 fork 的视口跟随指令（D4）：{id, n} 置值 → 画布 selectNode + setCenter。
+     n 递增去重；属视口态不入档。 */
+  const [focusNode, setFocusNode] = useState<{ id: string; n: number } | null>(
+    null
+  )
+  const focusSeq = useRef(0)
+  /** 切回列视图的统一出口：顺手清 focusNode——CanvasFlow 卸载会重置其去重 ref，
+      残留指令会在下次进画布时误触发一次跟随动画 */
+  const showColumnsView = useCallback(() => {
+    setViewMode("columns")
+    setFocusNode(null)
+  }, [setViewMode, setFocusNode])
+  /** 画布节点面板的会话动作（D3）：同一 chat-controller，无平行发送通道 */
+  const [canvasChat] = useState<CanvasChatActions>(() => ({
+    send: chat.send,
+    abort: chat.abort,
+    retry: chat.retry,
+  }))
 
   /* ---------- 工作台状态记忆（D7）：五项变化 ~300ms 轻防抖写 localStorage（按 treeId 分键）。
        首帧也会写一次，但内容 == 恢复出的初值，幂等无伤。 ---------- */
@@ -347,7 +372,7 @@ export function ThreadChatDemoInner({
     hint?: PlacementHint
   ) {
     // 意图收敛：打开会话 = 去列里读它——画布模式下先切回列视图再放置
-    setViewMode("columns")
+    showColumnsView()
     if (id === "main") {
       cols.flashThread("main")
       return
@@ -388,6 +413,13 @@ export function ThreadChatDemoInner({
     if (!r) return
     const q = question?.trim()
     if (q) chat.send(r.threadId, q)
+    // 画布内 fork（D4）：不占列槽——不走 cols.openThread（回列后布局与开分支前一致，
+    // 新分支经脚注/⌘K 打开）；置 focusNode 让画布 selectNode + setCenter 平滑跟随
+    if (viewMode === "canvas") {
+      setFocusNode({ id: r.threadId, n: ++focusSeq.current })
+      showToast(`已开启分支 · ${r.title}`)
+      return
+    }
     const eff = cols.openThread(r.threadId, s.threadId, hint)
     if (eff.kind === "replaced") {
       showToast(
@@ -551,7 +583,7 @@ export function ThreadChatDemoInner({
           点列头 <b>⇄</b> 把该列切换成任意会话，<b>⑂</b> 查看子分支
         </li>
         <li>分支里产出的 Artifact 从右侧抽屉弹出</li>
-        <li>顶栏可切换画布视图纵览全树，双击节点回到列模式</li>
+        <li>顶栏可切换画布视图纵览全树，单击节点就地对话，双击回到列模式</li>
         <li>对话自动保存，刷新或同链接重开可恢复；「新对话」另起一棵树</li>
       </ul>
       <span
@@ -607,13 +639,13 @@ export function ThreadChatDemoInner({
           <button
             className={`mode ${viewMode === "columns" ? "on" : ""}`}
             title="列视图：并排深读多个会话"
-            onClick={() => setViewMode("columns")}
+            onClick={showColumnsView}
           >
             <Columns3 size={12} />列
           </button>
           <button
             className={`mode ${viewMode === "canvas" ? "on" : ""}`}
-            title="画布视图：纵览整棵会话树，双击节点回到列模式"
+            title="画布视图：纵览整棵会话树，单击节点就地对话，双击回到列模式"
             onClick={() => setViewMode("canvas")}
           >
             <Waypoints size={12} />
@@ -723,24 +755,25 @@ export function ThreadChatDemoInner({
           store={store}
           mainSubtitle={mainSubtitle}
           viewState={canvasViewState}
+          chat={canvasChat}
+          focusNode={focusNode}
           onOpenThread={(id) => openBranchUI(id, null)}
         />
       )}
 
-      {/* Phase 1 画布只读：划选开分支仅列模式提供。列槽上下文喂给气泡的迷你列条，
-          预览与提交共用 placement 同一套规则 */}
-      {viewMode === "columns" && (
-        <SelectionBubble
-          state={state}
-          sel={sel}
-          onSelChange={setSel}
-          onFork={handleFork}
-          slots={cols.slots}
-          mode={mode}
-          maxExpanded={maxExpanded}
-          lastActiveOf={(id) => state.threads[id]?.lastActive ?? 0}
-        />
-      )}
+      {/* 划选气泡两种视图都在（画布面板消息与列模式同一套 .md-body 划选 DOM 契约，
+          openspec: add-canvas-conversations）。列模式：列槽上下文喂迷你列条，预览与
+          提交共用 placement 规则；画布模式：喂空槽（不渲染列条，fork 不占列槽 D4）。 */}
+      <SelectionBubble
+        state={state}
+        sel={sel}
+        onSelChange={setSel}
+        onFork={handleFork}
+        slots={viewMode === "canvas" ? EMPTY_SLOTS : cols.slots}
+        mode={mode}
+        maxExpanded={maxExpanded}
+        lastActiveOf={(id) => state.threads[id]?.lastActive ?? 0}
+      />
 
       {treeList !== null && (
         <TreeList

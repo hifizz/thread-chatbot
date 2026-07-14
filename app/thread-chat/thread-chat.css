@@ -1519,6 +1519,7 @@
 /* thread 卡：与列模式同一套纸墨语言（深度色左缘 / 脚注徽章 / 衬线标题）。
    尺寸与 use-canvas-layout 的估高常量同步：宽 280、padding 11×13、行高见各行注释 */
 .tc .canvas-card {
+  position: relative; /* 外挂面板 .canvas-expand 的定位上下文（挂卡下方） */
   width: 280px;
   background: #fff;
   border: 1px solid var(--rule-strong);
@@ -1640,6 +1641,104 @@
   border: 1px solid var(--rule);
   border-radius: 7px;
   padding: 5px 9px;
+}
+
+/* ---------------- 画布 Phase 2：节点外挂对话面板（openspec: add-canvas-conversations）
+   绝对定位挂卡下方、不参与 dagre 布局（展开零重排，D1）；LR 下会盖住下方兄弟卡——
+   选中节点的 zIndex 由 React Flow elevateNodesOnSelect 抬升，配近不透明纸面底色 +
+   深描边 + 重投影，视觉上明确「浮在树上方的工作层」。nodrag/nowheel 类由 RF 消费。 */
+.tc .canvas-expand {
+  position: absolute;
+  top: calc(100% + 9px);
+  left: -3px; /* 与卡的深度色左缘（3px 边框）对齐 */
+  width: 340px; /* 与 canvas-node.tsx 的 EXPAND_W 同步 */
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid var(--accent, #8a8377);
+  border-left-width: 3px;
+  border-radius: 10px;
+  box-shadow: 0 16px 38px -12px rgba(30, 26, 20, 0.42);
+  cursor: default;
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+  user-select: text;
+  -webkit-user-select: text;
+}
+/* 迷你消息列表：覆盖列模式 .msg-list 的 flex:1（面板内高度 clamp 内滚 + 贴底跟滚） */
+.tc .canvas-expand .msg-list.mini {
+  flex: none;
+  max-height: 360px;
+  overflow-y: auto;
+  padding: 11px 12px 2px;
+}
+.tc .canvas-expand .message {
+  margin: 0 0 12px;
+}
+.tc .canvas-expand .message.user .bubble {
+  font-size: 12.5px;
+  line-height: 1.5;
+  padding: 6px 10px;
+}
+.tc .canvas-expand .message.assistant .bubble {
+  font-size: 12.5px;
+  line-height: 1.62;
+}
+/* 面板里的 Markdown 缩小一号（.md-body 继承 bubble 字号，标题/代码等相对收敛） */
+.tc .canvas-expand .md-body h1 {
+  font-size: 15px;
+}
+.tc .canvas-expand .md-body h2 {
+  font-size: 14px;
+}
+.tc .canvas-expand .md-body h3,
+.tc .canvas-expand .md-body h4 {
+  font-size: 13px;
+}
+.tc .canvas-expand .msg-error {
+  font-size: 11.5px;
+}
+/* mini composer：语义同列模式（busy 时发送变停止），尺寸随面板收敛 */
+.tc .canvas-expand .cv-composer {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  padding: 8px 10px 9px;
+  border-top: 1px solid var(--rule);
+}
+.tc .canvas-expand .cv-composer textarea {
+  flex: 1;
+  border: 1px solid var(--rule-strong);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink);
+  resize: none;
+  padding: 5px 8px;
+  font-family: var(--font-ui);
+  font-size: 12.5px;
+  line-height: 1.45;
+  max-height: 68px; /* 与 canvas-node.tsx 的 COMPOSER_MAX_H 同步 */
+  min-height: 28px;
+}
+.tc .canvas-expand .cv-composer textarea:focus {
+  outline: none;
+  border-color: var(--accent, var(--d1));
+}
+.tc .canvas-expand .cv-composer textarea::placeholder {
+  color: var(--ink-faint);
+}
+.tc .canvas-expand .cv-send {
+  flex: none;
+  border: none;
+  cursor: pointer;
+  border-radius: 8px;
+  padding: 6px 11px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  background: var(--accent, #3a3733);
+}
+.tc .canvas-expand .cv-send.stop {
+  background: var(--ink-soft);
 }
 
 /* 顶栏「视图」seg 的图标按钮 */

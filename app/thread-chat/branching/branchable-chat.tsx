@@ -239,6 +239,10 @@ export function BranchableChat({
  * 为什么「手绘」而非 React 渲染高亮：锚点定位发生在**渲染后的真实 DOM**上
  * （locateAnchor 三层降级），坐标系 = .md-body 的 textContent，对 Markdown 结构免疫。
  *
+ * 导出供画布模式复用（openspec: add-canvas-conversations D2）：节点外挂面板的
+ * assistant 正文必须与列模式同一套渲染（.md-body 容器 + 锚点 effect + SmoothText），
+ * 否则划选反查（以 .md-body 为坐标系）在画布内直接失效。
+ *
  * React 与手绘 DOM 的冲突规避：
  * · MarkdownBody 按 source 用 memo——source 不变则不重渲染，手绘的高亮/脚注不被 reconcile 抹掉；
  * · source 变化只发生在流式增量时，而流式中的消息尚无 fork（fork 只在已完成消息上创建），
@@ -253,7 +257,7 @@ export function BranchableChat({
  * · fork 只在已完成消息（active=false）上创建，此时 useSmoothText 已把 display snap 到
  *   与 msg.text 完全一致，二者恒等，故锚点效果不受平滑影响，无需改锚点代码。
  */
-function AnchoredMarkdown({
+export function AnchoredMarkdown({
   state,
   msg,
   onOpenThread,
