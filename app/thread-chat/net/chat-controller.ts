@@ -223,9 +223,9 @@ export function createChatController(store: ThreadStore) {
 
   return {
     /** 在会话里发一条用户消息并触发流式回复；同会话已有在飞请求时直接忽略 */
-    send(threadId: string, text: string): void {
+    send(threadId: string, text: string, quote?: { text: string }): void {
       if (inflight.has(threadId)) return
-      if (!store.appendUserMessage(threadId, text)) return
+      if (!store.appendUserMessage(threadId, text, quote)) return
       const msgId = store.beginAssistantMessage(threadId)
       if (!msgId) return
       startAssistant(threadId, msgId)

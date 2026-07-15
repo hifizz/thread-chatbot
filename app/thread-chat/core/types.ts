@@ -48,6 +48,10 @@ export interface Message {
   forks: Fork[]
   artifactIds?: string[]
   /** 流式状态：pending（已建消息未收到首个 delta）/ streaming / done / error */
+  /** 划选引用（方向 C，用户定稿）：带问开分支时，首条 user 消息结构化携带
+      「我在问哪段话」——消息记录自足（导出/搜索/其他消费者拿到即用），UI 渲染
+      引用条，发送线据此拼 grounding。可选；无该字段 = 普通消息。 */
+  quote?: { text: string }
   status?: MessageStatus
   /** status === "error" 时的错误文案 */
   error?: string

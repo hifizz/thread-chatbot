@@ -412,7 +412,7 @@ export function ThreadChatDemoInner({
     })
     if (!r) return
     const q = question?.trim()
-    if (q) chat.send(r.threadId, q)
+    if (q) chat.send(r.threadId, q, { text: s.text }) // 划选原文随消息结构化落库（方向 C）
     // 画布内 fork（D4）：不占列槽——不走 cols.openThread（回列后布局与开分支前一致，
     // 新分支经脚注/⌘K 打开）；置 focusNode 让画布 selectNode + setCenter 平滑跟随
     if (viewMode === "canvas") {
@@ -607,7 +607,15 @@ export function ThreadChatDemoInner({
         <button
           className="tbtn"
           title="开启一棵全新的分支对话树（当前对话已自动保存，可经其 URL 随时回访）"
-          onClick={() => router.push(`/thread-chat/${crypto.randomUUID()}`)}
+          onClick={() => {
+            // 当前树还没聊过 = 已经是"新对话"：无操作（URL 不变、不再生成新 id），
+            // 轻提示告知即可——反复点按钮不该让空树的 URL 一直变（用户反馈）
+            if (!mainHasMessage) {
+              showToast("当前就是全新对话，直接开聊吧")
+              return
+            }
+            router.push(`/thread-chat/${crypto.randomUUID()}`)
+          }}
         >
           新对话
         </button>
@@ -621,9 +629,7 @@ export function ThreadChatDemoInner({
           <span className="kbd">⌘⇧K</span>
         </button>
         <div className="brand">
-          <span className="mark">
-            Thread Chat<em>·</em>
-          </span>
+          <span className="mark">Thread Chat</span>
         </div>
         <div className="spacer" />
         {!hintVisible && (

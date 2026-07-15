@@ -19,7 +19,8 @@ export const THREAD_CHAT_BRANCH_PREFIX =
 
 /** 分支焦点段的后半：跟在锚点原文之后 */
 export const THREAD_CHAT_BRANCH_SUFFIX =
-  "请围绕这个焦点结合上文展开，除非用户把话题引向别处。"
+  "请围绕这个焦点结合上文展开，除非用户把话题引向别处。" +
+  "用户问题里的指代（如「这」「它」「这段话」）默认指向这段被划选的话，而不是上文的其他内容。"
 
 /**
  * 继承段上下文字符总预算（openspec: add-bubble-composer D8）：
