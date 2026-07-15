@@ -8,7 +8,7 @@
 
 - [x] 2.1 selection-bubble 加单行自增高 textarea（placeholder「就这段问点什么…（可留空）」，clamp ~68px，弹出即 `focus({preventScroll:true})`）+ question state
 - [x] 2.2 键位流（D3）：Enter 提交 / Shift+Enter 换行 / ⌘Enter keepSource / Esc 壳层链；**IME isComposing+keyCode229 守卫**；按钮与 Enter 共用 submit()
-- [x] 2.3 按钮文案四态（override / ⌘ / 有输入 / 默认）
+- [x] 2.3 按钮文案（初版四态；后按 D9 修订为两态 + .place-hint 放置提示行）
 - [x] 2.4 CSS：输入区样式（.tc 纸面语言）+ 贴底翻转阈值随气泡高度调整（D5）
 
 ## 3. 提交链路
@@ -32,3 +32,11 @@
 ## 5. 文档收尾
 
 - [x] 5.1 e2e README 补 verify-bubble-composer 一段；`pnpm openspec:validate` 通过
+
+## 6. 实施后用户反馈迭代（均已完成并验证）
+
+- [x] 6.1 D9：按钮两态 + 放置提示行（替代四态文案；e2e 断言同步）
+- [x] 6.2 修复 smcell className 粘连导致的列条样式退化（恢复原版拼法，格子/白框/斜纹/cap 小字回归）
+- [x] 6.3 D10 方向 C：Message.quote 字段 + 引用条渲染（列/画布）+ 字段驱动 grounding + 服务端指代规则；e2e 含「刷新后引用仍在」断言
+- [x] 6.4 「新对话」空树无操作（URL 不变 + 轻提示；归属 add-branch-tree-persistence 的 URL 身份语义，spec 已同步）
+- [x] 6.5 正文阅读字体改无衬线（--font-read 跟随 --font-ui）；恢复 .md-body 列表 marker（Tailwind preflight 吞 list-style）
