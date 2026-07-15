@@ -81,6 +81,7 @@ import {
 } from "./orchestration/thread-switcher"
 import { TreeList } from "./orchestration/tree-list"
 import { ArtifactDrawer } from "./orchestration/artifact-drawer"
+import { AccountButton } from "./orchestration/account-button"
 // type-only：不把画布模块（React Flow）拖进首屏 bundle
 import type { CanvasChatActions } from "./orchestration/canvas-node"
 import type { CanvasViewState } from "./orchestration/use-canvas-layout"
@@ -717,6 +718,7 @@ export function ThreadChatDemoInner({
           Artifact
           <span className="cnt">{state.artifactOrder.length}</span>
         </button>
+        <AccountButton />
       </div>
 
       {viewMode === "columns" ? (

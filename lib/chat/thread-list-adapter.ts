@@ -1,6 +1,7 @@
 import type { RemoteThreadListAdapter } from "@assistant-ui/react"
 import type { RemoteThreadMetadata } from "@assistant-ui/core"
 import { createAssistantStream } from "assistant-stream"
+import { fetchWithAuth } from "@/lib/auth/session-recovery"
 
 type ThreadRow = {
   id: string
@@ -10,7 +11,7 @@ type ThreadRow = {
 }
 
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(path, {
+  const res = await fetchWithAuth(path, {
     ...init,
     headers: { "Content-Type": "application/json", ...init?.headers },
   })

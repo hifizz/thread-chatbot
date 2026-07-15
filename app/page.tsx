@@ -16,6 +16,7 @@ import { usePostgresThreadHistoryAdapter } from "@/lib/chat/use-thread-history-a
 import { r2AttachmentAdapter } from "@/lib/chat/attachment-adapter"
 import { useResearchMode } from "@/lib/chat/research-mode"
 import { useModelMode } from "@/lib/chat/model-mode"
+import { fetchWithAuth } from "@/lib/auth/session-recovery"
 
 function useMyChatRuntime() {
   const history = usePostgresThreadHistoryAdapter()
@@ -24,6 +25,8 @@ function useMyChatRuntime() {
   const transport = useMemo(
     () =>
       new AssistantChatTransport({
+        // 会话失效（401）时自动登出并跳登录页，避免流式请求卡在错误态
+        fetch: fetchWithAuth,
         prepareSendMessagesRequest: ({
           id,
           messages,

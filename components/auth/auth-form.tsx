@@ -1,10 +1,10 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { toast } from "sonner"
-import { authClient, signIn, signUp } from "@/lib/auth/client"
+import { authClient, signIn, signUp, useSession } from "@/lib/auth/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -53,6 +53,14 @@ export function AuthForm({ mode }: { mode: Mode }) {
   const params = useSearchParams()
   const redirect = params.get("redirect") || "/"
   const copy = COPY[mode]
+
+  // 兜底跳转：中间件不再乐观弹走带 cookie 的访问，改由这里用「真会话」判定——
+  // useSession 会真查 /api/auth/get-session，确属已登录才跳走；失效 cookie 返回 null，
+  // 用户留在登录页正常重登（避免死循环）。
+  const { data: session } = useSession()
+  useEffect(() => {
+    if (session) router.replace(redirect)
+  }, [session, redirect, router])
 
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
