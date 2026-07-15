@@ -18,10 +18,6 @@ import {
 import { TurnstileWidget, turnstileEnabled } from "@/components/auth/turnstile"
 import { GoogleIcon } from "@/components/auth/google-icon"
 
-// Google 登录按钮显隐：服务端配了 GOOGLE_CLIENT_ID/SECRET 后，把此 public 标志设为 true。
-// （客户端读不到服务端密钥，故用独立的 NEXT_PUBLIC 开关控制按钮渲染。）
-const googleEnabled = process.env.NEXT_PUBLIC_GOOGLE_AUTH_ENABLED === "true"
-
 type Mode = "sign-in" | "sign-up"
 
 const COPY: Record<
@@ -53,7 +49,14 @@ const COPY: Record<
   },
 }
 
-export function AuthForm({ mode }: { mode: Mode }) {
+export function AuthForm({
+  mode,
+  googleEnabled = false,
+}: {
+  mode: Mode
+  // 由服务端页面下传（客户端读不到 GOOGLE_CLIENT_ID 等服务端密钥）。
+  googleEnabled?: boolean
+}) {
   const router = useRouter()
   const params = useSearchParams()
   const redirect = params.get("redirect") || "/"
