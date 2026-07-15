@@ -791,9 +791,10 @@
   color: #a9a294;
 }
 .tc .sel-bubble .ask textarea:focus {
-  outline: 1.5px solid rgba(255, 255, 255, 0.55);
+  outline: 2px solid rgba(255, 255, 255, 0.25);
   outline-offset: 0;
   background: rgba(255, 255, 255, 0.14);
+  transition: all 0.3s;
 }
 .tc .sel-bubble button {
   width: 100%;
