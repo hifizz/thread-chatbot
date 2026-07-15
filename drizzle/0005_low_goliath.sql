@@ -1,1 +1,0 @@
-ALTER TABLE "branch_trees" ADD COLUMN "custom_title" text;
