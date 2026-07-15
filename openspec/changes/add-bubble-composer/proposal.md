@@ -8,7 +8,8 @@
 
 - **气泡加可选输入框**（单行 textarea 自增高）：**输入后提交 = 带问开分支**——问题直接成为新分支第一条 user 消息并触发流式首答（fork 后走 `chat.send`，store 无需新字段）；**留空提交 = 现有预填流原样保留**（空分支 + composer 预填 + 回车确认）。
 - **键位**：Enter 提交、Shift+Enter 换行、⌘Enter 提交且保留来源列（keepSource）、Esc 走壳层关闭链；**IME `isComposing`/keyCode 229 守卫**（参考分支没有、我们必须有——与 composer 同一课）。
-- **按钮文案随态切换**：列条 override →「开启并替换『X』」；⌘ 按住 →「在右侧新列打开」；有输入 →「带着问题开分支」；默认 →「开启分支讨论」。
+- **按钮文案两态 + 放置提示行**（实施中经用户定稿修订，替代最初的四态方案）：按钮只表达动作（「开启分支讨论」/「带着问题开分支」，长度稳定）；放置后果下沉到列条下的单行提示（超长省略）——默认「默认替换『X』（点小格可换）」、override「将替换/折叠『Y』」、⌘「保留本列 · 新列开在紧邻右侧」。变长列标题不再撑爆按钮。
+- **划选引用消息化（方向 C，用户定稿）**：`Message` 增加可选 `quote?: { text }` 字段——带问开分支时划选原文随首条 user 消息**结构化落库**（消息记录自足，导出/搜索/任何消费者拿到即用）；UI 在 user 气泡内渲染引用条（列视图与画布面板一致），气泡正文仍是用户原话；发送线 grounding 由字段驱动（拼「就我划选的这段话：『X』——」前缀，仅 payload）——修复裸问题（如「这是什么意思」）的指代被模型就近解析到上文结尾的严重问题（用户实测踩到）；服务端分支 system 追加指代规则一句。
 - **前置修复（必须先做）**：气泡的 capture 级 scroll 监听会把 textarea 自增高/内滚当成页面滚动、瞬间自毁气泡丢输入——移植参考分支的「事件 target 在 `.sel-bubble` 内则放行」修复。
 - **kickoff 预填文案更新**（用户定稿）：「请结合上下文，展开讲解『{X}』」——短、直接、衔接上文的意图放在句首。
 - **异步分支标题**：分支标题现为锚点截 13 字；首答完成后异步让模型生成 4–8 字标题替换（失败静默保留默认），随整树防抖存库持久化。
@@ -30,8 +31,9 @@
 - `app/thread-chat/branching/selection-bubble.tsx`（输入框 + 键位 + 文案态 + scroll 放行，~80–100 行）
 - `app/thread-chat/thread-chat-demo.tsx`（`handleFork` 加可选 `question` 参数：有问则 fork 后 `chat.send`，~15 行）
 - `app/thread-chat/net/prompt.ts`（kickoff 文案 + 继承段预算截断，~35 行）
-- `app/thread-chat/core/store.ts`（新 mutator `setThreadTitle`，~10 行）
+- `app/thread-chat/core/{types,store}.ts`（`Message.quote` 可选字段 + `appendUserMessage`/`chat.send` 透传；新 mutator `setThreadTitle`）
+- `app/thread-chat/chat/chat-view.tsx` 与 `orchestration/canvas-node.tsx`（user 气泡引用条渲染）
 - 新增小路由 `app/api/branch-title/route.ts`（4–8 字标题生成，用 `lib/ai/minimax.ts` 的裸模型 `minimaxModel`，照主聊天 generateTitle 先例）+ `net/persist.ts` 或 net/ 客户端函数（~40 行）
 - `app/thread-chat/thread-chat.css`（输入区样式 + 气泡贴底翻转阈值随高度调整，~20 行）
 - `e2e/thread-chat/verify-bubble-composer.mjs`（新入库脚本，断言面参考 playground verify6）
-- **不改**：fork 数据模型（无 firstQuestion 字段——发送走 chat-controller 天然成为首条 user 消息）、/api/chat、锚点/持久化机制（标题变更随整树存盘自然持久化）。
+- **不改**：fork 数据模型（无 firstQuestion 字段——发送走 chat-controller 天然成为首条 user 消息，划选引用经 `quote` 字段随消息携带）、/api/chat、锚点/持久化机制（quote 与标题变更随整树存盘自然持久化）。
