@@ -20,7 +20,9 @@
   --font-ui:
     -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
     "Hiragino Sans GB", sans-serif;
-  --font-read: Georgia, "Songti SC", "STSong", serif;
+  /* 阅读字体：原 demo 用衬线（Georgia/宋体）营造纸面感，用户不喜宋体——
+     改为跟随 UI 无衬线栈；将来想换专门阅读字体仍只改这一处 token */
+  --font-read: var(--font-ui);
   --font-mono:
     "SF Mono", ui-monospace, "JetBrains Mono", Menlo, Consolas, monospace;
   --col-min: 340px;
@@ -1909,6 +1911,16 @@
 .tc .md-body ol {
   margin: 0 0 12px;
   padding-left: 22px;
+}
+/* Tailwind preflight 全局 list-style:none 会吞掉 marker——正文列表必须显式恢复 */
+.tc .md-body ul {
+  list-style: disc;
+}
+.tc .md-body ol {
+  list-style: decimal;
+}
+.tc .md-body ul ul {
+  list-style: circle;
 }
 .tc .md-body li {
   margin: 3px 0;
