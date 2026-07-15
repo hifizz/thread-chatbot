@@ -32,9 +32,8 @@ function buildPrompt(anchorText: string, question: string, answer: string) {
 
 /** 清洗模型输出：剥 <think> 推理段 / 引号 / 标点，取首个非空行，超长截断；空则 null */
 function sanitizeTitle(raw: string): string | null {
-  let t = raw
-  const close = t.lastIndexOf("</think>")
-  if (close >= 0) t = t.slice(close + "</think>".length)
+  // 剥 <think>（含未闭合：截断输出可能只有开标签——一路剥到结尾，codex review P3）
+  const t = raw.replace(/<think>[\s\S]*?(<\/think>|$)/g, "")
   const line = t
     .split("\n")
     .map((s) => s.trim())
@@ -44,7 +43,8 @@ function sanitizeTitle(raw: string): string | null {
     .replace(/^[「『"'《【\s]+/, "")
     .replace(/[」』"'》】。！？!?，,.…\s]+$/, "")
     .trim()
-  if (!cleaned) return null
+  // 过短标题（1 字）不如锚点截断的默认标题信息多，视为生成失败（codex review P3）
+  if (cleaned.length < 2) return null
   return cleaned.slice(0, BRANCH_TITLE_GEN_MAX_LEN)
 }
 

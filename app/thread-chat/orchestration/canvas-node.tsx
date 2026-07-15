@@ -262,7 +262,7 @@ export const CanvasCard = memo(function CanvasCard({
 }: NodeProps<CanvasCardNode>) {
   return (
     <div
-      className={`canvas-card${selected ? "expanded" : ""}`}
+      className="canvas-card" /* 选中态样式由 .react-flow__node.selected 提供；此前的条件类拼接丢空格产出 canvas-cardexpanded 单 token，选中即丢全部卡片样式（codex review P1） */
       style={{ "--accent": data.accent } as React.CSSProperties}
       title={selected ? undefined : "单击：就地展开对话 · 双击：回到列模式打开"}
     >
