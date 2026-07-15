@@ -55,7 +55,7 @@ import { Button } from "@/components/ui/button";
 
 ### Google 登录（可选）
 
-配齐 `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`（后端）+ `NEXT_PUBLIC_GOOGLE_AUTH_ENABLED=true`（前端显示按钮）即启用，登录/注册页出现「使用 Google 登录」。Google Cloud Console 的 OAuth 客户端需把重定向 URI 设为 `{站点}/api/auth/callback/google`。因 Google 邮箱默认已验证，社交登录用户在**创建时即发放初始额度**（不走邮箱验证钩子；`ensureUserCredits` 幂等，与邮箱验证路径不重复发放）。
+同时配齐 `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` 即启用（登录/注册页自动出现「使用 Google 登录」，无需额外开关）。Google Cloud Console 的 OAuth 客户端需把重定向 URI 设为 `{站点}/api/auth/callback/google`——其中域名由 `BETTER_AUTH_URL` 决定，务必与 Google 后台一致。因 Google 邮箱默认已验证，社交登录用户在**创建时即发放初始额度**（不走邮箱验证钩子；`ensureUserCredits` 幂等，与邮箱验证路径不重复发放）。
 
 ### 大模型与 Cloudflare AI 网关
 
