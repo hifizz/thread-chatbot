@@ -16,6 +16,11 @@ import {
   CardContent,
 } from "@/components/ui/card"
 import { TurnstileWidget, turnstileEnabled } from "@/components/auth/turnstile"
+import { GoogleIcon } from "@/components/auth/google-icon"
+
+// Google 登录按钮显隐：服务端配了 GOOGLE_CLIENT_ID/SECRET 后，把此 public 标志设为 true。
+// （客户端读不到服务端密钥，故用独立的 NEXT_PUBLIC 开关控制按钮渲染。）
+const googleEnabled = process.env.NEXT_PUBLIC_GOOGLE_AUTH_ENABLED === "true"
 
 type Mode = "sign-in" | "sign-up"
 
@@ -81,6 +86,21 @@ export function AuthForm({ mode }: { mode: Mode }) {
   const fetchOptions = turnstileEnabled
     ? { headers: { "x-captcha-response": captchaToken } }
     : undefined
+
+  async function signInWithGoogle() {
+    setLoading(true)
+    try {
+      // 跳转到 Google 授权页；回来后 better-auth 建会话并跳回 callbackURL。
+      await authClient.signIn.social({
+        provider: "google",
+        callbackURL: redirect,
+      })
+    } catch {
+      toast.error("跳转 Google 登录失败，请稍后重试")
+      setLoading(false)
+    }
+    // 成功时浏览器已在跳转途中，无需复位 loading。
+  }
 
   async function resendVerification() {
     try {
@@ -170,6 +190,25 @@ export function AuthForm({ mode }: { mode: Mode }) {
         <CardDescription>{copy.desc}</CardDescription>
       </CardHeader>
       <CardContent>
+        {googleEnabled && (
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={loading}
+              onClick={signInWithGoogle}
+              className="w-full"
+            >
+              <GoogleIcon className="size-4" />
+              使用 Google {copy.submit}
+            </Button>
+            <div className="my-4 flex items-center gap-3 text-xs text-muted-foreground">
+              <span className="h-px flex-1 bg-border" />
+              或
+              <span className="h-px flex-1 bg-border" />
+            </div>
+          </>
+        )}
         <form onSubmit={onSubmit} className="flex flex-col gap-4">
           {mode === "sign-up" && (
             <div className="flex flex-col gap-1.5">
