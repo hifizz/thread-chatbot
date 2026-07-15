@@ -146,7 +146,7 @@
 
 ### Requirement: 业务 API 401 自愈
 
-业务 API（threads、chat、history、branch-trees 等非 better-auth 自身接口）返回 401 时，客户端 SHALL 通过 `fetchWithAuth` 包装的请求触发 `handleUnauthorized()`：尽力调用登出以清除本地失效会话 cookie，随后硬跳转到 `/sign-in` 并携带当前路径作为 `redirect` 参数。该机制 SHALL 仅包裹业务 API 请求，SHALL NOT 包裹 better-auth 自身的 `/api/auth/*` 接口（避免将登录失败等正常业务 401 误判为会话失效）。并发多个 401 SHALL 只触发一次登出与跳转。
+业务 API（threads、chat、history、branch-trees 等非 better-auth 自身接口）返回 401 时，客户端 SHALL 触发 `handleUnauthorized()`：尽力调用登出以清除本地失效会话 cookie，随后硬跳转到 `/sign-in` 并携带当前路径作为 `redirect` 参数。触发方式 SHALL 为 `fetchWithAuth` 包装（threads/history/branch-trees 的读写、主聊天 transport），或在需要保留流式 `Response` 与自定义错误文案的路径（thread-chat 的 `/api/chat` 控制器）上以等价的 `if (401) handleUnauthorized()` 手写实现。该机制 SHALL 仅包裹业务 API 请求，SHALL NOT 包裹 better-auth 自身的 `/api/auth/*` 接口（避免将登录失败等正常业务 401 误判为会话失效）。并发多个 401 SHALL 只触发一次登出与跳转。
 
 #### Scenario: 业务 API 会话失效时自动跳转
 
