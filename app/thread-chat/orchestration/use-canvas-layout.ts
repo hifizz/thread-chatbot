@@ -68,12 +68,19 @@ function estLines(text: string, fontPx: number, maxLines: number): number {
 }
 
 /** 估算卡高喂给 dagre：与实测高相差几个像素，LR 布局下误差由 nodesep（垂直间距）吸收 */
-function estimateCardHeight(d: CanvasCardData): number {
+function estimateCardHeight(
+  d: CanvasCardData,
+  reserveFullSummary = false
+): number {
   let h = 24 // 上下 padding 11×2 + 上下边框
   h += 26 // chead：徽章 + 标题一行
   if (d.subtitle) h += estLines(d.subtitle, 11.5, 2) * 17.5 + 4
   if (d.anchor) h += estLines(d.anchor, 11.5, 2) * 17.5 + 12 // 引文行 + 内边距 + 下距
-  if (d.summary) h += estLines(d.summary, 12, 3) * 19 + 8
+  // 流式期间按满额（3 行）预留 summary 高度：逐帧变长的摘要跨过 estLines 行数
+  // 阈值会让估高突变 → dagre 重排 → 正在就地对话时兄弟节点平移（codex review P2）。
+  // 满额预留使整场流式高度恒定，仅收尾一次性落位。
+  if (reserveFullSummary) h += 3 * 19 + 8
+  else if (d.summary) h += estLines(d.summary, 12, 3) * 19 + 8
   h += 14 // meta 行
   return Math.round(h)
 }
@@ -134,7 +141,12 @@ function buildBaseGraph(
           ? kickoffQuestion(t.anchorText)
           : null,
     }
-    const size = { width: CARD_W, height: estimateCardHeight(data) }
+    const streaming =
+      last && (last.status === "pending" || last.status === "streaming")
+    const size = {
+      width: CARD_W,
+      height: estimateCardHeight(data, !!streaming),
+    }
     nodes.push({
       id: t.id,
       type: "threadCard",

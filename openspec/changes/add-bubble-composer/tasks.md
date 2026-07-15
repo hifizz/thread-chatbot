@@ -36,7 +36,7 @@
 ## 6. 实施后用户反馈迭代（均已完成并验证）
 
 - [x] 6.1 D9：按钮两态 + 放置提示行（替代四态文案；e2e 断言同步）
-- [x] 6.2 修复 smcell className 粘连导致的列条样式退化（恢复原版拼法，格子/白框/斜纹/cap 小字回归）
+- [x] 6.2 修复 smcell className 粘连导致的列条样式退化（注：6630bbc 声称修复但未落地——codex review 字节级揪出，本轮真正修复并以确定性种子树验证：类名空格分隔/src 格 24px/cap 绝对定位）
 - [x] 6.3 D10 方向 C：Message.quote 字段 + 引用条渲染（列/画布）+ 字段驱动 grounding + 服务端指代规则；e2e 含「刷新后引用仍在」断言
 - [x] 6.4 「新对话」空树无操作（URL 不变 + 轻提示；归属 add-branch-tree-persistence 的 URL 身份语义，spec 已同步）
 - [x] 6.5 正文阅读字体改无衬线（--font-read 跟随 --font-ui）；恢复 .md-body 列表 marker（Tailwind preflight 吞 list-style）

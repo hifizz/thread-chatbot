@@ -76,10 +76,16 @@ export function buildRequestBody(
   const inherited: UIMessageLike[] = []
   for (const m of collectInherited(state, thread)) {
     if (!includable(m.role, m.text, m.status)) continue
+    // 继承段同样做 quote-aware 序列化（codex review P2）：父分支的带引用裸问题
+    // （如「这是什么意思？」）被更深分支继承时，若丢掉 quote 前缀，「就近指代」
+    // 歧义会在继承段原样复活——与当前会话消息用同一条拼接规则
+    const text = m.quote?.text
+      ? `就我划选的这段话：「${m.quote.text}」——${m.text}`
+      : m.text
     inherited.push({
       id: `inh-${m.id}`,
       role: m.role,
-      parts: [{ type: "text", text: m.text }],
+      parts: [{ type: "text", text }],
     })
   }
   const { kept, omitted } = applyInheritedBudget(
