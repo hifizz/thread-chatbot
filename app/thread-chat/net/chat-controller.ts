@@ -26,6 +26,7 @@
 import type { ThreadStore } from "../core/store"
 import { buildRequestBody } from "./prompt"
 import { consumeUIMessageStream, type UIStreamHandlers } from "./ui-stream"
+import { handleUnauthorized } from "@/lib/auth/session-recovery"
 
 /** 页面不可见 / 无 requestAnimationFrame 时的降级刷新间隔（毫秒） */
 const FALLBACK_FLUSH_MS = 50
@@ -181,11 +182,15 @@ export function createChatController(store: ThreadStore) {
         })
 
         if (!res.ok || !res.body) {
+          // 401：会话已失效——触发自救（登出 + 跳登录），并给出明确文案而非死胡同错误
+          if (res.status === 401) void handleUnauthorized()
           settle(() =>
             store.failAssistantMessage(
               threadId,
               msgId,
-              `请求失败（HTTP ${res.status}）`
+              res.status === 401
+                ? "登录已失效，正在跳转登录…"
+                : `请求失败（HTTP ${res.status}）`
             )
           )
           return

@@ -131,6 +131,13 @@
   border-radius: 999px;
   padding: 1px 6px;
 }
+/* 账户按钮里的用户名/邮箱：过长时截断，避免撑破顶栏 */
+.tc .tbtn .acct-label {
+  max-width: 12ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .tc .kbd {
   font-family: var(--font-mono);
   font-size: 10px;

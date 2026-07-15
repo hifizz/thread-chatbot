@@ -21,6 +21,7 @@ import {
   TREE_UI_KEY_PREFIX,
 } from "@/constants/thread-chat"
 import { isValidTreeId } from "@/lib/chat/tree-id"
+import { fetchWithAuth } from "@/lib/auth/session-recovery"
 import type { Message, Thread, ThreadTreeState } from "../core/types"
 import type { PlacementMode, Slot } from "../orchestration/placement"
 
@@ -56,7 +57,7 @@ export interface LoadedTree {
 /** GET 整树：未保存过 state 为 null（正常首访路径）；请求失败也降级为空并 console.warn（空树启动） */
 export async function loadTree(id: string): Promise<LoadedTree> {
   try {
-    const res = await fetch(`/api/branch-trees/${id}`)
+    const res = await fetchWithAuth(`/api/branch-trees/${id}`)
     if (!res.ok) throw new Error(`GET /api/branch-trees ${res.status}`)
     const data = (await res.json()) as LoadedTree
     return { state: data.state, customTitle: data.customTitle ?? null }

@@ -2,6 +2,7 @@
 
 import { useMemo } from "react"
 import { useAui, type ThreadHistoryAdapter } from "@assistant-ui/react"
+import { fetchWithAuth } from "@/lib/auth/session-recovery"
 
 type MessageRow = {
   id: string
@@ -27,7 +28,7 @@ export function usePostgresThreadHistoryAdapter(): ThreadHistoryAdapter {
               : undefined
             if (!remoteId) return { messages: [] }
 
-            const res = await fetch(`/api/threads/${remoteId}/messages`)
+            const res = await fetchWithAuth(`/api/threads/${remoteId}/messages`)
             if (!res.ok) return { messages: [] }
 
             const rows: MessageRow[] = await res.json()
@@ -48,7 +49,7 @@ export function usePostgresThreadHistoryAdapter(): ThreadHistoryAdapter {
               : undefined
             if (!remoteId) return
 
-            await fetch(`/api/threads/${remoteId}/messages`, {
+            await fetchWithAuth(`/api/threads/${remoteId}/messages`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({

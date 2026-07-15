@@ -20,10 +20,11 @@ export function proxy(request: NextRequest) {
   ])
   const isAuthPage = publicPages.has(pathname)
 
-  // 已登录用户访问登录/注册页 → 回到首页（找回/重置密码页不强制跳转）
-  if (hasSession && (pathname === "/sign-in" || pathname === "/sign-up")) {
-    return NextResponse.redirect(new URL("/", request.url))
-  }
+  // 注意：这里「不」再因为「有 cookie」就把用户从登录/注册页弹回首页。
+  // 中间件只做乐观 cookie 检查（不查库），而 cookie 可能是失效的「幽灵」（过期/被撤销/
+  // 用户被删/本地库重置）——若在此乐观弹走，用户就会被永远挡在登录页外，且所有 API 仍 401，
+  // 形成死循环。改由登录页客户端用 useSession（真查会话）来决定：确属已登录才跳走，
+  // 失效 cookie 则留在登录页正常重登（新 cookie 覆盖旧的）。
 
   // 未登录访问受保护页面（首页对话）→ 去登录页，并带上回跳地址
   if (!hasSession && !isAuthPage) {
