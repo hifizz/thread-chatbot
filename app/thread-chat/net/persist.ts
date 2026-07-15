@@ -97,7 +97,7 @@ export async function saveTree(
 ): Promise<void> {
   return enqueueTreeWrite(id, async () => {
     try {
-      const res = await fetch(`/api/branch-trees/${id}`, {
+      const res = await fetchWithAuth(`/api/branch-trees/${id}`, {
         method: "PUT",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ state, title }),
@@ -124,7 +124,7 @@ export interface TreeListItem {
 /** GET 树列表：失败返回空数组并 console.warn（弹层显示空态，不打断页面） */
 export async function listTrees(): Promise<TreeListItem[]> {
   try {
-    const res = await fetch("/api/branch-trees")
+    const res = await fetchWithAuth("/api/branch-trees")
     if (!res.ok) throw new Error(`GET /api/branch-trees ${res.status}`)
     const data = (await res.json()) as { trees: TreeListItem[] }
     return data.trees
@@ -136,7 +136,7 @@ export async function listTrees(): Promise<TreeListItem[]> {
 
 /** PATCH 重命名（只写 custom_title）：失败抛错——调用方做乐观更新回滚 + toast */
 export async function renameTree(id: string, title: string): Promise<void> {
-  const res = await fetch(`/api/branch-trees/${id}`, {
+  const res = await fetchWithAuth(`/api/branch-trees/${id}`, {
     method: "PATCH",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ title }),
@@ -147,7 +147,9 @@ export async function renameTree(id: string, title: string): Promise<void> {
 /** DELETE 树（幂等）：失败抛错——调用方保留条目 + toast */
 export async function deleteTree(id: string): Promise<void> {
   return enqueueTreeWrite(id, async () => {
-    const res = await fetch(`/api/branch-trees/${id}`, { method: "DELETE" })
+    const res = await fetchWithAuth(`/api/branch-trees/${id}`, {
+      method: "DELETE",
+    })
     if (!res.ok) throw new Error(`DELETE /api/branch-trees ${res.status}`)
   })
 }
