@@ -76,7 +76,7 @@ export const attachments = dbSchema.table("attachments", {
 // ThreadTreeState（JSON）。与上面 assistant-ui 线性模型的 threads/messages 表分开，
 // 互不复用——那两张表是线性会话，这张是树形分支态。treeId 由客户端生成
 // （crypto.randomUUID()），URL 路径段承载（/thread-chat/{treeId}），URL 即树身份。
-export const branchTrees = pgTable("branch_trees", {
+export const branchTrees = dbSchema.table("branch_trees", {
   id: text("id").primaryKey(), // 客户端生成的 treeId（UUID，URL 路径段承载）
   title: text("title"), // 可空：取 main 首条 user 文本前若干字，纯展示（机器派生轨）
   // 双轨标题（design D1）：用户重命名只写这列（PATCH），防抖整树 PUT 只写上面的派生

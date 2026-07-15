@@ -27,6 +27,15 @@ CREATE TABLE "thread_chat"."attachments" (
 	CONSTRAINT "attachments_key_unique" UNIQUE("key")
 );
 --> statement-breakpoint
+CREATE TABLE "thread_chat"."branch_trees" (
+	"id" text PRIMARY KEY NOT NULL,
+	"title" text,
+	"custom_title" text,
+	"state" jsonb NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
 CREATE TABLE "thread_chat"."messages" (
 	"id" text PRIMARY KEY NOT NULL,
 	"thread_id" text NOT NULL,
