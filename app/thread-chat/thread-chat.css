@@ -716,16 +716,15 @@
   background: var(--accent, #3a3733);
 }
 
-/* ---------------- 划选气泡 ---------------- */
+/* ---------------- 划选气泡 ----------------
+   落点走 floating-popup 定位模型（branching/bubble-position.ts），
+   外轮廓 + 指向选区的尾巴是一条平滑 path（branching/bubble-shape.tsx，移植自
+   smooth-tooltip），取代过去 ::after 的 CSS 旋转小方块。宽度 / left / top / visibility
+   由组件内联 style 给出（宽度 = BUBBLE_W）。 */
 .tc .sel-bubble {
   position: fixed;
   z-index: 60;
-  background: var(--ink);
   color: #fff;
-  border-radius: 11px;
-  padding: 8px 9px 9px;
-  box-shadow: 0 10px 30px -8px rgba(30, 26, 20, 0.5);
-  width: 230px;
   animation: tc-pop 0.14s ease;
 }
 @keyframes tc-pop {
@@ -737,15 +736,26 @@
     opacity: 1;
   }
 }
-.tc .sel-bubble::after {
-  content: "";
+/* 平滑曲线轮廓背景层：铺满面板宽度，尾巴靠 svg overflow 溢出面板上/下沿；
+   阴影用 CSS drop-shadow（屏幕坐标，永远朝下，不随尾巴上下翻转而反向）。
+   top 偏移由组件内联给出（尾巴朝上时上移 ah）。 */
+.tc .sel-bubble .sb-shape {
   position: absolute;
-  top: -6px;
-  left: 22px;
-  width: 12px;
-  height: 12px;
-  background: var(--ink);
-  transform: rotate(45deg);
+  left: 0;
+  width: 100%;
+  z-index: 0;
+  pointer-events: none;
+  filter: drop-shadow(0 8px 18px rgba(30, 26, 20, 0.45));
+}
+.tc .sel-bubble .sb-shape svg {
+  width: 100%;
+  height: auto;
+}
+/* 内容层：叠在轮廓上方；padding 决定面板高度 H（被 ResizeObserver 测量后回喂定位与 path） */
+.tc .sel-bubble .sb-content {
+  position: relative;
+  z-index: 1;
+  padding: 8px 9px 9px;
 }
 .tc .sel-bubble .lbl {
   font-size: 11px;
