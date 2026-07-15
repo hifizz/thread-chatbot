@@ -132,11 +132,21 @@ export function createThreadStore(seed: ThreadTreeState) {
     },
 
     /** 追加一条用户消息；返回消息 id，会话不存在时返回 null */
-    appendUserMessage(threadId: string, text: string): string | null {
+    appendUserMessage(
+      threadId: string,
+      text: string,
+      quote?: { text: string }
+    ): string | null {
       const t = state.threads[threadId]
       if (!t) return null
       const id = "m" + state.seq++
-      t.messages.push({ id, role: "user", text, forks: [] })
+      t.messages.push({
+        id,
+        role: "user",
+        text,
+        forks: [],
+        ...(quote ? { quote } : {}),
+      })
       touchSilently(threadId)
       notify()
       return id

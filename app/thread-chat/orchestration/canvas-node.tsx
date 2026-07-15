@@ -172,6 +172,7 @@ function CanvasExpand({
           >
             {msg.role === "user" ? (
               <div className="bubble" data-role="user">
+                {msg.quote && <div className="msg-quote">{msg.quote.text}</div>}
                 {msg.text}
               </div>
             ) : (

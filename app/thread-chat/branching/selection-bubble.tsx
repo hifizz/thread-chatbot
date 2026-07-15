@@ -223,13 +223,22 @@ export function SelectionBubble({
 
   /* —— 按钮文案四态（优先级）：列条 override > ⌘ 按住 > 有输入 > 默认 —— */
   const hasQuestion = question.trim().length > 0
-  const btnLabel = ov
-    ? `开启并${mode === "replace" ? "替换" : "折叠"}『${threadTitle(state, ov)}』`
+  // 按钮只表达「动作」（两态、长度稳定）；「放置后果」下沉到列条下的提示行——
+  // 变长的列标题在提示行里可单行省略，按钮宽度不再被撑爆（用户定的通用方案）
+  const btnLabel = hasQuestion ? "带着问题开分支" : "开启分支讨论"
+
+  /** 放置后果提示行：override 优先，其次 ⌘ 跟踪态，否则读 placement 预览 */
+  const placeHint = ov
+    ? `将${mode === "replace" ? "替换" : "折叠"}『${threadTitle(state, ov)}』`
     : metaHeld
-      ? "在右侧新列打开"
-      : hasQuestion
-        ? "带着问题开分支"
-        : "开启分支讨论"
+      ? "⌘ 保留本列 · 新列开在紧邻右侧"
+      : preview?.replaceId
+        ? `默认替换『${threadTitle(state, preview.replaceId)}』（点小格可换）`
+        : preview?.foldId
+          ? `默认折叠『${threadTitle(state, preview.foldId)}』（点小格可换）`
+          : preview
+            ? "将在右侧新开一列"
+            : null
 
   /** 统一提交：按钮点击与输入框 Enter 共用（事件瞬时修饰键与跟踪态任一为真即 keepSource）。
       question trim 后非空 = 带问开分支；留空 = 现有预填流（上层据第三参分流） */
@@ -355,6 +364,11 @@ export function SelectionBubble({
           aria-label="新分支的放置目标（点小格指定让位列）"
         >
           {cells}
+        </div>
+      )}
+      {placeHint && (
+        <div className="place-hint" aria-live="polite">
+          {placeHint}
         </div>
       )}
       <button onClick={(e) => submit(e.metaKey || e.ctrlKey)}>

@@ -163,7 +163,16 @@ const colMsgs = (colIdx) =>
     return Array.from(cols[idx]?.querySelectorAll(".message") ?? []).map(
       (el) => ({
         role: el.classList.contains("user") ? "user" : "assistant",
-        text: (el.querySelector(".bubble")?.textContent ?? "").trim(),
+        // 正文断言只看正文：排除 .msg-quote 引用条（方向 C 的划选引用展示件）
+        text: (() => {
+          const b = el.querySelector(".bubble")
+          if (!b) return ""
+          const c = b.cloneNode(true)
+          c.querySelector(".msg-quote")?.remove()
+          return (c.textContent ?? "").trim()
+        })(),
+        quote:
+          el.querySelector(".bubble .msg-quote")?.textContent?.trim() ?? null,
       })
     )
   }, colIdx)
@@ -330,6 +339,11 @@ ok("带问 Enter：分支列打开", true)
     msgs[0]?.role === "user" && msgs[0].text === Q1,
     JSON.stringify(msgs[0] ?? null)
   )
+  ok(
+    "新列第 1 条带划选引用条（方向 C）",
+    msgs[0]?.quote === anchorA,
+    JSON.stringify(msgs[0]?.quote ?? null)
+  )
   ok("新列第 2 条 = assistant（流式首答已就位）", msgs[1]?.role === "assistant")
   const composerVal = await page
     .locator(".tc .cols > .column")
@@ -344,9 +358,45 @@ ok("带问 Enter：分支列打开", true)
     "payload 契约：threadChat.anchorText = 划选原文",
     payload?.threadChat?.anchorText === anchorA
   )
+  // 锚点 grounding 契约：分支首条 user 在发送线上加「就我划选的这段话」前缀
+  // （裸问题的指代会被模型就近解析到上文结尾——用户实测踩过），UI 仍显示原文
+  const grounded = `就我划选的这段话：「${anchorA}」——${Q1}`
   ok(
-    "payload 契约：问题以 user 原文入 messages（不经预填合成）",
-    msgsInPayload.some((m) => m.role === "user" && m.parts?.[0]?.text === Q1)
+    "payload 契约：分支首问带锚点 grounding 前缀（仅发送线）",
+    msgsInPayload.some(
+      (m) => m.role === "user" && m.parts?.[0]?.text === grounded
+    )
+  )
+  const ui = await page.evaluate(() => {
+    const cols = document.querySelectorAll(".tc .cols > .column")
+    const bubble = cols[1]?.querySelector(".message.user .bubble")
+    const quote = bubble?.querySelector(".msg-quote")?.textContent?.trim() ?? ""
+    const clone = bubble?.cloneNode(true)
+    clone?.querySelector(".msg-quote")?.remove()
+    return { quote, text: clone?.textContent?.trim() ?? "" }
+  })
+  ok("UI 契约：user 气泡正文 = 原始问题（无前缀）", ui.text === Q1)
+  ok("UI 契约：气泡内引用条 = 划选原文（方向 C）", ui.quote === anchorA)
+  // 方向 C 的核心承诺：绑定关系是数据——刷新后引用条仍在（quote 随整树 JSON 落库）
+  await page.waitForTimeout(2000) // 过防抖存库
+  await page.reload({ waitUntil: "networkidle" })
+  await page.waitForSelector(".tc .message.user .bubble", { timeout: 15000 })
+  const afterReload = await page.evaluate(() => {
+    const cols = document.querySelectorAll(".tc .cols > .column")
+    for (const col of cols) {
+      const q = col.querySelector(".message.user .bubble .msg-quote")
+      if (q) return q.textContent?.trim() ?? ""
+    }
+    // 分支列可能未在恢复布局里展开：全 DOM 兜底找
+    return (
+      document
+        .querySelector(".message.user .bubble .msg-quote")
+        ?.textContent?.trim() ?? ""
+    )
+  })
+  ok(
+    "持久化契约：刷新后引用条仍在（quote 是数据不是代码行为）",
+    afterReload === anchorA
   )
 }
 await page.screenshot({ path: SHOT("bc-3-question-branch") })
@@ -451,31 +501,47 @@ const anchorC =
 ok("在带问分支列内划选（keepSource 用）", anchorC !== null, anchorC ?? "")
 await bubbleTextarea().pressSequentially("对比一下？")
 ok("有输入 → 带着问题开分支", (await bubbleLabel()) === "带着问题开分支")
+// 新契约（用户定稿）：按钮只表达动作、两态恒定；放置后果在 .place-hint 提示行
+const placeHint = async () =>
+  await page
+    .locator(".sel-bubble .place-hint")
+    .innerText()
+    .catch(() => "")
 await page.keyboard.down("Meta")
 ok(
-  "⌘ 按住优先于带问 → 在右侧新列打开",
-  (await bubbleLabel()) === "在右侧新列打开"
+  "⌘ 按住：按钮文案不变（动作恒定）",
+  (await bubbleLabel()) === "带着问题开分支"
+)
+ok(
+  "⌘ 按住：提示行 = 保留本列·右侧新开",
+  (await placeHint()).includes("保留本列")
 )
 await page.keyboard.up("Meta")
-ok("⌘ 松开回落 → 带着问题开分支", (await bubbleLabel()) === "带着问题开分支")
 {
-  // 列条 override（点非来源、未折叠小格）：文案 → 开启并替换/折叠『列名』
+  // 列条 override（点非来源、未折叠小格）：后果进提示行，按钮不变
   const cell = page.locator(
     ".sel-bubble .smcell:not(.main):not(.src):not(.ghost):not(.folded)"
   )
   ok("气泡含迷你列条（≥1 个可点小格）", (await cell.count()) >= 1)
-  await cell.first().click()
-  const ovLabel = await bubbleLabel()
+  const hintBefore = await placeHint()
   ok(
-    "override 态文案 = 开启并替换/折叠『列名』（优先级最高）",
-    /^开启并(替换|折叠)『.+』$/.test(ovLabel),
-    ovLabel
+    "默认态提示行说明放置后果（替换/折叠/新开）",
+    /将?(默认)?(替换|折叠|新开)/.test(hintBefore),
+    hintBefore
   )
-  await cell.first().click() // 再点同格取消
+  await cell.first().click()
+  const ovHint = await placeHint()
   ok(
-    "再点同格取消 override → 回落带着问题开分支",
+    "override 态提示行 = 将替换/折叠『列名』",
+    /^将(替换|折叠)『.+』$/.test(ovHint),
+    ovHint
+  )
+  ok(
+    "override 态按钮文案不变（动作恒定）",
     (await bubbleLabel()) === "带着问题开分支"
   )
+  await cell.first().click() // 再点同格取消
+  ok("取消 override → 提示行回落默认态", (await placeHint()) === hintBefore)
 }
 const Q2 = "把它和经典信道对比一下？"
 await bubbleTextarea().fill(Q2)

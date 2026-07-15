@@ -110,6 +110,7 @@ export function ChatView({
       <div className="who">{msg.role === "user" ? "你" : "AI"}</div>
       {msg.role === "user" ? (
         <div className="bubble" data-role="user">
+          {msg.quote && <div className="msg-quote">{msg.quote.text}</div>}
           {msg.text}
         </div>
       ) : (

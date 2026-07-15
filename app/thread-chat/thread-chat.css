@@ -2167,3 +2167,30 @@
 .tc .tbtn.help:hover {
   color: var(--ink);
 }
+
+/* 划选气泡的放置后果提示行：按钮只表达动作，后果在这里单行说明（超长省略） */
+.tc .sel-bubble .place-hint {
+  margin: 6px 2px 0;
+  font-size: 10px;
+  line-height: 1.4;
+  color: #d8d2c4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* user 气泡内的划选引用条（方向 C）：这条提问针对的划选原文，随消息落库、随气泡展示 */
+.tc .message.user .msg-quote {
+  margin: 0 0 6px;
+  padding: 3px 8px;
+  border-left: 2px solid color-mix(in srgb, var(--ink) 35%, transparent);
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+  border-radius: 4px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: color-mix(in srgb, var(--ink) 72%, transparent);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}

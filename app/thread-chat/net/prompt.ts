@@ -96,14 +96,22 @@ export function buildRequestBody(
   }
   messages.push(...kept)
 
-  // 2. 当前会话已有消息（排除流式占位 / error / 空 assistant）
+  // 2. 当前会话已有消息（排除流式占位 / error / 空 assistant）。
+  //    grounding 由消息级 quote 字段驱动（方向 C，用户定稿）：带 quote 的消息在
+  //    发送线上拼「就我划选的这段话」前缀——裸问题「这是什么意思？」紧跟长上文时，
+  //    模型会按就近原则把指代解析到上一条消息结尾（实测复现），前缀让指代确定落到
+  //    划选原文。绑定关系是数据（msg.quote）而非代码规则；UI 渲染引用条、store/DB
+  //    存原话与 quote 字段，拼接措辞可演进而数据不变。
   for (const m of thread.messages) {
     if (m.id === excludeMsgId) continue
     if (!includable(m.role, m.text, m.status)) continue
+    const text = m.quote?.text
+      ? `就我划选的这段话：「${m.quote.text}」——${m.text}`
+      : m.text
     messages.push({
       id: m.id,
       role: m.role,
-      parts: [{ type: "text", text: m.text }],
+      parts: [{ type: "text", text }],
     })
   }
 
