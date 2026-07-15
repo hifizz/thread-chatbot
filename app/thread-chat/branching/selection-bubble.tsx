@@ -21,7 +21,7 @@
  *   Esc 交由壳层关闭链关气泡；Enter 有 IME 守卫（isComposing / keyCode 229）。
  */
 
-import React, { useEffect, useRef, useState } from "react"
+import React, { useEffect, useLayoutEffect, useRef, useState } from "react"
 import { GitFork } from "lucide-react"
 import type { ThreadTreeState } from "../core/types"
 import { threadTitle } from "../core/selectors"
@@ -32,13 +32,22 @@ import {
   type PlacementMode,
   type Slot,
 } from "../orchestration/placement"
+import { computePopupPosition, type Rect } from "./bubble-position"
+import { BubbleShape, type TailDir } from "./bubble-shape"
+import {
+  BUBBLE_GAP,
+  BUBBLE_SAFE_PADDING,
+  BUBBLE_TAIL,
+  BUBBLE_TAIL_MARGIN,
+  BUBBLE_W,
+} from "@/constants/selection-bubble"
 
 export interface SelectionInfo {
   text: string
   threadId: string
   msgId: string
-  x: number
-  y: number
+  /** 选区包围盒（viewport 坐标）：喂 floating-popup 定位模型，气泡围绕它择位 */
+  rect: Rect
   /** 划选结束（mouseup）那一刻是否按着 ⌘/Ctrl：作为修饰键跟踪的初值 */
   meta?: boolean
   /** 文本锚点（在渲染后的 .md-body 上以 describeRange 生成）：渲染后重定位高亮用 */
@@ -76,6 +85,10 @@ export function SelectionBubble({
   /** 可选首问（受控 textarea）：留空提交 = 现有预填流；非空提交 = 带问开分支 */
   const [question, setQuestion] = useState("")
   const taRef = useRef<HTMLTextAreaElement | null>(null)
+  /** 气泡内容层（面板本体）：测其高度 H 喂定位模型与轮廓 path */
+  const contentRef = useRef<HTMLDivElement | null>(null)
+  /** 实测面板高度（内容驱动：输入框自增高、迷你列条出现都会变），0 = 尚未测量 */
+  const [measuredH, setMeasuredH] = useState(0)
   /** 渲染期间的派生状态调整（React 官方写法）：sel 变化 = 新一次划选，重置各态 */
   const [forSel, setForSel] = useState<SelectionInfo | null>(sel)
   if (forSel !== sel) {
@@ -83,7 +96,22 @@ export function SelectionBubble({
     setOverride(null)
     setMetaHeld(sel?.meta ?? false)
     setQuestion("")
+    setMeasuredH(0) // 换一段划选：高度作废，等重新测量再定位（先隐藏，避免旧位闪现）
   }
+
+  /* 测量面板高度：内容变化（打字自增高 / 列条出现）经 ResizeObserver 实时回填，
+     驱动定位模型重新择位（贴底时自动上下翻转），气泡不会被 viewport 裁切 */
+  useLayoutEffect(() => {
+    const el = contentRef.current
+    if (!sel || !el) return
+    // 清掉上一次划选留在 textarea 上的自增高（跨划选不重挂载），否则首帧量到偏大的 H
+    if (taRef.current) taRef.current.style.height = ""
+    const measure = () => setMeasuredH(el.offsetHeight)
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [sel])
 
   /* 气泡弹出即聚焦输入框（preventScroll：气泡定位刚结算完，不能再引发滚动）；
      顺手清掉上一次自增高留下的行内高度（textarea 跨划选不重挂载） */
@@ -96,8 +124,6 @@ export function SelectionBubble({
 
   /* 划选监听：mouseup 结算选区并定位气泡；mousedown / 滚动 / resize 隐藏 */
   useEffect(() => {
-    // 有分支列时气泡多出一行迷你列条（约 46px），夹取阈值同步放大避免贴底裁切
-    const extraH = slots.length > 0 ? 46 : 0
     const onMouseUp = (e: MouseEvent) => {
       if ((e.target as HTMLElement).closest?.(".sel-bubble")) return
       const meta = e.metaKey || e.ctrlKey
@@ -144,18 +170,13 @@ export function SelectionBubble({
         }
         const text = anchor.quote.exact
 
-        const rect = s.getRangeAt(0).getBoundingClientRect()
-        const left = Math.max(10, Math.min(rect.left, window.innerWidth - 244))
-        let top = rect.bottom + 9
-        // 贴底翻转阈值：150/132 → 190/172，多出的 ~40px 是输入框一行的高度（D5）
-        if (top > window.innerHeight - (190 + extraH))
-          top = Math.max(10, rect.top - (172 + extraH))
+        // 只存选区包围盒；气泡实际落点交给 floating-popup 模型在测得高度后计算
+        const r = s.getRangeAt(0).getBoundingClientRect()
         onSelChange({
           text,
           threadId,
           msgId,
-          x: left,
-          y: top,
+          rect: { left: r.left, top: r.top, width: r.width, height: r.height },
           meta,
           anchor,
         })
@@ -182,7 +203,7 @@ export function SelectionBubble({
       document.removeEventListener("scroll", onScroll, true)
       window.removeEventListener("resize", onScroll)
     }
-  }, [state, onSelChange, slots])
+  }, [state, onSelChange])
 
   /* 气泡打开期间跟踪 ⌘/Ctrl 起落（keydown/keyup 都带 metaKey/ctrlKey 快照） */
   useEffect(() => {
@@ -200,6 +221,37 @@ export function SelectionBubble({
   }, [sel])
 
   if (!sel) return null
+
+  /* —— 落点：floating-popup 定位模型，只用上/下两向（尾巴竖直指向选区）——
+     测得高度前（measuredH=0）先把气泡藏到屏外并隐藏，测完这一帧即就位，避免旧位闪现。 */
+  const ready = measuredH > 0 && typeof window !== "undefined"
+  const pos = ready
+    ? computePopupPosition(
+        sel.rect,
+        { width: BUBBLE_W, height: measuredH },
+        {
+          left: 0,
+          top: 0,
+          width: window.innerWidth,
+          height: window.innerHeight,
+        },
+        {
+          sides: ["bottom", "top"],
+          gap: BUBBLE_GAP,
+          safePadding: BUBBLE_SAFE_PADDING,
+        }
+      )
+    : null
+  // side="bottom"（面板在选区下方）→ 尾巴朝上；side="top"（面板在上方）→ 尾巴朝下
+  const dir: TailDir = pos?.side === "top" ? "down" : "up"
+  // 尾巴横向落点：对准选区中心，夹进面板安全范围（不让根部爬上圆角）
+  const anchorCx = sel.rect.left + sel.rect.width / 2
+  const cx = pos
+    ? Math.min(
+        BUBBLE_W - BUBBLE_TAIL_MARGIN,
+        Math.max(BUBBLE_TAIL_MARGIN, anchorCx - pos.left)
+      )
+    : BUBBLE_W / 2
 
   /* —— 生效目标 = override > 修饰键推导 > 默认规则（列条与提交共用 hint） —— */
   const ov =
@@ -327,54 +379,83 @@ export function SelectionBubble({
   }
 
   return (
-    <div className="sel-bubble" style={{ left: sel.x, top: sel.y }}>
-      <div className="lbl">在新分支中讨论这段</div>
-      <div className="quote">{sel.text}</div>
-      <div className="ask">
-        <textarea
-          ref={taRef}
-          rows={1}
-          value={question}
-          placeholder="就这段问点什么…（可留空）"
-          aria-label="就这段划选文字提出你的问题（可留空，留空则预填代拟问题待确认）"
-          onChange={(e) => {
-            setQuestion(e.target.value)
-            // 自增高：clamp 68px（与 CSS 的 max-height 同步），超出转内滚
-            const ta = e.currentTarget
-            ta.style.height = "auto"
-            ta.style.height = Math.min(ta.scrollHeight, 68) + "px"
-          }}
-          onKeyDown={(e) => {
-            if (e.key !== "Enter") return
-            // IME 守卫（同 chat-view composer）：输入法组合态按 Enter 只做「上屏」，
-            // 不提交、也不 preventDefault。isComposing 覆盖 Chrome/Firefox；
-            // keyCode 229 兜底 Safari（compositionend 后才派发的 Enter keydown）。
-            const ne = e.nativeEvent
-            if (ne.isComposing || ne.keyCode === 229) return
-            if (e.shiftKey) return // Shift+Enter = 换行（浏览器默认行为）
-            e.preventDefault()
-            submit(e.metaKey || e.ctrlKey)
-          }}
-        />
+    <div
+      className="sel-bubble"
+      data-dir={dir}
+      style={{
+        left: pos ? pos.left : -9999,
+        top: pos ? pos.top : -9999,
+        width: BUBBLE_W,
+        visibility: pos ? "visible" : "hidden",
+      }}
+    >
+      {/* 平滑曲线轮廓（背景层）：面板 + 指向选区的尾巴，一条 path。尾巴朝上时
+          整层上移 ah 让顶点探出面板上沿；朝下时留在原位向下探出。 */}
+      <div
+        className="sb-shape"
+        aria-hidden="true"
+        style={{ top: dir === "up" ? -BUBBLE_TAIL.ah : 0 }}
+      >
+        {ready && (
+          <BubbleShape
+            W={BUBBLE_W}
+            H={measuredH}
+            cx={cx}
+            geo={BUBBLE_TAIL}
+            dir={dir}
+            shadow={false}
+          />
+        )}
       </div>
-      {hasMap && (
-        <div
-          className="slotmap"
-          role="group"
-          aria-label="新分支的放置目标（点小格指定让位列）"
-        >
-          {cells}
+      <div className="sb-content" ref={contentRef}>
+        <div className="lbl">在新分支中讨论这段</div>
+        <div className="quote">{sel.text}</div>
+        <div className="ask">
+          <textarea
+            ref={taRef}
+            rows={1}
+            value={question}
+            placeholder="就这段问点什么…（可留空）"
+            aria-label="就这段划选文字提出你的问题（可留空，留空则预填代拟问题待确认）"
+            onChange={(e) => {
+              setQuestion(e.target.value)
+              // 自增高：clamp 68px（与 CSS 的 max-height 同步），超出转内滚
+              const ta = e.currentTarget
+              ta.style.height = "auto"
+              ta.style.height = Math.min(ta.scrollHeight, 68) + "px"
+            }}
+            onKeyDown={(e) => {
+              if (e.key !== "Enter") return
+              // IME 守卫（同 chat-view composer）：输入法组合态按 Enter 只做「上屏」，
+              // 不提交、也不 preventDefault。isComposing 覆盖 Chrome/Firefox；
+              // keyCode 229 兜底 Safari（compositionend 后才派发的 Enter keydown）。
+              const ne = e.nativeEvent
+              if (ne.isComposing || ne.keyCode === 229) return
+              if (e.shiftKey) return // Shift+Enter = 换行（浏览器默认行为）
+              e.preventDefault()
+              submit(e.metaKey || e.ctrlKey)
+            }}
+          />
         </div>
-      )}
-      {placeHint && (
-        <div className="place-hint" aria-live="polite">
-          {placeHint}
-        </div>
-      )}
-      <button onClick={(e) => submit(e.metaKey || e.ctrlKey)}>
-        <GitFork size={14} />
-        {btnLabel}
-      </button>
+        {hasMap && (
+          <div
+            className="slotmap"
+            role="group"
+            aria-label="新分支的放置目标（点小格指定让位列）"
+          >
+            {cells}
+          </div>
+        )}
+        {placeHint && (
+          <div className="place-hint" aria-live="polite">
+            {placeHint}
+          </div>
+        )}
+        <button onClick={(e) => submit(e.metaKey || e.ctrlKey)}>
+          <GitFork size={14} />
+          {btnLabel}
+        </button>
+      </div>
     </div>
   )
 }
