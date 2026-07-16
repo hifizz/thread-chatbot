@@ -86,6 +86,8 @@ export function resolveChatModel(modelId: string): LanguageModel {
     name: `${model.provider}${useGateway ? "-via-cf" : ""}`,
     baseURL: useGateway ? gatewayCompatBaseURL() : env.directBaseURL,
     apiKey: env.key,
+    // 同 minimax：流式响应默认不回 usage，不开这项会导致按 0 token 计费。
+    includeUsage: true,
     // 经网关时可选携带网关鉴权头（网关侧开启 Authenticated Gateway 时必需）。
     headers:
       useGateway && CF_TOKEN
