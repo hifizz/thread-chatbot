@@ -1,71 +1,31 @@
-"use client"
+import type { Metadata } from "next"
+import type { ReactElement } from "react"
 
-import { useMemo } from "react"
-import {
-  AssistantRuntimeProvider,
-  useRemoteThreadListRuntime,
-} from "@assistant-ui/react"
-import {
-  AssistantChatTransport,
-  useChatRuntime,
-} from "@assistant-ui/react-ai-sdk"
-import { Base } from "@/components/examples/base"
-import { AssistantTools } from "@/components/assistant-ui/tools"
-import { postgresThreadListAdapter } from "@/lib/chat/thread-list-adapter"
-import { usePostgresThreadHistoryAdapter } from "@/lib/chat/use-thread-history-adapter"
-import { r2AttachmentAdapter } from "@/lib/chat/attachment-adapter"
-import { useResearchMode } from "@/lib/chat/research-mode"
-import { useModelMode } from "@/lib/chat/model-mode"
-import { fetchWithAuth } from "@/lib/auth/session-recovery"
+import { Hero } from "@/components/landing/hero"
+import { BranchingDemo } from "@/components/landing/branching-demo"
+import { CanvasShowcase } from "@/components/landing/canvas-showcase"
+import { FeatureGrid } from "@/components/landing/feature-grid"
+import { ClosingCta } from "@/components/landing/closing-cta"
 
-function useMyChatRuntime() {
-  const history = usePostgresThreadHistoryAdapter()
-  // 把「深度研究」开关状态随每条消息发给 chat route。用 getState() 而非闭包快照，
-  // 保证读到发送时的最新开关值。
-  const transport = useMemo(
-    () =>
-      new AssistantChatTransport({
-        // 会话失效（401）时自动登出并跳登录页，避免流式请求卡在错误态
-        fetch: fetchWithAuth,
-        prepareSendMessagesRequest: ({
-          id,
-          messages,
-          trigger,
-          messageId,
-          body,
-        }) => ({
-          body: {
-            ...body,
-            id,
-            messages,
-            trigger,
-            messageId,
-            deepResearch: useResearchMode.getState().enabled,
-            // 随每条消息带上当前选中的模型（同「深度研究」开关的做法，读发送时的最新值）
-            modelId: useModelMode.getState().modelId,
-          },
-        }),
-      }),
-    []
-  )
-  return useChatRuntime({
-    transport,
-    adapters: { history, attachments: r2AttachmentAdapter },
-  })
+// 落地页专属 metadata（突出「分支对话」差异化）。
+export const metadata: Metadata = {
+  title: "Thread Chat · 让对话像思路一样分叉",
+  description:
+    "划选 AI 回复里的任意一句就地岔出新对话，整棵分支对话在画布上铺开——不再把追问挤进一根越拉越长的线里。",
 }
 
-export default function Page() {
-  const runtime = useRemoteThreadListRuntime({
-    runtimeHook: useMyChatRuntime,
-    adapter: postgresThreadListAdapter,
-  })
-
+/**
+ * 公开落地页——server component，不读 session（保持静态可缓存）。
+ * 按序组合各分区，套一个居中、限宽、纵向留白的响应式容器。
+ */
+export default function LandingPage(): ReactElement {
   return (
-    <div className="h-svh w-full">
-      <AssistantRuntimeProvider runtime={runtime}>
-        <AssistantTools />
-        <Base />
-      </AssistantRuntimeProvider>
-    </div>
+    <main className="mx-auto w-full max-w-5xl px-6 sm:px-8">
+      <Hero />
+      <BranchingDemo />
+      <CanvasShowcase />
+      <FeatureGrid />
+      <ClosingCta />
+    </main>
   )
 }

@@ -8,47 +8,11 @@ import {
 } from "drizzle-orm/pg-core"
 import { dbSchema } from "./pg-schema"
 import { EMBEDDING_DIMENSIONS } from "@/constants/rag"
-import { user } from "./auth-schema"
 
 // 认证与计费表在独立文件中定义，这里统一 re-export，使 drizzle 客户端与迁移能感知它们。
 export * from "./auth-schema"
 export * from "./billing-schema"
 export * from "./payment-schema"
-
-export const threads = dbSchema.table("threads", {
-  id: text("id").primaryKey(), // == RemoteThreadMetadata.remoteId; reused as-is from the client-generated local thread id
-  // 归属用户；历史数据可能为空，新建对话会写入当前登录用户。
-  userId: text("user_id").references(() => user.id, { onDelete: "cascade" }),
-  title: text("title"),
-  status: text("status", { enum: ["regular", "archived"] })
-    .notNull()
-    .default("regular"),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-  lastMessageAt: timestamp("last_message_at", { withTimezone: true }),
-})
-
-export const messages = dbSchema.table(
-  "messages",
-  {
-    id: text("id").primaryKey(), // == AI SDK UIMessage.id
-    threadId: text("thread_id")
-      .notNull()
-      .references(() => threads.id, { onDelete: "cascade" }),
-    parentId: text("parent_id"), // assistant-ui's message repository chain, used to rebuild branches
-    role: text("role").notNull(), // denormalized from content.role for cheap filtering
-    format: text("format").notNull().default("ai-sdk/v6"), // MessageStorageEntry.format
-    content: jsonb("content").notNull(), // full UIMessage minus id: {role, parts, metadata?} - incl. tool-call parts
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
-  },
-  (table) => [index("messages_thread_id_idx").on(table.threadId)]
-)
 
 export const attachments = dbSchema.table("attachments", {
   id: text("id").primaryKey(), // crypto.randomUUID()；同时是应用内 URL /api/attachments/{id} 的路径段

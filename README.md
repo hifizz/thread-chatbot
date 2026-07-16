@@ -31,7 +31,7 @@ import { Button } from "@/components/ui/button";
    - `BETTER_AUTH_SECRET`（`openssl rand -base64 32`）、`BETTER_AUTH_URL`（本地 `http://localhost:3000`）
    - 任一可用模型的凭据（`MINIMAX_API_KEY` 直连，或 `DEEPSEEK_API_KEY`/`OPENAI_API_KEY` 经网关）。
 2. `pnpm db:migrate`（在独立 schema `thread_chat` 下建全部表）。
-3. `pnpm dev`，访问首页会被重定向到 `/sign-in`。
+3. `pnpm dev`，访问首页 `/` 是公开落地页；点击「开始聊天」进入旗舰 `/thread-chat` 时，若未登录才会被重定向到 `/sign-in`（登录后回到旗舰）。
 
 ### 数据库 / Supabase（独立 schema + 连接池）
 

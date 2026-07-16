@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/card"
 import { TurnstileWidget, turnstileEnabled } from "@/components/auth/turnstile"
 import { GoogleIcon } from "@/components/auth/google-icon"
+import { DEFAULT_AUTHED_REDIRECT } from "@/constants/routes"
 
 type Mode = "sign-in" | "sign-up"
 
@@ -59,7 +60,7 @@ export function AuthForm({
 }) {
   const router = useRouter()
   const params = useSearchParams()
-  const redirect = params.get("redirect") || "/"
+  const redirect = params.get("redirect") || DEFAULT_AUTHED_REDIRECT
   const copy = COPY[mode]
 
   // 兜底跳转：中间件不再乐观弹走带 cookie 的访问，改由这里用「真会话」判定——
