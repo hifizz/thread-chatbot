@@ -7,7 +7,8 @@
 ## What Changes
 
 - **`/` 重写为公开 landing 页**：Hero + 主 CTA「开始聊天」+ 卖点段落（划选开分支、画布工作台、底座能力）。内容**数据驱动**（`constants/landing.ts`），视觉/文案后续可独立细化而不动结构。页面**不做鉴权**（获客页需登出可见、可 CDN 缓存）。
-- **旗舰 `/thread-chat` 保持不改名**，新增服务端 `app/thread-chat/layout.tsx` 做 gating：`getSession()` 未登录 → `redirect("/sign-in?redirect=/thread-chat")`。与 `/account` 现有写法同构，**不引入 middleware**（本项目已主动撤除 middleware、改页面级真会话判定——见 `lib/auth/server.ts` 与 `auth-form.tsx` 注释）。
+- **落地页 `/` 从 `proxy.ts` 白名单放行**：项目有边缘乐观门禁 `proxy.ts`（Next 16 的 middleware），默认把非白名单页当受保护页；`/` 须加入 `publicPages`，否则登出访客访问 `/` 被弹登录。
+- **旗舰 `/thread-chat` 保持不改名**，新增服务端 `app/thread-chat/layout.tsx` 叠真校验：`getSession()` 未登录 → `redirect("/sign-in?redirect=/thread-chat")`。与 `/account` 现有写法同构（受保护页 = proxy 乐观拦 + 页面 getSession 真校验双层）。
 - **登录/注册默认落点从 `/` 改为 `/thread-chat`**：`components/auth/auth-form.tsx` 的 `params.get("redirect") || "/"` 默认值改引路由常量。
 - **BREAKING** 彻底移除线性聊天栈及其数据表：
   - `app/page.tsx` 的线性挂载（被 landing 取代）
@@ -35,6 +36,7 @@
 - `components/landing/*`（**新增**：`hero` / `branching-demo` / `canvas-showcase` / `feature-grid` / `closing-cta` / `start-chat-button`）
 - `constants/landing.ts`（**新增**，内容 + 类型）、`constants/routes.ts`（**新增**，路由与默认落点单一事实来源）
 - `components/auth/auth-form.tsx`（默认 `redirect` 落点，引用常量）
+- `proxy.ts`（`publicPages` 加入 `ROUTES.landing`，放行落地页）
 - **删除**：`components/examples/base*`、`components/assistant-ui/tools.tsx` + `weather-tool`/`notepad-tool`/`compare-table-tool`、`lib/chat/thread-list-adapter.ts`、`lib/chat/use-thread-history-adapter.ts`、`app/api/threads/**`
 - `lib/db/schema.ts`（删 `threads`/`messages` 定义）+ `drizzle/`（新增 drop 迁移）
 - **不改**：`app/api/chat/route.ts`（threadChat 模式共用）、`app/thread-chat/**` 业务代码、`branch_trees`/`attachments`、billing/auth/account

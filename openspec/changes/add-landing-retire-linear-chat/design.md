@@ -4,7 +4,7 @@
 
 - **现状**：`/` = `app/page.tsx` 挂 assistant-ui 线性聊天（`Base` + `AssistantTools` + 三个 demo 工具 + `postgresThreadListAdapter` + `usePostgresThreadHistoryAdapter`），持久化走 `threads`/`messages` 表与 `/api/threads/*`。旗舰 `/thread-chat`（跳板 `page.tsx`）+ `/thread-chat/[treeId]`（`ThreadChatDemo`）走独立的 `branch_trees` 表。两套持久化零耦合。
 - **共享点（唯一）**：`/api/chat`——thread-chat 的 threadChat 模式复用它（`app/thread-chat/net/*`）。**必须保留**。
-- **鉴权现状**：项目已**主动撤除 middleware**，改页面级真会话判定（`lib/auth/server.ts`、`components/auth/auth-form.tsx` 注释均点明"中间件只做乐观 cookie 检查/不再乐观弹走"）；`/account` 是现成范式：服务端组件 `getSession()` → `redirect("/sign-in?redirect=/account")`。旗舰目前**未做页面级 gating**，只靠 `fetchWithAuth` 的 401 兜底。
+- **鉴权现状（两层）**：项目**有** `proxy.ts`（Next 16 把 middleware 约定重命名为 proxy）做**边缘乐观 cookie 门禁**——除 `publicPages` 白名单（sign-in/sign-up/找回密码/法务页）外的所有页面路由，无 session cookie 即 302 到 `/sign-in?redirect={pathname}`；它**不查库**（注释"中间件只做乐观 cookie 检查/不再乐观弹走登录页"指的正是它，不是"已撤除"）。之上，`/account` 再叠一层服务端真校验：`getSession()` → `redirect("/sign-in?redirect=/account")`。即受保护页 = **proxy 乐观拦 + 页面 getSession 真校验** 双层。旗舰目前只被 proxy 拦、无页面级真校验，且 `/` 因不在 proxy 白名单而被当作受保护页。
 - **约束**：CLAUDE.md——常量进 `constants/` 分主题文件、共享工具按域进 `lib/`、中文输出、Tailwind v4 CSS-first、shadcn 基于 Base UI（`components/ui/*`）。旗舰两个 page 均为 server component，可被 server `layout.tsx` 干净包裹。
 
 ## Goals / Non-Goals
@@ -208,9 +208,14 @@ const redirect = params.get("redirect") || DEFAULT_AUTHED_REDIRECT
 
 落地页是获客页，`/` 不读会话 → 保持静态可 CDN 缓存、首屏快。CTA 恒定指向 `/thread-chat`，登录态的差异化交给旗舰门禁。**弃选**：`/` 服务端读 session 切换 CTA 文案（"开始聊天" vs "继续对话"）——收益小却让整页转 dynamic、丢缓存，不值。
 
-### D2：gating 用服务端 layout，不用 middleware；redirect 目标取裸旗舰路径
+### D2：落地页从 proxy 白名单放行；旗舰叠服务端 layout 真校验（与 /account 同构）
 
-一处 `app/thread-chat/layout.tsx` 同时 gate 跳板与 `[treeId]`，与 `/account` 同构、真会话校验。**弃 middleware**：项目已主动撤除，且 better-auth 在 edge 建议只查 cookie 存在性（非真校验），走回头路无益。**redirect 目标用裸 `/thread-chat`**：server layout 拿不到 `[treeId]` 的具体 pathname（layout 无 pathname prop），而未登录者本就没有属于自己的树，跳裸路径登录后生成新树即可；为精确回跳去引 `x-pathname` header 不划算（见 Open Questions）。
+两处配合：
+
+1. **`/` 加入 `proxy.ts` 的 `publicPages`**——否则边缘乐观门禁把落地页当受保护页，登出访客访问 `/` 直接被弹 `/sign-in?redirect=%2F`（实测踩到过）。白名单项用 `ROUTES.landing` 绑单一事实来源。
+2. **旗舰 `app/thread-chat/layout.tsx` 叠服务端 `getSession()` 真校验**——proxy 只查 cookie 存在性（"幽灵" cookie 能骗过边缘），layout 在页面加载再做真校验，与 `/account` 完全同构（受保护页 = proxy 乐观拦 + 页面 getSession）。一处 layout 同时 gate 跳板与 `[treeId]`。
+
+**弃"仅靠 proxy"**：proxy 不查库，幽灵 cookie 会放行到旗舰、只剩 API 401 兜底、体验差；`/account` 已确立"双层"先例，旗舰照做。**redirect 目标用裸 `/thread-chat`**：server layout 拿不到 `[treeId]` 的具体 pathname（layout 无 pathname prop），而未登录者本就没有属于自己的树，跳裸路径登录后生成新树即可；为精确回跳去引 `x-pathname` header 不划算（见 Open Questions）。
 
 ### D3：路由与默认落点常量化
 

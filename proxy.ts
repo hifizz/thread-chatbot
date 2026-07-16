@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server"
 import { getSessionCookie } from "better-auth/cookies"
+import { ROUTES } from "@/constants/routes"
 
 // 乐观鉴权：仅检查会话 cookie 是否存在（不做数据库校验，避免 Edge 开销）。
 // 真正的会话有效性由各 API 路由 / 服务端再次校验。
@@ -8,8 +9,9 @@ export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
   const hasSession = getSessionCookie(request) != null
 
-  // 无需登录即可访问的页面（登录/注册/找回密码 + 法务页）
+  // 无需登录即可访问的页面（公开落地页 + 登录/注册/找回密码 + 法务页）
   const publicPages = new Set([
+    ROUTES.landing, // 公开落地页：登出访客也要能看到（获客页）
     "/sign-in",
     "/sign-up",
     "/forgot-password",
