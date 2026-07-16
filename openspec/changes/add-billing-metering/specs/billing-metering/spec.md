@@ -54,6 +54,20 @@
 - **WHEN** 用户余额在扣费前已经很低，本次调用的售价超过剩余余额
 - **THEN** 系统 SHALL 仍完整扣费使余额变为负数，不拒绝本次扣费与流水写入
 
+### Requirement: 流式用量必须被上游回传并正确捕获
+
+系统 SHALL 确保所有对话 provider 在流式响应中回传 token 用量。对 OpenAI 兼容端点（`createOpenAICompatible` 构造的 provider）而言，因其默认不在流式响应里回传 usage，系统 SHALL 显式开启用量回传（`includeUsage: true`，即 `stream_options.include_usage`）。缺失该配置时用量为空、经兜底后按 0 token 计费，属计费失效，SHALL NOT 出现。推理型模型的思维链 token 计入输出用量，与上游计费口径一致。
+
+#### Scenario: 流式对话结束后用量非零
+
+- **WHEN** 用户经 OpenAI 兼容端点（如 MiniMax 直连）完成一次流式对话
+- **THEN** 计费回调拿到的 `inputTokens`/`outputTokens` SHALL 反映真实消耗（非 0），据此写入的用量流水与扣费金额非 0
+
+#### Scenario: 推理 token 计入输出
+
+- **WHEN** 使用会输出思维链（`<think>`）的推理型模型
+- **THEN** 该次响应的输出用量 SHALL 包含思维链 token（与上游按 `completion_tokens` 收费一致），不单独从计费中剔除
+
 ### Requirement: 断连兜底计费
 
 系统 SHALL 保证客户端在流式响应完成前提前断开连接时，服务端仍会把该次响应完整消费至结束，从而使计费回调必然被触发，不因客户端断连而漏计已产生的供应商成本。
