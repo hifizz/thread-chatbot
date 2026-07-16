@@ -20,6 +20,7 @@
 - [x] 3.1 重写 `app/page.tsx`：移除线性聊天挂载，改为按序组合 landing 分区；落地页专属 `metadata`；server component 不读 session（build 确认 `/` 为 Static ○）
 - [x] 3.2 新增 `app/thread-chat/layout.tsx`：`getSession()` 未登录 → `redirect(signInWithRedirect(ROUTES.flagship))`（包住跳板与 `[treeId]`；build 确认 `/thread-chat` 转 Dynamic ƒ）
 - [x] 3.3 `components/auth/auth-form.tsx`：默认 `redirect` 由 `"/"` 改为 `DEFAULT_AUTHED_REDIRECT`（引常量）
+- [x] 3.4 `proxy.ts`：把 `ROUTES.landing`（`/`）加入 `publicPages` 白名单——否则边缘乐观门禁把落地页当受保护页，登出访客访问 `/` 被弹 `/sign-in?redirect=%2F`（修复实测 bug）
 
 ## 4. 移除线性聊天栈
 
