@@ -18,7 +18,7 @@ import {
  * thread-chat 顶栏的账户入口：
  * · 未登录 → 「登录」按钮，跳 /sign-in 并带上回跳地址；
  * · 已登录 → 右上角只放一个头像（无头像用姓名首字母的默认头像），
- *   点击展开下拉：用户名（含邮箱副行）/ Profile（→ 账户页）/ Log Out。
+ *   点击展开下拉：用户名（含邮箱副行）/ 个人资料（→ 账户页）/ 退出登录。
  * 顶栏本被中间件保护（未登录会被弹去登录页），登录态入口仍作兜底与可发现性保留。
  */
 export function AccountButton() {
@@ -77,10 +77,10 @@ export function AccountButton() {
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem render={<Link href="/account" />}>
-          Profile
+          个人资料
         </DropdownMenuItem>
         <DropdownMenuItem variant="destructive" onClick={handleSignOut}>
-          Log Out
+          退出登录
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
