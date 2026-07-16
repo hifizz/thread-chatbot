@@ -9,6 +9,7 @@ import {
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuLabel,
   DropdownMenuItem,
   DropdownMenuSeparator,
@@ -67,14 +68,16 @@ export function AccountButton() {
         </Avatar>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-44">
-        <DropdownMenuLabel className="flex flex-col gap-0.5">
-          <span className="truncate font-medium">{label}</span>
-          {name && email ? (
-            <span className="truncate text-xs font-normal text-muted-foreground">
-              {email}
-            </span>
-          ) : null}
-        </DropdownMenuLabel>
+        <DropdownMenuGroup>
+          <DropdownMenuLabel className="flex flex-col gap-0.5">
+            <span className="truncate font-medium">{label}</span>
+            {name && email ? (
+              <span className="truncate text-xs font-normal text-muted-foreground">
+                {email}
+              </span>
+            ) : null}
+          </DropdownMenuLabel>
+        </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuItem render={<Link href="/account" />}>
           个人资料
