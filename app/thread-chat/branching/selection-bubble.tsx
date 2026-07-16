@@ -22,7 +22,7 @@
  */
 
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react"
-import { GitFork } from "lucide-react"
+import { GitMerge } from "lucide-react"
 import type { ThreadTreeState } from "../core/types"
 import { threadTitle } from "../core/selectors"
 import { describeRange, type TextAnchor } from "./text-anchor"
@@ -452,7 +452,7 @@ export function SelectionBubble({
           </div>
         )}
         <button onClick={(e) => submit(e.metaKey || e.ctrlKey)}>
-          <GitFork size={14} />
+          <GitMerge size={14} />
           {btnLabel}
         </button>
       </div>
