@@ -20,12 +20,15 @@ export const metadata: Metadata = {
  */
 export default function LandingPage(): ReactElement {
   return (
-    <main className="mx-auto w-full max-w-5xl px-6 sm:px-8">
+    <main className="w-full">
+      {/* Hero 满屏全宽（自带动态背景），其余分区在限宽容器内 */}
       <Hero />
-      <BranchingDemo />
-      <CanvasShowcase />
-      <FeatureGrid />
-      <ClosingCta />
+      <div className="mx-auto w-full max-w-5xl px-6 sm:px-8">
+        <BranchingDemo />
+        <CanvasShowcase />
+        <FeatureGrid />
+        <ClosingCta />
+      </div>
     </main>
   )
 }
