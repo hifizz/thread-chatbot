@@ -36,26 +36,6 @@ CREATE TABLE "thread_chat"."branch_trees" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "thread_chat"."messages" (
-	"id" text PRIMARY KEY NOT NULL,
-	"thread_id" text NOT NULL,
-	"parent_id" text,
-	"role" text NOT NULL,
-	"format" text DEFAULT 'ai-sdk/v6' NOT NULL,
-	"content" jsonb NOT NULL,
-	"created_at" timestamp with time zone DEFAULT now() NOT NULL
-);
---> statement-breakpoint
-CREATE TABLE "thread_chat"."threads" (
-	"id" text PRIMARY KEY NOT NULL,
-	"user_id" text,
-	"title" text,
-	"status" text DEFAULT 'regular' NOT NULL,
-	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
-	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
-	"last_message_at" timestamp with time zone
-);
---> statement-breakpoint
 CREATE TABLE "thread_chat"."account" (
 	"id" text PRIMARY KEY NOT NULL,
 	"account_id" text NOT NULL,
@@ -157,8 +137,6 @@ CREATE TABLE "thread_chat"."subscriptions" (
 );
 --> statement-breakpoint
 ALTER TABLE "thread_chat"."attachment_chunks" ADD CONSTRAINT "attachment_chunks_attachment_id_attachments_id_fk" FOREIGN KEY ("attachment_id") REFERENCES "thread_chat"."attachments"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "thread_chat"."messages" ADD CONSTRAINT "messages_thread_id_threads_id_fk" FOREIGN KEY ("thread_id") REFERENCES "thread_chat"."threads"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "thread_chat"."threads" ADD CONSTRAINT "threads_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "thread_chat"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "thread_chat"."account" ADD CONSTRAINT "account_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "thread_chat"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "thread_chat"."session" ADD CONSTRAINT "session_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "thread_chat"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "thread_chat"."usage_records" ADD CONSTRAINT "usage_records_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "thread_chat"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -167,7 +145,6 @@ ALTER TABLE "thread_chat"."payments" ADD CONSTRAINT "payments_user_id_user_id_fk
 ALTER TABLE "thread_chat"."subscriptions" ADD CONSTRAINT "subscriptions_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "thread_chat"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX "attachment_chunks_attachment_id_idx" ON "thread_chat"."attachment_chunks" USING btree ("attachment_id");--> statement-breakpoint
 CREATE INDEX "attachment_chunks_embedding_idx" ON "thread_chat"."attachment_chunks" USING hnsw ("embedding" vector_cosine_ops);--> statement-breakpoint
-CREATE INDEX "messages_thread_id_idx" ON "thread_chat"."messages" USING btree ("thread_id");--> statement-breakpoint
 CREATE INDEX "usage_records_user_id_idx" ON "thread_chat"."usage_records" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "usage_records_thread_id_idx" ON "thread_chat"."usage_records" USING btree ("thread_id");--> statement-breakpoint
 CREATE INDEX "usage_records_cost_source_idx" ON "thread_chat"."usage_records" USING btree ("cost_source");--> statement-breakpoint
