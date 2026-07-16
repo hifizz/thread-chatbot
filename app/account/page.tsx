@@ -72,6 +72,8 @@ export default async function AccountPage() {
             variant="ghost"
             size="icon"
             className="size-8"
+            // 渲染成链接（<a>）而非原生 <button>，需关掉 nativeButton 以符合 Base UI 语义
+            nativeButton={false}
             render={<Link href="/" aria-label="返回对话" />}
           >
             <ArrowLeftIcon className="size-4" />
