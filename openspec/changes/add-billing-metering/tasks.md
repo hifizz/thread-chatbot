@@ -22,6 +22,7 @@
 
 ## 4. chat route 集成（`app/api/chat/route.ts`）
 
+- [x] 4.0 provider 开启流式用量回传：`lib/ai/minimax.ts` 与 `lib/ai/provider.ts` 的 `createOpenAICompatible` 均设 `includeUsage: true`（OpenAI 兼容端点默认不回 usage，不开会导致按 0 token 计费）——已 wire 层 + SDK 层实测：修复前 `usage=null`、修复后 in=43/out=60、利润率 30.00%
 - [x] 4.1 发送前 `hasPositiveBalance` 拦截，余额不足返回 402「额度不足，请充值后再试」
 - [x] 4.2 `streamText({ maxOutputTokens: MAX_OUTPUT_TOKENS /* 8192 */ })` 封顶单请求最大产出，收敛成本敞口
 - [x] 4.3 `onFinish: async ({ usage, providerMetadata }) => chargeUsage(...)`，`generationId` 从 `providerMetadata.gateway.generationId` 取（经网关时才有）

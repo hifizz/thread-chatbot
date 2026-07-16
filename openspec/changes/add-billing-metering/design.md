@@ -79,8 +79,29 @@
 
 **理由**：账单流水是财务记录，其生命周期不应该被对话数据的生命周期左右——用户删除一个对话（thread）是很平常的操作，不应该连带删掉已经发生的计费历史，否则账单会对不上、对账会失去依据。反过来，账单表也不应该阻止用户删除对话（如果加了外键且不设级联，删除 thread 会因为存在关联的 usage_records 而失败）。两者故意解耦，代价是 `threadId` 可能引用一个已经不存在的对话，但这是可接受的——`threadId` 在这里只是一个「用于聚合展示」的标签，不是需要引用完整性的关系。
 
+### D8：流式必须显式开启用量回传（`includeUsage`），否则按 0 token 计费
+
+**选择**：所有经 `createOpenAICompatible` 构造的 provider（`lib/ai/minimax.ts` 的 MiniMax、`lib/ai/provider.ts` 的 DeepSeek/OpenAI 直连或 CF 网关）一律设 `includeUsage: true`。
+
+**理由**：OpenAI 兼容端点在**流式**响应里**默认不回传 usage**，必须在请求中带 `stream_options: {include_usage: true}`（AI SDK 侧即 `includeUsage`）。不开这项时，上游最后一帧的 `usage` 为 `null` → AI SDK 映射出的 `usage.inputTokens/outputTokens` 为 `undefined` → 计费代码 `usage.inputTokens ?? 0` 兜底成 0 → **每条用量记录都记成 0 token / 成本 0 / 售价 0**，等于整个按量计费形同虚设（用户白嫖、账单全空）。这是计费链路的**前置必要条件**，不是可选优化。
+
+**实证**（wire 层直测 MiniMax `/chat/completions` 流式）：不带 `include_usage` → `usage: null`；带 `include_usage: true` → `{prompt_tokens, completion_tokens, total_tokens}` 齐全。经我方 provider + AI SDK 复测：`inputTokens=43, outputTokens=60`（其中 `reasoningTokens=43`——见下），成本 196 微元、售价 280 微元、利润率 30.00%。
+
+**附带口径**：推理型模型（MiniMax M2 等）的思维链 token 计入 `completion_tokens`/`outputTokens`（上游即按此收费），故我方 `outputTokens` 天然含 reasoning 部分，与上游计费口径一致，无需额外拆分。
+
+### D9：`MODEL_COST` 记「按量付费官网标价」，即使实际走订阅套餐——作为对定价保守的代理成本
+
+**选择**：`constants/pricing.ts` 的 `MODEL_COST` 一律填**供应商按量付费（pay-as-you-go）的官网标价**，即便当前实际是用**订阅套餐**（如 MiniMax Coding Plan、包月固定费）在付款，也不改这张表。
+
+**理由**：向用户收费的链路只依赖「每 token 的代理成本」，它与我方**实际怎么付款**解耦。订阅制下的真实单位成本 = `月费 ÷ 当月实际消耗 token`，**只有月底才知道、且随用量剧烈浮动**（吃满套餐→真实成本被摊薄、真实利润远高于 30%；用量太少→月费摊不回来、真实是亏的；超额→触发限流或额外计费）。把这种「事后才知、剧烈浮动」的数字塞进即时扣费链路既不可能也不稳。而用按量标价作代理成本对定价是**保守**的：我方按「标价成本 × 1.43」向用户收费，实际付的月费单价通常更低，真实毛利只会 ≥ 账面 30%、不会更低。想看真实单位经济学，另做一个内部指标（月费 ÷ 当月 token）即可，**不进计费链路**。
+
+**弃选**：把订阅月费按某种估算摊到每 token 写进 `MODEL_COST`——摊销分母（当月总 token）在计费当下未知，只能拿历史均值猜，既不准又会让「成本」随月初/月末漂移，破坏 D2「成本只低估不高估」的保守前提。
+
+**关联风险（见 Risks）**：用订阅套餐额度去支撑一个**面向付费用户的多用户转售服务**，很可能违反该套餐的服务条款（个人编码助手额度 ≠ 商用转售），需在上线前与供应商条款/客服核实；如不允许，正解是换按量付费 API key——那时 `MODEL_COST` 标价正好等于真实成本，账面 30% 即真实 30%。
+
 ## Risks / Trade-offs
 
+- **[订阅套餐转售的合规风险]** → 若以订阅制（Coding Plan 等）额度支撑面向付费用户的商业服务，可能违反供应商服务条款（额度通常授权个人/开发用途而非商用转售），最坏后果是封号、服务中断。这是**业务/合规**风险而非代码缺陷，`MODEL_COST` 的保守口径（D9）不能替代条款核实；上线前必须与供应商确认，不允许则切换按量付费 key。
 - **[估算与真实成本的短暂偏差]** → 在对账（≤15 分钟节奏）修正前，用户看到的余额基于估算而非真实成本；由 D2 的定价表口径（成本只应低估不应高估，汇率宁高勿低）与两阶段对账机制共同收敛，偏差窗口短且方向可控。
 - **[并发多请求透支]** → 发送前拦截只在请求发起的那一刻检查一次；如果同一用户几乎同时发起多个请求，多个请求都可能通过 `hasPositiveBalance` 检查后才依次扣费，理论上可以透支到比单次 `maxOutputTokens` 上限更负的余额。v1 接受这一敞口（见 D5 的权衡），未来若要收紧可以在 `hasPositiveBalance` 处加悲观锁或改为条件更新，本变更不预支这一复杂度。
 - **[直连模型永不产生 `generationId`，对账永远跳过]** → MiniMax 直连等不经网关的调用没有 `generationId`，`usage_records` 该字段为空，`reconcilePendingCosts` 的查询条件 (`isNotNull(generationId)`) 天然跳过这些行，它们永远停留在 `cost_source='estimate'`。这是预期行为而非缺陷：没有网关就没有可对账的真实成本来源，估算即最终结果。
