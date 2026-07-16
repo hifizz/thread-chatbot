@@ -2,7 +2,8 @@
 
 ## 1. 部署脚本
 
-- [x] 1.1 `package.json` 新增 `"vercel-build": "pnpm db:migrate && next build"`；`build`/`start` 保持不变（Vercel 自动优先执行 vercel-build）
+- [x] 1.1 `package.json` 新增 `"vercel-build": "node scripts/vercel-migrate.mjs && next build"`；`build`/`start` 保持不变（Vercel 自动优先执行 vercel-build）
+- [x] 1.2 新增迁移守卫 `scripts/vercel-migrate.mjs`：配了 `DIRECT_URL`/`DATABASE_URL` 才跑 `pnpm db:migrate`（失败非零退出中断部署），未配则跳过并 `exit 0`（让未配库的预览部署也能通过）
 
 ## 2. 连接串职责与降级
 

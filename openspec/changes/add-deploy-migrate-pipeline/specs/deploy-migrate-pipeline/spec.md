@@ -4,16 +4,21 @@
 
 ### Requirement: 部署时先迁移后构建
 
-系统 SHALL 提供 `vercel-build` 脚本，在构建产物生成前先应用数据库迁移：`pnpm db:migrate && next build`。Vercel 部署 SHALL 自动优先执行该脚本；迁移失败时 SHALL 以 `&&` 短路中断部署，不产出构建物。本地 `build` 脚本 SHALL 保持纯构建、不连接数据库。
+系统 SHALL 提供 `vercel-build` 脚本，在构建产物生成前经守卫脚本应用数据库迁移：`node scripts/vercel-migrate.mjs && next build`。Vercel 部署 SHALL 自动优先执行该脚本。守卫 SHALL 在配置了连接串（`DIRECT_URL`/`DATABASE_URL`）时运行迁移，迁移失败 SHALL 以 `&&` 短路中断部署、不产出构建物；未配置连接串时守卫 SHALL 跳过迁移并正常退出，使构建继续。本地 `build` 脚本 SHALL 保持纯构建、不连接数据库。
 
-#### Scenario: 部署触发迁移后构建
+#### Scenario: 已配库时先迁移后构建
 
-- **WHEN** Vercel 执行部署且存在 `vercel-build` 脚本
-- **THEN** 先运行 `pnpm db:migrate` 应用迁移，成功后再 `next build`
+- **WHEN** Vercel 执行部署，且配置了 `DATABASE_URL`/`DIRECT_URL`
+- **THEN** 守卫先运行 `pnpm db:migrate` 应用迁移，成功后再 `next build`
+
+#### Scenario: 未配库时跳过迁移让构建通过
+
+- **WHEN** Vercel 执行部署，但未配置任何数据库连接串（如尚未配置密钥的预览部署）
+- **THEN** 守卫跳过迁移并以 0 退出，`next build` 照常执行，部署不因缺少数据库而失败
 
 #### Scenario: 迁移失败中断部署
 
-- **WHEN** `pnpm db:migrate` 返回非零（迁移失败）
+- **WHEN** 已配置连接串且 `pnpm db:migrate` 返回非零（迁移失败）
 - **THEN** `&&` 短路，`next build` 不执行，部署失败，不产出可能与旧结构不匹配的构建物
 
 #### Scenario: 本地构建不触库

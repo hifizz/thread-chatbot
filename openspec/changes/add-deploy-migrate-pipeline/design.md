@@ -27,9 +27,11 @@
 
 ### D1：新增 `vercel-build`，而非改动 `build`
 
-**选择**：`package.json` 加 `"vercel-build": "pnpm db:migrate && next build"`；`build` 保持 `next build` 不变。
+**选择**：`package.json` 加 `"vercel-build": "node scripts/vercel-migrate.mjs && next build"`；`build` 保持 `next build` 不变。
 
-**理由**：Vercel 构建时若存在 `vercel-build` 脚本会**自动优先执行它**（否则才用 `build`）。据此把「先迁移 → 再构建」的部署语义收敛到一个专用脚本里，而**本地 `pnpm build` 保持纯构建、不连数据库**——本地开发者不会因为跑构建而误改库，两条路径互不干扰。`&&` 短路保证迁移失败即中断、不产出可能与旧表结构不匹配的构建物。
+**理由**：Vercel 构建时若存在 `vercel-build` 脚本会**自动优先执行它**（否则才用 `build`）。据此把「先迁移 → 再构建」的部署语义收敛到一个专用脚本里，而**本地 `pnpm build` 保持纯构建、不连数据库**——本地开发者不会因为跑构建而误改库，两条路径互不干扰。`&&` 短路保证迁移守卫失败即中断、不产出可能与旧表结构不匹配的构建物。
+
+**迁移守卫（`scripts/vercel-migrate.mjs`）**：迁移步不直接调 `db:migrate`，而是过一层守卫——配了连接串（`DIRECT_URL`/`DATABASE_URL`）才跑 `pnpm db:migrate`（迁移失败以非零码退出、中断部署）；未配连接串则打印跳过并 `exit 0`。动机：Vercel 的预览部署或尚未配置密钥的项目读不到连接串，直接 `db:migrate` 会因无法解析/连接而失败、连带整个部署失败。守卫让「未配库的构建照样通过」，同时保留「配了库就必须迁移成功才部署」。
 
 **弃选**：把 `build` 直接改成 `drizzle-kit migrate && next build`——会让本地 `pnpm build` 也强连数据库，破坏本地构建的纯粹性；且 CI/其它消费 `build` 的场景被动触库。
 
@@ -75,6 +77,6 @@
 ## Migration / Rollout
 
 1. Vercel 项目设 `DATABASE_URL`（事务池 6543）、`DIRECT_URL`（直连 5432）、`BETTER_AUTH_URL`（站点根，供 auth 回调）。
-2. 部署触发 `vercel-build` → `pnpm db:migrate`（走 `DIRECT_URL`）应用迁移 → `next build`。
+2. 部署触发 `vercel-build` → 守卫脚本：配了连接串则 `pnpm db:migrate`（走 `DIRECT_URL`）应用迁移，未配则跳过 → `next build`。
 3. 本地：只配 `DATABASE_URL` 即可，`pnpm db:migrate` 建表；`pnpm build` 不触库。
 4. 新增/改连接串后需重新部署以让构建期迁移在新环境生效。
