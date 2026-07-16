@@ -33,7 +33,7 @@
 - [x] 5.1 `lib/billing/usage-meta.ts`：`buildUsageMetadata(model, usage)` 构造 model/input/output/total tokens + cost/price 微元
 - [x] 5.2 `app/api/billing/summary/route.ts`：GET 返回登录用户 `balanceMicros`（顺带 `ensureUserCredits` 兼容 hook 上线前的老用户）+ 可选 `threadId` 过滤的 `usage_records` 聚合（token 总量、费用总量）+ 最近一次调用
 - [x] 5.3 `app/api/billing/reconcile/route.ts`：`CRON_SECRET` 鉴权（`Authorization: Bearer` 或 `x-cron-secret` 头，未配置密钥直接拒绝），调用 `reconcilePendingCosts`；GET/POST 均可触发
-- [x] 5.4 `vercel.json` 新增 cron 配置，`*/15 * * * *` 触发 `/api/billing/reconcile`
+- [x] 5.4 `vercel.json` 新增 cron 配置，每日 `0 3 * * *` 触发 `/api/billing/reconcile`（Hobby 套餐 cron 每天限一次，`*/15` 会致部署被拒；Pro 可改回更频繁）
 
 ## 6. 验收（已实现落地时完成，此处回填记录）
 

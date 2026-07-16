@@ -69,7 +69,7 @@
 
 ### D6：对账幂等 + `CRON_SECRET` 保护 + 15 分钟节奏
 
-**选择**：`reconcilePendingCosts` 只扫描 `cost_source='estimate'` 且 `generation_id` 非空的行；每行处理成功后立即翻成 `'gateway'`，未就绪（网关返回 null）的行保持 `'estimate'` 留给下次重试。触发端点 `app/api/billing/reconcile/route.ts` 要求请求携带匹配 `CRON_SECRET` 的鉴权头，**未配置该环境变量时直接拒绝所有请求**（不存在"裸奔"的默认放行）。`vercel.json` 配置 `*/15 * * * *` 触发。
+**选择**：`reconcilePendingCosts` 只扫描 `cost_source='estimate'` 且 `generation_id` 非空的行；每行处理成功后立即翻成 `'gateway'`，未就绪（网关返回 null）的行保持 `'estimate'` 留给下次重试。触发端点 `app/api/billing/reconcile/route.ts` 要求请求携带匹配 `CRON_SECRET` 的鉴权头，**未配置该环境变量时直接拒绝所有请求**（不存在"裸奔"的默认放行）。`vercel.json` 配置每日 `0 3 * * *` 触发（对账幂等，慢一点只是估算修正延迟到 24h 内；估算本就保守 ≥30% 利润，用户至多被暂时略微多扣、对账时退差）。**排程受 Vercel 套餐约束**：Hobby（免费）套餐 cron 每天只能触发一次，`*/15`（每 15 分钟）会导致部署被拒；升级 Pro 后可改回更频繁的排程。对账端点也保留 `CRON_SECRET`，可由外部调度器按需更频繁地触发。
 
 **理由**：幂等是对账任务的生命线——它会被定时反复调用，任何非幂等逻辑都会导致重复修正、余额被多次扣减或退回。「只认 estimate、成功翻 gateway」这个状态机足够简单，不需要额外的分布式锁或去重表。`CRON_SECRET` 未配置即拒绝（而不是未配置即放行）是故意的保守默认——一个能触发资金变动的端点不应该在忘记配置密钥时对外暴露。15 分钟是网关结算延迟与"额度偏差不宜挂太久"之间的折中，不是精确推导值。
 
