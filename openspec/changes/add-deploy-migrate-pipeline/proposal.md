@@ -10,7 +10,7 @@
 
 ## What Changes
 
-- **新增 `vercel-build` 脚本**：`pnpm db:migrate && next build`。Vercel 会自动优先执行 `vercel-build` 而非 `build`，于是部署链路变成「先应用迁移 → 再构建」，任一步失败即中断部署；本地 `pnpm build` 保持纯构建、不碰数据库。
+- **新增 `vercel-build` 脚本**：`node scripts/vercel-migrate.mjs && next build`。Vercel 会自动优先执行 `vercel-build` 而非 `build`，于是部署链路变成「先应用迁移 → 再构建」；本地 `pnpm build` 保持纯构建、不碰数据库。迁移步经一层守卫脚本：**配了数据库连接串（`DIRECT_URL`/`DATABASE_URL`）才跑迁移，迁移失败即中断部署**；**未配连接串则跳过迁移让构建继续**——避免尚未配置数据库的预览部署在 `db:migrate` 连不上库时整体失败。
 - **确立双连接串职责**：应用运行时用 `DATABASE_URL`（Supabase 事务池 6543，需 `prepare:false`）；迁移用 `DIRECT_URL`（Supabase 直连 5432）。`drizzle.config.ts` 取 `DIRECT_URL || DATABASE_URL`——**`DIRECT_URL` 可选**，未配置则迁移回退 `DATABASE_URL`，满足「小项目单库、只配一个」的场景。
 - **修复 `drizzle-kit` 对自定义 schema 失明**：`drizzle.config.ts` 显式声明 `schemaFilter: [DB_SCHEMA]`（`thread_chat`），使 `db:push` / `db:pull` 正确纳管本项目 schema，而非默认只看 `public`。
 - **确立 `db:migrate` 为建表/上线的权威路径**（而非 `db:push`）：迁移文件（`drizzle/0000_*.sql`）开头自带 `CREATE SCHEMA IF NOT EXISTS "thread_chat"` 与 `CREATE EXTENSION IF NOT EXISTS vector`，直接跑 SQL、不受 `schemaFilter` 影响，可复现。
