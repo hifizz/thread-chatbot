@@ -14,7 +14,6 @@
 - [x] 2.5 `components/landing/feature-grid.tsx`：底座能力卡片（`FEATURES` 驱动，lucide-react name→component 映射）
 - [x] 2.6 `components/landing/closing-cta.tsx`：收尾 CTA
 - [x] 2.7 各 section 仅接 `SectionProps`（className），内容自 `LANDING` 取
-- [x] 2.8 首屏动态背景：`components/landing/grain-gradient-background.tsx`（client 岛，`@paper-design/shaders-react` 的 grain-gradient「Wave」预设，`prefers-reduced-motion` 用 `useSyncExternalStore` 处理）；Hero 改为 `min-h-svh` 满屏 + scrim + 浅色文字，page.tsx 让 Hero 全宽出血。截图验证 WebGL 渲染正常、`/` 仍静态
 
 ## 3. 页面重写与旗舰门禁
 
