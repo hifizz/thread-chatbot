@@ -519,9 +519,14 @@
 }
 .tc .hint .close {
   margin-left: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
   cursor: pointer;
   color: var(--ink-faint);
   flex: none;
+  font: inherit;
+  line-height: inherit;
 }
 .tc .hint svg {
   flex: none;
@@ -978,6 +983,31 @@
 /* 居中 Dialog 面板：进场 keyframe 与退场目标态都要复写整个 transform（保住水平居中的 translateX） */
 .tc .swx.global {
   animation: tc-pop-center 150ms ease;
+}
+.tc .helpx {
+  max-height: min(620px, 82vh);
+}
+.tc .helpx-body {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 12px 16px 14px;
+  color: var(--ink-soft);
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+.tc .helpx-list {
+  margin: 0;
+  padding-left: 18px;
+  list-style: disc;
+}
+.tc .helpx-list li {
+  margin: 5px 0;
+}
+.tc .helpx-list li::marker {
+  color: var(--ink-faint);
+}
+.tc .helpx-list b {
+  color: var(--ink);
 }
 .tc .swx.global[data-ending-style] {
   opacity: 0;
