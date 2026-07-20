@@ -28,7 +28,6 @@ import React, { useCallback, useEffect, useRef, useState } from "react"
 import {
   CircleHelp,
   Columns3,
-  Highlighter,
   ListTodo,
   Network,
   Package,
@@ -82,6 +81,7 @@ import {
 import { TreeList } from "./orchestration/tree-list"
 import { ArtifactDrawer } from "./orchestration/artifact-drawer"
 import { AccountButton } from "./orchestration/account-button"
+import { HelpPanel, UsageHint } from "./orchestration/help-panel"
 // type-only：不把画布模块（React Flow）拖进首屏 bundle
 import type { CanvasChatActions } from "./orchestration/canvas-node"
 import type { CanvasViewState } from "./orchestration/use-canvas-layout"
@@ -332,10 +332,8 @@ export function ThreadChatDemoInner({
     customTitle ?? (mainHasMessage ? deriveTreeTitle(state) : SUBTITLE_FALLBACK)
 
   /* ---------- 其余 UI 状态 ---------- */
-  /* hint 双态：dismissed = 用户 × 关过；manual = 经顶栏「帮助」重开（开聊后也能看）。
-     可见性纯派生：手动打开恒可见；否则仅「未关过 && 还没开始聊」时可见。 */
+  /* 首次内联提示：仅「未关过 && 还没开始聊」时可见；顶栏帮助另走 Dialog。 */
   const [hintDismissed, setHintDismissed] = useState(false)
-  const [hintManual, setHintManual] = useState(false)
   const [sel, setSel] = useState<SelectionInfo | null>(null)
   /** closing = 正在播放退场动画（Dialog 置 open=false / local 面板加 .closing），
       到点（POPUP_EXIT_MS）由下方 effect 真正卸载 */
@@ -349,7 +347,13 @@ export function ThreadChatDemoInner({
     closing?: boolean
   } | null>(null)
   const tlSeq = useRef(0)
-  /** .tc 根元素：两个 Dialog 弹层的 Portal 挂载点（保住 .tc 作用域的选择器与 CSS 变量） */
+  /** Help Dialog：与会话列表/会话树相同的 closing 动画 + 延迟卸载模型。 */
+  const [helpPanel, setHelpPanel] = useState<{
+    n: number
+    closing?: boolean
+  } | null>(null)
+  const helpSeq = useRef(0)
+  /** .tc 根元素：Dialog 弹层的 Portal 挂载点（保住 .tc 作用域的选择器与 CSS 变量） */
   const tcRootRef = useRef<HTMLDivElement | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [activeArt, setActiveArt] = useState<string | null>(null)
@@ -461,6 +465,9 @@ export function ThreadChatDemoInner({
   const closeTreeList = useCallback(() => {
     setTreeList((v) => (v && !v.closing ? { ...v, closing: true } : v))
   }, [])
+  const closeHelpPanel = useCallback(() => {
+    setHelpPanel((v) => (v && !v.closing ? { ...v, closing: true } : v))
+  }, [])
   useEffect(() => {
     if (!switcher?.closing) return
     const t = setTimeout(() => setSwitcher(null), POPUP_EXIT_MS)
@@ -471,6 +478,11 @@ export function ThreadChatDemoInner({
     const t = setTimeout(() => setTreeList(null), POPUP_EXIT_MS)
     return () => clearTimeout(t)
   }, [treeList])
+  useEffect(() => {
+    if (!helpPanel?.closing) return
+    const t = setTimeout(() => setHelpPanel(null), POPUP_EXIT_MS)
+    return () => clearTimeout(t)
+  }, [helpPanel])
 
   const toggleGlobalSwitcher = useCallback(() => {
     setSwitcher((sw) =>
@@ -510,7 +522,7 @@ export function ThreadChatDemoInner({
   }, [])
 
   /* ---------- 快捷键：⌘⇧K 对话列表 / ⌘K 会话树 / Esc 逐层关闭
-       （对话列表弹层在关闭链最外层：列表 → 气泡 → 面板 → 抽屉） ---------- */
+       （帮助弹层在关闭链最外层：帮助 → 列表 → 气泡 → 面板 → 抽屉） ---------- */
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
@@ -522,7 +534,8 @@ export function ThreadChatDemoInner({
       if (e.key === "Escape") {
         // 逐层关闭链的唯一权威：Dialog 内建的 Esc 关闭已在 dialogCloseToShell 里
         // 取消并放行冒泡，事件最终只在这里被消费（closing 中的弹层视同已关闭）
-        if (treeList && !treeList.closing) closeTreeList()
+        if (helpPanel && !helpPanel.closing) closeHelpPanel()
+        else if (treeList && !treeList.closing) closeTreeList()
         else if (sel) setSel(null)
         else if (switcher && !switcher.closing) closeSwitcher()
         else if (drawerOpen) setDrawerOpen(false)
@@ -535,10 +548,12 @@ export function ThreadChatDemoInner({
     switcher,
     drawerOpen,
     treeList,
+    helpPanel,
     toggleGlobalSwitcher,
     toggleTreeList,
     closeSwitcher,
     closeTreeList,
+    closeHelpPanel,
   ])
 
   /** 会话是否忙碌：末条消息是 assistant 且仍在 pending/streaming（派生自 state，version 快照天然驱动） */
@@ -562,41 +577,9 @@ export function ThreadChatDemoInner({
 
   /* ---------- 主线 hint 卡片：仅整棵树还没有任何消息时展示（判 main 即可——
        分支必经主线产生），首条消息一出现即随派生状态消失；× 可提前手动关。 ---------- */
-  const hintVisible = hintManual || (!hintDismissed && !mainHasMessage)
+  const hintVisible = !hintDismissed && !mainHasMessage
   const hintNode = hintVisible ? (
-    <div className="hint">
-      <Highlighter size={15} color="#b07d2e" />
-      <ul>
-        <li>
-          <b>划选 AI 回复里的文字</b>开分支，输入框预填相关问题，改写后回车确认
-        </li>
-        <li>列数随屏宽自适应（2–4 列），列满默认替换来源列（可撤销）</li>
-        <li>
-          按住 <span className="kbd">⌘</span>/Ctrl 划选或点脚注 ={" "}
-          <b>保留本列</b>，新会话开在紧邻右侧
-        </li>
-        <li>拖动列间分割线调宽度，双击恢复均分</li>
-        <li>面包屑可就地回退到上游会话</li>
-        <li>
-          <span className="kbd">⌘K</span> 搜索并打开任意会话
-        </li>
-        <li>
-          点列头 <b>⇄</b> 把该列切换成任意会话，<b>⑂</b> 查看子分支
-        </li>
-        <li>分支里产出的 Artifact 从右侧抽屉弹出</li>
-        <li>顶栏可切换画布视图纵览全树，单击节点就地对话，双击回到列模式</li>
-        <li>对话自动保存，刷新或同链接重开可恢复；「新对话」另起一棵树</li>
-      </ul>
-      <span
-        className="close"
-        onClick={() => {
-          setHintManual(false)
-          setHintDismissed(true)
-        }}
-      >
-        ✕
-      </span>
-    </div>
+    <UsageHint onDismiss={() => setHintDismissed(true)} />
   ) : null
 
   /* ---------- 顶栏数据 ---------- */
@@ -633,11 +616,11 @@ export function ThreadChatDemoInner({
           <span className="mark">Thread Chat</span>
         </div>
         <div className="spacer" />
-        {!hintVisible && (
+        {(viewMode === "canvas" || !hintVisible) && (
           <button
             className="tbtn help"
             title="使用提示"
-            onClick={() => setHintManual(true)}
+            onClick={() => setHelpPanel({ n: ++helpSeq.current })}
           >
             <CircleHelp size={14} />
           </button>
@@ -822,6 +805,15 @@ export function ThreadChatDemoInner({
           container={tcRootRef}
           onPick={pickRow}
           onClose={closeSwitcher}
+        />
+      )}
+
+      {helpPanel && (
+        <HelpPanel
+          key={helpPanel.n}
+          closing={helpPanel.closing}
+          container={tcRootRef}
+          onClose={closeHelpPanel}
         />
       )}
 
