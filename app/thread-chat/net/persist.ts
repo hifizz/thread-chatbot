@@ -10,8 +10,8 @@
  *
  * 为什么需要 sanitizeLoadedState：防抖存盘可能恰好在流式中途落盘，而 AbortController
  * 不跨页面存活——重载后没有任何东西会把 pending/streaming 的 assistant 消息推进到终态，
- * 不收敛就是永远转圈的僵尸气泡。收敛规则与现有交互语义一致：有正文置 done（同停止按钮
- * ——保留已收文本完成）；空占位删除（同重试——用户可重新发问）。
+ * 不收敛就是永远转圈的僵尸气泡。正文或有效 Artifact 均视为可恢复输出；空占位删除，
+ * 同时过滤坏消息引用与无消息归属的孤儿 registry/order 项。
  */
 
 import {
@@ -22,8 +22,10 @@ import {
 } from "@/constants/thread-chat"
 import { isValidTreeId } from "@/lib/chat/tree-id"
 import { fetchWithAuth } from "@/lib/auth/session-recovery"
-import type { Message, Thread, ThreadTreeState } from "../core/types"
+import type { ThreadTreeState } from "../core/types"
 import type { PlacementMode, Slot } from "../orchestration/placement"
+import { withoutTransientGenerationState } from "./transient-state"
+export { sanitizeLoadedState } from "./sanitize-loaded-state"
 
 export { isValidTreeId }
 
@@ -100,7 +102,10 @@ export async function saveTree(
       const res = await fetchWithAuth(`/api/branch-trees/${id}`, {
         method: "PUT",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ state, title }),
+        body: JSON.stringify({
+          state: withoutTransientGenerationState(state),
+          title,
+        }),
       })
       if (!res.ok) throw new Error(`PUT /api/branch-trees ${res.status}`)
     } catch (err) {
@@ -170,33 +175,6 @@ export function deriveTreeTitle(state: ThreadTreeState): string {
   const firstUser = state.threads.main?.messages.find((m) => m.role === "user")
   const text = firstUser?.text.trim()
   return text ? text.slice(0, TREE_TITLE_MAX_LEN) : TREE_TITLE_FALLBACK
-}
-
-/* ---------------- 加载期 sanitize：非终态 assistant 消息收敛 ---------------- */
-
-/** 纯函数：pending/streaming 的 assistant 残留——有正文 → done；空占位 → 删除。无残留时原样返回 */
-export function sanitizeLoadedState(state: ThreadTreeState): ThreadTreeState {
-  let changed = false
-  const threads: Record<string, Thread> = {}
-  for (const [id, t] of Object.entries(state.threads)) {
-    let threadChanged = false
-    const messages: Message[] = []
-    for (const m of t.messages) {
-      if (
-        m.role === "assistant" &&
-        (m.status === "pending" || m.status === "streaming")
-      ) {
-        threadChanged = true
-        if (m.text.trim() !== "") messages.push({ ...m, status: "done" })
-        // 空占位：直接不放入（删除）
-      } else {
-        messages.push(m)
-      }
-    }
-    threads[id] = threadChanged ? { ...t, messages } : t
-    changed ||= threadChanged
-  }
-  return changed ? { ...state, threads } : state
 }
 
 /* ---------------- 每棵树的工作台状态（localStorage，按 treeId 分键） ---------------- */

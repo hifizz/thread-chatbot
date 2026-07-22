@@ -28,9 +28,9 @@ import React, { useCallback, useEffect, useRef, useState } from "react"
 import {
   CircleHelp,
   Columns3,
+  FileText,
   ListTodo,
   Network,
-  Package,
   Waypoints,
 } from "lucide-react"
 import "./thread-chat.css"
@@ -42,11 +42,15 @@ import {
 import { emptySeedState } from "./core/seed"
 import { createThreadStore, defaultBranchTitle } from "./core/store"
 import { useThreadStore } from "./core/use-thread-store"
-import { threadTitle, type TreeRow } from "./core/selectors"
+import {
+  hasRenderableAssistantOutput,
+  threadTitle,
+  type TreeRow,
+} from "./core/selectors"
 import type { Message, ThreadTreeState } from "./core/types"
 import { requestBranchTitle } from "./net/branch-title"
 import { createChatController } from "./net/chat-controller"
-import { kickoffQuestion } from "./net/prompt"
+import { kickoffQuestion, serializeMessageForModel } from "./net/prompt"
 import {
   deriveTreeTitle,
   loadTree,
@@ -238,7 +242,9 @@ export function ThreadChatDemoInner({
       const q = t.messages.find((m) => m.role === "user")
       const a = t.messages.find(
         (m) =>
-          m.role === "assistant" && m.status === "done" && m.text.trim() !== ""
+          m.role === "assistant" &&
+          m.status === "done" &&
+          hasRenderableAssistantOutput(s, m)
       )
       if (!q || !a) continue
       titleReqRef.current.add(t.id)
@@ -246,7 +252,7 @@ export function ThreadChatDemoInner({
       void requestBranchTitle({
         anchorText: t.anchorText,
         question: q.text,
-        answer: a.text,
+        answer: serializeMessageForModel(s, a) ?? a.text,
       })
         .then((title) => {
           if (title) store.setThreadTitle(threadId, title)
@@ -357,6 +363,13 @@ export function ThreadChatDemoInner({
   const tcRootRef = useRef<HTMLDivElement | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [activeArt, setActiveArt] = useState<string | null>(null)
+  const openArtifact = useCallback(
+    (artifactId: string) => {
+      setActiveArt(artifactId)
+      setDrawerOpen(true)
+    },
+    [setActiveArt, setDrawerOpen]
+  )
   const [toast, setToast] = useState<ToastState | null>(null)
   const toastSeq = useRef(0)
 
@@ -467,7 +480,7 @@ export function ThreadChatDemoInner({
   }, [])
   const closeHelpPanel = useCallback(() => {
     setHelpPanel((v) => (v && !v.closing ? { ...v, closing: true } : v))
-  }, [])
+  }, [setHelpPanel])
   useEffect(() => {
     if (!switcher?.closing) return
     const t = setTimeout(() => setSwitcher(null), POPUP_EXIT_MS)
@@ -584,6 +597,10 @@ export function ThreadChatDemoInner({
 
   /* ---------- 顶栏数据 ---------- */
   const branchCount = Object.keys(state.threads).length - 1
+  const markdownCount = state.artifactOrder.reduce(
+    (count, id) => count + (state.artifacts[id]?.kind === "markdown" ? 1 : 0),
+    0
+  )
 
   return (
     <div className="tc" ref={tcRootRef}>
@@ -693,13 +710,12 @@ export function ThreadChatDemoInner({
         </button>
         <button
           className="tbtn"
-          title="打开 / 收起 Artifact 抽屉"
+          title="打开 / 收起 Markdown 面板"
           onClick={() => setDrawerOpen((v) => !v)}
         >
-          {/* Package：贴合「产出物」语义，与抽屉头部图标一致 */}
-          <Package size={13} />
-          Artifact
-          <span className="cnt">{state.artifactOrder.length}</span>
+          <FileText size={13} />
+          Markdown
+          <span className="cnt">{markdownCount}</span>
         </button>
         <AccountButton />
       </div>
@@ -723,10 +739,7 @@ export function ThreadChatDemoInner({
               onOpenThread={(target, opts) =>
                 openBranchUI(target, threadId, opts)
               }
-              onOpenArtifact={(aid) => {
-                setActiveArt(aid)
-                setDrawerOpen(true)
-              }}
+              onOpenArtifact={openArtifact}
               onCrumbNav={(target) =>
                 cols.navColumn(vpIndex, target, "collapse")
               }
@@ -749,6 +762,7 @@ export function ThreadChatDemoInner({
           chat={canvasChat}
           focusNode={focusNode}
           onOpenThread={(id) => openBranchUI(id, null)}
+          onOpenArtifact={openArtifact}
         />
       )}
 

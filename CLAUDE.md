@@ -51,6 +51,7 @@ This project uses assistant-ui for chat interfaces.
 Documentation: https://www.assistant-ui.com/llms-full.txt (thin/incomplete on tool-UI and version-compat details — when in doubt, read the real signatures in `node_modules/@assistant-ui/*/dist/*.d.ts` or the shipped `.ts` sources under `node_modules/@assistant-ui/core/src/`, which are more reliable than the docs for this fast-moving pre-1.0 package).
 
 Key patterns:
+
 - Use AssistantRuntimeProvider at the app root
 - Thread component for full chat interface
 - AssistantModal for floating chat widget
@@ -63,12 +64,13 @@ Key patterns:
 MiniMax emits chain-of-thought as literal `<think>...</think>` text rather than a dedicated reasoning stream part. The model is wrapped with `wrapLanguageModel` + `extractReasoningMiddleware({ tagName: "think" })` so it renders as a collapsible reasoning block instead of raw text in the message.
 
 Three tools are wired end-to-end as a reference for adding more:
+
 - `getWeather` and `compareTable` — **backend** tools (mock data; `compareTable` uses `display: "standalone"` for its generative-UI table), defined server-side only in `route.ts`.
 - `writeNote` — a **frontend** tool that actually executes in the browser (saves to `localStorage`), defined client-side and forwarded to the model via `@assistant-ui/react-ai-sdk`'s `frontendTools()`.
 
 Each tool's custom UI is registered with the `useAssistantTool({ toolName, type, render, ... })` hook from `@assistant-ui/react`, in `components/assistant-ui/{weather,notepad,compare-table}-tool.tsx`. These are null-returning components mounted via `<AssistantTools />` (`components/assistant-ui/tools.tsx`) inside `AssistantRuntimeProvider` in `app/page.tsx`. `useAssistantTool` is marked `@deprecated` in favor of `defineToolkit`/`Tools({ toolkit })` + `useAui({ tools })`, but that path assumes assistant-ui's "use generative" compiler, which isn't set up in this project — keep using `useAssistantTool` for new tools unless that changes.
 
-`/api/chat` also has a **threadChat mode** for the branch-chat page (`app/thread-chat/`): the client sends `threadChat: { anchorText }` in the body (AI SDK v7's `streamText` rejects system-role messages from the client, so system prompts are server-owned), and the route builds a plain-text system prompt via `buildThreadChatSystem()` (`lib/chat/thread-chat-prompt.ts`, templates in `constants/thread-chat.ts`). In this mode the backend tools (`getWeather`/`compareTable`) are **not** attached. Additionally, `toUIMessageStreamResponse({ onError })` logs in-stream errors server-side (`[chat] 流内错误:`) for all modes while still masking them to the client.
+`/api/chat` also has a **threadChat mode** for the branch-chat page (`app/thread-chat/`): the client sends `threadChat: { anchorText }` in the body (AI SDK v7's `streamText` rejects system-role messages from the client, so system prompts are server-owned), and the route builds a plain-text system prompt via `buildThreadChatSystem()` (`lib/chat/thread-chat-prompt.ts`, templates in `constants/thread-chat.ts`). In this mode `getWeather`/`compareTable` are excluded and the only backend tool is `createMarkdownArtifact`. Its bilingual semantic description plus a conservative bilingual first-step intent check route requests to create/deliver a Markdown document; concept questions such as “Markdown 是什么？” remain ordinary text answers. `tool-input-start` creates a non-clickable inline progress card immediately; matching `tool-input-delta` chunks are accumulated by call id and parsed with AI SDK `parsePartialJson` to show partial title, real character/line counts, and recent headings. The validated `tool-input-available` event atomically replaces that transient progress with the persisted Markdown Artifact, rendered in the shared drawer through `MarkdownBody`. Never persist `Message.markdownGeneration` or partial tool input: `saveTree` strips the transient field, while the next prompt reconstructs model context only from completed message-owned Artifact title/content. `hasToolCall(createMarkdownArtifact)` terminates the model loop after the tool step so no redundant recap is generated. Additionally, `toUIMessageStreamResponse({ onError })` logs in-stream errors server-side (`[chat] 流内错误:`) for all modes while still masking them to the client.
 
 ## Database & thread persistence
 

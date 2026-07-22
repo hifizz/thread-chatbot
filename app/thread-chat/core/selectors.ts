@@ -3,7 +3,29 @@
  * 全部只读，不修改 state；配合外部 store 的「version 快照」模型使用。
  */
 
-import type { Message, Thread, ThreadTreeState } from "./types"
+import type { Artifact, Message, Thread, ThreadTreeState } from "./types"
+
+/** 消息引用且当前 registry 中真实存在的 Artifact（坏引用静默过滤）。 */
+export function validArtifactsOfMessage(
+  state: ThreadTreeState,
+  message: Message
+): Artifact[] {
+  return (message.artifactIds ?? []).flatMap((id) => {
+    const artifact = state.artifacts[id]
+    return artifact ? [artifact] : []
+  })
+}
+
+/** assistant 的有效输出 = 非空正文或至少一个有效 Artifact。 */
+export function hasRenderableAssistantOutput(
+  state: ThreadTreeState,
+  message: Message
+): boolean {
+  return (
+    message.text.trim() !== "" ||
+    validArtifactsOfMessage(state, message).length > 0
+  )
+}
 
 /** 会话标题（找不到时回退为 id，供 toast 等文案使用） */
 export function threadTitle(state: ThreadTreeState, id: string): string {

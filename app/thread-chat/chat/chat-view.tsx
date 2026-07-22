@@ -105,43 +105,61 @@ export function ChatView({
     ta.setSelectionRange(ta.value.length, ta.value.length)
   }, [threadId, composerPrefill])
 
-  const renderMessage = (msg: Message) => (
-    <div key={msg.id} className={`message ${msg.role}`} data-msg-id={msg.id}>
-      <div className="who">{msg.role === "user" ? "你" : "AI"}</div>
-      {msg.role === "user" ? (
-        <div className="bubble" data-role="user">
-          {msg.quote && <div className="msg-quote">{msg.quote.text}</div>}
-          {msg.text}
-        </div>
-      ) : (
-        <>
-          <div className="bubble" data-role="assistant">
-            {msg.status === "pending" && !msg.text ? (
-              <span className="typing">
-                <i />
-                <i />
-                <i />
-              </span>
-            ) : (
-              <>
-                {(renderAssistantBody ?? defaultAssistantBody)(msg)}
-                {msg.status === "streaming" && <span className="caret" />}
-              </>
-            )}
+  const renderMessage = (msg: Message) => {
+    const hasVisibleText = msg.text.trim().length > 0
+    const isWaitingForVisibleOutput =
+      msg.role === "assistant" &&
+      (msg.status === "pending" || msg.status === "streaming") &&
+      !hasVisibleText &&
+      !msg.artifactIds?.length &&
+      !msg.markdownGeneration
+
+    return (
+      <div key={msg.id} className={`message ${msg.role}`} data-msg-id={msg.id}>
+        <div className="who">{msg.role === "user" ? "你" : "AI"}</div>
+        {msg.role === "user" ? (
+          <div className="bubble" data-role="user">
+            {msg.quote && <div className="msg-quote">{msg.quote.text}</div>}
+            {msg.text}
           </div>
-          {msg.status === "error" && (
-            <div className="msg-error">
-              {msg.error ?? "生成失败"}
-              <button className="retry" onClick={() => onRetry?.(msg)}>
-                重试
-              </button>
-            </div>
-          )}
-          {renderAfterMessage?.(msg)}
-        </>
-      )}
-    </div>
-  )
+        ) : (
+          <>
+            {(hasVisibleText || isWaitingForVisibleOutput) && (
+              <div className="bubble" data-role="assistant">
+                {isWaitingForVisibleOutput ? (
+                  <span
+                    className="typing"
+                    role="status"
+                    aria-label="正在生成回复"
+                  >
+                    <i />
+                    <i />
+                    <i />
+                  </span>
+                ) : (
+                  <>
+                    {(renderAssistantBody ?? defaultAssistantBody)(msg)}
+                    {msg.status === "streaming" && hasVisibleText && (
+                      <span className="caret" />
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+            {msg.status === "error" && (
+              <div className="msg-error">
+                {msg.error ?? "生成失败"}
+                <button className="retry" onClick={() => onRetry?.(msg)}>
+                  重试
+                </button>
+              </div>
+            )}
+            {renderAfterMessage?.(msg)}
+          </>
+        )}
+      </div>
+    )
+  }
 
   return (
     <>

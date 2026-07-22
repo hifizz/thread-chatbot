@@ -30,6 +30,10 @@ import React, {
 import { Handle, Position, type Node, type NodeProps } from "@xyflow/react"
 import type { Message, ThreadTreeState } from "../core/types"
 import { AnchoredMarkdown } from "../branching/branchable-chat"
+import {
+  MarkdownArtifactCard,
+  MarkdownArtifactProgressCard,
+} from "./markdown-artifact-card"
 
 /** 会话动作（send/abort/retry）：壳层用 chat-controller 组装后传给画布（D3，零平行实现） */
 export interface CanvasChatActions {
@@ -45,6 +49,8 @@ export interface CanvasChatActions {
 export interface CanvasActions extends CanvasChatActions {
   /** 面板内点锚点高亮 / 脚注 = 在画布内聚焦对应分支节点（选中 + setCenter，不回列） */
   focusThread: (threadId: string) => void
+  /** 在全局 Markdown 面板中打开消息流里的交付物。 */
+  openArtifact: (artifactId: string) => void
   /** 读当前树快照（store 原地可变；面板随 version 重渲，渲染时读到即最新） */
   getState: () => ThreadTreeState
 }
@@ -164,60 +170,100 @@ function CanvasExpand({
             el.scrollHeight - el.scrollTop - el.clientHeight < STICK_THRESHOLD
         }}
       >
-        {data.messages.map((msg) => (
-          <div
-            key={msg.id}
-            className={`message ${msg.role}`}
-            data-msg-id={msg.id}
-          >
-            {msg.role === "user" ? (
-              <div className="bubble" data-role="user">
-                {msg.quote && <div className="msg-quote">{msg.quote.text}</div>}
-                {msg.text}
-              </div>
-            ) : (
-              <>
-                <div className="bubble" data-role="assistant">
-                  {msg.status === "pending" && !msg.text ? (
-                    <span
-                      className="typing"
-                      role="status"
-                      aria-label="正在生成回复"
-                    >
-                      <i />
-                      <i />
-                      <i />
-                    </span>
-                  ) : (
-                    <>
-                      {/* 与列模式同一渲染件（D2）：Markdown 富文本 + SmoothText 平滑
-                          + 锚点高亮/脚注手绘；点高亮 = 画布内聚焦该分支节点 */}
-                      {state && actions && (
-                        <AnchoredMarkdown
-                          state={state}
-                          msg={msg}
-                          onOpenThread={(id) => actions.focusThread(id)}
-                        />
-                      )}
-                      {msg.status === "streaming" && <span className="caret" />}
-                    </>
+        {data.messages.map((msg) => {
+          const hasVisibleText = msg.text.trim().length > 0
+          const isWaitingForVisibleOutput =
+            msg.role === "assistant" &&
+            (msg.status === "pending" || msg.status === "streaming") &&
+            !hasVisibleText &&
+            !msg.artifactIds?.length &&
+            !msg.markdownGeneration
+          return (
+            <div
+              key={msg.id}
+              className={`message ${msg.role}`}
+              data-msg-id={msg.id}
+            >
+              {msg.role === "user" ? (
+                <div className="bubble" data-role="user">
+                  {msg.quote && (
+                    <div className="msg-quote">{msg.quote.text}</div>
                   )}
+                  {msg.text}
                 </div>
-                {msg.status === "error" && (
-                  <div className="msg-error">
-                    {msg.error ?? "生成失败"}
-                    <button
-                      className="retry"
-                      onClick={() => actions?.retry(threadId, msg.id)}
-                    >
-                      重试
-                    </button>
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        ))}
+              ) : (
+                <>
+                  {(hasVisibleText || isWaitingForVisibleOutput) && (
+                    <div className="bubble" data-role="assistant">
+                      {isWaitingForVisibleOutput ? (
+                        <span
+                          className="typing"
+                          role="status"
+                          aria-label="正在生成回复"
+                        >
+                          <i />
+                          <i />
+                          <i />
+                        </span>
+                      ) : (
+                        <>
+                          {/* 与列模式同一渲染件（D2）：Markdown 富文本 + SmoothText 平滑
+                            + 锚点高亮/脚注手绘；点高亮 = 画布内聚焦该分支节点 */}
+                          {state && actions && (
+                            <AnchoredMarkdown
+                              state={state}
+                              msg={msg}
+                              onOpenThread={(id) => actions.focusThread(id)}
+                            />
+                          )}
+                          {msg.status === "streaming" && hasVisibleText && (
+                            <span className="caret" />
+                          )}
+                        </>
+                      )}
+                    </div>
+                  )}
+                  {msg.status === "error" && (
+                    <div className="msg-error">
+                      {msg.error ?? "生成失败"}
+                      <button
+                        className="retry"
+                        onClick={() => actions?.retry(threadId, msg.id)}
+                      >
+                        重试
+                      </button>
+                    </div>
+                  )}
+                  {msg.markdownGeneration && (
+                    <MarkdownArtifactProgressCard
+                      progress={msg.markdownGeneration}
+                      sourceDepth={data.depth}
+                      compact
+                    />
+                  )}
+                  {state &&
+                    actions &&
+                    msg.artifactIds?.map((artifactId) => {
+                      const artifact = state.artifacts[artifactId]
+                      if (!artifact) return null
+                      return (
+                        <MarkdownArtifactCard
+                          key={artifactId}
+                          artifact={artifact}
+                          sourceDepth={
+                            state.threads[artifact.sourceThreadId]?.depth ??
+                            null
+                          }
+                          onOpen={actions.openArtifact}
+                          compact
+                        />
+                      )
+                    })}
+                </>
+              )}
+            </div>
+          )
+        })}
       </div>
       <div className="cv-composer">
         <textarea
@@ -286,7 +332,7 @@ export const CanvasCard = memo(function CanvasCard({
         {data.artifactCount > 0 && (
           <span className="am">
             <span className="dot" style={{ background: data.dot }} />
-            {data.artifactCount} Artifact
+            {data.artifactCount} Markdown
           </span>
         )}
       </div>

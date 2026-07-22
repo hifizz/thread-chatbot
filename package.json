@@ -14,6 +14,7 @@
     "typecheck": "tsc --noEmit",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
+    "db:reset-schema": "node scripts/reset-thread-chat-schema.mjs",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "openspec:validate": "openspec validate --all --strict"

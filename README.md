@@ -17,7 +17,7 @@ This will place the ui components in the `components` directory.
 To use the components in your app, import them as follows:
 
 ```tsx
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui/button"
 ```
 
 ## 用户系统与按 token 计费
@@ -32,6 +32,14 @@ import { Button } from "@/components/ui/button";
    - 任一可用模型的凭据（`MINIMAX_API_KEY` 直连，或 `DEEPSEEK_API_KEY`/`OPENAI_API_KEY` 经网关）。
 2. `pnpm db:migrate`（在独立 schema `thread_chat` 下建全部表）。
 3. `pnpm dev`，访问首页 `/` 是公开落地页；点击「开始聊天」进入旗舰 `/thread-chat` 时，若未登录才会被重定向到 `/sign-in`（登录后回到旗舰）。
+
+### ThreadChat Markdown 交付物
+
+`/thread-chat` 是独立的树形分支对话界面。用户用中文、英文或等价表达要求“生成、输出、整理成 Markdown/.md 文档”时，服务端会调用 `createMarkdownArtifact`；完成后的 Markdown 卡片直接插入产生它的 assistant 消息，点击后在右侧 Markdown 面板通过现有 GFM renderer 预览。仅询问“Markdown 是什么/语法怎么用”不会创建交付物。
+
+Markdown 与消息关联、来源 thread 和 tab 顺序均保存在 `branch_trees.state` 的整树 JSON 中，不需要额外数据库迁移；刷新恢复、重试替换、Canvas 节点内打开和后续“修改刚才的 Markdown”均复用同一份 Artifact 数据。
+
+生成长文时，客户端从 AI SDK 的 `tool-input-start` 起就在最终位置显示不可点击的 Markdown 进度卡，并在 `tool-input-delta` 阶段展示局部标题、真实字符数/行数和最近章节；完整输入到达后原子替换为可点击卡片。该进度是当前页面临时态，不写入整树 JSON。Markdown 工具完成即结束本轮模型 loop，不再追加重复的“已生成/文档包含”说明。
 
 ### 数据库 / Supabase（独立 schema + 连接池）
 
@@ -72,6 +80,7 @@ import { Button } from "@/components/ui/button";
 - 输入框右下角实时显示「本次 token / 累计 token / 余额」，数据来自 `/api/billing/summary`。
 
 **健壮性（并发 / 幂等 / 断连）**：
+
 - 所有「余额变动 + 流水」用数据库事务包成原子（`chargeUsage` / 充值到账 / 退款 / 对账修正），不会扣了钱没记账或反之。
 - `after(result.consumeStream())`：即使客户端中途断连，服务端也会消费完整条流、触发 `onFinish` 计费，避免「已产生供应商成本却漏计费」。
 - `MAX_OUTPUT_TOKENS` 封顶单请求输出，收敛「后付费并发竞态」下的最大超支敞口，并防异常长输出打爆供应商账单。

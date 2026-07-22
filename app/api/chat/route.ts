@@ -1,8 +1,10 @@
 import {
   convertToModelMessages,
+  hasToolCall,
   isStepCount,
   streamText,
   tool,
+  type ToolSet,
   type UIMessage,
 } from "ai"
 import { after } from "next/server"
@@ -26,6 +28,13 @@ import {
 import { resolveChatModel, isModelConfigured } from "@/lib/ai/provider"
 import { hasPositiveBalance, chargeUsage } from "@/lib/billing/credits"
 import { buildUsageMetadata } from "@/lib/billing/usage-meta"
+import {
+  isExplicitMarkdownDeliverableRequest,
+  MARKDOWN_ARTIFACT_TOOL_DESCRIPTION,
+  MARKDOWN_ARTIFACT_TOOL_NAME,
+  markdownArtifactInputSchema,
+  type MarkdownArtifactToolResult,
+} from "@/lib/chat/markdown-artifact"
 
 // 深度研究可能多步循环，耗时较长，放宽单次请求时长上限
 export const maxDuration = 120
@@ -76,6 +85,24 @@ const compareTable = tool({
   execute: async (input) => input,
 })
 
+const createMarkdownArtifact = tool({
+  description: MARKDOWN_ARTIFACT_TOOL_DESCRIPTION,
+  inputSchema: markdownArtifactInputSchema,
+  execute: async (): Promise<MarkdownArtifactToolResult> => ({ created: true }),
+})
+
+/** 只看最后一条 user 消息的文本 part，供高置信首步强制路由。 */
+function latestUserText(messages: UIMessage[]): string {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const message = messages[i]
+    if (message.role !== "user") continue
+    return message.parts
+      .flatMap((part) => (part.type === "text" ? [part.text] : []))
+      .join("\n")
+  }
+  return ""
+}
+
 export async function POST(req: Request) {
   // 1) 鉴权：未登录直接拒绝
   const userId = await getCurrentUserId()
@@ -125,10 +152,15 @@ export async function POST(req: Request) {
   const searchReady = isSearchConfigured()
   // thread-chat 模式：结构化风格 system + 不挂后端工具（研究模式优先级更高）
   const isThreadChat = !research && threadChat != null
+  const forceMarkdownArtifact =
+    isThreadChat &&
+    isExplicitMarkdownDeliverableRequest(latestUserText(messages))
 
-  const allTools = {
-    // thread-chat 模式不挂后端工具：该页面是分支讲解对话，直接不给工具比在 prompt 里劝阻更可靠
-    ...(isThreadChat ? {} : { getWeather, compareTable }),
+  const allTools: ToolSet = {
+    // ThreadChat 只挂 Markdown 交付工具；线性聊天继续使用原有演示工具。
+    ...(isThreadChat
+      ? { [MARKDOWN_ARTIFACT_TOOL_NAME]: createMarkdownArtifact }
+      : { getWeather, compareTable }),
     ...(research && searchReady ? researchTools : {}),
     ...frontendTools(tools ?? {}),
   }
@@ -151,10 +183,29 @@ export async function POST(req: Request) {
       tools: allTools,
     }),
     tools: allTools,
+    // 高置信 Markdown 交付请求只强制第 0 步；若第 0 步调用工具，后续步骤禁用它，
+    // 防止多步循环重复创建。其余 ThreadChat 请求由双语 description 自动判定。
+    prepareStep: isThreadChat
+      ? ({ stepNumber }) =>
+          stepNumber === 0
+            ? forceMarkdownArtifact
+              ? {
+                  activeTools: [MARKDOWN_ARTIFACT_TOOL_NAME],
+                  toolChoice: {
+                    type: "tool",
+                    toolName: MARKDOWN_ARTIFACT_TOOL_NAME,
+                  },
+                }
+              : { activeTools: [MARKDOWN_ARTIFACT_TOOL_NAME] }
+            : { activeTools: [] }
+      : undefined,
     // 单请求输出封顶：收敛并发竞态下的最大超支敞口，并防异常长输出打爆供应商账单
     maxOutputTokens: MAX_OUTPUT_TOKENS,
-    // 研究模式允许更多工具轮次；普通对话维持原来的小步数
-    stopWhen: isStepCount(research && searchReady ? RESEARCH_MAX_STEPS : 5),
+    // Markdown Artifact 本身就是本轮最终交付：工具调用完成后停止，不再启动第二轮
+    // 模型去复述“已生成/包含哪些章节”。其它模式继续沿用既有步数上限。
+    stopWhen: isThreadChat
+      ? [hasToolCall(MARKDOWN_ARTIFACT_TOOL_NAME), isStepCount(5)]
+      : isStepCount(research && searchReady ? RESEARCH_MAX_STEPS : 5),
     // 4) 生成结束后按 token 用量即时扣费并写入流水（价目表估算，利润率 ≥30%）。
     //    若经 Vercel 网关，采集 generationId，稍后由 /api/billing/reconcile 拉真实成本对账。
     onFinish: async ({ usage, providerMetadata }) => {

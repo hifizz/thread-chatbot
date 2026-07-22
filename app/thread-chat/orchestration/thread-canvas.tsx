@@ -70,6 +70,8 @@ export interface ThreadCanvasProps {
   viewState: CanvasViewState
   /** 统一意图：双击节点 = 回列模式打开该会话（壳层 openBranchUI） */
   onOpenThread: (threadId: string) => void
+  /** 打开全局 Markdown 面板并选中对应交付物。 */
+  onOpenArtifact: (artifactId: string) => void
   /** 会话动作（send/abort/retry）：壳层用 chat-controller 组装（D3，同一发送链路） */
   chat: CanvasChatActions
   /** 画布内 fork 的视口跟随指令：壳层每次 fork 置 {id, n}（n 递增去重），
@@ -82,6 +84,7 @@ function CanvasFlow({
   mainSubtitle,
   viewState,
   onOpenThread,
+  onOpenArtifact,
   chat,
   focusNode,
 }: ThreadCanvasProps) {
@@ -125,8 +128,13 @@ function CanvasFlow({
   /* 节点面板的动作面（D3）：chat 三件套直达壳层 chat-controller；
      getState 供面板渲染读树快照（锚点 title 文案等） */
   const actions = useMemo<CanvasActions>(
-    () => ({ ...chat, focusThread, getState: store.getState }),
-    [chat, focusThread, store]
+    () => ({
+      ...chat,
+      focusThread,
+      openArtifact: onOpenArtifact,
+      getState: store.getState,
+    }),
+    [chat, focusThread, onOpenArtifact, store]
   )
 
   /* 画布内 fork：新节点入树后聚焦（ref 去重——effect 依赖含 nodes，每个 version

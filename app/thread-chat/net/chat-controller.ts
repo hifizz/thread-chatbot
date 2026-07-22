@@ -15,18 +15,18 @@
  *  - error chunk 的容错语义：实测 /api/chat 的流中会夹杂零星「瞬时」error chunk
  *    （疑似 MiniMax 个别 chunk 经 @ai-sdk/openai-compatible 解析失败，被
  *    toUIMessageStreamResponse 掩码为 "An error occurred." 后发出），之后正文
- *    text-delta 继续到达并正常 finish。因此 onError 不立即判死：只记录 lastError
+ *    text-delta / Markdown Artifact 继续到达并正常 finish。因此 onError 不立即判死：只记录 lastError
  *    （后到覆盖先到）并继续收流；终态统一裁决——收到过任何正文即按成功 finish
- *    （瞬时 error 忽略并 console.warn 留痕），零正文且有 error 用 lastError fail，
- *    零正文且无 error 也 fail（「未收到任何回复」：空回复应可重试而非静默完成）。
- *  - 中止（停止按钮 / 卸载 / retry 顶替）：已有正文 → 保留文本 finish；
- *    零正文 → fail（「已停止生成」，可重试），不留空的 done 气泡。网络失败照旧 fail。
+ *    （瞬时 error 忽略并 console.warn 留痕），正文/Artifact 都没有且有 error 用 lastError
+ *    fail，两者都没有且无 error 也 fail。中止同理：已有可渲染输出就保留并 finish。
  */
 
 import type { ThreadStore } from "../core/store"
 import { buildRequestBody } from "./prompt"
 import { consumeUIMessageStream, type UIStreamHandlers } from "./ui-stream"
 import { handleUnauthorized } from "@/lib/auth/session-recovery"
+import type { ArtifactSeed } from "../core/types"
+import { hasAssistantOutput } from "./assistant-output"
 
 /** 页面不可见 / 无 requestAnimationFrame 时的降级刷新间隔（毫秒） */
 const FALLBACK_FLUSH_MS = 50
@@ -66,18 +66,28 @@ export function createChatController(store: ThreadStore) {
 
     // ---- 合帧缓冲 ----
     let pending = ""
+    let pendingMarkdownProgress:
+      Parameters<ThreadStore["setMarkdownGenerationProgress"]>[2] | null = null
     let frame: number | null = null
     let usingRAF = false
 
     const doFlush = () => {
-      if (!pending) return
+      if (!pending && !pendingMarkdownProgress) return
       if (!isOwner()) {
         pending = "" // 已被新流顶替：丢弃残余，不写旧消息
+        pendingMarkdownProgress = null
         return
       }
-      const delta = pending
-      pending = ""
-      store.appendAssistantDelta(threadId, msgId, delta)
+      if (pending) {
+        const delta = pending
+        pending = ""
+        store.appendAssistantDelta(threadId, msgId, delta)
+      }
+      if (pendingMarkdownProgress) {
+        const progress = pendingMarkdownProgress
+        pendingMarkdownProgress = null
+        store.setMarkdownGenerationProgress(threadId, msgId, progress)
+      }
     }
     const onFrame = () => {
       frame = null
@@ -118,11 +128,18 @@ export function createChatController(store: ThreadStore) {
     let lastError: string | null = null
     /** 本次流累计收到的正文字符数（含尚在 pending 缓冲里的） */
     let receivedChars = 0
+    /** 已成功原子绑定到目标消息的 Artifact 数 */
+    let attachedArtifactCount = 0
+    const hasOutput = () =>
+      hasAssistantOutput({
+        receivedTextChars: receivedChars,
+        attachedArtifactCount,
+      })
 
     /** 流「正常走完」时的终态裁决：有正文即成功；零正文一律 fail（可重试） */
     const settleByOutcome = () => {
       settle(() => {
-        if (receivedChars > 0) {
+        if (hasOutput()) {
           if (lastError !== null)
             console.warn(
               "[thread-chat] 流中出现瞬时 error chunk（已忽略）:",
@@ -141,7 +158,7 @@ export function createChatController(store: ThreadStore) {
     /** 中止时的终态裁决：已有正文保留文本 finish；零正文 fail（可重试） */
     const settleByAbort = () => {
       settle(() => {
-        if (receivedChars > 0) store.finishAssistantMessage(threadId, msgId)
+        if (hasOutput()) store.finishAssistantMessage(threadId, msgId)
         else store.failAssistantMessage(threadId, msgId, ABORTED_ERROR)
       })
     }
@@ -149,9 +166,30 @@ export function createChatController(store: ThreadStore) {
     const handlers: UIStreamHandlers = {
       onTextDelta(delta) {
         if (settled) return
-        receivedChars += delta.length
+        receivedChars += delta.replace(/\s/g, "").length
         pending += delta
         schedule()
+      },
+      onMarkdownArtifactProgress(event) {
+        if (settled || !isOwner()) return
+        if (event.phase === "starting") {
+          pendingMarkdownProgress = null
+          store.setMarkdownGenerationProgress(threadId, msgId, event)
+          return
+        }
+        pendingMarkdownProgress = event
+        schedule()
+      },
+      onMarkdownArtifact(event) {
+        if (settled || !isOwner()) return
+        pendingMarkdownProgress = null
+        const seed: ArtifactSeed = {
+          kind: "markdown",
+          title: event.input.title,
+          content: event.input.content,
+        }
+        if (store.attachArtifactToMessage(threadId, msgId, seed) !== null)
+          attachedArtifactCount++
       },
       onError(message) {
         if (settled) return

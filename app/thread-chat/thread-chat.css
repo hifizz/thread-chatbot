@@ -671,6 +671,73 @@
 .tc .acard:hover .go {
   color: var(--fc, #8a8377);
 }
+.tc .acard-progress {
+  cursor: default;
+  border-style: dashed;
+  background: color-mix(in srgb, var(--fc, #8a8377) 4%, #fff);
+  overflow: hidden;
+}
+.tc .acard-progress:hover {
+  border-color: var(--rule-strong);
+  box-shadow: none;
+}
+.tc .acard-progress:hover .go {
+  color: var(--ink-faint);
+}
+.tc .acard-progress .progress-spinner {
+  display: flex;
+  animation: tc-progress-spin 1s linear infinite;
+}
+.tc .acard-progress .progress-heading {
+  margin-top: 3px;
+  color: var(--ink-soft);
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tc .acard-progress .progress-track {
+  position: relative;
+  display: block;
+  height: 3px;
+  margin-top: 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--fc, #8a8377) 10%, var(--paper-2));
+}
+.tc .acard-progress .progress-track span {
+  position: absolute;
+  inset-block: 0;
+  width: 38%;
+  border-radius: inherit;
+  background: var(--fc, var(--d1));
+  animation: tc-progress-slide 1.35s ease-in-out infinite;
+}
+@keyframes tc-progress-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes tc-progress-slide {
+  from {
+    transform: translateX(-110%);
+  }
+  to {
+    transform: translateX(285%);
+  }
+}
+.tc .acard.compact {
+  gap: 8px;
+  margin-top: 7px;
+  padding: 8px 9px;
+}
+.tc .acard.compact .ic {
+  width: 26px;
+  height: 26px;
+}
+.tc .acard.compact .go {
+  display: none;
+}
 
 /* ---------------- 输入框 ---------------- */
 .tc .composer {
@@ -1310,6 +1377,10 @@
 .tc .art-note p {
   margin: 0 0 13px;
   white-space: pre-wrap;
+}
+.tc .art-body .md-body {
+  font-size: 14.5px;
+  line-height: 1.75;
 }
 .tc .art-src {
   flex: none;

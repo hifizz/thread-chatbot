@@ -22,15 +22,17 @@
 
 import { INHERITED_CHAR_BUDGET } from "@/constants/thread-chat"
 import { collectInherited } from "../core/selectors"
-import type { Thread, ThreadTreeState } from "../core/types"
+import type { Message, Thread, ThreadTreeState } from "../core/types"
 import {
   applyInheritedBudget,
   kickoffQuestion,
   omittedNoticeText,
 } from "./prompt-pure"
+import { serializeMessageForModel } from "./message-serialization"
 
 // kickoff 文案模板定义在叶子模块 prompt-pure.ts（e2e 需 node 直载），这里保持原导入面
 export { kickoffQuestion }
+export { serializeMessageForModel }
 
 /** 发给 /api/chat 的最小消息形状（结构匹配 ai 的 UIMessage，仅用纯文本 part） */
 export interface UIMessageLike {
@@ -47,14 +49,9 @@ export interface ThreadChatRequestBody {
 }
 
 /** 一条领域消息是否应进入 payload（滤掉 error 与空正文 assistant） */
-function includable(
-  role: "user" | "assistant",
-  text: string,
-  status?: string
-): boolean {
-  if (status === "error") return false
-  if (role === "assistant" && text.trim() === "") return false
-  return true
+function includable(message: Message, serialized: string | null): boolean {
+  if (message.status === "error") return false
+  return message.role === "user" || serialized !== null
 }
 
 /**
@@ -75,13 +72,11 @@ export function buildRequestBody(
   //    发生丢弃时在继承段最前插入一条省略说明；当前会话消息不参与截断）
   const inherited: UIMessageLike[] = []
   for (const m of collectInherited(state, thread)) {
-    if (!includable(m.role, m.text, m.status)) continue
+    const text = serializeMessageForModel(state, m)
+    if (!includable(m, text) || text === null) continue
     // 继承段同样做 quote-aware 序列化（codex review P2）：父分支的带引用裸问题
     // （如「这是什么意思？」）被更深分支继承时，若丢掉 quote 前缀，「就近指代」
     // 歧义会在继承段原样复活——与当前会话消息用同一条拼接规则
-    const text = m.quote?.text
-      ? `就我划选的这段话：「${m.quote.text}」——${m.text}`
-      : m.text
     inherited.push({
       id: `inh-${m.id}`,
       role: m.role,
@@ -110,10 +105,8 @@ export function buildRequestBody(
   //    存原话与 quote 字段，拼接措辞可演进而数据不变。
   for (const m of thread.messages) {
     if (m.id === excludeMsgId) continue
-    if (!includable(m.role, m.text, m.status)) continue
-    const text = m.quote?.text
-      ? `就我划选的这段话：「${m.quote.text}」——${m.text}`
-      : m.text
+    const text = serializeMessageForModel(state, m)
+    if (!includable(m, text) || text === null) continue
     messages.push({
       id: m.id,
       role: m.role,

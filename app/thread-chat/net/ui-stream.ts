@@ -7,16 +7,38 @@
  *   - text-delta            → onTextDelta(chunk.delta)（正文增量）
  *   - error                 → onError(chunk.errorText)
  *   - finish / 流自然结束    → onFinish（只回调一次）
- *   - reasoning-* / tool-* / start / 其它未知类型 → 静默跳过
+ *   - tool-input-start(createMarkdownArtifact) → 立即发出不可点击的生成占位态
+ *   - tool-input-delta        → 解析局部 JSON，发出标题/字符/行数/章节进度
+ *   - tool-input-available(createMarkdownArtifact) → onMarkdownArtifact
+ *   - reasoning-* / 其它 tool-* / start / 其它未知类型 → 静默跳过
  *     （MiniMax 的 <think> 已被服务端 extractReasoningMiddleware 抽成 reasoning-* chunk，
  *      本 demo 只渲染「思考中…」指示器，不展示 reasoning 内容，故这里丢弃。）
  *
  * signal 被 abort 时静默返回（不外抛 AbortError），已收到的文本由上层保留。
  */
 
+import {
+  createMarkdownArtifactEventDispatcher,
+  createMarkdownArtifactProgressDispatcher,
+  type MarkdownArtifactProgressEvent,
+  type MarkdownArtifactStreamEvent,
+} from "../../../lib/chat/markdown-artifact"
+
+export type {
+  MarkdownArtifactStreamEvent,
+  MarkdownArtifactProgressEvent,
+  ToolInputDeltaChunk,
+  ToolInputStartChunk,
+  ToolInputAvailableChunk,
+} from "../../../lib/chat/markdown-artifact"
+
 export interface UIStreamHandlers {
   /** 收到一段正文增量（text-delta.delta） */
   onTextDelta(delta: string): void
+  /** 收到完整且已校验、响应内去重后的 Markdown Artifact 工具输入 */
+  onMarkdownArtifact(event: MarkdownArtifactStreamEvent): void
+  /** Markdown 工具开始或参数增量解析后的临时进度（不持久化） */
+  onMarkdownArtifactProgress(event: MarkdownArtifactProgressEvent): void
   /** 收到 error chunk（errorText 缺失时给出兜底文案） */
   onError(message: string): void
   /** finish chunk 或流自然结束时回调；实现内部保证只触发一次 */
@@ -44,6 +66,13 @@ export async function consumeUIMessageStream(
   const decoder = new TextDecoder()
   let buffer = ""
   let finished = false
+  const dispatchMarkdownArtifact = createMarkdownArtifactEventDispatcher(
+    handlers.onMarkdownArtifact
+  )
+  const dispatchMarkdownArtifactProgress =
+    createMarkdownArtifactProgressDispatcher(
+      handlers.onMarkdownArtifactProgress
+    )
 
   // onFinish 只回调一次（finish chunk 与「流自然结束」可能都想触发）
   const emitFinish = () => {
@@ -53,7 +82,7 @@ export async function consumeUIMessageStream(
   }
 
   /** 处理一个 SSE 事件文本；返回 true 表示遇到 [DONE]，应终止整条流 */
-  const handleEvent = (rawEvent: string): boolean => {
+  const handleEvent = async (rawEvent: string): Promise<boolean> => {
     // 一个事件可能包含多行；SSE 规范里同一事件的多个 data: 行以 \n 拼接
     const dataLines: string[] = []
     for (const line of rawEvent.split("\n")) {
@@ -67,21 +96,30 @@ export async function consumeUIMessageStream(
     const payload = dataLines.join("\n")
     if (payload === "[DONE]") return true
 
-    let chunk: { type?: string; delta?: unknown; errorText?: unknown }
+    let chunk: unknown
     try {
       chunk = JSON.parse(payload)
     } catch {
       return false // 半个/损坏的 JSON：跳过（跨 chunk 的半行由 buffer 兜住，正常不会到这）
     }
 
-    switch (chunk.type) {
+    if (await dispatchMarkdownArtifactProgress(chunk)) return false
+    if (dispatchMarkdownArtifact(chunk)) return false
+
+    if (typeof chunk !== "object" || chunk === null) return false
+    const value = chunk as {
+      type?: string
+      delta?: unknown
+      errorText?: unknown
+    }
+    switch (value.type) {
       case "text-delta":
-        if (typeof chunk.delta === "string") handlers.onTextDelta(chunk.delta)
+        if (typeof value.delta === "string") handlers.onTextDelta(value.delta)
         break
       case "error":
         handlers.onError(
-          typeof chunk.errorText === "string" && chunk.errorText
-            ? chunk.errorText
+          typeof value.errorText === "string" && value.errorText
+            ? value.errorText
             : "流式响应发生错误"
         )
         break
@@ -89,7 +127,7 @@ export async function consumeUIMessageStream(
         emitFinish()
         break
       default:
-        break // reasoning-* / tool-* / start / text-start / text-end / 未知类型：静默跳过
+        break // reasoning-* / 其它 tool-* / start / text-start / text-end / 未知类型：静默跳过
     }
     return false
   }
@@ -106,14 +144,14 @@ export async function consumeUIMessageStream(
       while ((sep = buffer.indexOf("\n\n")) !== -1) {
         const rawEvent = buffer.slice(0, sep)
         buffer = buffer.slice(sep + 2)
-        if (handleEvent(rawEvent)) {
+        if (await handleEvent(rawEvent)) {
           done = true // 遇到 [DONE]
           break
         }
       }
     }
     // 流自然结束：处理可能残留的、无末尾空行的最后一个事件
-    if (!signal.aborted && buffer.trim().length > 0) handleEvent(buffer)
+    if (!signal.aborted && buffer.trim().length > 0) await handleEvent(buffer)
   } catch (err) {
     if (signal.aborted || isAbortError(err)) return // 中止：静默
     throw err
