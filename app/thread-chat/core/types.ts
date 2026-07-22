@@ -8,7 +8,7 @@
 import type { TextAnchor } from "../branching/text-anchor"
 
 export type Role = "user" | "assistant"
-export type ArtifactKind = "code" | "note"
+export type ArtifactKind = "code" | "note" | "markdown"
 
 export interface Artifact {
   id: string
@@ -41,6 +41,20 @@ export interface Fork {
 /** 消息的流式生命周期状态；undefined 视为 "done"（历史消息 / 非流式消息） */
 export type MessageStatus = "pending" | "streaming" | "done" | "error"
 
+/**
+ * Markdown 工具输入的临时生成态。它只服务当前页面的进度反馈，不能持久化；
+ * 完整 input 到达后由正式 Artifact 原子替换。
+ */
+export interface MarkdownGenerationProgress {
+  toolCallId: string
+  phase: "starting" | "streaming"
+  partialTitle?: string
+  characterCount: number
+  lineCount: number
+  /** 最近解析到的 Markdown ATX 标题，最多保留三项。 */
+  headings: string[]
+}
+
 export interface Message {
   id: string
   role: Role
@@ -55,6 +69,8 @@ export interface Message {
   status?: MessageStatus
   /** status === "error" 时的错误文案 */
   error?: string
+  /** 当前页临时态；存盘前必须剥离，加载时也会防御性清理。 */
+  markdownGeneration?: MarkdownGenerationProgress
 }
 
 export interface Thread {

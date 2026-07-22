@@ -11,13 +11,17 @@
  */
 
 import React, { useEffect, useRef } from "react"
-import { FileCode2, FileText, ListTree } from "lucide-react"
+import { ListTree } from "lucide-react"
 import type { Message, ThreadTreeState } from "../core/types"
 import { collectInherited, lineage, threadTitle } from "../core/selectors"
 import { dc } from "../theme"
 import { ChatView } from "../chat/chat-view"
 import { MarkdownBody } from "../chat/markdown-body"
 import { useSmoothText } from "../chat/smooth-text"
+import {
+  MarkdownArtifactCard,
+  MarkdownArtifactProgressCard,
+} from "../orchestration/markdown-artifact-card"
 // 锚点在「渲染后的 Markdown DOM」上模糊恢复定位（position→exact→fuzzy），与纯文本解耦
 import { clearHighlights, locateAnchor, paintRange } from "./text-anchor"
 
@@ -81,37 +85,30 @@ export function BranchableChat({
 
   /* ---------- 注入：消息下方的 artifact 卡片 ---------- */
   const renderAfterMessage = (msg: Message) => {
-    if (!msg.artifactIds?.length) return null
-    return msg.artifactIds.map((aid) => {
+    const artifacts = (msg.artifactIds ?? []).flatMap((aid) => {
       const a = state.artifacts[aid]
-      if (!a) return null
-      const src = state.threads[a.sourceThreadId]
-      const cls = src && src.depth > 0 ? `fc-${dc(src.depth)}` : ""
-      return (
-        <button
+      if (!a) return []
+      return [
+        <MarkdownArtifactCard
           key={aid}
-          className={`acard ${cls}`}
-          onClick={() => onOpenArtifact(aid)}
-        >
-          <span className="ic">
-            {a.kind === "code" ? (
-              <FileCode2 size={15} />
-            ) : (
-              <FileText size={15} />
-            )}
-          </span>
-          <span className="t">
-            <span className="n" style={{ display: "block" }}>
-              {a.title}
-            </span>
-            <span className="k" style={{ display: "block" }}>
-              ARTIFACT · {a.kind === "code" ? (a.lang ?? "code") : "note"}
-            </span>
-          </span>
-          <span className="go">抽屉打开 →</span>
-        </button>
-      )
+          artifact={a}
+          sourceDepth={state.threads[a.sourceThreadId]?.depth ?? null}
+          onOpen={onOpenArtifact}
+        />,
+      ]
     })
+    if (!msg.markdownGeneration && artifacts.length === 0) return null
+    return (
+      <>
+        {msg.markdownGeneration ? (
+          <MarkdownArtifactProgressCard
+            progress={msg.markdownGeneration}
+            sourceDepth={thread.depth}
+          />
+        ) : null}
+        {artifacts}
+      </>
+    )
   }
 
   /* ---------- 列头（主线 / 分支两种形态，子分支按钮两者都有） ---------- */

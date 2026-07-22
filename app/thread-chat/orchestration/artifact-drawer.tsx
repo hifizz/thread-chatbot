@@ -1,13 +1,14 @@
 "use client"
 /**
  * orchestration/artifact-drawer —— Artifact 右侧抽屉「舞台」（全局唯一）。
- * 标签页管理全部 artifact（深度色圆点标来源会话），code 深底 pre / note 衬线段落，
+ * 标签页管理全部 artifact（深度色圆点标来源会话），Markdown 走统一富文本渲染，
  * 底部「定位来源会话」走壳层的统一打开意图。
  */
 
 import React from "react"
-import { LocateFixed, Package, X } from "lucide-react"
+import { FileText, LocateFixed, X } from "lucide-react"
 import type { Artifact, ThreadTreeState } from "../core/types"
+import { MarkdownBody } from "../chat/markdown-body"
 import { dotColorOf } from "../theme"
 
 export interface ArtifactDrawerProps {
@@ -38,9 +39,8 @@ export function ArtifactDrawer({
   return (
     <div className={`art-drawer ${open ? "open" : ""}`} aria-hidden={!open}>
       <div className="art-head">
-        {/* Package：贴合「产出物」语义（打包好的交付物），与顶栏 Artifact 按钮同图标 */}
-        <Package size={16} color="#6a6357" />
-        <h3>Artifact 舞台</h3>
+        <FileText size={16} color="#6a6357" />
+        <h3>Markdown</h3>
         <button className="art-x" title="收起抽屉" onClick={onClose}>
           <X size={13} />
         </button>
@@ -73,7 +73,7 @@ export function ArtifactDrawer({
       <div className="art-body">
         {!a && (
           <div className="art-empty">
-            还没有 Artifact——在主线或分支里生成后会出现在这里。
+            还没有 Markdown——在主线或分支里生成后会出现在这里。
           </div>
         )}
         {a && a.kind === "code" && <pre className="art-code">{a.content}</pre>}
@@ -84,6 +84,7 @@ export function ArtifactDrawer({
             ))}
           </div>
         )}
+        {a && a.kind === "markdown" && <MarkdownBody source={a.content} />}
       </div>
       {a && src && (
         <div
@@ -97,7 +98,7 @@ export function ArtifactDrawer({
           </span>
           <button
             className="loc"
-            title="打开产生这个 Artifact 的会话"
+            title="打开产生这个 Markdown 的会话"
             onClick={() => onLocate(src.id)}
           >
             <LocateFixed

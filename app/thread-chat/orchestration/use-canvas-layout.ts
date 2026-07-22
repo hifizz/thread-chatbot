@@ -31,6 +31,7 @@ import {
 } from "@dagrejs/dagre"
 import type { ThreadTreeState } from "../core/types"
 import type { ThreadStore } from "../core/store"
+import { validArtifactsOfMessage } from "../core/selectors"
 import { accentOf, dotColorOf, dvar } from "../theme"
 import { kickoffQuestion } from "../net/prompt-pure"
 import type { CanvasCardData, CanvasCardNode } from "./canvas-node"
@@ -105,7 +106,7 @@ function buildBaseGraph(
   const artifactCountOf = new Map<string, number>()
   state.artifactOrder.forEach((aid) => {
     const a = state.artifacts[aid]
-    if (a)
+    if (a?.kind === "markdown")
       artifactCountOf.set(
         a.sourceThreadId,
         (artifactCountOf.get(a.sourceThreadId) ?? 0) + 1
@@ -121,6 +122,11 @@ function buildBaseGraph(
     const t = state.threads[id]
     if (!t) return
     const last = t.messages[t.messages.length - 1]
+    const lastMarkdown = last
+      ? validArtifactsOfMessage(state, last).find(
+          (artifact) => artifact.kind === "markdown"
+        )
+      : undefined
     const data: CanvasCardData = {
       isMain: t.id === "main",
       title: t.title,
@@ -128,7 +134,7 @@ function buildBaseGraph(
       depth: t.depth,
       footnote: t.footnote,
       anchor: t.anchorText ? clip(t.anchorText, 40) : null,
-      summary: last ? clip(last.text, 90) : "",
+      summary: last ? clip(last.text || lastMarkdown?.title || "", 90) : "",
       msgCount: t.messages.length,
       artifactCount: artifactCountOf.get(t.id) ?? 0,
       accent: accentOf(t),

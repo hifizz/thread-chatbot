@@ -8,7 +8,12 @@
  */
 
 import type { TextAnchor } from "../branching/text-anchor"
-import type { ArtifactSeed, Message, ThreadTreeState } from "./types"
+import type {
+  ArtifactSeed,
+  MarkdownGenerationProgress,
+  Message,
+  ThreadTreeState,
+} from "./types"
 
 export interface ForkInput {
   /** 在哪个会话里划选的 */
@@ -65,6 +70,15 @@ export function createThreadStore(seed: ThreadTreeState) {
     state.artifacts[id] = { id, sourceThreadId, ...seed_ }
     state.artifactOrder.push(id)
     return id
+  }
+
+  /** 删除一条消息名下的全部 artifact，不发通知（retry 原子复位用）。 */
+  const removeMessageArtifactsSilently = (message: Message): void => {
+    if (!message.artifactIds?.length) return
+    const removing = new Set(message.artifactIds)
+    removing.forEach((id) => delete state.artifacts[id])
+    state.artifactOrder = state.artifactOrder.filter((id) => !removing.has(id))
+    message.artifactIds = undefined
   }
 
   /** 从尾部反向查找消息（流式目标通常是最新消息，反向查找更快） */
@@ -179,12 +193,29 @@ export function createThreadStore(seed: ThreadTreeState) {
       notify()
     },
 
+    /** 更新 Markdown 工具的临时生成进度；完整 Artifact 到达后会被原子清除。 */
+    setMarkdownGenerationProgress(
+      threadId: string,
+      msgId: string,
+      progress: MarkdownGenerationProgress
+    ): void {
+      const t = state.threads[threadId]
+      if (!t) return
+      const msg = findMessageFromTail(t.messages, msgId)
+      if (!msg || msg.role !== "assistant") return
+      if (msg.status === "done" || msg.status === "error") return
+      msg.markdownGeneration = progress
+      msg.status = "streaming"
+      notify()
+    },
+
     /** 流式结束：标记消息完成 */
     finishAssistantMessage(threadId: string, msgId: string): void {
       const t = state.threads[threadId]
       if (!t) return
       const msg = findMessageFromTail(t.messages, msgId)
       if (!msg) return
+      msg.markdownGeneration = undefined
       msg.status = "done"
       touchSilently(threadId)
       notify()
@@ -200,6 +231,7 @@ export function createThreadStore(seed: ThreadTreeState) {
       if (!t) return
       const msg = findMessageFromTail(t.messages, msgId)
       if (!msg) return
+      msg.markdownGeneration = undefined
       msg.status = "error"
       msg.error = message
       notify()
@@ -211,9 +243,11 @@ export function createThreadStore(seed: ThreadTreeState) {
       if (!t) return
       const msg = findMessageFromTail(t.messages, msgId)
       if (!msg) return
+      removeMessageArtifactsSilently(msg)
       msg.text = ""
       msg.status = "pending"
       msg.error = undefined
+      msg.markdownGeneration = undefined
       notify()
     },
 
@@ -232,6 +266,25 @@ export function createThreadStore(seed: ThreadTreeState) {
     /** 单独登记一个 artifact（fork 之外的入口，预留） */
     registerArtifact(sourceThreadId: string, seed_: ArtifactSeed): string {
       const id = registerSilently(sourceThreadId, seed_)
+      notify()
+      return id
+    },
+
+    /** 原子登记 artifact 并绑定到产生它的 assistant 消息；目标无效时零写入。 */
+    attachArtifactToMessage(
+      threadId: string,
+      messageId: string,
+      seed_: ArtifactSeed
+    ): string | null {
+      const thread = state.threads[threadId]
+      if (!thread) return null
+      const message = findMessageFromTail(thread.messages, messageId)
+      if (!message || message.role !== "assistant") return null
+      const id = registerSilently(threadId, seed_)
+      message.artifactIds = [...(message.artifactIds ?? []), id]
+      message.markdownGeneration = undefined
+      // 完整工具输入已经到达：即使尚无正文，也不再显示 pending 三点占位。
+      if (message.status === "pending") message.status = "streaming"
       notify()
       return id
     },
