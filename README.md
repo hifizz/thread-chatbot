@@ -9,15 +9,8 @@
 
 ## What it does
 
-- Streams real model responses; the default local configuration uses MiniMax, with additional configured providers available through the model registry.
-- Creates contextual branches from selected response text, preserving the relevant source context for each branch.
-- Lets you work across multiple conversation columns or inspect and navigate the complete tree in a canvas view.
-- Persists branch trees in PostgreSQL so conversations can be loaded again after a refresh; tree identity is carried in `/thread-chat/{treeId}`.
-- Produces Markdown artifacts directly in Thread Chat and keeps completed artifacts with the assistant message that created them.
-- Offers optional deep-research mode with multi-step web search and page reading, presenting source-backed results when a search provider is configured.
-- Supports optional attachments, including PDF text extraction, summaries, suggested questions, citations, and optional vector retrieval for large documents.
-
-Thread Chat is not a canned-response demo: model requests are handled by the server and the branch workspace persists its state through the application's APIs.
+- **Start a new branch from any point in a response (with context).** Select a phrase, claim, example, or question to open a focused conversation that inherits everything up to that point. The branch can develop independently without cluttering or changing the original thread, and it can split again whenever another idea deserves its own path.
+- **Navigate the whole conversation as a tree.** Keep important threads open side by side in resizable columns, use breadcrumbs and search to move between them, or zoom out to the canvas to see how every conversation connects and return to any branch.
 
 ## Quick start
 
