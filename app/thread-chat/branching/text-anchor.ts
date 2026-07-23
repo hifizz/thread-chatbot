@@ -446,6 +446,17 @@ function collectTextNodes(range: Range): Text[] {
 }
 
 /**
+ * Markdown 在块级结构之间会产生只含换行/缩进的 Text 节点。
+ *
+ * 它们不属于用户实际选中的正文；若包成 inline span，会在非叶子结构中生成匿名
+ * 布局盒，造成列表、表格、引用等 Markdown 块之间出现多余空白。仅凭文本内容判断，
+ * 不依赖也不枚举具体标签。
+ */
+function isHighlightableTextNode(node: Text): boolean {
+  return node.data.trim().length > 0
+}
+
+/**
  * 用 <span data-text-anchor-mark=id> 包裹 range 覆盖的文本，实现高亮。
  * 逐个文本节点切分包裹，跨行 / 跨内联元素都能贴合。返回是否绘制成功。
  */
@@ -460,7 +471,7 @@ export function paintRange(
 
   let painted = false
   nodes.forEach((node) => {
-    if (!node.data) return
+    if (!isHighlightableTextNode(node)) return
     if (node.parentElement?.closest(`[${MARK_ATTR}]`)) return
 
     let start = 0
