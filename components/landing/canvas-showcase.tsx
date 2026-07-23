@@ -1,42 +1,83 @@
+import { Maximize2, Minus, Plus } from "lucide-react"
 import type { ReactElement } from "react"
 
-import { cn } from "@/lib/utils"
 import { LANDING } from "@/constants/landing"
+import { cn } from "@/lib/utils"
 
-/** 分区组件通用 props：内容自 LANDING 取，仅暴露 className 供排版微调。 */
-export interface SectionProps {
-  className?: string
-}
+import styles from "./landing.module.css"
+import type { LandingSectionProps } from "./types"
 
-/** 「画布工作台」展示段：标题 + 描述 + 一块画布分支示意占位。 */
-export function CanvasShowcase({ className }: SectionProps): ReactElement {
-  const { title, description } = LANDING.canvasShowcase
+export function CanvasShowcase({
+  className,
+}: LandingSectionProps): ReactElement {
+  const { canvas, steps } = LANDING
 
   return (
     <section
+      id={canvas.id}
       className={cn(
-        "grid items-center gap-8 py-16 md:grid-cols-2",
+        styles.section,
+        styles.showcaseSection,
+        styles.canvasSection,
         className
       )}
+      aria-labelledby="canvas-heading"
     >
-      <div className="flex flex-col gap-3">
-        <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-          {title}
-        </h2>
-        <p className="max-w-2xl text-pretty text-muted-foreground">
-          {description}
+      <figure className={styles.canvasFigure}>
+        <figcaption className={styles.srOnly}>{canvas.description}</figcaption>
+        <div className={styles.canvasGrid} aria-hidden />
+        <div className={styles.canvasControls} aria-hidden>
+          <span>
+            <Minus />
+          </span>
+          <span>
+            <Plus />
+          </span>
+          <span>
+            <Maximize2 />
+          </span>
+        </div>
+        <div className={styles.canvasTree}>
+          <div className={styles.treeStem} aria-hidden />
+          <article className={cn(styles.canvasNode, styles.canvasNodeRoot)}>
+            <span>{steps[0].number}</span>
+            <h3>{steps[0].title}</h3>
+          </article>
+          <article className={cn(styles.canvasNode, styles.canvasNodeFocus)}>
+            <span>{steps[1].number}</span>
+            <h3>{steps[1].title}</h3>
+          </article>
+          <article className={cn(styles.canvasNode, styles.canvasNodeReturn)}>
+            <span>{steps[2].number}</span>
+            <h3>{steps[2].title}</h3>
+          </article>
+          <article className={cn(styles.canvasNode, styles.canvasNodeDeep)}>
+            <span>04</span>
+            <h3>{canvas.notes[2]}</h3>
+          </article>
+        </div>
+        <p className={styles.canvasLegend}>
+          <span aria-hidden />
+          {canvas.notes[0]}
         </p>
-      </div>
+      </figure>
 
-      {/* 画布示意：几枚节点用连线铺开，纯装饰占位（media 待补） */}
-      <div
-        aria-hidden
-        className="relative aspect-[4/3] overflow-hidden rounded-2xl border bg-card p-6 shadow-sm"
-      >
-        <div className="absolute top-6 left-6 h-14 w-40 rounded-xl border bg-muted/60" />
-        <div className="absolute top-1/2 left-1/2 h-14 w-40 -translate-x-1/2 rounded-xl border border-primary/40 bg-primary/10" />
-        <div className="absolute right-6 bottom-6 h-14 w-40 rounded-xl border bg-muted/60" />
-        <div className="absolute right-8 bottom-1/3 h-14 w-36 rounded-xl border bg-muted/40" />
+      <div className={styles.showcaseCopy}>
+        <p className={styles.sectionIndex}>
+          {steps[2].number} / {canvas.eyebrow}
+        </p>
+        <h2 id="canvas-heading" className={styles.sectionTitle}>
+          {canvas.title}
+        </h2>
+        <p className={styles.sectionDescription}>{canvas.description}</p>
+        <ul className={styles.noteList}>
+          {canvas.notes.map((note, index) => (
+            <li key={note}>
+              <span aria-hidden>0{index + 1}</span>
+              {note}
+            </li>
+          ))}
+        </ul>
       </div>
     </section>
   )

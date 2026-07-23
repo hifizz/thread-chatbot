@@ -4,6 +4,7 @@
   "packageManager": "pnpm@10.32.1",
   "type": "module",
   "private": true,
+  "license": "AGPL-3.0-only",
   "scripts": {
     "dev": "next dev",
     "build": "next build",

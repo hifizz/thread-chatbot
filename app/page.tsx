@@ -1,31 +1,37 @@
 import type { Metadata } from "next"
 import type { ReactElement } from "react"
 
-import { Hero } from "@/components/landing/hero"
-import { BranchingDemo } from "@/components/landing/branching-demo"
 import { CanvasShowcase } from "@/components/landing/canvas-showcase"
-import { FeatureGrid } from "@/components/landing/feature-grid"
 import { ClosingCta } from "@/components/landing/closing-cta"
+import { CapabilityGrid } from "@/components/landing/feature-grid"
+import { Hero } from "@/components/landing/hero"
+import { InteractionSteps } from "@/components/landing/interaction-steps"
+import { LandingFooter } from "@/components/landing/landing-footer"
+import { LandingHeader } from "@/components/landing/landing-header"
+import styles from "@/components/landing/landing.module.css"
+import { WorkspaceShowcase } from "@/components/landing/workspace-showcase"
 
-// 落地页专属 metadata（突出「分支对话」差异化）。
 export const metadata: Metadata = {
-  title: "Thread Chat · 让对话像思路一样分叉",
+  title: "Thread Chat — Branch your AI conversations",
   description:
-    "划选 AI 回复里的任意一句就地岔出新对话，整棵分支对话在画布上铺开——不再把追问挤进一根越拉越长的线里。",
+    "Select any part of an AI response, branch from that exact point, and navigate the full conversation as columns or a canvas.",
 }
 
-/**
- * 公开落地页——server component，不读 session（保持静态可缓存）。
- * 按序组合各分区，套一个居中、限宽、纵向留白的响应式容器。
- */
 export default function LandingPage(): ReactElement {
   return (
-    <main className="mx-auto w-full max-w-5xl px-6 sm:px-8">
-      <Hero />
-      <BranchingDemo />
-      <CanvasShowcase />
-      <FeatureGrid />
-      <ClosingCta />
-    </main>
+    <div className={styles.page}>
+      <LandingHeader />
+      <main>
+        <div className={styles.shell}>
+          <Hero />
+          <InteractionSteps />
+          <WorkspaceShowcase />
+          <CanvasShowcase />
+          <CapabilityGrid />
+          <ClosingCta />
+        </div>
+      </main>
+      <LandingFooter />
+    </div>
   )
 }

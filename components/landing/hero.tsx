@@ -1,42 +1,72 @@
+import { CornerDownRight, MousePointer2 } from "lucide-react"
 import type { ReactElement } from "react"
 
-import { cn } from "@/lib/utils"
 import { LANDING } from "@/constants/landing"
-import { StartChatButton } from "@/components/landing/start-chat-button"
+import { cn } from "@/lib/utils"
 
-/** 分区组件通用 props：内容自 LANDING 取，仅暴露 className 供排版微调。 */
-export interface SectionProps {
-  className?: string
-}
+import { LandingCtaLink } from "./landing-cta-link"
+import styles from "./landing.module.css"
+import type { LandingSectionProps } from "./types"
 
-/** 首屏 Hero：小标签 + 主标题 + 价值主张 + 主 CTA。 */
-export function Hero({ className }: SectionProps): ReactElement {
-  const { eyebrow, title, subtitle, primaryCta } = LANDING.hero
+export function Hero({ className }: LandingSectionProps): ReactElement {
+  const { hero, steps } = LANDING
 
   return (
-    <section
-      className={cn(
-        "flex flex-col items-center gap-6 py-16 text-center sm:py-24",
-        className
-      )}
-    >
-      {eyebrow ? (
-        <span className="inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium text-muted-foreground">
-          {eyebrow}
-        </span>
-      ) : null}
-      <h1 className="max-w-3xl text-4xl font-semibold tracking-tight text-balance sm:text-5xl md:text-6xl">
-        {title}
-      </h1>
-      <p className="max-w-2xl text-base text-pretty text-muted-foreground sm:text-lg">
-        {subtitle}
-      </p>
-      <StartChatButton
-        label={primaryCta.label}
-        href={primaryCta.href}
-        size="lg"
-        className="mt-2"
-      />
+    <section className={cn(styles.hero, className)}>
+      <div className={styles.heroCopy}>
+        <p className={styles.eyebrow}>
+          <span className={styles.eyebrowRule} aria-hidden />
+          {hero.eyebrow}
+        </p>
+        <h1 className={styles.heroTitle}>{hero.title}</h1>
+        <p className={styles.heroSubtitle}>{hero.subtitle}</p>
+        <div className={styles.heroActions}>
+          <LandingCtaLink cta={hero.primaryCta} tone="primary" />
+          <LandingCtaLink cta={hero.secondaryCta} tone="secondary" />
+        </div>
+        <p className={styles.marginNote}>
+          <span aria-hidden>01</span>
+          {steps[1].description}
+        </p>
+      </div>
+
+      <figure className={styles.heroFigure}>
+        <figcaption className={styles.srOnly}>
+          {steps[0].description} {steps[1].description}
+        </figcaption>
+        <div className={styles.notebookMeta} aria-hidden>
+          <span />
+          <span />
+          <span />
+          <p>{steps[0].number}</p>
+        </div>
+        <article className={styles.mainThreadCard}>
+          <p className={styles.cardKicker}>{steps[0].title}</p>
+          <p className={styles.responseText}>
+            {hero.subtitle}
+            <mark className={styles.selection}>
+              <MousePointer2 aria-hidden />
+              {steps[0].verb}
+            </mark>
+          </p>
+        </article>
+        <div className={styles.branchConnector} aria-hidden>
+          <CornerDownRight />
+        </div>
+        <article className={styles.branchCard}>
+          <span className={styles.branchDepth} aria-hidden />
+          <div>
+            <p className={styles.cardKicker}>
+              {steps[1].number} · {steps[1].verb}
+            </p>
+            <p>{steps[1].title}</p>
+          </div>
+        </article>
+        <aside className={styles.figureAnnotation}>
+          <span aria-hidden>↳</span>
+          {steps[2].title}
+        </aside>
+      </figure>
     </section>
   )
 }

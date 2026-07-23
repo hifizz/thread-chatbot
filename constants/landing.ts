@@ -1,90 +1,182 @@
-// 落地页内容 + 内容类型的单一事实来源。组件只做布局，改文案不改结构
-// （视觉/文案后续可独立细化，见 openspec: add-landing-retire-linear-chat）。
+// English landing-page content and its rendering contracts.
+// Components own presentation only; product copy and destinations stay here.
 
+import { PROJECT } from "./project"
 import { ROUTES } from "./routes"
 
-/** 一个 CTA：文案 + 目标路由（默认应指向 ROUTES.flagship）。 */
-export interface CtaContent {
+export type LandingSectionId =
+  "how-it-works" | "workspace" | "canvas" | "capabilities"
+
+export interface LandingNavItem {
+  label: string
+  href: `#${LandingSectionId}` | string
+  external?: boolean
+}
+
+export interface LandingCta {
   label: string
   href: string
+  external?: boolean
+  accessibleLabel?: string
 }
 
-export interface HeroContent {
-  eyebrow?: string // 顶部小标签（可选）
-  title: string // 主标题
-  subtitle: string // 一句话价值主张
-  primaryCta: CtaContent
+export interface LandingHeroContent {
+  eyebrow: string
+  title: string
+  subtitle: string
+  primaryCta: LandingCta
+  secondaryCta: LandingCta
 }
 
-export interface FeatureItem {
-  icon?: string // lucide-react 图标名或 emoji，由渲染层解释
+export interface LandingStep {
+  number: "01" | "02" | "03"
+  verb: "Select" | "Branch" | "Navigate"
   title: string
   description: string
 }
 
-/** 划选开分支的静态示意（纯展示，不接真实模型）。 */
-export interface BranchingDemoContent {
+export interface LandingShowcaseContent {
+  id: Extract<LandingSectionId, "workspace" | "canvas">
+  eyebrow: string
   title: string
   description: string
-  sampleAnswer: string // 样例 assistant 回复
-  anchorText: string // 其中被「划选」高亮的片段（必须是 sampleAnswer 的子串）
-  branchQuestion: string // 由该片段岔出的子问题
+  notes: readonly string[]
 }
 
-export interface CanvasShowcaseContent {
+export type LandingCapabilityIcon =
+  "messages" | "database" | "fileText" | "search"
+
+export interface LandingCapability {
+  icon: LandingCapabilityIcon
   title: string
   description: string
-  media?: string // 可选静态示意资源路径（后续补）
 }
 
-/** 落地页全部内容的聚合——组件从这里取。 */
 export interface LandingContent {
-  hero: HeroContent
-  branchingDemo: BranchingDemoContent
-  canvasShowcase: CanvasShowcaseContent
-  features: FeatureItem[]
-  closingCta: CtaContent
+  nav: readonly LandingNavItem[]
+  hero: LandingHeroContent
+  steps: readonly LandingStep[]
+  workspace: LandingShowcaseContent
+  canvas: LandingShowcaseContent
+  capabilitiesTitle: string
+  capabilities: readonly LandingCapability[]
+  closing: {
+    title: string
+    description: string
+    primaryCta: LandingCta
+    secondaryCta: LandingCta
+  }
 }
 
-// 占位文案：结构已定，措辞待细化。anchorText 必须是 sampleAnswer 的子串。
+const startChatCta: LandingCta = {
+  label: "Start chatting",
+  href: ROUTES.startChat,
+}
+
+const githubCta: LandingCta = {
+  label: "View on GitHub",
+  href: PROJECT.repositoryUrl,
+  external: true,
+}
+
 export const LANDING: LandingContent = {
-  hero: {
-    eyebrow: "Thread Chat",
-    title: "让对话像思路一样分叉",
-    subtitle:
-      "划选 AI 回复里的任意一句，就地岔出一条新对话。不再把追问挤进一根越拉越长的线里——每个想法都有自己的分支。",
-    primaryCta: { label: "开始聊天", href: ROUTES.flagship },
-  },
-  branchingDemo: {
-    title: "划选即开分支",
-    description:
-      "在 AI 的回答里选中你想深挖的片段，气泡当场弹出——带着上下文岔出一条子对话，主线原地保留一枚可回跳的脚注。",
-    sampleAnswer:
-      "要提升检索质量，可以从两方面入手：一是优化向量嵌入模型的选型，二是引入重排序（rerank）阶段对候选结果二次打分。",
-    anchorText: "重排序（rerank）阶段对候选结果二次打分",
-    branchQuestion: "rerank 具体怎么接？延迟会增加多少？",
-  },
-  canvasShowcase: {
-    title: "整棵对话是一张画布",
-    description:
-      "所有分支在画布上铺开，一眼看清脉络。在节点里直接读最近消息、继续追问，多条线并行推进，不用来回切换。",
-  },
-  features: [
+  nav: [
+    { label: "How it works", href: "#how-it-works" },
+    { label: "Workspace", href: "#workspace" },
+    { label: "Canvas", href: "#canvas" },
     {
-      icon: "database",
-      title: "持久化",
-      description: "整棵分支树自动入库，刷新、换设备都在，接着上次继续。",
-    },
-    {
-      icon: "sparkles",
-      title: "多模型",
-      description: "MiniMax、DeepSeek、OpenAI 等经统一网关随手切换，按需选型。",
-    },
-    {
-      icon: "wallet",
-      title: "按量计费",
-      description: "按 token 实时计费、余额透明，用多少付多少，无订阅门槛。",
+      label: "GitHub",
+      href: PROJECT.repositoryUrl,
+      external: true,
     },
   ],
-  closingCta: { label: "开始聊天", href: ROUTES.flagship },
+  hero: {
+    eyebrow: "A thinking interface for AI",
+    title: "Follow every thought. Lose none of the thread.",
+    subtitle:
+      "Select any part of an AI response and open a focused conversation from that exact point. Every branch keeps its context, while your main line stays intact.",
+    primaryCta: startChatCta,
+    secondaryCta: githubCta,
+  },
+  steps: [
+    {
+      number: "01",
+      verb: "Select",
+      title: "Start where curiosity strikes",
+      description:
+        "Highlight a phrase, claim, or example inside any AI response. The point you selected becomes the focus of a new conversation.",
+    },
+    {
+      number: "02",
+      verb: "Branch",
+      title: "Carry context, not clutter",
+      description:
+        "The branch inherits everything up to the fork, then develops independently. Your original conversation remains clean and readable.",
+    },
+    {
+      number: "03",
+      verb: "Navigate",
+      title: "Compare, return, and go deeper",
+      description:
+        "Move through breadcrumbs, side-by-side columns, or the full canvas. A branch can split again whenever the next question appears.",
+    },
+  ],
+  workspace: {
+    id: "workspace",
+    eyebrow: "Side-by-side workspace",
+    title: "Compare ideas without losing your place.",
+    description:
+      "Keep the main thread anchored while opening important branches beside it. Compare ideas side by side, then return without losing your place.",
+    notes: [
+      "Each branch inherits its context",
+      "Resizable reading columns",
+      "Breadcrumbs, search, and quick switching",
+    ],
+  },
+  canvas: {
+    id: "canvas",
+    eyebrow: "Conversation canvas",
+    title: "See the shape of your thinking.",
+    description:
+      "Zoom out from individual messages to the entire conversation tree. Find the path you took, spot parallel ideas, and jump back into any node.",
+    notes: [
+      "See every conversation at a glance",
+      "Pan, zoom, pin, and rearrange",
+      "Continue the discussion from the map",
+    ],
+  },
+  capabilitiesTitle: "Built for ideas that branch.",
+  capabilities: [
+    {
+      icon: "messages",
+      title: "Context-aware branches",
+      description:
+        "Every branch inherits the conversation up to the selected point, then develops independently.",
+    },
+    {
+      icon: "database",
+      title: "Persistent conversation trees",
+      description:
+        "Your branches and messages stay where you left them, across refreshes and return visits.",
+    },
+    {
+      icon: "fileText",
+      title: "Markdown artifacts",
+      description:
+        "Turn any branch into a structured Markdown document and keep it linked to the conversation that produced it.",
+    },
+    {
+      icon: "search",
+      title: "Deep research",
+      description:
+        "Search the web, read relevant pages, and keep source-backed findings inside the conversation tree.",
+    },
+  ],
+  closing: {
+    title: "Give every good question room to grow.",
+    description:
+      "Start with one conversation. Follow the interesting parts. Return with the whole line of thought still in view.",
+    primaryCta: startChatCta,
+    secondaryCta: githubCta,
+  },
 }

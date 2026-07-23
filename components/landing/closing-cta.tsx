@@ -1,33 +1,28 @@
 import type { ReactElement } from "react"
 
-import { cn } from "@/lib/utils"
 import { LANDING } from "@/constants/landing"
-import { StartChatButton } from "@/components/landing/start-chat-button"
+import { cn } from "@/lib/utils"
 
-/** 分区组件通用 props：内容自 LANDING 取，仅暴露 className 供排版微调。 */
-export interface SectionProps {
-  className?: string
-}
+import { LandingCtaLink } from "./landing-cta-link"
+import styles from "./landing.module.css"
+import type { LandingSectionProps } from "./types"
 
-/** 收尾 CTA：再给一次「开始聊天」入口。 */
-export function ClosingCta({ className }: SectionProps): ReactElement {
-  const { hero, closingCta } = LANDING
+export function ClosingCta({ className }: LandingSectionProps): ReactElement {
+  const { closing } = LANDING
 
   return (
-    <section
-      className={cn(
-        "my-16 flex flex-col items-center gap-6 rounded-3xl border bg-card px-6 py-16 text-center text-card-foreground shadow-sm",
-        className
-      )}
-    >
-      <h2 className="max-w-2xl text-2xl font-semibold tracking-tight text-balance sm:text-3xl">
-        {hero.title}
-      </h2>
-      <StartChatButton
-        label={closingCta.label}
-        href={closingCta.href}
-        size="lg"
-      />
+    <section className={cn(styles.closing, className)}>
+      <div className={styles.closingBranches} aria-hidden>
+        <span />
+        <span />
+        <span />
+      </div>
+      <h2>{closing.title}</h2>
+      <p>{closing.description}</p>
+      <div className={styles.closingActions}>
+        <LandingCtaLink cta={closing.primaryCta} tone="primary" />
+        <LandingCtaLink cta={closing.secondaryCta} tone="text" />
+      </div>
     </section>
   )
 }
