@@ -122,7 +122,7 @@ export function SelectionBubble({
     ta.focus({ preventScroll: true })
   }, [sel])
 
-  /* 划选监听：mouseup 结算选区并定位气泡；mousedown / 滚动 / resize 隐藏 */
+  /* 划选监听：mouseup 结算选区并定位气泡；外部 mousedown / resize 隐藏 */
   useEffect(() => {
     const onMouseUp = (e: MouseEvent) => {
       if ((e.target as HTMLElement).closest?.(".sel-bubble")) return
@@ -185,25 +185,35 @@ export function SelectionBubble({
     const onMouseDown = (e: MouseEvent) => {
       if (!(e.target as HTMLElement).closest?.(".sel-bubble")) onSelChange(null)
     }
-    const onScroll = (e: Event) => {
-      // 气泡内部的滚动（输入长问题时 textarea 自增高 / 内滚）不算「用户离开」——
-      // capture 监听会先于一切收到它，必须放行，否则打字打到换行气泡就自毁丢输入（D4）。
-      // resize 事件的 target 是 window（无 closest），自然落到关闭分支。
-      const t = e.target as Partial<HTMLElement> | null
-      if (t?.closest?.(".sel-bubble")) return
-      onSelChange(null)
-    }
+    const onResize = () => onSelChange(null)
     document.addEventListener("mouseup", onMouseUp)
     document.addEventListener("mousedown", onMouseDown)
-    document.addEventListener("scroll", onScroll, true)
-    window.addEventListener("resize", onScroll)
+    window.addEventListener("resize", onResize)
     return () => {
       document.removeEventListener("mouseup", onMouseUp)
       document.removeEventListener("mousedown", onMouseDown)
-      document.removeEventListener("scroll", onScroll, true)
-      window.removeEventListener("resize", onScroll)
+      window.removeEventListener("resize", onResize)
     }
   }, [state, onSelChange])
+
+  /* 滚动只在会改变来源选区 viewport 坐标时关闭气泡：
+     · 来源消息列 / 外层列容器 / document 滚动会让已存 rect 失效，关闭；
+     · 其他消息列（尤其最右侧流式回复的自动贴底）不移动来源选区，放行；
+     · 气泡内部 textarea 自增高后的内滚同样放行，避免丢输入。 */
+  useEffect(() => {
+    if (!sel) return
+    const onScroll = (e: Event) => {
+      const target = e.target
+      if (target instanceof Element) {
+        if (target.closest(".sel-bubble")) return
+        const list = target.closest<HTMLElement>(".msg-list[data-list]")
+        if (list && list.dataset.list !== sel.threadId) return
+      }
+      onSelChange(null)
+    }
+    document.addEventListener("scroll", onScroll, true)
+    return () => document.removeEventListener("scroll", onScroll, true)
+  }, [sel, onSelChange])
 
   /* 气泡打开期间跟踪 ⌘/Ctrl 起落（keydown/keyup 都带 metaKey/ctrlKey 快照） */
   useEffect(() => {

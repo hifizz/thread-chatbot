@@ -11,7 +11,7 @@
  * · 气泡结构：输入框存在 / placeholder 提示可留空 / 弹出即聚焦；
  * · 按钮文案四态：默认 / 有输入 / ⌘ 按住 / 列条 override（含优先级与复位）；
  * · Shift+Enter 换行不提交；长问题自增高 + 内滚不自毁气泡（scroll 放行修复）；
- * · 页面真实滚动仍关气泡（放行修复无回归）；输入中 Esc 关气泡、无消息入树；
+ * · 非来源列滚动不关气泡、来源列滚动仍关闭；输入中 Esc 关气泡、无消息入树；
  * · IME：CDP imeSetComposition + keyCode 229 的 Enter 不提交，insertText 上屏后
  *   真实 Enter 才提交；
  * · 带问 Enter：新列第 1 条 = 该 user 消息、第 2 条 assistant 流式、composer 无预填、
@@ -270,7 +270,7 @@ ok(
     chatPosts.length === postsBeforeEsc
 )
 
-/* —— 放行修复无回归：页面（消息列表）真实滚动仍关气泡 —— */
+/* —— 来源消息列表真实滚动仍关气泡 —— */
 anchorA = await selectInColumn(0, PHRASE_A, 16)
 ok("重新划选（回归用）", anchorA !== null)
 await page.evaluate(() => {
@@ -279,7 +279,7 @@ await page.evaluate(() => {
 })
 await page.waitForTimeout(250)
 ok(
-  "页面滚动仍关闭气泡（放行只对气泡内部生效）",
+  "来源消息列表滚动仍关闭气泡",
   (await page.locator(".sel-bubble").count()) === 0
 )
 
@@ -377,6 +377,38 @@ ok("带问 Enter：分支列打开", true)
   })
   ok("UI 契约：user 气泡正文 = 原始问题（无前缀）", ui.text === Q1)
   ok("UI 契约：气泡内引用条 = 划选原文（方向 C）", ui.quote === anchorA)
+
+  /* 右侧列继续流式/自动贴底时，左侧仍可成为当前划选来源；其他列滚动不改变
+     来源选区坐标，不应关闭气泡，来源列滚动则必须关闭以免 rect 过期。 */
+  const pickedWhileBranchActive = await selectInColumn(0, PHRASE_A, 16)
+  ok(
+    "右侧分支回复期间仍可划选左侧正文",
+    pickedWhileBranchActive !== null,
+    pickedWhileBranchActive ?? ""
+  )
+  await page.evaluate(() => {
+    const cols = document.querySelectorAll(".tc .cols > .column")
+    cols[1]
+      ?.querySelector(".msg-list")
+      ?.dispatchEvent(new Event("scroll"))
+  })
+  await page.waitForTimeout(200)
+  ok(
+    "非来源列滚动不关闭划选气泡",
+    (await page.locator(".sel-bubble").count()) === 1
+  )
+  await page.evaluate(() => {
+    const cols = document.querySelectorAll(".tc .cols > .column")
+    cols[0]
+      ?.querySelector(".msg-list")
+      ?.dispatchEvent(new Event("scroll"))
+  })
+  await page.waitForTimeout(200)
+  ok(
+    "来源列滚动仍关闭划选气泡",
+    (await page.locator(".sel-bubble").count()) === 0
+  )
+
   // 方向 C 的核心承诺：绑定关系是数据——刷新后引用条仍在（quote 随整树 JSON 落库）
   await page.waitForTimeout(2000) // 过防抖存库
   await page.reload({ waitUntil: "networkidle" })
