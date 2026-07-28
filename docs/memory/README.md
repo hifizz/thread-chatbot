@@ -11,19 +11,21 @@
 | --- | --- | --- | --- |
 | 0. 总纲 | `README.md`（本文件） | ✅ | 路线图与导航 |
 | 1. 全景调研 | `01-survey.md` | ✅ | 记忆分层分类学 + 社区方案全景 + 对比 + 路线图（本阶段产出） |
-| 2. 逐方案深入 | `02-deep-dives/` | ⬜ | 每个代表方案一篇：设计动机、架构、源码级实现细节 |
+| 2. 逐方案深入 | [`02-deep-dives/`](./02-deep-dives/) | ✅ | 8 个代表方案 + 评测设计：设计动机、架构、源码级实现细节与本项目判定 |
+| 2.5 成品架构研究 | [`research/`](./research/) | ✅ | A 托管服务 / B 混合内核 / C 事件图：共享类型、安全契约、Mermaid 图与落地计划 |
 | 3. 实验 | `03-experiments/` | ⬜ | 用最小可复现实验验证关键设计点（抽取质量、检索命中、延迟、成本） |
 | 4. 落地实现 | `04-implementation/` | ⬜ | 本项目的记忆功能设计文档、分期实施记录 |
 | 5. 总结 | `05-retrospective.md` | ⬜ | 实践结果、踩坑、经验与最佳实践 |
 
 ## 阅读顺序
 
-从零开始的读者按 1 → 2 → 3 → 4 → 5 顺序读即可；只关心「本项目怎么做」的读者可直接读 `01-survey.md` 的最后一章（落地路线图）和 `04-implementation/`。
+从零开始的读者按 1 → 2 → 3 → 4 → 5 顺序读即可；只关心「本项目怎么做」的读者可先读 [`01-survey.md`](./01-survey.md) 的最后一章（落地路线图），再读[阶段 2 结论](./02-deep-dives/#结论先行)和[自建 Postgres 蓝本](./02-deep-dives/01-self-built-postgres.md)。
 
 ## 当前进度
 
 - [x] 阶段 1：全景调研报告
-- [ ] 阶段 2：逐方案深入（Mem0 / Letta(MemGPT) / Zep(Graphiti) / LangMem / Claude memory tool / 自建 pgvector 路线…）
+- [x] 阶段 2：逐方案深入（自建 Postgres / Mem0 / Anthropic memory tool / Graphiti / LangMem / Memobase / Letta / ChatGPT memory / 评测）
+- [x] 成品架构研究：A / B / C 三套可比较落地方案
 - [ ] 阶段 3：关键实验
 - [ ] 阶段 4：分期落地
 - [ ] 阶段 5：总结复盘
