@@ -41,6 +41,17 @@ export type ModelCost = {
   outputPerMillion: number
 }
 
+/**
+ * Coding Plan 是订阅套餐，没有逐 token 的实际账单。MVP 先以 ¥10/¥40（输入/输出，
+ * 每百万 token）作为内部保守估值，避免新增模型因缺失定价被当成免费。
+ * 这不是火山方舟套餐标价；商业化前应按各上游最新按量价逐项替换。
+ */
+const ARK_CODING_MVP_COST: ModelCost = {
+  currency: "CNY",
+  inputPerMillion: 10,
+  outputPerMillion: 40,
+}
+
 export const MODEL_COST: Record<string, ModelCost> = {
   // MiniMax M2（直连）— 人民币计价，参考官方定价，请以实际账单为准
   "minimax-m2": {
@@ -60,6 +71,15 @@ export const MODEL_COST: Record<string, ModelCost> = {
     inputPerMillion: 0.15,
     outputPerMillion: 0.6,
   },
+  "doubao-seed-2.1-turbo": ARK_CODING_MVP_COST,
+  "doubao-seed-2.0-lite": ARK_CODING_MVP_COST,
+  "minimax-m2.7": ARK_CODING_MVP_COST,
+  "minimax-m3": ARK_CODING_MVP_COST,
+  "glm-5.2": ARK_CODING_MVP_COST,
+  "deepseek-v4-flash": ARK_CODING_MVP_COST,
+  "deepseek-v4-pro": ARK_CODING_MVP_COST,
+  "kimi-k2.6": ARK_CODING_MVP_COST,
+  "kimi-k2.7-code": ARK_CODING_MVP_COST,
 }
 
 /** 把某币种金额折算成微元。 */

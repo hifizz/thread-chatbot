@@ -9,6 +9,8 @@ import {
   createMarkdownArtifactProgressDispatcher,
 } from "../../lib/chat/markdown-artifact.ts"
 
+const resolveModelIdForTest = (modelId) => modelId ?? "minimax-m2"
+
 function test(name, fn) {
   return Promise.resolve()
     .then(fn)
@@ -20,6 +22,7 @@ function seed() {
     threads: {
       main: {
         id: "main",
+        modelId: "minimax-m2",
         parentId: null,
         depth: 0,
         title: "主线",
@@ -175,7 +178,7 @@ await test("Artifact-only 计为有效终态输出", () => {
   )
 })
 
-await test("UI stream 分派只转发合法 Markdown complete event 并按 call id 去重", () => {
+await test("UI stream 分派支持同一回复多份 Markdown，并按 call id 去重", () => {
   const valid = {
     type: "tool-input-available",
     toolCallId: "call-1",
@@ -189,20 +192,29 @@ await test("UI stream 分派只转发合法 Markdown complete event 并按 call 
   assert.equal(dispatch(valid), true)
   assert.equal(dispatch(valid), true)
   assert.equal(
-    dispatch({ ...valid, toolCallId: "call-2", toolName: "unknown" }),
+    dispatch({
+      ...valid,
+      toolCallId: "call-2",
+      input: { title: "详解", content: "# 详解" },
+    }),
+    true
+  )
+  assert.equal(
+    dispatch({ ...valid, toolCallId: "call-3", toolName: "unknown" }),
     false
   )
   assert.equal(
     dispatch({
       ...valid,
-      toolCallId: "call-3",
+      toolCallId: "call-4",
       input: { title: "总结", content: "" },
     }),
     false
   )
   assert.equal(dispatch({ type: "text-delta", delta: "完成" }), false)
-  assert.equal(artifacts.length, 1)
+  assert.equal(artifacts.length, 2)
   assert.equal(artifacts[0].toolCallId, "call-1")
+  assert.equal(artifacts[1].toolCallId, "call-2")
 })
 
 await test("sanitize 恢复 Artifact-only 中断消息并清理坏引用和孤儿", () => {
@@ -242,7 +254,7 @@ await test("sanitize 恢复 Artifact-only 中断消息并清理坏引用和孤�
     },
   ]
 
-  const clean = sanitizeLoadedState(state)
+  const clean = sanitizeLoadedState(state, resolveModelIdForTest)
   assert.equal(clean.threads.main.messages.length, 1)
   assert.equal(clean.threads.main.messages[0].status, "done")
   assert.deepEqual(clean.threads.main.messages[0].artifactIds, ["keep"])
@@ -268,7 +280,7 @@ await test("sanitize 防御性清理旧快照中的 Markdown 临时进度", () =
       },
     },
   ]
-  const clean = sanitizeLoadedState(state)
+  const clean = sanitizeLoadedState(state, resolveModelIdForTest)
   assert.equal(clean.threads.main.messages[0].status, "done")
   assert.equal(clean.threads.main.messages[0].markdownGeneration, undefined)
 })

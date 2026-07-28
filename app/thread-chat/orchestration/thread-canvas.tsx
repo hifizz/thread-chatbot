@@ -133,6 +133,7 @@ function CanvasFlow({
       focusThread,
       openArtifact: onOpenArtifact,
       getState: store.getState,
+      setThreadModel: store.setThreadModel,
     }),
     [chat, focusThread, onOpenArtifact, store]
   )

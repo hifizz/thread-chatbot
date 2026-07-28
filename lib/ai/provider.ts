@@ -6,10 +6,14 @@ import {
   type LanguageModel,
 } from "ai"
 import { minimaxChatModel, isMinimaxConfigured } from "@/lib/ai/minimax"
+import {
+  arkCodingChatModel,
+  isArkCodingConfigured,
+} from "@/lib/ai/ark"
 import { isVercelGatewayConfigured } from "@/lib/payments/vercel-gateway"
 import { getChatModel, type ChatModel } from "@/constants/model"
 
-// 统一的对话模型解析层，非 MiniMax 模型按优先级路由：
+// 统一的对话模型解析层。Ark 固定走 Coding Plan 专用端点；其余非 MiniMax 模型按优先级路由：
 //   1) Vercel AI 网关（配 AI_GATEWAY_API_KEY）—— 会回传 generationId，供真实成本对账；
 //   2) Cloudflare AI 网关 compat 端点（配 CF_AI_GATEWAY_*）；
 //   3) 供应商直连。
@@ -30,7 +34,7 @@ function gatewayCompatBaseURL(): string {
 
 // 各供应商的 API key 与直连 baseURL（网关未配置时的回退）。
 const PROVIDER_ENV: Record<
-  Exclude<ChatModel["provider"], "minimax">,
+  Exclude<ChatModel["provider"], "minimax" | "ark">,
   { key: string | undefined; directBaseURL: string }
 > = {
   deepseek: {
@@ -47,6 +51,7 @@ const PROVIDER_ENV: Record<
 /** 该模型是否具备可用配置（有对应 key / 网关）。用于给出友好报错。 */
 export function isModelConfigured(model: ChatModel): boolean {
   if (model.provider === "minimax") return isMinimaxConfigured()
+  if (model.provider === "ark") return isArkCodingConfigured()
   // Vercel 网关配了就能用（它自带各家凭据）；否则需要该供应商的直连/CF key。
   if (isVercelGatewayConfigured()) return true
   return Boolean(PROVIDER_ENV[model.provider].key)
@@ -62,6 +67,9 @@ export function resolveChatModel(modelId: string): LanguageModel {
 
   if (model.provider === "minimax") {
     return minimaxChatModel(model.upstreamModel)
+  }
+  if (model.provider === "ark") {
+    return arkCodingChatModel(model.upstreamModel)
   }
 
   // 优先 Vercel AI 网关：用 "creator/model" 标识（复用 gatewayModel），响应带 generationId。

@@ -44,6 +44,8 @@ export interface UIMessageLike {
 /** /api/chat 的 thread-chat 模式请求体 */
 export interface ThreadChatRequestBody {
   messages: UIMessageLike[]
+  /** 当前 Thread 拥有的模型；服务端仍会按统一注册表严格校验。 */
+  modelId: string
   /** 模式标记：服务端据此构造纯文本 system（anchorText 非空时追加分支焦点段） */
   threadChat: { anchorText: string | null }
 }
@@ -114,5 +116,9 @@ export function buildRequestBody(
     })
   }
 
-  return { messages, threadChat: { anchorText: anchor } }
+  return {
+    messages,
+    modelId: thread.modelId,
+    threadChat: { anchorText: anchor },
+  }
 }
