@@ -1,6 +1,5 @@
 import {
   convertToModelMessages,
-  hasToolCall,
   isStepCount,
   streamText,
   tool,
@@ -21,8 +20,8 @@ import {
 import { buildThreadChatSystem } from "@/lib/chat/thread-chat-prompt"
 import { getCurrentUserId } from "@/lib/auth/server"
 import {
+  DEFAULT_MODEL_ID,
   getChatModel,
-  resolveModelId,
   MAX_OUTPUT_TOKENS,
 } from "@/constants/model"
 import { resolveChatModel, isModelConfigured } from "@/lib/ai/provider"
@@ -126,17 +125,24 @@ export async function POST(req: Request) {
     deepResearch?: boolean
     /** thread-chat 分支对话页的模式标记：system 由服务端按锚点原文构造 */
     threadChat?: { anchorText?: string | null }
-    modelId?: string
+    modelId?: unknown
     id?: string
   } = await req.json()
 
   // 2) 解析并校验所选模型
-  const modelId = resolveModelId(rawModelId)
+  if (
+    rawModelId !== undefined &&
+    (typeof rawModelId !== "string" || !getChatModel(rawModelId))
+  ) {
+    return Response.json({ error: "未知或无效的模型。" }, { status: 400 })
+  }
+  const modelId =
+    typeof rawModelId === "string" ? rawModelId : DEFAULT_MODEL_ID
   const model = getChatModel(modelId)!
   if (!isModelConfigured(model)) {
     return Response.json(
       {
-        error: `模型「${model.name}」未配置，请联系管理员在服务端配置对应 API Key 或 CF AI 网关。`,
+        error: `模型「${model.name}」未配置，请联系管理员在服务端配置对应 API Key 或可用网关。`,
       },
       { status: 400 }
     )
@@ -183,8 +189,8 @@ export async function POST(req: Request) {
       tools: allTools,
     }),
     tools: allTools,
-    // 高置信 Markdown 交付请求只强制第 0 步；若第 0 步调用工具，后续步骤禁用它，
-    // 防止多步循环重复创建。其余 ThreadChat 请求由双语 description 自动判定。
+    // 高置信 Markdown 交付请求只强制第 0 步启动工具调用；后续步骤仍保留工具，
+    // 让模型在用户要求多份独立文档时，为每份文档分别创建一个 Artifact。
     prepareStep: isThreadChat
       ? ({ stepNumber }) =>
           stepNumber === 0
@@ -197,14 +203,14 @@ export async function POST(req: Request) {
                   },
                 }
               : { activeTools: [MARKDOWN_ARTIFACT_TOOL_NAME] }
-            : { activeTools: [] }
+            : { activeTools: [MARKDOWN_ARTIFACT_TOOL_NAME] }
       : undefined,
     // 单请求输出封顶：收敛并发竞态下的最大超支敞口，并防异常长输出打爆供应商账单
     maxOutputTokens: MAX_OUTPUT_TOKENS,
-    // Markdown Artifact 本身就是本轮最终交付：工具调用完成后停止，不再启动第二轮
-    // 模型去复述“已生成/包含哪些章节”。其它模式继续沿用既有步数上限。
+    // Thread Chat 最多允许 5 步工具交互，既支持一次交付多份 Markdown 文件，
+    // 也限制异常循环；其它模式继续沿用既有步数上限。
     stopWhen: isThreadChat
-      ? [hasToolCall(MARKDOWN_ARTIFACT_TOOL_NAME), isStepCount(5)]
+      ? isStepCount(5)
       : isStepCount(research && searchReady ? RESEARCH_MAX_STEPS : 5),
     // 4) 生成结束后按 token 用量即时扣费并写入流水（价目表估算，利润率 ≥30%）。
     //    若经 Vercel 网关，采集 generationId，稍后由 /api/billing/reconcile 拉真实成本对账。

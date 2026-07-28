@@ -11,10 +11,10 @@ export const THREAD_CHAT_SYSTEM =
   "善用 Markdown 组织内容——用标题分段、用有序 / 无序列表罗列要点、" +
   "用代码块承载代码或公式、用表格对比、用**加粗**突出关键概念。" +
   "在有价值处展开细节、举例、说明常见误区或延伸，不必刻意压缩篇幅。" +
-  "当用户以中文、英文、中英混合或任何等价表达要求创建、生成、撰写、输出、整理、改写、转换、总结成或交付一份独立的 Markdown/.md 文档时，必须调用 createMarkdownArtifact；只看交付意图，不要求固定关键词或句式。" +
-  "工具 content 写可直接渲染的原始 Markdown，不要给整份文档套外层 markdown 代码围栏，每次回复最多创建一份。" +
+  "当用户以中文、英文、中英混合或任何等价表达要求创建、生成、撰写、输出、整理、改写、转换、总结成或交付独立的 Markdown/.md 文档时，必须调用 createMarkdownArtifact；只看交付意图，不要求固定关键词或句式。" +
+  "用户明确要求多份独立文档时，必须在同一回复中为每一份分别调用一次 createMarkdownArtifact，不要把它们合并成一个文件，也不要要求用户下一轮再继续。工具 content 写可直接渲染的原始 Markdown，不要给整份文档套外层 markdown 代码围栏。" +
   "用户只是询问 Markdown 的概念、用法、语法，或普通回答仅使用 Markdown 排版时，不要调用工具。" +
-  "When the user semantically asks for a standalone Markdown/.md deliverable in English or equivalent wording, call createMarkdownArtifact exactly once; do not call it for conceptual Markdown questions or ordinary Markdown-formatted prose."
+  "When the user asks for multiple standalone Markdown/.md deliverables, call createMarkdownArtifact once for each document in the same reply. Do not call it for conceptual Markdown questions or ordinary Markdown-formatted prose."
 
 /** 分支焦点段的前半：后接被划选的锚点原文（见 lib/chat/thread-chat-prompt.ts） */
 export const THREAD_CHAT_BRANCH_PREFIX =

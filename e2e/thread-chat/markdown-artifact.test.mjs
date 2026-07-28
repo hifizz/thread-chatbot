@@ -4,6 +4,7 @@
  */
 import {
   MARKDOWN_ARTIFACT_CONTENT_MAX_CHARS,
+  MARKDOWN_ARTIFACT_TOOL_DESCRIPTION,
   MARKDOWN_ARTIFACT_TOOL_NAME,
   isExplicitMarkdownDeliverableRequest,
   markdownArtifactProgressFromPartialInput,
@@ -11,6 +12,7 @@ import {
   markdownArtifactInputSchema,
   normalizeMarkdownArtifactInput,
 } from "../../lib/chat/markdown-artifact.ts"
+import { THREAD_CHAT_SYSTEM } from "../../constants/thread-chat.ts"
 
 let failed = 0
 const ok = (label, condition) => {
@@ -50,6 +52,16 @@ ok(
     title: "长文",
     content: "x".repeat(MARKDOWN_ARTIFACT_CONTENT_MAX_CHARS + 1),
   }).success
+)
+ok(
+  "工具提示要求同一回复分别创建多份文件",
+  MARKDOWN_ARTIFACT_TOOL_DESCRIPTION.includes("once for each document") &&
+    !MARKDOWN_ARTIFACT_TOOL_DESCRIPTION.includes("Call at most once per reply")
+)
+ok(
+  "Thread Chat system 不再限制单份 Markdown 文件",
+  THREAD_CHAT_SYSTEM.includes("多份独立文档") &&
+    !THREAD_CHAT_SYSTEM.includes("每次回复最多创建一份")
 )
 
 const positive = [

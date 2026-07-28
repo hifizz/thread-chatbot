@@ -75,6 +75,8 @@ export interface Message {
 
 export interface Thread {
   id: string
+  /** 下一次请求使用的统一模型注册表 id。 */
+  modelId: string
   parentId: string | null
   depth: number
   title: string

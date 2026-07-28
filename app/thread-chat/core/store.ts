@@ -41,7 +41,10 @@ export function defaultBranchTitle(anchorText: string): string {
 
 export type ThreadStore = ReturnType<typeof createThreadStore>
 
-export function createThreadStore(seed: ThreadTreeState) {
+export function createThreadStore(
+  seed: ThreadTreeState,
+  isValidModelId: (modelId: string) => boolean = () => true
+) {
   const state = seed
   let version = 0
   const listeners = new Set<() => void>()
@@ -122,6 +125,7 @@ export function createThreadStore(seed: ThreadTreeState) {
 
       state.threads[id] = {
         id,
+        modelId: parent.modelId,
         parentId: input.sourceThreadId,
         depth,
         title,
@@ -260,6 +264,20 @@ export function createThreadStore(seed: ThreadTreeState) {
       const v = title.trim()
       if (!v || t.title === v) return
       t.title = v
+      notify()
+    },
+
+    /** MVP 模型策略：仅根 Thread 可切换；分支由 fork 继承且保持锁定。 */
+    setThreadModel(threadId: string, modelId: string): void {
+      const thread = state.threads[threadId]
+      if (
+        !thread ||
+        thread.parentId !== null ||
+        !isValidModelId(modelId) ||
+        thread.modelId === modelId
+      )
+        return
+      thread.modelId = modelId
       notify()
     },
 

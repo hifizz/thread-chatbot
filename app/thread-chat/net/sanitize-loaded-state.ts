@@ -5,7 +5,10 @@ import type { Message, Thread, ThreadTreeState } from "../core/types"
  * 有正文或有效 Artifact 的中断 assistant → done；两者皆空 → 删除。
  * message.artifactIds / registry / artifactOrder 最终只保留互相可达的数据。
  */
-export function sanitizeLoadedState(state: ThreadTreeState): ThreadTreeState {
+export function sanitizeLoadedState(
+  state: ThreadTreeState,
+  resolveModelId: (modelId: string | undefined) => string
+): ThreadTreeState {
   let changed = false
   const threads: Record<string, Thread> = {}
   const referencedArtifactIds = new Set<string>()
@@ -13,6 +16,8 @@ export function sanitizeLoadedState(state: ThreadTreeState): ThreadTreeState {
   for (const [id, thread] of Object.entries(state.threads)) {
     let threadChanged = false
     const messages: Message[] = []
+    const modelId = resolveModelId(thread.modelId)
+    threadChanged ||= modelId !== thread.modelId
 
     for (const message of thread.messages) {
       const validArtifactIds =
@@ -62,7 +67,9 @@ export function sanitizeLoadedState(state: ThreadTreeState): ThreadTreeState {
       threadChanged ||= artifactRefsChanged || hasTransientGeneration
     }
 
-    threads[id] = threadChanged ? { ...thread, messages } : thread
+    threads[id] = threadChanged
+      ? { ...thread, modelId, messages }
+      : thread
     changed ||= threadChanged
   }
 

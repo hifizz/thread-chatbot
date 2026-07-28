@@ -758,11 +758,18 @@
   border-radius: 12px;
   padding: 8px 8px 8px 12px;
 }
+.tc .composer .prompt-stack {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-start;
+}
 .tc .composer.branch .box:focus-within {
   border-color: var(--accent);
 }
 .tc .composer textarea {
-  flex: 1;
+  width: 100%;
   border: none;
   outline: none;
   resize: none;
@@ -773,6 +780,41 @@
   color: var(--ink);
   max-height: 120px;
   min-height: 20px;
+}
+.tc .thread-model-selector {
+  max-width: 100%;
+  height: 26px;
+  margin-top: 3px;
+  padding-inline: 4px;
+  color: var(--ink-soft);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+}
+.tc .thread-model-selector:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent, #3a3733) 30%, transparent);
+}
+.tc .thread-model-selector-tooltip-trigger {
+  display: inline-flex;
+  max-width: 100%;
+  border-radius: 6px;
+  cursor: help;
+}
+.tc .thread-model-selector.branch-locked:disabled {
+  /* 覆盖 trigger 的 disabled:opacity-50：分支锁定仍需让模型名可读。 */
+  opacity: 1;
+}
+.tc
+  .thread-model-selector-tooltip-trigger:hover
+  .thread-model-selector.branch-locked:disabled,
+.tc
+  .thread-model-selector-tooltip-trigger:focus-visible
+  .thread-model-selector.branch-locked:disabled {
+  color: var(--ink);
+  background: color-mix(in srgb, var(--accent, #3a3733) 30%, transparent);
+}
+.tc .thread-model-selector-tooltip-trigger:focus-visible {
+  outline: 1px solid color-mix(in srgb, var(--accent, #3a3733) 65%, transparent);
+  outline-offset: 2px;
 }
 .tc .send {
   flex: none;
@@ -1819,8 +1861,15 @@
   padding: 8px 10px 9px;
   border-top: 1px solid var(--rule);
 }
-.tc .canvas-expand .cv-composer textarea {
+.tc .canvas-expand .cv-prompt-stack {
+  display: flex;
+  min-width: 0;
   flex: 1;
+  flex-direction: column;
+  align-items: flex-start;
+}
+.tc .canvas-expand .cv-composer textarea {
+  width: 100%;
   border: 1px solid var(--rule-strong);
   border-radius: 8px;
   background: #fff;

@@ -13,6 +13,7 @@
 import React, { useEffect, useRef } from "react"
 import { MessageScroller } from "@shadcn/react/message-scroller"
 import type { Message } from "../core/types"
+import { ThreadModelSelector } from "./thread-model-selector"
 
 /** 把 \n 转成 <br/>（assistant 正文按段落渲染时的行内换行） */
 export function withBreaks(s: string, keyBase: string): React.ReactNode[] {
@@ -55,6 +56,13 @@ export interface ChatViewProps {
   onStop?: () => void
   /** composer 预填文案（新开分支的代拟首问）：仅在输入框为空时写入，待用户改写或回车确认 */
   composerPrefill?: string
+  /** 当前 Thread 的模型注册表 id。 */
+  modelId: string
+  /** 外部模型策略控制：生成期间或分支 Thread 为 true。 */
+  modelSelectorDisabled: boolean
+  /** 分支锁定时显示模型切换限制说明；生成期间仅禁用。 */
+  modelSelectorDisabledReason?: "branch" | "busy"
+  onModelChange: (modelId: string) => void
   onSend: (text: string) => void
 }
 
@@ -71,6 +79,10 @@ export function ChatView({
   onRetry,
   onStop,
   composerPrefill,
+  modelId,
+  modelSelectorDisabled,
+  modelSelectorDisabledReason,
+  onModelChange,
   onSend,
 }: ChatViewProps) {
   const taRef = useRef<HTMLTextAreaElement | null>(null)
@@ -190,26 +202,34 @@ export function ChatView({
       <div className={`composer ${isMain ? "" : "branch"}`}>
         <div className="lane">
           <div className="box">
-            <textarea
-              rows={1}
-              placeholder={isMain ? "继续在主线提问…" : "在这个分支里追问…"}
-              ref={taRef}
-              onInput={(e) => autoGrow(e.currentTarget)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  // IME 守卫：输入法组合态（中文选词中）按 Enter 只做「上屏」，
-                  // 不发送、也不 preventDefault——否则会把已上屏部分发出去，
-                  // 组合中的文字残留在输入框。isComposing 覆盖 Chrome/Firefox
-                  // （组合期间 keydown.isComposing 为 true）；keyCode 229 兜底
-                  // Safari——它在 compositionend 之后才派发这次 Enter keydown，
-                  // isComposing 已是 false，但 keyCode 仍报 229。
-                  const ne = e.nativeEvent
-                  if (ne.isComposing || ne.keyCode === 229) return
-                  e.preventDefault()
-                  doSend()
-                }
-              }}
-            />
+            <div className="prompt-stack">
+              <textarea
+                rows={1}
+                placeholder={isMain ? "继续在主线提问…" : "在这个分支里追问…"}
+                ref={taRef}
+                onInput={(e) => autoGrow(e.currentTarget)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    // IME 守卫：输入法组合态（中文选词中）按 Enter 只做「上屏」，
+                    // 不发送、也不 preventDefault——否则会把已上屏部分发出去，
+                    // 组合中的文字残留在输入框。isComposing 覆盖 Chrome/Firefox
+                    // （组合期间 keydown.isComposing 为 true）；keyCode 229 兜底
+                    // Safari——它在 compositionend 之后才派发这次 Enter keydown，
+                    // isComposing 已是 false，但 keyCode 仍报 229。
+                    const ne = e.nativeEvent
+                    if (ne.isComposing || ne.keyCode === 229) return
+                    e.preventDefault()
+                    doSend()
+                  }
+                }}
+              />
+              <ThreadModelSelector
+                modelId={modelId}
+                disabled={modelSelectorDisabled}
+                disabledReason={modelSelectorDisabledReason}
+                onValueChange={onModelChange}
+              />
+            </div>
             {busy ? (
               <button
                 className="send stop"

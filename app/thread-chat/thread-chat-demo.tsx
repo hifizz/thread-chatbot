@@ -39,6 +39,10 @@ import {
   TREE_SAVE_DEBOUNCE_MS,
   UI_SAVE_DEBOUNCE_MS,
 } from "@/constants/thread-chat"
+import {
+  isThreadChatModelId,
+  resolveThreadChatModelId,
+} from "@/constants/model"
 import { emptySeedState } from "./core/seed"
 import { createThreadStore, defaultBranchTitle } from "./core/store"
 import { useThreadStore } from "./core/use-thread-store"
@@ -140,7 +144,7 @@ export function ThreadChatDemo({ treeId }: { treeId: string }) {
       const loaded = await loadTree(treeId)
       // sanitize：收敛流式中途落盘的非终态 assistant 残留（见 persist.ts 头注）
       const seed = loaded.state
-        ? sanitizeLoadedState(loaded.state)
+        ? sanitizeLoadedState(loaded.state, resolveThreadChatModelId)
         : emptySeedState()
       // 工作台记忆按加载回来的树校验（列引用的 thread 必须存在）
       const ui = loadUiState(treeId, seed)
@@ -189,7 +193,9 @@ export function ThreadChatDemoInner({
   const router = useRouter()
 
   /* ---------- 会话树：外部可变 store，version 快照驱动重渲 ---------- */
-  const [store] = useState(() => createThreadStore(initialState))
+  const [store] = useState(() =>
+    createThreadStore(initialState, isThreadChatModelId)
+  )
   const version = useThreadStore(store)
   const state = store.getState()
 
@@ -748,6 +754,9 @@ export function ThreadChatDemoInner({
               onCollapse={() => cols.closeColumn(vpIndex)}
               busy={isThreadBusy(threadId)}
               composerPrefill={composerPrefillFor(threadId)}
+              onModelChange={(modelId) =>
+                store.setThreadModel(threadId, modelId)
+              }
               onRetry={(msg: Message) => chat.retry(threadId, msg.id)}
               onStop={() => chat.abort(threadId)}
               onSend={(text) => chat.send(threadId, text)}

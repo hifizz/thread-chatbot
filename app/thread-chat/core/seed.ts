@@ -4,12 +4,14 @@
  */
 
 import type { ThreadTreeState } from "./types"
+import { DEFAULT_THREAD_CHAT_MODEL_ID } from "@/constants/model"
 
 export function emptySeedState(): ThreadTreeState {
   return {
     threads: {
       main: {
         id: "main",
+        modelId: DEFAULT_THREAD_CHAT_MODEL_ID,
         parentId: null,
         depth: 0,
         title: "主线",

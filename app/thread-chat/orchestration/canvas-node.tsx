@@ -34,6 +34,7 @@ import {
   MarkdownArtifactCard,
   MarkdownArtifactProgressCard,
 } from "./markdown-artifact-card"
+import { ThreadModelSelector } from "../chat/thread-model-selector"
 
 /** 会话动作（send/abort/retry）：壳层用 chat-controller 组装后传给画布（D3，零平行实现） */
 export interface CanvasChatActions {
@@ -53,6 +54,8 @@ export interface CanvasActions extends CanvasChatActions {
   openArtifact: (artifactId: string) => void
   /** 读当前树快照（store 原地可变；面板随 version 重渲，渲染时读到即最新） */
   getState: () => ThreadTreeState
+  /** 根 Thread 切换模型；store 会拒绝所有分支写入。 */
+  setThreadModel: (threadId: string, modelId: string) => void
 }
 
 /** 由 ThreadCanvas 提供、穿过 React Flow 到自定义节点（面板不感知壳层） */
@@ -266,23 +269,37 @@ function CanvasExpand({
         })}
       </div>
       <div className="cv-composer">
-        <textarea
-          ref={taRef}
-          rows={1}
-          placeholder="就地继续这段会话…"
-          aria-label="在画布节点里继续对话"
-          onInput={(e) => autoGrow(e.currentTarget)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              // IME 守卫同列模式 composer：组合态 Enter 只做「上屏」不发送；
-              // isComposing 覆盖 Chrome/Firefox，keyCode 229 兜底 Safari
-              const ne = e.nativeEvent
-              if (ne.isComposing || ne.keyCode === 229) return
-              e.preventDefault()
-              doSend()
-            }
-          }}
-        />
+        <div className="cv-prompt-stack">
+          <textarea
+            ref={taRef}
+            rows={1}
+            placeholder="就地继续这段会话…"
+            aria-label="在画布节点里继续对话"
+            onInput={(e) => autoGrow(e.currentTarget)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                // IME 守卫同列模式 composer：组合态 Enter 只做「上屏」不发送；
+                // isComposing 覆盖 Chrome/Firefox，keyCode 229 兜底 Safari
+                const ne = e.nativeEvent
+                if (ne.isComposing || ne.keyCode === 229) return
+                e.preventDefault()
+                doSend()
+              }
+            }}
+          />
+          {state?.threads[threadId] && (
+            <ThreadModelSelector
+              modelId={state.threads[threadId].modelId}
+              disabled={!data.isMain || busy}
+              disabledReason={
+                !data.isMain ? "branch" : busy ? "busy" : undefined
+              }
+              onValueChange={(modelId) =>
+                actions?.setThreadModel(threadId, modelId)
+              }
+            />
+          )}
+        </div>
         {busy ? (
           <button
             className="cv-send stop"

@@ -618,6 +618,8 @@ export type ModelSelectorProps = Omit<ModelSelectorRootProps, "children"> &
   VariantProps<typeof modelSelectorTriggerVariants> & {
     /** Render a search input above the model list. */
     searchable?: boolean;
+    /** Disable opening the selector while still showing the selected model. */
+    disabled?: boolean;
     className?: string;
     contentClassName?: string;
   };
@@ -648,6 +650,7 @@ const ModelSelectorImpl = ({
   searchable,
   variant,
   size,
+  disabled,
   className,
   contentClassName,
   ...rootProps
@@ -658,6 +661,7 @@ const ModelSelectorImpl = ({
       <ModelSelectorTrigger
         variant={variant}
         size={size}
+        disabled={disabled}
         className={className}
       />
       <ModelSelectorContent
