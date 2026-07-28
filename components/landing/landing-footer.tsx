@@ -3,7 +3,6 @@ import type { ReactElement } from "react"
 
 import { LANDING } from "@/constants/landing"
 import { PROJECT } from "@/constants/project"
-import { ROUTES } from "@/constants/routes"
 
 import styles from "./landing.module.css"
 
@@ -11,20 +10,19 @@ export function LandingFooter(): ReactElement {
   return (
     <footer className={styles.footer}>
       <div className={styles.footerInner}>
-        <Link href={ROUTES.landing} className={styles.footerBrand}>
-          <span className={styles.footerMark} aria-hidden />
-          {PROJECT.name}
-        </Link>
+        <div>
+          <p>{LANDING.footer.line}</p>
+        </div>
         <nav aria-label="Footer navigation">
           <ul className={styles.footerLinks}>
-            {LANDING.nav.map((item) => (
-              <li key={item.href}>
-                {item.external ? (
-                  <a href={item.href} target="_blank" rel="noreferrer">
-                    {item.label}
+            {LANDING.footer.links.map((link) => (
+              <li key={link.href}>
+                {link.external ? (
+                  <a href={link.href} target="_blank" rel="noreferrer">
+                    {link.label}
                   </a>
                 ) : (
-                  <Link href={item.href}>{item.label}</Link>
+                  <Link href={link.href}>{link.label}</Link>
                 )}
               </li>
             ))}

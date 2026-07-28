@@ -18,41 +18,12 @@ export function LandingHeader(): ReactElement {
           aria-label={`${PROJECT.name} home`}
         >
           <span className={styles.brandMark} aria-hidden>
-            <span />
-            <span />
-            <span />
+            <i />
+            <i />
+            <i />
           </span>
-          <span>{PROJECT.name}</span>
         </Link>
-
-        <nav className={styles.nav} aria-label="Primary navigation">
-          <ul className={styles.navList}>
-            {LANDING.nav.map((item) => (
-              <li key={item.href}>
-                {item.external ? (
-                  <a
-                    href={item.href}
-                    className={styles.navLink}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    {item.label}
-                  </a>
-                ) : (
-                  <Link href={item.href} className={styles.navLink}>
-                    {item.label}
-                  </Link>
-                )}
-              </li>
-            ))}
-          </ul>
-        </nav>
-
-        <LandingCtaLink
-          cta={LANDING.hero.primaryCta}
-          tone="primary"
-          className={styles.headerCta}
-        />
+        <LandingCtaLink cta={LANDING.navCta} className={styles.headerCta} />
       </div>
     </header>
   )

@@ -6,6 +6,5 @@ export interface LandingSectionProps {
 
 export interface LandingCtaLinkProps {
   cta: LandingCta
-  tone: "primary" | "secondary" | "text"
   className?: string
 }

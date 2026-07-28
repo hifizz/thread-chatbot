@@ -1,182 +1,97 @@
-// English landing-page content and its rendering contracts.
-// Components own presentation only; product copy and destinations stay here.
+// Homepage copy, routes, and replaceable media live here so sections stay presentational.
 
 import { PROJECT } from "./project"
 import { ROUTES } from "./routes"
 
-export type LandingSectionId =
-  "how-it-works" | "workspace" | "canvas" | "capabilities"
-
-export interface LandingNavItem {
-  label: string
-  href: `#${LandingSectionId}` | string
-  external?: boolean
-}
-
 export interface LandingCta {
   label: string
   href: string
-  external?: boolean
   accessibleLabel?: string
 }
 
-export interface LandingHeroContent {
-  eyebrow: string
-  title: string
-  subtitle: string
-  primaryCta: LandingCta
-  secondaryCta: LandingCta
-}
-
-export interface LandingStep {
-  number: "01" | "02" | "03"
-  verb: "Select" | "Branch" | "Navigate"
-  title: string
-  description: string
-}
-
-export interface LandingShowcaseContent {
-  id: Extract<LandingSectionId, "workspace" | "canvas">
-  eyebrow: string
-  title: string
-  description: string
-  notes: readonly string[]
-}
-
-export type LandingCapabilityIcon =
-  "messages" | "database" | "fileText" | "search"
-
-export interface LandingCapability {
-  icon: LandingCapabilityIcon
-  title: string
-  description: string
-}
-
 export interface LandingContent {
-  nav: readonly LandingNavItem[]
-  hero: LandingHeroContent
-  steps: readonly LandingStep[]
-  workspace: LandingShowcaseContent
-  canvas: LandingShowcaseContent
-  capabilitiesTitle: string
-  capabilities: readonly LandingCapability[]
-  closing: {
+  hero: {
+    videoSrc: string
+    videoDescription: string
+    slogan: string
+  }
+  statement: {
     title: string
     description: string
-    primaryCta: LandingCta
-    secondaryCta: LandingCta
+  }
+  whyBuilt: {
+    title: string
+    paragraphs: readonly string[]
+  }
+  whyNotExisting: {
+    title: string
+    introduction: string
+    differences: readonly { title: string; description: string }[]
+  }
+  navCta: LandingCta
+  primaryCta: LandingCta
+  footer: {
+    line: string
+    links: readonly { label: string; href: string; external?: boolean }[]
   }
 }
 
-const startChatCta: LandingCta = {
-  label: "Start chatting",
-  href: ROUTES.startChat,
-}
-
-const githubCta: LandingCta = {
-  label: "View on GitHub",
-  href: PROJECT.repositoryUrl,
-  external: true,
-}
-
 export const LANDING: LandingContent = {
-  nav: [
-    { label: "How it works", href: "#how-it-works" },
-    { label: "Workspace", href: "#workspace" },
-    { label: "Canvas", href: "#canvas" },
-    {
-      label: "GitHub",
-      href: PROJECT.repositoryUrl,
-      external: true,
-    },
-  ],
   hero: {
-    eyebrow: "A thinking interface for AI",
-    title: "Follow every thought. Lose none of the thread.",
-    subtitle:
-      "Select any part of an AI response and open a focused conversation from that exact point. Every branch keeps its context, while your main line stays intact.",
-    primaryCta: startChatCta,
-    secondaryCta: githubCta,
+    // Replace this file when the final MP4 is ready. The visual shell works without it.
+    videoSrc: "/thread-chat-hero.mp4",
+    videoDescription:
+      "A preview of Thread Chat, where a selected answer opens a connected branch beside the main conversation.",
+    slogan: "Your thoughts are allowed to branch.",
   },
-  steps: [
-    {
-      number: "01",
-      verb: "Select",
-      title: "Start where curiosity strikes",
-      description:
-        "Highlight a phrase, claim, or example inside any AI response. The point you selected becomes the focus of a new conversation.",
-    },
-    {
-      number: "02",
-      verb: "Branch",
-      title: "Carry context, not clutter",
-      description:
-        "The branch inherits everything up to the fork, then develops independently. Your original conversation remains clean and readable.",
-    },
-    {
-      number: "03",
-      verb: "Navigate",
-      title: "Compare, return, and go deeper",
-      description:
-        "Move through breadcrumbs, side-by-side columns, or the full canvas. A branch can split again whenever the next question appears.",
-    },
-  ],
-  workspace: {
-    id: "workspace",
-    eyebrow: "Side-by-side workspace",
-    title: "Compare ideas without losing your place.",
+  statement: {
+    title: "Think past the first answer.",
     description:
-      "Keep the main thread anchored while opening important branches beside it. Compare ideas side by side, then return without losing your place.",
-    notes: [
-      "Each branch inherits its context",
-      "Resizable reading columns",
-      "Breadcrumbs, search, and quick switching",
+      "A workspace for following the interesting parts of an AI conversation without losing the original thread.",
+  },
+  whyBuilt: {
+    title: "A good question rarely moves in a straight line.",
+    paragraphs: [
+      "Most chat interfaces are designed to keep moving forward. But the useful part of a conversation often begins when one sentence makes you pause, question it, and take a different path.",
+      "Opening a new chat loses the moment that made the question matter. Staying in the same one turns the original line of thought into noise. I wanted both paths to remain visible.",
     ],
   },
-  canvas: {
-    id: "canvas",
-    eyebrow: "Conversation canvas",
-    title: "See the shape of your thinking.",
-    description:
-      "Zoom out from individual messages to the entire conversation tree. Find the path you took, spot parallel ideas, and jump back into any node.",
-    notes: [
-      "See every conversation at a glance",
-      "Pan, zoom, pin, and rearrange",
-      "Continue the discussion from the map",
+  whyNotExisting: {
+    title: "A branch is not yet a thinking structure.",
+    introduction:
+      "ChatGPT and Codex can open threads or branches. Thread Chat is built around what happens after the split: keeping the relationship between ideas intact as you keep exploring.",
+    differences: [
+      {
+        title: "Start from the exact thought",
+        description:
+          "Every branch inherits the conversation at the sentence you selected, so the question starts with the context that made it meaningful.",
+      },
+      {
+        title: "Keep the main line clear",
+        description:
+          "A branch develops beside the original conversation. You can go deep without turning the main thread into a transcript of detours.",
+      },
+      {
+        title: "Return to the whole shape",
+        description:
+          "Your tree and workspace persist across visits, and a useful branch can become a Markdown artifact without losing where it came from.",
+      },
     ],
   },
-  capabilitiesTitle: "Built for ideas that branch.",
-  capabilities: [
-    {
-      icon: "messages",
-      title: "Context-aware branches",
-      description:
-        "Every branch inherits the conversation up to the selected point, then develops independently.",
-    },
-    {
-      icon: "database",
-      title: "Persistent conversation trees",
-      description:
-        "Your branches and messages stay where you left them, across refreshes and return visits.",
-    },
-    {
-      icon: "fileText",
-      title: "Markdown artifacts",
-      description:
-        "Turn any branch into a structured Markdown document and keep it linked to the conversation that produced it.",
-    },
-    {
-      icon: "search",
-      title: "Deep research",
-      description:
-        "Search the web, read relevant pages, and keep source-backed findings inside the conversation tree.",
-    },
-  ],
-  closing: {
-    title: "Give every good question room to grow.",
-    description:
-      "Start with one conversation. Follow the interesting parts. Return with the whole line of thought still in view.",
-    primaryCta: startChatCta,
-    secondaryCta: githubCta,
+  navCta: {
+    label: "Get started",
+    href: ROUTES.startChat,
+  },
+  primaryCta: {
+    label: "Follow your next question",
+    href: ROUTES.startChat,
+  },
+  footer: {
+    line: "Built for curiosity with a long memory.",
+    links: [
+      { label: "GitHub", href: PROJECT.repositoryUrl, external: true },
+      { label: "Privacy", href: "/privacy" },
+      { label: "Terms", href: "/terms" },
+    ],
   },
 }
