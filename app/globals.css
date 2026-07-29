@@ -131,3 +131,21 @@
     @apply font-sans;
     }
 }
+
+/* assistant-ui Shiki notation：只装饰 token 行，不改变代码文本。 */
+.aui-shiki-base .line {
+    display: inline-block;
+    width: 100%;
+}
+
+.aui-shiki-base .line.highlighted {
+    background: color-mix(in oklch, var(--primary) 8%, transparent);
+}
+
+.aui-shiki-base .line.diff.add {
+    background: color-mix(in oklch, oklch(0.72 0.17 155) 16%, transparent);
+}
+
+.aui-shiki-base .line.diff.remove {
+    background: color-mix(in oklch, var(--destructive) 14%, transparent);
+}

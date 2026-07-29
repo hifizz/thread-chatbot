@@ -54,6 +54,31 @@ node e2e/thread-chat/verify-markdown-artifact.mjs
 覆盖列视图/Canvas 共用卡片、Artifact-only 无空气泡、右侧 GFM 预览、停止/重试、
 整树保存与刷新恢复、坏引用/孤儿清理，以及“修改刚才的 Markdown”的上下文回放。
 
+## Shiki 代码高亮浏览器验收（mock API）
+
+前提：dev server、本机 Chrome，以及已登录会话的 Playwright storage state。脚本 mock
+客户端 `/api/**`，因此真正运行的是当前 `/thread-chat` 的 `MarkdownBody`、Shiki
+动态加载、Artifact drawer 和锚点交互；但服务端 layout 在请求进入浏览器拦截前已经
+校验真实会话，所以仍需登录态，不需要模型额度。
+
+```bash
+CHROMIUM_PATH="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
+STORAGE_STATE=/path/to/authenticated-storage-state.json \
+BASE_URL=http://localhost:4040 \
+node e2e/thread-chat/verify-syntax-highlighting.mjs
+```
+
+覆盖稳定消息与静态 Artifact 的 Shiki DOM、未知语言 plaintext fallback、代码内
+`<script>` 文本不执行、复制保留原文、异步高亮结算后的锚点/脚注恢复、正文划选与
+脚注点击开分支，以及刷新后重绘。流式阶段与多代码块乱序/卸载的状态机覆盖见
+`markdown-settlement.test.mjs`；浏览器网络分片与长代码性能仍属于手工性能验收。
+
+`assistant-ui` 的完整 fence 标签由
+`patches/@assistant-ui__react-markdown@0.14.5.patch` 修正上游
+`CodeOverride` 正则。OpenSpec 收尾时用 4040 临时 harness 验证了：稳定 `ts` 会高亮、
+`shell-session` 保持完整标签并走 plaintext、running 代码块保持 plaintext，以及
+light/dark 主题切换；临时路由未保留在产品构建中。
+
 ## 默认 MiniMax 真实语义选择
 
 会产生少量真实模型用量；读取 `.env.local` 的 MiniMax 配置。

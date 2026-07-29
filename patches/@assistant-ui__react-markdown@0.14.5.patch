@@ -1,0 +1,15 @@
+diff --git a/dist/overrides/CodeOverride.js b/dist/overrides/CodeOverride.js
+index 2958a60343c6318cde527727e4f3a1a144f99e9f..ce871882010a6ebd3a9782347b4c6f23b1fd8491 100644
+--- a/dist/overrides/CodeOverride.js
++++ b/dist/overrides/CodeOverride.js
+@@ -15 +15 @@
+-	const language = /language-(\w+)/.exec(codeProps.className || "")?.[1] ?? "";
++	const language = /(?:^|\s)language-([^\s]+)/.exec(codeProps.className || "")?.[1] ?? "";
+diff --git a/src/overrides/CodeOverride.tsx b/src/overrides/CodeOverride.tsx
+index 93c7f1a9445d20309747d7604b22a6cac959660d..a852f137a80991869bd0e4f154c8790f3e95233e 100644
+--- a/src/overrides/CodeOverride.tsx
++++ b/src/overrides/CodeOverride.tsx
+@@ -44 +44,2 @@
+-  const language = /language-(\w+)/.exec(codeProps.className || "")?.[1] ?? "";
++  const language =
++    /(?:^|\s)language-([^\s]+)/.exec(codeProps.className || "")?.[1] ?? "";

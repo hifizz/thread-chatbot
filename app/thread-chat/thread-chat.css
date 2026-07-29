@@ -2166,51 +2166,87 @@
 /* 代码块：语言标签 + 复制按钮 + 代码体 */
 .tc .md-body .md-code {
   margin: 0 0 12px;
-  border: 1px solid var(--rule-strong);
+  border: 1px solid var(--rule);
   border-radius: 8px;
   overflow: hidden;
-  background: #2b2822;
+  background: #fff;
 }
 .tc .md-body .md-code-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 5px 10px;
-  background: #35312a;
-  border-bottom: 1px solid #453f36;
+  background: var(--paper-2);
+  border-bottom: 1px solid var(--rule);
   font-family: var(--font-mono);
 }
 .tc .md-body .md-code-head .lang {
   font-size: 10.5px;
   letter-spacing: 0.5px;
   text-transform: lowercase;
-  color: #b8ad98;
+  color: var(--ink-soft);
 }
 .tc .md-body .md-code-head .copy {
   display: inline-flex;
   align-items: center;
   background: transparent;
   border: none;
-  color: #b8ad98;
+  color: var(--ink-soft);
   cursor: pointer;
   padding: 2px;
   border-radius: 4px;
 }
 .tc .md-body .md-code-head .copy:hover {
-  color: #f0e9d8;
-  background: rgba(255, 255, 255, 0.08);
+  color: var(--ink);
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
 }
 .tc .md-body .md-code pre {
   margin: 0;
   padding: 11px 13px;
   overflow-x: auto;
 }
+.tc .md-body .md-code pre.shiki {
+  background: transparent !important;
+}
 .tc .md-body .md-code code {
+  display: block;
+  min-width: max-content;
   font-family: var(--font-mono);
   font-size: 12.5px;
   line-height: 1.6;
-  color: #ece3d1;
+  color: var(--ink);
   white-space: pre;
+}
+.tc .md-body .md-code .line {
+  display: inline-block;
+  width: 100%;
+}
+.tc .md-body .md-code .line.highlighted {
+  background: color-mix(in srgb, var(--d4) 10%, transparent);
+  box-shadow: -13px 0 color-mix(in srgb, var(--d4) 10%, transparent);
+}
+.tc .md-body .md-code .line.diff {
+  position: relative;
+  padding-left: 14px;
+}
+.tc .md-body .md-code .line.diff::before {
+  position: absolute;
+  left: 0;
+  color: var(--ink-faint);
+}
+.tc .md-body .md-code .line.diff.add {
+  background: color-mix(in srgb, var(--d1) 12%, transparent);
+}
+.tc .md-body .md-code .line.diff.add::before {
+  content: "+";
+  color: var(--d1);
+}
+.tc .md-body .md-code .line.diff.remove {
+  background: color-mix(in srgb, var(--d3) 12%, transparent);
+}
+.tc .md-body .md-code .line.diff.remove::before {
+  content: "-";
+  color: var(--d3);
 }
 
 /* 手绘锚点高亮（data-text-anchor-mark 由 paintRange 绘制，背景色内联）+ 脚注上标 */
