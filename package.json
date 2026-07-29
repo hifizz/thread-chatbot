@@ -35,6 +35,8 @@
     "@base-ui/react": "^1.6.0",
     "@dagrejs/dagre": "^3.0.0",
     "@shadcn/react": "^0.2.0",
+    "@shikijs/langs": "4.3.1",
+    "@shikijs/themes": "4.3.1",
     "@shikijs/transformers": "4.3.1",
     "@xyflow/react": "^12.11.2",
     "ai": "^7.0.14",
