@@ -1,0 +1,101 @@
+/* ── @/thread-chat/styles ── 顶栏：brand / 视图 seg / tbtn */
+
+/* ---------------- 顶栏 ---------------- */
+.tc .topbar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--rule-strong);
+  background: linear-gradient(180deg, #faf8f2, var(--paper));
+  flex-wrap: wrap;
+}
+.tc .brand {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.tc .brand .mark {
+  font-family: var(--font-read);
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+.tc .brand .mark em {
+  font-style: italic;
+  color: var(--d1);
+}
+.tc .spacer {
+  flex: 1;
+}
+
+.tc .seg {
+  display: inline-flex;
+  border: 1px solid var(--rule-strong);
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fff;
+}
+.tc .seg button {
+  border: none;
+  background: #fff;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-soft);
+  padding: 6px 10px;
+  border-right: 1px solid var(--rule);
+}
+.tc .seg button:last-child {
+  border-right: none;
+}
+.tc .seg button:hover {
+  background: var(--paper-2);
+}
+.tc .seg button.on {
+  background: color-mix(in srgb, var(--d1) 12%, #fff);
+  color: var(--d1);
+  font-weight: 700;
+}
+
+.tc .tbtn {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-soft);
+  cursor: pointer;
+  border: 1px solid var(--rule-strong);
+  border-radius: 8px;
+  padding: 5px 11px;
+  background: #fff;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.tc .tbtn:hover {
+  border-color: var(--d1);
+  color: var(--d1);
+}
+.tc .tbtn[disabled] {
+  opacity: 0.4;
+  cursor: default;
+  pointer-events: none;
+}
+.tc .tbtn .cnt {
+  font-size: 10px;
+  font-weight: 700;
+  color: #fff;
+  background: var(--d2);
+  border-radius: 999px;
+  padding: 1px 6px;
+}
+.tc .kbd {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-soft);
+  border: 1px solid var(--rule-strong);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  padding: 1px 5px;
+  background: #fff;
+}

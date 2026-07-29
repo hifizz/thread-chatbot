@@ -1,0 +1,283 @@
+/* ── @/thread-chat/styles ── 列布局 + 列间分割线（拖拽 / 键盘调宽） */
+
+/* ---------------- 列布局 ----------------
+   列行永远铺满视口：自动列 flex:1 1 0，显式调宽列由 ColumnShell 渲染 flex:1 1 <px>
+   （flex-basis 承载宽度，grow/shrink 保留），容器变化时全行按 grow/shrink 吸收差值，
+   两侧不留 gutter；窄屏总 min 超出容器时保持横向滚动（默认 start 对齐可达最左列）。
+   列宽只设下限 --col-min，「最大阅读宽度」不再约束列本身，由列内 .lane 通道承担。 */
+.tc .cols {
+  flex: 1;
+  display: flex;
+  overflow-x: auto;
+}
+.tc .column {
+  flex: 1 1 0;
+  min-width: var(--col-min);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--rule);
+  background: var(--paper);
+  position: relative;
+}
+.tc .column.branch {
+  background: linear-gradient(180deg, #faf8f2 0, var(--paper) 130px);
+}
+.tc .column.branch::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--accent);
+  z-index: 1;
+}
+.tc .column:last-child {
+  border-right: none;
+}
+
+/* 列内阅读通道：列头 / 横幅 / 消息流 / composer 的内容收敛在 --lane-max 内水平居中；
+   列宽 ≤ 通道宽时通道自然铺满（无感）。lane 是纯展示包装，纸面 / 边框仍随列通栏。
+   .lane.pad 用于父级没有水平 padding 的段（banner）：18px 侧距计入 lane 内侧，
+   max-width 相应放宽 2×18px，保证内容盒与消息通道左右对齐、窄列观感不变。 */
+.tc .lane {
+  width: 100%;
+  max-width: var(--lane-max);
+  margin-inline: auto;
+  min-width: 0;
+}
+.tc .lane.pad {
+  padding-inline: 18px;
+  max-width: calc(var(--lane-max) + 36px);
+}
+.tc .column.flash {
+  animation: tc-flash 0.9s ease;
+}
+
+/* ---------------- 列间分割线（相邻两个展开列之间，可拖拽 / 键盘调宽） ----------------
+   9px 热区骑在两列交界上（负 margin 各吞 4.5px，不占行宽）；默认视觉为中央 1px
+   --rule 线，顶掉左列自身的 border-right（改透明，保留 1px 占位使观感不变）。 */
+.tc .col-resizer {
+  flex: none;
+  width: 9px;
+  margin: 0 -4.5px;
+  position: relative;
+  z-index: 3;
+  cursor: col-resize;
+  touch-action: none;
+  outline: none;
+}
+.tc .col-resizer::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 4px;
+  width: 1px;
+  background: var(--rule);
+  transition:
+    left 0.12s,
+    width 0.12s,
+    background 0.12s;
+}
+.tc .col-resizer:hover::before,
+.tc .col-resizer.active::before,
+.tc .col-resizer:focus-visible::before {
+  left: 3px;
+  width: 3px;
+  background: var(--d1);
+}
+.tc .cols .column:has(+ .col-resizer) {
+  border-right-color: transparent;
+}
+/* 程序性变宽（双击恢复均分）才走过渡；拖拽期间绝不允许挂 .easing */
+.tc .cols.easing .column {
+  transition:
+    width 0.32s cubic-bezier(0.32, 0.72, 0, 1),
+    flex-basis 0.32s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.tc .col-head {
+  flex: none;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--rule);
+  background: #ffffff55;
+}
+.tc .crumb {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-soft);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-bottom: 9px;
+}
+.tc .crumb .seg2 {
+  cursor: pointer;
+  padding: 2px 7px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+}
+.tc .crumb .seg2:hover {
+  background: #fff;
+  border-color: var(--rule-strong);
+  color: var(--ink);
+}
+.tc .crumb .chev {
+  color: var(--ink-faint);
+}
+.tc .crumb .here {
+  color: var(--accent);
+  font-weight: 700;
+  cursor: default;
+  background: color-mix(in srgb, var(--accent) 9%, transparent);
+  padding: 2px 7px;
+  border-radius: 6px;
+}
+.tc .ctitle-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.tc .anchor-tag {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-soft);
+  border: 1px solid var(--rule-strong);
+  border-radius: 5px;
+  padding: 2px 6px;
+  flex: none;
+}
+.tc .depth-badge {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 5px;
+  padding: 2px 6px;
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  flex: none;
+}
+.tc .ctitle {
+  font-family: var(--font-read);
+  font-size: 16px;
+  font-weight: 600;
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tc .col-sub {
+  font-size: 12px;
+  color: var(--ink-faint);
+  margin-top: 2px;
+}
+.tc .cactions {
+  display: flex;
+  gap: 5px;
+  flex: none;
+}
+.tc .cbtn {
+  cursor: pointer;
+  border: 1px solid var(--rule-strong);
+  background: #fff;
+  border-radius: 7px;
+  padding: 4px 9px;
+  font-size: 12px;
+  color: var(--ink-soft);
+  line-height: 1;
+  white-space: nowrap;
+}
+.tc .cbtn:hover {
+  border-color: var(--accent, var(--d1));
+  color: var(--accent, var(--d1));
+}
+
+.tc .focus-banner {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--accent) 8%, var(--paper));
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--rule));
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+}
+.tc .focus-banner .fn {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  background: var(--accent);
+  border-radius: 5px;
+  padding: 2px 6px;
+  flex: none;
+  margin-top: 1px;
+}
+.tc .focus-banner .ft {
+  font-size: 13px;
+  line-height: 1.5;
+  min-width: 0;
+}
+.tc .focus-banner .ft .lbl {
+  color: var(--ink-soft);
+  font-size: 11px;
+  display: block;
+  margin-bottom: 2px;
+  font-family: var(--font-mono);
+}
+.tc .focus-banner .ft q {
+  font-family: var(--font-read);
+  color: var(--ink);
+  quotes: "「" "」";
+}
+
+.tc details.inherited {
+  margin: 12px 0 0;
+  border: 1px dashed var(--rule-strong);
+  border-radius: 9px;
+  background: #fff6;
+}
+.tc details.inherited > summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 9px 12px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-soft);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.tc details.inherited > summary::-webkit-details-marker {
+  display: none;
+}
+.tc details.inherited > summary .tw {
+  transition: transform 0.2s;
+}
+.tc details.inherited[open] > summary .tw {
+  transform: rotate(90deg);
+}
+.tc .inherited-body {
+  padding: 2px 12px 12px;
+  border-top: 1px dashed var(--rule);
+}
+.tc .inh-msg {
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--ink-faint);
+  margin: 8px 0;
+}
+.tc .inh-msg .who {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--ink-faint);
+  margin-right: 6px;
+}
