@@ -10,7 +10,7 @@
  * 本层只发出意图回调（打开会话 / 回退 / 收起…），列槽的增删换由 orchestration 决定。
  */
 
-import React, { useEffect, useRef } from "react"
+import React, { useCallback, useEffect, useReducer, useRef } from "react"
 import { ListTree } from "lucide-react"
 import type { Message, ThreadTreeState } from "../core/types"
 import { collectInherited, lineage, threadTitle } from "../core/selectors"
@@ -250,18 +250,18 @@ export function BranchableChat({
  * 否则划选反查（以 .md-body 为坐标系）在画布内直接失效。
  *
  * React 与手绘 DOM 的冲突规避：
- * · MarkdownBody 按 source 用 memo——source 不变则不重渲染，手绘的高亮/脚注不被 reconcile 抹掉；
+ * · MarkdownBody 按 source / streaming 用 memo；代码高亮 batch 结算后才允许手绘，
+ *   避免 Shiki 的异步 React commit 与 paintRange 同时改 token 子树；
  * · source 变化只发生在流式增量时，而流式中的消息尚无 fork（fork 只在已完成消息上创建），
  *   故无高亮与 React 更新的冲突；
- * · 只在 commit 后的 effect 里绘制（deps = [msg.text, forksKey]），绝不在 render / setState 里绘。
+ * · 只在 commit 后的 effect 里绘制，绝不在 render / setState 里绘。
  * · 定位失败（locateAnchor 返回 null 或 fuzzy 低于阈值）静默跳过该 fork——不高亮，
  *   但分支本体 / 脚注列表 / ⌘K 不受影响。
  *
  * 平滑打字（useSmoothText）与锚点 effect 的不变式：
- * · display 是 msg.text 的「追赶态」，deps 仍是 [msg.text, forksKey]（原文，非 display）——
- *   锚点定位坐标系必须是渲染后的完整正文，不能跟着平滑的中间态重绘；
- * · fork 只在已完成消息（active=false）上创建，此时 useSmoothText 已把 display snap 到
- *   与 msg.text 完全一致，二者恒等，故锚点效果不受平滑影响，无需改锚点代码。
+ * · active 时渲染 display 追赶态且不恢复锚点；
+ * · active=false 的首个 render 不能假设 useSmoothText 的 effect 已经完成 snap，因此
+ *   稳定态直接渲染 msg.text；待 MarkdownBody 报告当前 DOM settled 后再恢复锚点。
  */
 export function AnchoredMarkdown({
   state,
@@ -277,6 +277,14 @@ export function AnchoredMarkdown({
   const forksKey = msg.forks.map((f) => `${f.threadId}:${f.num}`).join("|")
   const active = msg.status === "streaming" || msg.status === "pending"
   const display = useSmoothText(msg.text, active)
+  const renderedSource = active ? display : msg.text
+  const [settledRevision, bumpSettledRevision] = useReducer(
+    (revision: number) => revision + 1,
+    0
+  )
+  const onContentSettled = useCallback(() => {
+    bumpSettledRevision()
+  }, [])
 
   useEffect(() => {
     const host = hostRef.current
@@ -289,6 +297,9 @@ export function AnchoredMarkdown({
       md.querySelectorAll("sup.fn-mark").forEach((n) => n.remove())
     }
     wipe()
+
+    // 高亮仍在飞或当前是流式 plaintext 时，绝不手改 React 即将 reconcile 的代码 DOM。
+    if (active || md.dataset.contentSettled !== "true") return wipe
 
     for (const fork of msg.forks) {
       if (!fork.anchor) continue
@@ -319,7 +330,7 @@ export function AnchoredMarkdown({
     return wipe
     // state 仅用于 title 文案，不参与重绘时机；有意省略以免每次 version 变动都重绘
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [msg.text, forksKey])
+  }, [active, msg.text, forksKey, settledRevision])
 
   // 点击冒泡到稳定容器：命中高亮 / 脚注（data-fork-id）即打开对应分支。
   // 高亮与脚注是手绘 DOM，但事件冒泡到此 React onClick，重绘不丢 handler。
@@ -333,7 +344,11 @@ export function AnchoredMarkdown({
 
   return (
     <div ref={hostRef} onClick={onClick}>
-      <MarkdownBody source={display} />
+      <MarkdownBody
+        source={renderedSource}
+        streaming={active}
+        onContentSettled={onContentSettled}
+      />
     </div>
   )
 }
