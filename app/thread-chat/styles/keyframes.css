@@ -1,0 +1,75 @@
+/* ── @/thread-chat/styles ── 全部 tc-* 具名关键帧（顺序无关，集中于此） */
+
+@keyframes tc-flash {
+  0% {
+    background: color-mix(in srgb, var(--accent) 14%, var(--paper));
+  }
+  100% {
+  }
+}
+
+@keyframes tc-progress-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes tc-progress-slide {
+  from {
+    transform: translateX(-110%);
+  }
+  to {
+    transform: translateX(285%);
+  }
+}
+
+@keyframes tc-pop {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes tc-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes tc-pop-center {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(6px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes tc-typing-bounce {
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.5;
+  }
+  30% {
+    transform: translateY(-3px);
+    opacity: 1;
+  }
+}
+
+@keyframes tc-caret-blink {
+  0%,
+  50% {
+    opacity: 1;
+  }
+  50.01%,
+  100% {
+    opacity: 0;
+  }
+}

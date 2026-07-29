@@ -1,0 +1,20 @@
+/* ── @/thread-chat/styles ── 滚动条 / 动效降级 */
+
+/* ---------------- 滚动条 / 动效降级 ---------------- */
+.tc ::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+.tc ::-webkit-scrollbar-thumb {
+  background: var(--rule-strong);
+  border-radius: 6px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tc *,
+  .tc *::before,
+  .tc *::after {
+    animation: none !important;
+    scroll-behavior: auto !important;
+    transition: none !important;
+  }
+}

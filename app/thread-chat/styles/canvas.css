@@ -1,0 +1,312 @@
+/* ── @/thread-chat/styles ── 画布模式（React Flow）+ 节点外挂对话面板 */
+
+/* ---------------- 画布模式（React Flow 容器 + 手稿风 thread 卡） ----------------
+   React Flow 自带全局类（.react-flow__*），此处全部再套 .tc 前缀二次作用域；
+   主题经 RF 的 --xy-* 定制点对齐纸色系。容器 flex:1 + min-height:0 给出确定高度。 */
+.tc .canvas-wrap {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  position: relative;
+}
+/* 首屏加载 / 跳板占位（loader 与 tree-redirect 共用）：与 canvas-loading 同款的一行轻量提示 */
+.tc .boot-loading {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink-faint);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.tc .canvas-loading {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink-faint);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+.tc .canvas-wrap .react-flow {
+  background: var(--paper);
+  --xy-background-pattern-color-default: var(--rule-strong);
+  --xy-edge-stroke-default: var(--rule-strong);
+  --xy-edge-stroke-selected-default: var(--ink-soft);
+  --xy-minimap-background-color-default: #fbf9f2;
+  --xy-minimap-node-background-color-default: #e6dfd0;
+  --xy-controls-button-background-color-default: #fff;
+  --xy-controls-button-background-color-hover-default: var(--paper-2);
+  --xy-controls-button-border-color-default: var(--rule);
+  --xy-controls-button-color-default: var(--ink-soft);
+  --xy-attribution-background-color-default: #ffffff88;
+}
+.tc .canvas-wrap .react-flow__minimap {
+  border: 1px solid var(--rule-strong);
+  border-radius: 9px;
+  overflow: hidden;
+}
+/* MiniMap 节点深度色：SVG fill 属性不解析 var()，经 .fc-N（--fc）+ CSS fill 上色 */
+.tc .canvas-wrap .react-flow__minimap-node {
+  fill: var(--fc, #8a8377);
+  stroke: none;
+}
+.tc .canvas-wrap .react-flow__controls {
+  border: 1px solid var(--rule-strong);
+  border-radius: 9px;
+  overflow: hidden;
+  box-shadow: 0 4px 14px -9px rgba(30, 26, 20, 0.3);
+}
+.tc .canvas-wrap .react-flow__attribution {
+  font-size: 9px;
+  color: var(--ink-faint);
+}
+
+/* thread 卡：与列模式同一套纸墨语言（深度色左缘 / 脚注徽章 / 衬线标题）。
+   尺寸与 use-canvas-layout 的估高常量同步：宽 280、padding 11×13、行高见各行注释 */
+.tc .canvas-card {
+  position: relative; /* 外挂面板 .canvas-expand 的定位上下文（挂卡下方） */
+  width: 280px;
+  background: #fff;
+  border: 1px solid var(--rule-strong);
+  border-left: 3px solid var(--accent, #8a8377);
+  border-radius: 10px;
+  padding: 11px 13px;
+  font-family: var(--font-ui);
+  box-shadow: 0 4px 14px -9px rgba(30, 26, 20, 0.22);
+  cursor: grab;
+}
+.tc .react-flow__node.dragging .canvas-card {
+  cursor: grabbing;
+}
+.tc .react-flow__node.selected .canvas-card {
+  border-color: var(--accent, #8a8377);
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--accent, #8a8377) 30%, transparent),
+    0 8px 20px -10px rgba(30, 26, 20, 0.35);
+}
+/* 只读画布：handle 只作边的定位锚点——用 opacity 隐藏，display:none 会破坏边坐标 */
+.tc .canvas-card .react-flow__handle {
+  opacity: 0;
+  pointer-events: none;
+}
+.tc .canvas-card .chead {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 6px;
+  min-height: 20px;
+}
+.tc .canvas-card .fn {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  color: #fff;
+  background: var(--accent, #8a8377);
+  border-radius: 4px;
+  padding: 2px 5px;
+  flex: none;
+  line-height: 1.2;
+}
+.tc .canvas-card .ttl {
+  font-family: var(--font-read);
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--ink);
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.35;
+}
+.tc .canvas-card .sub {
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--ink-faint);
+  margin-bottom: 4px;
+}
+.tc .canvas-card .anch {
+  font-family: var(--font-read);
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+  background: color-mix(in srgb, var(--accent, #8a8377) 7%, transparent);
+  border-radius: 5px;
+  padding: 3px 6px;
+  margin-bottom: 6px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.tc .canvas-card .sum {
+  font-size: 12px;
+  line-height: 1.58;
+  color: var(--ink-soft);
+  margin-bottom: 8px;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.tc .canvas-card .meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-faint);
+}
+.tc .canvas-card .meta .am {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.tc .canvas-card .meta .dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex: none;
+}
+
+/* 画布左上 Panel：重新排列 + 操作提示 */
+.tc .canvas-panel {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.tc .canvas-panel .cbtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  box-shadow: 0 3px 10px -6px rgba(30, 26, 20, 0.35);
+}
+.tc .canvas-panel .cbtn:hover {
+  color: var(--ink);
+  background: var(--paper-2);
+  border-color: var(--rule-strong);
+}
+.tc .canvas-panel .canvas-tip {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-soft);
+  background: #ffffffcc;
+  border: 1px solid var(--rule);
+  border-radius: 7px;
+  padding: 5px 9px;
+}
+
+/* ---------------- 画布 Phase 2：节点外挂对话面板（openspec: add-canvas-conversations）
+   绝对定位挂卡下方、不参与 dagre 布局（展开零重排，D1）；LR 下会盖住下方兄弟卡——
+   选中节点的 zIndex 由 React Flow elevateNodesOnSelect 抬升，配近不透明纸面底色 +
+   深描边 + 重投影，视觉上明确「浮在树上方的工作层」。nodrag/nowheel 类由 RF 消费。 */
+.tc .canvas-expand {
+  position: absolute;
+  top: calc(100% + 9px);
+  left: -3px; /* 与卡的深度色左缘（3px 边框）对齐 */
+  width: 340px; /* 与 canvas-node.tsx 的 EXPAND_W 同步 */
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid var(--accent, #8a8377);
+  border-left-width: 3px;
+  border-radius: 10px;
+  box-shadow: 0 16px 38px -12px rgba(30, 26, 20, 0.42);
+  cursor: default;
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+  user-select: text;
+  -webkit-user-select: text;
+}
+/* 迷你消息列表：覆盖列模式 .msg-list 的 flex:1（面板内高度 clamp 内滚 + 贴底跟滚） */
+.tc .canvas-expand .msg-list.mini {
+  flex: none;
+  max-height: 360px;
+  overflow-y: auto;
+  padding: 11px 12px 2px;
+}
+.tc .canvas-expand .message {
+  margin: 0 0 12px;
+}
+.tc .canvas-expand .message.user .bubble {
+  font-size: 12.5px;
+  line-height: 1.5;
+  padding: 6px 10px;
+}
+.tc .canvas-expand .message.assistant .bubble {
+  font-size: 12.5px;
+  line-height: 1.62;
+}
+/* 面板里的 Markdown 缩小一号（.md-body 继承 bubble 字号，标题/代码等相对收敛） */
+.tc .canvas-expand .md-body h1 {
+  font-size: 15px;
+}
+.tc .canvas-expand .md-body h2 {
+  font-size: 14px;
+}
+.tc .canvas-expand .md-body h3,
+.tc .canvas-expand .md-body h4 {
+  font-size: 13px;
+}
+.tc .canvas-expand .msg-error {
+  font-size: 11.5px;
+}
+/* mini composer：语义同列模式（busy 时发送变停止），尺寸随面板收敛 */
+.tc .canvas-expand .cv-composer {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  padding: 8px 10px 9px;
+  border-top: 1px solid var(--rule);
+}
+.tc .canvas-expand .cv-prompt-stack {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  gap: 4px;
+}
+.tc .canvas-expand .cv-composer textarea {
+  min-width: 0;
+  flex: 1;
+  border: 1px solid var(--rule-strong);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink);
+  resize: none;
+  padding: 5px 8px;
+  font-family: var(--font-ui);
+  font-size: 12.5px;
+  line-height: 1.45;
+  max-height: 68px; /* 与 canvas-node.tsx 的 COMPOSER_MAX_H 同步 */
+  min-height: 28px;
+}
+.tc .canvas-expand .cv-composer textarea:focus {
+  outline: none;
+  border-color: var(--accent, var(--d1));
+}
+.tc .canvas-expand .cv-composer textarea::placeholder {
+  color: var(--ink-faint);
+}
+.tc .canvas-expand .cv-send {
+  flex: none;
+  border: none;
+  cursor: pointer;
+  border-radius: 8px;
+  padding: 6px 11px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  background: var(--accent, #3a3733);
+}
+.tc .canvas-expand .cv-send.stop {
+  background: var(--ink-soft);
+}
+
+/* 顶栏「视图」seg 的图标按钮 */
+.tc .seg button.mode {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}

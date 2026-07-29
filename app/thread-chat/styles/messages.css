@@ -1,0 +1,296 @@
+/* ── @/thread-chat/styles ── 消息 + 功能要点列表 + 消息内 artifact 卡片 */
+
+/* ---------------- 消息 ---------------- */
+/* 滚动容器改由 headless @shadcn/react/message-scroller 接管「流式贴底 / 上滑释放 /
+   滚到底按钮」（原手搓 listRef + onScroll + stickBottomRef 两个 useEffect 已移除，
+   见 chat/chat-view.tsx）。DOM 链：.column（flex 列）> .msg-scroll-root（Root，
+   flex:1 撑高 + relative 供按钮定位）> .msg-list（Viewport，仍是原 class，
+   划选气泡的 .closest(".msg-list") + data-list 反查逻辑不受影响）> Content（纯包装
+   div）> .lane（阅读通道，内容排布不变）。 */
+.tc .msg-scroll-root {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.tc .msg-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px 18px 8px;
+}
+
+/* 「滚到底」按钮：流式中贴底时隐藏，用户上滑释放后淡入。奶黄纸面 + 墨色描边，
+   与 .tc 的手稿批注风一致；data-active 由组件依据「是否已在底部」写入。 */
+.tc .scroll-end-btn {
+  position: absolute;
+  right: 16px;
+  bottom: 14px;
+  z-index: 2;
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid var(--rule-strong);
+  background: var(--paper);
+  color: var(--ink-soft);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 4px 14px -6px rgba(30, 26, 20, 0.35);
+  opacity: 1;
+  transform: translateY(0);
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease;
+}
+.tc .scroll-end-btn:hover {
+  border-color: var(--d1);
+  color: var(--d1);
+  background: #fff;
+}
+.tc .scroll-end-btn[data-active="false"] {
+  opacity: 0;
+  transform: translateY(6px);
+  pointer-events: none;
+}
+.tc .hint {
+  margin: 0 0 15px;
+  padding: 11px 13px;
+  border-radius: 9px;
+  font-size: 12.5px;
+  line-height: 1.55;
+  background: #fff;
+  border: 1px solid var(--rule-strong);
+  color: var(--ink-soft);
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+}
+.tc .hint b {
+  color: var(--ink);
+}
+/* 功能要点列表：每个要点独占一行，行距略松、缩进克制（小圆点标记居外侧） */
+.tc .hint ul {
+  flex: 1;
+  margin: 0;
+  padding-left: 16px;
+  list-style: disc;
+}
+.tc .hint li {
+  margin: 3px 0;
+}
+.tc .hint li::marker {
+  color: var(--ink-faint);
+}
+.tc .hint .close {
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  color: var(--ink-faint);
+  flex: none;
+  font: inherit;
+  line-height: inherit;
+}
+.tc .hint svg {
+  flex: none;
+  margin-top: 1px;
+}
+
+.tc .message {
+  margin: 0 0 20px;
+  max-width: 100%;
+}
+.tc .message .who {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-bottom: 5px;
+}
+.tc .message.user {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+.tc .message.user .bubble {
+  background: var(--user-bg);
+  border-radius: 13px 13px 3px 13px;
+  padding: 9px 13px;
+  font-size: 14px;
+  line-height: 1.55;
+  max-width: 84%;
+  white-space: pre-wrap;
+}
+.tc .message.assistant .bubble {
+  font-family: var(--font-read);
+  font-size: 15px;
+  line-height: 1.72;
+  color: var(--ink);
+}
+.tc .message.assistant .bubble p {
+  margin: 0 0 12px;
+}
+.tc .message.assistant .bubble p:last-child {
+  margin-bottom: 0;
+}
+
+.tc .anchored {
+  border-bottom: 2px solid color-mix(in srgb, var(--fc) 55%, transparent);
+  background: color-mix(in srgb, var(--fc) 9%, transparent);
+  border-radius: 2px;
+  padding: 0 1px;
+  cursor: pointer;
+}
+.tc sup.fnote {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  color: #fff;
+  cursor: pointer;
+  background: var(--fc);
+  border-radius: 4px;
+  padding: 1px 4px;
+  margin: 0 1px 0 2px;
+  vertical-align: super;
+  line-height: 1;
+  user-select: none;
+}
+.tc sup.fnote:hover {
+  filter: brightness(1.1);
+}
+.tc .fc-1 {
+  --fc: var(--d1);
+}
+.tc .fc-2 {
+  --fc: var(--d2);
+}
+.tc .fc-3 {
+  --fc: var(--d3);
+}
+.tc .fc-4 {
+  --fc: var(--d4);
+}
+.tc .fc-5 {
+  --fc: var(--d5);
+}
+
+/* 消息内 artifact 卡片 */
+.tc .acard {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 10px 0 4px;
+  padding: 10px 12px;
+  width: 100%;
+  max-width: 430px;
+  background: #fff;
+  border: 1px solid var(--rule-strong);
+  border-left: 3px solid var(--fc, #8a8377);
+  border-radius: 10px;
+  cursor: pointer;
+  font-family: var(--font-ui);
+  text-align: left;
+}
+.tc .acard:hover {
+  border-color: var(--fc, #8a8377);
+  box-shadow: 0 4px 14px -6px rgba(30, 26, 20, 0.25);
+}
+.tc .acard .ic {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--fc, #8a8377) 10%, #fff);
+  color: var(--fc, #8a8377);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.tc .acard .t {
+  flex: 1;
+  min-width: 0;
+}
+.tc .acard .t .n {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tc .acard .t .k {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-faint);
+  margin-top: 2px;
+}
+.tc .acard .go {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-faint);
+}
+.tc .acard:hover .go {
+  color: var(--fc, #8a8377);
+}
+.tc .acard-progress {
+  cursor: default;
+  border-style: dashed;
+  background: color-mix(in srgb, var(--fc, #8a8377) 4%, #fff);
+  overflow: hidden;
+}
+.tc .acard-progress:hover {
+  border-color: var(--rule-strong);
+  box-shadow: none;
+}
+.tc .acard-progress:hover .go {
+  color: var(--ink-faint);
+}
+.tc .acard-progress .progress-spinner {
+  display: flex;
+  animation: tc-progress-spin 1s linear infinite;
+}
+.tc .acard-progress .progress-heading {
+  margin-top: 3px;
+  color: var(--ink-soft);
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tc .acard-progress .progress-track {
+  position: relative;
+  display: block;
+  height: 3px;
+  margin-top: 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--fc, #8a8377) 10%, var(--paper-2));
+}
+.tc .acard-progress .progress-track span {
+  position: absolute;
+  inset-block: 0;
+  width: 38%;
+  border-radius: inherit;
+  background: var(--fc, var(--d1));
+  animation: tc-progress-slide 1.35s ease-in-out infinite;
+}
+.tc .acard.compact {
+  gap: 8px;
+  margin-top: 7px;
+  padding: 8px 9px;
+}
+.tc .acard.compact .ic {
+  width: 26px;
+  height: 26px;
+}
+.tc .acard.compact .go {
+  display: none;
+}

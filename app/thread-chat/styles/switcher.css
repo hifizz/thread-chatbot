@@ -1,0 +1,252 @@
+/* ── @/thread-chat/styles ── 会话切换器 swx（⌘K 全局 / 每列局部） */
+
+/* ---------------- 会话切换器（⌘K 全局 / 每列局部） ----------------
+   进出双向动效（对齐 shadcn Dialog 的体系，但配色仍是 .tc 纸面 token）：
+   · 进场用 keyframe（元素只在打开时挂载，动画天然只播一次）。不用
+     [data-starting-style] + transition：Base UI 在首帧 rAF 里就摘掉该属性，
+     早于浏览器对新插入节点的首次样式计算，transition 根本不会启动——
+     这也是 shadcn 自家 dialog.tsx 用 animate-in 动画而非过渡做进场的原因；
+   · 退场用 transition：Dialog 面板（.swx.global / .tlx）关闭期间带
+     [data-ending-style]（Base UI 会等 transition 播完才卸载 Popup），
+     锚定小面板（.swx.local / .subtree）由壳层加 .closing 类走同一条
+     transition，到点后延时卸载（见 POPUP_EXIT_MS）。 */
+.tc .swx-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 72;
+  background: rgba(30, 26, 20, 0.18);
+  animation: tc-fade-in 150ms ease;
+  transition: opacity 150ms ease;
+}
+.tc .swx-scrim.clear {
+  background: transparent;
+}
+.tc .swx-scrim[data-ending-style],
+.tc .swx-scrim.closing {
+  opacity: 0;
+}
+.tc .swx {
+  position: fixed;
+  z-index: 74;
+  background: var(--paper);
+  border: 1px solid var(--rule-strong);
+  border-radius: 13px;
+  box-shadow: 0 24px 60px -18px rgba(30, 26, 20, 0.45);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition:
+    opacity 150ms ease,
+    transform 150ms ease;
+}
+/* 锚定小面板进场 */
+.tc .swx.local,
+.tc .swx.subtree {
+  animation: tc-pop 0.15s ease;
+}
+/* 锚定小面板退场：壳层置 .closing 后滑向消失（reduced-motion 下 transition 被剥掉 = 立即隐去） */
+.tc .swx.closing {
+  opacity: 0;
+  transform: translateY(4px) scale(0.97);
+}
+/* 居中 Dialog 面板：进场 keyframe 与退场目标态都要复写整个 transform（保住水平居中的 translateX） */
+.tc .swx.global {
+  animation: tc-pop-center 150ms ease;
+}
+.tc .helpx {
+  max-height: min(620px, 82vh);
+}
+.tc .helpx-body {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 12px 16px 14px;
+  color: var(--ink-soft);
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+.tc .helpx-list {
+  margin: 0;
+  padding-left: 18px;
+  list-style: disc;
+}
+.tc .helpx-list li {
+  margin: 5px 0;
+}
+.tc .helpx-list li::marker {
+  color: var(--ink-faint);
+}
+.tc .helpx-list b {
+  color: var(--ink);
+}
+.tc .swx.global[data-ending-style] {
+  opacity: 0;
+  transform: translateX(-50%) translateY(6px) scale(0.97);
+}
+/* 退场期间（Dialog 的 data-closed / local 的 .closing）不再吃点击 */
+.tc .swx[data-closed],
+.tc .swx.closing,
+.tc .swx-scrim[data-closed],
+.tc .swx-scrim.closing {
+  pointer-events: none;
+}
+.tc .swx.global {
+  left: 50%;
+  transform: translateX(-50%);
+  top: 68px;
+  width: min(500px, 94vw);
+  max-height: min(560px, 78vh);
+}
+.tc .swx.local {
+  width: min(330px, 92vw);
+  max-height: 420px;
+}
+.tc .swx-search {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 13px;
+  border-bottom: 1px solid var(--rule);
+}
+.tc .swx-search svg {
+  flex: none;
+  color: var(--ink-faint);
+}
+.tc .swx-search input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-family: var(--font-ui);
+  font-size: 14px;
+  color: var(--ink);
+}
+.tc .swx-search input::placeholder {
+  color: var(--ink-faint);
+}
+.tc .swx-hd {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  color: var(--ink-faint);
+  padding: 10px 13px 0;
+}
+.tc .swx-recent {
+  flex: none;
+  padding: 8px 13px 10px;
+  border-bottom: 1px dashed var(--rule);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.tc .swx-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--rule-strong);
+  background: #fff;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  color: var(--ink-soft);
+  max-width: 190px;
+}
+.tc .swx-chip:hover {
+  border-color: var(--dc, #8a8377);
+  color: var(--ink);
+}
+.tc .swx-chip .dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex: none;
+  background: var(--dc, #8a8377);
+}
+.tc .swx-chip .tt {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tc .swx-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+}
+.tc .swx-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 9px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.tc .swx-row.hi {
+  background: var(--paper-2);
+}
+.tc .swx-row .dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex: none;
+  background: var(--dc, #8a8377);
+}
+.tc .swx-row .n {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  color: #fff;
+  border-radius: 5px;
+  padding: 1px 5px;
+  background: var(--dc, #8a8377);
+  flex: none;
+}
+.tc .swx-row .t {
+  flex: 1;
+  min-width: 0;
+  font-size: 13.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tc .swx-row .t.main {
+  font-family: var(--font-read);
+  font-weight: 600;
+}
+.tc .swx-row .anch {
+  flex: none;
+  max-width: 34%;
+  font-size: 11px;
+  color: var(--ink-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tc .swx-row .st {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--dc, #8a8377);
+  border: 1px solid color-mix(in srgb, var(--dc, #8a8377) 45%, transparent);
+  background: color-mix(in srgb, var(--dc, #8a8377) 8%, transparent);
+  border-radius: 5px;
+  padding: 1px 6px;
+}
+.tc .swx-empty {
+  padding: 20px;
+  text-align: center;
+  color: var(--ink-faint);
+  font-size: 12.5px;
+}
+.tc .swx-foot {
+  flex: none;
+  border-top: 1px solid var(--rule);
+  padding: 8px 13px;
+  display: flex;
+  gap: 14px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-faint);
+}

@@ -41,6 +41,7 @@ Next.js **16** App Router project (React 19, TypeScript, Tailwind CSS **v4**), s
 - **shadcn/ui on Base UI, not Radix.** `components.json` uses the `base-rhea` style; primitives in `components/ui/` import from `@base-ui/react` (e.g. `@base-ui/react/button`). Don't reach for `@radix-ui/*` when editing or adding components.
 - **The full component kit is already vendored** in `components/ui/` (~60 components), including chat-oriented primitives: `message.tsx`, `message-scroller.tsx`, `bubble.tsx`, `attachment.tsx`, `marker.tsx`. Check for an existing component before adding or writing a new one.
 - **Tailwind v4, CSS-first config.** There is no tailwind.config file; theme tokens live as CSS variables in `app/globals.css`. Class merging goes through `cn()` in `lib/utils.ts`.
+- **thread-chat 的手写样式** 是独立于 Tailwind 的一层：全部收敛在 `.tc` 作用域（手工命名空间的手稿风设计系统，语义类名、非原子类）。实体规则按功能区块拆在 `app/thread-chat/styles/*.css`，`app/thread-chat/thread-chat.css` 只是按**源码顺序** `@import` 它们的桶文件——改这里务必保持 `@import` 顺序（级联依赖它），且非相邻功能刻意拆成 `*-collapse/-stream/-extras` 等后缀文件以保序（如流式的 `.send.stop` 覆盖必须在 `composer.css` 之后）。设计 token（`--paper/--ink/--d1..d5/字体/尺寸`）的**单一来源**是 `styles/tokens.css`，`theme.ts` 的深度→变量映射依赖此处变量名。
 - Path aliases: `@/components`, `@/components/ui`, `@/lib`, `@/hooks` (see `components.json` and tsconfig.json).
 - Theming via `next-themes` through `components/theme-provider.tsx`, wired up in `app/layout.tsx` (dark mode toggles with the `d` key on the starter page).
 
