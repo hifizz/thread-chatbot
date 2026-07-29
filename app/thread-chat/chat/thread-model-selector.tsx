@@ -11,6 +11,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { THREAD_CHAT_MODELS } from "@/constants/model"
+import { Bot } from "lucide-react"
 
 /** 模型 selector 的产品展示顺序；同一品牌内沿用模型注册表顺序。 */
 const MODEL_FAMILY_ORDER = ["glm", "kimi", "deepseek", "minimax", "doubao"] as const
@@ -44,6 +45,8 @@ const THREAD_CHAT_MODEL_OPTIONS: readonly ModelOption[] = THREAD_CHAT_MODELS
 export interface ThreadModelSelectorProps {
   modelId: string
   disabled: boolean
+  /** 画布就地输入框只保留模型入口，避免模型名挤占输入空间。 */
+  compact?: boolean
   /** 禁用来源决定是否需要向用户解释模型策略。 */
   disabledReason?: "branch" | "busy"
   onValueChange: (modelId: string) => void
@@ -59,6 +62,7 @@ const BRANCH_MODEL_LOCK_MESSAGE =
 export function ThreadModelSelector({
   modelId,
   disabled,
+  compact = false,
   disabledReason,
   onValueChange,
 }: ThreadModelSelectorProps) {
@@ -70,8 +74,10 @@ export function ThreadModelSelector({
       variant="ghost"
       size="sm"
       disabled={disabled}
-      className={`thread-model-selector${isBranchLocked ? "branch-locked" : ""}`}
-    />
+      className={`thread-model-selector${compact ? " compact" : ""}${isBranchLocked ? " branch-locked" : ""}`}
+    >
+      {compact ? <Bot aria-hidden="true" size={12} /> : undefined}
+    </ModelSelector.Trigger>
   )
 
   return (

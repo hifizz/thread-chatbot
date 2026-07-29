@@ -101,10 +101,7 @@ export function ArtifactDrawer({
             title="打开产生这个 Markdown 的会话"
             onClick={() => onLocate(src.id)}
           >
-            <LocateFixed
-              size={11}
-              style={{ verticalAlign: "-1px", marginRight: 4 }}
-            />
+            <LocateFixed size={10} />
             定位来源会话
           </button>
         </div>

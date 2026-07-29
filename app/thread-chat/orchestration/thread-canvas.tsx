@@ -195,10 +195,7 @@ function CanvasFlow({
               title="清除手动固定的节点位置，重新自动布局并适配视口"
               onClick={onRelayout}
             >
-              <RotateCcw
-                size={11}
-                style={{ verticalAlign: "-1px", marginRight: 4 }}
-              />
+              <RotateCcw size={10} />
               重新排列{pinCount > 0 ? ` · 已固定 ${pinCount}` : ""}
             </button>
             <span className="canvas-tip">

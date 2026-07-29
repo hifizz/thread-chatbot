@@ -270,6 +270,19 @@ function CanvasExpand({
       </div>
       <div className="cv-composer">
         <div className="cv-prompt-stack">
+          {state?.threads[threadId] && (
+            <ThreadModelSelector
+              modelId={state.threads[threadId].modelId}
+              disabled={!data.isMain || busy}
+              compact
+              disabledReason={
+                !data.isMain ? "branch" : busy ? "busy" : undefined
+              }
+              onValueChange={(modelId) =>
+                actions?.setThreadModel(threadId, modelId)
+              }
+            />
+          )}
           <textarea
             ref={taRef}
             rows={1}
@@ -287,18 +300,6 @@ function CanvasExpand({
               }
             }}
           />
-          {state?.threads[threadId] && (
-            <ThreadModelSelector
-              modelId={state.threads[threadId].modelId}
-              disabled={!data.isMain || busy}
-              disabledReason={
-                !data.isMain ? "branch" : busy ? "busy" : undefined
-              }
-              onValueChange={(modelId) =>
-                actions?.setThreadModel(threadId, modelId)
-              }
-            />
-          )}
         </div>
         {busy ? (
           <button

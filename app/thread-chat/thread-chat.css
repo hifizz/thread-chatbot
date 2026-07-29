@@ -783,12 +783,23 @@
 }
 .tc .thread-model-selector {
   max-width: 100%;
-  height: 26px;
-  margin-top: 3px;
-  padding-inline: 4px;
+  min-width: 74px;
+  height: 22px;
+  margin-top: 1px;
+  /* 选择器自身的左内边距会让文字比 textarea 多缩进，左移相同距离后对齐。 */
+  margin-left: -2px;
+  padding: 1px 2px;
   color: var(--ink-soft);
   font-family: var(--font-mono);
   font-size: 10.5px;
+}
+.tc .thread-model-selector.compact {
+  width: 30px;
+  min-width: 0;
+  height: 20px;
+  margin-top: 2px;
+  padding: 1px 3px;
+  gap: 1px;
 }
 .tc .thread-model-selector:hover:not(:disabled) {
   background: color-mix(in srgb, var(--accent, #3a3733) 30%, transparent);
@@ -1450,6 +1461,9 @@
   text-overflow: ellipsis;
 }
 .tc .art-src .loc {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   cursor: pointer;
   border: 1px solid var(--rule-strong);
   background: #fff;
@@ -1787,7 +1801,15 @@
   gap: 9px;
 }
 .tc .canvas-panel .cbtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   box-shadow: 0 3px 10px -6px rgba(30, 26, 20, 0.35);
+}
+.tc .canvas-panel .cbtn:hover {
+  color: var(--ink);
+  background: var(--paper-2);
+  border-color: var(--rule-strong);
 }
 .tc .canvas-panel .canvas-tip {
   font-family: var(--font-mono);
@@ -1865,11 +1887,12 @@
   display: flex;
   min-width: 0;
   flex: 1;
-  flex-direction: column;
-  align-items: flex-start;
+  align-items: center;
+  gap: 4px;
 }
 .tc .canvas-expand .cv-composer textarea {
-  width: 100%;
+  min-width: 0;
+  flex: 1;
   border: 1px solid var(--rule-strong);
   border-radius: 8px;
   background: #fff;
