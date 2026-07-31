@@ -24,60 +24,37 @@ Current directions include strengthening automated coverage, improving deploymen
 
 #### P0 · High priority
 
-- [ ] **P0 Inherited-context compression** — Research how to compress inherited context, reducing the cost blowup from integrating context every time a new column is opened and a new message is sent.
-- [ ] **P0 Project form** — Make ThreadChat take a Project form, similar to the Project product shape on Claude's web app:
-  - [ ] Support setting a goal (i.e., a project-injection prompt)
-  - [ ] Support adding shared documents (modeled on how Claude Projects work)
-  - [ ] Add a UX/UI interaction entry point on the main-line UI
-- [ ] **P0 In-product memory system** — Design and implement in-product memory so users get a memory experience better suited to project research.
+- [ ] **Inherited-context compression** - Compress inherited branch context to lower multi-column conversation cost.
+- [ ] **Project workspace** - Project-level goals and shared documents.
+- [ ] **In-product memory** - Long-term memory geared toward project research.
 
 #### Core features
 
-- [ ] **Summarize & index content** — Add a capability in skill or prompt input that lets users quickly summarize the discussion and results of a column or topic; even index the summary back to the main line or other columns (e.g., via `@` references), or turn it into memory.
-- [ ] **Multi-tenant & multi-user architecture** — Design and implement a multi-tenant, multi-user architecture; per-user isolation, and memory design across a user's different projects (memory may be project-scoped or user-scoped), needs dedicated design.
-- [ ] **Web search** — Add a web-search toggle to prompt input, or enable it automatically. Focus on the two currently integrated providers: MiniMax's Coding Plan and Volcengine Ark's Coding Plan.
-  - Setting aside whether Coding Plan is production-ready; this is just a demo. Need to know:
-    1. How to implement web search with these APIs?
-    2. If we later switch to a real third-party API forwarder, what's the per-answer cost when every answer includes web search, and how to lower it?
-    3. Does Claude lower cost via its own search cache?
-    4. Goal: implement web search intelligently with balanced cost, like Claude Opus frequently querying for up-to-date knowledge before answering.
-    5. Survey industry approaches and layering end-to-end — frontend/backend, architecture design, system design, model capability / self-built service, third-party search APIs, cost balancing, performance/speed/quality — before scoping a project-specific implementation.
-- [ ] **Migrate DeepResearch** — Bring the DeepResearch search capability into this product.
-- [ ] **Skill system** — Support web-based Skills, and ship a built-in Skill Creator.
-- [ ] **Sub-agent invocation** — Research how to implement Sub-agent invocation in a web chatbot. Key concerns:
-  1. **Creation & planning**: the user issues an instruction (e.g., "launch a Sub-agent to batch-implement the tasks above"); the system receives it, decomposes and plans the tasks, and decides how to launch the Sub-agents and execute them.
-  2. **Status monitoring & UI**: the system continuously monitors Sub-agent status and messages; the UI presents it visually (e.g., three "capsule" icons for three Sub-agents); clicking a capsule opens a right-side Panel (drawer) showing what that Sub-agent is doing and other essentials.
-  3. **Result aggregation**: once all Sub-agents finish, the main-line Agent collects and aggregates all results into a unified report, ending the flow.
-  - **To investigate**: how exactly is a Sub-agent started across the frontend, protocol layer (Tool Use definitions and Artifacts), and backend? What does a Sub-agent look like in practice (show pseudocode)? After backend launch, how do they communicate with each other?
+- [ ] **Summarize & index** - Summarize a column or topic, with indexing and retention.
+- [ ] **Multi-tenant & multi-user** - User isolation, with memory scoped per user/project.
+- [ ] **Web search** - Bring web search into the conversation.
+- [ ] **DeepResearch** - Add deep-research capability.
+- [ ] **Skill system** - Web-based Skills and a built-in Skill Creator.
+- [ ] **Sub-agent** - Create, monitor, and aggregate multiple Sub-agents.
 
-#### Interactive Preview (core feature)
+#### Interactive Preview
 
-- [ ] **Investigate and implement a Claude-like Interactive Preview** — Later implement an interactive-preview feature like Claude's: auto-generate interactive visual artifacts (e.g., SVG) within generated content.
-  - First investigate how Claude's Interactive Preview is implemented.
-  - To confirm: is it independent of the Markdown-artifact system, or a layer on top; sandboxing and interaction scope; trigger mode (auto-detect vs. explicit instruction).
+- [ ] **Interactive Preview** - Render interactive visual artifacts within generated content.
 
 #### Markdown & content rendering
 
-- [ ] **Improve Markdown rendering** — Refine and optimize Markdown rendering and essential features.
-  - [ ] Implement Mermaid rendering with a system prompt definition.
-- [ ] **Survey code-block highlighting** — Research how code-block highlighting is currently implemented.
-- [ ] **Optimize Markdown artifact display**
-  - Artifact panel position: when the user clicks the Markdown button to show the artifact panel, it shouldn't default to the right half; place it based on click position and avoid covering the column the user is focused on.
-  - Rethink what the Markdown panel needs to show: current UI elements waste space; this is a high-density, high-information product, so screen real estate matters.
-- [ ] **HTML generation & preview** — Do we need an HTML-generation feature later? How to render and show a preview?
+- [ ] **Markdown rendering enhancements** - Refine rendering and essentials, including Mermaid.
+- [ ] **Code-block highlighting** - Improve the code-block highlighting experience.
+- [ ] **Markdown artifact display** - Refine panel placement and information density.
+- [ ] **HTML generation & preview** - Support HTML generation and preview.
 
 #### UI / UX interaction
 
-- [ ] **Text-selection toolbar** — The bubble that appears after selecting text anywhere is currently an input (dialog); make it a ChatGPT-style action bubble (toolbar) with three small tools:
-  1. Quote and follow up
-  2. Branch and follow up
-  3. Highlight: four dot icons for different colors; clicking a color highlights the selected text in that color; later extend to popping a small dialog for notes on highlight.
-- [ ] **Chat TOC** — Design and implement a TOC for each chat, showing a series of dots on the right edge.
-- [ ] **Scroll-to-bottom button** — When a column isn't at the bottom, show a "jump to bottom" button:
-  - Move it from the far right of the column to the center of the column.
-  - Scroll threshold: currently the button doesn't appear at 99% (not fully 100%); set a sensible threshold.
-- [ ] **Simplify input area** — The bottom area with the model input shouldn't need a border-top and background; a single shadow-bordered input is enough.
-- [ ] **Overall UI micro-polish** — Micro-optimize the overall UI, especially UI elements and interaction effects.
+- [ ] **Text-selection toolbar** - Quick action bubble on text selection.
+- [ ] **Chat TOC** - Side directory navigation per conversation.
+- [ ] **Scroll-to-bottom button** - Refine placement and appearance threshold.
+- [ ] **Simplify input area** - Streamline the bottom input styling.
+- [ ] **Overall UI micro-polish** - Fine-tune UI elements and interaction effects.
 
 ## Quick start
 
