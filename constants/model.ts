@@ -2,7 +2,24 @@
 // id 在全站统一使用：输入框选择器、计费定价（constants/pricing.ts 的 key）、
 // 服务端 provider 解析（lib/ai/provider.ts）。
 
-export type ChatModelProvider = "minimax" | "deepseek" | "openai" | "ark"
+export const OPENROUTER_MODEL_IDS = [
+  "openai/gpt-5.6-luna",
+  "openai/gpt-5.6-luna-pro",
+  "openai/gpt-5.6-terra",
+  "openai/gpt-5.6-terra-pro",
+  "openai/gpt-5.6-sol",
+  "openai/gpt-5.6-sol-pro",
+  "openai/gpt-5.5",
+  "openai/gpt-5.5-pro",
+  "moonshotai/kimi-k3",
+  "deepseek/deepseek-v4-flash-0731",
+] as const
+
+export type OpenRouterModelId = (typeof OPENROUTER_MODEL_IDS)[number]
+export type ChatModelProvider =
+  "minimax" | "deepseek" | "openai" | "ark" | "openrouter"
+export type ReasoningTransport = "think-tags" | "native"
+export type ChatModelSurface = "linear" | "thread"
 
 export type ChatModel = {
   /** 注册表 id，全站唯一标识 */
@@ -20,8 +37,12 @@ export type ChatModel = {
    * MiniMax 不在 CF 网关支持列表中，故为空 → 走直连。
    */
   gatewayModel?: string
-  /** 该模型输出是否用 <think> 包裹推理（需 reasoning 抽取中间件） */
-  reasoning?: boolean
+  /** 推理传输方式；只有 think-tags 需要标签抽取中间件。 */
+  reasoningTransport?: ReasoningTransport
+  /** 模型可见的产品入口。 */
+  surfaces: readonly ChatModelSurface[]
+  /** 仅用于展示分组，不参与鉴权和路由。 */
+  creator?: "openai" | "moonshotai" | "deepseek"
 }
 
 export const CHAT_MODELS: readonly ChatModel[] = [
@@ -31,7 +52,8 @@ export const CHAT_MODELS: readonly ChatModel[] = [
     description: "通用对话模型（直连）",
     provider: "minimax",
     upstreamModel: "MiniMax-M2",
-    reasoning: true,
+    reasoningTransport: "think-tags",
+    surfaces: ["linear"],
   },
   {
     id: "deepseek-chat",
@@ -40,6 +62,7 @@ export const CHAT_MODELS: readonly ChatModel[] = [
     provider: "deepseek",
     upstreamModel: "deepseek-chat",
     gatewayModel: "deepseek/deepseek-chat",
+    surfaces: ["linear"],
   },
   {
     id: "gpt-4o-mini",
@@ -48,6 +71,7 @@ export const CHAT_MODELS: readonly ChatModel[] = [
     provider: "openai",
     upstreamModel: "gpt-4o-mini",
     gatewayModel: "openai/gpt-4o-mini",
+    surfaces: ["linear"],
   },
   {
     id: "doubao-seed-2.1-turbo",
@@ -55,6 +79,7 @@ export const CHAT_MODELS: readonly ChatModel[] = [
     description: "火山方舟 Coding Plan",
     provider: "ark",
     upstreamModel: "doubao-seed-2.1-turbo",
+    surfaces: ["linear", "thread"],
   },
   {
     id: "doubao-seed-2.0-lite",
@@ -62,6 +87,7 @@ export const CHAT_MODELS: readonly ChatModel[] = [
     description: "火山方舟 Coding Plan",
     provider: "ark",
     upstreamModel: "doubao-seed-2.0-lite",
+    surfaces: ["linear", "thread"],
   },
   {
     id: "minimax-m2.7",
@@ -69,6 +95,7 @@ export const CHAT_MODELS: readonly ChatModel[] = [
     description: "火山方舟 Coding Plan",
     provider: "ark",
     upstreamModel: "minimax-m2.7",
+    surfaces: ["linear"],
   },
   {
     id: "minimax-m3",
@@ -76,6 +103,7 @@ export const CHAT_MODELS: readonly ChatModel[] = [
     description: "火山方舟 Coding Plan",
     provider: "ark",
     upstreamModel: "minimax-m3",
+    surfaces: ["linear", "thread"],
   },
   {
     id: "glm-5.2",
@@ -83,6 +111,7 @@ export const CHAT_MODELS: readonly ChatModel[] = [
     description: "火山方舟 Coding Plan",
     provider: "ark",
     upstreamModel: "glm-5.2",
+    surfaces: ["linear", "thread"],
   },
   {
     id: "deepseek-v4-flash",
@@ -90,6 +119,7 @@ export const CHAT_MODELS: readonly ChatModel[] = [
     description: "火山方舟 Coding Plan",
     provider: "ark",
     upstreamModel: "deepseek-v4-flash",
+    surfaces: ["linear", "thread"],
   },
   {
     id: "deepseek-v4-pro",
@@ -97,6 +127,7 @@ export const CHAT_MODELS: readonly ChatModel[] = [
     description: "火山方舟 Coding Plan",
     provider: "ark",
     upstreamModel: "deepseek-v4-pro",
+    surfaces: ["linear", "thread"],
   },
   {
     id: "kimi-k2.6",
@@ -104,6 +135,7 @@ export const CHAT_MODELS: readonly ChatModel[] = [
     description: "火山方舟 Coding Plan",
     provider: "ark",
     upstreamModel: "kimi-k2.6",
+    surfaces: ["linear", "thread"],
   },
   {
     id: "kimi-k2.7-code",
@@ -111,20 +143,105 @@ export const CHAT_MODELS: readonly ChatModel[] = [
     description: "火山方舟 Coding Plan",
     provider: "ark",
     upstreamModel: "kimi-k2.7-code",
+    surfaces: ["linear", "thread"],
+  },
+  {
+    id: "openrouter-gpt-5.6-luna",
+    name: "GPT-5.6 Luna",
+    provider: "openrouter",
+    upstreamModel: "openai/gpt-5.6-luna",
+    reasoningTransport: "native",
+    surfaces: ["thread"],
+    creator: "openai",
+  },
+  {
+    id: "openrouter-gpt-5.6-luna-pro",
+    name: "GPT-5.6 Luna Pro",
+    provider: "openrouter",
+    upstreamModel: "openai/gpt-5.6-luna-pro",
+    reasoningTransport: "native",
+    surfaces: ["thread"],
+    creator: "openai",
+  },
+  {
+    id: "openrouter-gpt-5.6-terra",
+    name: "GPT-5.6 Terra",
+    provider: "openrouter",
+    upstreamModel: "openai/gpt-5.6-terra",
+    reasoningTransport: "native",
+    surfaces: ["thread"],
+    creator: "openai",
+  },
+  {
+    id: "openrouter-gpt-5.6-terra-pro",
+    name: "GPT-5.6 Terra Pro",
+    provider: "openrouter",
+    upstreamModel: "openai/gpt-5.6-terra-pro",
+    reasoningTransport: "native",
+    surfaces: ["thread"],
+    creator: "openai",
+  },
+  {
+    id: "openrouter-gpt-5.6-sol",
+    name: "GPT-5.6 Sol",
+    provider: "openrouter",
+    upstreamModel: "openai/gpt-5.6-sol",
+    reasoningTransport: "native",
+    surfaces: ["thread"],
+    creator: "openai",
+  },
+  {
+    id: "openrouter-gpt-5.6-sol-pro",
+    name: "GPT-5.6 Sol Pro",
+    provider: "openrouter",
+    upstreamModel: "openai/gpt-5.6-sol-pro",
+    reasoningTransport: "native",
+    surfaces: ["thread"],
+    creator: "openai",
+  },
+  {
+    id: "openrouter-gpt-5.5",
+    name: "GPT-5.5",
+    provider: "openrouter",
+    upstreamModel: "openai/gpt-5.5",
+    reasoningTransport: "native",
+    surfaces: ["thread"],
+    creator: "openai",
+  },
+  {
+    id: "openrouter-gpt-5.5-pro",
+    name: "GPT-5.5 Pro",
+    provider: "openrouter",
+    upstreamModel: "openai/gpt-5.5-pro",
+    reasoningTransport: "native",
+    surfaces: ["thread"],
+    creator: "openai",
+  },
+  {
+    id: "openrouter-kimi-k3",
+    name: "Kimi K3",
+    provider: "openrouter",
+    upstreamModel: "moonshotai/kimi-k3",
+    reasoningTransport: "native",
+    surfaces: ["thread"],
+    creator: "moonshotai",
+  },
+  {
+    id: "openrouter-deepseek-v4-flash-0731",
+    name: "DeepSeek V4 Flash 0731",
+    provider: "openrouter",
+    upstreamModel: "deepseek/deepseek-v4-flash-0731",
+    reasoningTransport: "native",
+    surfaces: ["thread"],
+    creator: "deepseek",
   },
 ]
 
 export const DEFAULT_MODEL_ID = "minimax-m2"
 
-/**
- * Thread Chat MVP 已接入、并允许用户在 selector 中切换的模型。
- * M2 / M2.7 暂不在该产品入口展示，但仍保留在全站注册表，确保既有通用聊天配置可用。
- */
+/** 从注册表的产品可见面派生 Thread Chat 选项。 */
 export const THREAD_CHAT_MODELS: readonly ChatModel[] = CHAT_MODELS.filter(
-  (model) =>
-    (model.provider === "minimax" || model.provider === "ark") &&
-    model.id !== "minimax-m2" &&
-    model.id !== "minimax-m2.7"
+  (model) => model.surfaces.includes("thread")
 )
 
 /** Thread Chat 新建树及旧树模型回退使用的默认模型。 */
@@ -149,7 +266,8 @@ export function isChatModelId(id: unknown): id is string {
 /** Thread Chat 允许写入 Thread 的模型 id。 */
 export function isThreadChatModelId(id: unknown): id is string {
   return (
-    typeof id === "string" && THREAD_CHAT_MODELS.some((model) => model.id === id)
+    typeof id === "string" &&
+    THREAD_CHAT_MODELS.some((model) => model.id === id)
   )
 }
 

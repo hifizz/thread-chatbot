@@ -25,6 +25,7 @@ import {
   MAX_OUTPUT_TOKENS,
 } from "@/constants/model"
 import { resolveChatModel, isModelConfigured } from "@/lib/ai/provider"
+import { openRouterCostUsdFromSteps } from "@/lib/ai/openrouter"
 import { hasPositiveBalance, chargeUsage } from "@/lib/billing/credits"
 import { buildUsageMetadata } from "@/lib/billing/usage-meta"
 import {
@@ -136,8 +137,7 @@ export async function POST(req: Request) {
   ) {
     return Response.json({ error: "未知或无效的模型。" }, { status: 400 })
   }
-  const modelId =
-    typeof rawModelId === "string" ? rawModelId : DEFAULT_MODEL_ID
+  const modelId = typeof rawModelId === "string" ? rawModelId : DEFAULT_MODEL_ID
   const model = getChatModel(modelId)!
   if (!isModelConfigured(model)) {
     return Response.json(
@@ -214,29 +214,43 @@ export async function POST(req: Request) {
       : isStepCount(research && searchReady ? RESEARCH_MAX_STEPS : 5),
     // 4) 生成结束后按 token 用量即时扣费并写入流水（价目表估算，利润率 ≥30%）。
     //    若经 Vercel 网关，采集 generationId，稍后由 /api/billing/reconcile 拉真实成本对账。
-    onFinish: async ({ usage, providerMetadata }) => {
+    onEnd: async ({ usage, providerMetadata, steps }) => {
       const generationId =
         typeof providerMetadata?.gateway?.generationId === "string"
           ? providerMetadata.gateway.generationId
           : null
+      const openRouterCostUsd =
+        model.provider === "openrouter"
+          ? openRouterCostUsdFromSteps(steps)
+          : null
+      if (model.provider === "openrouter" && openRouterCostUsd == null) {
+        console.warn(
+          `[chat] OpenRouter 成本元数据不完整，使用静态估值：${model.id}`
+        )
+      }
       await chargeUsage({
         userId,
         model: modelId,
         inputTokens: usage.inputTokens ?? 0,
         outputTokens: usage.outputTokens ?? 0,
         threadId: threadId ?? null,
-        generationId,
+        costEvidence:
+          openRouterCostUsd != null
+            ? { source: "openrouter", costUsd: openRouterCostUsd }
+            : generationId
+              ? { source: "vercel-gateway", generationId }
+              : { source: "estimate" },
       })
     },
   })
 
-  // 即使客户端中途断连，也在服务端把整条流消费完，保证 onFinish（计费）必然触发，
+  // 即使客户端中途断连，也在服务端把整条流消费完，保证 onEnd（计费）必然触发，
   // 避免「已产生供应商成本却漏计费」。after 让 Serverless 保活到消费结束。
   after(async () => {
     try {
       await result.consumeStream()
     } catch {
-      // 生成出错时不计费（onFinish 不触发），忽略消费错误即可
+      // 生成出错时不计费（onEnd 不触发），忽略消费错误即可
     }
   })
 

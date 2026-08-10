@@ -106,6 +106,10 @@ The following features are opt-in and are not required for the quick start:
 
 Do not commit `.env.local` or credentials.
 
+## OpenRouter models
+
+Thread Chat offers ten fixed OpenRouter-backed internal model IDs: `openrouter-gpt-5.6-luna`, `openrouter-gpt-5.6-luna-pro`, `openrouter-gpt-5.6-terra`, `openrouter-gpt-5.6-terra-pro`, `openrouter-gpt-5.6-sol`, `openrouter-gpt-5.6-sol-pro`, `openrouter-gpt-5.5`, `openrouter-gpt-5.5-pro`, `openrouter-kimi-k3`, and `openrouter-deepseek-v4-flash-0731`. Configure `OPENROUTER_API_KEY`; `OPENROUTER_HTTP_REFERER` and `OPENROUTER_APP_TITLE` are optional attribution values. These IDs always use the dedicated OpenRouter provider—arbitrary external slugs are rejected. Completed requests use OpenRouter's real per-step USD cost when complete, with conservative static pricing as fallback. Attachments remain on the existing text-extraction path.
+
 ## Architecture
 
 The project is a Next.js 16 App Router application using React, TypeScript, Tailwind CSS, Base UI-backed shadcn components, assistant-ui, AI SDK, Drizzle ORM, and PostgreSQL.

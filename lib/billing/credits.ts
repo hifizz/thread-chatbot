@@ -35,6 +35,13 @@ export async function hasPositiveBalance(userId: string): Promise<boolean> {
   return (await getBalanceMicros(userId)) > 0
 }
 
+export type UsageCostEvidence =
+  | { source: "estimate" }
+  | { source: "vercel-gateway"; generationId: string }
+  | { source: "openrouter"; costUsd: number }
+
+export type UsageCostSource = "estimate" | "gateway" | "openrouter"
+
 export type UsageInput = {
   userId: string
   model: string
@@ -42,14 +49,15 @@ export type UsageInput = {
   outputTokens: number
   threadId?: string | null
   messageId?: string | null
-  /** Vercel 网关 generation id（有则供事后真实成本对账） */
-  generationId?: string | null
+  /** 成本来源证据；缺省按静态价估算。 */
+  costEvidence?: UsageCostEvidence
 }
 
 export type ChargeResult = {
   costMicros: number
   priceMicros: number
   balanceMicros: number
+  costSource: UsageCostSource
 }
 
 /**
@@ -57,8 +65,19 @@ export type ChargeResult = {
  * 发送前的 hasPositiveBalance 拦截；这里允许扣至负数以覆盖最后一条消息的成本）。
  */
 export async function chargeUsage(input: UsageInput): Promise<ChargeResult> {
-  const cost = costMicros(input.model, input.inputTokens, input.outputTokens)
-  const price = priceMicros(input.model, input.inputTokens, input.outputTokens)
+  const evidence = input.costEvidence ?? { source: "estimate" }
+  const cost =
+    evidence.source === "openrouter"
+      ? usdToMicros(evidence.costUsd)
+      : costMicros(input.model, input.inputTokens, input.outputTokens)
+  const price =
+    evidence.source === "openrouter"
+      ? priceFromCost(cost)
+      : priceMicros(input.model, input.inputTokens, input.outputTokens)
+  const generationId =
+    evidence.source === "vercel-gateway" ? evidence.generationId : null
+  const costSource: UsageCostSource =
+    evidence.source === "openrouter" ? "openrouter" : "estimate"
 
   await ensureUserCredits(input.userId)
 
@@ -83,14 +102,14 @@ export async function chargeUsage(input: UsageInput): Promise<ChargeResult> {
       outputTokens: input.outputTokens,
       costMicros: cost,
       priceMicros: price,
-      generationId: input.generationId ?? null,
-      costSource: "estimate",
+      generationId,
+      costSource,
     })
 
     return row?.balance ?? 0
   })
 
-  return { costMicros: cost, priceMicros: price, balanceMicros }
+  return { costMicros: cost, priceMicros: price, balanceMicros, costSource }
 }
 
 /** 给用户增加额度（充值到账）。确保额度行存在后原子累加，返回新余额。 */

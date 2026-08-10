@@ -14,7 +14,15 @@ import { THREAD_CHAT_MODELS } from "@/constants/model"
 import { Bot } from "lucide-react"
 
 /** 模型 selector 的产品展示顺序；同一品牌内沿用模型注册表顺序。 */
-const MODEL_FAMILY_ORDER = ["glm", "kimi", "deepseek", "minimax", "doubao"] as const
+const MODEL_FAMILY_ORDER = [
+  "openai",
+  "glm",
+  "kimi",
+  "moonshotai",
+  "deepseek",
+  "minimax",
+  "doubao",
+] as const
 
 function modelFamilyIndex(upstreamModel: string): number {
   const normalizedName = upstreamModel.toLowerCase()
@@ -29,18 +37,18 @@ function modelFamilyIndex(upstreamModel: string): number {
  * Thread Chat 仅展示当前产品入口可用的模型。
  * 隐藏项和未接入 provider 仍保留在全站注册表，避免影响其他入口与历史配置。
  */
-const THREAD_CHAT_MODEL_OPTIONS: readonly ModelOption[] = THREAD_CHAT_MODELS
-  .map((model, registryIndex) => ({ model, registryIndex }))
-  .sort(
-    (left, right) =>
-      modelFamilyIndex(left.model.upstreamModel) -
-        modelFamilyIndex(right.model.upstreamModel) ||
-      left.registryIndex - right.registryIndex
-  )
-  .map(({ model }) => ({
-    id: model.id,
-    name: model.name,
-  }))
+const THREAD_CHAT_MODEL_OPTIONS: readonly ModelOption[] =
+  THREAD_CHAT_MODELS.map((model, registryIndex) => ({ model, registryIndex }))
+    .sort(
+      (left, right) =>
+        modelFamilyIndex(left.model.upstreamModel) -
+          modelFamilyIndex(right.model.upstreamModel) ||
+        left.registryIndex - right.registryIndex
+    )
+    .map(({ model }) => ({
+      id: model.id,
+      name: model.name,
+    }))
 
 export interface ThreadModelSelectorProps {
   modelId: string
@@ -74,7 +82,7 @@ export function ThreadModelSelector({
       variant="ghost"
       size="sm"
       disabled={disabled}
-      className={`thread-model-selector${compact ? " compact" : ""}${isBranchLocked ? " branch-locked" : ""}`}
+      className={`thread-model-selector${compact ? "compact" : ""}${isBranchLocked ? "branch-locked" : ""}`}
     >
       {compact ? <Bot aria-hidden="true" size={12} /> : undefined}
     </ModelSelector.Trigger>

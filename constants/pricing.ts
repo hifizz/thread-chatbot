@@ -53,6 +53,56 @@ const ARK_CODING_MVP_COST: ModelCost = {
 }
 
 export const MODEL_COST: Record<string, ModelCost> = {
+  "openrouter-gpt-5.6-luna": {
+    currency: "USD",
+    inputPerMillion: 0.2,
+    outputPerMillion: 0.9,
+  },
+  "openrouter-gpt-5.6-luna-pro": {
+    currency: "USD",
+    inputPerMillion: 0.2,
+    outputPerMillion: 0.9,
+  },
+  "openrouter-gpt-5.6-terra": {
+    currency: "USD",
+    inputPerMillion: 2,
+    outputPerMillion: 9,
+  },
+  "openrouter-gpt-5.6-terra-pro": {
+    currency: "USD",
+    inputPerMillion: 2,
+    outputPerMillion: 9,
+  },
+  "openrouter-gpt-5.6-sol": {
+    currency: "USD",
+    inputPerMillion: 10,
+    outputPerMillion: 45,
+  },
+  "openrouter-gpt-5.6-sol-pro": {
+    currency: "USD",
+    inputPerMillion: 10,
+    outputPerMillion: 45,
+  },
+  "openrouter-gpt-5.5": {
+    currency: "USD",
+    inputPerMillion: 10,
+    outputPerMillion: 45,
+  },
+  "openrouter-gpt-5.5-pro": {
+    currency: "USD",
+    inputPerMillion: 60,
+    outputPerMillion: 270,
+  },
+  "openrouter-kimi-k3": {
+    currency: "USD",
+    inputPerMillion: 3,
+    outputPerMillion: 15,
+  },
+  "openrouter-deepseek-v4-flash-0731": {
+    currency: "USD",
+    inputPerMillion: 0.14,
+    outputPerMillion: 0.28,
+  },
   // MiniMax M2（直连）— 人民币计价，参考官方定价，请以实际账单为准
   "minimax-m2": {
     currency: "CNY",
