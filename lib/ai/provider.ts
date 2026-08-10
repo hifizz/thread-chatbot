@@ -6,14 +6,19 @@ import {
   type LanguageModel,
 } from "ai"
 import { minimaxChatModel, isMinimaxConfigured } from "@/lib/ai/minimax"
-import {
-  arkCodingChatModel,
-  isArkCodingConfigured,
-} from "@/lib/ai/ark"
+import { arkCodingChatModel, isArkCodingConfigured } from "@/lib/ai/ark"
 import { isVercelGatewayConfigured } from "@/lib/payments/vercel-gateway"
-import { getChatModel, type ChatModel } from "@/constants/model"
+import {
+  getChatModel,
+  type ChatModel,
+  type OpenRouterModelId,
+} from "@/constants/model"
+import {
+  isOpenRouterConfigured,
+  openRouterChatModel,
+} from "@/lib/ai/openrouter"
 
-// 统一的对话模型解析层。Ark 固定走 Coding Plan 专用端点；其余非 MiniMax 模型按优先级路由：
+// 统一的对话模型解析层。Ark 与 OpenRouter 固定走各自专用端点；其余非 MiniMax 模型按优先级路由：
 //   1) Vercel AI 网关（配 AI_GATEWAY_API_KEY）—— 会回传 generationId，供真实成本对账；
 //   2) Cloudflare AI 网关 compat 端点（配 CF_AI_GATEWAY_*）；
 //   3) 供应商直连。
@@ -34,7 +39,7 @@ function gatewayCompatBaseURL(): string {
 
 // 各供应商的 API key 与直连 baseURL（网关未配置时的回退）。
 const PROVIDER_ENV: Record<
-  Exclude<ChatModel["provider"], "minimax" | "ark">,
+  Exclude<ChatModel["provider"], "minimax" | "ark" | "openrouter">,
   { key: string | undefined; directBaseURL: string }
 > = {
   deepseek: {
@@ -52,6 +57,7 @@ const PROVIDER_ENV: Record<
 export function isModelConfigured(model: ChatModel): boolean {
   if (model.provider === "minimax") return isMinimaxConfigured()
   if (model.provider === "ark") return isArkCodingConfigured()
+  if (model.provider === "openrouter") return isOpenRouterConfigured()
   // Vercel 网关配了就能用（它自带各家凭据）；否则需要该供应商的直连/CF key。
   if (isVercelGatewayConfigured()) return true
   return Boolean(PROVIDER_ENV[model.provider].key)
@@ -71,6 +77,9 @@ export function resolveChatModel(modelId: string): LanguageModel {
   if (model.provider === "ark") {
     return arkCodingChatModel(model.upstreamModel)
   }
+  if (model.provider === "openrouter") {
+    return openRouterChatModel(model.upstreamModel as OpenRouterModelId)
+  }
 
   // 优先 Vercel AI 网关：用 "creator/model" 标识（复用 gatewayModel），响应带 generationId。
   // Vercel 网关自带鉴权/计费，无需各供应商的 key。
@@ -78,7 +87,7 @@ export function resolveChatModel(modelId: string): LanguageModel {
     const base = gateway(
       model.gatewayModel ?? `${model.provider}/${model.upstreamModel}`
     )
-    return model.reasoning
+    return model.reasoningTransport === "think-tags"
       ? wrapLanguageModel({
           model: base,
           middleware: extractReasoningMiddleware({ tagName: "think" }),
@@ -110,7 +119,7 @@ export function resolveChatModel(modelId: string): LanguageModel {
   const base = provider(upstreamId)
 
   // DeepSeek reasoner 等会输出 <think>，通用 chat 模型不需要抽取；此处按需包裹。
-  return model.reasoning
+  return model.reasoningTransport === "think-tags"
     ? wrapLanguageModel({
         model: base,
         middleware: extractReasoningMiddleware({ tagName: "think" }),
