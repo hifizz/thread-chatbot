@@ -37,8 +37,10 @@ export const usageRecords = dbSchema.table(
       .default(0), // 向用户收取（微元）
     // Vercel AI 网关的 generation id（gen_...）；用于事后拉取真实成本对账。直连/CF 时为空。
     generationId: text("generation_id"),
-    // 成本口径：estimate=价目表估算（即时扣费用）；gateway=已用网关真实成本对账修正。
-    costSource: text("cost_source", { enum: ["estimate", "gateway"] })
+    // 成本口径：estimate=价目表估算；gateway=Vercel 对账；openrouter=OpenRouter 即时真实成本。
+    costSource: text("cost_source", {
+      enum: ["estimate", "gateway", "openrouter"],
+    })
       .notNull()
       .default("estimate"),
     createdAt: timestamp("created_at", { withTimezone: true })

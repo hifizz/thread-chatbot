@@ -62,6 +62,10 @@ pnpm dev
 
 请勿提交 `.env.local` 或任何凭据。
 
+## OpenRouter 模型
+
+Thread Chat 提供 10 个固定走 OpenRouter 的内部模型 id：`openrouter-gpt-5.6-luna`、`openrouter-gpt-5.6-luna-pro`、`openrouter-gpt-5.6-terra`、`openrouter-gpt-5.6-terra-pro`、`openrouter-gpt-5.6-sol`、`openrouter-gpt-5.6-sol-pro`、`openrouter-gpt-5.5`、`openrouter-gpt-5.5-pro`、`openrouter-kimi-k3` 和 `openrouter-deepseek-v4-flash-0731`。必须配置 `OPENROUTER_API_KEY`；`OPENROUTER_HTTP_REFERER` 与 `OPENROUTER_APP_TITLE` 是可选归因信息。这些 id 固定使用专属 OpenRouter provider，API 会拒绝任意外部 slug。成功请求在每个 step 的成本元数据完整时按真实美元成本计费，否则使用保守静态价回退。附件仍沿用现有文本提取路径。
+
 ## 架构
 
 项目基于 Next.js 16 App Router，使用 React、TypeScript、Tailwind CSS、Base UI 支撑的 shadcn 组件、assistant-ui、AI SDK、Drizzle ORM 和 PostgreSQL。
