@@ -84,7 +84,11 @@ export function ArtifactDrawer({
             ))}
           </div>
         )}
-        {a && a.kind === "markdown" && <MarkdownBody source={a.content} />}
+        {a && a.kind === "markdown" && (
+          <div className="mx-auto my-6 max-w-2xl">
+            <MarkdownBody source={a.content} />
+          </div>
+        )}
       </div>
       {a && src && (
         <div
