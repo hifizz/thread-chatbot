@@ -1,0 +1,1402 @@
+{
+  "kind": "glm-5.2-routing",
+  "recordedAt": "2026-08-05T09:29:56.097Z",
+  "model": "glm-5.2",
+  "sampleCount": 64,
+  "mustSearchRecall": 1,
+  "noSearchPrecision": 1,
+  "maxProviderCalls": 1,
+  "medianAutoProviderCalls": 1,
+  "allRequiredPassed": true,
+  "rows": [
+    {
+      "id": "zh-must-01",
+      "language": "zh",
+      "mode": "auto",
+      "label": "must_search",
+      "expected": "search",
+      "selected": true,
+      "providerCalls": 1,
+      "passed": true,
+      "usage": {
+        "inputTokens": 606,
+        "inputTokenDetails": {
+          "noCacheTokens": 606,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 84,
+        "outputTokenDetails": {
+          "textTokens": 84,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 690
+      }
+    },
+    {
+      "id": "zh-must-02",
+      "language": "zh",
+      "mode": "auto",
+      "label": "must_search",
+      "expected": "search",
+      "selected": true,
+      "providerCalls": 1,
+      "passed": true,
+      "usage": {
+        "inputTokens": 600,
+        "inputTokenDetails": {
+          "noCacheTokens": 600,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 64,
+        "outputTokenDetails": {
+          "textTokens": 64,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 664
+      }
+    },
+    {
+      "id": "zh-must-03",
+      "language": "zh",
+      "mode": "auto",
+      "label": "must_search",
+      "expected": "search",
+      "selected": true,
+      "providerCalls": 1,
+      "passed": true,
+      "usage": {
+        "inputTokens": 603,
+        "inputTokenDetails": {
+          "noCacheTokens": 603,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 96,
+        "outputTokenDetails": {
+          "textTokens": 96,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 699
+      }
+    },
+    {
+      "id": "zh-must-04",
+      "language": "zh",
+      "mode": "auto",
+      "label": "must_search",
+      "expected": "search",
+      "selected": true,
+      "providerCalls": 1,
+      "passed": true,
+      "usage": {
+        "inputTokens": 599,
+        "inputTokenDetails": {
+          "noCacheTokens": 599,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 77,
+        "outputTokenDetails": {
+          "textTokens": 77,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 676
+      }
+    },
+    {
+      "id": "zh-must-05",
+      "language": "zh",
+      "mode": "auto",
+      "label": "must_search",
+      "expected": "search",
+      "selected": true,
+      "providerCalls": 1,
+      "passed": true,
+      "usage": {
+        "inputTokens": 607,
+        "inputTokenDetails": {
+          "noCacheTokens": 607,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 66,
+        "outputTokenDetails": {
+          "textTokens": 66,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 673
+      }
+    },
+    {
+      "id": "zh-must-06",
+      "language": "zh",
+      "mode": "auto",
+      "label": "must_search",
+      "expected": "search",
+      "selected": true,
+      "providerCalls": 1,
+      "passed": true,
+      "usage": {
+        "inputTokens": 598,
+        "inputTokenDetails": {
+          "noCacheTokens": 598,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 76,
+        "outputTokenDetails": {
+          "textTokens": 76,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 674
+      }
+    },
+    {
+      "id": "zh-must-07",
+      "language": "zh",
+      "mode": "auto",
+      "label": "must_search",
+      "expected": "search",
+      "selected": true,
+      "providerCalls": 1,
+      "passed": true,
+      "usage": {
+        "inputTokens": 602,
+        "inputTokenDetails": {
+          "noCacheTokens": 602,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 61,
+        "outputTokenDetails": {
+          "textTokens": 61,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 663
+      }
+    },
+    {
+      "id": "zh-must-08",
+      "language": "zh",
+      "mode": "auto",
+      "label": "must_search",
+      "expected": "search",
+      "selected": true,
+      "providerCalls": 1,
+      "passed": true,
+      "usage": {
+        "inputTokens": 601,
+        "inputTokenDetails": {
+          "noCacheTokens": 601,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 81,
+        "outputTokenDetails": {
+          "textTokens": 81,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 682
+      }
+    },
+    {
+      "id": "zh-must-09",
+      "language": "zh",
+      "mode": "auto",
+      "label": "must_search",
+      "expected": "search",
+      "selected": true,
+      "providerCalls": 1,
+      "passed": true,
+      "usage": {
+        "inputTokens": 605,
+        "inputTokenDetails": {
+          "noCacheTokens": 605,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 67,
+        "outputTokenDetails": {
+          "textTokens": 67,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 672
+      }
+    },
+    {
+      "id": "zh-must-10",
+      "language": "zh",
+      "mode": "auto",
+      "label": "must_search",
+      "expected": "search",
+      "selected": true,
+      "providerCalls": 1,
+      "passed": true,
+      "usage": {
+        "inputTokens": 604,
+        "inputTokenDetails": {
+          "noCacheTokens": 604,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 45,
+        "outputTokenDetails": {
+          "textTokens": 45,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 649
+      }
+    },
+    {
+      "id": "zh-must-11",
+      "language": "zh",
+      "mode": "auto",
+      "label": "must_search",
+      "expected": "search",
+      "selected": true,
+      "providerCalls": 1,
+      "passed": true,
+      "usage": {
+        "inputTokens": 599,
+        "inputTokenDetails": {
+          "noCacheTokens": 599,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 84,
+        "outputTokenDetails": {
+          "textTokens": 84,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 683
+      }
+    },
+    {
+      "id": "zh-must-12",
+      "language": "zh",
+      "mode": "auto",
+      "label": "must_search",
+      "expected": "search",
+      "selected": true,
+      "providerCalls": 1,
+      "passed": true,
+      "usage": {
+        "inputTokens": 602,
+        "inputTokenDetails": {
+          "noCacheTokens": 602,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 81,
+        "outputTokenDetails": {
+          "textTokens": 81,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 683
+      }
+    },
+    {
+      "id": "en-must-01",
+      "language": "en",
+      "mode": "auto",
+      "label": "must_search",
+      "expected": "search",
+      "selected": true,
+      "providerCalls": 1,
+      "passed": true,
+      "usage": {
+        "inputTokens": 605,
+        "inputTokenDetails": {
+          "noCacheTokens": 605,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 77,
+        "outputTokenDetails": {
+          "textTokens": 77,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 682
+      }
+    },
+    {
+      "id": "en-must-02",
+      "language": "en",
+      "mode": "auto",
+      "label": "must_search",
+      "expected": "search",
+      "selected": true,
+      "providerCalls": 1,
+      "passed": true,
+      "usage": {
+        "inputTokens": 600,
+        "inputTokenDetails": {
+          "noCacheTokens": 600,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 96,
+        "outputTokenDetails": {
+          "textTokens": 96,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 696
+      }
+    },
+    {
+      "id": "en-must-03",
+      "language": "en",
+      "mode": "auto",
+      "label": "must_search",
+      "expected": "search",
+      "selected": true,
+      "providerCalls": 1,
+      "passed": true,
+      "usage": {
+        "inputTokens": 603,
+        "inputTokenDetails": {
+          "noCacheTokens": 603,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 71,
+        "outputTokenDetails": {
+          "textTokens": 71,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 674
+      }
+    },
+    {
+      "id": "en-must-04",
+      "language": "en",
+      "mode": "auto",
+      "label": "must_search",
+      "expected": "search",
+      "selected": true,
+      "providerCalls": 1,
+      "passed": true,
+      "usage": {
+        "inputTokens": 602,
+        "inputTokenDetails": {
+          "noCacheTokens": 602,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 86,
+        "outputTokenDetails": {
+          "textTokens": 86,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 688
+      }
+    },
+    {
+      "id": "en-must-05",
+      "language": "en",
+      "mode": "auto",
+      "label": "must_search",
+      "expected": "search",
+      "selected": true,
+      "providerCalls": 1,
+      "passed": true,
+      "usage": {
+        "inputTokens": 602,
+        "inputTokenDetails": {
+          "noCacheTokens": 602,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 66,
+        "outputTokenDetails": {
+          "textTokens": 66,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 668
+      }
+    },
+    {
+      "id": "en-must-06",
+      "language": "en",
+      "mode": "auto",
+      "label": "must_search",
+      "expected": "search",
+      "selected": true,
+      "providerCalls": 1,
+      "passed": true,
+      "usage": {
+        "inputTokens": 603,
+        "inputTokenDetails": {
+          "noCacheTokens": 603,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 70,
+        "outputTokenDetails": {
+          "textTokens": 70,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 673
+      }
+    },
+    {
+      "id": "en-must-07",
+      "language": "en",
+      "mode": "auto",
+      "label": "must_search",
+      "expected": "search",
+      "selected": true,
+      "providerCalls": 1,
+      "passed": true,
+      "usage": {
+        "inputTokens": 598,
+        "inputTokenDetails": {
+          "noCacheTokens": 598,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 80,
+        "outputTokenDetails": {
+          "textTokens": 80,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 678
+      }
+    },
+    {
+      "id": "en-must-08",
+      "language": "en",
+      "mode": "auto",
+      "label": "must_search",
+      "expected": "search",
+      "selected": true,
+      "providerCalls": 1,
+      "passed": true,
+      "usage": {
+        "inputTokens": 602,
+        "inputTokenDetails": {
+          "noCacheTokens": 602,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 58,
+        "outputTokenDetails": {
+          "textTokens": 58,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 660
+      }
+    },
+    {
+      "id": "en-must-09",
+      "language": "en",
+      "mode": "auto",
+      "label": "must_search",
+      "expected": "search",
+      "selected": true,
+      "providerCalls": 1,
+      "passed": true,
+      "usage": {
+        "inputTokens": 600,
+        "inputTokenDetails": {
+          "noCacheTokens": 600,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 84,
+        "outputTokenDetails": {
+          "textTokens": 84,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 684
+      }
+    },
+    {
+      "id": "en-must-10",
+      "language": "en",
+      "mode": "auto",
+      "label": "must_search",
+      "expected": "search",
+      "selected": true,
+      "providerCalls": 1,
+      "passed": true,
+      "usage": {
+        "inputTokens": 602,
+        "inputTokenDetails": {
+          "noCacheTokens": 602,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 81,
+        "outputTokenDetails": {
+          "textTokens": 81,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 683
+      }
+    },
+    {
+      "id": "en-must-11",
+      "language": "en",
+      "mode": "auto",
+      "label": "must_search",
+      "expected": "search",
+      "selected": true,
+      "providerCalls": 1,
+      "passed": true,
+      "usage": {
+        "inputTokens": 602,
+        "inputTokenDetails": {
+          "noCacheTokens": 602,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 75,
+        "outputTokenDetails": {
+          "textTokens": 75,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 677
+      }
+    },
+    {
+      "id": "en-must-12",
+      "language": "en",
+      "mode": "auto",
+      "label": "must_search",
+      "expected": "search",
+      "selected": true,
+      "providerCalls": 1,
+      "passed": true,
+      "usage": {
+        "inputTokens": 604,
+        "inputTokenDetails": {
+          "noCacheTokens": 604,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 68,
+        "outputTokenDetails": {
+          "textTokens": 68,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 672
+      }
+    },
+    {
+      "id": "zh-no-01",
+      "language": "zh",
+      "mode": "auto",
+      "label": "no_search",
+      "expected": "no_search",
+      "selected": false,
+      "providerCalls": 0,
+      "passed": true,
+      "usage": {
+        "inputTokens": 601,
+        "inputTokenDetails": {
+          "noCacheTokens": 601,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 96,
+        "outputTokenDetails": {
+          "textTokens": 96,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 697
+      }
+    },
+    {
+      "id": "zh-no-02",
+      "language": "zh",
+      "mode": "auto",
+      "label": "no_search",
+      "expected": "no_search",
+      "selected": false,
+      "providerCalls": 0,
+      "passed": true,
+      "usage": {
+        "inputTokens": 598,
+        "inputTokenDetails": {
+          "noCacheTokens": 598,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 88,
+        "outputTokenDetails": {
+          "textTokens": 88,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 686
+      }
+    },
+    {
+      "id": "zh-no-03",
+      "language": "zh",
+      "mode": "auto",
+      "label": "no_search",
+      "expected": "no_search",
+      "selected": false,
+      "providerCalls": 0,
+      "passed": true,
+      "usage": {
+        "inputTokens": 598,
+        "inputTokenDetails": {
+          "noCacheTokens": 598,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 96,
+        "outputTokenDetails": {
+          "textTokens": 96,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 694
+      }
+    },
+    {
+      "id": "zh-no-04",
+      "language": "zh",
+      "mode": "auto",
+      "label": "no_search",
+      "expected": "no_search",
+      "selected": false,
+      "providerCalls": 0,
+      "passed": true,
+      "usage": {
+        "inputTokens": 594,
+        "inputTokenDetails": {
+          "noCacheTokens": 594,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 96,
+        "outputTokenDetails": {
+          "textTokens": 96,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 690
+      }
+    },
+    {
+      "id": "zh-no-05",
+      "language": "zh",
+      "mode": "auto",
+      "label": "no_search",
+      "expected": "no_search",
+      "selected": false,
+      "providerCalls": 0,
+      "passed": true,
+      "usage": {
+        "inputTokens": 606,
+        "inputTokenDetails": {
+          "noCacheTokens": 606,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 96,
+        "outputTokenDetails": {
+          "textTokens": 96,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 702
+      }
+    },
+    {
+      "id": "zh-no-06",
+      "language": "zh",
+      "mode": "auto",
+      "label": "no_search",
+      "expected": "no_search",
+      "selected": false,
+      "providerCalls": 0,
+      "passed": true,
+      "usage": {
+        "inputTokens": 600,
+        "inputTokenDetails": {
+          "noCacheTokens": 600,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 96,
+        "outputTokenDetails": {
+          "textTokens": 96,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 696
+      }
+    },
+    {
+      "id": "zh-no-07",
+      "language": "zh",
+      "mode": "auto",
+      "label": "no_search",
+      "expected": "no_search",
+      "selected": false,
+      "providerCalls": 0,
+      "passed": true,
+      "usage": {
+        "inputTokens": 605,
+        "inputTokenDetails": {
+          "noCacheTokens": 605,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 47,
+        "outputTokenDetails": {
+          "textTokens": 47,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 652
+      }
+    },
+    {
+      "id": "zh-no-08",
+      "language": "zh",
+      "mode": "auto",
+      "label": "no_search",
+      "expected": "no_search",
+      "selected": false,
+      "providerCalls": 0,
+      "passed": true,
+      "usage": {
+        "inputTokens": 602,
+        "inputTokenDetails": {
+          "noCacheTokens": 602,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 96,
+        "outputTokenDetails": {
+          "textTokens": 96,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 698
+      }
+    },
+    {
+      "id": "zh-no-09",
+      "language": "zh",
+      "mode": "auto",
+      "label": "no_search",
+      "expected": "no_search",
+      "selected": false,
+      "providerCalls": 0,
+      "passed": true,
+      "usage": {
+        "inputTokens": 599,
+        "inputTokenDetails": {
+          "noCacheTokens": 599,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 82,
+        "outputTokenDetails": {
+          "textTokens": 82,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 681
+      }
+    },
+    {
+      "id": "zh-no-10",
+      "language": "zh",
+      "mode": "auto",
+      "label": "no_search",
+      "expected": "no_search",
+      "selected": false,
+      "providerCalls": 0,
+      "passed": true,
+      "usage": {
+        "inputTokens": 596,
+        "inputTokenDetails": {
+          "noCacheTokens": 596,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 96,
+        "outputTokenDetails": {
+          "textTokens": 96,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 692
+      }
+    },
+    {
+      "id": "en-no-01",
+      "language": "en",
+      "mode": "auto",
+      "label": "no_search",
+      "expected": "no_search",
+      "selected": false,
+      "providerCalls": 0,
+      "passed": true,
+      "usage": {
+        "inputTokens": 597,
+        "inputTokenDetails": {
+          "noCacheTokens": 597,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 96,
+        "outputTokenDetails": {
+          "textTokens": 96,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 693
+      }
+    },
+    {
+      "id": "en-no-02",
+      "language": "en",
+      "mode": "auto",
+      "label": "no_search",
+      "expected": "no_search",
+      "selected": false,
+      "providerCalls": 0,
+      "passed": true,
+      "usage": {
+        "inputTokens": 595,
+        "inputTokenDetails": {
+          "noCacheTokens": 595,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 96,
+        "outputTokenDetails": {
+          "textTokens": 96,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 691
+      }
+    },
+    {
+      "id": "en-no-03",
+      "language": "en",
+      "mode": "auto",
+      "label": "no_search",
+      "expected": "no_search",
+      "selected": false,
+      "providerCalls": 0,
+      "passed": true,
+      "usage": {
+        "inputTokens": 599,
+        "inputTokenDetails": {
+          "noCacheTokens": 599,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 96,
+        "outputTokenDetails": {
+          "textTokens": 96,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 695
+      }
+    },
+    {
+      "id": "en-no-04",
+      "language": "en",
+      "mode": "auto",
+      "label": "no_search",
+      "expected": "no_search",
+      "selected": false,
+      "providerCalls": 0,
+      "passed": true,
+      "usage": {
+        "inputTokens": 598,
+        "inputTokenDetails": {
+          "noCacheTokens": 598,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 96,
+        "outputTokenDetails": {
+          "textTokens": 96,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 694
+      }
+    },
+    {
+      "id": "en-no-05",
+      "language": "en",
+      "mode": "auto",
+      "label": "no_search",
+      "expected": "no_search",
+      "selected": false,
+      "providerCalls": 0,
+      "passed": true,
+      "usage": {
+        "inputTokens": 603,
+        "inputTokenDetails": {
+          "noCacheTokens": 603,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 49,
+        "outputTokenDetails": {
+          "textTokens": 49,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 652
+      }
+    },
+    {
+      "id": "en-no-06",
+      "language": "en",
+      "mode": "auto",
+      "label": "no_search",
+      "expected": "no_search",
+      "selected": false,
+      "providerCalls": 0,
+      "passed": true,
+      "usage": {
+        "inputTokens": 594,
+        "inputTokenDetails": {
+          "noCacheTokens": 594,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 96,
+        "outputTokenDetails": {
+          "textTokens": 96,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 690
+      }
+    },
+    {
+      "id": "en-no-07",
+      "language": "en",
+      "mode": "auto",
+      "label": "no_search",
+      "expected": "no_search",
+      "selected": false,
+      "providerCalls": 0,
+      "passed": true,
+      "usage": {
+        "inputTokens": 601,
+        "inputTokenDetails": {
+          "noCacheTokens": 601,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 96,
+        "outputTokenDetails": {
+          "textTokens": 96,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 697
+      }
+    },
+    {
+      "id": "en-no-08",
+      "language": "en",
+      "mode": "auto",
+      "label": "no_search",
+      "expected": "no_search",
+      "selected": false,
+      "providerCalls": 0,
+      "passed": true,
+      "usage": {
+        "inputTokens": 597,
+        "inputTokenDetails": {
+          "noCacheTokens": 597,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 96,
+        "outputTokenDetails": {
+          "textTokens": 96,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 693
+      }
+    },
+    {
+      "id": "en-no-09",
+      "language": "en",
+      "mode": "auto",
+      "label": "no_search",
+      "expected": "no_search",
+      "selected": false,
+      "providerCalls": 0,
+      "passed": true,
+      "usage": {
+        "inputTokens": 603,
+        "inputTokenDetails": {
+          "noCacheTokens": 603,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 96,
+        "outputTokenDetails": {
+          "textTokens": 96,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 699
+      }
+    },
+    {
+      "id": "en-no-10",
+      "language": "en",
+      "mode": "auto",
+      "label": "no_search",
+      "expected": "no_search",
+      "selected": false,
+      "providerCalls": 0,
+      "passed": true,
+      "usage": {
+        "inputTokens": 595,
+        "inputTokenDetails": {
+          "noCacheTokens": 595,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 96,
+        "outputTokenDetails": {
+          "textTokens": 96,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 691
+      }
+    },
+    {
+      "id": "zh-amb-01",
+      "language": "zh",
+      "mode": "auto",
+      "label": "ambiguous",
+      "expected": "optional",
+      "selected": false,
+      "providerCalls": 0,
+      "passed": true,
+      "usage": {
+        "inputTokens": 594,
+        "inputTokenDetails": {
+          "noCacheTokens": 594,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 96,
+        "outputTokenDetails": {
+          "textTokens": 96,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 690
+      }
+    },
+    {
+      "id": "zh-amb-02",
+      "language": "zh",
+      "mode": "auto",
+      "label": "ambiguous",
+      "expected": "optional",
+      "selected": false,
+      "providerCalls": 0,
+      "passed": true,
+      "usage": {
+        "inputTokens": 596,
+        "inputTokenDetails": {
+          "noCacheTokens": 596,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 96,
+        "outputTokenDetails": {
+          "textTokens": 96,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 692
+      }
+    },
+    {
+      "id": "zh-amb-03",
+      "language": "zh",
+      "mode": "auto",
+      "label": "ambiguous",
+      "expected": "optional",
+      "selected": false,
+      "providerCalls": 0,
+      "passed": true,
+      "usage": {
+        "inputTokens": 594,
+        "inputTokenDetails": {
+          "noCacheTokens": 594,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 96,
+        "outputTokenDetails": {
+          "textTokens": 96,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 690
+      }
+    },
+    {
+      "id": "zh-amb-04",
+      "language": "zh",
+      "mode": "auto",
+      "label": "ambiguous",
+      "expected": "optional",
+      "selected": false,
+      "providerCalls": 0,
+      "passed": true,
+      "usage": {
+        "inputTokens": 593,
+        "inputTokenDetails": {
+          "noCacheTokens": 593,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 96,
+        "outputTokenDetails": {
+          "textTokens": 96,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 689
+      }
+    },
+    {
+      "id": "en-amb-01",
+      "language": "en",
+      "mode": "auto",
+      "label": "ambiguous",
+      "expected": "optional",
+      "selected": false,
+      "providerCalls": 0,
+      "passed": true,
+      "usage": {
+        "inputTokens": 595,
+        "inputTokenDetails": {
+          "noCacheTokens": 595,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 96,
+        "outputTokenDetails": {
+          "textTokens": 96,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 691
+      }
+    },
+    {
+      "id": "en-amb-02",
+      "language": "en",
+      "mode": "auto",
+      "label": "ambiguous",
+      "expected": "optional",
+      "selected": true,
+      "providerCalls": 1,
+      "passed": true,
+      "usage": {
+        "inputTokens": 597,
+        "inputTokenDetails": {
+          "noCacheTokens": 597,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 96,
+        "outputTokenDetails": {
+          "textTokens": 96,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 693
+      }
+    },
+    {
+      "id": "en-amb-03",
+      "language": "en",
+      "mode": "auto",
+      "label": "ambiguous",
+      "expected": "optional",
+      "selected": false,
+      "providerCalls": 0,
+      "passed": true,
+      "usage": {
+        "inputTokens": 595,
+        "inputTokenDetails": {
+          "noCacheTokens": 595,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 96,
+        "outputTokenDetails": {
+          "textTokens": 96,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 691
+      }
+    },
+    {
+      "id": "en-amb-04",
+      "language": "en",
+      "mode": "auto",
+      "label": "ambiguous",
+      "expected": "optional",
+      "selected": false,
+      "providerCalls": 0,
+      "passed": true,
+      "usage": {
+        "inputTokens": 595,
+        "inputTokenDetails": {
+          "noCacheTokens": 595,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 96,
+        "outputTokenDetails": {
+          "textTokens": 96,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 691
+      }
+    },
+    {
+      "id": "zh-always-01",
+      "language": "zh",
+      "mode": "always",
+      "label": "forced_search",
+      "expected": "search",
+      "selected": true,
+      "providerCalls": 1,
+      "passed": true,
+      "serverForced": true
+    },
+    {
+      "id": "zh-always-02",
+      "language": "zh",
+      "mode": "always",
+      "label": "forced_search",
+      "expected": "search",
+      "selected": true,
+      "providerCalls": 1,
+      "passed": true,
+      "serverForced": true
+    },
+    {
+      "id": "en-always-01",
+      "language": "en",
+      "mode": "always",
+      "label": "forced_search",
+      "expected": "search",
+      "selected": true,
+      "providerCalls": 1,
+      "passed": true,
+      "serverForced": true
+    },
+    {
+      "id": "en-always-02",
+      "language": "en",
+      "mode": "always",
+      "label": "forced_search",
+      "expected": "search",
+      "selected": true,
+      "providerCalls": 1,
+      "passed": true,
+      "serverForced": true
+    },
+    {
+      "id": "zh-off-01",
+      "language": "zh",
+      "mode": "off",
+      "label": "disabled",
+      "expected": "no_search",
+      "selected": false,
+      "providerCalls": 0,
+      "passed": true,
+      "usage": {
+        "inputTokens": 374,
+        "inputTokenDetails": {
+          "noCacheTokens": 374,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 96,
+        "outputTokenDetails": {
+          "textTokens": 96,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 470
+      }
+    },
+    {
+      "id": "zh-off-02",
+      "language": "zh",
+      "mode": "off",
+      "label": "disabled",
+      "expected": "no_search",
+      "selected": false,
+      "providerCalls": 0,
+      "passed": true,
+      "usage": {
+        "inputTokens": 372,
+        "inputTokenDetails": {
+          "noCacheTokens": 372,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 96,
+        "outputTokenDetails": {
+          "textTokens": 96,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 468
+      }
+    },
+    {
+      "id": "en-off-01",
+      "language": "en",
+      "mode": "off",
+      "label": "disabled",
+      "expected": "no_search",
+      "selected": false,
+      "providerCalls": 0,
+      "passed": true,
+      "usage": {
+        "inputTokens": 374,
+        "inputTokenDetails": {
+          "noCacheTokens": 374,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 96,
+        "outputTokenDetails": {
+          "textTokens": 96,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 470
+      }
+    },
+    {
+      "id": "en-off-02",
+      "language": "en",
+      "mode": "off",
+      "label": "disabled",
+      "expected": "no_search",
+      "selected": false,
+      "providerCalls": 0,
+      "passed": true,
+      "usage": {
+        "inputTokens": 372,
+        "inputTokenDetails": {
+          "noCacheTokens": 372,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 96,
+        "outputTokenDetails": {
+          "textTokens": 96,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 468
+      }
+    },
+    {
+      "id": "tool-invalid-01",
+      "language": "n/a",
+      "mode": "auto",
+      "label": "invalid_tool_input",
+      "expected": "reject_before_provider",
+      "prompt": "Synthetic invalid call",
+      "toolInput": {
+        "query": null
+      },
+      "selected": false,
+      "passed": true,
+      "synthetic": true
+    },
+    {
+      "id": "tool-invalid-02",
+      "language": "n/a",
+      "mode": "auto",
+      "label": "invalid_tool_input",
+      "expected": "reject_before_provider",
+      "prompt": "Synthetic invalid call",
+      "toolInput": {
+        "query": ""
+      },
+      "selected": false,
+      "passed": true,
+      "synthetic": true
+    },
+    {
+      "id": "tool-invalid-03",
+      "language": "n/a",
+      "mode": "auto",
+      "label": "invalid_tool_input",
+      "expected": "reject_before_provider",
+      "prompt": "Synthetic invalid call",
+      "toolInput": {
+        "query": "__OVER_QUERY_LIMIT__"
+      },
+      "selected": false,
+      "passed": true,
+      "synthetic": true
+    },
+    {
+      "id": "tool-invalid-04",
+      "language": "n/a",
+      "mode": "auto",
+      "label": "invalid_tool_input",
+      "expected": "reject_before_provider",
+      "prompt": "Synthetic invalid call",
+      "toolInput": {
+        "query": "valid",
+        "unexpected": true
+      },
+      "selected": false,
+      "passed": true,
+      "synthetic": true
+    }
+  ]
+}

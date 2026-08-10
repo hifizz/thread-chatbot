@@ -8,13 +8,26 @@ import {
   THREAD_CHAT_BRANCH_SUFFIX,
   THREAD_CHAT_SYSTEM,
 } from "@/constants/thread-chat"
+import {
+  buildThreadChatSearchPolicy,
+  type ThreadChatSearchPolicyOptions,
+} from "@/lib/chat/thread-chat-search-policy"
 
 /**
  * 构造 thread-chat 模式的 system 提示：
  * 通用结构化风格段 +（anchorText 非空时）分支焦点段（锚点原文作为数据嵌入「」内）。
  */
-export function buildThreadChatSystem(anchorText?: string | null): string {
+export function buildThreadChatSystem(
+  anchorText?: string | null,
+  searchPolicy?: ThreadChatSearchPolicyOptions
+): string {
   const anchor = anchorText?.trim()
-  if (!anchor) return THREAD_CHAT_SYSTEM
-  return `${THREAD_CHAT_SYSTEM}\n\n${THREAD_CHAT_BRANCH_PREFIX}「${anchor}」。${THREAD_CHAT_BRANCH_SUFFIX}`
+  const branch = anchor
+    ? `${THREAD_CHAT_BRANCH_PREFIX}「${anchor}」。${THREAD_CHAT_BRANCH_SUFFIX}`
+    : null
+  const policy = searchPolicy
+    ? buildThreadChatSearchPolicy(searchPolicy)
+    : null
+
+  return [THREAD_CHAT_SYSTEM, branch, policy].filter(Boolean).join("\n\n")
 }

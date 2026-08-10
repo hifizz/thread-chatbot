@@ -77,6 +77,27 @@
   text-decoration: underline;
   text-underline-offset: 2px;
 }
+.tc .md-body a.source-pill {
+  display: inline-flex;
+  max-width: min(100%, 220px);
+  align-items: center;
+  overflow: hidden;
+  padding: 1px 7px;
+  border: 1px solid color-mix(in srgb, var(--d1) 35%, var(--rule));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--d1) 5%, var(--paper));
+  font-family: var(--font-ui);
+  font-size: 0.78em;
+  line-height: 1.55;
+  text-decoration: none;
+  text-overflow: ellipsis;
+  vertical-align: 0.08em;
+  white-space: nowrap;
+}
+.tc .md-body a.source-pill:hover {
+  border-color: var(--d1);
+  background: color-mix(in srgb, var(--d1) 9%, var(--paper));
+}
 .tc .md-body hr {
   border: none;
   border-top: 1px solid var(--rule);

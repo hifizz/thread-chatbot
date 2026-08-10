@@ -1,6 +1,6 @@
 import { and, desc, eq, sql } from "drizzle-orm"
 import { db } from "@/lib/db"
-import { usageRecords } from "@/lib/db/schema"
+import { externalUsageRecords, usageRecords } from "@/lib/db/schema"
 import { getCurrentUserId } from "@/lib/auth/server"
 import { ensureUserCredits, getBalanceMicros } from "@/lib/billing/credits"
 
@@ -19,31 +19,56 @@ export async function GET(req: Request) {
     inputTokens: number
     outputTokens: number
     totalTokens: number
+    modelPriceMicros: number
+    externalPriceMicros: number
+    externalCallCount: number
+    externalBillableUnits: number
     priceMicros: number
   } | null = null
 
   if (threadId) {
-    const [agg] = await db
-      .select({
-        inputTokens: sql<number>`coalesce(sum(${usageRecords.inputTokens}), 0)`,
-        outputTokens: sql<number>`coalesce(sum(${usageRecords.outputTokens}), 0)`,
-        priceMicros: sql<number>`coalesce(sum(${usageRecords.priceMicros}), 0)`,
-      })
-      .from(usageRecords)
-      .where(
-        and(
-          eq(usageRecords.userId, userId),
-          eq(usageRecords.threadId, threadId)
-        )
-      )
+    const [[modelAgg], [externalAgg]] = await Promise.all([
+      db
+        .select({
+          inputTokens: sql<number>`coalesce(sum(${usageRecords.inputTokens}), 0)`,
+          outputTokens: sql<number>`coalesce(sum(${usageRecords.outputTokens}), 0)`,
+          priceMicros: sql<number>`coalesce(sum(${usageRecords.priceMicros}), 0)`,
+        })
+        .from(usageRecords)
+        .where(
+          and(
+            eq(usageRecords.userId, userId),
+            eq(usageRecords.threadId, threadId)
+          )
+        ),
+      db
+        .select({
+          callCount: sql<number>`count(*)`,
+          billableUnits: sql<number>`coalesce(sum(${externalUsageRecords.billableUnits}), 0)`,
+          priceMicros: sql<number>`coalesce(sum(${externalUsageRecords.userPriceMicros}), 0)`,
+        })
+        .from(externalUsageRecords)
+        .where(
+          and(
+            eq(externalUsageRecords.userId, userId),
+            eq(externalUsageRecords.threadId, threadId)
+          )
+        ),
+    ])
 
-    const inputTokens = Number(agg?.inputTokens ?? 0)
-    const outputTokens = Number(agg?.outputTokens ?? 0)
+    const inputTokens = Number(modelAgg?.inputTokens ?? 0)
+    const outputTokens = Number(modelAgg?.outputTokens ?? 0)
+    const modelPriceMicros = Number(modelAgg?.priceMicros ?? 0)
+    const externalPriceMicros = Number(externalAgg?.priceMicros ?? 0)
     thread = {
       inputTokens,
       outputTokens,
       totalTokens: inputTokens + outputTokens,
-      priceMicros: Number(agg?.priceMicros ?? 0),
+      modelPriceMicros,
+      externalPriceMicros,
+      externalCallCount: Number(externalAgg?.callCount ?? 0),
+      externalBillableUnits: Number(externalAgg?.billableUnits ?? 0),
+      priceMicros: modelPriceMicros + externalPriceMicros,
     }
   }
 
@@ -51,6 +76,7 @@ export async function GET(req: Request) {
   const [lastRow] = await db
     .select({
       model: usageRecords.model,
+      messageId: usageRecords.messageId,
       inputTokens: usageRecords.inputTokens,
       outputTokens: usageRecords.outputTokens,
       priceMicros: usageRecords.priceMicros,
@@ -67,14 +93,38 @@ export async function GET(req: Request) {
     .orderBy(desc(usageRecords.createdAt))
     .limit(1)
 
+  const [lastExternal] = lastRow?.messageId
+    ? await db
+        .select({
+          callCount: sql<number>`count(*)`,
+          billableUnits: sql<number>`coalesce(sum(${externalUsageRecords.billableUnits}), 0)`,
+          priceMicros: sql<number>`coalesce(sum(${externalUsageRecords.userPriceMicros}), 0)`,
+        })
+        .from(externalUsageRecords)
+        .where(
+          and(
+            eq(externalUsageRecords.userId, userId),
+            eq(externalUsageRecords.responseId, lastRow.messageId)
+          )
+        )
+    : []
+
   const last = lastRow
-    ? {
-        model: lastRow.model,
-        inputTokens: lastRow.inputTokens,
-        outputTokens: lastRow.outputTokens,
-        totalTokens: lastRow.inputTokens + lastRow.outputTokens,
-        priceMicros: Number(lastRow.priceMicros),
-      }
+    ? (() => {
+        const modelPriceMicros = Number(lastRow.priceMicros)
+        const externalPriceMicros = Number(lastExternal?.priceMicros ?? 0)
+        return {
+          model: lastRow.model,
+          inputTokens: lastRow.inputTokens,
+          outputTokens: lastRow.outputTokens,
+          totalTokens: lastRow.inputTokens + lastRow.outputTokens,
+          modelPriceMicros,
+          externalPriceMicros,
+          externalCallCount: Number(lastExternal?.callCount ?? 0),
+          externalBillableUnits: Number(lastExternal?.billableUnits ?? 0),
+          priceMicros: modelPriceMicros + externalPriceMicros,
+        }
+      })()
     : null
 
   return Response.json({ balanceMicros, thread, last })

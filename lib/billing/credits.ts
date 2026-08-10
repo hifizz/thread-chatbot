@@ -1,15 +1,24 @@
 import { randomUUID } from "node:crypto"
 import { and, desc, eq, isNotNull, sql } from "drizzle-orm"
 import { db } from "@/lib/db"
-import { userCredits, usageRecords, payments } from "@/lib/db/schema"
+import {
+  externalUsageRecords,
+  userCredits,
+  usageRecords,
+  payments,
+} from "@/lib/db/schema"
 import {
   INITIAL_CREDIT_MICROS,
   costMicros,
   priceMicros,
   priceFromCost,
+  tavilySearchCreditCostMicros,
   usdToMicros,
 } from "@/constants/pricing"
 import { getGenerationCostUsd } from "@/lib/payments/vercel-gateway"
+import { externalUsageIdempotencyKey } from "@/lib/billing/external-usage"
+
+export { fingerprintExternalQuery } from "@/lib/billing/external-usage"
 
 // 用户额度与用量记账。金额单位为「微元」（见 constants/pricing.ts）。
 
@@ -50,6 +59,159 @@ export type ChargeResult = {
   costMicros: number
   priceMicros: number
   balanceMicros: number
+}
+
+export type ExternalUsageStatus =
+  | "succeeded"
+  | "failed"
+  | "timeout"
+  | "rate_limited"
+  | "provider_error"
+  | "empty"
+  | "filtered"
+
+export type ExternalUsageInput = {
+  userId: string
+  threadId?: string | null
+  responseId?: string | null
+  requestId: string
+  callIndex: number
+  provider: "tavily"
+  operation: "basic_search"
+  status: ExternalUsageStatus
+  /** Provider 确认/按成功语义应消耗的 credits；失败且无计费证据时必须为 0。 */
+  billableUnits: number
+  latencyMs: number
+  resultCount: number
+  /** 只接受 SHA-256 hex，不接收或保存完整 query。 */
+  queryFingerprint: string
+}
+
+export type ExternalChargeResult = {
+  recordId: string
+  charged: boolean
+  costMicros: number
+  priceMicros: number
+  balanceMicros: number
+}
+
+const SHA256_HEX_PATTERN = /^[a-f0-9]{64}$/i
+
+function requireNonEmpty(value: string, field: string): void {
+  if (value.length === 0 || value.length > 200) {
+    throw new Error(`${field} 必须是 1–200 字符`)
+  }
+}
+
+function requireNonNegativeInteger(value: number, field: string): void {
+  if (!Number.isSafeInteger(value) || value < 0) {
+    throw new Error(`${field} 必须是非负安全整数`)
+  }
+}
+
+function validateExternalUsageInput(input: ExternalUsageInput): void {
+  requireNonEmpty(input.userId, "userId")
+  requireNonEmpty(input.requestId, "requestId")
+  requireNonNegativeInteger(input.callIndex, "callIndex")
+  requireNonNegativeInteger(input.billableUnits, "billableUnits")
+  requireNonNegativeInteger(input.latencyMs, "latencyMs")
+  requireNonNegativeInteger(input.resultCount, "resultCount")
+  if (!SHA256_HEX_PATTERN.test(input.queryFingerprint)) {
+    throw new Error("queryFingerprint 必须是 SHA-256 hex")
+  }
+}
+
+/**
+ * 记录并扣除一次外部工具用量。
+ *
+ * 幂等键由 provider/requestId/callIndex 派生；只有首次成功插入流水的事务会扣余额，
+ * 重复调用返回原流水和当前余额。流水插入与扣款同事务，任何一步失败都会整体回滚。
+ */
+export async function chargeExternalUsage(
+  input: ExternalUsageInput
+): Promise<ExternalChargeResult> {
+  validateExternalUsageInput(input)
+
+  const cost = tavilySearchCreditCostMicros(input.billableUnits)
+  const price = priceFromCost(cost)
+  const idempotencyKey = externalUsageIdempotencyKey(
+    input.provider,
+    input.requestId,
+    input.callIndex
+  )
+
+  await ensureUserCredits(input.userId)
+
+  return db.transaction(async (tx) => {
+    const recordId = randomUUID()
+    const [inserted] = await tx
+      .insert(externalUsageRecords)
+      .values({
+        id: recordId,
+        userId: input.userId,
+        threadId: input.threadId ?? null,
+        responseId: input.responseId ?? null,
+        requestId: input.requestId,
+        callIndex: input.callIndex,
+        provider: input.provider,
+        operation: input.operation,
+        status: input.status,
+        billableUnits: input.billableUnits,
+        providerCostMicros: cost,
+        userPriceMicros: price,
+        latencyMs: input.latencyMs,
+        resultCount: input.resultCount,
+        queryFingerprint: input.queryFingerprint.toLowerCase(),
+        idempotencyKey,
+      })
+      .onConflictDoNothing({ target: externalUsageRecords.idempotencyKey })
+      .returning({ id: externalUsageRecords.id })
+
+    if (!inserted) {
+      const [[existing], [credits]] = await Promise.all([
+        tx
+          .select({
+            id: externalUsageRecords.id,
+            costMicros: externalUsageRecords.providerCostMicros,
+            priceMicros: externalUsageRecords.userPriceMicros,
+          })
+          .from(externalUsageRecords)
+          .where(eq(externalUsageRecords.idempotencyKey, idempotencyKey))
+          .limit(1),
+        tx
+          .select({ balance: userCredits.balanceMicros })
+          .from(userCredits)
+          .where(eq(userCredits.userId, input.userId))
+          .limit(1),
+      ])
+      if (!existing) throw new Error("外部用量幂等冲突后未找到原流水")
+      return {
+        recordId: existing.id,
+        charged: false,
+        costMicros: Number(existing.costMicros),
+        priceMicros: Number(existing.priceMicros),
+        balanceMicros: Number(credits?.balance ?? 0),
+      }
+    }
+
+    const [credits] = await tx
+      .update(userCredits)
+      .set({
+        balanceMicros: sql`${userCredits.balanceMicros} - ${price}`,
+        updatedAt: new Date(),
+      })
+      .where(eq(userCredits.userId, input.userId))
+      .returning({ balance: userCredits.balanceMicros })
+
+    if (!credits) throw new Error("外部用量扣费时未找到用户余额")
+    return {
+      recordId,
+      charged: true,
+      costMicros: cost,
+      priceMicros: price,
+      balanceMicros: Number(credits.balance),
+    }
+  })
 }
 
 /**

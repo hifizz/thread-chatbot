@@ -1,0 +1,70 @@
+{
+  "kind": "glm-5.2-live-programming",
+  "recordedAt": "2026-08-05T09:32:04.683Z",
+  "model": "glm-5.2",
+  "searchProvider": "Tavily Basic Search",
+  "sampleCount": 1,
+  "automatedPassRate": 1,
+  "sourceValidityRate": 1,
+  "maxProviderCalls": 1,
+  "medianProviderCalls": 1,
+  "averageProviderCalls": 1,
+  "p50LatencyMs": 30489,
+  "p95LatencyMs": 30489,
+  "estimatedTavilyCredits": 1,
+  "estimatedTavilyCostUsd": 0.008,
+  "limitation": "Automated gates cover call bounds, returned-source validity and non-empty grounded answers. Correctness/non-regression still requires human review of answer/baselineAnswer pairs.",
+  "rows": [
+    {
+      "id": "live-15",
+      "prompt": "Next.js 16 Cache Components 的 cacheLife 和 cacheTag 当前应如何使用？",
+      "passed": true,
+      "providerCalls": 1,
+      "sourceCount": 1,
+      "returnedSources": [
+        {
+          "sourceId": "src_7229n8",
+          "title": "Functions: cacheLife | Next.js",
+          "url": "https://nextjs.org/docs/app/api-reference/functions/cacheLife"
+        }
+      ],
+      "citedUrlCount": 1,
+      "sourceValidity": true,
+      "searchStatus": "success",
+      "searchError": null,
+      "latencyMs": 30489,
+      "baselineLatencyMs": 18984,
+      "incrementalLatencyMs": 11505,
+      "usage": {
+        "inputTokens": 769,
+        "inputTokenDetails": {
+          "noCacheTokens": 769,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 1213,
+        "outputTokenDetails": {
+          "textTokens": 1213,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 1982
+      },
+      "baselineUsage": {
+        "inputTokens": 446,
+        "inputTokenDetails": {
+          "noCacheTokens": 446,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 700,
+        "outputTokenDetails": {
+          "textTokens": 700,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 1146
+      },
+      "answer": "# Next.js 16 Cache Components：`cacheLife` 与 `cacheTag` 的用法\n\n根据本轮搜索到的官方文档摘要，下面给出当前可核验的信息，并明确标注未核验的部分。\n\n## 总体前提：`use cache` 指令\n\n在 Next.js 的 Cache Components（原 Dynamic IO / PPR 相关缓存机制）模型中，`cacheLife` 和 `cacheTag` 都不是独立使用的 API，它们必须配合 `use cache` 指令。`use cache` 指令需放置在文件级别，或异步函数 / 组件的顶部。\n\n示例结构：\n\n```tsx\nimport { cacheLife, cacheTag } from 'next/cache'\n\nexport async function MyComponent() {\n  'use cache'\n  cacheLife('hours')\n  cacheTag('my-data')\n  // ... 数据获取与渲染\n}\n```\n\n> ⚠️ 限制说明：本轮搜索只返回了 `cacheLife` 官方文档摘要，未返回 `cacheTag` 的官方文档摘要，也未能核验 Next.js 16 的具体版本号或稳定/实验状态。以下 `cacheLife` 部分基于官方文档摘要，`cacheTag` 部分基于通用机制说明，未由本轮一手来源直接确认。\n\n## `cacheLife`\n\n来源：[Functions: cacheLife | Next.js](https://nextjs.org/docs/app/api-reference/functions/cacheLife)\n\n### 作用\n用于设置函数或组件的缓存生命周期。它通过引用一个\"缓存配置文件（cache profile）\"来定义缓存的行为，包括 `stale`、`revalidate` 等属性。\n\n### 使用方式\n\n1. **预设缓存配置文件（Preset profiles）**：官方内置了若干预设配置文件，例如 `\"days\"`、`\"hours\"`、`\"default\"` 等。直接传入字符串即可使用：\n   ```ts\n   cacheLife('hours')\n   ```\n\n2. **覆盖默认配置文件**：可以覆盖默认的 `\"days\"` 等配置文件。文档示例展示了如何 override 默认 `\"days\"` 配置文件（摘要未给出具体代码细节，未进一步核验）。\n\n3. **自定义缓存配置文件**：可在 `next.config` 中定义自定义配置文件，再通过 `cacheLife('myProfile')` 引用。\n\n4. **内联缓存配置文件**：可以直接传入一个内联对象而非字符串配置文件名。\n\n### 与 `staleTimes.static` 的关系\n官方文档明确指出：更新 `staleTimes.static` 也会更新 `default` 缓存配置文件的 `stale` 值。这说明 `default` 配置文件的 `stale` 行为受全局配置影响。\n\n## `cacheTag`\n\n> ⚠️ 以下为基于 Cache Components 通用机制的说明，本轮未搜索到 `cacheTag` 官方文档摘要，无法逐一核验字段与限制。\n\n在 Cache Components 模型中，`cacheTag` 的作用是给被 `use cache` 包裹的内容打上标签，便于后续按标签失效缓存：\n\n```tsx\nimport { cacheLife, cacheTag } from 'next/cache'\n\nexport async function Product({ id }: { id: string }) {\n  'use cache'\n  cacheLife('hours')\n  cacheTag(`product-${id}`)\n  // ...\n}\n```\n\n随后可在服务端通过 `revalidateTag('product-123')` 失效对应缓存。\n\n**未核验项**：`cacheTag` 在 Cache Components 下的确切签名、是否仅限 `use cache` 作用域内调用、与旧版 `revalidateTag` 的兼容性、以及在 Next.js 16 中是否稳定，本轮搜索无法确认。\n\n## 关键限制\n\n1. **版本状态未核验**：搜索摘要未明确说明上述 API 在 \"Next.js 16\" 中是稳定版、实验版还是仍需 `next.config` 中开启实验标志。使用前请查阅官方发布说明或 `next.config` 文档确认。\n2. **`cacheTag` 文档未返回**：本轮搜索仅返回 `cacheLife` 官方文档摘要，`cacheTag` 的具体行为建议直接查阅官方文档：[未核验链接已移除]\n3. **`use cache` 指令状态**：该指令长期处于实验阶段，配置方式在不同 Next.js 版本间可能变化，请以官方最新文档为准。\n\n如需进一步核验 `cacheTag` 或 Next.js 16 的稳定状态，建议下一轮再进行一次针对性搜索。",
+      "rawAnswer": "# Next.js 16 Cache Components：`cacheLife` 与 `cacheTag` 的用法\n\n根据本轮搜索到的官方文档摘要，下面给出当前可核验的信息，并明确标注未核验的部分。\n\n## 总体前提：`use cache` 指令\n\n在 Next.js 的 Cache Components（原 Dynamic IO / PPR 相关缓存机制）模型中，`cacheLife` 和 `cacheTag` 都不是独立使用的 API，它们必须配合 `use cache` 指令。`use cache` 指令需放置在文件级别，或异步函数 / 组件的顶部。\n\n示例结构：\n\n```tsx\nimport { cacheLife, cacheTag } from 'next/cache'\n\nexport async function MyComponent() {\n  'use cache'\n  cacheLife('hours')\n  cacheTag('my-data')\n  // ... 数据获取与渲染\n}\n```\n\n> ⚠️ 限制说明：本轮搜索只返回了 `cacheLife` 官方文档摘要，未返回 `cacheTag` 的官方文档摘要，也未能核验 Next.js 16 的具体版本号或稳定/实验状态。以下 `cacheLife` 部分基于官方文档摘要，`cacheTag` 部分基于通用机制说明，未由本轮一手来源直接确认。\n\n## `cacheLife`\n\n来源：[Functions: cacheLife | Next.js](https://nextjs.org/docs/app/api-reference/functions/cacheLife)\n\n### 作用\n用于设置函数或组件的缓存生命周期。它通过引用一个\"缓存配置文件（cache profile）\"来定义缓存的行为，包括 `stale`、`revalidate` 等属性。\n\n### 使用方式\n\n1. **预设缓存配置文件（Preset profiles）**：官方内置了若干预设配置文件，例如 `\"days\"`、`\"hours\"`、`\"default\"` 等。直接传入字符串即可使用：\n   ```ts\n   cacheLife('hours')\n   ```\n\n2. **覆盖默认配置文件**：可以覆盖默认的 `\"days\"` 等配置文件。文档示例展示了如何 override 默认 `\"days\"` 配置文件（摘要未给出具体代码细节，未进一步核验）。\n\n3. **自定义缓存配置文件**：可在 `next.config` 中定义自定义配置文件，再通过 `cacheLife('myProfile')` 引用。\n\n4. **内联缓存配置文件**：可以直接传入一个内联对象而非字符串配置文件名。\n\n### 与 `staleTimes.static` 的关系\n官方文档明确指出：更新 `staleTimes.static` 也会更新 `default` 缓存配置文件的 `stale` 值。这说明 `default` 配置文件的 `stale` 行为受全局配置影响。\n\n## `cacheTag`\n\n> ⚠️ 以下为基于 Cache Components 通用机制的说明，本轮未搜索到 `cacheTag` 官方文档摘要，无法逐一核验字段与限制。\n\n在 Cache Components 模型中，`cacheTag` 的作用是给被 `use cache` 包裹的内容打上标签，便于后续按标签失效缓存：\n\n```tsx\nimport { cacheLife, cacheTag } from 'next/cache'\n\nexport async function Product({ id }: { id: string }) {\n  'use cache'\n  cacheLife('hours')\n  cacheTag(`product-${id}`)\n  // ...\n}\n```\n\n随后可在服务端通过 `revalidateTag('product-123')` 失效对应缓存。\n\n**未核验项**：`cacheTag` 在 Cache Components 下的确切签名、是否仅限 `use cache` 作用域内调用、与旧版 `revalidateTag` 的兼容性、以及在 Next.js 16 中是否稳定，本轮搜索无法确认。\n\n## 关键限制\n\n1. **版本状态未核验**：搜索摘要未明确说明上述 API 在 \"Next.js 16\" 中是稳定版、实验版还是仍需 `next.config` 中开启实验标志。使用前请查阅官方发布说明或 `next.config` 文档确认。\n2. **`cacheTag` 文档未返回**：本轮搜索仅返回 `cacheLife` 官方文档摘要，`cacheTag` 的具体行为建议直接查阅官方文档：https://nextjs.org/docs/app/api-reference/functions/cacheTag\n3. **`use cache` 指令状态**：该指令长期处于实验阶段，配置方式在不同 Next.js 版本间可能变化，请以官方最新文档为准。\n\n如需进一步核验 `cacheTag` 或 Next.js 16 的稳定状态，建议下一轮再进行一次针对性搜索。",
+      "baselineAnswer": "",
+      "manualCorrectnessReview": "required"
+    }
+  ]
+}

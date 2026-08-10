@@ -35,6 +35,10 @@ import {
   markdownSettlementRevision,
   type MarkdownSettlementBatch,
 } from "@/lib/markdown/settlement-batch"
+import {
+  compactSourceLabel,
+  stripSourcePrefix,
+} from "@/lib/chat/source-label"
 
 interface MarkdownSettlementContextValue {
   batch: MarkdownSettlementBatch
@@ -43,6 +47,7 @@ interface MarkdownSettlementContextValue {
 
 const MarkdownSettlementContext =
   createContext<MarkdownSettlementContextValue | null>(null)
+const CompactExternalLinksContext = createContext(false)
 
 /** 代码块：语言标签 + 复制按钮 + 高亮体（视觉参考 assistant-ui markdown-text 的代码头） */
 function CodeBlock({
@@ -109,6 +114,28 @@ function CodeBlock({
 }
 
 type MarkdownCodeProps = ComponentProps<"code"> & ExtraProps
+type MarkdownLinkProps = ComponentProps<"a"> & ExtraProps
+type MarkdownParagraphProps = ComponentProps<"p"> & ExtraProps
+
+function MarkdownParagraph({
+  children,
+  node: _node,
+  ...props
+}: MarkdownParagraphProps) {
+  void _node
+  const compactExternalLinks = useContext(CompactExternalLinksContext)
+  if (!compactExternalLinks) return <p {...props}>{children}</p>
+
+  const items = React.Children.toArray(children)
+  const hasSourceLink = items.some(
+    (item) =>
+      React.isValidElement(item) &&
+      (item.type === MarkdownLink || item.type === "a")
+  )
+  if (hasSourceLink && typeof items[0] === "string")
+    items[0] = stripSourcePrefix(items[0])
+  return <p {...props}>{items}</p>
+}
 
 function MarkdownCode({
   className,
@@ -139,20 +166,72 @@ function MarkdownCode({
   )
 }
 
+function MarkdownLink({
+  href,
+  children,
+  node: _node,
+  ...props
+}: MarkdownLinkProps) {
+  void _node
+  const compactExternalLinks = useContext(CompactExternalLinksContext)
+  if (href?.startsWith("#")) {
+    return (
+      <a {...props} href={href}>
+        {children}
+      </a>
+    )
+  }
+  let external = false
+  try {
+    const url = new URL(href ?? "")
+    external =
+      (url.protocol === "http:" || url.protocol === "https:") &&
+      !url.username &&
+      !url.password
+  } catch {
+    external = false
+  }
+  if (!external) {
+    return <span title="链接未通过安全校验">{children}</span>
+  }
+  const fullLabel = String(children ?? "").trim()
+  return (
+    <a
+      {...props}
+      className={compactExternalLinks ? "source-pill" : props.className}
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      title={compactExternalLinks ? fullLabel || href : props.title}
+    >
+      {compactExternalLinks
+        ? compactSourceLabel(fullLabel, href ?? "")
+        : children}
+    </a>
+  )
+}
+
 const components: Components = {
   // 代码块被默认包在 <pre> 里；把 <pre> 透传成 children，让 code 自己产出完整卡片，
   // 避免出现 <pre><div class=md-code> 的多余嵌套。
   pre: ({ children }) => <>{children}</>,
+  p: MarkdownParagraph,
   code: MarkdownCode,
+  /** 外部来源统一新标签打开，并隔离 opener/referrer 能力。 */
+  a: MarkdownLink,
 }
 
 export const MarkdownBody = memo(function MarkdownBody({
   source,
+  classNames,
   streaming = false,
+  compactExternalLinks = false,
   onContentSettled,
 }: {
   source: string
+  classNames?: string
   streaming?: boolean
+  compactExternalLinks?: boolean
   onContentSettled?: (revision: number) => void
 }) {
   const batch = useMemo(
@@ -192,14 +271,16 @@ export const MarkdownBody = memo(function MarkdownBody({
 
   return (
     <div
-      className="md-body"
+      className={`md-body ${classNames}`}
       data-content-revision={snapshot.revision}
       data-content-settled={snapshot.settled && !streaming ? "true" : "false"}
     >
       <MarkdownSettlementContext.Provider value={contextValue}>
-        <Markdown remarkPlugins={[remarkGfm]} components={components}>
-          {source}
-        </Markdown>
+        <CompactExternalLinksContext.Provider value={compactExternalLinks}>
+          <Markdown remarkPlugins={[remarkGfm]} components={components}>
+            {source}
+          </Markdown>
+        </CompactExternalLinksContext.Provider>
       </MarkdownSettlementContext.Provider>
     </div>
   )

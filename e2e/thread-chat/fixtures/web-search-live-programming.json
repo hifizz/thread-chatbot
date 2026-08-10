@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "createdAt": "2026-08-05",
+  "model": "glm-5.2",
+  "cases": [
+    { "id": "live-01", "prompt": "Next.js 16.2 中动态路由 page 的 params 当前是什么类型，应该怎样读取？请以官方文档为准。" },
+    { "id": "live-02", "prompt": "AI SDK v7 的 prepareStep 回调现在能接收和返回哪些关键字段？引用官方文档。" },
+    { "id": "live-03", "prompt": "React 19.2 的 Activity 组件目前是什么状态，适合生产使用吗？" },
+    { "id": "live-04", "prompt": "Node.js 当前默认 LTS 主版本及其生命周期阶段是什么？" },
+    { "id": "live-05", "prompt": "TypeScript 当前稳定版中 using / await using 的支持情况如何？" },
+    { "id": "live-06", "prompt": "Vercel Functions 当前默认超时、最大请求体和推荐 Node.js 运行方式是什么？" },
+    { "id": "live-07", "prompt": "pnpm 10 的 minimumReleaseAge 和 minimumReleaseAgeExclude 应如何配置？" },
+    { "id": "live-08", "prompt": "Drizzle ORM 0.45 在 PostgreSQL 中如何写 transaction callback 和嵌套 savepoint？" },
+    { "id": "live-09", "prompt": "Zod 当前版本如何定义 strict object 并拒绝未知字段？" },
+    { "id": "live-10", "prompt": "ESLint 10 相比 ESLint 9 的官方迁移重点有哪些？" },
+    { "id": "live-11", "prompt": "PostgreSQL 18 的 JSON_TABLE 当前语法和最小官方示例是什么？" },
+    { "id": "live-12", "prompt": "Cloudflare Workers 当前启用 Node.js API 兼容需要哪些 compatibility flags？" },
+    { "id": "live-13", "prompt": "Bun 当前是否能作为 Vercel Functions runtime，配置方法是什么？" },
+    { "id": "live-14", "prompt": "React 官方目前怎样区分 useEffectEvent 和普通事件处理函数？" },
+    { "id": "live-15", "prompt": "Next.js 16 Cache Components 的 cacheLife 和 cacheTag 当前应如何使用？" },
+    { "id": "live-16", "prompt": "AI SDK v7 的 experimental_repairToolCall 当前签名和失败返回语义是什么？" },
+    { "id": "live-17", "prompt": "Node.js 24 当前内置 TypeScript 类型剥离有哪些限制？" },
+    { "id": "live-18", "prompt": "Prisma 当前版本对 PostgreSQL 18 的支持状态如何？" },
+    { "id": "live-19", "prompt": "Tavily Search API 当前 Basic 与 Advanced 搜索分别消耗多少 credits？" },
+    { "id": "live-20", "prompt": "GitHub Actions 当前推荐怎样固定第三方 action 来降低供应链风险？请引用 GitHub 官方文档。" }
+  ]
+}

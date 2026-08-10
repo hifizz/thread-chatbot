@@ -22,9 +22,13 @@ import {
 } from "@/constants/thread-chat"
 import { isValidTreeId } from "@/lib/chat/tree-id"
 import { fetchWithAuth } from "@/lib/auth/session-recovery"
-import type { ThreadTreeState } from "../core/types"
+import type { ThreadTreeState, WebSearchMode } from "../core/types"
 import type { PlacementMode, Slot } from "../orchestration/placement"
 import { withoutTransientGenerationState } from "./transient-state"
+import {
+  DEFAULT_WEB_SEARCH_MODE,
+  isWebSearchMode,
+} from "./web-search-stream"
 export { sanitizeLoadedState } from "./sanitize-loaded-state"
 
 export { isValidTreeId }
@@ -194,6 +198,8 @@ export interface TreeUiState {
   mode: PlacementMode
   /** 列 / 画布视图 */
   viewMode: ViewMode
+  /** 每棵树独立记忆的联网策略；旧数据缺失时回到 auto。 */
+  webSearchMode: WebSearchMode
 }
 
 const uiKeyOf = (treeId: string) => `${TREE_UI_KEY_PREFIX}${treeId}`
@@ -250,6 +256,9 @@ export function loadUiState(
       forceCols: typeof parsed.forceCols === "number" ? parsed.forceCols : null,
       mode: parsed.mode === "fold" ? "fold" : "replace",
       viewMode: parsed.viewMode === "canvas" ? "canvas" : "columns",
+      webSearchMode: isWebSearchMode(parsed.webSearchMode)
+        ? parsed.webSearchMode
+        : DEFAULT_WEB_SEARCH_MODE,
     }
   } catch {
     return null // 记忆损坏：整体作废，回默认布局

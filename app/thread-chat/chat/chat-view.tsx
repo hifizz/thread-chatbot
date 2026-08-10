@@ -27,8 +27,8 @@ export function withBreaks(s: string, keyBase: string): React.ReactNode[] {
 }
 
 /** 默认的 assistant 正文渲染：按空行分段（无任何分支装饰） */
-function defaultAssistantBody(msg: Message): React.ReactNode {
-  return msg.text
+function defaultAssistantBody(msg: Message, source = msg.text): React.ReactNode {
+  return source
     .split("\n\n")
     .map((p, i) => <p key={i}>{withBreaks(p, `p${i}`)}</p>)
 }
@@ -45,7 +45,9 @@ export interface ChatViewProps {
   /** 消息列表顶部的插卡（主线的 hint 提示） */
   intro?: React.ReactNode
   /** 注入 assistant 正文渲染（锚点高亮 + 脚注上标） */
-  renderAssistantBody?: (msg: Message) => React.ReactNode
+  renderAssistantBody?: (msg: Message, source?: string) => React.ReactNode
+  /** 聚合后的联网卡；由 text offset 决定插入到正文的哪个流式位置。 */
+  renderWebSearchActivity?: (msg: Message) => React.ReactNode
   /** 注入 assistant 消息气泡之后的附加内容（artifact 卡片） */
   renderAfterMessage?: (msg: Message) => React.ReactNode
   /** 流式生成中：发送键变「停止」（textarea 仍可输入，Enter 提交被拦） */
@@ -74,6 +76,7 @@ export function ChatView({
   banner,
   intro,
   renderAssistantBody,
+  renderWebSearchActivity,
   renderAfterMessage,
   busy = false,
   onRetry,
@@ -124,7 +127,29 @@ export function ChatView({
       (msg.status === "pending" || msg.status === "streaming") &&
       !hasVisibleText &&
       !msg.artifactIds?.length &&
-      !msg.markdownGeneration
+      !msg.markdownGeneration &&
+      !msg.webSearchActivities?.length
+    const hasSearchActivity =
+      msg.role === "assistant" &&
+      Boolean(msg.webSearchActivities?.length && renderWebSearchActivity)
+    const rawSearchOffset = msg.webSearchActivityTextOffset
+    const searchOffset =
+      hasSearchActivity && typeof rawSearchOffset === "number"
+        ? Math.max(0, Math.min(msg.text.length, rawSearchOffset))
+        : null
+    const renderBody = (source: string) =>
+      (renderAssistantBody ?? defaultAssistantBody)(msg, source)
+    const renderAssistantBubble = (source: string, key: string) => {
+      if (!source.trim()) return null
+      return (
+        <div className="bubble" data-role="assistant" key={key}>
+          {renderBody(source)}
+          {msg.status === "streaming" && key === "after" && (
+            <span className="caret" />
+          )}
+        </div>
+      )
+    }
 
     return (
       <div key={msg.id} className={`message ${msg.role}`} data-msg-id={msg.id}>
@@ -136,6 +161,14 @@ export function ChatView({
           </div>
         ) : (
           <>
+            {searchOffset !== null ? (
+              <>
+                {renderAssistantBubble(msg.text.slice(0, searchOffset), "before")}
+                {renderWebSearchActivity?.(msg)}
+                {renderAssistantBubble(msg.text.slice(searchOffset), "after")}
+              </>
+            ) : (
+              <>
             {(hasVisibleText || isWaitingForVisibleOutput) && (
               <div className="bubble" data-role="assistant">
                 {isWaitingForVisibleOutput ? (
@@ -150,13 +183,16 @@ export function ChatView({
                   </span>
                 ) : (
                   <>
-                    {(renderAssistantBody ?? defaultAssistantBody)(msg)}
+                    {renderBody(msg.text)}
                     {msg.status === "streaming" && hasVisibleText && (
                       <span className="caret" />
                     )}
                   </>
                 )}
               </div>
+            )}
+                {hasSearchActivity && renderWebSearchActivity?.(msg)}
+              </>
             )}
             {msg.status === "error" && (
               <div className="msg-error">

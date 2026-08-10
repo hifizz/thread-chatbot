@@ -27,6 +27,11 @@ import { consumeUIMessageStream, type UIStreamHandlers } from "./ui-stream"
 import { handleUnauthorized } from "@/lib/auth/session-recovery"
 import type { ArtifactSeed } from "../core/types"
 import { hasAssistantOutput } from "./assistant-output"
+import {
+  DEFAULT_WEB_SEARCH_MODE,
+  isWebSearchMode,
+} from "./web-search-stream"
+import type { WebSearchMode } from "../core/types"
 
 /** 页面不可见 / 无 requestAnimationFrame 时的降级刷新间隔（毫秒） */
 const FALLBACK_FLUSH_MS = 50
@@ -48,9 +53,20 @@ function isAbortError(err: unknown): boolean {
   )
 }
 
-export function createChatController(store: ThreadStore) {
+export interface ChatControllerOptions {
+  /** 长寿 controller 的初始策略；后续由 setWebSearchMode 原子更新。 */
+  initialWebSearchMode?: WebSearchMode
+}
+
+export function createChatController(
+  store: ThreadStore,
+  options: ChatControllerOptions = {}
+) {
   /** 每个会话同一时间只允许一路在飞的流式请求 */
   const inflight = new Map<string, AbortController>()
+  let webSearchMode = isWebSearchMode(options.initialWebSearchMode)
+    ? options.initialWebSearchMode
+    : DEFAULT_WEB_SEARCH_MODE
 
   /**
    * 对某会话的某条 assistant 消息发起真实流式请求。
@@ -191,6 +207,12 @@ export function createChatController(store: ThreadStore) {
         if (store.attachArtifactToMessage(threadId, msgId, seed) !== null)
           attachedArtifactCount++
       },
+      onWebSearch(event) {
+        if (settled || !isOwner()) return
+        // 搜索卡必须锚定在真实 SSE 顺序：先把此前合帧的文本写入，再记录 offset。
+        doFlush()
+        store.setWebSearchActivity(threadId, msgId, event.activity)
+      },
       onError(message) {
         if (settled) return
         lastError = message // 不立即 settle：可能是瞬时噪声，正文还会继续到达（后到覆盖先到）
@@ -211,7 +233,7 @@ export function createChatController(store: ThreadStore) {
           return
         }
 
-        const body = buildRequestBody(state, thread, msgId)
+        const body = buildRequestBody(state, thread, msgId, webSearchMode)
         const res = await fetch("/api/chat", {
           method: "POST",
           headers: { "content-type": "application/json" },
@@ -265,6 +287,10 @@ export function createChatController(store: ThreadStore) {
   }
 
   return {
+    /** 更新后续请求使用的联网策略；在飞请求不受影响。 */
+    setWebSearchMode(mode: WebSearchMode): void {
+      if (isWebSearchMode(mode)) webSearchMode = mode
+    },
     /** 在会话里发一条用户消息并触发流式回复；同会话已有在飞请求时直接忽略 */
     send(threadId: string, text: string, quote?: { text: string }): void {
       if (inflight.has(threadId)) return

@@ -1,0 +1,80 @@
+{
+  "kind": "glm-5.2-live-programming",
+  "recordedAt": "2026-08-05T09:30:51.584Z",
+  "model": "glm-5.2",
+  "searchProvider": "Tavily Basic Search",
+  "sampleCount": 1,
+  "automatedPassRate": 1,
+  "sourceValidityRate": 1,
+  "maxProviderCalls": 1,
+  "medianProviderCalls": 1,
+  "averageProviderCalls": 1,
+  "p50LatencyMs": 22616,
+  "p95LatencyMs": 22616,
+  "estimatedTavilyCredits": 1,
+  "estimatedTavilyCostUsd": 0.008,
+  "limitation": "Automated gates cover call bounds, returned-source validity and non-empty grounded answers. Correctness/non-regression still requires human review of answer/baselineAnswer pairs.",
+  "rows": [
+    {
+      "id": "live-14",
+      "prompt": "React 官方目前怎样区分 useEffectEvent 和普通事件处理函数？",
+      "passed": true,
+      "providerCalls": 1,
+      "sourceCount": 3,
+      "returnedSources": [
+        {
+          "sourceId": "src_p2219k",
+          "title": "useEffectEvent – React 中文文档",
+          "url": "https://zh-hans.react.dev/reference/react/useEffectEvent"
+        },
+        {
+          "sourceId": "src_17gz207",
+          "title": "将事件从 Effect 中分开 – React 中文文档",
+          "url": "https://zh-hans.react.dev/learn/separating-events-from-effects"
+        },
+        {
+          "sourceId": "src_1hjkxzb",
+          "title": "普通组件（例如 <div>） – React 中文文档",
+          "url": "https://zh-hans.react.dev/reference/react-dom/components/common"
+        }
+      ],
+      "citedUrlCount": 2,
+      "sourceValidity": true,
+      "searchStatus": "success",
+      "searchError": null,
+      "latencyMs": 22616,
+      "baselineLatencyMs": 20233,
+      "incrementalLatencyMs": 2383,
+      "usage": {
+        "inputTokens": 1476,
+        "inputTokenDetails": {
+          "noCacheTokens": 1476,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 1046,
+        "outputTokenDetails": {
+          "textTokens": 1046,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 2522
+      },
+      "baselineUsage": {
+        "inputTokens": 445,
+        "inputTokenDetails": {
+          "noCacheTokens": 445,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 700,
+        "outputTokenDetails": {
+          "textTokens": 700,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 1145
+      },
+      "answer": "根据 React 官方文档，`useEffectEvent` 和普通事件处理函数的区别可以从以下几个方面理解：\n\n## 核心区别\n\n### 1. 响应式 vs 非响应式\n\n**普通事件处理函数**内部的逻辑是**非响应式的**。它只在用户再次执行同样的交互（如点击）时才会重新运行，不会因为读取的 props 或 state 变化而重新执行。\n\n**Effect**内部的逻辑是**响应式的**。如果 Effect 读取了某个响应式值（props/state），就必须将其列为依赖项；当该值变化时，React 会用新值重新运行 Effect。\n\n`useEffectEvent` 返回的 **Effect Event** 是两者的\"混合体\"：它是 Effect 逻辑的一部分，但行为更像事件处理函数——它总是能\"看到\"最新的 props 和 state，却**不会**因为这些值变化而触发 Effect 重新同步。\n\n### 2. 使用场景\n\n- **普通事件处理函数**：响应用户的特定交互（如点击\"发送\"按钮才发消息）。\n- **Effect**：需要在某些响应式值变化时自动同步（如 `roomId` 变了就重新连接聊天室）。\n- **Effect Event**：当 Effect 只需响应**部分**值的变化，但其中又需要读取**其他**会变化的值时使用。例如连接逻辑只依赖 `roomId`，但连接成功后的通知需要用到最新的 `theme`，此时把\"读 `theme` 发通知\"的逻辑放进 `useEffectEvent`，就能避免 `theme` 变化导致 Effect 重新连接。\n\n### 3. 代码形态对比\n\n```jsx\n// 普通事件处理函数：直接写在 JSX 上，响应用户交互\n<button onClick={() => sendMessage(message)}>发送</button>\n\n// Effect Event：用 useEffectEvent 包裹，在 Effect 内调用\nconst onConnected = useEffectEvent(() => {\n  showNotification('已连接！', theme); // 总是读取最新 theme\n});\n\nuseEffect(() => {\n  const connection = createConnection(roomId);\n  connection.on('connected', onConnected);\n  connection.connect();\n  return () => connection.disconnect();\n}, [roomId]); // 只依赖 roomId，不依赖 theme/onConnected\n```\n\n## 重要限制\n\n根据官方文档描述，`useEffectEvent` 的返回值（Effect Event）目前**只能在 Effect 内部调用**，不能像普通事件处理函数那样直接传给 JSX 元素或用于其他渲染逻辑。\n\n## 参考来源\n\n- [useEffectEvent – React 中文文档](https://zh-hans.react.dev/reference/react/useEffectEvent)\n- [将事件从 Effect 中分开 – React 中文文档](https://zh-hans.react.dev/learn/separating-events-from-effects)\n\n> **提示**：`useEffectEvent` 在当前 React 稳定版中仍属于实验性 API，具体行为可能随版本调整。以上结论基于官方文档的描述，实际使用前建议核对你所用 React 版本的官方说明。",
+      "rawAnswer": "根据 React 官方文档，`useEffectEvent` 和普通事件处理函数的区别可以从以下几个方面理解：\n\n## 核心区别\n\n### 1. 响应式 vs 非响应式\n\n**普通事件处理函数**内部的逻辑是**非响应式的**。它只在用户再次执行同样的交互（如点击）时才会重新运行，不会因为读取的 props 或 state 变化而重新执行。\n\n**Effect**内部的逻辑是**响应式的**。如果 Effect 读取了某个响应式值（props/state），就必须将其列为依赖项；当该值变化时，React 会用新值重新运行 Effect。\n\n`useEffectEvent` 返回的 **Effect Event** 是两者的\"混合体\"：它是 Effect 逻辑的一部分，但行为更像事件处理函数——它总是能\"看到\"最新的 props 和 state，却**不会**因为这些值变化而触发 Effect 重新同步。\n\n### 2. 使用场景\n\n- **普通事件处理函数**：响应用户的特定交互（如点击\"发送\"按钮才发消息）。\n- **Effect**：需要在某些响应式值变化时自动同步（如 `roomId` 变了就重新连接聊天室）。\n- **Effect Event**：当 Effect 只需响应**部分**值的变化，但其中又需要读取**其他**会变化的值时使用。例如连接逻辑只依赖 `roomId`，但连接成功后的通知需要用到最新的 `theme`，此时把\"读 `theme` 发通知\"的逻辑放进 `useEffectEvent`，就能避免 `theme` 变化导致 Effect 重新连接。\n\n### 3. 代码形态对比\n\n```jsx\n// 普通事件处理函数：直接写在 JSX 上，响应用户交互\n<button onClick={() => sendMessage(message)}>发送</button>\n\n// Effect Event：用 useEffectEvent 包裹，在 Effect 内调用\nconst onConnected = useEffectEvent(() => {\n  showNotification('已连接！', theme); // 总是读取最新 theme\n});\n\nuseEffect(() => {\n  const connection = createConnection(roomId);\n  connection.on('connected', onConnected);\n  connection.connect();\n  return () => connection.disconnect();\n}, [roomId]); // 只依赖 roomId，不依赖 theme/onConnected\n```\n\n## 重要限制\n\n根据官方文档描述，`useEffectEvent` 的返回值（Effect Event）目前**只能在 Effect 内部调用**，不能像普通事件处理函数那样直接传给 JSX 元素或用于其他渲染逻辑。\n\n## 参考来源\n\n- [useEffectEvent – React 中文文档](https://zh-hans.react.dev/reference/react/useEffectEvent)\n- [将事件从 Effect 中分开 – React 中文文档](https://zh-hans.react.dev/learn/separating-events-from-effects)\n\n> **提示**：`useEffectEvent` 在当前 React 稳定版中仍属于实验性 API，具体行为可能随版本调整。以上结论基于官方文档的描述，实际使用前建议核对你所用 React 版本的官方说明。",
+      "baselineAnswer": "",
+      "manualCorrectnessReview": "required"
+    }
+  ]
+}

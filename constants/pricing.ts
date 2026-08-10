@@ -6,6 +6,11 @@
 //
 // 金额单位统一为「微元」整数：1 元 = 1_000_000 微元。
 
+import {
+  TAVILY_BASIC_SEARCH_CREDITS,
+  TAVILY_PAYG_USD_PER_CREDIT,
+} from "./web-search.ts"
+
 /** 目标利润率（占售价比例）。至少 30%。 */
 export const PROFIT_MARGIN = 0.3
 
@@ -121,6 +126,36 @@ export function priceMicros(
   outputTokens: number
 ): number {
   return priceFromCost(costMicros(model, inputTokens, outputTokens))
+}
+
+/** 外部 provider 的美元计价单位换算为微元，统一向上取整。 */
+export function externalCostMicros(
+  billableUnits: number,
+  usdPerUnit: number
+): number {
+  if (!Number.isFinite(billableUnits) || billableUnits <= 0) return 0
+  if (!Number.isFinite(usdPerUnit) || usdPerUnit <= 0) return 0
+  return usdToMicros(billableUnits * usdPerUnit)
+}
+
+/** Tavily Basic Search 的 PAYG shadow cost（微元）。 */
+export function tavilySearchCreditCostMicros(billableCredits = 1): number {
+  return externalCostMicros(
+    billableCredits,
+    TAVILY_PAYG_USD_PER_CREDIT
+  )
+}
+
+/** 若干次 Tavily Basic Search 的 PAYG shadow cost（微元）。 */
+export function tavilyBasicSearchCostMicros(callCount = 1): number {
+  return tavilySearchCreditCostMicros(
+    callCount * TAVILY_BASIC_SEARCH_CREDITS
+  )
+}
+
+/** Tavily Basic Search 对用户的售价（微元，利润率不少于配置值）。 */
+export function tavilyBasicSearchPriceMicros(callCount = 1): number {
+  return priceFromCost(tavilyBasicSearchCostMicros(callCount))
 }
 
 /** 某模型对用户的售价（元 / 每 100 万 token），输入/输出分别计。用于选择器展示。 */

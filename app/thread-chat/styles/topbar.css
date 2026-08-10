@@ -99,3 +99,73 @@
   padding: 1px 5px;
   background: #fff;
 }
+
+/* ---------------- 联网搜索：顶栏高级设置 ---------------- */
+.tc .web-search-settings {
+  position: relative;
+}
+.tc .web-search-settings > summary {
+  list-style: none;
+  user-select: none;
+}
+.tc .web-search-settings > summary::-webkit-details-marker {
+  display: none;
+}
+.tc .web-search-settings[open] > summary {
+  border-color: var(--d1);
+  color: var(--d1);
+}
+.tc .web-search-menu {
+  position: absolute;
+  z-index: 80;
+  top: calc(100% + 7px);
+  right: 0;
+  width: 270px;
+  padding: 10px;
+  border: 1px solid var(--rule-strong);
+  border-radius: 10px;
+  background: #fffdf8;
+  box-shadow: 0 12px 32px #30271d24;
+}
+.tc .web-search-menu-title {
+  padding: 2px 5px 7px;
+  color: var(--ink-soft);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+.tc .web-search-menu button {
+  display: grid;
+  width: 100%;
+  grid-template-columns: 45px minmax(0, 1fr);
+  gap: 8px;
+  padding: 8px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  text-align: left;
+}
+.tc .web-search-menu button:hover,
+.tc .web-search-menu button.on {
+  background: color-mix(in srgb, var(--d1) 10%, #fff);
+}
+.tc .web-search-menu button span {
+  font-size: 12px;
+  font-weight: 700;
+}
+.tc .web-search-menu button small {
+  color: var(--ink-soft);
+  font-size: 11px;
+  line-height: 1.45;
+}
+.tc .web-search-fee-hint {
+  margin: 7px 4px 1px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--rule);
+  color: #8b5b24;
+  font-size: 11px;
+  line-height: 1.45;
+}

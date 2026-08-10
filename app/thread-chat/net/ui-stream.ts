@@ -23,6 +23,10 @@ import {
   type MarkdownArtifactProgressEvent,
   type MarkdownArtifactStreamEvent,
 } from "../../../lib/chat/markdown-artifact"
+import {
+  createWebSearchEventDispatcher,
+  type WebSearchStreamEvent,
+} from "./web-search-stream"
 
 export type {
   MarkdownArtifactStreamEvent,
@@ -39,6 +43,8 @@ export interface UIStreamHandlers {
   onMarkdownArtifact(event: MarkdownArtifactStreamEvent): void
   /** Markdown 工具开始或参数增量解析后的临时进度（不持久化） */
   onMarkdownArtifactProgress(event: MarkdownArtifactProgressEvent): void
+  /** Web Search 的白名单活动事件（不含 provider 原始 payload）。 */
+  onWebSearch(event: WebSearchStreamEvent): void
   /** 收到 error chunk（errorText 缺失时给出兜底文案） */
   onError(message: string): void
   /** finish chunk 或流自然结束时回调；实现内部保证只触发一次 */
@@ -73,6 +79,9 @@ export async function consumeUIMessageStream(
     createMarkdownArtifactProgressDispatcher(
       handlers.onMarkdownArtifactProgress
     )
+  const dispatchWebSearch = createWebSearchEventDispatcher(
+    handlers.onWebSearch
+  )
 
   // onFinish 只回调一次（finish chunk 与「流自然结束」可能都想触发）
   const emitFinish = () => {
@@ -105,6 +114,7 @@ export async function consumeUIMessageStream(
 
     if (await dispatchMarkdownArtifactProgress(chunk)) return false
     if (dispatchMarkdownArtifact(chunk)) return false
+    if (dispatchWebSearch(chunk)) return false
 
     if (typeof chunk !== "object" || chunk === null) return false
     const value = chunk as {

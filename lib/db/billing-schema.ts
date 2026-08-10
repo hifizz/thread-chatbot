@@ -1,4 +1,11 @@
-import { text, timestamp, integer, bigint, index } from "drizzle-orm/pg-core"
+import {
+  text,
+  timestamp,
+  integer,
+  bigint,
+  index,
+  uniqueIndex,
+} from "drizzle-orm/pg-core"
 import { dbSchema } from "./pg-schema"
 import { user } from "./auth-schema"
 
@@ -50,5 +57,52 @@ export const usageRecords = dbSchema.table(
     index("usage_records_thread_id_idx").on(table.threadId),
     // 对账扫描：按来源筛未对账 + 有 generationId 的行
     index("usage_records_cost_source_idx").on(table.costSource),
+  ]
+)
+
+// 外部工具逐次调用流水。与模型 token 用量分表，避免把 provider credit 伪装成
+// token，也让失败尝试、shadow cost 和逐调用幂等语义可以独立审计。
+export const externalUsageRecords = dbSchema.table(
+  "external_usage_records",
+  {
+    id: text("id").primaryKey(), // crypto.randomUUID()
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    threadId: text("thread_id"),
+    responseId: text("response_id"),
+    requestId: text("request_id").notNull(),
+    callIndex: integer("call_index").notNull(),
+    provider: text("provider").notNull(),
+    operation: text("operation").notNull(),
+    status: text("status").notNull(),
+    billableUnits: integer("billable_units").notNull().default(0),
+    providerCostMicros: bigint("provider_cost_micros", { mode: "number" })
+      .notNull()
+      .default(0),
+    userPriceMicros: bigint("user_price_micros", { mode: "number" })
+      .notNull()
+      .default(0),
+    latencyMs: integer("latency_ms").notNull().default(0),
+    resultCount: integer("result_count").notNull().default(0),
+    queryFingerprint: text("query_fingerprint").notNull(),
+    // 不保存完整 query。该 key 是 provider/requestId/callIndex 的 SHA-256，既用于
+    // 唯一约束，也避免把可能含敏感文本的 requestId 组合复制进索引。
+    idempotencyKey: text("idempotency_key").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("external_usage_records_idempotency_key_idx").on(
+      table.idempotencyKey
+    ),
+    index("external_usage_records_user_id_idx").on(table.userId),
+    index("external_usage_records_thread_id_idx").on(table.threadId),
+    index("external_usage_records_response_id_idx").on(table.responseId),
+    index("external_usage_records_provider_operation_idx").on(
+      table.provider,
+      table.operation
+    ),
   ]
 )

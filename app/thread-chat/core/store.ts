@@ -13,6 +13,7 @@ import type {
   MarkdownGenerationProgress,
   Message,
   ThreadTreeState,
+  WebSearchActivity,
 } from "./types"
 
 export interface ForkInput {
@@ -213,6 +214,32 @@ export function createThreadStore(
       notify()
     },
 
+    /** 按 call id 原子更新 Web Search 活动；仅终态会写入持久化快照。 */
+    setWebSearchActivity(
+      threadId: string,
+      msgId: string,
+      activity: WebSearchActivity
+    ): void {
+      const t = state.threads[threadId]
+      if (!t) return
+      const msg = findMessageFromTail(t.messages, msgId)
+      if (!msg || msg.role !== "assistant") return
+      if (msg.status === "done" || msg.status === "error") return
+      if (msg.webSearchActivityTextOffset === undefined) {
+        msg.webSearchActivityTextOffset = msg.text.length
+      }
+      const activities = msg.webSearchActivities ?? []
+      const index = activities.findIndex(
+        (item) => item.toolCallId === activity.toolCallId
+      )
+      msg.webSearchActivities =
+        index === -1
+          ? [...activities, activity]
+          : activities.map((item, i) => (i === index ? activity : item))
+      msg.status = "streaming"
+      notify()
+    },
+
     /** 流式结束：标记消息完成 */
     finishAssistantMessage(threadId: string, msgId: string): void {
       const t = state.threads[threadId]
@@ -220,6 +247,15 @@ export function createThreadStore(
       const msg = findMessageFromTail(t.messages, msgId)
       if (!msg) return
       msg.markdownGeneration = undefined
+      msg.webSearchActivities = msg.webSearchActivities?.map((activity) =>
+        activity.phase === "starting" || activity.phase === "searching"
+          ? {
+              ...activity,
+              phase: "failed",
+              error: "搜索未返回完整结果，回答将基于已有知识继续",
+            }
+          : activity
+      )
       msg.status = "done"
       touchSilently(threadId)
       notify()
@@ -236,6 +272,15 @@ export function createThreadStore(
       const msg = findMessageFromTail(t.messages, msgId)
       if (!msg) return
       msg.markdownGeneration = undefined
+      msg.webSearchActivities = msg.webSearchActivities?.map((activity) =>
+        activity.phase === "starting" || activity.phase === "searching"
+          ? {
+              ...activity,
+              phase: "failed",
+              error: "回复已结束，搜索未返回完整结果",
+            }
+          : activity
+      )
       msg.status = "error"
       msg.error = message
       notify()
@@ -252,6 +297,8 @@ export function createThreadStore(
       msg.status = "pending"
       msg.error = undefined
       msg.markdownGeneration = undefined
+      msg.webSearchActivities = undefined
+      msg.webSearchActivityTextOffset = undefined
       notify()
     },
 

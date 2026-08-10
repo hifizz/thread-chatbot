@@ -1,6 +1,11 @@
 import { desc, eq, sql } from "drizzle-orm"
 import { db } from "@/lib/db"
-import { payments, subscriptions, usageRecords } from "@/lib/db/schema"
+import {
+  externalUsageRecords,
+  payments,
+  subscriptions,
+  usageRecords,
+} from "@/lib/db/schema"
 import { getBalanceMicros, ensureUserCredits } from "@/lib/billing/credits"
 
 // 账户页所需的聚合数据：余额、充值/消耗流水、订阅、累计统计。
@@ -45,7 +50,14 @@ export async function getAccountData(userId: string): Promise<AccountData> {
   await ensureUserCredits(userId)
   const balanceMicros = await getBalanceMicros(userId)
 
-  const [paymentRows, usageRows, subRows, topupAgg, spendAgg] =
+  const [
+    paymentRows,
+    usageRows,
+    subRows,
+    topupAgg,
+    modelSpendAgg,
+    externalSpendAgg,
+  ] =
     await Promise.all([
       db
         .select()
@@ -79,12 +91,20 @@ export async function getAccountData(userId: string): Promise<AccountData> {
         })
         .from(usageRecords)
         .where(eq(usageRecords.userId, userId)),
+      db
+        .select({
+          total: sql<number>`coalesce(sum(${externalUsageRecords.userPriceMicros}), 0)`,
+        })
+        .from(externalUsageRecords)
+        .where(eq(externalUsageRecords.userId, userId)),
     ])
 
   return {
     balanceMicros,
     totalToppedUpMicros: Number(topupAgg[0]?.total ?? 0),
-    totalSpentMicros: Number(spendAgg[0]?.total ?? 0),
+    totalSpentMicros:
+      Number(modelSpendAgg[0]?.total ?? 0) +
+      Number(externalSpendAgg[0]?.total ?? 0),
     payments: paymentRows.map((p) => ({
       id: p.id,
       type: p.type,

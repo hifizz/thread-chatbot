@@ -9,6 +9,7 @@ import type { TextAnchor } from "../branching/text-anchor"
 
 export type Role = "user" | "assistant"
 export type ArtifactKind = "code" | "note" | "markdown"
+export type WebSearchMode = "auto" | "always" | "off"
 
 export interface Artifact {
   id: string
@@ -55,6 +56,17 @@ export interface MarkdownGenerationProgress {
   headings: string[]
 }
 
+/** Web Search 工具活动；进行中状态只留当前连接，结束状态随 assistant 消息持久化。 */
+export interface WebSearchActivity {
+  toolCallId: string
+  phase: "starting" | "searching" | "completed" | "failed"
+  query?: string
+  resultCount?: number
+  durationMs?: number
+  sources?: { sourceId: string; title: string; url: string }[]
+  error?: string
+}
+
 export interface Message {
   id: string
   role: Role
@@ -71,6 +83,10 @@ export interface Message {
   error?: string
   /** 当前页临时态；存盘前必须剥离，加载时也会防御性清理。 */
   markdownGeneration?: MarkdownGenerationProgress
+  /** 搜索活动：starting/searching 不存盘，completed/failed 可在刷新后重放聚合卡。 */
+  webSearchActivities?: WebSearchActivity[]
+  /** 第一个 Web Search 流事件到达时的正文长度；随终态活动存盘以恢复真实流顺序。 */
+  webSearchActivityTextOffset?: number
 }
 
 export interface Thread {

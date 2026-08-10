@@ -22,7 +22,12 @@
 
 import { INHERITED_CHAR_BUDGET } from "@/constants/thread-chat"
 import { collectInherited } from "../core/selectors"
-import type { Message, Thread, ThreadTreeState } from "../core/types"
+import type {
+  Message,
+  Thread,
+  ThreadTreeState,
+  WebSearchMode,
+} from "../core/types"
 import {
   applyInheritedBudget,
   kickoffQuestion,
@@ -48,6 +53,8 @@ export interface ThreadChatRequestBody {
   modelId: string
   /** 模式标记：服务端据此构造纯文本 system（anchorText 非空时追加分支焦点段） */
   threadChat: { anchorText: string | null }
+  /** 用户搜索策略；服务端必须再次严格校验并拥有最终执行权。 */
+  webSearchMode: WebSearchMode
 }
 
 /** 一条领域消息是否应进入 payload（滤掉 error 与空正文 assistant） */
@@ -65,7 +72,8 @@ function includable(message: Message, serialized: string | null): boolean {
 export function buildRequestBody(
   state: ThreadTreeState,
   thread: Thread,
-  excludeMsgId: string
+  excludeMsgId: string,
+  webSearchMode: WebSearchMode = "auto"
 ): ThreadChatRequestBody {
   const anchor = thread.anchorText?.trim() ? thread.anchorText : null
   const messages: UIMessageLike[] = []
@@ -120,5 +128,6 @@ export function buildRequestBody(
     messages,
     modelId: thread.modelId,
     threadChat: { anchorText: anchor },
+    webSearchMode,
   }
 }

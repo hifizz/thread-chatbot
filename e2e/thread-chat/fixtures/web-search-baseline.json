@@ -1,0 +1,37 @@
+{
+  "recordedAt": "2026-08-02",
+  "environment": {
+    "model": "glm-5.2",
+    "sdk": "AI SDK v7",
+    "searchProvider": "Tavily",
+    "secretsRecorded": false
+  },
+  "routingDecisionBaseline": {
+    "englishPolicyAB": { "cases": 14, "matchedExpectation": 14 },
+    "chineseAndMixed": { "cases": 6, "matchedExpectation": 6 },
+    "limitation": "小样本、同一调研者标注，只证明可行性，不构成生产准确率结论。"
+  },
+  "noSearchThreadChatBaseline": {
+    "searchToolAvailable": false,
+    "providerCallsPerResponse": 0,
+    "answerCapture": "not_recorded",
+    "limitation": "改动前 Thread Chat 未暴露搜索工具；未保存逐题答案，禁止补造。"
+  },
+  "existingHeavySearchBaseline": {
+    "questionClass": "Next.js 16 version-sensitive programming question",
+    "modelSteps": 3,
+    "providerCalls": 3,
+    "searchDepth": "advanced",
+    "credits": 6,
+    "inputTokens": 8927,
+    "outputTokens": 808,
+    "totalTokens": 9735,
+    "estimatedSearchCostCny": 0.3504,
+    "estimatedModelCostCny": 0.1216,
+    "estimatedTotalCostCny": 0.472,
+    "answerOutcome": "找到 Next.js 官方资料并产生正确引用；最终输出因 maxOutputTokens=700 以 length 结束。",
+    "latencyMs": null,
+    "latencyLimitation": "原始调研未记录端到端 latency，保持 null 而不是估算。"
+  },
+  "source": "openspec/changes/add-proactive-web-search/research/README.md#4-glm-52-实测记录"
+}

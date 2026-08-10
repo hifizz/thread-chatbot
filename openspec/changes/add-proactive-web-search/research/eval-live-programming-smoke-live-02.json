@@ -1,0 +1,55 @@
+{
+  "kind": "glm-5.2-live-programming",
+  "recordedAt": "2026-08-05T09:04:55.794Z",
+  "model": "glm-5.2",
+  "searchProvider": "Tavily Basic Search",
+  "sampleCount": 1,
+  "automatedPassRate": 0,
+  "sourceValidityRate": 1,
+  "maxProviderCalls": 1,
+  "medianProviderCalls": 1,
+  "limitation": "Automated gates cover call bounds, returned-source validity and non-empty grounded answers. Correctness/non-regression still requires human review of answer/baselineAnswer pairs.",
+  "rows": [
+    {
+      "id": "live-02",
+      "prompt": "AI SDK v7 的 prepareStep 回调现在能接收和返回哪些关键字段？引用官方文档。",
+      "passed": false,
+      "providerCalls": 1,
+      "sourceCount": 0,
+      "citedUrlCount": 0,
+      "sourceValidity": true,
+      "latencyMs": 22577,
+      "baselineLatencyMs": 19419,
+      "incrementalLatencyMs": 3158,
+      "usage": {
+        "inputTokens": 1120,
+        "inputTokenDetails": {
+          "noCacheTokens": 1120,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 900,
+        "outputTokenDetails": {
+          "textTokens": 900,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 2020
+      },
+      "baselineUsage": {
+        "inputTokens": 388,
+        "inputTokenDetails": {
+          "noCacheTokens": 388,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 700,
+        "outputTokenDetails": {
+          "textTokens": 700,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 1088
+      },
+      "answer": "基于本轮搜索返回的官方文档摘要，AI SDK 中 `prepareStep` 回调可接收和返回的关键字段如下。需要先声明限制：搜索仅返回受限摘要，未覆盖官方文档全文，以下字段可能不完整，建议以官方文档为准。\n\n## `prepareStep` 接收的参数（输入字段）\n\n根据官方文档片段，回调函数参数对象包含：\n\n- `model`：传入 `generateText`（或 `streamText` 等）的模型。\n- `stopWhen`：传入 `generateText` 的停止条件。\n- `stepNumber`：当前正在执行的步骤编号。\n- `steps`：目前已执行的步骤。\n- `instructions`：将发送给当前步骤模型的指令。\n- `initialMessages`：初始消息。\n- `responseMessages`：响应消息。\n\n文档示例也直接展示了从参数解构这些字段：\n\n```ts\nprepareStep: ({ initialMessages, responseMessages",
+      "baselineAnswer": "无法联网核验本轮问题，特此说明。\n\n`prepareStep` 回调属于 AI SDK 中会随版本演进的 API 细节，且本轮 Web Search 不可用，我无法读取 AI SDK v7 的官方文档来确认它当前可接收/返回的确切字段。为避免凭印象编造字段名或伪造文档链接，我不会给出一个\"看似准确\"的字段清单。\n\n可以提供的、相对稳定的一般性说明（不保证对 v7 适用，请以官方文档为准）：\n\n- `prepareStep` 通常用于在多步（multi-step）生成流程中、每一步实际执行前进行预处理，例如选择模型、注入系统提示、调整工具配置、设置 `stepCount` 上限等。\n- 这类回调一般会接收一个上下文对象，包含当前对话消息、已用步骤数、可用工具等信息；返回值则用于覆盖该步的生成参数（如 `model`、`system`、`tools`、`prompt`、`stepCount` 等）。\n- 但字段名、是否支持流式覆盖、是否允许返回 Promise、是否区分 `prepareStep` 与 `prepareSteps` 等点，在 v4 → v5 → v6 → v7 之间多次调整，我无法在无网络情况下确认 v7 的最终形态。\n\n建议你直接查阅以下来源以获取权威字段定义（我没有联网获取，不能保证 URL 与 v7 完全对应）：\n\n- Vercel AI SDK 官方文档站：`https://ai-sdk.dev/`\n- AI SDK 仓库：`https://github.com/vercel/ai`\n- 在仓库内搜索 `prepareStep` 的类型定义（通常在 `packages/",
+      "manualCorrectnessReview": "required"
+    }
+  ]
+}

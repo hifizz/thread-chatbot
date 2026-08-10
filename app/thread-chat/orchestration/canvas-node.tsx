@@ -34,6 +34,7 @@ import {
   MarkdownArtifactCard,
   MarkdownArtifactProgressCard,
 } from "./markdown-artifact-card"
+import { WebSearchActivityCard } from "./web-search-activity-card"
 import { ThreadModelSelector } from "../chat/thread-model-selector"
 
 /** 会话动作（send/abort/retry）：壳层用 chat-controller 组装后传给画布（D3，零平行实现） */
@@ -180,7 +181,32 @@ function CanvasExpand({
             (msg.status === "pending" || msg.status === "streaming") &&
             !hasVisibleText &&
             !msg.artifactIds?.length &&
-            !msg.markdownGeneration
+            !msg.markdownGeneration &&
+            !msg.webSearchActivities?.length
+          const hasSearchActivity = Boolean(msg.webSearchActivities?.length)
+          const rawSearchOffset = msg.webSearchActivityTextOffset
+          const searchOffset =
+            hasSearchActivity && typeof rawSearchOffset === "number"
+              ? Math.max(0, Math.min(msg.text.length, rawSearchOffset))
+              : null
+          const renderAssistantBubble = (source: string, key: string) => {
+            if (!source.trim()) return null
+            return (
+              <div className="bubble" data-role="assistant" key={key}>
+                {state && actions && (
+                  <AnchoredMarkdown
+                    state={state}
+                    msg={msg}
+                    source={source}
+                    onOpenThread={(id) => actions.focusThread(id)}
+                  />
+                )}
+                {msg.status === "streaming" && key === "after" && (
+                  <span className="caret" />
+                )}
+              </div>
+            )
+          }
           return (
             <div
               key={msg.id}
@@ -196,6 +222,23 @@ function CanvasExpand({
                 </div>
               ) : (
                 <>
+                  {searchOffset !== null ? (
+                    <>
+                      {renderAssistantBubble(
+                        msg.text.slice(0, searchOffset),
+                        "before"
+                      )}
+                      <WebSearchActivityCard
+                        activities={msg.webSearchActivities ?? []}
+                        compact
+                      />
+                      {renderAssistantBubble(
+                        msg.text.slice(searchOffset),
+                        "after"
+                      )}
+                    </>
+                  ) : (
+                    <>
                   {(hasVisibleText || isWaitingForVisibleOutput) && (
                     <div className="bubble" data-role="assistant">
                       {isWaitingForVisibleOutput ? (
@@ -225,6 +268,14 @@ function CanvasExpand({
                         </>
                       )}
                     </div>
+                  )}
+                      {hasSearchActivity ? (
+                        <WebSearchActivityCard
+                          activities={msg.webSearchActivities ?? []}
+                          compact
+                        />
+                      ) : null}
+                    </>
                   )}
                   {msg.status === "error" && (
                     <div className="msg-error">

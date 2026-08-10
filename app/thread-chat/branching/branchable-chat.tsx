@@ -22,6 +22,7 @@ import {
   MarkdownArtifactCard,
   MarkdownArtifactProgressCard,
 } from "../orchestration/markdown-artifact-card"
+import { WebSearchActivityCard } from "../orchestration/web-search-activity-card"
 // 锚点在「渲染后的 Markdown DOM」上模糊恢复定位（position→exact→fuzzy），与纯文本解耦
 import { clearHighlights, locateAnchor, paintRange } from "./text-anchor"
 
@@ -82,8 +83,13 @@ export function BranchableChat({
   const childCount = thread.children.length
 
   /* ---------- 注入：assistant 正文（Markdown 渲染 + 渲染后手绘锚点高亮/脚注） ---------- */
-  const renderAssistantBody = (msg: Message) => (
-    <AnchoredMarkdown state={state} msg={msg} onOpenThread={onOpenThread} />
+  const renderAssistantBody = (msg: Message, source = msg.text) => (
+    <AnchoredMarkdown
+      state={state}
+      msg={msg}
+      source={source}
+      onOpenThread={onOpenThread}
+    />
   )
 
   /* ---------- 注入：消息下方的 artifact 卡片 ---------- */
@@ -100,7 +106,11 @@ export function BranchableChat({
         />,
       ]
     })
-    if (!msg.markdownGeneration && artifacts.length === 0) return null
+    if (
+      !msg.markdownGeneration &&
+      artifacts.length === 0
+    )
+      return null
     return (
       <>
         {msg.markdownGeneration ? (
@@ -222,6 +232,11 @@ export function BranchableChat({
       banner={banner}
       intro={intro}
       renderAssistantBody={renderAssistantBody}
+      renderWebSearchActivity={(msg) =>
+        msg.webSearchActivities?.length ? (
+          <WebSearchActivityCard activities={msg.webSearchActivities} />
+        ) : null
+      }
       renderAfterMessage={renderAfterMessage}
       busy={busy}
       onRetry={onRetry}
@@ -266,18 +281,21 @@ export function BranchableChat({
 export function AnchoredMarkdown({
   state,
   msg,
+  source = msg.text,
   onOpenThread,
 }: {
   state: ThreadTreeState
   msg: Message
+  source?: string
   onOpenThread: (targetId: string, opts?: { keepSource?: boolean }) => void
 }) {
   const hostRef = useRef<HTMLDivElement | null>(null)
   // forksKey 只随 fork 的增删与编号变化——source 未变、仅新增 fork 时也能触发重绘
   const forksKey = msg.forks.map((f) => `${f.threadId}:${f.num}`).join("|")
   const active = msg.status === "streaming" || msg.status === "pending"
-  const display = useSmoothText(msg.text, active)
-  const renderedSource = active ? display : msg.text
+  const display = useSmoothText(source, active)
+  const renderedSource = active ? display : source
+  const canPaintAnchors = source === msg.text
   const [settledRevision, bumpSettledRevision] = useReducer(
     (revision: number) => revision + 1,
     0
@@ -299,7 +317,8 @@ export function AnchoredMarkdown({
     wipe()
 
     // 高亮仍在飞或当前是流式 plaintext 时，绝不手改 React 即将 reconcile 的代码 DOM。
-    if (active || md.dataset.contentSettled !== "true") return wipe
+    if (!canPaintAnchors || active || md.dataset.contentSettled !== "true")
+      return wipe
 
     for (const fork of msg.forks) {
       if (!fork.anchor) continue
@@ -330,7 +349,7 @@ export function AnchoredMarkdown({
     return wipe
     // state 仅用于 title 文案，不参与重绘时机；有意省略以免每次 version 变动都重绘
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active, msg.text, forksKey, settledRevision])
+  }, [active, canPaintAnchors, source, forksKey, settledRevision])
 
   // 点击冒泡到稳定容器：命中高亮 / 脚注（data-fork-id）即打开对应分支。
   // 高亮与脚注是手绘 DOM，但事件冒泡到此 React onClick，重绘不丢 handler。
@@ -347,6 +366,7 @@ export function AnchoredMarkdown({
       <MarkdownBody
         source={renderedSource}
         streaming={active}
+        compactExternalLinks
         onContentSettled={onContentSettled}
       />
     </div>

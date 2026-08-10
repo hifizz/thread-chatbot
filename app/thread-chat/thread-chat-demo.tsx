@@ -29,6 +29,7 @@ import {
   CircleHelp,
   Columns3,
   FileText,
+  Globe2,
   ListTodo,
   Network,
   Waypoints,
@@ -51,9 +52,10 @@ import {
   threadTitle,
   type TreeRow,
 } from "./core/selectors"
-import type { Message, ThreadTreeState } from "./core/types"
+import type { Message, ThreadTreeState, WebSearchMode } from "./core/types"
 import { requestBranchTitle } from "./net/branch-title"
 import { createChatController } from "./net/chat-controller"
+import { DEFAULT_WEB_SEARCH_MODE } from "./net/web-search-stream"
 import { kickoffQuestion, serializeMessageForModel } from "./net/prompt"
 import {
   deriveTreeTitle,
@@ -199,8 +201,17 @@ export function ThreadChatDemoInner({
   const version = useThreadStore(store)
   const state = store.getState()
 
+  /* ---------- 联网策略：工作台级本地设置；新树/旧数据均默认 auto。 ---------- */
+  const [webSearchMode, setWebSearchMode] = useState<WebSearchMode>(
+    initialUi?.webSearchMode ?? DEFAULT_WEB_SEARCH_MODE
+  )
+
   /* ---------- 聊天控制器：发送 / 分支首答 / 重试 / 停止（真实 /api/chat SSE 流式） ---------- */
-  const [chat] = useState(() => createChatController(store))
+  const [chat] = useState(() =>
+    createChatController(store, {
+      initialWebSearchMode: initialUi?.webSearchMode ?? DEFAULT_WEB_SEARCH_MODE,
+    })
+  )
   useEffect(() => () => chat.abortAll(), [chat])
 
   /* ---------- 防抖存库：version 变化后 1.5s 静默才整树 PUT（流式期间合并为一次写）。
@@ -323,10 +334,19 @@ export function ThreadChatDemoInner({
         forceCols,
         mode,
         viewMode,
+        webSearchMode,
       })
     }, UI_SAVE_DEBOUNCE_MS)
     return () => clearTimeout(t)
-  }, [treeId, cols.slots, cols.widths, forceCols, mode, viewMode])
+  }, [
+    treeId,
+    cols.slots,
+    cols.widths,
+    forceCols,
+    mode,
+    viewMode,
+    webSearchMode,
+  ])
   /** 画布视图状态宿主（节点 pin 表）：跨「列 ⇄ 画布」切换存活，属视口状态不进 core store。
       与上面的 store 同一模式：useState(初始化函数) 造出的长寿可变对象（type-only import，
       不把画布模块拖进首屏 bundle） */
@@ -723,6 +743,50 @@ export function ThreadChatDemoInner({
           Markdown
           <span className="cnt">{markdownCount}</span>
         </button>
+        <details className="web-search-settings">
+          <summary className="tbtn" title="联网搜索设置">
+            <Globe2 size={13} />
+            联网 ·
+            {webSearchMode === "auto"
+              ? " 自动"
+              : webSearchMode === "always"
+                ? " 每次"
+                : " 关闭"}
+          </summary>
+          <div className="web-search-menu">
+            <div className="web-search-menu-title">联网搜索</div>
+            {(
+              [
+                ["auto", "自动", "遇到时效性或不确定事实时由 AI 搜索"],
+                ["always", "每次", "每次回答首步强制搜索"],
+                ["off", "关闭", "回答时不访问搜索服务"],
+              ] as const
+            ).map(([value, label, description]) => (
+              <button
+                key={value}
+                className={webSearchMode === value ? "on" : ""}
+                onClick={(event) => {
+                  chat.setWebSearchMode(value)
+                  setWebSearchMode(value)
+                  if (value !== "always")
+                    event.currentTarget
+                      .closest("details")
+                      ?.removeAttribute("open")
+                }}
+              >
+                <span>{label}</span>
+                <small>{description}</small>
+              </button>
+            ))}
+            {webSearchMode !== "off" && (
+              <p className="web-search-fee-hint">
+                {webSearchMode === "always"
+                  ? "每次回答都会产生额外联网费用；单轮最多调用 2 次搜索。"
+                  : "只有实际调用搜索时才产生联网附加费；单轮最多调用 2 次。"}
+              </p>
+            )}
+          </div>
+        </details>
         <AccountButton />
       </div>
 

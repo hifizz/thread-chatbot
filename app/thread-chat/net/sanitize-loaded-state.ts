@@ -1,4 +1,5 @@
 import type { Message, Thread, ThreadTreeState } from "../core/types"
+import { persistableWebSearchState } from "./web-search-persistence.ts"
 
 /**
  * 纯函数：恢复流式残留并修复 Artifact 三方关系。
@@ -35,14 +36,22 @@ export function sanitizeLoadedState(
           (artifactId, index) => message.artifactIds?.[index] !== artifactId
         )
       const hasTransientGeneration = message.markdownGeneration !== undefined
+      const searchState = persistableWebSearchState(message)
+      const searchStateChanged =
+        searchState.activities !== message.webSearchActivities ||
+        searchState.textOffset !== message.webSearchActivityTextOffset
       let nextMessage =
-        artifactRefsChanged || hasTransientGeneration
+        artifactRefsChanged ||
+        hasTransientGeneration ||
+        searchStateChanged
           ? {
               ...message,
               artifactIds: validArtifactIds.length
                 ? validArtifactIds
                 : undefined,
               markdownGeneration: undefined,
+              webSearchActivities: searchState.activities,
+              webSearchActivityTextOffset: searchState.textOffset,
             }
           : message
 
@@ -64,7 +73,10 @@ export function sanitizeLoadedState(
           referencedArtifactIds.add(artifactId)
         )
       }
-      threadChanged ||= artifactRefsChanged || hasTransientGeneration
+      threadChanged ||=
+        artifactRefsChanged ||
+        hasTransientGeneration ||
+        searchStateChanged
     }
 
     threads[id] = threadChanged

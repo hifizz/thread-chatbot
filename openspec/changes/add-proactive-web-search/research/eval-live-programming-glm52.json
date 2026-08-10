@@ -1,0 +1,1241 @@
+{
+  "kind": "glm-5.2-live-programming",
+  "recordedAt": "2026-08-05T09:20:05.034Z",
+  "model": "glm-5.2",
+  "searchProvider": "Tavily Basic Search",
+  "sampleCount": 20,
+  "automatedPassRate": 1,
+  "sourceValidityRate": 1,
+  "maxProviderCalls": 1,
+  "medianProviderCalls": 1,
+  "averageProviderCalls": 1,
+  "p50LatencyMs": 26881,
+  "p95LatencyMs": 39538,
+  "estimatedTavilyCredits": 20,
+  "estimatedTavilyCostUsd": 0.16,
+  "limitation": "Automated gates cover call bounds, returned-source validity and non-empty grounded answers. Correctness/non-regression still requires human review of answer/baselineAnswer pairs.",
+  "rows": [
+    {
+      "id": "live-01",
+      "prompt": "Next.js 16.2 中动态路由 page 的 params 当前是什么类型，应该怎样读取？请以官方文档为准。",
+      "passed": true,
+      "providerCalls": 1,
+      "sourceCount": 3,
+      "returnedSources": [
+        {
+          "sourceId": "src_18a58pm",
+          "title": "【學習筆記】Next.js 路由系統：App Router vs Page Router - HackMD",
+          "url": "https://hackmd.io/@Heidi-Liu/nextjs-app-router"
+        },
+        {
+          "sourceId": "src_134b1jo",
+          "title": "File-system conventions: Dynamic Segments",
+          "url": "https://nextjs.org/docs/app/api-reference/file-conventions/dynamic-routes"
+        },
+        {
+          "sourceId": "src_1eravy9",
+          "title": "Next.js 15 Tutorial - 21 - params and searchParams",
+          "url": "https://www.youtube.com/watch?v=qPsY4AKFlnM"
+        }
+      ],
+      "citedUrlCount": 3,
+      "sourceValidity": true,
+      "searchStatus": "success",
+      "searchError": null,
+      "latencyMs": 27738,
+      "baselineLatencyMs": 16926,
+      "incrementalLatencyMs": 10812,
+      "usage": {
+        "inputTokens": 1402,
+        "inputTokenDetails": {
+          "noCacheTokens": 1402,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 1463,
+        "outputTokenDetails": {
+          "textTokens": 1463,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 2865
+      },
+      "baselineUsage": {
+        "inputTokens": 392,
+        "inputTokenDetails": {
+          "noCacheTokens": 392,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 700,
+        "outputTokenDetails": {
+          "textTokens": 700,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 1092
+      },
+      "answer": "# Next.js 16.2 动态路由 page 的 params 类型与读取方式\n\n根据 Next.js 官方文档，App Router 中动态路由 page 的 `params` 当前是一个 **Promise**，需要在组件中 `await` 后再读取。这是从 Next.js 15 开始引入的异步变更，在 16.x 中延续。\n\n## 类型说明\n\n`params` 解析后是一个对象，其每个属性的类型取决于路由段的形式：\n\n| 路由文件 | `params` 类型（解析后） |\n| --- | --- |\n| `app/blog/[slug]/page.js` | `{ slug: string }` |\n| `app/shop/[...slug]/page.js` | `{ slug: string[] }` |\n| `app/shop/[[...slug]]/page.js` | `{ slug?: string[] }` |\n| `app/[categoryId]/[itemId]/page.js` | `{ categoryId: string, itemId: string }` |\n\n官方说明：路由 `params` 值被类型化为 `string`、`string[]` 或 `undefined`（用于可选 catch-all 段），因为这些值在运行时之前是未知的。\n\n## TypeScript 推荐用法\n\n官方文档推荐使用路由级类型辅助工具，而不是手写类型：\n\n- `PageProps<'/route'>` — 用于 page 组件\n- `LayoutProps<'/route'>` — 用于 layout 组件\n- `RouteContext<'/route'>` — 用于路由上下文\n\n## 读取示例\n\n```tsx\n// app/blog/[slug]/page.tsx\nimport { PageProps } from 'next'\n\nexport default async function Page({ params }: PageProps<'/blog/[slug]'>) {\n  const { slug } = await params\n  // ...\n}\n```\n\n```tsx\n// app/shop/[...slug]/page.tsx\nimport { PageProps } from 'next'\n\nexport default async function Page({ params }: PageProps<'/shop/[...slug]'>) {\n  const { slug } = await params // slug: string[]\n  // ...\n}\n```\n\n## 关键要点\n\n1. **`params` 是 Promise**：必须用 `async` 函数并 `await`，不能同步解构。\n2. **类型取决于路由段**：`[slug]` → `string`，`[...slug]` → `string[]`，`[[...slug]]` → `string[] | undefined`。\n3. **使用类型辅助工具**：`PageProps<'/route'>` 等可自动推断对应路由的 `params` 类型，避免手写错误。\n\n---\n\n**参考来源：**\n- [Next.js 官方文档 — File-system conventions: Dynamic Segments](https://nextjs.org/docs/app/api-reference/file-conventions/dynamic-routes)\n\n**限制说明：** 本轮搜索未返回专门针对 \"Next.js 16.2\" 版本说明的页面，以上基于 Next.js 官方文档当前内容。`PageProps<'/route'>` 等类型辅助工具是较新引入的 API，若你的项目使用较旧版本，可能需要手写 `{ params: Promise<{ slug: string }> }` 等类型。建议以你实际安装版本的官方文档为准。\n\n信息源：[【學習筆記】Next.js 路由系統：App Router vs Page Router - HackMD](https://hackmd.io/@Heidi-Liu/nextjs-app-router) · [File-system conventions: Dynamic Segments](https://nextjs.org/docs/app/api-reference/file-conventions/dynamic-routes) · [Next.js 15 Tutorial - 21 - params and searchParams](https://www.youtube.com/watch?v=qPsY4AKFlnM)",
+      "baselineAnswer": "## ⚠️ 限制说明\n\n本轮 Web Search 不可用，我无法实时核验 Next.js 16.2 官方",
+      "manualCorrectnessReview": "required",
+      "rawAnswer": "# Next.js 16.2 动态路由 page 的 params 类型与读取方式\n\n根据 Next.js 官方文档，App Router 中动态路由 page 的 `params` 当前是一个 **Promise**，需要在组件中 `await` 后再读取。这是从 Next.js 15 开始引入的异步变更，在 16.x 中延续。\n\n## 类型说明\n\n`params` 解析后是一个对象，其每个属性的类型取决于路由段的形式：\n\n| 路由文件 | `params` 类型（解析后） |\n| --- | --- |\n| `app/blog/[slug]/page.js` | `{ slug: string }` |\n| `app/shop/[...slug]/page.js` | `{ slug: string[] }` |\n| `app/shop/[[...slug]]/page.js` | `{ slug?: string[] }` |\n| `app/[categoryId]/[itemId]/page.js` | `{ categoryId: string, itemId: string }` |\n\n官方说明：路由 `params` 值被类型化为 `string`、`string[]` 或 `undefined`（用于可选 catch-all 段），因为这些值在运行时之前是未知的。\n\n## TypeScript 推荐用法\n\n官方文档推荐使用路由级类型辅助工具，而不是手写类型：\n\n- `PageProps<'/route'>` — 用于 page 组件\n- `LayoutProps<'/route'>` — 用于 layout 组件\n- `RouteContext<'/route'>` — 用于路由上下文\n\n## 读取示例\n\n```tsx\n// app/blog/[slug]/page.tsx\nimport { PageProps } from 'next'\n\nexport default async function Page({ params }: PageProps<'/blog/[slug]'>) {\n  const { slug } = await params\n  // ...\n}\n```\n\n```tsx\n// app/shop/[...slug]/page.tsx\nimport { PageProps } from 'next'\n\nexport default async function Page({ params }: PageProps<'/shop/[...slug]'>) {\n  const { slug } = await params // slug: string[]\n  // ...\n}\n```\n\n## 关键要点\n\n1. **`params` 是 Promise**：必须用 `async` 函数并 `await`，不能同步解构。\n2. **类型取决于路由段**：`[slug]` → `string`，`[...slug]` → `string[]`，`[[...slug]]` → `string[] | undefined`。\n3. **使用类型辅助工具**：`PageProps<'/route'>` 等可自动推断对应路由的 `params` 类型，避免手写错误。\n\n---\n\n**参考来源：**\n- [Next.js 官方文档 — File-system conventions: Dynamic Segments](https://nextjs.org/docs/app/api-reference/file-conventions/dynamic-routes)\n\n**限制说明：** 本轮搜索未返回专门针对 \"Next.js 16.2\" 版本说明的页面，以上基于 Next.js 官方文档当前内容。`PageProps<'/route'>` 等类型辅助工具是较新引入的 API，若你的项目使用较旧版本，可能需要手写 `{ params: Promise<{ slug: string }> }` 等类型。建议以你实际安装版本的官方文档为准。"
+    },
+    {
+      "id": "live-02",
+      "prompt": "AI SDK v7 的 prepareStep 回调现在能接收和返回哪些关键字段？引用官方文档。",
+      "passed": true,
+      "providerCalls": 1,
+      "sourceCount": 3,
+      "returnedSources": [
+        {
+          "sourceId": "src_1pmfztg",
+          "title": "Tool Calling",
+          "url": "https://ai-sdk.dev/docs/ai-sdk-core/tools-and-tool-calling"
+        },
+        {
+          "sourceId": "src_1m13lri",
+          "title": "AI SDK",
+          "url": "https://vercel.com/docs/ai-sdk"
+        },
+        {
+          "sourceId": "src_5mad52",
+          "title": "add `experimental_context` parameter to `prepareStep` callback · Issue #10482 · vercel/ai · GitHub",
+          "url": "https://github.com/vercel/ai/issues/10482"
+        }
+      ],
+      "citedUrlCount": 3,
+      "sourceValidity": true,
+      "searchStatus": "success",
+      "searchError": null,
+      "latencyMs": 20568,
+      "baselineLatencyMs": 19541,
+      "incrementalLatencyMs": 1027,
+      "usage": {
+        "inputTokens": 1121,
+        "inputTokenDetails": {
+          "noCacheTokens": 1121,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 634,
+        "outputTokenDetails": {
+          "textTokens": 634,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 1755
+      },
+      "baselineUsage": {
+        "inputTokens": 388,
+        "inputTokenDetails": {
+          "noCacheTokens": 388,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 700,
+        "outputTokenDetails": {
+          "textTokens": 700,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 1088
+      },
+      "answer": "AI SDK v7 中 `prepareStep` 回调能接收和返回哪些字段，官方文档（Tool Calling 页面）有部分说明，但本轮搜索摘要未覆盖到完整字段清单。以下是基于现有证据的整理：\n\n## 接收参数（回调入参）\n\n根据官方文档摘要，`prepareStep` 回调接收一个对象，包含以下字段（https://ai-sdk.dev/docs/ai-sdk-core/tools-and-tool-calling）：\n\n- `model`：传入 `generateText` 的模型\n- `stopWhen`：传入 `generateText` 的停止条件\n- `stepNumber`：当前正在执行的步骤编号\n- `steps`：到目前为止已执行的步骤\n- `instructions`：将发送给模型用于当前步骤的指令\n- `initialMessages`：初始消息\n- `responseMessages`：响应消息\n\n## 返回字段\n\n- `instructions`：如果返回 `instructions` 覆盖，这些指令会作为后续步骤的默认值继续传递\n- 消息更改会跨步骤保留\n\n## 说明\n\n本轮搜索摘要信息不完整，可能还有其他返回字段（例如 `tools`、`system`、`activeTools`、`messages` 等）未在摘要中体现。建议直接查阅官方文档确认完整字段列表：https://ai-sdk.dev/docs/ai-sdk-core/tools-and-tool-calling\n\n另外，GitHub Issue #10482 提到在 v6.0 里程碑中讨论了向 `prepareStep` 添加 `experimental_context` 参数（https://github.com/vercel/ai/issues/10482），这与 v7 的能力可能相关，但具体是否已合入 v7 需进一步核实。\n\n信息源：[Tool Calling](https://ai-sdk.dev/docs/ai-sdk-core/tools-and-tool-calling) · [AI SDK](https://vercel.com/docs/ai-sdk) · [add `experimental_context` parameter to `prepareStep` callback · Issue #10482 · vercel/ai · GitHub](https://github.com/vercel/ai/issues/10482)",
+      "baselineAnswer": "无法联网",
+      "manualCorrectnessReview": "required",
+      "rawAnswer": "AI SDK v7 中 `prepareStep` 回调能接收和返回哪些字段，官方文档（Tool Calling 页面）有部分说明，但本轮搜索摘要未覆盖到完整字段清单。以下是基于现有证据的整理：\n\n## 接收参数（回调入参）\n\n根据官方文档摘要，`prepareStep` 回调接收一个对象，包含以下字段（https://ai-sdk.dev/docs/ai-sdk-core/tools-and-tool-calling）：\n\n- `model`：传入 `generateText` 的模型\n- `stopWhen`：传入 `generateText` 的停止条件\n- `stepNumber`：当前正在执行的步骤编号\n- `steps`：到目前为止已执行的步骤\n- `instructions`：将发送给模型用于当前步骤的指令\n- `initialMessages`：初始消息\n- `responseMessages`：响应消息\n\n## 返回字段\n\n- `instructions`：如果返回 `instructions` 覆盖，这些指令会作为后续步骤的默认值继续传递\n- 消息更改会跨步骤保留\n\n## 说明\n\n本轮搜索摘要信息不完整，可能还有其他返回字段（例如 `tools`、`system`、`activeTools`、`messages` 等）未在摘要中体现。建议直接查阅官方文档确认完整字段列表：https://ai-sdk.dev/docs/ai-sdk-core/tools-and-tool-calling\n\n另外，GitHub Issue #10482 提到在 v6.0 里程碑中讨论了向 `prepareStep` 添加 `experimental_context` 参数（https://github.com/vercel/ai/issues/10482），这与 v7 的能力可能相关，但具体是否已合入 v7 需进一步核实。"
+    },
+    {
+      "id": "live-03",
+      "prompt": "React 19.2 的 Activity 组件目前是什么状态，适合生产使用吗？",
+      "passed": true,
+      "providerCalls": 1,
+      "sourceCount": 3,
+      "returnedSources": [
+        {
+          "sourceId": "src_ev0g3v",
+          "title": "Meta Ships React 19.2 Featuring Activity API, Cache Signals, and SSR Enhancements - InfoQ",
+          "url": "https://www.infoq.com/news/2025/10/meta-ships-react-19-2"
+        },
+        {
+          "sourceId": "src_kezb6d",
+          "title": "React 19.2 is here: Activity API, useEffectEvent, and more - LogRocket Blog",
+          "url": "https://blog.logrocket.com/react-19-2-is-here"
+        },
+        {
+          "sourceId": "src_1h1li4s",
+          "title": "React 19.2: New Features & Performance Boosts",
+          "url": "https://javascript-conference.com/blog/react-19-2-updates-performance-activity-component"
+        }
+      ],
+      "citedUrlCount": 3,
+      "sourceValidity": true,
+      "searchStatus": "success",
+      "searchError": null,
+      "latencyMs": 27868,
+      "baselineLatencyMs": 18078,
+      "incrementalLatencyMs": 9790,
+      "usage": {
+        "inputTokens": 1186,
+        "inputTokenDetails": {
+          "noCacheTokens": 1186,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 1113,
+        "outputTokenDetails": {
+          "textTokens": 1113,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 2299
+      },
+      "baselineUsage": {
+        "inputTokens": 384,
+        "inputTokenDetails": {
+          "noCacheTokens": 384,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 700,
+        "outputTokenDetails": {
+          "textTokens": 700,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 1084
+      },
+      "answer": "基于搜索到的信息，目前情况如下：\n\n## 发布状态\n\nReact 19.2 已由 Meta 于 **2025 年 10 月**正式发布（release），`<Activity>` 组件是这次发布的官方特性之一，而不再只是实验性 API。\n\nInfoQ 在报道中用的措辞是 \"Meta Ships React 19.2 Featuring Activity API, Cache Signals, and SSR Enhancements\"，即 Activity API 与 Cache Signals、SSR 增强一起作为 19.2 的主打特性正式 ship。\n\n## Activity 组件的作用\n\n它的定位是替代传统的条件渲染隐藏方式：\n\n```jsx\n// 传统方式：卸载会丢失内部状态\n{isHidden && <MyComponent />}\n\n// 新方式：保留状态，转入低优先级后台\n<Activity mode=\"hidden\">\n  <MyComponent />\n</Activity>\n```\n\n根据 JavaScript Conference 的说明，`<Activity>` 不是简单地把元素从 DOM 中移除，而是把暂时不在前台的 UI 转入一个「受控的低优先级状态」——类比操作系统把任务移到后台队列：内存和上下文保留，必要时仍能做轻量更新，但把 CPU 让给前台任务。它支持 `visible` 与 `hidden` 两种模式，可用于预渲染隐藏组件、按需切换显示，同时保留子组件的内部状态。\n\n## 是否适合生产使用\n\n从证据看，它已经随 React 19.2 正式发布，不再是 unstable_ 前缀的实验特性，理论上可以作为生产可用 API 使用。但需要说明几点限制：\n\n- 搜索摘要中没有直接给出官方对其稳定性级别的明确标注（例如是否仍标注为「初步稳定、API 可能调整」）。我没有在本次搜索结果中看到 React 官方文档原文的措辞，无法 100% 确认它是否被官方归类为完全稳定。\n- 作为较新特性，社区实际生产案例和踩坑资料（相对成熟特性而言）仍在积累中。\n- LogRocket 的文章标题将 Activity API 与 `useEffectEvent` 并列介绍，后者在 React 生态中长期以来带有「实验性/尚未最终稳定」的印象，但标题并列并不等于两者稳定性相同，这一点不能据此推断。\n\n## 建议\n\n- 如果你的项目已经在 React 19.2 上，可以开始在**非关键路径**（如 tab 切换、可折叠面板的预渲染）中试用 `<Activity>`，验证状态保留与隐藏后的副作用行为是否符合预期。\n- 对于核心流程或对 API 变更敏感的基础设施代码，建议先查阅 React 官方文档（react.dev）中 Activity 的当前说明，确认其稳定性标注，再决定是否大规模采用。我本轮搜索的摘要未包含官方文档原文，因此这点需要你自行最终核验。\n\n参考来源：\n- [Meta Ships React 19.2 Featuring Activity API, Cache Signals, and SSR Enhancements — InfoQ](https://www.infoq.com/news/2025/10/meta-ships-react-19-2)\n- [React 19.2 is here: Activity API, useEffectEvent, and more — LogRocket Blog](https://blog.logrocket.com/react-19-2-is-here)\n- [React 19.2: New Features & Performance Boosts — JavaScript Conference](https://javascript-conference.com/blog/react-19-2-updates-performance-activity-component)\n\n信息源：[Meta Ships React 19.2 Featuring Activity API, Cache Signals, and SSR Enhancements - InfoQ](https://www.infoq.com/news/2025/10/meta-ships-react-19-2) · [React 19.2 is here: Activity API, useEffectEvent, and more - LogRocket Blog](https://blog.logrocket.com/react-19-2-is-here) · [React 19.2: New Features & Performance Boosts](https://javascript-conference.com/blog/react-19-2-updates-performance-activity-component)",
+      "baselineAnswer": "# React 19.2 的 Activity 组件状态\n\n> ⚠️ **无法联网核验**：当前我无法执行联网搜索来确认 React 19.2 的确切发布内容以及 `<Activity>` 组件的最新状态。以下基于我的已有知识说明，但对 19.2 这个具体版本的细节可能不准确，请以官方渠道为准。\n\n## 已有知识回顾\n\n### Activity 组件是什么\n\n`<Activity>` 是 React 团队长期研究的实验性特性，早期在社区和 RFC 中被称为 **Offscreen**（`<Offscreen>`）。它的核心能力是：\n\n- 在**不卸载组件**的情况下隐藏其可见输出\n- 保留组件的 DOM 节点和 state\n- 允许 React 对被隐藏的部分暂停渲染、暂停 effect 或暂停布局 effect\n\n典型应用场景：\n\n1. **标签页/路由切换**时保持离屏页面状态，切换回来立即可用\n2. **预渲染**未来可能访问的路由或内容\n3. 条件性地\"冻结\"昂贵",
+      "manualCorrectnessReview": "required",
+      "rawAnswer": "基于搜索到的信息，目前情况如下：\n\n## 发布状态\n\nReact 19.2 已由 Meta 于 **2025 年 10 月**正式发布（release），`<Activity>` 组件是这次发布的官方特性之一，而不再只是实验性 API。\n\nInfoQ 在报道中用的措辞是 \"Meta Ships React 19.2 Featuring Activity API, Cache Signals, and SSR Enhancements\"，即 Activity API 与 Cache Signals、SSR 增强一起作为 19.2 的主打特性正式 ship。\n\n## Activity 组件的作用\n\n它的定位是替代传统的条件渲染隐藏方式：\n\n```jsx\n// 传统方式：卸载会丢失内部状态\n{isHidden && <MyComponent />}\n\n// 新方式：保留状态，转入低优先级后台\n<Activity mode=\"hidden\">\n  <MyComponent />\n</Activity>\n```\n\n根据 JavaScript Conference 的说明，`<Activity>` 不是简单地把元素从 DOM 中移除，而是把暂时不在前台的 UI 转入一个「受控的低优先级状态」——类比操作系统把任务移到后台队列：内存和上下文保留，必要时仍能做轻量更新，但把 CPU 让给前台任务。它支持 `visible` 与 `hidden` 两种模式，可用于预渲染隐藏组件、按需切换显示，同时保留子组件的内部状态。\n\n## 是否适合生产使用\n\n从证据看，它已经随 React 19.2 正式发布，不再是 unstable_ 前缀的实验特性，理论上可以作为生产可用 API 使用。但需要说明几点限制：\n\n- 搜索摘要中没有直接给出官方对其稳定性级别的明确标注（例如是否仍标注为「初步稳定、API 可能调整」）。我没有在本次搜索结果中看到 React 官方文档原文的措辞，无法 100% 确认它是否被官方归类为完全稳定。\n- 作为较新特性，社区实际生产案例和踩坑资料（相对成熟特性而言）仍在积累中。\n- LogRocket 的文章标题将 Activity API 与 `useEffectEvent` 并列介绍，后者在 React 生态中长期以来带有「实验性/尚未最终稳定」的印象，但标题并列并不等于两者稳定性相同，这一点不能据此推断。\n\n## 建议\n\n- 如果你的项目已经在 React 19.2 上，可以开始在**非关键路径**（如 tab 切换、可折叠面板的预渲染）中试用 `<Activity>`，验证状态保留与隐藏后的副作用行为是否符合预期。\n- 对于核心流程或对 API 变更敏感的基础设施代码，建议先查阅 React 官方文档（react.dev）中 Activity 的当前说明，确认其稳定性标注，再决定是否大规模采用。我本轮搜索的摘要未包含官方文档原文，因此这点需要你自行最终核验。\n\n参考来源：\n- [Meta Ships React 19.2 Featuring Activity API, Cache Signals, and SSR Enhancements — InfoQ](https://www.infoq.com/news/2025/10/meta-ships-react-19-2)\n- [React 19.2 is here: Activity API, useEffectEvent, and more — LogRocket Blog](https://blog.logrocket.com/react-19-2-is-here)\n- [React 19.2: New Features & Performance Boosts — JavaScript Conference](https://javascript-conference.com/blog/react-19-2-updates-performance-activity-component)"
+    },
+    {
+      "id": "live-04",
+      "prompt": "Node.js 当前默认 LTS 主版本及其生命周期阶段是什么？",
+      "passed": true,
+      "providerCalls": 1,
+      "sourceCount": 3,
+      "returnedSources": [
+        {
+          "sourceId": "src_1dr9p3x",
+          "title": "Node.js 所有主要版本的发布时间、稳定版本（Stable）和长期支持版本（LTS） 的整理",
+          "url": "https://blog.csdn.net/zp357252539/article/details/148521271"
+        },
+        {
+          "sourceId": "src_szqz5w",
+          "title": "Node.js 所有主要版本的发布时间、稳定版本（Stable）和长期承受版本（LTS） 的整理 - wzzkaifa - 博客园",
+          "url": "https://www.cnblogs.com/wzzkaifa/p/19022220"
+        },
+        {
+          "sourceId": "src_1hdymjp",
+          "title": "Node.js — Node.js 版本",
+          "url": "https://nodejs.org/zh-cn/about/previous-releases"
+        }
+      ],
+      "citedUrlCount": 3,
+      "sourceValidity": true,
+      "searchStatus": "success",
+      "searchError": null,
+      "latencyMs": 15334,
+      "baselineLatencyMs": 16220,
+      "incrementalLatencyMs": -886,
+      "usage": {
+        "inputTokens": 1820,
+        "inputTokenDetails": {
+          "noCacheTokens": 1820,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 619,
+        "outputTokenDetails": {
+          "textTokens": 619,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 2439
+      },
+      "baselineUsage": {
+        "inputTokens": 378,
+        "inputTokenDetails": {
+          "noCacheTokens": 378,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 700,
+        "outputTokenDetails": {
+          "textTokens": 700,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 1078
+      },
+      "answer": "根据 Node.js 官方发布信息（截至 2026 年 8 月），当前默认 LTS 主版本及其生命周期阶段如下：\n\n## 当前默认 LTS 主版本\n\n**Node.js v24（代号 Krypton）**\n- 生命周期阶段：**Active LTS（活跃 LTS）**\n- 说明：偶数版本在发布 6 个月后进入活跃 LTS 阶段，适用于生产环境 [Node.js 版本](https://nodejs.org/zh-cn/about/previous-releases)\n\n## 其他仍在支持的主版本\n\n**Node.js v22（代号 Jod）**\n- 生命周期阶段：**Maintenance LTS（维护期 LTS）** 或接近 EOL\n- 说明：在活跃 LTS 结束后进入维护期，仅接受关键修复\n\n## 已结束支持的主版本\n\n以下版本均已 **EOL（End of Life，生命周期结束）**，不再接收任何更新或安全修复 [Node.js 版本](https://nodejs.org/zh-cn/about/previous-releases)：\n- v20 (Iron)\n- v18 (Hydrogen)\n- v16 (Gallium)\n- v14 (Fermium)\n- v13、v15、v17、v19、v21、v23、v25 等奇数版本\n\n## 选择建议\n\n- 生产环境应使用 **Active LTS（当前为 v24）** 或 **Maintenance LTS（v22）**\n- 奇数版本（Current）仅适合库作者适配和尝鲜，不适用于生产环境\n\n> 注：上述结论基于 Node.js 官方 Previous Releases 页面。官方版本表会随时间更新，建议定期核对 [Node.js 官方版本页面](https://nodejs.org/zh-cn/about/previous-releases) 获取最新状态。\n\n信息源：[Node.js 所有主要版本的发布时间、稳定版本（Stable）和长期支持版本（LTS） 的整理](https://blog.csdn.net/zp357252539/article/details/148521271) · [Node.js 所有主要版本的发布时间、稳定版本（Stable）和长期承受版本（LTS） 的整理 - wzzkaifa - 博客园](https://www.cnblogs.com/wzzkaifa/p/19022220) · [Node.js — Node.js 版本](https://nodejs.org/zh-cn/about/previous-releases)",
+      "baselineAnswer": "",
+      "manualCorrectnessReview": "required",
+      "rawAnswer": "根据 Node.js 官方发布信息（截至 2026 年 8 月），当前默认 LTS 主版本及其生命周期阶段如下：\n\n## 当前默认 LTS 主版本\n\n**Node.js v24（代号 Krypton）**\n- 生命周期阶段：**Active LTS（活跃 LTS）**\n- 说明：偶数版本在发布 6 个月后进入活跃 LTS 阶段，适用于生产环境 [Node.js 版本](https://nodejs.org/zh-cn/about/previous-releases)\n\n## 其他仍在支持的主版本\n\n**Node.js v22（代号 Jod）**\n- 生命周期阶段：**Maintenance LTS（维护期 LTS）** 或接近 EOL\n- 说明：在活跃 LTS 结束后进入维护期，仅接受关键修复\n\n## 已结束支持的主版本\n\n以下版本均已 **EOL（End of Life，生命周期结束）**，不再接收任何更新或安全修复 [Node.js 版本](https://nodejs.org/zh-cn/about/previous-releases)：\n- v20 (Iron)\n- v18 (Hydrogen)\n- v16 (Gallium)\n- v14 (Fermium)\n- v13、v15、v17、v19、v21、v23、v25 等奇数版本\n\n## 选择建议\n\n- 生产环境应使用 **Active LTS（当前为 v24）** 或 **Maintenance LTS（v22）**\n- 奇数版本（Current）仅适合库作者适配和尝鲜，不适用于生产环境\n\n> 注：上述结论基于 Node.js 官方 Previous Releases 页面。官方版本表会随时间更新，建议定期核对 [Node.js 官方版本页面](https://nodejs.org/zh-cn/about/previous-releases) 获取最新状态。"
+    },
+    {
+      "id": "live-05",
+      "prompt": "TypeScript 当前稳定版中 using / await using 的支持情况如何？",
+      "passed": true,
+      "providerCalls": 1,
+      "sourceCount": 3,
+      "returnedSources": [
+        {
+          "sourceId": "src_s0rm90",
+          "title": "How does async/await work with TypeScript and ECMAScript 2017? - Firecasts",
+          "url": "https://www.youtube.com/watch?v=TCYhr_UMZkI"
+        },
+        {
+          "sourceId": "src_1o19i1n",
+          "title": "await using - JavaScript | MDN",
+          "url": "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/await_using"
+        },
+        {
+          "sourceId": "src_1b58x5k",
+          "title": "Medium",
+          "url": "https://medium.com/@alex.kilpatrick/using-async-await-with-typescript-the-minimum-you-need-to-know-7fc8b1760071"
+        }
+      ],
+      "citedUrlCount": 3,
+      "sourceValidity": true,
+      "searchStatus": "success",
+      "searchError": null,
+      "latencyMs": 26615,
+      "baselineLatencyMs": 18500,
+      "incrementalLatencyMs": 8115,
+      "usage": {
+        "inputTokens": 1073,
+        "inputTokenDetails": {
+          "noCacheTokens": 1073,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 954,
+        "outputTokenDetails": {
+          "textTokens": 954,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 2027
+      },
+      "baselineUsage": {
+        "inputTokens": 380,
+        "inputTokenDetails": {
+          "noCacheTokens": 380,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 700,
+        "outputTokenDetails": {
+          "textTokens": 700,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 1080
+      },
+      "answer": "## 回答\n\n本轮搜索未返回 TypeScript 官方关于 `using` / `await using` 支持版本的发布说明，因此无法通过这次搜索证据来确认 **当前（2026-08）TypeScript 稳定版的具体版本号**。下面基于搜索到的 MDN 文档说明语义，并结合已知的稳定历史事实作答，相关限制会明确标注。\n\n### 1. 语义层面（来自搜索证据）\n\n根据 MDN 对 `await using` 的说明（[MDN](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/await_using)）：\n\n- `await using` 声明的变量值可以是 `null`、`undefined`，或带有 `[Symbol.asyncDispose]` / `[Symbol.dispose]` 方法的对象。\n- 只要作用域中存在至少一个 `await using` 变量，即便值为 `null` / `undefined`，退出作用域时也保证至少发生一次 `await`，以避免同步释放导致的时序问题。\n- 该声明只能在支持 `await` 的上下文（如 `async` 函数）中使用。\n\n这与 TypeScript 中的语义一致；TypeScript 的 `using` / `await using` 实现的是同一提案（Explicit Resource Management）。\n\n### 2. TypeScript 支持情况（历史事实，本轮搜索未验证最新版）\n\n- TypeScript 自 **5.2** 起稳定支持 `using` 和 `await using` 声明，对应 ECMAScript 的 Explicit Resource Management 提案。\n- 编译需要目标运行时提供 `Symbol.dispose` / `Symbol.asyncDispose` 和 `SuppressedError` 等（或通过 `tslib` / polyfill 降级）。\n\n> ⚠️ 限制披露：本轮搜索结果未包含 TypeScript 官方发布说明或当前稳定版版本号信息，因此我**无法通过搜索证据确认 2026-08 当前最新稳定版的具体版本号**及是否有进一步的语义调整。以上版本信息基于 2024 年初之前已公开的稳定发布事实，建议以 TypeScript 官方发布说明（Release Notes）或 GitHub 发布页为准核实最新状态。\n\n信息源：[How does async/await work with TypeScript and ECMAScript 2017? - Firecasts](https://www.youtube.com/watch?v=TCYhr_UMZkI) · [await using - JavaScript | MDN](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/await_using) · [Medium](https://medium.com/@alex.kilpatrick/using-async-await-with-typescript-the-minimum-you-need-to-know-7fc8b1760071)",
+      "baselineAnswer": "由于本轮联网搜索不可用，我无法核验「当前」TypeScript 稳定版的确切版本号，也无法确认 ECMAScript Explicit Resource Management 提案最新所处的阶段。下面基于我已有的知识说明，版本/阶段相关结论请以官方最新发布为准。\n\n## 支持情况（基于已知事实）\n\n- **TypeScript 5.2（2023 年 8 月发布）** 起正式",
+      "manualCorrectnessReview": "required",
+      "rawAnswer": "## 回答\n\n本轮搜索未返回 TypeScript 官方关于 `using` / `await using` 支持版本的发布说明，因此无法通过这次搜索证据来确认 **当前（2026-08）TypeScript 稳定版的具体版本号**。下面基于搜索到的 MDN 文档说明语义，并结合已知的稳定历史事实作答，相关限制会明确标注。\n\n### 1. 语义层面（来自搜索证据）\n\n根据 MDN 对 `await using` 的说明（[MDN](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/await_using)）：\n\n- `await using` 声明的变量值可以是 `null`、`undefined`，或带有 `[Symbol.asyncDispose]` / `[Symbol.dispose]` 方法的对象。\n- 只要作用域中存在至少一个 `await using` 变量，即便值为 `null` / `undefined`，退出作用域时也保证至少发生一次 `await`，以避免同步释放导致的时序问题。\n- 该声明只能在支持 `await` 的上下文（如 `async` 函数）中使用。\n\n这与 TypeScript 中的语义一致；TypeScript 的 `using` / `await using` 实现的是同一提案（Explicit Resource Management）。\n\n### 2. TypeScript 支持情况（历史事实，本轮搜索未验证最新版）\n\n- TypeScript 自 **5.2** 起稳定支持 `using` 和 `await using` 声明，对应 ECMAScript 的 Explicit Resource Management 提案。\n- 编译需要目标运行时提供 `Symbol.dispose` / `Symbol.asyncDispose` 和 `SuppressedError` 等（或通过 `tslib` / polyfill 降级）。\n\n> ⚠️ 限制披露：本轮搜索结果未包含 TypeScript 官方发布说明或当前稳定版版本号信息，因此我**无法通过搜索证据确认 2026-08 当前最新稳定版的具体版本号**及是否有进一步的语义调整。以上版本信息基于 2024 年初之前已公开的稳定发布事实，建议以 TypeScript 官方发布说明（Release Notes）或 GitHub 发布页为准核实最新状态。"
+    },
+    {
+      "id": "live-06",
+      "prompt": "Vercel Functions 当前默认超时、最大请求体和推荐 Node.js 运行方式是什么？",
+      "passed": true,
+      "providerCalls": 1,
+      "sourceCount": 3,
+      "returnedSources": [
+        {
+          "sourceId": "src_uoi8ym",
+          "title": "Vercel Functions",
+          "url": "https://vercel.com/docs/functions"
+        },
+        {
+          "sourceId": "src_1vmas6s",
+          "title": "Vercel Functions Limits",
+          "url": "https://vercel.com/docs/functions/limitations"
+        },
+        {
+          "sourceId": "src_ku0rpz",
+          "title": "Vercel Functions can now run up to 30 minutes - Vercel",
+          "url": "https://vercel.com/changelog/vercel-functions-can-now-run-up-to-30-minutes"
+        }
+      ],
+      "citedUrlCount": 3,
+      "sourceValidity": true,
+      "searchStatus": "success",
+      "searchError": null,
+      "latencyMs": 26881,
+      "baselineLatencyMs": 20247,
+      "incrementalLatencyMs": 6634,
+      "usage": {
+        "inputTokens": 1145,
+        "inputTokenDetails": {
+          "noCacheTokens": 1145,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 1167,
+        "outputTokenDetails": {
+          "textTokens": 1167,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 2312
+      },
+      "baselineUsage": {
+        "inputTokens": 388,
+        "inputTokenDetails": {
+          "noCacheTokens": 388,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 700,
+        "outputTokenDetails": {
+          "textTokens": 700,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 1088
+      },
+      "answer": "基于搜索结果，我可以回答关于 Vercel Functions 的部分问题，但需要披露证据不足的部分。\n\n## 默认超时与最大持续时间\n\n根据 [Vercel Functions Limits](https://vercel.com/docs/functions/limitations) 文档：\n\n| 计划 | 默认 | 最大 | 扩展最大值 |\n|------|------|------|------------|\n| Hobby | 300s（5 分钟） | 300s（5 分钟） | — |\n| Pro | 300s（5 分钟） | 800s | 1800s（30 分钟）Beta |\n| Enterprise | 300s（5 分钟） | 800s | 1800s（30 分钟）Beta |\n\n- **默认超时为 300 秒（5 分钟）**，适用于所有计划。\n- 可通过 `maxDuration` 配置延长持续时间；超过 800 秒需要函数级别配置。\n- 根据 [2026-06-15 的更新](https://vercel.com/changelog/vercel-functions-can-now-run-up-to-30-minutes)，Node.js 和 Python 运行时现在对 Pro 和 Enterprise 团队支持最长 30 分钟的执行时间（Beta），超过此前 800 秒限制的 2 倍多。\n- 如果函数在持续时间内未完成，会返回 504 错误码（`FUNCTION_INVOCATION_TIMEOUT`）。\n- 启用 **fluid compute** 时，会有不同的默认值和最大限制。\n\n## 最大请求体\n\n⚠️ **证据不足**：搜索结果中提到了 Vercel 提供 payload size 限制，但未返回具体的最大请求体数值。建议直接查阅 [Vercel Functions Limits](https://vercel.com/docs/functions/limitations) 页面获取准确数值。\n\n## 推荐 Node.js 运行方式\n\n搜索结果提到了以下相关信息，但未明确称为\"推荐运行方式\"：\n\n- 默认情况下，Node.js 运行时的函数在 Washington, D.C., USA (`iad1`) 执行，建议将函数部署在靠近数据源的区域以减少延迟。\n- **Fluid compute** 是一种使长时间运行工作更具成本效益的方式：Active CPU billing 仅在代码执行时计费，在等待 I/O（如 AI 模型调用、数据库查询、第三方 API）时暂停。\n- 支持 Node.js、Python、Go 等运行时，可在函数配置中设置区域、内存、超时等选项。\n- 支持流式响应以在生成内容时即时交付。\n\n⚠️ 关于\"推荐 Node.js 运行方式\"的确切官方表述，搜索结果证据有限，可能需要直接查阅 [Vercel Functions 文档](https://vercel.com/docs/functions) 以获取更精确的指导。\n\n信息源：[Vercel Functions](https://vercel.com/docs/functions) · [Vercel Functions Limits](https://vercel.com/docs/functions/limitations) · [Vercel Functions can now run up to 30 minutes - Vercel](https://vercel.com/changelog/vercel-functions-can-now-run-up-to-30-minutes)",
+      "baselineAnswer": "",
+      "manualCorrectnessReview": "required",
+      "rawAnswer": "基于搜索结果，我可以回答关于 Vercel Functions 的部分问题，但需要披露证据不足的部分。\n\n## 默认超时与最大持续时间\n\n根据 [Vercel Functions Limits](https://vercel.com/docs/functions/limitations) 文档：\n\n| 计划 | 默认 | 最大 | 扩展最大值 |\n|------|------|------|------------|\n| Hobby | 300s（5 分钟） | 300s（5 分钟） | — |\n| Pro | 300s（5 分钟） | 800s | 1800s（30 分钟）Beta |\n| Enterprise | 300s（5 分钟） | 800s | 1800s（30 分钟）Beta |\n\n- **默认超时为 300 秒（5 分钟）**，适用于所有计划。\n- 可通过 `maxDuration` 配置延长持续时间；超过 800 秒需要函数级别配置。\n- 根据 [2026-06-15 的更新](https://vercel.com/changelog/vercel-functions-can-now-run-up-to-30-minutes)，Node.js 和 Python 运行时现在对 Pro 和 Enterprise 团队支持最长 30 分钟的执行时间（Beta），超过此前 800 秒限制的 2 倍多。\n- 如果函数在持续时间内未完成，会返回 504 错误码（`FUNCTION_INVOCATION_TIMEOUT`）。\n- 启用 **fluid compute** 时，会有不同的默认值和最大限制。\n\n## 最大请求体\n\n⚠️ **证据不足**：搜索结果中提到了 Vercel 提供 payload size 限制，但未返回具体的最大请求体数值。建议直接查阅 [Vercel Functions Limits](https://vercel.com/docs/functions/limitations) 页面获取准确数值。\n\n## 推荐 Node.js 运行方式\n\n搜索结果提到了以下相关信息，但未明确称为\"推荐运行方式\"：\n\n- 默认情况下，Node.js 运行时的函数在 Washington, D.C., USA (`iad1`) 执行，建议将函数部署在靠近数据源的区域以减少延迟。\n- **Fluid compute** 是一种使长时间运行工作更具成本效益的方式：Active CPU billing 仅在代码执行时计费，在等待 I/O（如 AI 模型调用、数据库查询、第三方 API）时暂停。\n- 支持 Node.js、Python、Go 等运行时，可在函数配置中设置区域、内存、超时等选项。\n- 支持流式响应以在生成内容时即时交付。\n\n⚠️ 关于\"推荐 Node.js 运行方式\"的确切官方表述，搜索结果证据有限，可能需要直接查阅 [Vercel Functions 文档](https://vercel.com/docs/functions) 以获取更精确的指导。"
+    },
+    {
+      "id": "live-07",
+      "prompt": "pnpm 10 的 minimumReleaseAge 和 minimumReleaseAgeExclude 应如何配置？",
+      "passed": true,
+      "providerCalls": 1,
+      "sourceCount": 3,
+      "returnedSources": [
+        {
+          "sourceId": "src_1htikhh",
+          "title": "Releases · pnpm/pnpm",
+          "url": "https://github.com/pnpm/pnpm/releases"
+        },
+        {
+          "sourceId": "src_kv560c",
+          "title": "Configure pnpm for the best possible developer experience",
+          "url": "https://adamcoster.com/blog/pnpm-config"
+        },
+        {
+          "sourceId": "src_v0fego",
+          "title": "Fast, disk space efficient package manager | pnpm",
+          "url": "https://pnpm.io/"
+        }
+      ],
+      "citedUrlCount": 3,
+      "sourceValidity": true,
+      "searchStatus": "success",
+      "searchError": null,
+      "latencyMs": 30100,
+      "baselineLatencyMs": 17704,
+      "incrementalLatencyMs": 12396,
+      "usage": {
+        "inputTokens": 1020,
+        "inputTokenDetails": {
+          "noCacheTokens": 1020,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 1305,
+        "outputTokenDetails": {
+          "textTokens": 1305,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 2325
+      },
+      "baselineUsage": {
+        "inputTokens": 383,
+        "inputTokenDetails": {
+          "noCacheTokens": 383,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 700,
+        "outputTokenDetails": {
+          "textTokens": 700,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 1083
+      },
+      "answer": "# pnpm 10 中 minimumReleaseAge 与 minimumReleaseAgeExclude 的配置\n\n## 基本概念\n\n`minimumReleaseAge` 是 pnpm 为降低供应链攻击风险引入的「发布冷却期」机制：新版本必须发布满一定时间后才允许被安装，从而避免刚发布就引入可能被植入恶意代码的依赖。`minimumReleaseAgeExclude` 则用于把某些包排除在该冷却策略之外。\n\n## 配置位置与语法\n\n这两个选项在 pnpm 10 中通过 **`pnpm-workspace.yaml`** 配置（不再是 `.npmrc`）。\n\n典型写法：\n\n```yaml\n# pnpm-workspace.yaml\npackages:\n  - 'apps/*'\n  - 'packages/*'\n\n# 新版本至少发布满 1 天才允许安装\nminimumReleaseAge: 1d\n\n# 排除部分必须立即更新的包（例如紧急安全补丁或内部私有包）\nminimumReleaseAgeExclude:\n  - '@scope/urgent-package'\n  - 'some-critical-lib'\n```\n\n- `minimumReleaseAge`：接受时间字符串，例如 `1d`（1 天）、`12h`（12 小时）等。\n- `minimumReleaseAgeExclude`：接受一个包名列表，列表中的包不受冷却期约束。\n\n## pnpm 10 的相关变更（来自 release notes）\n\n根据 pnpm 的发布说明，pnpm 10 在该特性上有几个重要调整：\n\n1. **`minimumReleaseAge` 不再影响 `self-update`**\n   - 在 `pnpm-workspace.yaml` 中设置 `minimumReleaseAge` 只会约束项目自身的依赖。\n   - 执行 `pnpm self-update` 时的冷却期改由「内置默认值 / 全局配置 / `PNPM_CONFIG_` 环境变量 / 命令行参数」决定。\n   - 这修复了在工作区中提高了冷却阈值后，`self-update` 在工作区内失败、在其他地方却成功的矛盾行为，也避免仓库无意中放宽或收紧 self-update 的冷却期。\n   - 来源：https://github.com/pnpm/pnpm/releases\n\n2. **通过 pnpr server 安装时策略修复**\n   - 此前 `minimumReleaseAgeExclude`、`minimumReleaseAgeIgnoreMissingTime`、`trustPolicy`、`trustPolicyExclude`、`trustPolicyIgnoreAfter`、`trustLockfile` 等在 pnpr server 安装路径中被忽略，导致被排除的包仍被冷却，含这些包的 lockfile 也可能被拒绝。新版已修复，使整个项目的校验策略在 pnpr server 安装中同样生效。\n   - 来源：https://github.com/pnpm/pnpm/releases\n\n## 证据限制说明\n\n本轮搜索返回的摘要主要来自 pnpm 的 GitHub Releases 页面和首页介绍，**未包含官方文档中对这两个字段完整定义、全部可选值、默认值以及边界行为的逐项说明**。例如：\n\n- `minimumReleaseAge` 是否支持更精细的单位（如分钟、周）；\n- `minimumReleaseAgeExclude` 是否支持 glob/通配符；\n- 与 `minimumReleaseAgeIgnoreMissingTime`（处理发布时间缺失的包）的配合方式；\n- 与 lockfile 已锁定版本之间的交互。\n\n这些细节我无法在当前证据下确认，建议直接查阅 pnpm 官方文档（`pnpm.io`）中关于 `pnpm-workspace.yaml` 与「minimum release age / trust policy」的章节，或 pnpm GitHub 仓库的 CHANGELOG 以获取最准确的字段定义。\n\n信息源：[Releases · pnpm/pnpm](https://github.com/pnpm/pnpm/releases) · [Configure pnpm for the best possible developer experience](https://adamcoster.com/blog/pnpm-config) · [Fast, disk space efficient package manager | pnpm](https://pnpm.io/)",
+      "baselineAnswer": "",
+      "manualCorrectnessReview": "required",
+      "rawAnswer": "# pnpm 10 中 minimumReleaseAge 与 minimumReleaseAgeExclude 的配置\n\n## 基本概念\n\n`minimumReleaseAge` 是 pnpm 为降低供应链攻击风险引入的「发布冷却期」机制：新版本必须发布满一定时间后才允许被安装，从而避免刚发布就引入可能被植入恶意代码的依赖。`minimumReleaseAgeExclude` 则用于把某些包排除在该冷却策略之外。\n\n## 配置位置与语法\n\n这两个选项在 pnpm 10 中通过 **`pnpm-workspace.yaml`** 配置（不再是 `.npmrc`）。\n\n典型写法：\n\n```yaml\n# pnpm-workspace.yaml\npackages:\n  - 'apps/*'\n  - 'packages/*'\n\n# 新版本至少发布满 1 天才允许安装\nminimumReleaseAge: 1d\n\n# 排除部分必须立即更新的包（例如紧急安全补丁或内部私有包）\nminimumReleaseAgeExclude:\n  - '@scope/urgent-package'\n  - 'some-critical-lib'\n```\n\n- `minimumReleaseAge`：接受时间字符串，例如 `1d`（1 天）、`12h`（12 小时）等。\n- `minimumReleaseAgeExclude`：接受一个包名列表，列表中的包不受冷却期约束。\n\n## pnpm 10 的相关变更（来自 release notes）\n\n根据 pnpm 的发布说明，pnpm 10 在该特性上有几个重要调整：\n\n1. **`minimumReleaseAge` 不再影响 `self-update`**\n   - 在 `pnpm-workspace.yaml` 中设置 `minimumReleaseAge` 只会约束项目自身的依赖。\n   - 执行 `pnpm self-update` 时的冷却期改由「内置默认值 / 全局配置 / `PNPM_CONFIG_` 环境变量 / 命令行参数」决定。\n   - 这修复了在工作区中提高了冷却阈值后，`self-update` 在工作区内失败、在其他地方却成功的矛盾行为，也避免仓库无意中放宽或收紧 self-update 的冷却期。\n   - 来源：https://github.com/pnpm/pnpm/releases\n\n2. **通过 pnpr server 安装时策略修复**\n   - 此前 `minimumReleaseAgeExclude`、`minimumReleaseAgeIgnoreMissingTime`、`trustPolicy`、`trustPolicyExclude`、`trustPolicyIgnoreAfter`、`trustLockfile` 等在 pnpr server 安装路径中被忽略，导致被排除的包仍被冷却，含这些包的 lockfile 也可能被拒绝。新版已修复，使整个项目的校验策略在 pnpr server 安装中同样生效。\n   - 来源：https://github.com/pnpm/pnpm/releases\n\n## 证据限制说明\n\n本轮搜索返回的摘要主要来自 pnpm 的 GitHub Releases 页面和首页介绍，**未包含官方文档中对这两个字段完整定义、全部可选值、默认值以及边界行为的逐项说明**。例如：\n\n- `minimumReleaseAge` 是否支持更精细的单位（如分钟、周）；\n- `minimumReleaseAgeExclude` 是否支持 glob/通配符；\n- 与 `minimumReleaseAgeIgnoreMissingTime`（处理发布时间缺失的包）的配合方式；\n- 与 lockfile 已锁定版本之间的交互。\n\n这些细节我无法在当前证据下确认，建议直接查阅 pnpm 官方文档（`pnpm.io`）中关于 `pnpm-workspace.yaml` 与「minimum release age / trust policy」的章节，或 pnpm GitHub 仓库的 CHANGELOG 以获取最准确的字段定义。"
+    },
+    {
+      "id": "live-08",
+      "prompt": "Drizzle ORM 0.45 在 PostgreSQL 中如何写 transaction callback 和嵌套 savepoint？",
+      "passed": true,
+      "providerCalls": 1,
+      "sourceCount": 3,
+      "returnedSources": [
+        {
+          "sourceId": "src_r75b1b",
+          "title": "Drizzle ORM Tutorial: Type-Safe Postgres in 13 Steps [2026]",
+          "url": "https://tech-insider.org/drizzle-orm-tutorial-typescript-postgres-2026"
+        },
+        {
+          "sourceId": "src_uxocct",
+          "title": "GitHub - nickdeis/drizzle-transaction-context: Implicit and execution scoped transactions/savepoints for drizzle-orm · GitHub",
+          "url": "https://github.com/nickdeis/drizzle-transaction-context"
+        },
+        {
+          "sourceId": "src_m3bq3j",
+          "title": "Drizzle ORM - Transactions",
+          "url": "https://orm.drizzle.team/docs/transactions"
+        }
+      ],
+      "citedUrlCount": 3,
+      "sourceValidity": true,
+      "searchStatus": "success",
+      "searchError": null,
+      "latencyMs": 24723,
+      "baselineLatencyMs": 14766,
+      "incrementalLatencyMs": 9957,
+      "usage": {
+        "inputTokens": 1172,
+        "inputTokenDetails": {
+          "noCacheTokens": 1172,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 1086,
+        "outputTokenDetails": {
+          "textTokens": 1086,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 2258
+      },
+      "baselineUsage": {
+        "inputTokens": 385,
+        "inputTokenDetails": {
+          "noCacheTokens": 385,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 700,
+        "outputTokenDetails": {
+          "textTokens": 700,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 1085
+      },
+      "answer": "# Drizzle ORM 0.45 PostgreSQL 事务与嵌套 savepoint\n\n基于 Drizzle ORM 官方文档，在 PostgreSQL 中使用事务回调和嵌套 savepoint 的写法如下。\n\n## 1. Transaction callback（事务回调）\n\n使用 `db.transaction(async (tx) => { ... })`，回调会收到一个事务作用域的 `tx` 客户端，它暴露与 `db` 相同的查询 API：\n\n- 回调 **正常 resolve** → 提交\n- 回调 **抛出异常** → 回滚\n\n```ts\nimport { eq, sql } from 'drizzle-orm'\nimport { db } from './db'\nimport { accounts, users } from './schema'\n\nawait db.transaction(async (tx) => {\n  await tx.update(accounts)\n    .set({ balance: sql`${accounts.balance} - 100.00` })\n    .where(eq(users.name, 'Dan'))\n\n  await tx.update(accounts)\n    .set({ balance: sql`${accounts.balance} + 100.00` })\n    .where(eq(users.name, 'Andrew'))\n})\n```\n\n该模式在 PostgreSQL / MySQL / SQLite 中用法一致，仅隔离级别按方言映射。\n\n## 2. 嵌套 savepoint\n\nDrizzle 用**嵌套事务 API** 来实现 savepoint：在外层事务的 `tx` 上再次调用 `tx.transaction(...)`，会自动转换为数据库的 `SAVEPOINT`。内层回调抛错只会回滚到 savepoint，不会影响外层事务。\n\n```ts\nawait db.transaction(async (tx) => {\n  await tx.update(accounts)\n    .set({ balance: sql`${accounts.balance} - 100.00` })\n    .where(eq(users.name, 'Dan'))\n\n  // 内层嵌套事务 -> 自动转为 SAVEPOINT\n  try {\n    await tx.transaction(async (sp) => {\n      await sp.update(accounts)\n        .set({ balance: sql`${accounts.balance} + 100.00` })\n        .where(eq(users.name, 'Andrew'))\n\n      // 抛错 -> 仅回滚到这个 savepoint\n      throw new Error('rollback to savepoint')\n    })\n  } catch {\n    // savepoint 已回滚，外层事务继续可用\n    console.log('inner savepoint rolled back, outer tx still alive')\n  }\n\n  // 这条仍然会随外层事务一起提交\n  await tx.insert(users)\n    .values({ name: 'Bee' })\n})\n```\n\n## 要点速查\n\n| 场景 | 调用方式 | 行为 |\n|---|---|---|\n| 开启事务 | `db.transaction(async (tx) => ...)` | 提交 / 回滚整个事务 |\n| 嵌套 savepoint | 在 `tx` 上调用 `tx.transaction(async (sp) => ...)` | 自动 `SAVEPOINT`，内层抛错只回滚到该点 |\n| 错误恢复 | `try/catch` 包住 `tx.transaction` | 外层 `tx` 仍可继续使用 |\n\n> ⚠️ 注意：内层 `tx.transaction(...)` 的回调参数（示例中的 `sp`）也是一个完整查询客户端；继续嵌套还会生成更深层的 savepoint。如果外层事务本身已回滚或已提交，对 `tx` / `sp` 的任何操作都会失效。\n\n参考来源：\n- Drizzle ORM 官方文档 — Transactions: https://orm.drizzle.team/docs/transactions\n\n信息源：[Drizzle ORM Tutorial: Type-Safe Postgres in 13 Steps  2026](https://tech-insider.org/drizzle-orm-tutorial-typescript-postgres-2026) · [GitHub - nickdeis/drizzle-transaction-context: Implicit and execution scoped transactions/savepoints for drizzle-orm · GitHub](https://github.com/nickdeis/drizzle-transaction-context) · [Drizzle ORM - Transactions](https://orm.drizzle.team/docs/transactions)",
+      "baselineAnswer": "",
+      "manualCorrectnessReview": "required",
+      "rawAnswer": "# Drizzle ORM 0.45 PostgreSQL 事务与嵌套 savepoint\n\n基于 Drizzle ORM 官方文档，在 PostgreSQL 中使用事务回调和嵌套 savepoint 的写法如下。\n\n## 1. Transaction callback（事务回调）\n\n使用 `db.transaction(async (tx) => { ... })`，回调会收到一个事务作用域的 `tx` 客户端，它暴露与 `db` 相同的查询 API：\n\n- 回调 **正常 resolve** → 提交\n- 回调 **抛出异常** → 回滚\n\n```ts\nimport { eq, sql } from 'drizzle-orm'\nimport { db } from './db'\nimport { accounts, users } from './schema'\n\nawait db.transaction(async (tx) => {\n  await tx.update(accounts)\n    .set({ balance: sql`${accounts.balance} - 100.00` })\n    .where(eq(users.name, 'Dan'))\n\n  await tx.update(accounts)\n    .set({ balance: sql`${accounts.balance} + 100.00` })\n    .where(eq(users.name, 'Andrew'))\n})\n```\n\n该模式在 PostgreSQL / MySQL / SQLite 中用法一致，仅隔离级别按方言映射。\n\n## 2. 嵌套 savepoint\n\nDrizzle 用**嵌套事务 API** 来实现 savepoint：在外层事务的 `tx` 上再次调用 `tx.transaction(...)`，会自动转换为数据库的 `SAVEPOINT`。内层回调抛错只会回滚到 savepoint，不会影响外层事务。\n\n```ts\nawait db.transaction(async (tx) => {\n  await tx.update(accounts)\n    .set({ balance: sql`${accounts.balance} - 100.00` })\n    .where(eq(users.name, 'Dan'))\n\n  // 内层嵌套事务 -> 自动转为 SAVEPOINT\n  try {\n    await tx.transaction(async (sp) => {\n      await sp.update(accounts)\n        .set({ balance: sql`${accounts.balance} + 100.00` })\n        .where(eq(users.name, 'Andrew'))\n\n      // 抛错 -> 仅回滚到这个 savepoint\n      throw new Error('rollback to savepoint')\n    })\n  } catch {\n    // savepoint 已回滚，外层事务继续可用\n    console.log('inner savepoint rolled back, outer tx still alive')\n  }\n\n  // 这条仍然会随外层事务一起提交\n  await tx.insert(users)\n    .values({ name: 'Bee' })\n})\n```\n\n## 要点速查\n\n| 场景 | 调用方式 | 行为 |\n|---|---|---|\n| 开启事务 | `db.transaction(async (tx) => ...)` | 提交 / 回滚整个事务 |\n| 嵌套 savepoint | 在 `tx` 上调用 `tx.transaction(async (sp) => ...)` | 自动 `SAVEPOINT`，内层抛错只回滚到该点 |\n| 错误恢复 | `try/catch` 包住 `tx.transaction` | 外层 `tx` 仍可继续使用 |\n\n> ⚠️ 注意：内层 `tx.transaction(...)` 的回调参数（示例中的 `sp`）也是一个完整查询客户端；继续嵌套还会生成更深层的 savepoint。如果外层事务本身已回滚或已提交，对 `tx` / `sp` 的任何操作都会失效。\n\n参考来源：\n- Drizzle ORM 官方文档 — Transactions: https://orm.drizzle.team/docs/transactions"
+    },
+    {
+      "id": "live-09",
+      "prompt": "Zod 当前版本如何定义 strict object 并拒绝未知字段？",
+      "passed": true,
+      "providerCalls": 1,
+      "sourceCount": 3,
+      "returnedSources": [
+        {
+          "sourceId": "src_1mmk4yt",
+          "title": "Defining schemas | Zod",
+          "url": "https://zod.dev/api"
+        },
+        {
+          "sourceId": "src_e0cbt9",
+          "title": "Strict object validation is handy for data exploration – Matias Kinnunen",
+          "url": "https://mtsknn.fi/blog/zod-object-strict"
+        },
+        {
+          "sourceId": "src_4uh61o",
+          "title": "Make Excessive Object Properties Fail on Zod Validation | egghead.io",
+          "url": "https://egghead.io/make-excessive-object-properties-fail-on-zod-validation~xx73o"
+        }
+      ],
+      "citedUrlCount": 3,
+      "sourceValidity": true,
+      "searchStatus": "success",
+      "searchError": null,
+      "latencyMs": 14266,
+      "baselineLatencyMs": 14911,
+      "incrementalLatencyMs": -645,
+      "usage": {
+        "inputTokens": 1089,
+        "inputTokenDetails": {
+          "noCacheTokens": 1089,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 618,
+        "outputTokenDetails": {
+          "textTokens": 618,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 1707
+      },
+      "baselineUsage": {
+        "inputTokens": 379,
+        "inputTokenDetails": {
+          "noCacheTokens": 379,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 700,
+        "outputTokenDetails": {
+          "textTokens": 700,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 1079
+      },
+      "answer": "根据 Zod 官方文档，当前版本定义 strict object 并拒绝未知字段主要有两种等价方式：\n\n## 1. 使用 `z.strictObject()`\n\n这是 `z.object().strict()` 的简写形式，直接创建一个严格对象 schema：\n\n```ts\nimport { z } from \"zod\";\n\nconst StrictDog = z.strictObject({\n  name: z.string(),\n});\n\nStrictDog.parse({ name: \"Yeller\", extraKey: true });\n// ❌ throws：发现未知键 extraKey\n```\n\n## 2. 使用 `.strict()` 方法\n\n在普通 `z.object()` 上链式调用 `.strict()`，效果相同：\n\n```ts\nconst StrictDog = z.object({\n  name: z.string(),\n}).strict();\n\nStrictDog.parse({ name: \"Yeller\", extraKey: true });\n// ❌ throws：未识别的键\n```\n\n## 三种对象模式对比\n\nZod 对未知键有三种处理策略：\n\n| API | 行为 |\n|---|---|\n| `z.object()` | 默认：**剥离**未知键，不报错 |\n| `z.strictObject()` / `.strict()` | **报错**：遇到未知键抛出异常 |\n| `z.looseObject()` / `.passthrough()` | **保留**未知键，原样通过 |\n\n```ts\n// 默认：剥离未知键\nconst Dog = z.object({ name: z.string() });\nDog.parse({ name: \"Yeller\", extraKey: true });\n// ✅ 返回 { name: \"Yeller\" }，extraKey 被去掉\n\n// 严格：拒绝未知键\nconst StrictDog = z.strictObject({ name: z.string() });\nStrictDog.parse({ name: \"Yeller\", extraKey: true });\n// ❌ throws\n\n// 宽松：保留未知键\nconst LooseDog = z.looseObject({ name: z.string() });\nLooseDog.parse({ name: \"Yeller\", extraKey: true });\n// ✅ 返回 { name: \"Yeller\", extraKey: true }\n```\n\n## 实用场景\n\n严格模式在**探索文档不全的 API 返回数据**时特别有用——任何未在 schema 中声明的字段都会让 Zod 抛错，从而帮助你发现遗漏的字段并逐步补全 schema。\n\n**注意**：`.strict()` 默认只作用于当前对象层级，不会自动递归到嵌套对象。如果需要嵌套对象也严格拒绝未知字段，需要在每一层都使用 `.strict()` 或 `z.strictObject()`。\n\n**参考来源：**\n- [Defining schemas | Zod 官方文档](https://zod.dev/api)\n- [Strict object validation is handy for data exploration – Matias Kinnunen](https://mtsknn.fi/blog/zod-object-strict)\n\n信息源：[Defining schemas | Zod](https://zod.dev/api) · [Strict object validation is handy for data exploration – Matias Kinnunen](https://mtsknn.fi/blog/zod-object-strict) · [Make Excessive Object Properties Fail on Zod Validation | egghead.io](https://egghead.io/make-excessive-object-properties-fail-on-zod-validation~xx73o)",
+      "baselineAnswer": "",
+      "manualCorrectnessReview": "required",
+      "rawAnswer": "根据 Zod 官方文档，当前版本定义 strict object 并拒绝未知字段主要有两种等价方式：\n\n## 1. 使用 `z.strictObject()`\n\n这是 `z.object().strict()` 的简写形式，直接创建一个严格对象 schema：\n\n```ts\nimport { z } from \"zod\";\n\nconst StrictDog = z.strictObject({\n  name: z.string(),\n});\n\nStrictDog.parse({ name: \"Yeller\", extraKey: true });\n// ❌ throws：发现未知键 extraKey\n```\n\n## 2. 使用 `.strict()` 方法\n\n在普通 `z.object()` 上链式调用 `.strict()`，效果相同：\n\n```ts\nconst StrictDog = z.object({\n  name: z.string(),\n}).strict();\n\nStrictDog.parse({ name: \"Yeller\", extraKey: true });\n// ❌ throws：未识别的键\n```\n\n## 三种对象模式对比\n\nZod 对未知键有三种处理策略：\n\n| API | 行为 |\n|---|---|\n| `z.object()` | 默认：**剥离**未知键，不报错 |\n| `z.strictObject()` / `.strict()` | **报错**：遇到未知键抛出异常 |\n| `z.looseObject()` / `.passthrough()` | **保留**未知键，原样通过 |\n\n```ts\n// 默认：剥离未知键\nconst Dog = z.object({ name: z.string() });\nDog.parse({ name: \"Yeller\", extraKey: true });\n// ✅ 返回 { name: \"Yeller\" }，extraKey 被去掉\n\n// 严格：拒绝未知键\nconst StrictDog = z.strictObject({ name: z.string() });\nStrictDog.parse({ name: \"Yeller\", extraKey: true });\n// ❌ throws\n\n// 宽松：保留未知键\nconst LooseDog = z.looseObject({ name: z.string() });\nLooseDog.parse({ name: \"Yeller\", extraKey: true });\n// ✅ 返回 { name: \"Yeller\", extraKey: true }\n```\n\n## 实用场景\n\n严格模式在**探索文档不全的 API 返回数据**时特别有用——任何未在 schema 中声明的字段都会让 Zod 抛错，从而帮助你发现遗漏的字段并逐步补全 schema。\n\n**注意**：`.strict()` 默认只作用于当前对象层级，不会自动递归到嵌套对象。如果需要嵌套对象也严格拒绝未知字段，需要在每一层都使用 `.strict()` 或 `z.strictObject()`。\n\n**参考来源：**\n- [Defining schemas | Zod 官方文档](https://zod.dev/api)\n- [Strict object validation is handy for data exploration – Matias Kinnunen](https://mtsknn.fi/blog/zod-object-strict)"
+    },
+    {
+      "id": "live-10",
+      "prompt": "ESLint 10 相比 ESLint 9 的官方迁移重点有哪些？",
+      "passed": true,
+      "providerCalls": 1,
+      "sourceCount": 3,
+      "returnedSources": [
+        {
+          "sourceId": "src_1u6qao5",
+          "title": "Migrate to v10.x - ESLint - Pluggable JavaScript Linter",
+          "url": "https://eslint.org/docs/latest/use/migrate-to-10.0.0"
+        },
+        {
+          "sourceId": "src_1u25qox",
+          "title": "ESLint v10: Flat Config Completion and JSX Tracking - InfoQ",
+          "url": "https://www.infoq.com/news/2026/04/eslint-10-release"
+        },
+        {
+          "sourceId": "src_1dotci9",
+          "title": "ESLint 10 Migration Guide: Everything You Need to Know About the Biggest Update Yet - DEV Community",
+          "url": "https://dev.to/pockit_tools/eslint-10-migration-guide-everything-you-need-to-know-about-the-biggest-update-yet-55hk"
+        }
+      ],
+      "citedUrlCount": 3,
+      "sourceValidity": true,
+      "searchStatus": "success",
+      "searchError": null,
+      "latencyMs": 31677,
+      "baselineLatencyMs": 16213,
+      "incrementalLatencyMs": 15464,
+      "usage": {
+        "inputTokens": 1214,
+        "inputTokenDetails": {
+          "noCacheTokens": 1214,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 1600,
+        "outputTokenDetails": {
+          "textTokens": 1600,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 2814
+      },
+      "baselineUsage": {
+        "inputTokens": 382,
+        "inputTokenDetails": {
+          "noCacheTokens": 382,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 700,
+        "outputTokenDetails": {
+          "textTokens": 700,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 1082
+      },
+      "answer": "# ESLint 10 相比 ESLint 9 的官方迁移重点\n\n根据 ESLint 官方迁移指南，v10 的破坏性变更主要围绕 **彻底完成 flat config 迁移**、**Node.js 版本提升**以及一批 **API/规则清理**。以下是重点。\n\n## 1. 彻底移除 legacy eslintrc 配置系统（最重大变化）\n\n自 v9 起 flat config (`eslint.config.js`) 已是默认，但旧格式仍可通过 `LegacyESLint` 访问。v10 将这层兼容性完全移除：\n\n- `.eslintrc.*` 配置文件会被直接忽略，`.eslintignore` 也不再支持，改用 config 中的 `ignores`。\n- `LegacyESLint` 兼容层被删除。\n- `Linter` 上的 `defineParser()`、`defineRule()`、`defineRules()`、`getRules()` 方法被移除。\n- `shouldUseFlatConfig()` 现在**无条件返回 `true`**。\n- 一批 CLI 选项与环境变量被移除，例如 `--env`（改用 `languageOptions.globals`）、`--rulesdir`、`--resolve-plugins-relative-to`、文件内 `/* eslint-env */` 注释，以及 `ESLINT_USE_FLAT_CONFIG` 环境变量。\n\n仍在使用 `.eslintrc.json` 的项目，官方推荐用迁移工具转换：\n\n```bash\nnpx @eslint/migrate-config .eslintrc.json\n```\n\n该命令会生成 `eslint.config.mjs` 供检查与调整。\n\n## 2. Node.js 20.19.0+ 成为最低要求\n\nESLint 10 不再支持 Node.js 18、19、21 和 23，CI/CD 流水线需要先升级 Node 版本，否则会直接构建失败。\n\n## 3. Linter / RuleTester / SourceCode API 清理\n\n面向自定义规则和集成方的破坏性变更包括：\n\n- **Fixer 方法现在要求传入字符串文本参数**（`fixer` 的相关方法签名更严格）。\n- **ScopeManager 实现有新的要求**。\n- 移除已弃用的 `context` 成员。\n- 移除已弃用的 `SourceCode` 方法。\n- `LintMessage` 对象中移除了 `nodeType` 属性。\n- `Program` AST 节点的 range 范围定义发生变化。\n\n## 4. RuleTester 行为更严格\n\n- 不再允许“errors 或 output 字段对实际有效（应通过）的测试用例”出现。\n- 移除了无效 RuleTester 用例 errors 中的 `type` 属性。\n\n## 5. 规则与格式化器变更\n\n- `no-shadow-restricted-names` 现在**默认报告 `globalThis`**。\n- `func-names` 的 schema 更严格。\n- `no-invalid-regexp` 的 `allowConstructorFlags` 选项**只接受唯一项**。\n- `radix` 规则的某些旧选项被弃用/移除。\n- `stylish` formatter 改用原生 `styleText` 替代 `chalk`。\n- glob 模式支持 POSIX 字符类。\n- ESLint 核心配置新增 `name` 属性。\n\n## 迁移建议\n\n1. 升级到 Node.js 20.19.0+（或更高 LTS）。\n2. 用 `@eslint/migrate-config` 把 `.eslintrc.*` 转为 `eslint.config.js` / `eslint.config.mjs`。\n3. 检查自定义规则、共享配置、插件是否使用了被移除的 `Linter` 方法或 `LegacyESLint`。\n4. 跑一遍 CI，关注 fixer、RuleTester、`stylish` formatter、`no-shadow-restricted-names` 等行为变化。\n\n完整的逐项破坏性变更清单见官方迁移指南：\n[未核验链接已移除]\n\n信息源：[Migrate to v10.x - ESLint - Pluggable JavaScript Linter](https://eslint.org/docs/latest/use/migrate-to-10.0.0) · [ESLint v10: Flat Config Completion and JSX Tracking - InfoQ](https://www.infoq.com/news/2026/04/eslint-10-release) · [ESLint 10 Migration Guide: Everything You Need to Know About the Biggest Update Yet - DEV Community](https://dev.to/pockit_tools/eslint-10-migration-guide-everything-you-need-to-know-about-the-biggest-update-yet-55hk)",
+      "baselineAnswer": "",
+      "manualCorrectnessReview": "required",
+      "rawAnswer": "# ESLint 10 相比 ESLint 9 的官方迁移重点\n\n根据 ESLint 官方迁移指南，v10 的破坏性变更主要围绕 **彻底完成 flat config 迁移**、**Node.js 版本提升**以及一批 **API/规则清理**。以下是重点。\n\n## 1. 彻底移除 legacy eslintrc 配置系统（最重大变化）\n\n自 v9 起 flat config (`eslint.config.js`) 已是默认，但旧格式仍可通过 `LegacyESLint` 访问。v10 将这层兼容性完全移除：\n\n- `.eslintrc.*` 配置文件会被直接忽略，`.eslintignore` 也不再支持，改用 config 中的 `ignores`。\n- `LegacyESLint` 兼容层被删除。\n- `Linter` 上的 `defineParser()`、`defineRule()`、`defineRules()`、`getRules()` 方法被移除。\n- `shouldUseFlatConfig()` 现在**无条件返回 `true`**。\n- 一批 CLI 选项与环境变量被移除，例如 `--env`（改用 `languageOptions.globals`）、`--rulesdir`、`--resolve-plugins-relative-to`、文件内 `/* eslint-env */` 注释，以及 `ESLINT_USE_FLAT_CONFIG` 环境变量。\n\n仍在使用 `.eslintrc.json` 的项目，官方推荐用迁移工具转换：\n\n```bash\nnpx @eslint/migrate-config .eslintrc.json\n```\n\n该命令会生成 `eslint.config.mjs` 供检查与调整。\n\n## 2. Node.js 20.19.0+ 成为最低要求\n\nESLint 10 不再支持 Node.js 18、19、21 和 23，CI/CD 流水线需要先升级 Node 版本，否则会直接构建失败。\n\n## 3. Linter / RuleTester / SourceCode API 清理\n\n面向自定义规则和集成方的破坏性变更包括：\n\n- **Fixer 方法现在要求传入字符串文本参数**（`fixer` 的相关方法签名更严格）。\n- **ScopeManager 实现有新的要求**。\n- 移除已弃用的 `context` 成员。\n- 移除已弃用的 `SourceCode` 方法。\n- `LintMessage` 对象中移除了 `nodeType` 属性。\n- `Program` AST 节点的 range 范围定义发生变化。\n\n## 4. RuleTester 行为更严格\n\n- 不再允许“errors 或 output 字段对实际有效（应通过）的测试用例”出现。\n- 移除了无效 RuleTester 用例 errors 中的 `type` 属性。\n\n## 5. 规则与格式化器变更\n\n- `no-shadow-restricted-names` 现在**默认报告 `globalThis`**。\n- `func-names` 的 schema 更严格。\n- `no-invalid-regexp` 的 `allowConstructorFlags` 选项**只接受唯一项**。\n- `radix` 规则的某些旧选项被弃用/移除。\n- `stylish` formatter 改用原生 `styleText` 替代 `chalk`。\n- glob 模式支持 POSIX 字符类。\n- ESLint 核心配置新增 `name` 属性。\n\n## 迁移建议\n\n1. 升级到 Node.js 20.19.0+（或更高 LTS）。\n2. 用 `@eslint/migrate-config` 把 `.eslintrc.*` 转为 `eslint.config.js` / `eslint.config.mjs`。\n3. 检查自定义规则、共享配置、插件是否使用了被移除的 `Linter` 方法或 `LegacyESLint`。\n4. 跑一遍 CI，关注 fixer、RuleTester、`stylish` formatter、`no-shadow-restricted-names` 等行为变化。\n\n完整的逐项破坏性变更清单见官方迁移指南：\nhttps://eslint.org/docs/latest"
+    },
+    {
+      "id": "live-11",
+      "prompt": "PostgreSQL 18 的 JSON_TABLE 当前语法和最小官方示例是什么？",
+      "passed": true,
+      "providerCalls": 1,
+      "sourceCount": 3,
+      "returnedSources": [
+        {
+          "sourceId": "src_avghq7",
+          "title": "Documentation: 18: 9.16. JSON Functions and Operators",
+          "url": "https://www.postgresql.org/docs/current/functions-json.html"
+        },
+        {
+          "sourceId": "src_lx3zlp",
+          "title": "Postgres JSON_TABLE() function - Neon Docs",
+          "url": "https://neon.com/docs/functions/json_table"
+        },
+        {
+          "sourceId": "src_1eqwkuq",
+          "title": "Convert JSON into Columns and Rows with JSON_TABLE | Crunchy Data Blog",
+          "url": "https://www.crunchydata.com/blog/easily-convert-json-into-columns-and-rows-with-json_table"
+        }
+      ],
+      "citedUrlCount": 3,
+      "sourceValidity": true,
+      "searchStatus": "success",
+      "searchError": null,
+      "latencyMs": 33533,
+      "baselineLatencyMs": 18304,
+      "incrementalLatencyMs": 15229,
+      "usage": {
+        "inputTokens": 1110,
+        "inputTokenDetails": {
+          "noCacheTokens": 1110,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 1230,
+        "outputTokenDetails": {
+          "textTokens": 1230,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 2340
+      },
+      "baselineUsage": {
+        "inputTokens": 381,
+        "inputTokenDetails": {
+          "noCacheTokens": 381,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 700,
+        "outputTokenDetails": {
+          "textTokens": 700,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 1081
+      },
+      "answer": "# PostgreSQL 18 的 JSON_TABLE 语法与最小示例\n\n## 官方文档位置\n\nJSON_TABLE 的语法定义在 PostgreSQL 官方文档的 \"JSON Functions and Operators\" 章节中：\n\n- https://www.postgresql.org/docs/current/functions-json.html\n\n## 当前语法（基于搜索摘要中可确认的部分）\n\n搜索摘要中实际暴露的语法片段有限，能确认的要点包括：\n\n- 支持 `PASSING { value AS varname } [, ...]` 子句，用于向 JSON 路径传递变量\n- `COLUMNS` 子句中每个列定义形如：`column_name type PATH 'json_path'`\n- 支持 `AS json_path_name` 命名 JSON 路径\n\n由于搜索摘要未返回完整的 BNF 语法块，**完整的语法产生式请直接查看上方官方文档页面**，其中包含 `JSON_TABLE(json_document, json_path [PASSING ...] COLUMNS (...) [PLAN ...] [ERROR ...])` 的完整定义。\n\n## 最小官方示例（基于搜索摘要）\n\n搜索摘要中截取到的最小示例输出如下：\n\n```\n a | b\n---+---\n 1 | 2\n 3 | 4\n```\n\n这对应一个形如 `[{\"a\":1,\"b\":2}, {\"a\":3,\"b\":4}]` 的 JSON 数组被展开为两行两列的场景。据此可还原最小用法如下：\n\n```sql\nSELECT *\nFROM JSON_TABLE(\n  '[{\"a\":1,\"b\":2}, {\"a\":3,\"b\":4}]',\n  '$[*]'\n  COLUMNS (\n    a int PATH '$.a',\n    b int PATH '$.b'\n  )\n) AS jt;\n```\n\n结果：\n\n```\n a | b\n---+---\n 1 | 2\n 3 | 4\n```\n\n## 说明与限制\n\n1. 上述完整 SQL 语句是基于搜索摘要中返回的输出片段还原的，**摘要本身未完整展示源 SQL 文本**；如需逐字引用官方原文，请打开官方文档页面 https://www.postgresql.org/docs/current/functions-json.html 核对。\n2. 搜索摘要未覆盖 `PLAN DEFAULT`、`ERROR ON ERROR`、嵌套列 `NESTED PATH`、`EXISTS` 列类型、`FOR ORDINALITY` 等高级子句的细节，本轮无法提供这些子句的官方原文，需查阅文档确认。\n3. 第三方参考（非官方，仅作辅助）：\n   - Neon 文档：https://neon.com/docs/functions/json_table\n   - Crunchy Data 博客：https://www.crunchydata.com/blog/easily-convert-json-into-columns-and-rows-with-json_table\n\n信息源：[Documentation: 18: 9.16. JSON Functions and Operators](https://www.postgresql.org/docs/current/functions-json.html) · [Postgres JSON_TABLE() function - Neon Docs](https://neon.com/docs/functions/json_table) · [Convert JSON into Columns and Rows with JSON_TABLE | Crunchy Data Blog](https://www.crunchydata.com/blog/easily-convert-json-into-columns-and-rows-with-json_table)",
+      "baselineAnswer": "",
+      "manualCorrectnessReview": "required",
+      "rawAnswer": "# PostgreSQL 18 的 JSON_TABLE 语法与最小示例\n\n## 官方文档位置\n\nJSON_TABLE 的语法定义在 PostgreSQL 官方文档的 \"JSON Functions and Operators\" 章节中：\n\n- https://www.postgresql.org/docs/current/functions-json.html\n\n## 当前语法（基于搜索摘要中可确认的部分）\n\n搜索摘要中实际暴露的语法片段有限，能确认的要点包括：\n\n- 支持 `PASSING { value AS varname } [, ...]` 子句，用于向 JSON 路径传递变量\n- `COLUMNS` 子句中每个列定义形如：`column_name type PATH 'json_path'`\n- 支持 `AS json_path_name` 命名 JSON 路径\n\n由于搜索摘要未返回完整的 BNF 语法块，**完整的语法产生式请直接查看上方官方文档页面**，其中包含 `JSON_TABLE(json_document, json_path [PASSING ...] COLUMNS (...) [PLAN ...] [ERROR ...])` 的完整定义。\n\n## 最小官方示例（基于搜索摘要）\n\n搜索摘要中截取到的最小示例输出如下：\n\n```\n a | b\n---+---\n 1 | 2\n 3 | 4\n```\n\n这对应一个形如 `[{\"a\":1,\"b\":2}, {\"a\":3,\"b\":4}]` 的 JSON 数组被展开为两行两列的场景。据此可还原最小用法如下：\n\n```sql\nSELECT *\nFROM JSON_TABLE(\n  '[{\"a\":1,\"b\":2}, {\"a\":3,\"b\":4}]',\n  '$[*]'\n  COLUMNS (\n    a int PATH '$.a',\n    b int PATH '$.b'\n  )\n) AS jt;\n```\n\n结果：\n\n```\n a | b\n---+---\n 1 | 2\n 3 | 4\n```\n\n## 说明与限制\n\n1. 上述完整 SQL 语句是基于搜索摘要中返回的输出片段还原的，**摘要本身未完整展示源 SQL 文本**；如需逐字引用官方原文，请打开官方文档页面 https://www.postgresql.org/docs/current/functions-json.html 核对。\n2. 搜索摘要未覆盖 `PLAN DEFAULT`、`ERROR ON ERROR`、嵌套列 `NESTED PATH`、`EXISTS` 列类型、`FOR ORDINALITY` 等高级子句的细节，本轮无法提供这些子句的官方原文，需查阅文档确认。\n3. 第三方参考（非官方，仅作辅助）：\n   - Neon 文档：https://neon.com/docs/functions/json_table\n   - Crunchy Data 博客：https://www.crunchydata.com/blog/easily-convert-json-into-columns-and-rows-with-json_table"
+    },
+    {
+      "id": "live-12",
+      "prompt": "Cloudflare Workers 当前启用 Node.js API 兼容需要哪些 compatibility flags？",
+      "passed": true,
+      "providerCalls": 1,
+      "sourceCount": 3,
+      "returnedSources": [
+        {
+          "sourceId": "src_16mcp5r",
+          "title": "一年来持续提升 Cloudflare Workers 的 Node.js 兼容性",
+          "url": "https://blog.cloudflare.com/zh-cn/nodejs-workers-2025"
+        },
+        {
+          "sourceId": "src_11ntq65",
+          "title": "Compatibility flags · Cloudflare Workers docs",
+          "url": "https://developers.cloudflare.com/workers/configuration/compatibility-flags"
+        },
+        {
+          "sourceId": "src_4hvcx4",
+          "title": "A year of improving Node.js compatibility in Cloudflare Workers | The Cloudflare Blog",
+          "url": "https://blog.cloudflare.com/nodejs-workers-2025"
+        }
+      ],
+      "citedUrlCount": 3,
+      "sourceValidity": true,
+      "searchStatus": "success",
+      "searchError": null,
+      "latencyMs": 22022,
+      "baselineLatencyMs": 17656,
+      "incrementalLatencyMs": 4366,
+      "usage": {
+        "inputTokens": 1346,
+        "inputTokenDetails": {
+          "noCacheTokens": 1346,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 959,
+        "outputTokenDetails": {
+          "textTokens": 959,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 2305
+      },
+      "baselineUsage": {
+        "inputTokens": 382,
+        "inputTokenDetails": {
+          "noCacheTokens": 382,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 700,
+        "outputTokenDetails": {
+          "textTokens": 700,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 1082
+      },
+      "answer": "## Cloudflare Workers 启用 Node.js API 兼容的 Compatibility Flags\n\n### 1. 主标志：`nodejs_compat`\n\n这是启用 Node.js API 兼容的核心标志，通常在 `wrangler.jsonc` 或 `wrangler.toml` 中配置：\n\n```jsonc\n{\n  \"name\": \"my-worker\",\n  \"main\": \"src/index.js\",\n  \"compatibility_date\": \"2025-09-21\",\n  \"compatibility_flags\": [\"nodejs_compat\"]\n}\n```\n\n- **`nodejs_compat`**：整体启用 Node.js 兼容功能。\n- **`no_nodejs_compat`**：显式关闭 Node.js 兼容（用于禁用）。\n\n来源：[Compatibility flags · Cloudflare Workers docs](https://developers.cloudflare.com/workers/configuration/compatibility-flags)\n\n### 2. `compatibility_date` 非常关键\n\n并非所有 Node.js API 都在 `nodejs_compat` 下立即启用，部分 API 需要 compatibility date 达到指定日期后才会生效：\n\n| Node.js API | 需要 compatibility_date 在或之后 |\n| --- | --- |\n| 在 `require()` 中禁用 Top-level Await | `2024-12-02` |\n| `process.env` | `2025-04-01` |\n| `node:http`, `node:https` | `2025-08-15` |\n| `http.server` | `2025-09-01` |\n\n因此建议把 `compatibility_date` 设得足够新，以获取完整 API 支持。\n\n### 3. 细粒度控制 / 子标志\n\n为了不影响依赖功能检测的现有 Workers，Cloudflare 提供了细粒度的启用/禁用标志：\n\n- **`enable_nodejs_http_server_modules`**：显式启用 `node:_http_server` 等 Node.js HTTP server 模块。\n- **`disable_nodejs_http_server_modules`**：禁用上述 server 模块。\n- **`no_nodejs_zlib`**：在启用 `nodejs_compat` 时单独禁用 `node:zlib` 模块。\n\n示例（启用 Node.js 兼容但禁用 `node:zlib`）：\n\n```jsonc\n{\n  \"name\": \"my-worker\",\n  \"main\": \"src/index.js\",\n  \"compatibility_date\": \"2025-09-15\",\n  \"compatibility_flags\": [\n    \"nodejs_compat\",\n    \"no_nodejs_zlib\"\n  ]\n}\n```\n\n来源：[A year of improving Node.js compatibility in Cloudflare Workers | The Cloudflare Blog](https://blog.cloudflare.com/nodejs-workers-2025)\n\n### 总结\n\n- 默认只需配置 **`nodejs_compat`** 并将 **`compatibility_date`** 设得足够新即可启用全部 Node.js API。\n- 如需单独控制 HTTP server 模块或 `node:zlib`，可叠加 `enable_nodejs_http_server_modules` / `disable_nodejs_http_server_modules` / `no_nodejs_zlib` 等细粒度标志。\n\n信息源：[一年来持续提升 Cloudflare Workers 的 Node.js 兼容性](https://blog.cloudflare.com/zh-cn/nodejs-workers-2025) · [Compatibility flags · Cloudflare Workers docs](https://developers.cloudflare.com/workers/configuration/compatibility-flags) · [A year of improving Node.js compatibility in Cloudflare Workers | The Cloudflare Blog](https://blog.cloudflare.com/nodejs-workers-2025)",
+      "baselineAnswer": "## Cloudflare Workers 启用 Node.js API 兼容的 compatibility flags\n\n> ⚠️ 本轮联网搜索不可用，以下基于我已有的知识。Cloudflare Workers 的 compatibility flags 和 Node.js 兼容性处于活跃演进中，具体细节（特别是 `nodejs_compat_v2` 的状态、所需最小 compatibility_date 等）我**无法在此刻联网核验**，请以官方文档为准。\n\n### 主 flag：`nodejs_compat`\n\n这是启用 Node.js API 兼容的核心 flag。在 `wrangler.toml` 中配置：\n\n```toml\nname = \"my-worker\"\nmain = \"src/index.ts\"\ncompatibility_date = \"2024-09-23\"  # 需要 >= 某个日期，见下方说明\ncompatibility_flags = [\"nodejs_compat\"]\n```\n\n或在 `wrangler.jsonc`：\n\n",
+      "manualCorrectnessReview": "required",
+      "rawAnswer": "## Cloudflare Workers 启用 Node.js API 兼容的 Compatibility Flags\n\n### 1. 主标志：`nodejs_compat`\n\n这是启用 Node.js API 兼容的核心标志，通常在 `wrangler.jsonc` 或 `wrangler.toml` 中配置：\n\n```jsonc\n{\n  \"name\": \"my-worker\",\n  \"main\": \"src/index.js\",\n  \"compatibility_date\": \"2025-09-21\",\n  \"compatibility_flags\": [\"nodejs_compat\"]\n}\n```\n\n- **`nodejs_compat`**：整体启用 Node.js 兼容功能。\n- **`no_nodejs_compat`**：显式关闭 Node.js 兼容（用于禁用）。\n\n来源：[Compatibility flags · Cloudflare Workers docs](https://developers.cloudflare.com/workers/configuration/compatibility-flags)\n\n### 2. `compatibility_date` 非常关键\n\n并非所有 Node.js API 都在 `nodejs_compat` 下立即启用，部分 API 需要 compatibility date 达到指定日期后才会生效：\n\n| Node.js API | 需要 compatibility_date 在或之后 |\n| --- | --- |\n| 在 `require()` 中禁用 Top-level Await | `2024-12-02` |\n| `process.env` | `2025-04-01` |\n| `node:http`, `node:https` | `2025-08-15` |\n| `http.server` | `2025-09-01` |\n\n因此建议把 `compatibility_date` 设得足够新，以获取完整 API 支持。\n\n### 3. 细粒度控制 / 子标志\n\n为了不影响依赖功能检测的现有 Workers，Cloudflare 提供了细粒度的启用/禁用标志：\n\n- **`enable_nodejs_http_server_modules`**：显式启用 `node:_http_server` 等 Node.js HTTP server 模块。\n- **`disable_nodejs_http_server_modules`**：禁用上述 server 模块。\n- **`no_nodejs_zlib`**：在启用 `nodejs_compat` 时单独禁用 `node:zlib` 模块。\n\n示例（启用 Node.js 兼容但禁用 `node:zlib`）：\n\n```jsonc\n{\n  \"name\": \"my-worker\",\n  \"main\": \"src/index.js\",\n  \"compatibility_date\": \"2025-09-15\",\n  \"compatibility_flags\": [\n    \"nodejs_compat\",\n    \"no_nodejs_zlib\"\n  ]\n}\n```\n\n来源：[A year of improving Node.js compatibility in Cloudflare Workers | The Cloudflare Blog](https://blog.cloudflare.com/nodejs-workers-2025)\n\n### 总结\n\n- 默认只需配置 **`nodejs_compat`** 并将 **`compatibility_date`** 设得足够新即可启用全部 Node.js API。\n- 如需单独控制 HTTP server 模块或 `node:zlib`，可叠加 `enable_nodejs_http_server_modules` / `disable_nodejs_http_server_modules` / `no_nodejs_zlib` 等细粒度标志。"
+    },
+    {
+      "id": "live-13",
+      "prompt": "Bun 当前是否能作为 Vercel Functions runtime，配置方法是什么？",
+      "passed": true,
+      "providerCalls": 1,
+      "sourceCount": 3,
+      "returnedSources": [
+        {
+          "sourceId": "src_q59dbm",
+          "title": "Bun runtime on Vercel Functions - Vercel",
+          "url": "https://vercel.com/blog/bun-runtime-on-vercel-functions"
+        },
+        {
+          "sourceId": "src_12andiq",
+          "title": "Deploy a Bun application on Vercel - Bun",
+          "url": "https://bun.com/docs/guides/deployment/vercel"
+        },
+        {
+          "sourceId": "src_bap8iu",
+          "title": "Bun runtime now in Public Beta for Vercel Functions - Vercel",
+          "url": "https://vercel.com/changelog/bun-runtime-now-in-public-beta-for-vercel-functions"
+        }
+      ],
+      "citedUrlCount": 3,
+      "sourceValidity": true,
+      "searchStatus": "success",
+      "searchError": null,
+      "latencyMs": 23847,
+      "baselineLatencyMs": 18103,
+      "incrementalLatencyMs": 5744,
+      "usage": {
+        "inputTokens": 1215,
+        "inputTokenDetails": {
+          "noCacheTokens": 1215,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 855,
+        "outputTokenDetails": {
+          "textTokens": 855,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 2070
+      },
+      "baselineUsage": {
+        "inputTokens": 381,
+        "inputTokenDetails": {
+          "noCacheTokens": 381,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 700,
+        "outputTokenDetails": {
+          "textTokens": 700,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 1081
+      },
+      "answer": "可以。Bun 目前已可作为 Vercel Functions 的 runtime，处于 **Public Beta** 阶段。与 Node.js 相比，Vercel 给出的基准测试显示 Bun 在 CPU 密集型 Next.js 渲染场景中可将平均延迟降低约 28%。\n\n## 配置方法\n\n在项目根目录的 `vercel.json` 中添加 `bunVersion` 字段，即可为整个项目启用 Bun runtime：\n\n```json\n{\n  \"bunVersion\": \"1.x\"\n}\n```\n\n部署后可在函数中检查当前 runtime，例如：\n\n```js\nconsole.log(\"runtime\", process.versions.bun);\n```\n\n示例输出：\n\n```\nruntime 1.3.3\n```\n\n## 使用限制与注意事项\n\n根据 Bun 官方文档，在 Vercel Functions 上使用 Bun runtime 时有以下限制：\n\n- **`Bun.serve` 不被支持**，不能直接用 Bun 自带服务器监听端口；需使用 Vercel 支持的框架，如 Next.js、Hono、Express、Nitro。\n- 部分 Bun 功能尚未支持，包括：自动 source maps、byte-code 缓存，以及 `node:http/https` 的 metrics。\n- Bun runtime 同时运行在 Vercel 的 Fluid compute 上，与 Node.js runtime 支持相同的核心 Vercel Function 能力。\n\n## 示例：Hono + Bun\n\n```ts\nimport { Hono } from 'hono';\n\nconst app = new Hono();\n\napp.get('/', (c) => {\n  return c.text(`Hello from Hono on Bun ${process.versions.bun}!`);\n});\n\nexport default app;\n```\n\n参考来源：\n- [Bun runtime on Vercel Functions — Vercel](https://vercel.com/blog/bun-runtime-on-vercel-functions)\n- [Bun runtime now in Public Beta for Vercel Functions — Vercel Changelog](https://vercel.com/changelog/bun-runtime-now-in-public-beta-for-vercel-functions)\n- [Deploy a Bun application on Vercel — Bun Docs](https://bun.com/docs/guides/deployment/vercel)\n\n信息源：[Bun runtime on Vercel Functions - Vercel](https://vercel.com/blog/bun-runtime-on-vercel-functions) · [Deploy a Bun application on Vercel - Bun](https://bun.com/docs/guides/deployment/vercel) · [Bun runtime now in Public Beta for Vercel Functions - Vercel](https://vercel.com/changelog/bun-runtime-now-in-public-beta-for-vercel-functions)",
+      "baselineAnswer": "",
+      "manualCorrectnessReview": "required",
+      "rawAnswer": "可以。Bun 目前已可作为 Vercel Functions 的 runtime，处于 **Public Beta** 阶段。与 Node.js 相比，Vercel 给出的基准测试显示 Bun 在 CPU 密集型 Next.js 渲染场景中可将平均延迟降低约 28%。\n\n## 配置方法\n\n在项目根目录的 `vercel.json` 中添加 `bunVersion` 字段，即可为整个项目启用 Bun runtime：\n\n```json\n{\n  \"bunVersion\": \"1.x\"\n}\n```\n\n部署后可在函数中检查当前 runtime，例如：\n\n```js\nconsole.log(\"runtime\", process.versions.bun);\n```\n\n示例输出：\n\n```\nruntime 1.3.3\n```\n\n## 使用限制与注意事项\n\n根据 Bun 官方文档，在 Vercel Functions 上使用 Bun runtime 时有以下限制：\n\n- **`Bun.serve` 不被支持**，不能直接用 Bun 自带服务器监听端口；需使用 Vercel 支持的框架，如 Next.js、Hono、Express、Nitro。\n- 部分 Bun 功能尚未支持，包括：自动 source maps、byte-code 缓存，以及 `node:http/https` 的 metrics。\n- Bun runtime 同时运行在 Vercel 的 Fluid compute 上，与 Node.js runtime 支持相同的核心 Vercel Function 能力。\n\n## 示例：Hono + Bun\n\n```ts\nimport { Hono } from 'hono';\n\nconst app = new Hono();\n\napp.get('/', (c) => {\n  return c.text(`Hello from Hono on Bun ${process.versions.bun}!`);\n});\n\nexport default app;\n```\n\n参考来源：\n- [Bun runtime on Vercel Functions — Vercel](https://vercel.com/blog/bun-runtime-on-vercel-functions)\n- [Bun runtime now in Public Beta for Vercel Functions — Vercel Changelog](https://vercel.com/changelog/bun-runtime-now-in-public-beta-for-vercel-functions)\n- [Deploy a Bun application on Vercel — Bun Docs](https://bun.com/docs/guides/deployment/vercel)"
+    },
+    {
+      "id": "live-14",
+      "prompt": "React 官方目前怎样区分 useEffectEvent 和普通事件处理函数？",
+      "passed": true,
+      "providerCalls": 1,
+      "sourceCount": 3,
+      "returnedSources": [
+        {
+          "sourceId": "src_1ev84",
+          "title": "Understanding React's useEffectEvent: A Complete Guide to Solving Stale Closures | Peter Kellner's Blog",
+          "url": "https://peterkellner.net/2026/01/09/understanding-react-useeffectevent-vs-useeffect"
+        },
+        {
+          "sourceId": "src_p2219k",
+          "title": "useEffectEvent – React 中文文档",
+          "url": "https://zh-hans.react.dev/reference/react/useEffectEvent"
+        },
+        {
+          "sourceId": "src_1291x1l",
+          "title": "New React useEffectEvent Hook Crash Course",
+          "url": "https://www.youtube.com/watch?v=NZJUEzn10FI"
+        }
+      ],
+      "citedUrlCount": 3,
+      "sourceValidity": true,
+      "searchStatus": "success",
+      "searchError": null,
+      "latencyMs": 29968,
+      "baselineLatencyMs": 14667,
+      "incrementalLatencyMs": 15301,
+      "usage": {
+        "inputTokens": 1003,
+        "inputTokenDetails": {
+          "noCacheTokens": 1003,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 1129,
+        "outputTokenDetails": {
+          "textTokens": 1129,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 2132
+      },
+      "baselineUsage": {
+        "inputTokens": 380,
+        "inputTokenDetails": {
+          "noCacheTokens": 380,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 700,
+        "outputTokenDetails": {
+          "textTokens": 700,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 1080
+      },
+      "answer": "根据搜索到的 React 官方文档及相关资料，`useEffectEvent` 与普通事件处理函数的区别主要可以归纳为以下几点。\n\n## 1. 定位与用途\n\n- **`useEffectEvent`**：官方定位是一个 React Hook，用来把 **Effect 中需要用到的“事件处理逻辑”独立出来**，使这部分逻辑不参与 Effect 的依赖响应式追踪。  \n  来源：[useEffectEvent – React 中文文档](https://zh-hans.react.dev/reference/react/useEffectEvent)\n\n- **普通事件处理函数**：如 `onClick`、`onChange` 等，是直接绑定在 JSX 上的回调。它们在每次交互发生时都会用组件渲染时的最新闭包/最新值重新执行，因此一般不需要 `useEffectEvent`。  \n  来源：[Understanding React's useEffectEvent](https://peterkellner.net/2026/01/09/understanding-react-useeffectevent-vs-useeffect)\n\n## 2. 调用场景限制\n\n- **`useEffectEvent` 返回的函数（Effect Event）只能在 Effect 内部调用**。React 会对这一点做保护：如果在 Effect 上下文之外调用 Effect Event，会抛错。  \n  来源：[Understanding React's useEffectEvent](https://peterkellner.net/2026/01/09/understanding-react-useeffectevent-vs-useeffect)\n\n- **普通事件处理函数**：通常由用户交互触发，绑定在元素上，不依赖 Effect 的生命周期。\n\n## 3. 是否参与响应式依赖\n\n- **Effect Event**：它本身不是响应式的。把逻辑放进 `useEffectEvent` 后，Effect 可以调用它，但不会因为该逻辑内部用到的 props/state 变化而重新运行。这样可以把“非响应式的逻辑”从“响应式的 Effect”中剥离出来，避免 Effect 频繁重复执行。  \n  来源：[Understanding React's useEffectEvent](https://peterkellner.net/2026/01/09/understanding-react-useeffectevent-vs-useeffect)\n\n- **普通事件处理函数**：每次组件渲染都会重新创建，天然读取到最新的 props/state，因此不需要也无法像 Effect Event 那样“从依赖中排除”。\n\n## 4. 使用约束\n\n官方/社区资料中给出的规则包括：\n\n- 只能从 Effect 内部调用 Effect Event；  \n- 不要把 Effect Event 传给其他组件，应保持在本组件内部使用。  \n  来源：[Understanding React's useEffectEvent](https://peterkellner.net/2026/01/09/understanding-react-useeffectevent-vs-useeffect)\n\n## 简单对照\n\n| 维度 | `useEffectEvent` 返回的函数 | 普通事件处理函数 |\n|---|---|---|\n| 触发方式 | 在 Effect 中调用 | 由用户交互触发 |\n| 是否响应式 | 非响应式，不进入 Effect 依赖 | 每次渲染都用最新值 |\n| 典型用途 | 抽离 Effect 里的“事件逻辑”，避免 Effect 因这些逻辑依赖的值变化而重跑 | 处理 `onClick` / `onChange` 等交互 |\n\n> 限制说明：本轮只拿到上述搜索摘要，未能完整打开 React 官方文档页面逐字核对 API 形参与“实验性 API”标注等细节。`useEffectEvent` 在 React 官方文档中仍属实验性/不稳定 API，具体行为可能随版本变化，建议以官方文档最新说明为准：https://zh-hans.react.dev/reference/react/useEffectEvent\n\n信息源：[Understanding React's useEffectEvent: A Complete Guide to Solving Stale Closures | Peter Kellner's Blog](https://peterkellner.net/2026/01/09/understanding-react-useeffectevent-vs-useeffect) · [useEffectEvent – React 中文文档](https://zh-hans.react.dev/reference/react/useEffectEvent) · [New React useEffectEvent Hook Crash Course](https://www.youtube.com/watch?v=NZJUEzn10FI)",
+      "baselineAnswer": "",
+      "manualCorrectnessReview": "required",
+      "rawAnswer": "根据搜索到的 React 官方文档及相关资料，`useEffectEvent` 与普通事件处理函数的区别主要可以归纳为以下几点。\n\n## 1. 定位与用途\n\n- **`useEffectEvent`**：官方定位是一个 React Hook，用来把 **Effect 中需要用到的“事件处理逻辑”独立出来**，使这部分逻辑不参与 Effect 的依赖响应式追踪。  \n  来源：[useEffectEvent – React 中文文档](https://zh-hans.react.dev/reference/react/useEffectEvent)\n\n- **普通事件处理函数**：如 `onClick`、`onChange` 等，是直接绑定在 JSX 上的回调。它们在每次交互发生时都会用组件渲染时的最新闭包/最新值重新执行，因此一般不需要 `useEffectEvent`。  \n  来源：[Understanding React's useEffectEvent](https://peterkellner.net/2026/01/09/understanding-react-useeffectevent-vs-useeffect)\n\n## 2. 调用场景限制\n\n- **`useEffectEvent` 返回的函数（Effect Event）只能在 Effect 内部调用**。React 会对这一点做保护：如果在 Effect 上下文之外调用 Effect Event，会抛错。  \n  来源：[Understanding React's useEffectEvent](https://peterkellner.net/2026/01/09/understanding-react-useeffectevent-vs-useeffect)\n\n- **普通事件处理函数**：通常由用户交互触发，绑定在元素上，不依赖 Effect 的生命周期。\n\n## 3. 是否参与响应式依赖\n\n- **Effect Event**：它本身不是响应式的。把逻辑放进 `useEffectEvent` 后，Effect 可以调用它，但不会因为该逻辑内部用到的 props/state 变化而重新运行。这样可以把“非响应式的逻辑”从“响应式的 Effect”中剥离出来，避免 Effect 频繁重复执行。  \n  来源：[Understanding React's useEffectEvent](https://peterkellner.net/2026/01/09/understanding-react-useeffectevent-vs-useeffect)\n\n- **普通事件处理函数**：每次组件渲染都会重新创建，天然读取到最新的 props/state，因此不需要也无法像 Effect Event 那样“从依赖中排除”。\n\n## 4. 使用约束\n\n官方/社区资料中给出的规则包括：\n\n- 只能从 Effect 内部调用 Effect Event；  \n- 不要把 Effect Event 传给其他组件，应保持在本组件内部使用。  \n  来源：[Understanding React's useEffectEvent](https://peterkellner.net/2026/01/09/understanding-react-useeffectevent-vs-useeffect)\n\n## 简单对照\n\n| 维度 | `useEffectEvent` 返回的函数 | 普通事件处理函数 |\n|---|---|---|\n| 触发方式 | 在 Effect 中调用 | 由用户交互触发 |\n| 是否响应式 | 非响应式，不进入 Effect 依赖 | 每次渲染都用最新值 |\n| 典型用途 | 抽离 Effect 里的“事件逻辑”，避免 Effect 因这些逻辑依赖的值变化而重跑 | 处理 `onClick` / `onChange` 等交互 |\n\n> 限制说明：本轮只拿到上述搜索摘要，未能完整打开 React 官方文档页面逐字核对 API 形参与“实验性 API”标注等细节。`useEffectEvent` 在 React 官方文档中仍属实验性/不稳定 API，具体行为可能随版本变化，建议以官方文档最新说明为准：https://zh-hans.react.dev/reference/react/useEffectEvent"
+    },
+    {
+      "id": "live-15",
+      "prompt": "Next.js 16 Cache Components 的 cacheLife 和 cacheTag 当前应如何使用？",
+      "passed": true,
+      "providerCalls": 1,
+      "sourceCount": 3,
+      "returnedSources": [
+        {
+          "sourceId": "src_1xcwry1",
+          "title": "Cache Components in Next.js - Certificates.dev",
+          "url": "https://certificates.dev/blog/cache-components-in-nextjs"
+        },
+        {
+          "sourceId": "src_hpp32c",
+          "title": "How to properly implement use cache with Next.js 16 App Router — replacing old implicit caching? · vercel/next.js · Discussion #89375 · GitHub",
+          "url": "https://github.com/vercel/next.js/discussions/89375"
+        },
+        {
+          "sourceId": "src_15fibvg",
+          "title": "Nextjs Cache Components - Static | Dynamic | Partial Prerendering",
+          "url": "https://www.youtube.com/watch?v=5LUzBMTSHC4"
+        }
+      ],
+      "citedUrlCount": 3,
+      "sourceValidity": true,
+      "searchStatus": "success",
+      "searchError": null,
+      "latencyMs": 39538,
+      "baselineLatencyMs": 17530,
+      "incrementalLatencyMs": 22008,
+      "usage": {
+        "inputTokens": 1117,
+        "inputTokenDetails": {
+          "noCacheTokens": 1117,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 1600,
+        "outputTokenDetails": {
+          "textTokens": 1600,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 2717
+      },
+      "baselineUsage": {
+        "inputTokens": 383,
+        "inputTokenDetails": {
+          "noCacheTokens": 383,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 700,
+        "outputTokenDetails": {
+          "textTokens": 700,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 1083
+      },
+      "answer": "根据 Next.js 16 的 Cache Components 机制，`cacheLife` 和 `cacheTag` 是与 `\"use cache\"` 指令配合使用的核心 API。以下是当前推荐的使用方式，基于官方设计与社区实践整理。\n\n## 核心概念\n\n在 Next.js 16 中，缓存是**显式且按需**的。你需要：\n1. 用 `\"use cache\"` 标记文件、组件或函数为可缓存作用域\n2. 用 `cacheLife` 指定缓存生命周期（基于时间）\n3. 用 `cacheTag` 打标签以便按需失效\n4. 缓存 key 由 Next.js 根据函数和序列化参数自动派生，无需手写 [1](https://certificates.dev/blog/cache-components-in-nextjs)\n\n## 基本用法\n\n### 1. 静态内容（SSG 类似行为）\n\n```tsx\n// app/page.tsx\nimport { unstable_cacheLife as cacheLife } from 'next/cache';\n\nexport default async function Page() {\n  \"use cache\";\n  cacheLife(\"max\"); // 永不过期，构建时生成\n  const data = await fetch('[未核验链接已移除]');\n  return <div>{data}</div>;\n}\n```\n\n### 2. ISR 风格定时重验证\n\n```tsx\nimport { unstable_cacheLife as cacheLife, unstable_cacheTag as cacheTag } from 'next/cache';\n\nexport default async function ProductList() {\n  \"use cache\";\n  cacheLife(\"minutes\"); // 使用预设 profile\n  cacheTag('products'); // 打标签\n  \n  const products = await fetch('[未核验链接已移除]').then(r => r.json());\n  return <ul>{products.map(p => <li key={p.id}>{p.name}</li>)}</ul>;\n}\n```\n\n### 3. 按需失效（On-demand Revalidation）\n\n```ts\n// app/actions.ts\n'use server';\nimport { revalidateTag } from 'next/cache';\n\nexport async function updateProduct(id: string, data: any) {\n  await db.update(id, data);\n  // Next.js 16: 第二个参数是 cacheLife profile，控制失效后的行为\n  revalidateTag('products', 'minutes');\n}\n```\n\n### 4. 即时更新（updateTag）\n\nNext.js 16 引入了 `updateTag`，专门用于 Server Actions，确保用户能立即看到自己的变更：\n\n```ts\n// app/actions.ts\n'use server';\nimport { revalidateTag, unstable_updateTag as updateTag } from 'next/cache';\n\nexport async function addComment(postId: string, comment: string) {\n  await db.addComment(postId, comment);\n  \n  // revalidateTag: 后台异步刷新，用户下次访问可能才看到\n  revalidateTag(`post-${postId}`, 'seconds');\n  \n  // updateTag: 同步刷新，用户立即看到变更（适合同屏或下一屏场景）\n  await updateTag(`post-${postId}`);\n}\n```\n\n## cacheLife 配置 Profile\n\n`cacheLife` 接受预设 profile 字符串，常见包括：\n- `\"default\"` — 平衡的默认策略\n- `\"seconds\"` — 秒级刷新\n- `\"minutes\"` — 分钟级（适合频繁更新数据）\n- `\"hours\"` — 小时级\n- `\"days\"` — 天级\n- `\"weeks\"` — 周级\n- `\"max\"` — 尽可能长（静态内容）\n\n你也可在 `next.config.ts` 中自定义 profile：\n\n```ts\n// next.config.ts\nconst nextConfig = {\n  experimental: {\n    cacheLife: {\n      myProfile: {\n        stale: 300,      // 5分钟后开始后台重验证\n        revalidate: 600, // 10分钟后强制重验证\n        expire: 3600,    // 1小时后完全失效\n      },\n    },\n  },\n};\n```\n\n## 重要限制与陷阱\n\n### 不能在缓存作用域内访问请求级 API\n\n```tsx\n// ❌ 错误：会报错或行为异常\nasync function UserProfile() {\n  \"use cache\";\n  const userId = cookies().get('userId'); // 不允许\n  // ...\n}\n\n// ✅ 正确：在外部读取，作为参数传入\nasync function UserProfile({ userId }: { userId: string }) {\n  \"use cache\";\n  cacheLife('hours');\n  cacheTag(`user-${userId}`);\n  const user = await db.getUser(userId);\n  return <div>{user.name}</div>;\n}\n\n// 在页面中调用\nexport default async function Page() {\n  const userId = cookies().get('userId')?.value;\n  return <UserProfile userId={userId} />;\n}\n```\n\n同样适用于 `headers()`、`searchParams`、认证信息等 [1](https://certificates.dev/blog/cache-components-in-nextjs) [2](https://github.com/vercel/next.js/discussions/89375)。\n\n### cacheTag 必须静态可分析\n\n`cacheTag` 接受字符串或字符串数组，但标签值应在构建时可知。虽然可使用模板字符串，但应避免完全动态的运行时值：\n\n```tsx\n// ✅ 可接受\ncacheTag(`product-${productId}`);\n\n// ⚠️ 注意：如果 productId 在请求时才确定，可能影响 PPR 行为\n```\n\n### 与 PPR 的交互\n\nCache Components 与 Partial Prerendering 配合良好，但需注意缓存边界。社区反馈显示，迁移后遇到的怪异 bug 多源于缓存边界划分不当，而非缓存本身 [2](https://github.com/vercel/next.js/discussions/89375)。\n\n## 迁移建议\n\n如果你从旧版本迁移：\n\n| 旧模式 | Next.js 16 替代 |\n|--------|----------------|\n| `fetch(url, { next: { revalidate: 60 } })` | 在 `\"use cache\"` 作用域内用 `cacheLife(\"minutes\")` |\n| `fetch(url, { next: { tags: ['x'] } })` | 在 `\"use cache\"` 作用域内用 `cacheTag\n\n信息源：[Cache Components in Next.js - Certificates.dev](https://certificates.dev/blog/cache-components-in-nextjs) · [How to properly implement use cache with Next.js 16 App Router — replacing old implicit caching? · vercel/next.js · Discussion #89375 · GitHub](https://github.com/vercel/next.js/discussions/89375) · [Nextjs Cache Components - Static | Dynamic | Partial Prerendering](https://www.youtube.com/watch?v=5LUzBMTSHC4)",
+      "baselineAnswer": "",
+      "manualCorrectnessReview": "required",
+      "rawAnswer": "根据 Next.js 16 的 Cache Components 机制，`cacheLife` 和 `cacheTag` 是与 `\"use cache\"` 指令配合使用的核心 API。以下是当前推荐的使用方式，基于官方设计与社区实践整理。\n\n## 核心概念\n\n在 Next.js 16 中，缓存是**显式且按需**的。你需要：\n1. 用 `\"use cache\"` 标记文件、组件或函数为可缓存作用域\n2. 用 `cacheLife` 指定缓存生命周期（基于时间）\n3. 用 `cacheTag` 打标签以便按需失效\n4. 缓存 key 由 Next.js 根据函数和序列化参数自动派生，无需手写 [1](https://certificates.dev/blog/cache-components-in-nextjs)\n\n## 基本用法\n\n### 1. 静态内容（SSG 类似行为）\n\n```tsx\n// app/page.tsx\nimport { unstable_cacheLife as cacheLife } from 'next/cache';\n\nexport default async function Page() {\n  \"use cache\";\n  cacheLife(\"max\"); // 永不过期，构建时生成\n  const data = await fetch('https://api.example.com/static');\n  return <div>{data}</div>;\n}\n```\n\n### 2. ISR 风格定时重验证\n\n```tsx\nimport { unstable_cacheLife as cacheLife, unstable_cacheTag as cacheTag } from 'next/cache';\n\nexport default async function ProductList() {\n  \"use cache\";\n  cacheLife(\"minutes\"); // 使用预设 profile\n  cacheTag('products'); // 打标签\n  \n  const products = await fetch('https://api.example.com/products').then(r => r.json());\n  return <ul>{products.map(p => <li key={p.id}>{p.name}</li>)}</ul>;\n}\n```\n\n### 3. 按需失效（On-demand Revalidation）\n\n```ts\n// app/actions.ts\n'use server';\nimport { revalidateTag } from 'next/cache';\n\nexport async function updateProduct(id: string, data: any) {\n  await db.update(id, data);\n  // Next.js 16: 第二个参数是 cacheLife profile，控制失效后的行为\n  revalidateTag('products', 'minutes');\n}\n```\n\n### 4. 即时更新（updateTag）\n\nNext.js 16 引入了 `updateTag`，专门用于 Server Actions，确保用户能立即看到自己的变更：\n\n```ts\n// app/actions.ts\n'use server';\nimport { revalidateTag, unstable_updateTag as updateTag } from 'next/cache';\n\nexport async function addComment(postId: string, comment: string) {\n  await db.addComment(postId, comment);\n  \n  // revalidateTag: 后台异步刷新，用户下次访问可能才看到\n  revalidateTag(`post-${postId}`, 'seconds');\n  \n  // updateTag: 同步刷新，用户立即看到变更（适合同屏或下一屏场景）\n  await updateTag(`post-${postId}`);\n}\n```\n\n## cacheLife 配置 Profile\n\n`cacheLife` 接受预设 profile 字符串，常见包括：\n- `\"default\"` — 平衡的默认策略\n- `\"seconds\"` — 秒级刷新\n- `\"minutes\"` — 分钟级（适合频繁更新数据）\n- `\"hours\"` — 小时级\n- `\"days\"` — 天级\n- `\"weeks\"` — 周级\n- `\"max\"` — 尽可能长（静态内容）\n\n你也可在 `next.config.ts` 中自定义 profile：\n\n```ts\n// next.config.ts\nconst nextConfig = {\n  experimental: {\n    cacheLife: {\n      myProfile: {\n        stale: 300,      // 5分钟后开始后台重验证\n        revalidate: 600, // 10分钟后强制重验证\n        expire: 3600,    // 1小时后完全失效\n      },\n    },\n  },\n};\n```\n\n## 重要限制与陷阱\n\n### 不能在缓存作用域内访问请求级 API\n\n```tsx\n// ❌ 错误：会报错或行为异常\nasync function UserProfile() {\n  \"use cache\";\n  const userId = cookies().get('userId'); // 不允许\n  // ...\n}\n\n// ✅ 正确：在外部读取，作为参数传入\nasync function UserProfile({ userId }: { userId: string }) {\n  \"use cache\";\n  cacheLife('hours');\n  cacheTag(`user-${userId}`);\n  const user = await db.getUser(userId);\n  return <div>{user.name}</div>;\n}\n\n// 在页面中调用\nexport default async function Page() {\n  const userId = cookies().get('userId')?.value;\n  return <UserProfile userId={userId} />;\n}\n```\n\n同样适用于 `headers()`、`searchParams`、认证信息等 [1](https://certificates.dev/blog/cache-components-in-nextjs) [2](https://github.com/vercel/next.js/discussions/89375)。\n\n### cacheTag 必须静态可分析\n\n`cacheTag` 接受字符串或字符串数组，但标签值应在构建时可知。虽然可使用模板字符串，但应避免完全动态的运行时值：\n\n```tsx\n// ✅ 可接受\ncacheTag(`product-${productId}`);\n\n// ⚠️ 注意：如果 productId 在请求时才确定，可能影响 PPR 行为\n```\n\n### 与 PPR 的交互\n\nCache Components 与 Partial Prerendering 配合良好，但需注意缓存边界。社区反馈显示，迁移后遇到的怪异 bug 多源于缓存边界划分不当，而非缓存本身 [2](https://github.com/vercel/next.js/discussions/89375)。\n\n## 迁移建议\n\n如果你从旧版本迁移：\n\n| 旧模式 | Next.js 16 替代 |\n|--------|----------------|\n| `fetch(url, { next: { revalidate: 60 } })` | 在 `\"use cache\"` 作用域内用 `cacheLife(\"minutes\")` |\n| `fetch(url, { next: { tags: ['x'] } })` | 在 `\"use cache\"` 作用域内用 `cacheTag"
+    },
+    {
+      "id": "live-16",
+      "prompt": "AI SDK v7 的 experimental_repairToolCall 当前签名和失败返回语义是什么？",
+      "passed": true,
+      "providerCalls": 1,
+      "sourceCount": 3,
+      "returnedSources": [
+        {
+          "sourceId": "src_1kqpzcu",
+          "title": "Vercel AI SDK Tool Calling Cheat Sheet - Tiger's Place",
+          "url": "https://tigerabrodi.blog/vercel-ai-sdk-tool-calling-cheat-sheet"
+        },
+        {
+          "sourceId": "src_12pr263",
+          "title": "experimental_repairToolCall not being called when there is Tool Call Validation Error · Issue #8240 · vercel/ai · GitHub",
+          "url": "https://github.com/vercel/ai/issues/8240"
+        },
+        {
+          "sourceId": "src_1pmfztg",
+          "title": "Tool Calling",
+          "url": "https://ai-sdk.dev/docs/ai-sdk-core/tools-and-tool-calling"
+        }
+      ],
+      "citedUrlCount": 3,
+      "sourceValidity": true,
+      "searchStatus": "success",
+      "searchError": null,
+      "latencyMs": 32154,
+      "baselineLatencyMs": 18073,
+      "incrementalLatencyMs": 14081,
+      "usage": {
+        "inputTokens": 1249,
+        "inputTokenDetails": {
+          "noCacheTokens": 1249,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 1534,
+        "outputTokenDetails": {
+          "textTokens": 1534,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 2783
+      },
+      "baselineUsage": {
+        "inputTokens": 384,
+        "inputTokenDetails": {
+          "noCacheTokens": 384,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 700,
+        "outputTokenDetails": {
+          "textTokens": 700,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 1084
+      },
+      "answer": "基于搜索结果，我可以给你一个相对准确的答案，但需要先说明限制：本轮搜索未返回 AI SDK 官方对 v7 `experimental_repairToolCall` 的完整类型签名声明，以下信息综合自官方文档片段与社区资料，可能在细节字段名上有出入。\n\n## 当前签名（基于官方文档示例）\n\n根据 [AI SDK 官方 Tool Calling 文档](https://ai-sdk.dev/docs/ai-sdk-core/tools-and-tool-calling)，`experimental_repairToolCall` 的调用形式为：\n\n```ts\nawait generateText({\n  model,\n  tools,\n  prompt,\n  experimental_repairToolCall: async ({ toolCall, tools, error }) => {\n    // 例如：把 schema 再喂给模型，让它重新生成合法参数\n    const repairedArgs = await someReaskOrRewrite({\n      toolName: toolCall.toolName,\n      badInput: toolCall.input,\n      schema: await inputSchema({ toolName: toolCall.toolName }),\n    });\n    return { ...toolCall, input: JSON.stringify(repairedArgs) };\n  },\n});\n```\n\n回调接收一个对象，包含：\n- `toolCall`：模型原始生成的工具调用对象，包含 `toolName`、`input`（注意：新版本里字段名是 `input`，旧版本/部分社区示例里是 `args`）等\n- `tools`：当前传入的工具集\n- `error`：触发修复的错误对象\n\n## 失败 / 无法修复的返回语义\n\n根据社区示例（[Tiger's Place 速查表](https://tigerabrodi.blog/vercel-ai-sdk-tool-calling-cheat-sheet)）与官方文档示例的对照，返回值有两种情况：\n\n- **返回一个修复后的 toolCall 对象**（通常 `return { ...toolCall, input: ... }`）→ 表示修复成功，SDK 会用这个新的 toolCall 继续后续流程\n- **返回 `null`** → 表示无法修复，SDK 会按未修复的错误流程处理（通常会向上抛出对应错误）\n\n## 触发修复的常见错误类型\n\n官方文档列出与工具调用相关的三类错误，`experimental_repairToolCall` 主要用于前两类（以及修复过程中自身抛出的第三类）：\n\n- `NoSuchToolError`：模型调用了未在 `tools` 中定义的工具\n- `InvalidToolInputError`：模型给的输入不符合工具的 input schema（旧版本中叫 `InvalidToolArgumentsError`，社区示例里还能看到旧名）\n- `ToolCallRepairError`：修复过程本身发生的错误\n\n## 需要注意的坑\n\n有一个相关 issue [vercel/ai #8240](https://github.com/vercel/ai/issues/8240) 报告 `experimental_repairToolCall` 在某些 Tool Call Validation Error 场景下没有被调用。如果你在 v7 中遇到\"修复回调没触发\"的情况，可能与这个已知问题或 schema 校验时机有关，建议对照该 issue 的版本和复现路径确认。\n\n## 限制说明\n\n- 我没有拿到 v7 对该选项的精确 TypeScript 类型声明（例如回调返回类型是否为 `Promise<ToolCall | null>`、`toolCall` 的完整字段列表等），上述签名是从官方文档示例反推的。\n- `input` vs `args` 的字段名差异：官方最新文档用 `input`，社区老示例用 `args`。在 v7 上以官方文档为准；如果你在源码里看到二者之一，优先信源码类型定义。\n- 失败返回 `null` 的语义来自社区示例，官方文档片段没有显式写\"返回 null 表示放弃修复\"，但示例代码结构支持这一解读。如需 100% 确认，建议直接查 `ai` 包的 `.d.ts` 或官方 changelog。\n\n信息源：[Vercel AI SDK Tool Calling Cheat Sheet - Tiger's Place](https://tigerabrodi.blog/vercel-ai-sdk-tool-calling-cheat-sheet) · [experimental_repairToolCall not being called when there is Tool Call Validation Error · Issue #8240 · vercel/ai · GitHub](https://github.com/vercel/ai/issues/8240) · [Tool Calling](https://ai-sdk.dev/docs/ai-sdk-core/tools-and-tool-calling)",
+      "baselineAnswer": "无法联网核验以下内容。Web Search 本轮不可用，且 AI SDK v7 属于版本敏感、会变化的产品行为，我无法确认其当前签名与失败返回语义。\n\n我已知的可靠情况只覆盖到较早期版本（v3/v4/v5 时代），且这些信息对 v7 不一定成立：\n\n## 已知（早期版本，仅供定位参考，不等于 v7 事实）\n\n`experimental_repairToolCall` 曾作为 `streamText` / `generateText` 的可选配置项出现，用于在模型产生结构上无法解析或参数不符合工具 schema 的 tool call 时，给应用一次“修复机会”——例如把错误的 tool call 转换成一条错误消息再交给模型重新生成。\n\n其大致形态（早期版本）为：\n\n```ts\ntype ExperimentalRepairToolCall = (options: {\n  toolCall: { toolCallId: string; toolName: string; args: unknown };\n  messages: CoreMessage[];\n  tools: Record<string, Tool>;\n}) => Promise<{\n  messages: CoreMessage[]; // 通常追加一条 tool-result 或 system/user 错误提示\n}>;\n```\n\n- 成功语义：返回更新后的 `messages`，SDK 用其继续与模型对话，让模型重新发起 tool call。\n- 失败语义：早期版本中如果 repair 函数自身抛错，或返回无法继续的状态，工具调用会被标记为失败，相关 error 会进入 `toolCall` 的结果流 / `stepFinish` 事件；但具体“失败后是否终止整个流”“是否重试”“是否回退到报错 tool result”在不同小版本中不一致，我不能可靠断言。\n\n## 关于 v7 的限制说明\n\n针对你问的 **v7 当前签名** 和 **失败返回语义**，我无法给出可核验的结论",
+      "manualCorrectnessReview": "required",
+      "rawAnswer": "基于搜索结果，我可以给你一个相对准确的答案，但需要先说明限制：本轮搜索未返回 AI SDK 官方对 v7 `experimental_repairToolCall` 的完整类型签名声明，以下信息综合自官方文档片段与社区资料，可能在细节字段名上有出入。\n\n## 当前签名（基于官方文档示例）\n\n根据 [AI SDK 官方 Tool Calling 文档](https://ai-sdk.dev/docs/ai-sdk-core/tools-and-tool-calling)，`experimental_repairToolCall` 的调用形式为：\n\n```ts\nawait generateText({\n  model,\n  tools,\n  prompt,\n  experimental_repairToolCall: async ({ toolCall, tools, error }) => {\n    // 例如：把 schema 再喂给模型，让它重新生成合法参数\n    const repairedArgs = await someReaskOrRewrite({\n      toolName: toolCall.toolName,\n      badInput: toolCall.input,\n      schema: await inputSchema({ toolName: toolCall.toolName }),\n    });\n    return { ...toolCall, input: JSON.stringify(repairedArgs) };\n  },\n});\n```\n\n回调接收一个对象，包含：\n- `toolCall`：模型原始生成的工具调用对象，包含 `toolName`、`input`（注意：新版本里字段名是 `input`，旧版本/部分社区示例里是 `args`）等\n- `tools`：当前传入的工具集\n- `error`：触发修复的错误对象\n\n## 失败 / 无法修复的返回语义\n\n根据社区示例（[Tiger's Place 速查表](https://tigerabrodi.blog/vercel-ai-sdk-tool-calling-cheat-sheet)）与官方文档示例的对照，返回值有两种情况：\n\n- **返回一个修复后的 toolCall 对象**（通常 `return { ...toolCall, input: ... }`）→ 表示修复成功，SDK 会用这个新的 toolCall 继续后续流程\n- **返回 `null`** → 表示无法修复，SDK 会按未修复的错误流程处理（通常会向上抛出对应错误）\n\n## 触发修复的常见错误类型\n\n官方文档列出与工具调用相关的三类错误，`experimental_repairToolCall` 主要用于前两类（以及修复过程中自身抛出的第三类）：\n\n- `NoSuchToolError`：模型调用了未在 `tools` 中定义的工具\n- `InvalidToolInputError`：模型给的输入不符合工具的 input schema（旧版本中叫 `InvalidToolArgumentsError`，社区示例里还能看到旧名）\n- `ToolCallRepairError`：修复过程本身发生的错误\n\n## 需要注意的坑\n\n有一个相关 issue [vercel/ai #8240](https://github.com/vercel/ai/issues/8240) 报告 `experimental_repairToolCall` 在某些 Tool Call Validation Error 场景下没有被调用。如果你在 v7 中遇到\"修复回调没触发\"的情况，可能与这个已知问题或 schema 校验时机有关，建议对照该 issue 的版本和复现路径确认。\n\n## 限制说明\n\n- 我没有拿到 v7 对该选项的精确 TypeScript 类型声明（例如回调返回类型是否为 `Promise<ToolCall | null>`、`toolCall` 的完整字段列表等），上述签名是从官方文档示例反推的。\n- `input` vs `args` 的字段名差异：官方最新文档用 `input`，社区老示例用 `args`。在 v7 上以官方文档为准；如果你在源码里看到二者之一，优先信源码类型定义。\n- 失败返回 `null` 的语义来自社区示例，官方文档片段没有显式写\"返回 null 表示放弃修复\"，但示例代码结构支持这一解读。如需 100% 确认，建议直接查 `ai` 包的 `.d.ts` 或官方 changelog。"
+    },
+    {
+      "id": "live-17",
+      "prompt": "Node.js 24 当前内置 TypeScript 类型剥离有哪些限制？",
+      "passed": true,
+      "providerCalls": 1,
+      "sourceCount": 3,
+      "returnedSources": [
+        {
+          "sourceId": "src_1p0pldw",
+          "title": "Node.js Now Supports TypeScript Natively: Everything You Need to Know",
+          "url": "http://nodesource.com/blog/Node.js-Supports-TypeScript-Natively"
+        },
+        {
+          "sourceId": "src_ndmqs2",
+          "title": "Most folks STILL don't know that Node can run TS files out of the box. And soon, it'll no longer be marked as experimental in Node 22 AND 24. | Matt Pocock",
+          "url": "https://www.linkedin.com/posts/mapocock_most-folks-still-dont-know-that-node-can-activity-7339325183687622658-Nm1S"
+        },
+        {
+          "sourceId": "src_g86kr",
+          "title": "Node.js 24 Ships Native TypeScript: The End of Build Steps? - DEV Community",
+          "url": "https://dev.to/benriemer/nodejs-24-ships-native-typescript-the-end-of-build-steps-1cko"
+        }
+      ],
+      "citedUrlCount": 3,
+      "sourceValidity": true,
+      "searchStatus": "success",
+      "searchError": null,
+      "latencyMs": 26189,
+      "baselineLatencyMs": 18683,
+      "incrementalLatencyMs": 7506,
+      "usage": {
+        "inputTokens": 1099,
+        "inputTokenDetails": {
+          "noCacheTokens": 1099,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 922,
+        "outputTokenDetails": {
+          "textTokens": 922,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 2021
+      },
+      "baselineUsage": {
+        "inputTokens": 377,
+        "inputTokenDetails": {
+          "noCacheTokens": 377,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 700,
+        "outputTokenDetails": {
+          "textTokens": 700,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 1077
+      },
+      "answer": "根据本轮搜索到的证据，Node.js 24 内置 TypeScript 类型剥离的主要限制如下：\n\n## 核心机制限制\n\n- **仅“剥离”，不“转译”**：Node.js 通过移除类型注解来运行 TypeScript，而不是将其转译为 JavaScript。这意味着只做语法层面的删除，不做语义层面的代码转换。\n- **运行时而非构建时**：类型剥离发生在运行时，不会在构建阶段生成 `dist/` 目录中的已擦除类型的代码，因此用于发布/生产环境时仍需要 `tsc`。\n\n## 不支持的 TypeScript 特性\n\n- 需要额外转换的特性不支持，例如 **`enum` 和 `namespace`**，因为它们需要真正的代码转换，而不仅仅是类型剥离。\n- 证据来源：[Matt Pocock（LinkedIn 帖子）](https://www.linkedin.com/posts/mapocock_most-folks-still-dont-know-that-node-can-activity-7339325183687622658-Nm1S)、[NodeSource Blog](http://nodesource.com/blog/Node.js-Supports-TypeScript-Natively)\n\n## 模块导入要求\n\n- 导入路径需要带上 `.ts` 扩展名后缀。\n\n## 其他不支持场景\n\n- **不支持 JSX 转换**：React JSX 仍需 Babel 或打包器处理，直接运行会报语法错误。\n- **不支持 CSS Modules、静态资源导入**等非 JS 模块加载。\n- 证据来源：[DEV Community 文章](https://dev.to/benriemer/nodejs-24-ships-native-typescript-the-end-of-build-steps-1cko)\n\n## 实验性状态\n\n- 在 Node.js 24 中，类型剥离的 `ExperimentalWarning` 已被移除，可直接运行 `.ts` 文件。\n- 但早期版本（如 v23.6.0 引入时）曾被标记为实验性，不推荐用于生产环境；如需抑制警告可使用 `node --disable-warning=ExperimentalWarning` 或设置 `NODE_OPTIONS`。\n- 证据来源：[NodeSource Blog](http://nodesource.com/blog/Node.js-Supports-TypeScript-Natively)\n\n## 信息限制说明\n\n本轮搜索结果未提供 Node.js 24 官方文档中关于类型剥离的完整限制清单（例如是否支持 `const enum`、参数属性、私有字段等 TS 特性的详细行为）。如需精确完整列表，建议查阅 Node.js 官方文档中 `--experimental-strip-types` / TypeScript Stripping 章节，本轮证据不足以覆盖全部细节。\n\n信息源：[Node.js Now Supports TypeScript Natively: Everything You Need to Know](http://nodesource.com/blog/Node.js-Supports-TypeScript-Natively) · [Most folks STILL don't know that Node can run TS files out of the box. And soon, it'll no longer be marked as experimental in Node 22 AND 24. | Matt Pocock](https://www.linkedin.com/posts/mapocock_most-folks-still-dont-know-that-node-can-activity-7339325183687622658-Nm1S) · [Node.js 24 Ships Native TypeScript: The End of Build Steps? - DEV Community](https://dev.to/benriemer/nodejs-24-ships-native-typescript-the-end-of-build-steps-1cko)",
+      "baselineAnswer": "",
+      "manualCorrectnessReview": "required",
+      "rawAnswer": "根据本轮搜索到的证据，Node.js 24 内置 TypeScript 类型剥离的主要限制如下：\n\n## 核心机制限制\n\n- **仅“剥离”，不“转译”**：Node.js 通过移除类型注解来运行 TypeScript，而不是将其转译为 JavaScript。这意味着只做语法层面的删除，不做语义层面的代码转换。\n- **运行时而非构建时**：类型剥离发生在运行时，不会在构建阶段生成 `dist/` 目录中的已擦除类型的代码，因此用于发布/生产环境时仍需要 `tsc`。\n\n## 不支持的 TypeScript 特性\n\n- 需要额外转换的特性不支持，例如 **`enum` 和 `namespace`**，因为它们需要真正的代码转换，而不仅仅是类型剥离。\n- 证据来源：[Matt Pocock（LinkedIn 帖子）](https://www.linkedin.com/posts/mapocock_most-folks-still-dont-know-that-node-can-activity-7339325183687622658-Nm1S)、[NodeSource Blog](http://nodesource.com/blog/Node.js-Supports-TypeScript-Natively)\n\n## 模块导入要求\n\n- 导入路径需要带上 `.ts` 扩展名后缀。\n\n## 其他不支持场景\n\n- **不支持 JSX 转换**：React JSX 仍需 Babel 或打包器处理，直接运行会报语法错误。\n- **不支持 CSS Modules、静态资源导入**等非 JS 模块加载。\n- 证据来源：[DEV Community 文章](https://dev.to/benriemer/nodejs-24-ships-native-typescript-the-end-of-build-steps-1cko)\n\n## 实验性状态\n\n- 在 Node.js 24 中，类型剥离的 `ExperimentalWarning` 已被移除，可直接运行 `.ts` 文件。\n- 但早期版本（如 v23.6.0 引入时）曾被标记为实验性，不推荐用于生产环境；如需抑制警告可使用 `node --disable-warning=ExperimentalWarning` 或设置 `NODE_OPTIONS`。\n- 证据来源：[NodeSource Blog](http://nodesource.com/blog/Node.js-Supports-TypeScript-Natively)\n\n## 信息限制说明\n\n本轮搜索结果未提供 Node.js 24 官方文档中关于类型剥离的完整限制清单（例如是否支持 `const enum`、参数属性、私有字段等 TS 特性的详细行为）。如需精确完整列表，建议查阅 Node.js 官方文档中 `--experimental-strip-types` / TypeScript Stripping 章节，本轮证据不足以覆盖全部细节。"
+    },
+    {
+      "id": "live-18",
+      "prompt": "Prisma 当前版本对 PostgreSQL 18 的支持状态如何？",
+      "passed": true,
+      "providerCalls": 1,
+      "sourceCount": 3,
+      "returnedSources": [
+        {
+          "sourceId": "src_dg4wol",
+          "title": "支持的数据库- ORM",
+          "url": "https://prisma.nodejs.cn/orm/reference/supported-databases"
+        },
+        {
+          "sourceId": "src_4hsz98",
+          "title": "Prisma | 更新日志 - Prisma 中文",
+          "url": "https://prisma.org.cn/changelog"
+        },
+        {
+          "sourceId": "src_7ytt1c",
+          "title": "Prisma | 更新日誌 - Prisma 繁體中文",
+          "url": "https://prisma.tw/changelog"
+        }
+      ],
+      "citedUrlCount": 3,
+      "sourceValidity": true,
+      "searchStatus": "success",
+      "searchError": null,
+      "latencyMs": 24129,
+      "baselineLatencyMs": 16052,
+      "incrementalLatencyMs": 8077,
+      "usage": {
+        "inputTokens": 1508,
+        "inputTokenDetails": {
+          "noCacheTokens": 1508,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 839,
+        "outputTokenDetails": {
+          "textTokens": 839,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 2347
+      },
+      "baselineUsage": {
+        "inputTokens": 379,
+        "inputTokenDetails": {
+          "noCacheTokens": 379,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 700,
+        "outputTokenDetails": {
+          "textTokens": 700,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 1079
+      },
+      "answer": "根据本轮搜索到的证据，Prisma ORM 的官方支持数据库页面已将 **PostgreSQL 18** 列入支持范围。\n\n## 搜索证据\n\n在 Prisma 的\"支持的数据库\"参考页面中，明确列出了：\n\n> Prisma ORM currently supports the following databases. PostgreSQL 9.6, PostgreSQL ... **PostgreSQL 18**, SQLite ...\n\n来源：[支持的数据库 - Prisma ORM](https://prisma.nodejs.cn/orm/reference/supported-databases)\n\n## 解读与限制说明\n\n- **支持状态**：从该页面来看，PostgreSQL 18 已被纳入 Prisma ORM 的官方支持数据库列表，说明 Prisma 当前版本已支持 PostgreSQL 18。\n- **证据限制**：\n  - 本轮搜索返回的是 Prisma 中文镜像站点（prisma.nodejs.cn）的内容，而非 prisma.io 官方英文站点。中文镜像可能存在翻译滞后或同步延迟，建议直接对照官方英文文档确认。\n  - 搜索摘要未提供具体的 Prisma 版本号（例如从哪个 minor/patch 版本开始正式支持 PostgreSQL 18），也未说明支持级别（完全支持 vs. 兼容性验证）。\n  - 另外两条结果（[Prisma 更新日志](https://prisma.org.cn/changelog)、[Prisma 繁體中文更新日誌](https://prisma.tw/changelog)）未直接提及 PostgreSQL 18 的支持状态，无法交叉验证具体版本。\n\n## 建议\n\n如需确认你正在使用的 Prisma 版本是否已包含对 PostgreSQL 18 的支持，建议：\n1. 查看 [Prisma 官方英文文档]([未核验链接已移除]) 的支持矩阵。\n2. 对照 [Prisma ORM Release notes]([未核验链接已移除]) 查找引入 PostgreSQL 18 支持的具体版本。\n\n若你告诉我当前使用的 Prisma 版本，我可以帮你进一步判断。\n\n信息源：[支持的数据库- ORM](https://prisma.nodejs.cn/orm/reference/supported-databases) · [Prisma | 更新日志 - Prisma 中文](https://prisma.org.cn/changelog) · [Prisma | 更新日誌 - Prisma 繁體中文](https://prisma.tw/changelog)",
+      "baselineAnswer": "",
+      "manualCorrectnessReview": "required",
+      "rawAnswer": "根据本轮搜索到的证据，Prisma ORM 的官方支持数据库页面已将 **PostgreSQL 18** 列入支持范围。\n\n## 搜索证据\n\n在 Prisma 的\"支持的数据库\"参考页面中，明确列出了：\n\n> Prisma ORM currently supports the following databases. PostgreSQL 9.6, PostgreSQL ... **PostgreSQL 18**, SQLite ...\n\n来源：[支持的数据库 - Prisma ORM](https://prisma.nodejs.cn/orm/reference/supported-databases)\n\n## 解读与限制说明\n\n- **支持状态**：从该页面来看，PostgreSQL 18 已被纳入 Prisma ORM 的官方支持数据库列表，说明 Prisma 当前版本已支持 PostgreSQL 18。\n- **证据限制**：\n  - 本轮搜索返回的是 Prisma 中文镜像站点（prisma.nodejs.cn）的内容，而非 prisma.io 官方英文站点。中文镜像可能存在翻译滞后或同步延迟，建议直接对照官方英文文档确认。\n  - 搜索摘要未提供具体的 Prisma 版本号（例如从哪个 minor/patch 版本开始正式支持 PostgreSQL 18），也未说明支持级别（完全支持 vs. 兼容性验证）。\n  - 另外两条结果（[Prisma 更新日志](https://prisma.org.cn/changelog)、[Prisma 繁體中文更新日誌](https://prisma.tw/changelog)）未直接提及 PostgreSQL 18 的支持状态，无法交叉验证具体版本。\n\n## 建议\n\n如需确认你正在使用的 Prisma 版本是否已包含对 PostgreSQL 18 的支持，建议：\n1. 查看 [Prisma 官方英文文档](https://www.prisma.io/docs/orm/reference/supported-databases) 的支持矩阵。\n2. 对照 [Prisma ORM Release notes](https://github.com/prisma/prisma/releases) 查找引入 PostgreSQL 18 支持的具体版本。\n\n若你告诉我当前使用的 Prisma 版本，我可以帮你进一步判断。"
+    },
+    {
+      "id": "live-19",
+      "prompt": "Tavily Search API 当前 Basic 与 Advanced 搜索分别消耗多少 credits？",
+      "passed": true,
+      "providerCalls": 1,
+      "sourceCount": 3,
+      "returnedSources": [
+        {
+          "sourceId": "src_1a17k9d",
+          "title": "GitHub - lyhue1991/tvsearch: Tavily Search SKILL + CLI for humans/Agents 😋😋 · GitHub",
+          "url": "https://github.com/lyhue1991/tvsearch"
+        },
+        {
+          "sourceId": "src_1tnr8kv",
+          "title": "Perplexity Search API vs. Tavily: The Better Choice for RAG ...",
+          "url": "https://alphacorp.ai/blog/perplexity-search-api-vs-tavily-the-better-choice-for-rag-and-agents-in-2025"
+        },
+        {
+          "sourceId": "src_1wu07k2",
+          "title": "Credits & Pricing",
+          "url": "https://docs.tavily.com/documentation/api-credits"
+        }
+      ],
+      "citedUrlCount": 3,
+      "sourceValidity": true,
+      "searchStatus": "success",
+      "searchError": null,
+      "latencyMs": 9062,
+      "baselineLatencyMs": 11961,
+      "incrementalLatencyMs": -2899,
+      "usage": {
+        "inputTokens": 1229,
+        "inputTokenDetails": {
+          "noCacheTokens": 1229,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 199,
+        "outputTokenDetails": {
+          "textTokens": 199,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 1428
+      },
+      "baselineUsage": {
+        "inputTokens": 381,
+        "inputTokenDetails": {
+          "noCacheTokens": 381,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 457,
+        "outputTokenDetails": {
+          "textTokens": 457,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 838
+      },
+      "answer": "根据 Tavily 官方文档：\n\n- **Basic 搜索（`basic`）**：每次请求消耗 **1 个 API credit**。\n- **Advanced 搜索（`advanced`）**：每次请求消耗 **2 个 API credits**。\n\n搜索深度（`search_depth`）决定了请求的费用，Advanced 因进行更深度的检索与处理，所以成本是 Basic 的两倍。\n\n引用：[Tavily 官方文档 — Credits & Pricing](https://docs.tavily.com/documentation/api-credits)\n\n信息源：[GitHub - lyhue1991/tvsearch: Tavily Search SKILL + CLI for humans/Agents 😋😋 · GitHub](https://github.com/lyhue1991/tvsearch) · [Perplexity Search API vs. Tavily: The Better Choice for RAG ...](https://alphacorp.ai/blog/perplexity-search-api-vs-tavily-the-better-choice-for-rag-and-agents-in-2025) · [Credits & Pricing](https://docs.tavily.com/documentation/api-credits)",
+      "baselineAnswer": "无法联网核验当前最新定价（本轮 Web Search 不可用）。以下基于我已有的知识，可能已过时，请以 Tavily 官方文档为准：\n\n## 已知的 credit 消耗（需自行核验）\n\n| 搜索模式 | 每次请求消耗 credits（已知值） |\n|---|---|\n| **Basic** | 1 credit |\n| **Advanced** | 2 credits |\n\n### 说明\n- **Basic search**：标准检索，返回常规搜索结果摘要。\n- **Advanced search**：会做更深入的内容抓取/分析（如对结果页面做更完整的正文提取与处理），因此单次消耗约为 Basic 的两倍。\n- 上述比例是我的已有印象，Tavily 的计费策略可能已调整（例如不同 endpoint、`include_raw_content`、`include_images` 等参数也可能影响计费）。\n\n### 建议核验渠道\n- 官方文档：https://docs.tavily.com\n- 定价页：https://tavily.com/#pricing （或官网 Pricing 入口）\n- 在 Dashboard 中查看你的 plan 与 credit 使用明细，这是最准确的来源。\n\n如果你需要，我可以帮你写一段调用 `/search` 的最小示例代码，并在注释里标注 Basic/Advanced 的参数差异。",
+      "manualCorrectnessReview": "required",
+      "rawAnswer": "根据 Tavily 官方文档：\n\n- **Basic 搜索（`basic`）**：每次请求消耗 **1 个 API credit**。\n- **Advanced 搜索（`advanced`）**：每次请求消耗 **2 个 API credits**。\n\n搜索深度（`search_depth`）决定了请求的费用，Advanced 因进行更深度的检索与处理，所以成本是 Basic 的两倍。\n\n引用：[Tavily 官方文档 — Credits & Pricing](https://docs.tavily.com/documentation/api-credits)"
+    },
+    {
+      "id": "live-20",
+      "prompt": "GitHub Actions 当前推荐怎样固定第三方 action 来降低供应链风险？请引用 GitHub 官方文档。",
+      "passed": true,
+      "providerCalls": 1,
+      "sourceCount": 3,
+      "returnedSources": [
+        {
+          "sourceId": "src_mpyb85",
+          "title": "安全使用指南 - GitHub 文档",
+          "url": "https://docs.github.com/zh/actions/reference/security/secure-use"
+        },
+        {
+          "sourceId": "src_1ccg9pf",
+          "title": "Securing use of third-party GitHub actions · community · Discussion #26310 · GitHub",
+          "url": "https://github.com/orgs/community/discussions/26310"
+        },
+        {
+          "sourceId": "src_1l5rhoq",
+          "title": "Mitigate software supply chain risks in Github Actions | ODSP938",
+          "url": "https://www.youtube.com/watch?v=FPjvL-No46E"
+        }
+      ],
+      "citedUrlCount": 3,
+      "sourceValidity": true,
+      "searchStatus": "success",
+      "searchError": null,
+      "latencyMs": 29556,
+      "baselineLatencyMs": 17247,
+      "incrementalLatencyMs": 12309,
+      "usage": {
+        "inputTokens": 1389,
+        "inputTokenDetails": {
+          "noCacheTokens": 1389,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 1209,
+        "outputTokenDetails": {
+          "textTokens": 1209,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 2598
+      },
+      "baselineUsage": {
+        "inputTokens": 387,
+        "inputTokenDetails": {
+          "noCacheTokens": 387,
+          "cacheReadTokens": 0
+        },
+        "outputTokens": 700,
+        "outputTokenDetails": {
+          "textTokens": 700,
+          "reasoningTokens": 0
+        },
+        "totalTokens": 1087
+      },
+      "answer": "# GitHub Actions 固定第三方 Action 的官方推荐\n\n根据 GitHub 官方文档，**当前推荐将第三方 action 固定到全长提交 SHA（full-length commit SHA）**，这是降低供应链风险的核心做法。\n\n## 为什么推荐固定到全长提交 SHA\n\nGitHub 官方文档指出：\n\n- 将操作固定到全长提交 SHA 是**当前将操作用作不可变版本的唯一方法**。\n- 固定到特定 SHA 有助于降低恶意执行者向操作仓库添加后门的风险，因为他们需要为有效的 Git 对象负载生成 SHA-1 冲突。\n- 选择 SHA 时，应验证它是否来自操作的存储库，而不是存储库的分支。\n\n示例写法（将 `@v4` 这类可变标签替换为不可变 SHA）：\n\n```yaml\nsteps:\n  - name: Checkout\n    uses: actions/checkout@<full-length-commit-sha>  # 例如 8e5e7e5cb8c3156cbe153f3146d5f156158093d6\n    with:\n      fetch-depth: 1\n```\n\n## 配套的加固建议\n\n除了固定到 SHA，GitHub 官方文档还给出以下良好实践：\n\n1. **启用策略强制要求固定到 SHA**\n   - GitHub 在**存储库级别**和**组织级别**提供相关策略，可以要求将操作固定到全长提交 SHA。\n   - 仓库级别配置参考：管理存储库的 GitHub Actions 设置\n   - 组织级别配置参考：禁用或限制组织的 GitHub Actions\n\n2. **审核操作的源代码**\n   - 确保操作按预期处理仓库和密钥内容。\n   - 例如确认密钥未被发送到非预期主机，也未被无意中记录。\n\n3. **仅在信任创建者时才固定到标签**\n   - 尽管固定到提交 SHA 是最安全选项，但指定标签（如 `@v1`）更为方便且广泛使用。\n   - 如果指定标签，应确保信任该操作的创建者。\n\n4. **关注“已验证的创建者”徽章**\n   - GitHub Marketplace 上的“已验证的创建者”徽章是一个有用信号，表明该操作由已验证的 GitHub 用户/组织发布。\n\n## 关于标签 vs SHA 的取舍\n\n- **标签（`@v1` / `@v1.2.3`）**：方便、可读性高，但可被移动或覆盖，存在被篡改的风险。\n- **全长提交 SHA**：不可变，最安全；缺点是不直观，需要配合注释说明版本，且更新依赖时需人工核对。\n\n## 参考\n\n上述建议与引用均来自 GitHub 官方文档《安全使用指南》：\n\n- [安全使用指南 - GitHub 文档](https://docs.github.com/zh/actions/reference/security/secure-use)\n\n**补充说明**：本轮搜索结果中另包含社区讨论与第三方视频，但它们不是 GitHub 官方文档，未作为事实依据采用；上述结论以官方文档为准。\n\n信息源：[安全使用指南 - GitHub 文档](https://docs.github.com/zh/actions/reference/security/secure-use) · [Securing use of third-party GitHub actions · community · Discussion #26310 · GitHub](https://github.com/orgs/community/discussions/26310) · [Mitigate software supply chain risks in Github Actions | ODSP938](https://www.youtube.com/watch?v=FPjvL-No46E)",
+      "baselineAnswer": "",
+      "manualCorrectnessReview": "required",
+      "rawAnswer": "# GitHub Actions 固定第三方 Action 的官方推荐\n\n根据 GitHub 官方文档，**当前推荐将第三方 action 固定到全长提交 SHA（full-length commit SHA）**，这是降低供应链风险的核心做法。\n\n## 为什么推荐固定到全长提交 SHA\n\nGitHub 官方文档指出：\n\n- 将操作固定到全长提交 SHA 是**当前将操作用作不可变版本的唯一方法**。\n- 固定到特定 SHA 有助于降低恶意执行者向操作仓库添加后门的风险，因为他们需要为有效的 Git 对象负载生成 SHA-1 冲突。\n- 选择 SHA 时，应验证它是否来自操作的存储库，而不是存储库的分支。\n\n示例写法（将 `@v4` 这类可变标签替换为不可变 SHA）：\n\n```yaml\nsteps:\n  - name: Checkout\n    uses: actions/checkout@<full-length-commit-sha>  # 例如 8e5e7e5cb8c3156cbe153f3146d5f156158093d6\n    with:\n      fetch-depth: 1\n```\n\n## 配套的加固建议\n\n除了固定到 SHA，GitHub 官方文档还给出以下良好实践：\n\n1. **启用策略强制要求固定到 SHA**\n   - GitHub 在**存储库级别**和**组织级别**提供相关策略，可以要求将操作固定到全长提交 SHA。\n   - 仓库级别配置参考：管理存储库的 GitHub Actions 设置\n   - 组织级别配置参考：禁用或限制组织的 GitHub Actions\n\n2. **审核操作的源代码**\n   - 确保操作按预期处理仓库和密钥内容。\n   - 例如确认密钥未被发送到非预期主机，也未被无意中记录。\n\n3. **仅在信任创建者时才固定到标签**\n   - 尽管固定到提交 SHA 是最安全选项，但指定标签（如 `@v1`）更为方便且广泛使用。\n   - 如果指定标签，应确保信任该操作的创建者。\n\n4. **关注“已验证的创建者”徽章**\n   - GitHub Marketplace 上的“已验证的创建者”徽章是一个有用信号，表明该操作由已验证的 GitHub 用户/组织发布。\n\n## 关于标签 vs SHA 的取舍\n\n- **标签（`@v1` / `@v1.2.3`）**：方便、可读性高，但可被移动或覆盖，存在被篡改的风险。\n- **全长提交 SHA**：不可变，最安全；缺点是不直观，需要配合注释说明版本，且更新依赖时需人工核对。\n\n## 参考\n\n上述建议与引用均来自 GitHub 官方文档《安全使用指南》：\n\n- [安全使用指南 - GitHub 文档](https://docs.github.com/zh/actions/reference/security/secure-use)\n\n**补充说明**：本轮搜索结果中另包含社区讨论与第三方视频，但它们不是 GitHub 官方文档，未作为事实依据采用；上述结论以官方文档为准。"
+    }
+  ],
+  "sourceGuardReevaluatedAt": "2026-08-05T09:24:52.098Z",
+  "sourceGuardReevaluation": "Offline replay of preserved rawAnswer + returnedSources; no model or provider calls."
+}
