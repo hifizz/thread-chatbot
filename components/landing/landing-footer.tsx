@@ -1,7 +1,6 @@
 import Link from "next/link"
 import type { ReactElement } from "react"
 
-import { LANDING } from "@/constants/landing"
 import { PROJECT } from "@/constants/project"
 
 import styles from "./landing.module.css"
@@ -11,21 +10,21 @@ export function LandingFooter(): ReactElement {
     <footer className={styles.footer}>
       <div className={styles.footerInner}>
         <div>
-          <p>{LANDING.footer.line}</p>
+          <p>应当像人思考一样使用 AI</p>
         </div>
-        <nav aria-label="Footer navigation">
+        <nav aria-label="页脚导航">
           <ul className={styles.footerLinks}>
-            {LANDING.footer.links.map((link) => (
-              <li key={link.href}>
-                {link.external ? (
-                  <a href={link.href} target="_blank" rel="noreferrer">
-                    {link.label}
-                  </a>
-                ) : (
-                  <Link href={link.href}>{link.label}</Link>
-                )}
-              </li>
-            ))}
+            <li>
+              <a href={PROJECT.repositoryUrl} target="_blank" rel="noreferrer">
+                GitHub
+              </a>
+            </li>
+            <li>
+              <Link href="/privacy">隐私政策</Link>
+            </li>
+            <li>
+              <Link href="/terms">服务条款</Link>
+            </li>
           </ul>
         </nav>
         <p className={styles.footerCopyright}>

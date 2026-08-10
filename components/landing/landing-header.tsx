@@ -1,7 +1,7 @@
+import Image from "next/image"
 import Link from "next/link"
 import type { ReactElement } from "react"
 
-import { LANDING } from "@/constants/landing"
 import { PROJECT } from "@/constants/project"
 import { ROUTES } from "@/constants/routes"
 
@@ -15,15 +15,21 @@ export function LandingHeader(): ReactElement {
         <Link
           href={ROUTES.landing}
           className={styles.brand}
-          aria-label={`${PROJECT.name} home`}
+          aria-label={`${PROJECT.name} 首页`}
         >
-          <span className={styles.brandMark} aria-hidden>
-            <i />
-            <i />
-            <i />
-          </span>
+          <Image
+            src="/favicon.ico"
+            alt=""
+            width={26}
+            height={26}
+            className={styles.brandLogo}
+            preload
+          />
         </Link>
-        <LandingCtaLink cta={LANDING.navCta} className={styles.headerCta} />
+        <LandingCtaLink
+          cta={{ label: "立刻开始", href: ROUTES.startChat }}
+          className={styles.headerCta}
+        />
       </div>
     </header>
   )
