@@ -2,10 +2,10 @@
  * ThreadChat（/thread-chat 分支对话页）真实后端端到端验收。
  *
  * 运行前提：
- *   1. dev server 已在 localhost:3000 跑着（pnpm dev）；
+ *   1. dev server 已在 localhost:4040 跑着（pnpm dev）；
  *   2. .env.local 配好 MiniMax（MINIMAX_API_KEY / MINIMAX_BASE_URL / LLM_MODEL_ID）；
  *   3. 本机有 Chromium：优先取环境变量 CHROMIUM_PATH，否则用 playwright-core 默认发现逻辑。
- * 运行（默认 http://localhost:3000，可用 BASE_URL 覆盖；--experimental-strip-types
+ * 运行（默认 http://localhost:4040，可用 BASE_URL 覆盖；--experimental-strip-types
  * 是因为脚本直接 import prompt-pure.ts 生成 kickoff 预填的期望值——文案改一处即全跟随）：
  *   CHROMIUM_PATH=/opt/pw-browsers/chromium node --experimental-strip-types e2e/thread-chat/verify-live.mjs
  *
@@ -51,7 +51,7 @@ page.on("request", (req) => {
 })
 page.on("pageerror", (e) => console.log("PAGEERROR:", e.message))
 
-const BASE_URL = process.env.BASE_URL || "http://localhost:3000"
+const BASE_URL = process.env.BASE_URL || "http://localhost:4040"
 await page.goto(`${BASE_URL}/thread-chat`, {
   waitUntil: "networkidle",
 })
