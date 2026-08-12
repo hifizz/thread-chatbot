@@ -54,7 +54,7 @@ async function waitUntil(fn, timeout = 8000, step = 200) {
   return fn()
 }
 
-const BASE_URL = process.env.BASE_URL || "http://localhost:3000"
+const BASE_URL = process.env.BASE_URL || "http://localhost:4040"
 const browser = await chromium.launch({
   executablePath: process.env.CHROMIUM_PATH || undefined,
   headless: true,

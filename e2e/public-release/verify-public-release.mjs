@@ -6,7 +6,7 @@
  * signed-out flow. Optionally provide a pre-authenticated Playwright storage
  * state to also verify the fresh-chat UUID contract:
  *
- *   CHROMIUM_PATH=... BASE_URL=http://localhost:3000 \
+ *   CHROMIUM_PATH=... BASE_URL=http://localhost:4040 \
  *     node e2e/public-release/verify-public-release.mjs
  *
  *   CHROMIUM_PATH=... PLAYWRIGHT_STORAGE_STATE=/safe/path/state.json \
@@ -17,7 +17,7 @@
  */
 import { chromium } from "playwright-core"
 
-const BASE_URL = (process.env.BASE_URL || "http://localhost:3000").replace(
+const BASE_URL = (process.env.BASE_URL || "http://localhost:4040").replace(
   /\/$/,
   ""
 )

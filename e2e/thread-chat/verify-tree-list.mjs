@@ -24,7 +24,7 @@ const ok = (label, cond) => {
   console.log(`${cond ? "PASS" : "FAIL"}  ${label}`)
   if (!cond) process.exitCode = 1
 }
-const BASE = process.env.BASE_URL || "http://localhost:3000"
+const BASE = process.env.BASE_URL || "http://localhost:4040"
 
 // DATABASE_URL：优先环境变量，回退 .env.local
 const env = Object.fromEntries(

@@ -79,7 +79,7 @@ For the default minimum local setup, set these values in `.env.local`:
 DATABASE_URL=postgres://...
 DIRECT_URL=postgres://...
 BETTER_AUTH_SECRET=replace-with-a-high-entropy-secret
-BETTER_AUTH_URL=http://localhost:3000
+BETTER_AUTH_URL=http://localhost:4040
 MINIMAX_API_KEY=...
 ```
 
@@ -92,7 +92,7 @@ pnpm db:migrate
 pnpm dev
 ```
 
-Open <http://localhost:3000/thread-chat> to enter the Thread Chat workspace. Sign in when prompted; the bare route resumes the most recently opened tree when available, while a tree URL such as `/thread-chat/{treeId}` identifies a specific persisted conversation.
+Open <http://localhost:4040/thread-chat> to enter the Thread Chat workspace. Sign in when prompted; the bare route resumes the most recently opened tree when available, while a tree URL such as `/thread-chat/{treeId}` identifies a specific persisted conversation.
 
 ### Optional integrations
 
