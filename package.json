@@ -6,7 +6,7 @@
   "private": true,
   "license": "AGPL-3.0-only",
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --port 4040",
     "build": "next build",
     "vercel-build": "node scripts/vercel-migrate.mjs && next build",
     "start": "next start",

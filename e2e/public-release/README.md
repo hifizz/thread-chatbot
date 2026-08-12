@@ -6,11 +6,11 @@
 
 ```bash
 CHROMIUM_PATH="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
-BASE_URL=http://localhost:3000 \
+BASE_URL=http://localhost:4040 \
 node e2e/public-release/verify-public-release.mjs
 ```
 
-默认 `BASE_URL` 为 `http://localhost:3000`。检查项包括英文 H1、全部 `Start chatting` 和 GitHub 链接目标、首页无许可文案、1440px 与 390px 下无横向溢出及首屏 CTA 可见，以及 signed-out `/start-chat` 到 sign-in 的 redirect 参数。
+默认 `BASE_URL` 为 `http://localhost:4040`。检查项包括英文 H1、全部 `Start chatting` 和 GitHub 链接目标、首页无许可文案、1440px 与 390px 下无横向溢出及首屏 CTA 可见，以及 signed-out `/start-chat` 到 sign-in 的 redirect 参数。
 
 如操作员已经在安全位置准备好一个已登录的 Playwright storage state，可额外验证连续两次 fresh start 都转到有效且不同的 UUID：
 

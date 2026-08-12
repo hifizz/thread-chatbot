@@ -35,7 +35,7 @@ cp .env.example .env.local
 DATABASE_URL=postgres://...
 DIRECT_URL=postgres://...
 BETTER_AUTH_SECRET=replace-with-a-high-entropy-secret
-BETTER_AUTH_URL=http://localhost:3000
+BETTER_AUTH_URL=http://localhost:4040
 MINIMAX_API_KEY=...
 ```
 
@@ -48,7 +48,7 @@ pnpm db:migrate
 pnpm dev
 ```
 
-打开 <http://localhost:3000/thread-chat> 进入 Thread Chat 工作区。按提示登录；裸路径会在可用时恢复最近打开的树，而 `/thread-chat/{treeId}` 这样的树 URL 则标识一段特定的已持久化对话。
+打开 <http://localhost:4040/thread-chat> 进入 Thread Chat 工作区。按提示登录；裸路径会在可用时恢复最近打开的树，而 `/thread-chat/{treeId}` 这样的树 URL 则标识一段特定的已持久化对话。
 
 ### 可选集成
 

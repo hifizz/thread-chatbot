@@ -8,7 +8,7 @@
  */
 import { chromium } from "playwright-core"
 
-const BASE_URL = process.env.BASE_URL || "http://localhost:3000"
+const BASE_URL = process.env.BASE_URL || "http://localhost:4040"
 const TREE_ID = "00000000-0000-4000-8000-000000000042"
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
