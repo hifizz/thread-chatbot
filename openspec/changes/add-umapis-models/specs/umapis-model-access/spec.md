@@ -1,21 +1,21 @@
 ## ADDED Requirements
 
 ### Requirement: UMAPIS 模型注册
-系统 SHALL 以 UMAPIS 专属 provider 注册 claude-opus-4-6、claude-sonnet-5、gpt-5.6-sol 和 gpt-5.6-terra，并 SHALL 在 Thread Chat 模型选择器展示四者。
+系统 SHALL 以 UMAPIS 专属 provider 注册 claude-opus-4-6、claude-sonnet-5、gpt-5.6-sol 和 gpt-5.6-terra，并 SHALL 在 Thread Chat Prompt 输入关联的模型选择器展示四者。
 
 #### Scenario: 查看 UMAPIS 模型
-- **WHEN** 用户打开 Thread Chat 模型选择器
+- **WHEN** 用户打开 Thread Chat Prompt 输入关联的模型选择器
 - **THEN** 系统展示四个指定模型，选中值使用统一注册表 id
 
 ### Requirement: UMAPIS 专属路由
-系统 SHALL 使用独立 UMAPIS API Key 和可配 Base URL 调用 UMAPIS，MUST NOT 把这些请求路由到 Vercel、Cloudflare、Ark 或现有供应商直连分支。
+系统 SHALL 使用独立 UMAPIS API Key 和可配 Base URL 调用 UMAPIS；Claude 模型使用 Claude 组 Key，GPT 模型使用 GPT 组 Key，MUST NOT 把这些请求路由到 Vercel、Cloudflare、Ark 或现有供应商直连分支。
 
 #### Scenario: 配置完整
-- **WHEN** UMAPIS 凭据已配置且客户端请求已注册 UMAPIS 模型
+- **WHEN** 该模型所属 UMAPIS 凭据组已配置且客户端请求已注册 UMAPIS 模型
 - **THEN** 服务端把请求发送到 UMAPIS provider，并使用注册的上游模型 id
 
 #### Scenario: 凭据缺失
-- **WHEN** 客户端请求 UMAPIS 模型但服务端没有 UMAPIS API Key
+- **WHEN** 客户端请求 UMAPIS 模型但服务端没有该模型所属组的 UMAPIS API Key
 - **THEN** 服务端在调用上游前返回可读的 400，且不泄露凭据或内部配置
 
 ### Requirement: UMAPIS 流式能力
@@ -23,7 +23,7 @@
 
 #### Scenario: 成功流式生成
 - **WHEN** UMAPIS 返回流式响应
-- **THEN** 用户逐步看到回复，完成时系统保留上游可用的 reasoning 与 token usage
+- **THEN** 用户逐步看到回复，完成时系统保留上游可用的 reasoning 与 token usage，且请求不携带未经验证的 Effort 参数
 
 #### Scenario: 标准 reasoning 流
 - **WHEN** UMAPIS 已返回独立 reasoning 事件

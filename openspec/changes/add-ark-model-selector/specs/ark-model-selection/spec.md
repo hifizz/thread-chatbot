@@ -4,10 +4,10 @@
 
 The system SHALL register the models listed by the Ark Coding Plan documentation in the shared chat model registry and SHALL route each Ark model through the Coding Plan OpenAI-compatible endpoint using the server-only `ARK_CODING_API_KEY`. The default endpoint SHALL include `/api/coding/v3`.
 
-#### Scenario: GLM-5.2 request uses Ark Coding Plan
+#### Scenario: glm-5.2 request uses Ark Coding Plan
 
 - **WHEN** `/api/chat` receives a valid request whose `modelId` is `glm-5.2`
-- **THEN** the system SHALL stream the response from the Ark Coding Plan-compatible GLM-5.2 model through AI SDK 7
+- **THEN** the system SHALL stream the response from the Ark Coding Plan-compatible glm-5.3 model through AI SDK 7
 
 #### Scenario: Ark key is missing
 
@@ -39,7 +39,7 @@ A newly forked Thread SHALL copy its parent Thread's current `modelId`. The mode
 
 #### Scenario: Branch inherits the main model
 
-- **WHEN** the user forks a message while the parent Thread uses GLM-5.2
+- **WHEN** the user forks a message while the parent Thread uses glm-5.2
 - **THEN** the new Thread SHALL be created with `modelId` equal to `glm-5.2`
 
 #### Scenario: Branch selector is disabled

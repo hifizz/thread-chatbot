@@ -54,14 +54,14 @@ function seed(modelId = DEFAULT_MODEL_ID) {
 
 {
   const store = createThreadStore(seed(), isValidModelId)
-  store.setThreadModel("main", "glm-5.2")
-  assert.equal(store.getState().threads.main.modelId, "glm-5.2")
+  store.setThreadModel("main", "glm-5.3")
+  assert.equal(store.getState().threads.main.modelId, "glm-5.3")
 
   store.setThreadModel("main", "not-a-model")
-  assert.equal(store.getState().threads.main.modelId, "glm-5.2")
+  assert.equal(store.getState().threads.main.modelId, "glm-5.3")
 
   store.setThreadModel("main", "minimax-m2")
-  assert.equal(store.getState().threads.main.modelId, "glm-5.2")
+  assert.equal(store.getState().threads.main.modelId, "glm-5.3")
 
   const branch = store.fork({
     sourceThreadId: "main",
@@ -69,10 +69,10 @@ function seed(modelId = DEFAULT_MODEL_ID) {
     anchorText: "可分叉",
   })
   assert.ok(branch)
-  assert.equal(store.getState().threads[branch.threadId].modelId, "glm-5.2")
+  assert.equal(store.getState().threads[branch.threadId].modelId, "glm-5.3")
 
   store.setThreadModel(branch.threadId, "deepseek-v4-pro")
-  assert.equal(store.getState().threads[branch.threadId].modelId, "glm-5.2")
+  assert.equal(store.getState().threads[branch.threadId].modelId, "glm-5.3")
   console.log("PASS  根 Thread 可切换，分支继承且拒绝独立切换")
 }
 
