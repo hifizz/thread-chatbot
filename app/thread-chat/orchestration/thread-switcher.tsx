@@ -18,6 +18,7 @@ import React, { useEffect, useRef, useState } from "react"
 import { ListTree, Search } from "lucide-react"
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog"
 import { Dialog, DialogPortal } from "@/components/ui/dialog"
+import { THREAD_CHAT_SHORTCUTS } from "@/constants/thread-chat"
 import type { ThreadTreeState } from "../core/types"
 import {
   allTreeRows,
@@ -27,6 +28,7 @@ import {
 } from "../core/selectors"
 import { dotColorOf, dvar } from "../theme"
 import type { Slot } from "./placement"
+import { ShortcutHint } from "./shortcut-hint"
 
 /**
  * Dialog 关闭回调的统一策略：Esc 的权威在壳层 keydown 逐层关闭链——
@@ -156,7 +158,9 @@ export function ThreadSwitcher({
               }
             }}
           />
-          {isGlobal && <span className="kbd">⌘K</span>}
+          {isGlobal && (
+            <ShortcutHint {...THREAD_CHAT_SHORTCUTS.openThreadTree} />
+          )}
         </div>
       )}
 
@@ -243,13 +247,21 @@ export function ThreadSwitcher({
         {isSubtree ? (
           <>
             <span>点击行打开（列满走当前策略）</span>
-            <span>esc 关闭</span>
+            <span>
+              <ShortcutHint {...THREAD_CHAT_SHORTCUTS.closeDialog} /> 关闭
+            </span>
           </>
         ) : (
           <>
-            <span>↑↓ 选择</span>
-            <span>⏎ 打开</span>
-            <span>esc 关闭</span>
+            <span>
+              <ShortcutHint {...THREAD_CHAT_SHORTCUTS.moveSelection} /> 选择
+            </span>
+            <span>
+              <ShortcutHint {...THREAD_CHAT_SHORTCUTS.openSelection} /> 打开
+            </span>
+            <span>
+              <ShortcutHint {...THREAD_CHAT_SHORTCUTS.closeDialog} /> 关闭
+            </span>
             {isGlobal ? (
               <span>点击 = 智能放置（列满走当前策略）</span>
             ) : (

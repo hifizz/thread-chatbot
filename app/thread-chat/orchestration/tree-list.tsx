@@ -24,8 +24,12 @@ import React, { useEffect, useState } from "react"
 import { Check, ListTodo, Pencil, Trash2, X } from "lucide-react"
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog"
 import { Dialog, DialogPortal } from "@/components/ui/dialog"
-import { CUSTOM_TITLE_MAX_LEN } from "@/constants/thread-chat"
+import {
+  CUSTOM_TITLE_MAX_LEN,
+  THREAD_CHAT_SHORTCUTS,
+} from "@/constants/thread-chat"
 import { dialogCloseToShell } from "./thread-switcher"
+import { ShortcutHint } from "./shortcut-hint"
 import {
   cleanupAfterTreeDelete,
   deleteTree,
@@ -227,7 +231,10 @@ export function TreeList({
           <div className="swx-title">
             <ListTodo size={14} />
             对话列表
-            <span className="kbd">⌘⇧K</span>
+            <ShortcutHint
+              {...THREAD_CHAT_SHORTCUTS.openTreeList}
+              className="ml-auto shrink-0"
+            />
           </div>
           <div className="swx-list">
             {items === null && <div className="swx-empty">加载中…</div>}
@@ -353,7 +360,9 @@ export function TreeList({
           <div className="swx-foot">
             <span>点击切换</span>
             <span>悬停条目可重命名 / 删除</span>
-            <span>esc 关闭</span>
+            <span>
+              <ShortcutHint {...THREAD_CHAT_SHORTCUTS.closeDialog} /> 关闭
+            </span>
           </div>
         </DialogPrimitive.Popup>
       </DialogPortal>
