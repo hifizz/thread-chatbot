@@ -37,7 +37,7 @@ export function TopupPacks({
         return
       }
       // 跳转到 Creem 托管支付页
-      window.location.href = data.url
+      window.location.assign(data.url)
     } catch {
       toast.error("网络错误，请稍后重试")
     } finally {
