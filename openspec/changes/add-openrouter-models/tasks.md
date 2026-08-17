@@ -45,6 +45,6 @@
 ## 7. 验证与交付
 
 - [x] 7.1 扩展现有 Node e2e/纯状态验证，覆盖注册表、Thread 模型选择、成本解析、计费来源和未知 id 拒绝
-- [ ] 7.2 使用真实 OpenRouter key 对 GPT-5.6 Luna、Kimi K3、DeepSeek V4 Flash 0731 运行流式文本与至少一次工具调用 smoke；记录 GPT-5.5 Pro 为高成本手工验证项
+- [x] 7.2 使用真实 OpenRouter key 对 GPT-5.6 Luna、Kimi K3、DeepSeek V4 Flash 0731 运行流式文本与至少一次工具调用 smoke；记录 GPT-5.5 Pro 为高成本手工验证项
 - [x] 7.3 分批运行 `pnpm typecheck`，最终运行相关 e2e、`pnpm lint` 与 `pnpm build` 并修复本 change 引入的问题
 - [x] 7.4 运行 `pnpm openspec:validate`（必要时再执行 OpenSpec strict validation），确认 proposal、design、spec、plan 与 tasks 一致且 apply-ready

@@ -12,13 +12,15 @@ import {
   getChatModel,
   type ChatModel,
   type OpenRouterModelId,
+  type UMAPISModelId,
 } from "@/constants/model"
 import {
   isOpenRouterConfigured,
   openRouterChatModel,
 } from "@/lib/ai/openrouter"
+import { isUMAPISConfigured, umapisChatModel } from "@/lib/ai/umapis"
 
-// 统一的对话模型解析层。Ark 与 OpenRouter 固定走各自专用端点；其余非 MiniMax 模型按优先级路由：
+// 统一的对话模型解析层。Ark、OpenRouter 与 UMAPIS 固定走各自专用端点；其余非 MiniMax 模型按优先级路由：
 //   1) Vercel AI 网关（配 AI_GATEWAY_API_KEY）—— 会回传 generationId，供真实成本对账；
 //   2) Cloudflare AI 网关 compat 端点（配 CF_AI_GATEWAY_*）；
 //   3) 供应商直连。
@@ -39,7 +41,7 @@ function gatewayCompatBaseURL(): string {
 
 // 各供应商的 API key 与直连 baseURL（网关未配置时的回退）。
 const PROVIDER_ENV: Record<
-  Exclude<ChatModel["provider"], "minimax" | "ark" | "openrouter">,
+  Exclude<ChatModel["provider"], "minimax" | "ark" | "openrouter" | "umapis">,
   { key: string | undefined; directBaseURL: string }
 > = {
   deepseek: {
@@ -58,6 +60,12 @@ export function isModelConfigured(model: ChatModel): boolean {
   if (model.provider === "minimax") return isMinimaxConfigured()
   if (model.provider === "ark") return isArkCodingConfigured()
   if (model.provider === "openrouter") return isOpenRouterConfigured()
+  if (model.provider === "umapis") {
+    return (
+      model.umapisCredentialGroup !== undefined &&
+      isUMAPISConfigured(model.umapisCredentialGroup)
+    )
+  }
   // Vercel 网关配了就能用（它自带各家凭据）；否则需要该供应商的直连/CF key。
   if (isVercelGatewayConfigured()) return true
   return Boolean(PROVIDER_ENV[model.provider].key)
@@ -79,6 +87,15 @@ export function resolveChatModel(modelId: string): LanguageModel {
   }
   if (model.provider === "openrouter") {
     return openRouterChatModel(model.upstreamModel as OpenRouterModelId)
+  }
+  if (model.provider === "umapis") {
+    if (!model.umapisCredentialGroup) {
+      throw new Error(`UMAPIS 模型 ${model.name} 未声明凭据组`)
+    }
+    return umapisChatModel(
+      model.upstreamModel as UMAPISModelId,
+      model.umapisCredentialGroup
+    )
   }
 
   // 优先 Vercel AI 网关：用 "creator/model" 标识（复用 gatewayModel），响应带 generationId。

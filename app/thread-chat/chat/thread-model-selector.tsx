@@ -16,10 +16,14 @@ import { Bot } from "lucide-react"
 /** 模型 selector 的产品展示顺序；同一品牌内沿用模型注册表顺序。 */
 const MODEL_FAMILY_ORDER = [
   "openai",
+  "gpt",
+  "claude",
   "glm",
+  "qwen",
   "kimi",
   "moonshotai",
   "deepseek",
+  "x-ai",
   "minimax",
   "doubao",
 ] as const
@@ -118,7 +122,7 @@ export function ThreadModelSelector({
       )}
       <ModelSelector.Content
         side="top"
-        className="thread-model-selector-content"
+        className="thread-model-selector-content w-96 max-w-[calc(100vw-2rem)]"
       />
     </ModelSelector.Root>
   )
