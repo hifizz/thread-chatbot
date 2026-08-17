@@ -4,7 +4,9 @@ import type React from "react"
 import { CircleHelp, Highlighter } from "lucide-react"
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog"
 import { Dialog, DialogPortal } from "@/components/ui/dialog"
+import { THREAD_CHAT_SHORTCUTS } from "@/constants/thread-chat"
 import { dialogCloseToShell } from "./thread-switcher"
+import { ShortcutHint } from "./shortcut-hint"
 
 /** 首次内联提示与手动 Help Dialog 共用的功能要点。 */
 function UsageTips() {
@@ -15,13 +17,15 @@ function UsageTips() {
       </li>
       <li>列数随屏宽自适应（2–4 列），列满默认替换来源列（可撤销）</li>
       <li>
-        按住 <span className="kbd">⌘</span>/Ctrl 划选或点脚注 = <b>保留本列</b>
+        按住 <ShortcutHint {...THREAD_CHAT_SHORTCUTS.keepSourceColumn} />
+        /Ctrl 划选或点脚注 = <b>保留本列</b>
         ，新会话开在紧邻右侧
       </li>
       <li>拖动列间分割线调宽度，双击恢复均分</li>
       <li>面包屑可就地回退到上游会话</li>
       <li>
-        <span className="kbd">⌘K</span> 搜索并打开任意会话
+        <ShortcutHint {...THREAD_CHAT_SHORTCUTS.openThreadTree} />{" "}
+        搜索并打开任意会话
       </li>
       <li>
         点列头 <b>⇄</b> 把该列切换成任意会话，<b>⑂</b> 查看子分支
@@ -89,7 +93,9 @@ export function HelpPanel({
           </div>
           <div className="swx-foot">
             <span>点击遮罩关闭</span>
-            <span>esc 关闭</span>
+            <span>
+              <ShortcutHint {...THREAD_CHAT_SHORTCUTS.closeDialog} /> 关闭
+            </span>
           </div>
         </DialogPrimitive.Popup>
       </DialogPortal>

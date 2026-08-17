@@ -36,6 +36,7 @@ import {
 import "./thread-chat.css"
 import {
   POPUP_EXIT_MS,
+  THREAD_CHAT_SHORTCUTS,
   TREE_SAVE_DEBOUNCE_MS,
   UI_SAVE_DEBOUNCE_MS,
 } from "@/constants/thread-chat"
@@ -90,6 +91,7 @@ import { TreeList } from "./orchestration/tree-list"
 import { ArtifactDrawer } from "./orchestration/artifact-drawer"
 import { AccountButton } from "./orchestration/account-button"
 import { HelpPanel, UsageHint } from "./orchestration/help-panel"
+import { ShortcutHint } from "./orchestration/shortcut-hint"
 // type-only：不把画布模块（React Flow）拖进首屏 bundle
 import type { CanvasChatActions } from "./orchestration/canvas-node"
 import type { CanvasViewState } from "./orchestration/use-canvas-layout"
@@ -633,7 +635,7 @@ export function ThreadChatDemoInner({
         >
           <ListTodo size={13} />
           对话列表
-          <span className="kbd">⌘⇧K</span>
+          <ShortcutHint {...THREAD_CHAT_SHORTCUTS.openTreeList} />
         </button>
         <div className="brand">
           <span className="mark">Thread Chat</span>
@@ -712,7 +714,7 @@ export function ThreadChatDemoInner({
         >
           <Network size={13} />
           会话树{branchCount > 0 ? ` · ${branchCount}` : ""}
-          <span className="kbd">⌘K</span>
+          <ShortcutHint {...THREAD_CHAT_SHORTCUTS.openThreadTree} />
         </button>
         <button
           className="tbtn"

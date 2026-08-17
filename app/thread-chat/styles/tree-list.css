@@ -4,9 +4,6 @@
 .tc .swx.tlx {
   width: min(460px, 94vw);
 }
-.tc .swx-title .kbd {
-  margin-left: auto;
-}
 .tc .tlx-row {
   gap: 8px;
 }
