@@ -14,6 +14,12 @@ type UseCarouselParameters = Parameters<typeof useEmblaCarousel>
 type CarouselOptions = UseCarouselParameters[0]
 type CarouselPlugin = UseCarouselParameters[1]
 
+type CarouselScrollState = "none" | "previous" | "next" | "both"
+
+function getServerScrollState(): CarouselScrollState {
+  return "none"
+}
+
 type CarouselProps = {
   opts?: CarouselOptions
   plugins?: CarouselPlugin
@@ -58,14 +64,38 @@ function Carousel({
     },
     plugins
   )
-  const [canScrollPrev, setCanScrollPrev] = React.useState(false)
-  const [canScrollNext, setCanScrollNext] = React.useState(false)
 
-  const onSelect = React.useCallback((api: CarouselApi) => {
-    if (!api) return
-    setCanScrollPrev(api.canScrollPrev())
-    setCanScrollNext(api.canScrollNext())
-  }, [])
+  const subscribeToScrollState = React.useCallback(
+    (onStoreChange: () => void) => {
+      if (!api) return () => undefined
+      api.on("reInit", onStoreChange)
+      api.on("select", onStoreChange)
+
+      return () => {
+        api.off("reInit", onStoreChange)
+        api.off("select", onStoreChange)
+      }
+    },
+    [api]
+  )
+
+  const getScrollState = React.useCallback(() => {
+    if (!api) return "none"
+    const canScrollPrevious = api.canScrollPrev()
+    const canScrollNext = api.canScrollNext()
+    if (canScrollPrevious && canScrollNext) return "both"
+    if (canScrollPrevious) return "previous"
+    if (canScrollNext) return "next"
+    return "none"
+  }, [api])
+
+  const scrollState = React.useSyncExternalStore(
+    subscribeToScrollState,
+    getScrollState,
+    getServerScrollState
+  )
+  const canScrollPrev = scrollState === "previous" || scrollState === "both"
+  const canScrollNext = scrollState === "next" || scrollState === "both"
 
   const scrollPrev = React.useCallback(() => {
     api?.scrollPrev()
@@ -92,17 +122,6 @@ function Carousel({
     if (!api || !setApi) return
     setApi(api)
   }, [api, setApi])
-
-  React.useEffect(() => {
-    if (!api) return
-    onSelect(api)
-    api.on("reInit", onSelect)
-    api.on("select", onSelect)
-
-    return () => {
-      api?.off("select", onSelect)
-    }
-  }, [api, onSelect])
 
   return (
     <CarouselContext.Provider
@@ -188,7 +207,7 @@ function CarouselPrevious({
         "absolute touch-manipulation rounded-2xl",
         orientation === "horizontal"
           ? "inset-y-0 -start-12 my-auto"
-          : "-top-12 start-1/2 -translate-x-1/2 rtl:translate-x-1/2 rotate-90",
+          : "start-1/2 -top-12 -translate-x-1/2 rotate-90 rtl:translate-x-1/2",
         className
       )}
       disabled={!canScrollPrev}
@@ -218,7 +237,7 @@ function CarouselNext({
         "absolute touch-manipulation rounded-2xl",
         orientation === "horizontal"
           ? "inset-y-0 -end-12 my-auto"
-          : "-bottom-12 start-1/2 -translate-x-1/2 rtl:translate-x-1/2 rotate-90",
+          : "start-1/2 -bottom-12 -translate-x-1/2 rotate-90 rtl:translate-x-1/2",
         className
       )}
       disabled={!canScrollNext}
