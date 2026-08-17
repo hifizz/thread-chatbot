@@ -21,5 +21,5 @@
 ## 4. 验证
 
 - [x] 4.1 增加或更新针对 Thread 默认模型、切换限制、分支继承和旧数据升级的测试
-- [x] 4.2 使用 `ARK_CODING_API_KEY` 通过 AI SDK 7 验证 GLM-5.2 流式聊天与 tool call
+- [x] 4.2 使用 `ARK_CODING_API_KEY` 通过 AI SDK 7 验证 glm-5.2 流式聊天与 tool call
 - [x] 4.3 运行 typecheck、lint 与相关测试，并检查 OpenSpec change 状态

@@ -22,6 +22,7 @@ import { getCurrentUserId } from "@/lib/auth/server"
 import {
   DEFAULT_MODEL_ID,
   getChatModel,
+  isUnbilledPreviewModel,
   MAX_OUTPUT_TOKENS,
 } from "@/constants/model"
 import { resolveChatModel, isModelConfigured } from "@/lib/ai/provider"
@@ -148,8 +149,10 @@ export async function POST(req: Request) {
     )
   }
 
-  // 3) 计费拦截：余额不足不允许发起新对话
-  if (!(await hasPositiveBalance(userId))) {
+  const isUnbilledPreview = isUnbilledPreviewModel(model)
+
+  // 3) 计费拦截：未计费预览模型不依赖用户余额。
+  if (!isUnbilledPreview && !(await hasPositiveBalance(userId))) {
     return Response.json({ error: "额度不足，请充值后再试。" }, { status: 402 })
   }
 
@@ -212,9 +215,10 @@ export async function POST(req: Request) {
     stopWhen: isThreadChat
       ? isStepCount(5)
       : isStepCount(research && searchReady ? RESEARCH_MAX_STEPS : 5),
-    // 4) 生成结束后按 token 用量即时扣费并写入流水（价目表估算，利润率 ≥30%）。
-    //    若经 Vercel 网关，采集 generationId，稍后由 /api/billing/reconcile 拉真实成本对账。
+    // 4) 已计费模型在生成结束后按 token 用量即时扣费并写入流水。
+    //    UMAPIS 预览尚未有经确认的价格，不扣余额也不写流水。
     onEnd: async ({ usage, providerMetadata, steps }) => {
+      if (isUnbilledPreview) return
       const generationId =
         typeof providerMetadata?.gateway?.generationId === "string"
           ? providerMetadata.gateway.generationId

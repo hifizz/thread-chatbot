@@ -8,7 +8,7 @@ Thread Chat 已经复用全站 `/api/chat` 与 AI SDK 7 的 `UIMessage`/`ModelMe
 
 **Goals:**
 
-- 通过 Ark Coding Plan 专用的 OpenAI-compatible endpoint 调用文档列出的模型，并以 GLM-5.2 跑通流式聊天。
+- 通过 Ark Coding Plan 专用的 OpenAI-compatible endpoint 调用文档列出的模型，并以 glm-5.2 跑通流式聊天。
 - 把 `modelId` 作为 Thread 的持久化领域状态，使请求路由和 UI 展示始终以当前 Thread 为准。
 - 主线提供可控模型选择器；新分支继承父 Thread 模型并禁用选择器。
 - 兼容已有 localStorage 树数据，并在服务端拒绝伪造或过期的模型 id。
@@ -72,7 +72,7 @@ Thread Chat 的 request builder 每次发送都从当前 Thread 读取 `modelId`
 
 1. 先部署代码与 `ARK_CODING_API_KEY` 环境变量；没有 Ark key 时现有非 Ark 模型仍可工作。
 2. localStorage 树在读取时补齐 `modelId`，不做破坏性 schema 清空或一次性数据迁移。
-3. 发布后用 GLM-5.2 验证主线发送、切换、刷新持久化和分支继承/锁定。
+3. 发布后用 glm-5.2 验证主线发送、切换、刷新持久化和分支继承/锁定。
 4. 回滚时可移除 Ark 模型和 selector；旧树中多出的 `modelId` 字段会被旧代码忽略。
 
 ## Open Questions

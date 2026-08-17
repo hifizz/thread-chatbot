@@ -13,11 +13,23 @@ export const OPENROUTER_MODEL_IDS = [
   "openai/gpt-5.5-pro",
   "moonshotai/kimi-k3",
   "deepseek/deepseek-v4-flash-0731",
+  "qwen/qwen3.8-max",
+  "x-ai/grok-4.5",
+  "x-ai/grok-4.6",
 ] as const
 
 export type OpenRouterModelId = (typeof OPENROUTER_MODEL_IDS)[number]
+export const UMAPIS_MODEL_IDS = [
+  "claude-opus-4-6",
+  "claude-sonnet-5",
+  "gpt-5.6-sol",
+  "gpt-5.6-terra",
+] as const
+
+export type UMAPISModelId = (typeof UMAPIS_MODEL_IDS)[number]
+export type UMAPISCredentialGroup = "claude" | "gpt"
 export type ChatModelProvider =
-  "minimax" | "deepseek" | "openai" | "ark" | "openrouter"
+  "minimax" | "deepseek" | "openai" | "ark" | "openrouter" | "umapis"
 export type ReasoningTransport = "think-tags" | "native"
 export type ChatModelSurface = "linear" | "thread"
 
@@ -39,10 +51,14 @@ export type ChatModel = {
   gatewayModel?: string
   /** 推理传输方式；只有 think-tags 需要标签抽取中间件。 */
   reasoningTransport?: ReasoningTransport
+  /** UMAPIS 模型使用的服务端凭据组。 */
+  umapisCredentialGroup?: UMAPISCredentialGroup
+  /** 尚未定义价格与扣费策略的模型，只保留可用 token usage。 */
+  unbilledPreview?: true
   /** 模型可见的产品入口。 */
   surfaces: readonly ChatModelSurface[]
   /** 仅用于展示分组，不参与鉴权和路由。 */
-  creator?: "openai" | "moonshotai" | "deepseek"
+  creator?: "anthropic" | "openai" | "moonshotai" | "deepseek" | "qwen" | "x-ai"
 }
 
 export const CHAT_MODELS: readonly ChatModel[] = [
@@ -106,11 +122,11 @@ export const CHAT_MODELS: readonly ChatModel[] = [
     surfaces: ["linear", "thread"],
   },
   {
-    id: "glm-5.2",
-    name: "GLM-5.2",
+    id: "glm-5.3",
+    name: "glm-5.3",
     description: "火山方舟 Coding Plan",
     provider: "ark",
-    upstreamModel: "glm-5.2",
+    upstreamModel: "glm-5.3",
     surfaces: ["linear", "thread"],
   },
   {
@@ -146,8 +162,56 @@ export const CHAT_MODELS: readonly ChatModel[] = [
     surfaces: ["linear", "thread"],
   },
   {
+    id: "umapis-claude-opus-4-6",
+    name: "UMAPIS · Claude Opus 4.6",
+    description: "UMAPIS 预览（Claude 组）",
+    provider: "umapis",
+    upstreamModel: "claude-opus-4-6",
+    reasoningTransport: "native",
+    umapisCredentialGroup: "claude",
+    unbilledPreview: true,
+    surfaces: ["thread"],
+    creator: "anthropic",
+  },
+  {
+    id: "umapis-claude-sonnet-5",
+    name: "UMAPIS · Claude Sonnet 5",
+    description: "UMAPIS 预览（Claude 组）",
+    provider: "umapis",
+    upstreamModel: "claude-sonnet-5",
+    reasoningTransport: "native",
+    umapisCredentialGroup: "claude",
+    unbilledPreview: true,
+    surfaces: ["thread"],
+    creator: "anthropic",
+  },
+  {
+    id: "umapis-gpt-5.6-sol",
+    name: "UMAPIS · GPT-5.6 Sol",
+    description: "UMAPIS 预览（GPT 组）",
+    provider: "umapis",
+    upstreamModel: "gpt-5.6-sol",
+    reasoningTransport: "native",
+    umapisCredentialGroup: "gpt",
+    unbilledPreview: true,
+    surfaces: ["thread"],
+    creator: "openai",
+  },
+  {
+    id: "umapis-gpt-5.6-terra",
+    name: "UMAPIS · GPT-5.6 Terra",
+    description: "UMAPIS 预览（GPT 组）",
+    provider: "umapis",
+    upstreamModel: "gpt-5.6-terra",
+    reasoningTransport: "native",
+    umapisCredentialGroup: "gpt",
+    unbilledPreview: true,
+    surfaces: ["thread"],
+    creator: "openai",
+  },
+  {
     id: "openrouter-gpt-5.6-luna",
-    name: "GPT-5.6 Luna",
+    name: "OpenRouter · GPT-5.6 Luna",
     provider: "openrouter",
     upstreamModel: "openai/gpt-5.6-luna",
     reasoningTransport: "native",
@@ -156,7 +220,7 @@ export const CHAT_MODELS: readonly ChatModel[] = [
   },
   {
     id: "openrouter-gpt-5.6-luna-pro",
-    name: "GPT-5.6 Luna Pro",
+    name: "OpenRouter · GPT-5.6 Luna Pro",
     provider: "openrouter",
     upstreamModel: "openai/gpt-5.6-luna-pro",
     reasoningTransport: "native",
@@ -165,7 +229,7 @@ export const CHAT_MODELS: readonly ChatModel[] = [
   },
   {
     id: "openrouter-gpt-5.6-terra",
-    name: "GPT-5.6 Terra",
+    name: "OpenRouter · GPT-5.6 Terra",
     provider: "openrouter",
     upstreamModel: "openai/gpt-5.6-terra",
     reasoningTransport: "native",
@@ -174,7 +238,7 @@ export const CHAT_MODELS: readonly ChatModel[] = [
   },
   {
     id: "openrouter-gpt-5.6-terra-pro",
-    name: "GPT-5.6 Terra Pro",
+    name: "OpenRouter · GPT-5.6 Terra Pro",
     provider: "openrouter",
     upstreamModel: "openai/gpt-5.6-terra-pro",
     reasoningTransport: "native",
@@ -183,7 +247,7 @@ export const CHAT_MODELS: readonly ChatModel[] = [
   },
   {
     id: "openrouter-gpt-5.6-sol",
-    name: "GPT-5.6 Sol",
+    name: "OpenRouter · GPT-5.6 Sol",
     provider: "openrouter",
     upstreamModel: "openai/gpt-5.6-sol",
     reasoningTransport: "native",
@@ -192,7 +256,7 @@ export const CHAT_MODELS: readonly ChatModel[] = [
   },
   {
     id: "openrouter-gpt-5.6-sol-pro",
-    name: "GPT-5.6 Sol Pro",
+    name: "OpenRouter · GPT-5.6 Sol Pro",
     provider: "openrouter",
     upstreamModel: "openai/gpt-5.6-sol-pro",
     reasoningTransport: "native",
@@ -201,7 +265,7 @@ export const CHAT_MODELS: readonly ChatModel[] = [
   },
   {
     id: "openrouter-gpt-5.5",
-    name: "GPT-5.5",
+    name: "OpenRouter · GPT-5.5",
     provider: "openrouter",
     upstreamModel: "openai/gpt-5.5",
     reasoningTransport: "native",
@@ -210,7 +274,7 @@ export const CHAT_MODELS: readonly ChatModel[] = [
   },
   {
     id: "openrouter-gpt-5.5-pro",
-    name: "GPT-5.5 Pro",
+    name: "OpenRouter · GPT-5.5 Pro",
     provider: "openrouter",
     upstreamModel: "openai/gpt-5.5-pro",
     reasoningTransport: "native",
@@ -219,7 +283,7 @@ export const CHAT_MODELS: readonly ChatModel[] = [
   },
   {
     id: "openrouter-kimi-k3",
-    name: "Kimi K3",
+    name: "OpenRouter · Kimi K3",
     provider: "openrouter",
     upstreamModel: "moonshotai/kimi-k3",
     reasoningTransport: "native",
@@ -228,12 +292,39 @@ export const CHAT_MODELS: readonly ChatModel[] = [
   },
   {
     id: "openrouter-deepseek-v4-flash-0731",
-    name: "DeepSeek V4 Flash 0731",
+    name: "OpenRouter · DeepSeek V4 Flash 0731",
     provider: "openrouter",
     upstreamModel: "deepseek/deepseek-v4-flash-0731",
     reasoningTransport: "native",
     surfaces: ["thread"],
     creator: "deepseek",
+  },
+  {
+    id: "openrouter-qwen3.8-max",
+    name: "OpenRouter · Qwen3.8 Max",
+    provider: "openrouter",
+    upstreamModel: "qwen/qwen3.8-max",
+    reasoningTransport: "native",
+    surfaces: ["thread"],
+    creator: "qwen",
+  },
+  {
+    id: "openrouter-grok-4.5",
+    name: "OpenRouter · Grok 4.5",
+    provider: "openrouter",
+    upstreamModel: "x-ai/grok-4.5",
+    reasoningTransport: "native",
+    surfaces: ["thread"],
+    creator: "x-ai",
+  },
+  {
+    id: "openrouter-grok-4.6",
+    name: "OpenRouter · Grok 4.6",
+    provider: "openrouter",
+    upstreamModel: "x-ai/grok-4.6",
+    reasoningTransport: "native",
+    surfaces: ["thread"],
+    creator: "x-ai",
   },
 ]
 
@@ -245,7 +336,7 @@ export const THREAD_CHAT_MODELS: readonly ChatModel[] = CHAT_MODELS.filter(
 )
 
 /** Thread Chat 新建树及旧树模型回退使用的默认模型。 */
-export const DEFAULT_THREAD_CHAT_MODEL_ID = "glm-5.2"
+export const DEFAULT_THREAD_CHAT_MODEL_ID = "glm-5.3"
 
 /**
  * 单次生成的输出 token 上限（安全阀）。
@@ -257,6 +348,11 @@ export const MAX_OUTPUT_TOKENS = 8192
 
 export function getChatModel(id: string | undefined): ChatModel | undefined {
   return CHAT_MODELS.find((m) => m.id === id)
+}
+
+/** 未定义价格和额度策略的模型仅作为不扣费预览提供。 */
+export function isUnbilledPreviewModel(model: ChatModel): boolean {
+  return model.unbilledPreview === true
 }
 
 export function isChatModelId(id: unknown): id is string {

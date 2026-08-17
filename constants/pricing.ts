@@ -103,6 +103,21 @@ export const MODEL_COST: Record<string, ModelCost> = {
     inputPerMillion: 0.14,
     outputPerMillion: 0.28,
   },
+  "openrouter-qwen3.8-max": {
+    currency: "USD",
+    inputPerMillion: 2,
+    outputPerMillion: 6,
+  },
+  "openrouter-grok-4.5": {
+    currency: "USD",
+    inputPerMillion: 4,
+    outputPerMillion: 12,
+  },
+  "openrouter-grok-4.6": {
+    currency: "USD",
+    inputPerMillion: 4,
+    outputPerMillion: 12,
+  },
   // MiniMax M2（直连）— 人民币计价，参考官方定价，请以实际账单为准
   "minimax-m2": {
     currency: "CNY",
@@ -125,7 +140,7 @@ export const MODEL_COST: Record<string, ModelCost> = {
   "doubao-seed-2.0-lite": ARK_CODING_MVP_COST,
   "minimax-m2.7": ARK_CODING_MVP_COST,
   "minimax-m3": ARK_CODING_MVP_COST,
-  "glm-5.2": ARK_CODING_MVP_COST,
+  "glm-5.3": ARK_CODING_MVP_COST,
   "deepseek-v4-flash": ARK_CODING_MVP_COST,
   "deepseek-v4-pro": ARK_CODING_MVP_COST,
   "kimi-k2.6": ARK_CODING_MVP_COST,
