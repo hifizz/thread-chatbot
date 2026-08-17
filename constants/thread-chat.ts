@@ -70,3 +70,31 @@ export const TREE_TITLE_FALLBACK = "未命名对话"
  * 到点再真正卸载组件（Dialog 面板由 Base UI 在过渡结束时先行卸掉 Popup，这里只是兜底）。
  */
 export const POPUP_EXIT_MS = 200
+
+/** thread-chat 中展示给用户的键盘快捷键（触发逻辑同时兼容 Command 与 Control）。 */
+export const THREAD_CHAT_SHORTCUTS = {
+  openThreadTree: {
+    keys: ["⌘", "K"],
+    label: "打开会话树：Command 或 Control 加 K",
+  },
+  openTreeList: {
+    keys: ["⌘", "⇧", "K"],
+    label: "打开对话列表：Command 或 Control 加 Shift 加 K",
+  },
+  keepSourceColumn: {
+    keys: ["⌘"],
+    label: "保留来源列：按住 Command 或 Control",
+  },
+  moveSelection: {
+    keys: ["↑", "↓"],
+    label: "上下移动选择",
+  },
+  openSelection: {
+    keys: ["⏎"],
+    label: "打开当前选择",
+  },
+  closeDialog: {
+    keys: ["Esc"],
+    label: "关闭弹层",
+  },
+} as const

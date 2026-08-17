@@ -8,6 +8,8 @@
 .tc {
   --paper: #f5f2ea;
   --paper-2: #efe9dd;
+  /* Kbd 比纸面底色略深，提供可辨识的键帽层次而不过分抢眼。 */
+  --kbd-bg: color-mix(in srgb, var(--paper) 65%, var(--paper-2));
   --ink: #24211b;
   --ink-soft: #6a6357;
   --ink-faint: #a79e8d;
@@ -42,4 +44,11 @@
 .tc *::before,
 .tc *::after {
   box-sizing: border-box;
+}
+
+/* shadcn Kbd：沿用组件的尺寸与圆角，仅与 thread-chat 纸面 token 对齐。 */
+.tc [data-slot="kbd"] {
+  background-color: var(--kbd-bg);
+  color: var(--ink-soft);
+  font-family: var(--font-mono);
 }
