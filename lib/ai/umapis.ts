@@ -1,3 +1,4 @@
+import { createAnthropic } from "@ai-sdk/anthropic"
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible"
 import type { LanguageModel } from "ai"
 import type { UMAPISCredentialGroup, UMAPISModelId } from "@/constants/model"
@@ -40,12 +41,20 @@ export function umapisChatModel(
     throw new Error(`UMAPIS ${credentialGroup.toUpperCase()} 组未配置 API Key`)
   }
 
+  if (credentialGroup === "claude") {
+    const provider = createAnthropic({
+      name: "umapis-anthropic",
+      baseURL: normalizeUMAPISBaseURL(),
+      apiKey,
+    })
+    return provider(modelId)
+  }
+
   const provider = createOpenAICompatible({
-    name: "umapis",
+    name: "umapis-openai",
     baseURL: normalizeUMAPISBaseURL(),
     apiKey,
     includeUsage: true,
   })
-
   return provider(modelId)
 }
