@@ -34,6 +34,7 @@ import {
   MarkdownArtifactCard,
   MarkdownArtifactProgressCard,
 } from "./markdown-artifact-card"
+import { WebResearchPanel } from "./web-research-panel"
 import { ThreadModelSelector } from "../chat/thread-model-selector"
 
 /** 会话动作（send/abort/retry）：壳层用 chat-controller 组装后传给画布（D3，零平行实现） */
@@ -180,7 +181,8 @@ function CanvasExpand({
             (msg.status === "pending" || msg.status === "streaming") &&
             !hasVisibleText &&
             !msg.artifactIds?.length &&
-            !msg.markdownGeneration
+            !msg.markdownGeneration &&
+            !msg.webResearch?.length
           return (
             <div
               key={msg.id}
@@ -244,6 +246,7 @@ function CanvasExpand({
                       compact
                     />
                   )}
+                  <WebResearchPanel activities={msg.webResearch ?? []} />
                   {state &&
                     actions &&
                     msg.artifactIds?.map((artifactId) => {

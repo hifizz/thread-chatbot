@@ -124,7 +124,8 @@ export function ChatView({
       (msg.status === "pending" || msg.status === "streaming") &&
       !hasVisibleText &&
       !msg.artifactIds?.length &&
-      !msg.markdownGeneration
+      !msg.markdownGeneration &&
+      !msg.webResearch?.length
 
     return (
       <div key={msg.id} className={`message ${msg.role}`} data-msg-id={msg.id}>

@@ -191,6 +191,10 @@ export function createChatController(store: ThreadStore) {
         if (store.attachArtifactToMessage(threadId, msgId, seed) !== null)
           attachedArtifactCount++
       },
+      onWebResearchActivity(activity) {
+        if (settled || !isOwner()) return
+        store.setWebResearchActivity(threadId, msgId, activity)
+      },
       onError(message) {
         if (settled) return
         lastError = message // 不立即 settle：可能是瞬时噪声，正文还会继续到达（后到覆盖先到）

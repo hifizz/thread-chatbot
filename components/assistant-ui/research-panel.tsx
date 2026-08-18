@@ -8,7 +8,6 @@ import {
   BookOpenIcon,
   ChevronDownIcon,
   GlobeIcon,
-  Loader2Icon,
   CheckIcon,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -32,7 +31,7 @@ type ToolPart = {
   status?: { type?: string }
 }
 
-type Step =
+export type ResearchStep =
   | {
       kind: "search"
       query: string
@@ -57,11 +56,14 @@ function hostOf(url: string): string {
  * 返回一个每次都新建的数组/对象——那样 useSyncExternalStore 每次都会判定"变化了"，
  * 触发无限重渲染（Maximum update depth exceeded）。
  */
-function useResearchSteps(): { steps: Step[]; anyRunning: boolean } {
+function useResearchSteps(): {
+  steps: ResearchStep[]
+  anyRunning: boolean
+} {
   const content = useAuiState((s) => s.message.content) as unknown as ToolPart[]
 
   return useMemo(() => {
-    const steps: Step[] = []
+    const steps: ResearchStep[] = []
     let anyRunning = false
     for (const part of content) {
       if (part.type !== "tool-call" || !part.toolName) continue
@@ -138,9 +140,16 @@ export const ResearchProgress: FC = () => {
 }
 
 /** 纯展示：给定步骤即渲染面板（无 assistant-ui 依赖，便于预览/测试） */
-export const ResearchPanelView: FC<{ steps: Step[]; anyRunning: boolean }> = ({
+export const ResearchPanelView: FC<{
+  steps: ResearchStep[]
+  anyRunning: boolean
+  title?: string
+  completionText?: string
+}> = ({
   steps,
   anyRunning,
+  title = "深度研究",
+  completionText = "研究完成，报告见下方",
 }) => {
   const [open, setOpen] = useState(true)
 
@@ -156,22 +165,26 @@ export const ResearchPanelView: FC<{ steps: Step[]; anyRunning: boolean }> = ({
   return (
     <div
       data-slot="research-panel"
-      className="my-2 overflow-hidden rounded-xl border border-border/60 bg-gradient-to-b from-[color-mix(in_oklab,var(--color-primary)_6%,var(--color-background))] to-background"
+      className="mt-2 mb-6 overflow-hidden rounded-xl border border-border/60 bg-gradient-to-b from-[color-mix(in_oklab,var(--color-primary)_6%,var(--color-background))] to-background"
     >
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left transition-colors hover:bg-muted/40"
       >
-        <span className="relative flex size-6 items-center justify-center text-primary">
+        <span className="flex size-6 items-center justify-center text-primary">
           <TelescopeIcon className="size-4.5" />
-          {anyRunning && (
-            <span className="absolute inset-0 animate-spin rounded-full border border-primary/40 border-t-primary" />
-          )}
         </span>
         <span className="flex flex-1 flex-col">
-          <span className="text-sm font-medium">深度研究</span>
-          <span className="text-xs text-muted-foreground">{summary}</span>
+          <span className="text-sm font-medium">{title}</span>
+          <span
+            className={cn(
+              "text-xs text-muted-foreground",
+              anyRunning && "shimmer"
+            )}
+          >
+            {summary}
+          </span>
         </span>
         <ChevronDownIcon
           className={cn(
@@ -193,16 +206,16 @@ export const ResearchPanelView: FC<{ steps: Step[]; anyRunning: boolean }> = ({
               {step.kind === "search" ? (
                 <>
                   <TimelineNode running={step.running}>
-                    {step.running ? (
-                      <Loader2Icon className="size-3.5 animate-spin" />
-                    ) : (
-                      <SearchIcon className="size-3.5" />
-                    )}
+                    <SearchIcon className="size-3.5" />
                   </TimelineNode>
                   <div className="flex min-w-0 flex-1 flex-col gap-1.5 pt-0.5">
                     <span className="text-sm">
                       <span className="text-muted-foreground">搜索</span>{" "}
-                      <span className="font-medium">{step.query}</span>
+                      <span
+                        className={cn("font-medium", step.running && "shimmer")}
+                      >
+                        {step.query}
+                      </span>
                     </span>
                     {step.sources.length > 0 && (
                       <div className="flex flex-wrap gap-1.5">
@@ -216,11 +229,7 @@ export const ResearchPanelView: FC<{ steps: Step[]; anyRunning: boolean }> = ({
               ) : (
                 <>
                   <TimelineNode running={step.running}>
-                    {step.running ? (
-                      <Loader2Icon className="size-3.5 animate-spin" />
-                    ) : (
-                      <BookOpenIcon className="size-3.5" />
-                    )}
+                    <BookOpenIcon className="size-3.5" />
                   </TimelineNode>
                   <div className="flex min-w-0 flex-1 items-center gap-2 pt-1 text-sm">
                     <span className="text-muted-foreground">阅读</span>
@@ -240,7 +249,7 @@ export const ResearchPanelView: FC<{ steps: Step[]; anyRunning: boolean }> = ({
           {!anyRunning && (
             <div className="flex items-center gap-1.5 pl-9 text-xs text-muted-foreground">
               <CheckIcon className="size-3.5" />
-              研究完成，报告见下方
+              {completionText}
             </div>
           )}
         </div>

@@ -10,6 +10,7 @@
  *   - tool-input-start(createMarkdownArtifact) → 立即发出不可点击的生成占位态
  *   - tool-input-delta        → 解析局部 JSON，发出标题/字符/行数/章节进度
  *   - tool-input-available(createMarkdownArtifact) → onMarkdownArtifact
+ *   - webSearch / readUrl 的 tool-* → onWebResearchActivity（聚合活动与来源）
  *   - reasoning-* / 其它 tool-* / start / 其它未知类型 → 静默跳过
  *     （MiniMax 的 <think> 已被服务端 extractReasoningMiddleware 抽成 reasoning-* chunk，
  *      本 demo 只渲染「思考中…」指示器，不展示 reasoning 内容，故这里丢弃。）
@@ -23,6 +24,10 @@ import {
   type MarkdownArtifactProgressEvent,
   type MarkdownArtifactStreamEvent,
 } from "../../../lib/chat/markdown-artifact"
+import {
+  createWebResearchActivityDispatcher,
+  type WebResearchActivity,
+} from "../../../lib/chat/web-research-activity"
 
 export type {
   MarkdownArtifactStreamEvent,
@@ -39,6 +44,8 @@ export interface UIStreamHandlers {
   onMarkdownArtifact(event: MarkdownArtifactStreamEvent): void
   /** Markdown 工具开始或参数增量解析后的临时进度（不持久化） */
   onMarkdownArtifactProgress(event: MarkdownArtifactProgressEvent): void
+  /** Tavily 搜索/深读调用的聚合状态与来源结果。 */
+  onWebResearchActivity(activity: WebResearchActivity): void
   /** 收到 error chunk（errorText 缺失时给出兜底文案） */
   onError(message: string): void
   /** finish chunk 或流自然结束时回调；实现内部保证只触发一次 */
@@ -73,6 +80,9 @@ export async function consumeUIMessageStream(
     createMarkdownArtifactProgressDispatcher(
       handlers.onMarkdownArtifactProgress
     )
+  const dispatchWebResearchActivity = createWebResearchActivityDispatcher(
+    handlers.onWebResearchActivity
+  )
 
   // onFinish 只回调一次（finish chunk 与「流自然结束」可能都想触发）
   const emitFinish = () => {
@@ -105,6 +115,7 @@ export async function consumeUIMessageStream(
 
     if (await dispatchMarkdownArtifactProgress(chunk)) return false
     if (dispatchMarkdownArtifact(chunk)) return false
+    if (dispatchWebResearchActivity(chunk)) return false
 
     if (typeof chunk !== "object" || chunk === null) return false
     const value = chunk as {
@@ -127,7 +138,7 @@ export async function consumeUIMessageStream(
         emitFinish()
         break
       default:
-        break // reasoning-* / 其它 tool-* / start / text-start / text-end / 未知类型：静默跳过
+        break // reasoning-* / 非联网 tool-* / start / text-start / text-end / 未知类型：静默跳过
     }
     return false
   }

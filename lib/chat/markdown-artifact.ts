@@ -43,35 +43,37 @@ export const markdownArtifactInputSchema = rawMarkdownArtifactInputSchema
   })
 
 /**
- * 只覆盖“可以安全强制工具”的高置信表达。完整的开放式语义识别由双语 tool
- * description + system prompt 完成；这里刻意宁可漏判，也不把概念问答误判成交付物。
+ * 只识别用户明确要求“独立交付物”的高置信表达。该结果同时控制工具是否挂载，
+ * 因此刻意宁可漏判，也不把普通长回答、分析、总结或 Markdown 排版误判成文件产物。
  */
-export function isExplicitMarkdownDeliverableRequest(text: string): boolean {
+export function isExplicitMarkdownArtifactRequest(text: string): boolean {
   const normalized = text.trim()
   if (!normalized) return false
 
-  const mentionsFormat =
-    /\bmarkdown\b|\.md\b|\bmd[\t ]+(?:file|document)\b|\bmd[\t ]*(?:文件|文档|格式)/i.test(
-      normalized
-    )
-  if (!mentionsFormat) return false
-
   const conceptQuestion =
-    /(?:什么是|是什么|什么意思|怎么用|如何使用|语法|教程|解释|介绍|区别)|\b(?:what\s+is|what\s+does|how\s+(?:do|does|to)|syntax|tutorial|explain|difference)\b/i.test(
+    /^(?:请问[，,：:]?)?(?:(?:什么是|如何|怎么|怎样).{0,40}(?:markdown[\t ]*(?:文件|文档|格式)?|\.md|md[\t ]*(?:文件|文档|格式))|(?:markdown[\t ]*(?:文件|文档|格式)?|\.md|md[\t ]*(?:文件|文档|格式)).{0,30}(?:是什么|什么意思|怎么用|如何使用|语法|区别))\s*[？?。.]?$|^(?:what\s+is|what\s+does|how\s+(?:do|does|to)|explain|difference)\b.{0,60}\b(?:markdown(?:\s+(?:file|document))?|md\s+(?:file|document))\b\s*[?.]*$/i.test(
       normalized
     )
-  if (conceptQuestion) return false
+  const instructionQuestion =
+    /^(?:请问[，,：:]?)?(?:(?:如何|怎么|怎样).{0,60}(?:创建|生成|撰写|写|制作|输出|导出|保存).{0,40}(?:文件|文档|产物|附件|文章|报告|文稿|稿件|博客|博文|教程|说明书|成稿|内容)|(?:这个|这份|该|一个|一份)?(?:文件|文档|产物|附件|文章|报告|文稿|稿件|博客|博文|教程|说明书|成稿|内容).{0,30}(?:如何|怎么|怎样).{0,30}(?:创建|生成|撰写|写|制作|输出|导出|保存))|^how\s+(?:do\s+i|can\s+i|to)\b.{0,60}\b(?:create|generate|write|draft|produce|export|save)\b.{0,60}\b(?:file|document|artifact|article|report|manuscript|blog\s+post|tutorial|markdown)\b/i.test(
+      normalized
+    )
+  if (conceptQuestion || instructionQuestion) return false
 
-  const chineseDeliverable =
-    /(?:帮我|请|给我|提供|创建|生成|输出|整理|制作|写成|写为|改写|转换|转成|导出|总结成|表示成).{0,24}(?:markdown|\.md|md[\t ]*(?:文件|文档|格式))|(?:markdown|\.md|md[\t ]*(?:文件|文档|格式)).{0,24}(?:创建|生成|输出|整理|制作|写成|写为|改写|转换|转成|导出|总结|表示)/i.test(
+  const chineseArtifact =
+    /(?:(?:帮我|请|为我).{0,8})?(?:创建|生成|输出|整理成|制作|写成|写为|改写成|转换成|转成|导出|保存为|交付).{0,30}(?:markdown|\.md|md[\t ]*(?:文件|文档|格式)|文件|文档|产物|附件)|(?:给我|提供)(?:[\s：:，,]*(?:一份|一个|一篇|该|这份|这个))?[\s：:，,]*(?:markdown|\.md|md[\t ]*(?:文件|文档|格式)|文件|文档|产物|附件)|(?:markdown|\.md|md[\t ]*(?:文件|文档|格式)|文件|文档|产物|附件).{0,30}(?:创建|生成|输出|整理|制作|写成|写为|改写|转换|转成|导出|保存|交付)/i.test(
       normalized
     )
-  const englishDeliverable =
-    /\b(?:create|generate|write|output|format|convert|export|produce|deliver|provide|return|summari[sz]e|present|turn)\b.{0,60}(?:\bmarkdown\b|\.md\b|\bmd[\t ]+(?:file|document)\b)|(?:\bmarkdown\b|\.md\b|\bmd[\t ]+(?:file|document)\b).{0,60}\b(?:create|generate|write|output|format|convert|export|produce|deliver|provide|return|summari[sz]e|present)\b/i.test(
+  const chineseLongForm =
+    /(?:(?:帮我|请|为我).{0,8})?(?:创建|生成|撰写|写|创作|制作|输出|交付).{0,20}(?:(?:一|这)(?:篇|份|个))?(?:文章|报告|文稿|稿件|博客|博文|教程|说明书|成稿)|(?:给我|提供)[\s：:，,]*(?:一篇|一份|一个)(?:文章|报告|文稿|稿件|博客|博文|教程|说明书|内容|成稿)|(?:生成|创建|撰写|写|输出).{0,20}(?:一篇|一份|一个)(?:内容|成稿)/i.test(
+      normalized
+    )
+  const englishArtifact =
+    /\b(?:create|generate|output|convert|export|produce|deliver|provide|return|save)\b.{0,60}\b(?:markdown|md\s+(?:file|document)|file|document|artifact|deliverable)\b|\b(?:markdown|md\s+(?:file|document)|file|document|artifact|deliverable)\b.{0,60}\b(?:create|generate|output|convert|export|produce|deliver|provide|return|save)\b|\b(?:create|generate|write|draft|produce)\b.{0,60}\b(?:article|report|manuscript|blog\s+post|tutorial)\b/i.test(
       normalized
     )
 
-  return chineseDeliverable || englishDeliverable
+  return chineseArtifact || chineseLongForm || englishArtifact
 }
 
 export interface ToolInputAvailableChunk {
@@ -244,7 +246,7 @@ export function createMarkdownArtifactEventDispatcher(
 }
 
 export const MARKDOWN_ARTIFACT_TOOL_DESCRIPTION = `
-Create one standalone Markdown artifact for the user. Use this tool whenever the user semantically asks you to create, generate, write, output, organize, rewrite, convert, summarize into, or deliver a Markdown/.md document, regardless of whether they speak Chinese, English, mixed language, or use wording not shown in examples. Put directly renderable raw Markdown in content; do not wrap the whole document in an outer markdown code fence. When the user explicitly requests multiple separate documents, call this tool once for each document in the same reply, with one title/content pair per call. Do not combine the documents or ask the user to continue in a later turn. Do not call merely because a normal answer uses Markdown formatting, or when the user only asks what Markdown is or how its syntax works.
+Create one standalone Markdown artifact only when the user explicitly asks for an independent deliverable, such as an article, document, file, report, Markdown/.md file, or artifact. Put directly renderable raw Markdown in content; do not wrap the whole document in an outer markdown code fence. When the user explicitly requests multiple separate documents, call this tool once for each document in the same reply, with one title/content pair per call. Never call it merely because an answer is long, structured, uses Markdown formatting, summarizes research, or contains headings and lists.
 
-为用户创建一份独立的 Markdown 产物。只要用户表达了“创建、生成、撰写、输出、整理、改写、转换、总结成或交付一份 Markdown/.md 文档”的语义，就应调用本工具；中文、英文、中英混合或未出现在示例中的等价说法都适用。content 必须是可直接渲染的原始 Markdown，不要给整份文档再套一层 markdown 代码围栏。用户明确要求多份独立文档时，必须在同一回复中为每一份分别调用一次本工具，每次调用只带一组 title/content；不要合并文件，也不要要求用户下一轮再继续。仅仅因为普通回答使用 Markdown 排版，或者用户只是在询问 Markdown 的概念、用法、语法时，不要调用。
+仅当用户明确要求文章、文档、文件、报告、Markdown/.md 或“产物”等独立交付物时，才创建 Markdown 产物。content 必须是可直接渲染的原始 Markdown，不要给整份文档再套一层 markdown 代码围栏。用户明确要求多份独立文档时，必须在同一回复中为每一份分别调用一次本工具。不要因为回答较长、结构化、使用 Markdown 排版、总结研究结果或包含标题列表就调用本工具。
 `.trim()

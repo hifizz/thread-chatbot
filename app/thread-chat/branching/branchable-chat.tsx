@@ -22,6 +22,7 @@ import {
   MarkdownArtifactCard,
   MarkdownArtifactProgressCard,
 } from "../orchestration/markdown-artifact-card"
+import { WebResearchPanel } from "../orchestration/web-research-panel"
 // 锚点在「渲染后的 Markdown DOM」上模糊恢复定位（position→exact→fuzzy），与纯文本解耦
 import { clearHighlights, locateAnchor, paintRange } from "./text-anchor"
 
@@ -100,9 +101,16 @@ export function BranchableChat({
         />,
       ]
     })
-    if (!msg.markdownGeneration && artifacts.length === 0) return null
+    const webResearch = msg.webResearch ?? []
+    if (
+      webResearch.length === 0 &&
+      !msg.markdownGeneration &&
+      artifacts.length === 0
+    )
+      return null
     return (
       <>
+        <WebResearchPanel activities={webResearch} />
         {msg.markdownGeneration ? (
           <MarkdownArtifactProgressCard
             progress={msg.markdownGeneration}

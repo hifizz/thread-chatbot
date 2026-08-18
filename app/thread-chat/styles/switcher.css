@@ -66,13 +66,32 @@
 }
 .tc .helpx-list {
   margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.tc .helpx-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.tc .helpx-section-title {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  letter-spacing: 0.01em;
+}
+.tc .helpx-section ul {
+  margin: 0;
   padding-left: 18px;
   list-style: disc;
 }
-.tc .helpx-list li {
+.tc .helpx-section li {
   margin: 5px 0;
 }
-.tc .helpx-list li::marker {
+.tc .helpx-section li::marker {
   color: var(--ink-faint);
 }
 .tc .helpx-list b {

@@ -6,6 +6,7 @@
  */
 
 import type { TextAnchor } from "../branching/text-anchor"
+import type { WebResearchActivity } from "@/lib/chat/web-research-activity"
 
 export type Role = "user" | "assistant"
 export type ArtifactKind = "code" | "note" | "markdown"
@@ -71,6 +72,8 @@ export interface Message {
   error?: string
   /** 当前页临时态；存盘前必须剥离，加载时也会防御性清理。 */
   markdownGeneration?: MarkdownGenerationProgress
+  /** Tavily 搜索/深读活动；完成结果随消息持久化，刷新后仍可核验来源。 */
+  webResearch?: WebResearchActivity[]
 }
 
 export interface Thread {
