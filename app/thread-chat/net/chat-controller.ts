@@ -195,6 +195,14 @@ export function createChatController(store: ThreadStore) {
         if (settled || !isOwner()) return
         store.setWebResearchActivity(threadId, msgId, activity)
       },
+      onResearchRoute(route) {
+        if (settled || !isOwner()) return
+        store.setResearchRoute(threadId, msgId, route)
+      },
+      onResearchPlan(plan) {
+        if (settled || !isOwner()) return
+        store.setResearchPlan(threadId, msgId, plan)
+      },
       onError(message) {
         if (settled) return
         lastError = message // 不立即 settle：可能是瞬时噪声，正文还会继续到达（后到覆盖先到）

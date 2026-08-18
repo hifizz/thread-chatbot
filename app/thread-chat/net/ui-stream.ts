@@ -28,6 +28,14 @@ import {
   createWebResearchActivityDispatcher,
   type WebResearchActivity,
 } from "../../../lib/chat/web-research-activity"
+import {
+  isResearchPlanStreamEvent,
+  isResearchRouteStreamEvent,
+} from "../../../lib/chat/research-events"
+import type {
+  ResearchPlan,
+  ResearchRoute,
+} from "../../../lib/chat/research-router"
 
 export type {
   MarkdownArtifactStreamEvent,
@@ -46,6 +54,10 @@ export interface UIStreamHandlers {
   onMarkdownArtifactProgress(event: MarkdownArtifactProgressEvent): void
   /** Tavily 搜索/深读调用的聚合状态与来源结果。 */
   onWebResearchActivity(activity: WebResearchActivity): void
+  /** 后端编排器给出的结构化联网路由。 */
+  onResearchRoute(route: ResearchRoute): void
+  /** 复杂研究的结构化计划摘要。 */
+  onResearchPlan(plan: ResearchPlan): void
   /** 收到 error chunk（errorText 缺失时给出兜底文案） */
   onError(message: string): void
   /** finish chunk 或流自然结束时回调；实现内部保证只触发一次 */
@@ -116,6 +128,14 @@ export async function consumeUIMessageStream(
     if (await dispatchMarkdownArtifactProgress(chunk)) return false
     if (dispatchMarkdownArtifact(chunk)) return false
     if (dispatchWebResearchActivity(chunk)) return false
+    if (isResearchRouteStreamEvent(chunk)) {
+      handlers.onResearchRoute(chunk.data)
+      return false
+    }
+    if (isResearchPlanStreamEvent(chunk)) {
+      handlers.onResearchPlan(chunk.data)
+      return false
+    }
 
     if (typeof chunk !== "object" || chunk === null) return false
     const value = chunk as {

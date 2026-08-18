@@ -1,5 +1,7 @@
 import {
   convertToModelMessages,
+  createUIMessageStream,
+  createUIMessageStreamResponse,
   isStepCount,
   streamText,
   tool,
@@ -11,10 +13,15 @@ import { frontendTools } from "@assistant-ui/react-ai-sdk"
 import type { ToolJSONSchema } from "assistant-stream"
 import { z } from "zod"
 import { resolveAttachmentParts } from "@/lib/chat/resolve-attachments"
-import { researchTools } from "@/lib/chat/research-tools"
+import {
+  readUrlTool,
+  webSearchTool,
+} from "@/lib/chat/research-tools"
 import { isSearchConfigured } from "@/lib/ai/search"
 import {
+  DIRECT_FETCH_SYSTEM_PROMPT,
   RESEARCH_MAX_STEPS,
+  RESEARCH_ROUTER_CONTEXT_MESSAGES,
   RESEARCH_SYSTEM_PROMPT,
   WEB_ACCESS_SYSTEM_PROMPT,
 } from "@/constants/research"
@@ -37,6 +44,14 @@ import {
   markdownArtifactInputSchema,
   type MarkdownArtifactToolResult,
 } from "@/lib/chat/markdown-artifact"
+import {
+  createResearchPlan,
+  reasoningForResearchRoute,
+  researchPlanExecutionPrompt,
+  resolveResearchRoute,
+  type ResearchPlan,
+  type ResearchRoute,
+} from "@/lib/chat/research-router"
 
 // Tavily 搜索与网页深读可能形成多步循环，放宽单次请求时长上限。
 export const maxDuration = 300
@@ -105,16 +120,17 @@ function latestUserText(messages: UIMessage[]): string {
   return ""
 }
 
-/** 明确要求联网/访问页面时强制首步搜索，避免模型错误声称自己无法联网。 */
-function explicitlyRequestsWebAccess(text: string): boolean {
-  const normalized = text.toLowerCase()
-  if (/https?:\/\/|www\./i.test(normalized)) return true
-
-  const webTarget =
-    /(github|网页|网站|链接|官网|官方文档|社区|文章|新闻|互联网|网络|web|website|url|link|docs?)/i
-  const accessIntent =
-    /(访问|打开|读取|浏览|搜索|检索|查找|搜一下|看一下|核验|最新|当前|实时|search|browse|open|read|visit|look\s*up|latest|current)/i
-  return webTarget.test(normalized) && accessIntent.test(normalized)
+/** Router 只取最近少量纯文本上下文，用于理解“这个/它”等指代。 */
+function recentConversationText(messages: UIMessage[]): string {
+  return messages
+    .slice(-RESEARCH_ROUTER_CONTEXT_MESSAGES)
+    .map((message) => {
+      const text = message.parts
+        .flatMap((part) => (part.type === "text" ? [part.text] : []))
+        .join("\n")
+      return `${message.role}: ${text}`
+    })
+    .join("\n")
 }
 
 export async function POST(req: Request) {
@@ -174,11 +190,48 @@ export async function POST(req: Request) {
   const research = deepResearch === true
   const searchReady = isSearchConfigured()
   const isThreadChat = threadChat != null
-  const forceWebSearch =
-    searchReady && explicitlyRequestsWebAccess(latestUserText(messages))
+  const latestText = latestUserText(messages)
+  const chatModel = resolveChatModel(modelId)
+  const researchRoute: ResearchRoute = research
+    ? searchReady
+      ? {
+          mode: "research",
+          reasonCode: "multi_source_research",
+          urls: [],
+          suggestedQueries: [],
+        }
+      : {
+          mode: "answer",
+          reasonCode: "search_unavailable",
+          urls: [],
+          suggestedQueries: [],
+        }
+    : await resolveResearchRoute({
+        model: chatModel,
+        latestUserText: latestText,
+        recentConversation: recentConversationText(messages),
+        searchReady,
+      })
+  const researchPlan: ResearchPlan | null =
+    researchRoute.mode === "research"
+      ? await createResearchPlan({
+          model: chatModel,
+          userRequest: latestText,
+          route: researchRoute,
+        })
+      : null
+  const webToolsEnabled =
+    searchReady && researchRoute.mode !== "answer"
   const markdownArtifactRequested =
     isThreadChat &&
-    isExplicitMarkdownArtifactRequest(latestUserText(messages))
+    isExplicitMarkdownArtifactRequest(latestText)
+
+  const routedWebTools: ToolSet =
+    researchRoute.mode === "fetch"
+      ? { readUrl: readUrlTool }
+      : researchRoute.mode === "search" || researchRoute.mode === "research"
+        ? { webSearch: webSearchTool, readUrl: readUrlTool }
+        : {}
 
   const allTools: ToolSet = {
     // 普通 ThreadChat 请求完全不暴露 Markdown 工具，避免模型把长回答误判成产物。
@@ -188,7 +241,7 @@ export async function POST(req: Request) {
         ? { [MARKDOWN_ARTIFACT_TOOL_NAME]: createMarkdownArtifact }
         : {}
       : { getWeather, compareTable }),
-    ...(searchReady ? researchTools : {}),
+    ...(webToolsEnabled ? routedWebTools : {}),
     ...frontendTools(tools ?? {}),
   }
 
@@ -201,8 +254,12 @@ export async function POST(req: Request) {
           enableMarkdownArtifact: markdownArtifactRequested,
         })
       : null,
-    searchReady ? WEB_ACCESS_SYSTEM_PROMPT : null,
-    research && searchReady ? RESEARCH_SYSTEM_PROMPT : null,
+    researchRoute.mode === "fetch" ? DIRECT_FETCH_SYSTEM_PROMPT : null,
+    researchRoute.mode === "search" || researchRoute.mode === "research"
+      ? WEB_ACCESS_SYSTEM_PROMPT
+      : null,
+    researchRoute.mode === "research" ? RESEARCH_SYSTEM_PROMPT : null,
+    researchPlan ? researchPlanExecutionPrompt(researchPlan) : null,
     research && !searchReady
       ? "用户开启了深度研究，但服务端未配置搜索服务（SEARCH_API_KEY），请如实告知该功能暂不可用，并基于已有知识尽力回答。"
       : null,
@@ -211,7 +268,8 @@ export async function POST(req: Request) {
     .join("\n\n")
 
   const result = streamText({
-    model: resolveChatModel(modelId),
+    model: chatModel,
+    reasoning: reasoningForResearchRoute(researchRoute.mode),
     system,
     messages: await convertToModelMessages(resolvedMessages, {
       tools: allTools,
@@ -220,18 +278,35 @@ export async function POST(req: Request) {
     // 明确 Markdown 交付请求只强制第 0 步启动工具调用；后续步骤仍保留工具，
     // 让模型在用户要求多份独立文档时，为每份文档分别创建一个 Artifact。
     prepareStep:
-      isThreadChat || forceWebSearch
+      isThreadChat || webToolsEnabled
         ? ({ stepNumber }) => {
+            const activeWebTools =
+              researchRoute.mode === "fetch"
+                ? ["readUrl"]
+                : researchRoute.mode === "search" ||
+                    researchRoute.mode === "research"
+                  ? ["webSearch", "readUrl"]
+                  : []
             const activeTools = isThreadChat
               ? [
                   ...(markdownArtifactRequested
                     ? [MARKDOWN_ARTIFACT_TOOL_NAME]
                     : []),
-                  ...(searchReady ? ["webSearch", "readUrl"] : []),
+                  ...activeWebTools,
                 ]
-              : undefined
+              : activeWebTools
 
-            if (stepNumber === 0 && forceWebSearch) {
+            if (stepNumber === 0 && researchRoute.mode === "fetch") {
+              return {
+                activeTools,
+                toolChoice: { type: "tool" as const, toolName: "readUrl" },
+              }
+            }
+            if (
+              stepNumber === 0 &&
+              (researchRoute.mode === "search" ||
+                researchRoute.mode === "research")
+            ) {
               return {
                 activeTools,
                 toolChoice: { type: "tool" as const, toolName: "webSearch" },
@@ -246,13 +321,13 @@ export async function POST(req: Request) {
                 },
               }
             }
-            return activeTools ? { activeTools } : undefined
+            return activeTools.length > 0 ? { activeTools } : undefined
           }
         : undefined,
     // 单请求输出封顶：收敛并发竞态下的最大超支敞口，并防异常长输出打爆供应商账单
     maxOutputTokens: MAX_OUTPUT_TOKENS,
     // 联网模式允许模型反复搜索、深读并综合；20 步只作为异常循环熔断。
-    stopWhen: isStepCount(searchReady ? RESEARCH_MAX_STEPS : 5),
+    stopWhen: isStepCount(webToolsEnabled ? RESEARCH_MAX_STEPS : 5),
     // 4) 已计费模型在生成结束后按 token 用量即时扣费并写入流水。
     //    UMAPIS 预览尚未有经确认的价格，不扣余额也不写流水。
     onEnd: async ({ usage, providerMetadata, steps }) => {
@@ -296,16 +371,36 @@ export async function POST(req: Request) {
     }
   })
 
-  return result.toUIMessageStreamResponse({
-    // 流内错误在服务端留日志便于排查；返回值仍是发给客户端的掩码文案（默认行为不变）
-    onError: (error) => {
-      console.error("[chat] 流内错误:", error)
-      return "An error occurred."
+  const uiStream = createUIMessageStream({
+    execute: ({ writer }) => {
+      writer.write({
+        type: "data-research-route",
+        id: "research-route",
+        data: researchRoute,
+      })
+      if (researchPlan) {
+        writer.write({
+          type: "data-research-plan",
+          id: "research-plan",
+          data: researchPlan,
+        })
+      }
+      writer.merge(
+        result.toUIMessageStream({
+          // 流内错误在服务端留日志；返回客户端的仍是统一掩码文案。
+          onError: (error) => {
+            console.error("[chat] 流内错误:", error)
+            return "An error occurred."
+          },
+          // 把本次用量与费用附到 assistant 消息 metadata，随消息持久化。
+          messageMetadata: ({ part }) =>
+            part.type === "finish"
+              ? buildUsageMetadata(modelId, part.totalUsage)
+              : undefined,
+        })
+      )
     },
-    // 把本次用量与费用附到 assistant 消息 metadata，随消息持久化，供输入框下方 token 统计展示
-    messageMetadata: ({ part }) =>
-      part.type === "finish"
-        ? buildUsageMetadata(modelId, part.totalUsage)
-        : undefined,
   })
+
+  return createUIMessageStreamResponse({ stream: uiStream })
 }
