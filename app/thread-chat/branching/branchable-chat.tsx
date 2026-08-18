@@ -87,6 +87,16 @@ export function BranchableChat({
     <AnchoredMarkdown state={state} msg={msg} onOpenThread={onOpenThread} />
   )
 
+  /* ---------- 注入：正文前的研究计划与联网活动（按真实调用顺序） ---------- */
+  const renderBeforeAssistantBody = (msg: Message) => (
+    <WebResearchPanel
+      activities={msg.webResearch ?? []}
+      route={msg.researchRoute}
+      plan={msg.researchPlan}
+      status={msg.status}
+    />
+  )
+
   /* ---------- 注入：消息下方的 artifact 卡片 ---------- */
   const renderAfterMessage = (msg: Message) => {
     const artifacts = (msg.artifactIds ?? []).flatMap((aid) => {
@@ -101,16 +111,10 @@ export function BranchableChat({
         />,
       ]
     })
-    const webResearch = msg.webResearch ?? []
-    if (
-      webResearch.length === 0 &&
-      !msg.markdownGeneration &&
-      artifacts.length === 0
-    )
+    if (!msg.markdownGeneration && artifacts.length === 0)
       return null
     return (
       <>
-        <WebResearchPanel activities={webResearch} />
         {msg.markdownGeneration ? (
           <MarkdownArtifactProgressCard
             progress={msg.markdownGeneration}
@@ -230,6 +234,7 @@ export function BranchableChat({
       banner={banner}
       intro={intro}
       renderAssistantBody={renderAssistantBody}
+      renderBeforeAssistantBody={renderBeforeAssistantBody}
       renderAfterMessage={renderAfterMessage}
       busy={busy}
       onRetry={onRetry}

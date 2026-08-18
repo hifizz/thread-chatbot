@@ -7,6 +7,7 @@
 
 import type { TextAnchor } from "../branching/text-anchor"
 import type { WebResearchActivity } from "@/lib/chat/web-research-activity"
+import type { ResearchPlan, ResearchRoute } from "@/lib/chat/research-router"
 
 export type Role = "user" | "assistant"
 export type ArtifactKind = "code" | "note" | "markdown"
@@ -74,6 +75,10 @@ export interface Message {
   markdownGeneration?: MarkdownGenerationProgress
   /** Tavily 搜索/深读活动；完成结果随消息持久化，刷新后仍可核验来源。 */
   webResearch?: WebResearchActivity[]
+  /** 本轮联网路由决策；不含原始 CoT。 */
+  researchRoute?: ResearchRoute
+  /** 复杂研究的结构化计划；随消息持久化，供 UI 和调试核验。 */
+  researchPlan?: ResearchPlan
 }
 
 export interface Thread {

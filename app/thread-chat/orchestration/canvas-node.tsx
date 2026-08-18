@@ -182,7 +182,9 @@ function CanvasExpand({
             !hasVisibleText &&
             !msg.artifactIds?.length &&
             !msg.markdownGeneration &&
-            !msg.webResearch?.length
+            !msg.webResearch?.length &&
+            !msg.researchPlan &&
+            (!msg.researchRoute || msg.researchRoute.mode === "answer")
           return (
             <div
               key={msg.id}
@@ -198,6 +200,12 @@ function CanvasExpand({
                 </div>
               ) : (
                 <>
+                  <WebResearchPanel
+                    activities={msg.webResearch ?? []}
+                    route={msg.researchRoute}
+                    plan={msg.researchPlan}
+                    status={msg.status}
+                  />
                   {(hasVisibleText || isWaitingForVisibleOutput) && (
                     <div className="bubble" data-role="assistant">
                       {isWaitingForVisibleOutput ? (
@@ -246,7 +254,6 @@ function CanvasExpand({
                       compact
                     />
                   )}
-                  <WebResearchPanel activities={msg.webResearch ?? []} />
                   {state &&
                     actions &&
                     msg.artifactIds?.map((artifactId) => {

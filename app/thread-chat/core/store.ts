@@ -15,6 +15,7 @@ import type {
   ThreadTreeState,
 } from "./types"
 import type { WebResearchActivity } from "@/lib/chat/web-research-activity"
+import type { ResearchPlan, ResearchRoute } from "@/lib/chat/research-router"
 
 export interface ForkInput {
   /** 在哪个会话里划选的 */
@@ -237,6 +238,37 @@ export function createThreadStore(
       notify()
     },
 
+    /** 保存本轮联网路由决策；普通 answer 路由不改变可见状态。 */
+    setResearchRoute(
+      threadId: string,
+      msgId: string,
+      route: ResearchRoute
+    ): void {
+      const thread = state.threads[threadId]
+      if (!thread) return
+      const message = findMessageFromTail(thread.messages, msgId)
+      if (!message || message.role !== "assistant") return
+      if (message.status === "done" || message.status === "error") return
+      message.researchRoute = route
+      notify()
+    },
+
+    /** 保存复杂研究的可审计计划摘要，不保存或展示模型原始思维链。 */
+    setResearchPlan(
+      threadId: string,
+      msgId: string,
+      plan: ResearchPlan
+    ): void {
+      const thread = state.threads[threadId]
+      if (!thread) return
+      const message = findMessageFromTail(thread.messages, msgId)
+      if (!message || message.role !== "assistant") return
+      if (message.status === "done" || message.status === "error") return
+      message.researchPlan = plan
+      message.status = "streaming"
+      notify()
+    },
+
     /** 流式结束：标记消息完成 */
     finishAssistantMessage(threadId: string, msgId: string): void {
       const t = state.threads[threadId]
@@ -285,6 +317,8 @@ export function createThreadStore(
       msg.error = undefined
       msg.markdownGeneration = undefined
       msg.webResearch = undefined
+      msg.researchRoute = undefined
+      msg.researchPlan = undefined
       notify()
     },
 

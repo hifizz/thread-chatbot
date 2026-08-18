@@ -9,6 +9,7 @@ import {
   ChevronDownIcon,
   GlobeIcon,
   CheckIcon,
+  ListChecksIcon,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -145,11 +146,13 @@ export const ResearchPanelView: FC<{
   anyRunning: boolean
   title?: string
   completionText?: string
+  plan?: { goal: string; items: string[] }
 }> = ({
   steps,
   anyRunning,
   title = "深度研究",
   completionText = "研究完成，报告见下方",
+  plan,
 }) => {
   const [open, setOpen] = useState(true)
 
@@ -159,8 +162,12 @@ export const ResearchPanelView: FC<{
     0
   )
   const summary = anyRunning
-    ? "正在研究…"
-    : `已完成 · 检索 ${searchCount} 次 · ${sourceCount} 个来源`
+    ? plan
+      ? `正在执行 ${plan.items.length} 项研究计划…`
+      : "正在查询网络…"
+    : plan
+      ? `已完成 · ${plan.items.length} 个子问题 · ${sourceCount} 个来源`
+      : `已完成 · 检索 ${searchCount} 次 · ${sourceCount} 个来源`
 
   return (
     <div
@@ -201,6 +208,23 @@ export const ResearchPanelView: FC<{
             aria-hidden
             className="absolute top-2 bottom-4 left-[26px] w-px bg-border"
           />
+          {plan && (
+            <div className="relative flex gap-3">
+              <TimelineNode running={false}>
+                <ListChecksIcon className="size-3.5" />
+              </TimelineNode>
+              <div className="flex min-w-0 flex-1 flex-col gap-1 pt-0.5">
+                <span className="text-sm font-medium">{plan.goal}</span>
+                <ol className="list-decimal space-y-0.5 pl-4 text-xs text-muted-foreground">
+                  {plan.items.map((item, index) => (
+                    <li key={`${index}-${item}`} className="break-words">
+                      {item}
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            </div>
+          )}
           {steps.map((step, i) => (
             <div key={i} className="relative flex gap-3">
               {step.kind === "search" ? (
