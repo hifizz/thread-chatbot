@@ -77,3 +77,45 @@ export function prepareAssistantRetry(
     },
   }
 }
+
+/** 为“重试孤立 user turn”准备 pending assistant patch，不修改 store。 */
+export function prepareUserTurnRetry(
+  state: ThreadTreeState,
+  input: {
+    threadId: string
+    userMessageId: string
+    assistantMessageId: string
+    generationId: string
+  }
+): RegenerationPreparationResult {
+  const intent = { kind: "retry-orphan-user" as const }
+  const patch = prepareRegenerationPatch(state, {
+    threadId: input.threadId,
+    userMessageId: input.userMessageId,
+    assistantMessageId: input.assistantMessageId,
+    generationId: input.generationId,
+    intent,
+  })
+  if (!patch) {
+    return {
+      ok: false,
+      code: "not_latest_turn",
+      message: "该消息已不是可恢复的最后一轮",
+    }
+  }
+
+  return {
+    ok: true,
+    start: {
+      threadId: input.threadId,
+      messageId: input.assistantMessageId,
+      userMessageId: input.userMessageId,
+      generationId: input.generationId,
+      action: {
+        intent,
+        patch,
+        sourceUserMessageId: input.userMessageId,
+      },
+    },
+  }
+}

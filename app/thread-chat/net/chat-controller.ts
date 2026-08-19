@@ -40,6 +40,7 @@ import {
 } from "./assistant-stream-runtime"
 import {
   prepareAssistantRetry,
+  prepareUserTurnRetry,
   type PreparedRegenerationAction,
   type PreparedRegenerationStart,
 } from "./regeneration-command"
@@ -345,33 +346,14 @@ export function createChatController(
       threadId: string,
       userMessageId: string
     ): Promise<GenerationActionResult> {
-      const generationId = crypto.randomUUID()
-      const assistantMessageId = crypto.randomUUID()
-      const patch = prepareRegenerationPatch(store.getState(), {
+      const prepared = prepareUserTurnRetry(store.getState(), {
         threadId,
         userMessageId,
-        assistantMessageId,
-        generationId,
-        intent: { kind: "retry-orphan-user" },
+        assistantMessageId: crypto.randomUUID(),
+        generationId: crypto.randomUUID(),
       })
-      if (!patch)
-        return {
-          ok: false,
-          code: "not_latest_turn",
-          message: "该消息已不是可恢复的最后一轮",
-        }
-      detachThread(threadId)
-      return startAssistant(
-        threadId,
-        assistantMessageId,
-        userMessageId,
-        generationId,
-        {
-          intent: { kind: "retry-orphan-user" },
-          patch,
-          sourceUserMessageId: userMessageId,
-        }
-      )
+      if (!prepared.ok) return prepared
+      return startPreparedRegeneration(prepared.start)
     },
 
     async editAndRegenerate(
