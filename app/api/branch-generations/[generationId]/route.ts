@@ -1,6 +1,6 @@
 import { getCurrentUserId } from "@/lib/auth/server"
 import { isValidTreeId } from "@/lib/chat/tree-id"
-import { failStaleGenerationForOwner } from "@/lib/thread-chat-generation/repository"
+import { failStaleGenerationForOwner } from "@/lib/thread-chat-generation/stale-generation-repository"
 import { toGenerationSummary } from "@/lib/thread-chat-generation/query-repository"
 
 type RouteContext = { params: Promise<{ generationId: string }> }

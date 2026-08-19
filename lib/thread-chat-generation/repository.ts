@@ -1,4 +1,4 @@
-import { and, eq, inArray, lt, max, sql } from "drizzle-orm"
+import { and, eq, inArray, max, sql } from "drizzle-orm"
 import type { ThreadTreeState } from "@/lib/thread-chat/domain/types"
 import { parseThreadTreeState } from "@/lib/thread-chat/domain/message-graph"
 import {
@@ -12,19 +12,10 @@ import type {
   GenerationTurnSnapshot,
   ThreadChatGenerationIntent,
 } from "@/lib/thread-chat/domain/generation"
-import { generationResultV1Schema } from "@/lib/thread-chat/contracts/generation-result"
-import {
-  ACTIVE_GENERATION_STATUSES,
-  GENERATION_ERRORS,
-  GENERATION_LEASE_MS,
-  GENERATION_RESULT_VERSION,
-} from "@/constants/generation"
+import { ACTIVE_GENERATION_STATUSES } from "@/constants/generation"
 import { db } from "@/lib/db"
 import { branchGenerations, branchTrees } from "@/lib/db/schema"
-import {
-  getGenerationForOwner,
-  type GenerationRow,
-} from "@/lib/thread-chat-generation/query-repository"
+import type { GenerationRow } from "@/lib/thread-chat-generation/query-repository"
 
 export class GenerationRepositoryError extends Error {
   constructor(
@@ -411,83 +402,4 @@ export async function compareAndSetGenerationTerminal(input: {
     .from(branchGenerations)
     .where(eq(branchGenerations.id, input.generationId))
   return current ?? null
-}
-
-function staleFailureResult(row: GenerationRow): GenerationResultV1 {
-  const partial = row.turnSnapshot.assistantMessage
-  return generationResultV1Schema.parse({
-    version: GENERATION_RESULT_VERSION,
-    generationId: row.id,
-    text: partial.text,
-    status: "error",
-    error: GENERATION_ERRORS.backgroundInterrupted,
-    artifactIds: partial.artifactIds ?? [],
-    artifacts: {},
-    webResearch: partial.webResearch,
-    webResearchTextOffset: partial.webResearchTextOffset,
-    researchRoute: partial.researchRoute,
-    researchPlan: partial.researchPlan,
-  })
-}
-
-export async function failStaleGenerationsForTree(
-  userId: string,
-  treeId: string,
-  now = new Date()
-): Promise<number> {
-  const staleBefore = new Date(now.getTime() - GENERATION_LEASE_MS)
-  const staleRows = await db
-    .select()
-    .from(branchGenerations)
-    .where(
-      and(
-        eq(branchGenerations.userId, userId),
-        eq(branchGenerations.treeId, treeId),
-        inArray(branchGenerations.status, ACTIVE_GENERATION_STATUSES),
-        lt(branchGenerations.heartbeatAt, staleBefore)
-      )
-    )
-
-  let changed = 0
-  for (const row of staleRows) {
-    const [updated] = await db
-      .update(branchGenerations)
-      .set({
-        status: "failed",
-        result: staleFailureResult(row),
-        error: GENERATION_ERRORS.backgroundInterrupted,
-        billingStatus: "usage_unavailable",
-        finishedAt: now,
-        updatedAt: now,
-      })
-      .where(
-        and(
-          eq(branchGenerations.id, row.id),
-          inArray(branchGenerations.status, ACTIVE_GENERATION_STATUSES),
-          lt(branchGenerations.heartbeatAt, staleBefore)
-        )
-      )
-      .returning({ id: branchGenerations.id })
-    if (updated) changed++
-  }
-  return changed
-}
-
-export async function failStaleGenerationForOwner(
-  userId: string,
-  generationId: string,
-  now = new Date()
-): Promise<GenerationRow | null> {
-  const row = await getGenerationForOwner(userId, generationId)
-  if (!row) return null
-  if (
-    ACTIVE_GENERATION_STATUSES.includes(
-      row.status as (typeof ACTIVE_GENERATION_STATUSES)[number]
-    ) &&
-    row.heartbeatAt.getTime() < now.getTime() - GENERATION_LEASE_MS
-  ) {
-    await failStaleGenerationsForTree(userId, row.treeId, now)
-    return getGenerationForOwner(userId, generationId)
-  }
-  return row
 }

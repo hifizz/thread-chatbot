@@ -26,7 +26,7 @@ import {
   assertCompletedMessageGenerationLinks,
   reconcileThreadChatTurns,
 } from "@/lib/thread-chat/application/reconcile-turns"
-import { failStaleGenerationsForTree } from "@/lib/thread-chat-generation/repository"
+import { failStaleGenerationsForTree } from "@/lib/thread-chat-generation/stale-generation-repository"
 import {
   listGenerationsForTree,
   listCurrentGenerationsForTree,
