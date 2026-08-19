@@ -63,6 +63,15 @@
   }
 }
 
+@keyframes tc-generation-shimmer {
+  from {
+    background-position: 140% 50%;
+  }
+  to {
+    background-position: -40% 50%;
+  }
+}
+
 @keyframes tc-caret-blink {
   0%,
   50% {

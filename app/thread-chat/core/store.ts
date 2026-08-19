@@ -16,6 +16,10 @@ import type {
 } from "./types"
 import type { WebResearchActivity } from "@/lib/chat/web-research-activity"
 import type { ResearchPlan, ResearchRoute } from "@/lib/chat/research-router"
+import {
+  mergeGenerationResult,
+  type MergeGenerationResultInput,
+} from "../generation/merge-result"
 
 export interface ForkInput {
   /** 在哪个会话里划选的 */
@@ -173,7 +177,10 @@ export function createThreadStore(
     },
 
     /** 新建一条 pending 的空 assistant 消息（流式回复的占位），返回消息 id */
-    beginAssistantMessage(threadId: string): string | null {
+    beginAssistantMessage(
+      threadId: string,
+      generationId?: string
+    ): string | null {
       const t = state.threads[threadId]
       if (!t) return null
       const id = "m" + state.seq++
@@ -182,6 +189,8 @@ export function createThreadStore(
         role: "assistant",
         text: "",
         forks: [],
+        generationId,
+        backgroundGeneration: undefined,
         status: "pending",
       })
       notify()
@@ -308,13 +317,19 @@ export function createThreadStore(
     },
 
     /** 重试前重置消息：清空正文与错误，回到 pending，复用同一 msgId */
-    resetAssistantMessage(threadId: string, msgId: string): void {
+    resetAssistantMessage(
+      threadId: string,
+      msgId: string,
+      generationId?: string
+    ): void {
       const t = state.threads[threadId]
       if (!t) return
       const msg = findMessageFromTail(t.messages, msgId)
       if (!msg) return
       removeMessageArtifactsSilently(msg)
       msg.text = ""
+      msg.generationId = generationId
+      msg.backgroundGeneration = undefined
       msg.status = "pending"
       msg.error = undefined
       msg.markdownGeneration = undefined
@@ -323,6 +338,15 @@ export function createThreadStore(
       msg.researchRoute = undefined
       msg.researchPlan = undefined
       notify()
+    },
+
+    /** 轮询/加载终态的 generationId CAS 合并；旧 attempt 返回 false 且零写入。 */
+    applyGenerationResult(input: MergeGenerationResultInput): boolean {
+      const merged = mergeGenerationResult(state, input)
+      if (merged === state) return false
+      Object.assign(state, merged)
+      notify()
+      return true
     },
 
     /** 替换某会话的标题（异步分支标题 D7：首答完成后由模型生成语义标题）。

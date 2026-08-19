@@ -40,6 +40,33 @@ node --experimental-strip-types e2e/thread-chat/markdown-artifact-state.test.mjs
 store 临时进度与完整 Artifact 原子替换、存盘剥离、Artifact-only 终态、retry 清理、
 加载 sanitize 及后续模型上下文序列化。
 
+## Generation 刷新持久化测试（P0）
+
+结构化投影与整树合并是无数据库纯测试：
+
+```bash
+node --experimental-strip-types e2e/thread-chat/generation-persistence.test.mjs
+```
+
+覆盖正文、Markdown Artifact、联网来源/研究上下文、partial error、空回复、确定性
+Artifact id、重复投影/合并幂等、fork 保留、旧 attempt CAS、缺消息读修复，以及只有
+服务端 active generation 能保留 pending 的加载 sanitize。
+
+repository/finalize 是开发数据库测试；读取 `.env.local` 后运行，脚本创建随机测试用户
+与树，并在 `finally` 中级联清理：
+
+```bash
+node --import tsx e2e/thread-chat/generation-db.test.mjs
+```
+
+覆盖并发重复 start、单 current attempt、supersede、Stop-vs-complete、stale heartbeat、
+跨用户 404 语义，以及 superseded attempt 的结果审计与 finalize 重入只扣费一次。
+
+浏览器手工验收必须使用当前 checkout 的 dev server：发送可控慢回复后刷新，页面应显示
+“正在后台生成，完成后显示”，服务端继续生成且只计费一次，轮询后原子显示完整结构化
+结果。明确 Stop 才会中止；普通刷新不得产生 stopped。P0 不恢复错过的逐 token 动画，只
+恢复后台状态和最终答案。
+
 ## Markdown Artifact 浏览器验收（mock API）
 
 前提：dev server 与本机 Chrome。脚本在浏览器层 mock 对话与整树持久化 API，不需要

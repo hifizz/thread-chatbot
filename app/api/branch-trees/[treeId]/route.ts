@@ -15,30 +15,96 @@
  * treeId 做 UUID 形状校验（安全阀），不合法一律 400。
  */
 
-import { eq } from "drizzle-orm"
+import { and, eq, isNull } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { branchTrees } from "@/lib/db/schema"
 import { isValidTreeId } from "@/lib/chat/tree-id"
 import { CUSTOM_TITLE_MAX_LEN } from "@/constants/thread-chat"
+import { getCurrentUserId } from "@/lib/auth/server"
+import type { ThreadTreeState } from "@/app/thread-chat/core/types"
+import { mergeGenerationResult } from "@/app/thread-chat/generation/merge-result"
+import {
+  failStaleGenerationsForTree,
+  listCurrentGenerationsForTree,
+  toGenerationSummary,
+  treeHasActiveGenerations,
+} from "@/lib/thread-chat-generation/repository"
 
 type RouteContext = { params: Promise<{ treeId: string }> }
 
+function unauthorized() {
+  return Response.json(
+    { error: { code: "unauthorized", message: "请先登录" } },
+    { status: 401 }
+  )
+}
+
+function notFound() {
+  return Response.json(
+    { error: { code: "not_found", message: "分支树不存在" } },
+    { status: 404 }
+  )
+}
+
+async function loadOwnedOrClaimedTree(userId: string, treeId: string) {
+  return db.transaction(async (tx) => {
+    const [owned] = await tx
+      .select({
+        state: branchTrees.state,
+        customTitle: branchTrees.customTitle,
+      })
+      .from(branchTrees)
+      .where(
+        and(eq(branchTrees.id, treeId), eq(branchTrees.userId, userId))
+      )
+    if (owned) return owned
+
+    // 精确 URL 的一次性历史迁移认领；并发时只有一个 UPDATE 能成功。
+    const [claimed] = await tx
+      .update(branchTrees)
+      .set({ userId })
+      .where(and(eq(branchTrees.id, treeId), isNull(branchTrees.userId)))
+      .returning({
+        state: branchTrees.state,
+        customTitle: branchTrees.customTitle,
+      })
+    return claimed ?? null
+  })
+}
+
 export async function GET(_req: Request, { params }: RouteContext) {
+  const userId = await getCurrentUserId()
+  if (!userId) return unauthorized()
   const { treeId } = await params
   if (!isValidTreeId(treeId))
     return new Response("treeId 必须是 UUID", { status: 400 })
 
-  const [row] = await db
-    .select({ state: branchTrees.state, customTitle: branchTrees.customTitle })
-    .from(branchTrees)
-    .where(eq(branchTrees.id, treeId))
+  const row = await loadOwnedOrClaimedTree(userId, treeId)
+  if (!row) return notFound()
+
+  await failStaleGenerationsForTree(userId, treeId)
+  const generations = await listCurrentGenerationsForTree(userId, treeId)
+  let state = row.state as ThreadTreeState
+  for (const generation of generations) {
+    if (!generation.result) continue
+    state = mergeGenerationResult(state, {
+      threadId: generation.threadId,
+      assistantMessageId: generation.assistantMessageId,
+      generationId: generation.id,
+      turnSnapshot: generation.turnSnapshot,
+      result: generation.result,
+    })
+  }
   return Response.json({
-    state: row?.state ?? null,
-    customTitle: row?.customTitle ?? null,
+    state,
+    customTitle: row.customTitle,
+    generations: generations.map(toGenerationSummary),
   })
 }
 
 export async function PUT(req: Request, { params }: RouteContext) {
+  const userId = await getCurrentUserId()
+  if (!userId) return unauthorized()
   const { treeId } = await params
   if (!isValidTreeId(treeId))
     return new Response("treeId 必须是 UUID", { status: 400 })
@@ -60,17 +126,30 @@ export async function PUT(req: Request, { params }: RouteContext) {
 
   const title = typeof body.title === "string" ? body.title : null
   const now = new Date()
-  await db
-    .insert(branchTrees)
-    .values({ id: treeId, state, title, updatedAt: now })
-    .onConflictDoUpdate({
-      target: branchTrees.id,
-      set: { state, title, updatedAt: now },
-    })
+  const saved = await db.transaction(async (tx) => {
+    const [updated] = await tx
+      .update(branchTrees)
+      .set({ state, title, updatedAt: now })
+      .where(
+        and(eq(branchTrees.id, treeId), eq(branchTrees.userId, userId))
+      )
+      .returning({ id: branchTrees.id })
+    if (updated) return true
+
+    const [inserted] = await tx
+      .insert(branchTrees)
+      .values({ id: treeId, userId, state, title, updatedAt: now })
+      .onConflictDoNothing({ target: branchTrees.id })
+      .returning({ id: branchTrees.id })
+    return Boolean(inserted)
+  })
+  if (!saved) return notFound()
   return Response.json({ ok: true })
 }
 
 export async function PATCH(req: Request, { params }: RouteContext) {
+  const userId = await getCurrentUserId()
+  if (!userId) return unauthorized()
   const { treeId } = await params
   if (!isValidTreeId(treeId))
     return new Response("treeId 必须是 UUID", { status: 400 })
@@ -92,18 +171,37 @@ export async function PATCH(req: Request, { params }: RouteContext) {
   const updated = await db
     .update(branchTrees)
     .set({ customTitle: title })
-    .where(eq(branchTrees.id, treeId))
+    .where(and(eq(branchTrees.id, treeId), eq(branchTrees.userId, userId)))
     .returning({ id: branchTrees.id })
   if (updated.length === 0) return new Response("树不存在", { status: 404 })
   return Response.json({ ok: true })
 }
 
 export async function DELETE(_req: Request, { params }: RouteContext) {
+  const userId = await getCurrentUserId()
+  if (!userId) return unauthorized()
   const { treeId } = await params
   if (!isValidTreeId(treeId))
     return new Response("treeId 必须是 UUID", { status: 400 })
 
-  // 幂等：不存在也返回 ok——重复删除 / 悬空条目再删都不是错误
-  await db.delete(branchTrees).where(eq(branchTrees.id, treeId))
+  const [owned] = await db
+    .select({ id: branchTrees.id })
+    .from(branchTrees)
+    .where(and(eq(branchTrees.id, treeId), eq(branchTrees.userId, userId)))
+  if (!owned) return notFound()
+  if (await treeHasActiveGenerations(userId, treeId)) {
+    return Response.json(
+      {
+        error: {
+          code: "generation_running",
+          message: "请先停止正在运行的生成，再删除这棵对话树",
+        },
+      },
+      { status: 409 }
+    )
+  }
+  await db
+    .delete(branchTrees)
+    .where(and(eq(branchTrees.id, treeId), eq(branchTrees.userId, userId)))
   return Response.json({ ok: true })
 }

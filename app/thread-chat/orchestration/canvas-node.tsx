@@ -28,6 +28,7 @@ import React, {
   useRef,
 } from "react"
 import { Handle, Position, type Node, type NodeProps } from "@xyflow/react"
+import { GENERATION_BACKGROUND_LABEL } from "@/constants/generation"
 import type { Message, ThreadTreeState } from "../core/types"
 import { AnchoredMarkdown } from "../branching/branchable-chat"
 import {
@@ -37,12 +38,12 @@ import {
 import { WebResearchPanel } from "./web-research-panel"
 import { ThreadModelSelector } from "../chat/thread-model-selector"
 
-/** 会话动作（send/abort/retry）：壳层用 chat-controller 组装后传给画布（D3，零平行实现） */
+/** 会话动作（send/stop/retry）：壳层用 chat-controller 组装后传给画布（D3，零平行实现） */
 export interface CanvasChatActions {
   /** 发一条用户消息并触发流式回复（同会话已有在飞请求时由 controller 忽略） */
   send: (threadId: string, text: string) => void
-  /** 中止在飞的流式请求（有正文保留 finish；零正文标「已停止生成」可重试） */
-  abort: (threadId: string) => void
+  /** 经服务端确认的显式 Stop；普通页面卸载不调用。 */
+  stop: (threadId: string) => void
   /** 重试某条 assistant 消息（先中止旧流、复位、再起新流） */
   retry: (threadId: string, msgId: string) => void
 }
@@ -203,11 +204,23 @@ function CanvasExpand({
                   {(hasVisibleAssistantContent ||
                     isWaitingForVisibleOutput) && (
                     <div className="bubble" data-role="assistant">
+                      {msg.backgroundGeneration && (
+                        <span
+                          className="generation-background"
+                          role="status"
+                        >
+                          {GENERATION_BACKGROUND_LABEL}
+                        </span>
+                      )}
                       {isWaitingForVisibleOutput ? (
                         <span
                           className="typing"
                           role="status"
-                          aria-label="正在生成回复"
+                          aria-label={
+                            msg.backgroundGeneration
+                              ? GENERATION_BACKGROUND_LABEL
+                              : "正在生成回复"
+                          }
                         >
                           <i />
                           <i />
@@ -325,7 +338,7 @@ function CanvasExpand({
           <button
             className="cv-send stop"
             title="停止生成（已收到的内容会保留）"
-            onClick={() => actions?.abort(threadId)}
+            onClick={() => actions?.stop(threadId)}
           >
             停止
           </button>

@@ -47,7 +47,14 @@ export interface ThreadChatRequestBody {
   /** 当前 Thread 拥有的模型；服务端仍会按统一注册表严格校验。 */
   modelId: string
   /** 模式标记：服务端据此构造纯文本 system（anchorText 非空时追加分支焦点段） */
-  threadChat: { anchorText: string | null }
+  threadChat: {
+    anchorText: string | null
+    treeId: string
+    threadId: string
+    userMessageId: string
+    assistantMessageId: string
+    generationId: string
+  }
 }
 
 /** 一条领域消息是否应进入 payload（滤掉 error 与空正文 assistant） */
@@ -65,7 +72,12 @@ function includable(message: Message, serialized: string | null): boolean {
 export function buildRequestBody(
   state: ThreadTreeState,
   thread: Thread,
-  excludeMsgId: string
+  excludeMsgId: string,
+  identity: {
+    treeId: string
+    userMessageId: string
+    generationId: string
+  }
 ): ThreadChatRequestBody {
   const anchor = thread.anchorText?.trim() ? thread.anchorText : null
   const messages: UIMessageLike[] = []
@@ -119,6 +131,13 @@ export function buildRequestBody(
   return {
     messages,
     modelId: thread.modelId,
-    threadChat: { anchorText: anchor },
+    threadChat: {
+      anchorText: anchor,
+      treeId: identity.treeId,
+      threadId: thread.id,
+      userMessageId: identity.userMessageId,
+      assistantMessageId: excludeMsgId,
+      generationId: identity.generationId,
+    },
   }
 }

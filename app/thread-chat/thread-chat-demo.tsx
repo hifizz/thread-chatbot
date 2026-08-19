@@ -41,6 +41,11 @@ import {
   UI_SAVE_DEBOUNCE_MS,
 } from "@/constants/thread-chat"
 import {
+  GENERATION_CLIENT_POLL_MS,
+  GENERATION_ERRORS,
+  GENERATION_HIDDEN_POLL_MS,
+} from "@/constants/generation"
+import {
   isThreadChatModelId,
   resolveThreadChatModelId,
 } from "@/constants/model"
@@ -63,10 +68,13 @@ import {
   rememberTreeId,
   sanitizeLoadedState,
   saveTree,
+  saveTreeStrict,
   saveUiState,
   type TreeUiState,
   type ViewMode,
 } from "./net/persist"
+import type { GenerationSummary } from "./generation/types"
+import { fetchWithAuth } from "@/lib/auth/session-recovery"
 import { BranchableChat } from "./branching/branchable-chat"
 import {
   SelectionBubble,
@@ -115,7 +123,6 @@ const EMPTY_SLOTS: Slot[] = []
 interface ToastState {
   msg: string
   undo?: () => void
-  n: number
 }
 
 /** 把面板锚定在按钮下方（夹在视口内），w/h 为面板预估尺寸 */
@@ -138,6 +145,7 @@ export function ThreadChatDemo({ treeId }: { treeId: string }) {
     ui: TreeUiState | null
     /** 用户重命名过的标题（未改过为 null）——主线列头副标题优先展示 */
     customTitle: string | null
+    generations: GenerationSummary[]
   } | null>(null)
 
   useEffect(() => {
@@ -146,13 +154,22 @@ export function ThreadChatDemo({ treeId }: { treeId: string }) {
       const loaded = await loadTree(treeId)
       // sanitize：收敛流式中途落盘的非终态 assistant 残留（见 persist.ts 头注）
       const seed = loaded.state
-        ? sanitizeLoadedState(loaded.state, resolveThreadChatModelId)
+        ? sanitizeLoadedState(
+            loaded.state,
+            resolveThreadChatModelId,
+            loaded.generations
+          )
         : emptySeedState()
       // 工作台记忆按加载回来的树校验（列引用的 thread 必须存在）
       const ui = loadUiState(treeId, seed)
       if (cancelled) return
       rememberTreeId(treeId) // 成功打开即记为「最近一棵」（裸路径的跳转目标）
-      setBoot({ seed, ui, customTitle: loaded.customTitle })
+      setBoot({
+        seed,
+        ui,
+        customTitle: loaded.customTitle,
+        generations: loaded.generations,
+      })
     })()
     return () => {
       cancelled = true
@@ -172,6 +189,7 @@ export function ThreadChatDemo({ treeId }: { treeId: string }) {
       initialState={boot.seed}
       initialUi={boot.ui}
       initialCustomTitle={boot.customTitle}
+      initialGenerations={boot.generations}
     />
   )
 }
@@ -184,6 +202,7 @@ interface ThreadChatDemoInnerProps {
   initialUi: TreeUiState | null
   /** 用户重命名过的标题（未改过为 null）——主线列头副标题优先展示 */
   initialCustomTitle?: string | null
+  initialGenerations: GenerationSummary[]
 }
 
 export function ThreadChatDemoInner({
@@ -191,6 +210,7 @@ export function ThreadChatDemoInner({
   initialState,
   initialUi,
   initialCustomTitle = null,
+  initialGenerations,
 }: ThreadChatDemoInnerProps) {
   const router = useRouter()
 
@@ -201,9 +221,140 @@ export function ThreadChatDemoInner({
   const version = useThreadStore(store)
   const state = store.getState()
 
-  /* ---------- 聊天控制器：发送 / 分支首答 / 重试 / 停止（真实 /api/chat SSE 流式） ---------- */
-  const [chat] = useState(() => createChatController(store))
-  useEffect(() => () => chat.abortAll(), [chat])
+  const [toast, setToast] = useState<ToastState | null>(null)
+
+  function showToast(msg: string, undo?: () => void) {
+    setToast({ msg, undo })
+  }
+  useEffect(() => {
+    if (!toast) return
+    const t = setTimeout(() => setToast(null), toast.undo ? 5200 : 2600)
+    return () => clearTimeout(t)
+  }, [toast])
+
+  /* ---------- 聊天控制器：发送屏障 / Retry / 显式 Stop（真实 /api/chat SSE） ---------- */
+  const [chat] = useState(() =>
+    createChatController(store, {
+      treeId,
+      persistNow: () => {
+        const current = store.getState()
+        return saveTreeStrict(treeId, current, deriveTreeTitle(current))
+      },
+      onError: (message) => showToast(message),
+    })
+  )
+  useEffect(() => () => chat.detachAll(), [chat])
+
+  /* ---------- generation 终态轮询：刷新后不续 token 流，只在完成时原子替换。 ---------- */
+  const generationIdsRef = useRef(
+    new Set(
+      initialGenerations
+        .filter(
+          (generation) =>
+            generation.status === "running" ||
+            generation.status === "stop_requested"
+        )
+        .map((generation) => generation.id)
+    )
+  )
+  useEffect(() => {
+    for (const thread of Object.values(store.getState().threads)) {
+      for (const message of thread.messages) {
+        if (
+          message.role === "assistant" &&
+          (message.status === "pending" || message.status === "streaming") &&
+          message.generationId
+        ) {
+          generationIdsRef.current.add(message.generationId)
+        }
+      }
+    }
+  }, [version, store])
+  useEffect(() => {
+    let cancelled = false
+    let timer: ReturnType<typeof setTimeout> | null = null
+
+    const schedule = () => {
+      if (cancelled) return
+      timer = setTimeout(
+        poll,
+        document.hidden
+          ? GENERATION_HIDDEN_POLL_MS
+          : GENERATION_CLIENT_POLL_MS
+      )
+    }
+    const poll = async () => {
+      for (const generationId of [...generationIdsRef.current]) {
+        if (cancelled) return
+        try {
+          const res = await fetchWithAuth(
+            `/api/branch-generations/${generationId}`
+          )
+          if (res.status === 404) {
+            generationIdsRef.current.delete(generationId)
+            for (const thread of Object.values(store.getState().threads)) {
+              const message = thread.messages.find(
+                (candidate) => candidate.generationId === generationId
+              )
+              if (message)
+                store.failAssistantMessage(
+                  thread.id,
+                  message.id,
+                  GENERATION_ERRORS.backgroundInterrupted
+                )
+            }
+            continue
+          }
+          if (!res.ok) continue
+          const data = (await res.json()) as {
+            generation: GenerationSummary
+          }
+          const generation = data.generation
+          if (
+            generation.status === "running" ||
+            generation.status === "stop_requested"
+          )
+            continue
+
+          generationIdsRef.current.delete(generationId)
+          if (!generation.isCurrent || !generation.result) continue
+          const current = store.getState()
+          const thread = current.threads[generation.threadId]
+          const assistantIndex = thread?.messages.findIndex(
+            (message) => message.id === generation.assistantMessageId
+          )
+          if (!thread || assistantIndex == null || assistantIndex < 1) continue
+          const assistantMessage = thread.messages[assistantIndex]
+          const userMessage = thread.messages[assistantIndex - 1]
+          if (
+            assistantMessage?.role !== "assistant" ||
+            userMessage?.role !== "user"
+          )
+            continue
+          store.applyGenerationResult({
+            threadId: generation.threadId,
+            assistantMessageId: generation.assistantMessageId,
+            generationId,
+            turnSnapshot: {
+              threadId: generation.threadId,
+              assistantMessageIndex: assistantIndex,
+              userMessage,
+              assistantMessage,
+            },
+            result: generation.result,
+          })
+        } catch (error) {
+          console.warn("[thread-chat] generation 轮询失败，将继续重试", error)
+        }
+      }
+      schedule()
+    }
+    schedule()
+    return () => {
+      cancelled = true
+      if (timer) clearTimeout(timer)
+    }
+  }, [store])
 
   /* ---------- 防抖存库：version 变化后 1.5s 静默才整树 PUT（流式期间合并为一次写）。
        首屏（version 未变过）不写；卸载时若有 pending 定时器则立即 flush（尽力而为）。
@@ -310,7 +461,7 @@ export function ThreadChatDemoInner({
   /** 画布节点面板的会话动作（D3）：同一 chat-controller，无平行发送通道 */
   const [canvasChat] = useState<CanvasChatActions>(() => ({
     send: chat.send,
-    abort: chat.abort,
+    stop: chat.stop,
     retry: chat.retry,
   }))
 
@@ -378,17 +529,6 @@ export function ThreadChatDemoInner({
     },
     [setActiveArt, setDrawerOpen]
   )
-  const [toast, setToast] = useState<ToastState | null>(null)
-  const toastSeq = useRef(0)
-
-  function showToast(msg: string, undo?: () => void) {
-    setToast({ msg, undo, n: ++toastSeq.current })
-  }
-  useEffect(() => {
-    if (!toast) return
-    const t = setTimeout(() => setToast(null), toast.undo ? 5200 : 2600)
-    return () => clearTimeout(t)
-  }, [toast])
 
   /* ---------- 统一意图入口：打开某会话（脚注 / ⌘K / 子树 / 定位来源 / 画布双击都走这里）
        hint：可选放置提示（⌘ keepSource「保留来源列，开在其右」/ targetId 显式让位列） ---------- */
@@ -760,7 +900,7 @@ export function ThreadChatDemoInner({
                 store.setThreadModel(threadId, modelId)
               }
               onRetry={(msg: Message) => chat.retry(threadId, msg.id)}
-              onStop={() => chat.abort(threadId)}
+              onStop={() => chat.stop(threadId)}
               onSend={(text) => chat.send(threadId, text)}
             />
           )}

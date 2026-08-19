@@ -1,5 +1,6 @@
 import {
   convertToModelMessages,
+  consumeStream,
   createUIMessageStream,
   createUIMessageStreamResponse,
   isStepCount,
@@ -52,6 +53,23 @@ import {
   type ResearchPlan,
   type ResearchRoute,
 } from "@/lib/chat/research-router"
+import {
+  GenerationRepositoryError,
+  startGeneration,
+  toGenerationSummary,
+} from "@/lib/thread-chat-generation/repository"
+import {
+  observeGenerationCancellation,
+  registerGenerationController,
+  unregisterGenerationController,
+} from "@/lib/thread-chat-generation/execution"
+import {
+  finalizeGeneration,
+  type FinalizeGenerationInput,
+  type FinalizeGenerationUsage,
+} from "@/lib/thread-chat-generation/finalize"
+import { projectGenerationResult } from "@/app/thread-chat/generation/project-result"
+import { GENERATION_ERRORS } from "@/constants/generation"
 
 // AnySearch 搜索与网页深读可能形成多步循环，放宽单次请求时长上限。
 export const maxDuration = 300
@@ -108,6 +126,61 @@ const createMarkdownArtifact = tool({
   execute: async (): Promise<MarkdownArtifactToolResult> => ({ created: true }),
 })
 
+const threadChatPersistenceSchema = z.object({
+  anchorText: z.string().nullable().optional(),
+  treeId: z.string().uuid(),
+  threadId: z.string().min(1),
+  userMessageId: z.string().min(1),
+  assistantMessageId: z.string().min(1),
+  generationId: z.string().uuid(),
+})
+
+type ThreadChatPersistence = z.infer<typeof threadChatPersistenceSchema>
+
+function generationStartError(error: unknown): Response {
+  if (error instanceof GenerationRepositoryError) {
+    return Response.json(
+      {
+        error: {
+          code: error.code,
+          message: error.message,
+        },
+      },
+      { status: error.code === "not_found" ? 404 : 409 }
+    )
+  }
+  console.error("[thread-chat-generation] start transaction 失败", error)
+  return Response.json(
+    {
+      error: {
+        code: "generation_start_failed",
+        message: "无法建立生成任务，尚未调用模型",
+      },
+    },
+    { status: 503 }
+  )
+}
+
+async function finalizeWithRetry(input: FinalizeGenerationInput) {
+  let lastError: unknown
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      return await finalizeGeneration(input)
+    } catch (error) {
+      lastError = error
+      console.error("[thread-chat-generation] finalize 失败", {
+        generationId: input.generationId,
+        attempt,
+        error,
+      })
+      if (attempt < 3) {
+        await new Promise((resolve) => setTimeout(resolve, attempt * 150))
+      }
+    }
+  }
+  throw lastError
+}
+
 /** 只看最后一条 user 消息的文本 part，供高置信首步强制路由。 */
 function latestUserText(messages: UIMessage[]): string {
   for (let i = messages.length - 1; i >= 0; i--) {
@@ -149,13 +222,13 @@ export async function POST(req: Request) {
     deepResearch,
     threadChat,
     modelId: rawModelId,
-    id: threadId,
+    id: linearThreadId,
   }: {
     messages: UIMessage[]
     tools?: Record<string, ToolJSONSchema>
     deepResearch?: boolean
     /** thread-chat 分支对话页的模式标记：system 由服务端按锚点原文构造 */
-    threadChat?: { anchorText?: string | null }
+    threadChat?: unknown
     modelId?: unknown
     id?: string
   } = await req.json()
@@ -185,11 +258,55 @@ export async function POST(req: Request) {
     return Response.json({ error: "额度不足，请充值后再试。" }, { status: 402 })
   }
 
+  let persistence: ThreadChatPersistence | null = null
+  let generationController: AbortController | null = null
+  let generationObserver: ReturnType<
+    typeof observeGenerationCancellation
+  > | null = null
+  if (threadChat != null) {
+    const parsed = threadChatPersistenceSchema.safeParse(threadChat)
+    if (!parsed.success) {
+      return Response.json(
+        {
+          error: {
+            code: "invalid_generation_identity",
+            message: "thread-chat 请求缺少有效的持久化身份，请刷新页面后重试",
+          },
+        },
+        { status: 400 }
+      )
+    }
+    persistence = parsed.data
+    try {
+      const started = await startGeneration({
+        userId,
+        modelId,
+        ...persistence,
+      })
+      if (!started.created) {
+        return Response.json(
+          { generation: toGenerationSummary(started.generation) },
+          { status: 202 }
+        )
+      }
+    } catch (error) {
+      return generationStartError(error)
+    }
+    generationController = new AbortController()
+    registerGenerationController(persistence.generationId, generationController)
+    generationObserver = observeGenerationCancellation(
+      persistence.generationId,
+      generationController
+    )
+  }
+
+  try {
+
   // AnySearch 是当前统一联网层：所有模型都获得相同的搜索与网页深读工具。
   // deepResearch 只控制研究提示强度，不再决定工具是否存在。
   const research = deepResearch === true
   const searchReady = isSearchConfigured()
-  const isThreadChat = threadChat != null
+  const isThreadChat = persistence != null
   const latestText = latestUserText(messages)
   const chatModel = resolveChatModel(modelId)
   const researchRoute: ResearchRoute = research
@@ -250,7 +367,7 @@ export async function POST(req: Request) {
 
   const system = [
     isThreadChat
-      ? buildThreadChatSystem(threadChat.anchorText, {
+      ? buildThreadChatSystem(persistence?.anchorText ?? null, {
           enableMarkdownArtifact: markdownArtifactRequested,
         })
       : null,
@@ -267,8 +384,16 @@ export async function POST(req: Request) {
     .filter((part): part is string => part !== null)
     .join("\n\n")
 
+  let capturedUsage: FinalizeGenerationUsage | undefined
+  let capturedProviderMetadata: unknown
+  let modelStreamError: string | undefined
+  let abortedUsageUnavailable = false
+
   const result = streamText({
     model: chatModel,
+    ...(generationController
+      ? { abortSignal: generationController.signal }
+      : {}),
     reasoning: reasoningForResearchRoute(researchRoute.mode),
     system,
     messages: await convertToModelMessages(resolvedMessages, {
@@ -324,15 +449,53 @@ export async function POST(req: Request) {
             return activeTools.length > 0 ? { activeTools } : undefined
           }
         : undefined,
-    // 单请求输出封顶：收敛并发竞态下的最大超支敞口，并防异常长输出打爆供应商账单
     maxOutputTokens: MAX_OUTPUT_TOKENS,
-    // 联网模式允许模型反复搜索、深读并综合；20 步只作为异常循环熔断。
     stopWhen: isStepCount(webToolsEnabled ? RESEARCH_MAX_STEPS : 5),
-    // 4) 已计费模型在生成结束后按 token 用量即时扣费并写入流水。
-    //    UMAPIS 预览尚未有经确认的价格，不扣余额也不写流水。
+    onError: ({ error }) => {
+      modelStreamError =
+        error instanceof Error ? error.message : GENERATION_ERRORS.streamFailed
+      console.error("[chat] 模型流错误:", error)
+    },
+    onAbort: ({ steps }) => {
+      if (!persistence) return
+      const inputTokens = steps.reduce(
+        (total, step) => total + (step.usage.inputTokens ?? 0),
+        0
+      )
+      const outputTokens = steps.reduce(
+        (total, step) => total + (step.usage.outputTokens ?? 0),
+        0
+      )
+      const openRouterCostUsd =
+        model.provider === "openrouter"
+          ? openRouterCostUsdFromSteps(steps)
+          : null
+      const providerMetadata = steps.at(-1)?.providerMetadata
+      const gatewayGenerationId =
+        typeof providerMetadata?.gateway?.generationId === "string"
+          ? providerMetadata.gateway.generationId
+          : null
+      if (steps.length > 0) {
+        capturedUsage = {
+          inputTokens,
+          outputTokens,
+          costEvidence:
+            openRouterCostUsd != null
+              ? { source: "openrouter", costUsd: openRouterCostUsd }
+              : gatewayGenerationId
+                ? {
+                    source: "vercel-gateway",
+                    generationId: gatewayGenerationId,
+                  }
+                : { source: "estimate" },
+        }
+        capturedProviderMetadata = providerMetadata
+      }
+      abortedUsageUnavailable = true
+    },
     onEnd: async ({ usage, providerMetadata, steps }) => {
       if (isUnbilledPreview) return
-      const generationId =
+      const providerGenerationId =
         typeof providerMetadata?.gateway?.generationId === "string"
           ? providerMetadata.gateway.generationId
           : null
@@ -345,33 +508,42 @@ export async function POST(req: Request) {
           `[chat] OpenRouter 成本元数据不完整，使用静态估值：${model.id}`
         )
       }
+      const costEvidence =
+        openRouterCostUsd != null
+          ? ({ source: "openrouter", costUsd: openRouterCostUsd } as const)
+          : providerGenerationId
+            ? ({
+                source: "vercel-gateway",
+                generationId: providerGenerationId,
+              } as const)
+            : ({ source: "estimate" } as const)
+      if (persistence) {
+        capturedUsage = {
+          inputTokens: usage.inputTokens ?? 0,
+          outputTokens: usage.outputTokens ?? 0,
+          costEvidence,
+        }
+        capturedProviderMetadata = providerMetadata
+        return
+      }
       await chargeUsage({
         userId,
         model: modelId,
         inputTokens: usage.inputTokens ?? 0,
         outputTokens: usage.outputTokens ?? 0,
-        threadId: threadId ?? null,
-        costEvidence:
-          openRouterCostUsd != null
-            ? { source: "openrouter", costUsd: openRouterCostUsd }
-            : generationId
-              ? { source: "vercel-gateway", generationId }
-              : { source: "estimate" },
+        threadId: linearThreadId ?? null,
+        costEvidence,
       })
     },
   })
 
-  // 即使客户端中途断连，也在服务端把整条流消费完，保证 onEnd（计费）必然触发，
-  // 避免「已产生供应商成本却漏计费」。after 让 Serverless 保活到消费结束。
-  after(async () => {
-    try {
-      await result.consumeStream()
-    } catch {
-      // 生成出错时不计费（onEnd 不触发），忽略消费错误即可
-    }
-  })
-
   const uiStream = createUIMessageStream({
+    ...(persistence
+      ? {
+          originalMessages: resolvedMessages,
+          generateId: () => persistence.assistantMessageId,
+        }
+      : {}),
     execute: ({ writer }) => {
       writer.write({
         type: "data-research-route",
@@ -387,12 +559,10 @@ export async function POST(req: Request) {
       }
       writer.merge(
         result.toUIMessageStream({
-          // 流内错误在服务端留日志；返回客户端的仍是统一掩码文案。
           onError: (error) => {
             console.error("[chat] 流内错误:", error)
             return "An error occurred."
           },
-          // 把本次用量与费用附到 assistant 消息 metadata，随消息持久化。
           messageMetadata: ({ part }) =>
             part.type === "finish"
               ? buildUsageMetadata(modelId, part.totalUsage)
@@ -400,7 +570,109 @@ export async function POST(req: Request) {
         })
       )
     },
+    onEnd: persistence
+      ? async ({ responseMessage, isAborted, finishReason }) => {
+          const failedWithoutFinish =
+            finishReason == null && modelStreamError !== undefined
+          const requestedTerminal = isAborted
+            ? "stopped"
+            : failedWithoutFinish
+              ? "failed"
+              : "completed"
+          const projected = projectGenerationResult({
+            generationId: persistence.generationId,
+            threadId: persistence.threadId,
+            responseMessage,
+            terminalStatus: requestedTerminal,
+            error: modelStreamError,
+            researchRoute,
+            researchPlan: researchPlan ?? undefined,
+            usage: capturedUsage
+              ? {
+                  inputTokens: capturedUsage.inputTokens,
+                  outputTokens: capturedUsage.outputTokens,
+                  totalTokens:
+                    capturedUsage.inputTokens + capturedUsage.outputTokens,
+                  providerMetadata: capturedProviderMetadata,
+                }
+              : undefined,
+          })
+          const outcome =
+            requestedTerminal === "completed" &&
+            !projected.hasDisplayableOutput
+              ? "failed"
+              : requestedTerminal
+          await finalizeWithRetry({
+            generationId: persistence.generationId,
+            outcome,
+            result: projected.result,
+            error: projected.result.error ?? modelStreamError,
+            usage: isUnbilledPreview ? undefined : capturedUsage,
+            usageUnavailable:
+              !isUnbilledPreview &&
+              (abortedUsageUnavailable ||
+                (requestedTerminal !== "completed" && !capturedUsage)),
+          })
+        }
+      : undefined,
   })
 
-  return createUIMessageStreamResponse({ stream: uiStream })
+  return createUIMessageStreamResponse({
+    stream: uiStream,
+    consumeSseStream: ({ stream }) => {
+      after(async () => {
+        await consumeStream({
+          stream,
+          onError: (error) => {
+            console.error("[chat] 服务端 UI stream 消费失败", error)
+          },
+        })
+        generationObserver?.stop()
+        if (generationObserver) await generationObserver.done
+        if (persistence && generationController) {
+          unregisterGenerationController(
+            persistence.generationId,
+            generationController
+          )
+        }
+      })
+    },
+  })
+  } catch (error) {
+    generationController?.abort(error)
+    generationObserver?.stop()
+    if (persistence && generationController) {
+      unregisterGenerationController(
+        persistence.generationId,
+        generationController
+      )
+      const projected = projectGenerationResult({
+        generationId: persistence.generationId,
+        threadId: persistence.threadId,
+        responseMessage: { parts: [] },
+        terminalStatus: "failed",
+        error:
+          error instanceof Error ? error.message : GENERATION_ERRORS.streamFailed,
+      })
+      try {
+        await finalizeWithRetry({
+          generationId: persistence.generationId,
+          outcome: "failed",
+          result: projected.result,
+          error: projected.result.error,
+          usageUnavailable: !isUnbilledPreview,
+        })
+      } catch (finalizeError) {
+        console.error(
+          "[thread-chat-generation] 请求初始化失败后的终态保存失败",
+          { generationId: persistence.generationId, finalizeError }
+        )
+      }
+    }
+    console.error("[chat] 请求初始化失败", error)
+    return Response.json(
+      { error: "生成初始化失败，请重试。" },
+      { status: 500 }
+    )
+  }
 }
