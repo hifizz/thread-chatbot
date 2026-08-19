@@ -40,10 +40,9 @@ import {
   resolveThreadChatModelId,
 } from "@/constants/model"
 import { emptySeedState } from "./core/seed"
-import { createThreadStore, defaultBranchTitle } from "./core/store"
+import { createThreadStore } from "./core/store"
 import { useThreadStore } from "./core/use-thread-store"
 import {
-  hasRenderableAssistantOutput,
   activeLeafTurn,
   activePathArtifacts,
   threadTitle,
@@ -54,9 +53,8 @@ import type {
   MessageFeedbackSummary,
   ThreadTreeState,
 } from "./core/types"
-import { requestBranchTitle } from "./net/branch-title"
 import { createChatController } from "./net/chat-controller"
-import { kickoffQuestion, serializeMessageForModel } from "./net/prompt"
+import { kickoffQuestion } from "./net/prompt"
 import {
   deriveTreeTitle,
   loadTree,
@@ -73,6 +71,7 @@ import type { RecoverableTurn } from "./generation/types"
 import { useGenerationReconciliation } from "./generation/use-generation-reconciliation"
 import { useMessageActions } from "./chat/use-message-actions"
 import { useTreePersistence } from "./net/use-tree-persistence"
+import { useBranchTitles } from "./net/use-branch-titles"
 import { useUiStatePersistence } from "./orchestration/use-ui-state-persistence"
 import { BranchableChat } from "./branching/branchable-chat"
 import {
@@ -288,42 +287,7 @@ export function ThreadChatDemoInner({
       window.location.reload()
     },
   })
-
-  /* ---------- 异步分支标题（D7）：分支首答完成后请求一次 4–8 字语义标题。
-       触发条件：非主线、标题仍是默认（锚点截 13 字——已生成过 / 重命名过则跳过，
-       重载后靠这一条天然防重）、首条 user + 首条 done 且非空的 assistant 都已就位。
-       Set ref 防同会话内重复请求；成功走 setThreadTitle（随整树防抖存盘持久化），
-       失败 console.warn 静默保留默认标题。 ---------- */
-  const titleReqRef = useRef<Set<string>>(new Set())
-  useEffect(() => {
-    const s = store.getState()
-    for (const t of Object.values(s.threads)) {
-      if (!t.parentId || !t.anchorText) continue
-      if (titleReqRef.current.has(t.id)) continue
-      if (t.title !== defaultBranchTitle(t.anchorText)) continue
-      const q = t.messages.find((m) => m.role === "user")
-      const a = t.messages.find(
-        (m) =>
-          m.role === "assistant" &&
-          m.status === "done" &&
-          hasRenderableAssistantOutput(s, m)
-      )
-      if (!q || !a) continue
-      titleReqRef.current.add(t.id)
-      const threadId = t.id
-      void requestBranchTitle({
-        anchorText: t.anchorText,
-        question: q.text,
-        answer: serializeMessageForModel(s, a) ?? a.text,
-      })
-        .then((title) => {
-          if (title) store.setThreadTitle(threadId, title)
-        })
-        .catch((err) => {
-          console.warn("[thread-chat] 分支标题生成失败（保留默认标题）：", err)
-        })
-    }
-  }, [version, store])
+  useBranchTitles({ store, version })
 
   /* ---------- 自适应列数（SSR 阶段 winW=null，顶栏显示「列数」占位） ---------- */
   const winW = useWindowWidth()

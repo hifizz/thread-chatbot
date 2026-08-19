@@ -1,9 +1,9 @@
 /**
  * net/branch-title —— 异步分支标题的客户端一侧（openspec: add-bubble-composer D7）。
  *
- * 分支首答完成后由壳层（thread-chat-demo）触发一次：POST /api/branch-title
+ * 分支首答完成后由 useBranchTitles 触发一次：POST /api/branch-title
  * 带锚点原文 + 首轮问答，拿回 4–8 字语义标题；成功走 store.setThreadTitle 原子替换，
- * 失败（网络 / 服务端）由调用方 console.warn 静默——默认标题（锚点截 13 字）保留。
+ * 失败（网络 / 服务端）由 hook console.warn 静默——默认标题（锚点截 13 字）保留。
  */
 
 export interface BranchTitleInput {
