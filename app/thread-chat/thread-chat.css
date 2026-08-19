@@ -10,6 +10,7 @@
 @import "./styles/topbar.css";
 @import "./styles/columns.css";
 @import "./styles/messages.css";
+@import "./styles/artifact-card.css";
 @import "./styles/message-actions.css";
 @import "./styles/branch-source.css";
 @import "./styles/composer.css";
