@@ -28,7 +28,6 @@ import {
 } from "@/lib/thread-chat/application/reconcile-turns"
 import { failStaleGenerationsForTree } from "@/lib/thread-chat-generation/stale-generation-repository"
 import {
-  listGenerationsForTree,
   listCurrentGenerationsForTree,
   toGenerationSummary,
 } from "@/lib/thread-chat-generation/query-repository"
@@ -92,11 +91,11 @@ export async function GET(_req: Request, { params }: RouteContext) {
   if (!row) return notFound()
 
   await failStaleGenerationsForTree(userId, treeId)
-  const [generations, allGenerations, messageFeedbacks] = await Promise.all([
+  const [generations, messageFeedbacks] = await Promise.all([
     listCurrentGenerationsForTree(userId, treeId),
-    listGenerationsForTree(userId, treeId),
     listMessageFeedbackForTree(userId, treeId),
   ])
+  const generationSummaries = generations.map(toGenerationSummary)
   let reconciled
   try {
     reconciled = reconcileThreadChatTurns({
@@ -108,7 +107,7 @@ export async function GET(_req: Request, { params }: RouteContext) {
     })
     assertCompletedMessageGenerationLinks(
       reconciled.state,
-      allGenerations.map(toGenerationSummary)
+      generationSummaries
     )
   } catch (error) {
     console.error("[thread-chat] 消息图读取协调失败", { treeId, error })
@@ -126,7 +125,7 @@ export async function GET(_req: Request, { params }: RouteContext) {
     state: reconciled.state,
     revision: row.revision,
     customTitle: row.customTitle,
-    generations: generations.map(toGenerationSummary),
+    generations: generationSummaries,
     messageFeedbacks,
     recoverableTurns: reconciled.recoverableTurns,
   })

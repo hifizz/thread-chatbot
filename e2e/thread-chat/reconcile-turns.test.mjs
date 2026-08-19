@@ -63,6 +63,7 @@ function generation({
   userMessage = user("u1"),
   assistantMessage = assistant("a1", userMessage.id, id),
   status = "running",
+  isCurrent = true,
   result,
 } = {}) {
   return {
@@ -72,7 +73,7 @@ function generation({
     userMessageId: userMessage.id,
     assistantMessageId: assistantMessage.id,
     attempt: 1,
-    isCurrent: true,
+    isCurrent,
     status,
     updatedAt: "2026-01-01T00:00:00.000Z",
     result,
@@ -195,6 +196,22 @@ await test("done assistant requires a completed generation linked by message id"
     "a1"
   )
   assert.throws(() => assertCompletedMessageGenerationLinks(completedState, []))
+  assert.throws(() =>
+    assertCompletedMessageGenerationLinks(completedState, [
+      generation({
+        status: "completed",
+        isCurrent: false,
+        result: {
+          version: 1,
+          generationId: "g1",
+          text: "旧答案",
+          status: "done",
+          artifactIds: [],
+          artifacts: {},
+        },
+      }),
+    ])
+  )
   assert.doesNotThrow(() =>
     assertCompletedMessageGenerationLinks(completedState, [
       generation({

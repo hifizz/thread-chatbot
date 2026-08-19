@@ -52,22 +52,6 @@ export async function listCurrentGenerationsForTree(
     .orderBy(desc(branchGenerations.updatedAt))
 }
 
-export async function listGenerationsForTree(
-  userId: string,
-  treeId: string
-): Promise<GenerationRow[]> {
-  return db
-    .select()
-    .from(branchGenerations)
-    .where(
-      and(
-        eq(branchGenerations.userId, userId),
-        eq(branchGenerations.treeId, treeId)
-      )
-    )
-    .orderBy(desc(branchGenerations.updatedAt))
-}
-
 export function toGenerationSummary(row: GenerationRow): GenerationSummary {
   return {
     id: row.id,

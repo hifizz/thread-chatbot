@@ -43,6 +43,7 @@ export function assertCompletedMessageGenerationLinks(
       if (message.role !== "assistant" || message.status !== "done") continue
       const linked = generations.some(
         (generation) =>
+          generation.isCurrent &&
           generation.threadId === thread.id &&
           generation.assistantMessageId === message.id &&
           generation.status === "completed" &&
