@@ -25,7 +25,6 @@
 import type { ThreadStore } from "../core/store"
 import { buildRequestBody } from "./prompt"
 import { consumeUIMessageStream, type UIStreamHandlers } from "./ui-stream"
-import { handleUnauthorized } from "@/lib/auth/session-recovery"
 import type {
   ArtifactSeed,
   MessageFeedback,
@@ -43,9 +42,9 @@ import { activeLeafTurn } from "../core/message-graph"
 import { submitMessageFeedback } from "./message-feedback-command"
 import { switchActiveLeaf } from "./switch-active-leaf-command"
 import { requestGenerationStop } from "./stop-generation-command"
+import { requestChatGeneration } from "./chat-generation-command"
 import type {
   GenerationActionResult,
-  MessageActionFailureCode,
   VariantSwitchResult,
 } from "./message-action-results"
 
@@ -326,14 +325,8 @@ export function createChatController(
           generationId,
           intent: action?.intent ?? { kind: "persisted-turn" },
         })
-        const res = await fetch("/api/chat", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify(body),
-          signal,
-        })
-
-        if (res.status === 202) {
+        const command = await requestChatGeneration({ body, signal })
+        if (command.kind === "replayed") {
           // 同 generation 请求重放：服务端已在执行或已终态，不启动第二次模型；
           // 保留 pending，由 generation 轮询取得权威状态。
           if (action) store.applyPreparedTurn(action.patch)
@@ -350,31 +343,20 @@ export function createChatController(
               : {}),
           }
         }
-        if (!res.ok || !res.body) {
-          // 401：会话已失效——触发自救（登出 + 跳登录），并给出明确文案而非死胡同错误
-          if (res.status === 401) void handleUnauthorized()
-          const payload = (await res.json().catch(() => null)) as {
-            error?: { code?: MessageActionFailureCode; message?: string }
-          } | null
-          const message =
-            res.status === 401
-              ? "登录已失效，正在跳转登录…"
-              : (payload?.error?.message ?? `请求失败（HTTP ${res.status}）`)
+        if (command.kind === "rejected") {
           if (!action)
-            settle(() => store.failAssistantMessage(threadId, msgId, message))
-          return {
-            ok: false,
-            code:
-              res.status === 401
-                ? "unauthorized"
-                : (payload?.error?.code ?? "network_error"),
-            message,
-          }
+            settle(() =>
+              store.failAssistantMessage(
+                threadId,
+                msgId,
+                command.failure.message
+              )
+            )
+          return command.failure
         }
-
-        const revision = Number(res.headers.get("x-thread-tree-revision"))
-        if (Number.isInteger(revision))
-          setKnownTreeRevision(options.treeId, revision)
+        const res = command.response
+        if (command.revision !== null)
+          setKnownTreeRevision(options.treeId, command.revision)
         if (action && !store.applyPreparedTurn(action.patch)) {
           return {
             ok: false,
