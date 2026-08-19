@@ -8,10 +8,12 @@
 import type { TextAnchor } from "@/lib/thread-chat/domain/text-anchor"
 import type { WebResearchActivity } from "@/lib/chat/web-research-activity"
 import type { ResearchPlan, ResearchRoute } from "@/lib/chat/research-router"
+import type { MessageFeedback } from "@/lib/thread-chat/contracts/message-feedback"
+
+export type { MessageFeedback } from "@/lib/thread-chat/contracts/message-feedback"
 
 export type Role = "user" | "assistant"
 export type ArtifactKind = "code" | "note" | "markdown"
-export type MessageFeedback = "positive" | "negative"
 
 export interface MessageFeedbackSummary {
   treeId: string

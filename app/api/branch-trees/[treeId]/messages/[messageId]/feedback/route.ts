@@ -1,16 +1,11 @@
-import { z } from "zod"
 import { getCurrentUserId } from "@/lib/auth/server"
 import { isValidTreeId } from "@/lib/chat/tree-id"
+import { setMessageFeedbackRequestSchema } from "@/lib/thread-chat/contracts/message-feedback"
 import { setMessageFeedbackForOwner } from "@/lib/thread-chat-generation/message-feedback-repository"
 
 type RouteContext = {
   params: Promise<{ treeId: string; messageId: string }>
 }
-
-const feedbackBodySchema = z.object({
-  threadId: z.string().min(1),
-  feedback: z.enum(["positive", "negative"]).nullable(),
-})
 
 export async function PUT(req: Request, { params }: RouteContext) {
   const userId = await getCurrentUserId()
@@ -27,7 +22,9 @@ export async function PUT(req: Request, { params }: RouteContext) {
       { status: 400 }
     )
 
-  const body = feedbackBodySchema.safeParse(await req.json().catch(() => null))
+  const body = setMessageFeedbackRequestSchema.safeParse(
+    await req.json().catch(() => null)
+  )
   if (!body.success)
     return Response.json(
       {
