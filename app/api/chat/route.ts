@@ -28,6 +28,7 @@ import { getCurrentUserId } from "@/lib/auth/server"
 import {
   DEFAULT_MODEL_ID,
   getChatModel,
+  isThreadChatModelId,
   isUnbilledPreviewModel,
   MAX_OUTPUT_TOKENS,
 } from "@/constants/model"
@@ -287,6 +288,17 @@ export async function POST(req: Request) {
       )
     }
     persistence = parsed.data
+    if (!isThreadChatModelId(modelId)) {
+      return Response.json(
+        {
+          error: {
+            code: "invalid_thread_model",
+            message: "Thread Chat 不允许使用该模型，请刷新页面后重试",
+          },
+        },
+        { status: 400 }
+      )
+    }
     try {
       const started = await prepareGeneration({
         userId,

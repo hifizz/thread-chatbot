@@ -6,6 +6,7 @@ import assert from "node:assert/strict"
 import {
   CHAT_MODELS,
   DEFAULT_THREAD_CHAT_MODEL_ID,
+  isThreadChatModelId,
   THREAD_CHAT_MODELS,
 } from "../../constants/model.ts"
 import { MODEL_COST, costMicros } from "../../constants/pricing.ts"
@@ -113,5 +114,8 @@ function seed(modelId = DEFAULT_MODEL_ID) {
   const visibleIds = new Set(THREAD_CHAT_MODELS.map((model) => model.id))
   assert.ok(!visibleIds.has("minimax-m2"))
   assert.ok(!visibleIds.has("minimax-m2.7"))
+  assert.equal(isThreadChatModelId("minimax-m2"), false)
+  assert.equal(isThreadChatModelId("minimax-m2.7"), false)
+  assert.equal(isThreadChatModelId("glm-5.3"), true)
   console.log("PASS  Thread Chat selector 不展示 M2 与 M2.7")
 }

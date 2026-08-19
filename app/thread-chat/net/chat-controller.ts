@@ -62,6 +62,7 @@ export type MessageActionFailureCode =
   | "not_found"
   | "invalid_id"
   | "invalid_request"
+  | "invalid_thread_model"
   | "invalid_turn"
   | "not_latest_turn"
   | "generation_conflict"
