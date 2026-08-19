@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm"
 import { db } from "../../lib/db/index.ts"
 import { branchTrees, user } from "../../lib/db/schema.ts"
 import { finalizeGeneration } from "../../lib/thread-chat-generation/finalize.ts"
-import { startGeneration } from "../../lib/thread-chat-generation/repository.ts"
+import { startGeneration } from "../../lib/thread-chat-generation/start-generation-repository.ts"
 import {
   listMessageFeedbackForTree,
   setMessageFeedbackForOwner,

@@ -13,7 +13,7 @@ import {
   getBalanceMicros,
 } from "../../lib/billing/credits.ts"
 import { finalizeGeneration } from "../../lib/thread-chat-generation/finalize.ts"
-import { startGeneration } from "../../lib/thread-chat-generation/repository.ts"
+import { startGeneration } from "../../lib/thread-chat-generation/start-generation-repository.ts"
 import { requestGenerationStop } from "../../lib/thread-chat-generation/execution-state-repository.ts"
 import { failStaleGenerationsForTree } from "../../lib/thread-chat-generation/stale-generation-repository.ts"
 import {

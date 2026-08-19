@@ -6,7 +6,7 @@ import { branchGenerations, branchTrees, user } from "../../lib/db/schema.ts"
 import {
   GenerationRepositoryError,
   prepareGeneration,
-} from "../../lib/thread-chat-generation/repository.ts"
+} from "../../lib/thread-chat-generation/start-generation-repository.ts"
 
 const suffix = randomUUID()
 const userId = `generation-actions-${suffix}`
