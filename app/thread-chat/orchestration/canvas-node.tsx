@@ -28,7 +28,6 @@ import React, {
   useRef,
 } from "react"
 import { Handle, Position, type Node, type NodeProps } from "@xyflow/react"
-import { GENERATION_BACKGROUND_LABEL } from "@/constants/generation"
 import type { Message, ThreadTreeState } from "../core/types"
 import { AnchoredMarkdown } from "../branching/branchable-chat"
 import {
@@ -37,13 +36,8 @@ import {
 } from "./markdown-artifact-card"
 import { WebResearchPanel } from "./web-research-panel"
 import { ConversationComposer } from "../chat/conversation-composer"
-import { EditableUserMessage } from "../chat/editable-user-message"
-import { AssistantMessageToolbar } from "../chat/assistant-message-toolbar"
-import { TurnVariantPicker } from "../chat/turn-variant-picker"
-import {
-  hasCompletedAssistantActions,
-  type MessageActionViewState,
-} from "../chat/message-action-types"
+import { ConversationMessage } from "../chat/conversation-message"
+import type { MessageActionViewState } from "../chat/message-action-types"
 import type { ThreadMessageActionCommands } from "../net/chat-controller"
 
 /** 会话动作（send/stop/retry）：壳层用 chat-controller 组装后传给画布（D3，零平行实现） */
@@ -154,135 +148,49 @@ function CanvasExpand({
         }}
       >
         {data.messages.map((msg) => {
-          const hasVisibleText = msg.text.trim().length > 0
           const hasWebResearch = Boolean(msg.webResearch?.length)
-          const hasVisibleAssistantContent = hasVisibleText || hasWebResearch
-          const isWaitingForVisibleOutput =
-            msg.role === "assistant" &&
-            (msg.status === "pending" || msg.status === "streaming") &&
-            !hasVisibleAssistantContent &&
-            !msg.artifactIds?.length &&
-            !msg.markdownGeneration &&
-            !msg.webResearch?.length
           return (
-            <div
+            <ConversationMessage
               key={msg.id}
-              className={`message ${msg.role}`}
-              data-msg-id={msg.id}
-            >
-              {msg.role === "user" ? (
-                actions ? (
-                  <EditableUserMessage
-                    threadId={threadId}
-                    message={msg}
-                    editable={msg.id === presentation?.latestUserMessageId}
-                    recovery={actions.messageActionState.recoverableByUserMessageId.get(
-                      msg.id
-                    )}
-                    commands={actions}
+              threadId={threadId}
+              message={msg}
+              renderUserFallback={() => null}
+              renderAssistantBody={(message) =>
+                state && actions ? (
+                  <AnchoredMarkdown
+                    state={state}
+                    msg={message}
+                    onOpenThread={(id) => actions.focusThread(id)}
+                    insertAt={
+                      hasWebResearch
+                        ? (message.webResearchTextOffset ?? 0)
+                        : undefined
+                    }
+                    insert={
+                      hasWebResearch ? (
+                        <WebResearchPanel
+                          activities={message.webResearch ?? []}
+                          route={message.researchRoute}
+                          plan={message.researchPlan}
+                          complete={message.status === "done"}
+                        />
+                      ) : undefined
+                    }
                   />
                 ) : null
-              ) : (
+              }
+              renderAfterMessage={(message) => (
                 <>
-                  {(hasVisibleAssistantContent ||
-                    isWaitingForVisibleOutput) && (
-                    <div className="bubble" data-role="assistant">
-                      {msg.backgroundGeneration && (
-                        <span className="generation-background" role="status">
-                          {GENERATION_BACKGROUND_LABEL}
-                        </span>
-                      )}
-                      {isWaitingForVisibleOutput ? (
-                        <span
-                          className="typing"
-                          role="status"
-                          aria-label={
-                            msg.backgroundGeneration
-                              ? GENERATION_BACKGROUND_LABEL
-                              : "正在生成回复"
-                          }
-                        >
-                          <i />
-                          <i />
-                          <i />
-                        </span>
-                      ) : (
-                        <>
-                          {/* 与列模式同一渲染件（D2）：Markdown 富文本 + SmoothText 平滑
-                            + 锚点高亮/脚注手绘；点高亮 = 画布内聚焦该分支节点 */}
-                          {state && actions && (
-                            <AnchoredMarkdown
-                              state={state}
-                              msg={msg}
-                              onOpenThread={(id) => actions.focusThread(id)}
-                              insertAt={
-                                hasWebResearch
-                                  ? (msg.webResearchTextOffset ?? 0)
-                                  : undefined
-                              }
-                              insert={
-                                hasWebResearch ? (
-                                  <WebResearchPanel
-                                    activities={msg.webResearch ?? []}
-                                    route={msg.researchRoute}
-                                    plan={msg.researchPlan}
-                                    complete={msg.status === "done"}
-                                  />
-                                ) : undefined
-                              }
-                            />
-                          )}
-                          {msg.status === "streaming" && hasVisibleText && (
-                            <span className="caret" />
-                          )}
-                        </>
-                      )}
-                    </div>
-                  )}
-                  {msg.status === "error" && (
-                    <div className="msg-error">
-                      {msg.error ?? "生成失败"}
-                      <button
-                        className="retry"
-                        onClick={() => actions?.retry(threadId, msg.id)}
-                      >
-                        重试
-                      </button>
-                    </div>
-                  )}
-                  {actions && hasCompletedAssistantActions(msg) && (
-                    <div className="assistant-actions-row">
-                      <AssistantMessageToolbar
-                        threadId={threadId}
-                        message={msg}
-                        regeneratable={
-                          msg.id === presentation?.latestAssistantMessageId
-                        }
-                        feedback={actions.messageActionState.feedbackByMessageId.get(
-                          msg.id
-                        )}
-                        commands={actions}
-                      />
-                      {msg.id === presentation?.latestAssistantMessageId && (
-                        <TurnVariantPicker
-                          threadId={threadId}
-                          activeAssistantMessageId={msg.id}
-                          alternatives={presentation?.alternatives ?? []}
-                          onSwitch={actions.switchTurnVariant}
-                        />
-                      )}
-                    </div>
-                  )}
-                  {msg.markdownGeneration && (
+                  {message.markdownGeneration && (
                     <MarkdownArtifactProgressCard
-                      progress={msg.markdownGeneration}
+                      progress={message.markdownGeneration}
                       sourceDepth={data.depth}
                       compact
                     />
                   )}
                   {state &&
                     actions &&
-                    msg.artifactIds?.map((artifactId) => {
+                    message.artifactIds?.map((artifactId) => {
                       const artifact = state.artifacts[artifactId]
                       if (!artifact) return null
                       return (
@@ -300,7 +208,15 @@ function CanvasExpand({
                     })}
                 </>
               )}
-            </div>
+              onRetry={(message) => actions?.retry(threadId, message.id)}
+              messageActionState={actions?.messageActionState}
+              messageCommands={actions ?? undefined}
+              editableUserMessageId={presentation?.latestUserMessageId}
+              regeneratableAssistantMessageId={
+                presentation?.latestAssistantMessageId
+              }
+              turnAlternatives={presentation?.alternatives ?? []}
+            />
           )
         })}
       </div>

@@ -12,35 +12,11 @@
 
 import React from "react"
 import { MessageScroller } from "@shadcn/react/message-scroller"
-import { GENERATION_BACKGROUND_LABEL } from "@/constants/generation"
 import type { Message } from "../core/types"
 import { ConversationComposer } from "./conversation-composer"
-import { EditableUserMessage } from "./editable-user-message"
-import { AssistantMessageToolbar } from "./assistant-message-toolbar"
-import { TurnVariantPicker } from "./turn-variant-picker"
-import {
-  hasCompletedAssistantActions,
-  type MessageActionViewState,
-} from "./message-action-types"
+import { ConversationMessage } from "./conversation-message"
+import type { MessageActionViewState } from "./message-action-types"
 import type { ThreadMessageActionCommands } from "../net/chat-controller"
-
-/** 把 \n 转成 <br/>（assistant 正文按段落渲染时的行内换行） */
-export function withBreaks(s: string, keyBase: string): React.ReactNode[] {
-  const lines = s.split("\n")
-  const out: React.ReactNode[] = []
-  lines.forEach((line, i) => {
-    if (i > 0) out.push(<br key={`${keyBase}-br${i}`} />)
-    if (line) out.push(line)
-  })
-  return out
-}
-
-/** 默认的 assistant 正文渲染：按空行分段（无任何分支装饰） */
-function defaultAssistantBody(msg: Message): React.ReactNode {
-  return msg.text
-    .split("\n\n")
-    .map((p, i) => <p key={i}>{withBreaks(p, `p${i}`)}</p>)
-}
 
 export interface ChatViewProps {
   /** 会话 id：写到 .msg-list 的 data-list 上（划选气泡靠它反查消息） */
@@ -107,105 +83,6 @@ export function ChatView({
   regeneratableAssistantMessageId,
   turnAlternatives = [],
 }: ChatViewProps) {
-  const renderMessage = (msg: Message) => {
-    const hasVisibleText = msg.text.trim().length > 0
-    const hasWebResearch = Boolean(msg.webResearch?.length)
-    const hasVisibleAssistantContent = hasVisibleText || hasWebResearch
-    const isWaitingForVisibleOutput =
-      msg.role === "assistant" &&
-      (msg.status === "pending" || msg.status === "streaming") &&
-      !hasVisibleAssistantContent &&
-      !msg.artifactIds?.length &&
-      !msg.markdownGeneration &&
-      !msg.webResearch?.length
-
-    return (
-      <div key={msg.id} className={`message ${msg.role}`} data-msg-id={msg.id}>
-        <div className="who">{msg.role === "user" ? "你" : "AI"}</div>
-        {msg.role === "user" ? (
-          messageCommands ? (
-            <EditableUserMessage
-              threadId={threadId}
-              message={msg}
-              editable={msg.id === editableUserMessageId}
-              recovery={messageActionState?.recoverableByUserMessageId.get(
-                msg.id
-              )}
-              commands={messageCommands}
-            />
-          ) : (
-            <div className="bubble" data-role="user">
-              {msg.quote && <div className="msg-quote">{msg.quote.text}</div>}
-              {msg.text}
-            </div>
-          )
-        ) : (
-          <>
-            {(hasVisibleAssistantContent || isWaitingForVisibleOutput) && (
-              <div className="bubble mt-3 mb-1" data-role="assistant">
-                {msg.backgroundGeneration && (
-                  <span className="generation-background" role="status">
-                    {GENERATION_BACKGROUND_LABEL}
-                  </span>
-                )}
-                {isWaitingForVisibleOutput ? (
-                  <span
-                    className="typing"
-                    role="status"
-                    aria-label={
-                      msg.backgroundGeneration
-                        ? GENERATION_BACKGROUND_LABEL
-                        : "正在生成回复"
-                    }
-                  >
-                    <i />
-                    <i />
-                    <i />
-                  </span>
-                ) : (
-                  <>
-                    {(renderAssistantBody ?? defaultAssistantBody)(msg)}
-                    {msg.status === "streaming" && hasVisibleText && (
-                      <span className="caret" />
-                    )}
-                  </>
-                )}
-              </div>
-            )}
-            {msg.status === "error" && (
-              <div className="msg-error">
-                {msg.error ?? "生成失败"}
-                <button className="retry" onClick={() => onRetry?.(msg)}>
-                  重试
-                </button>
-              </div>
-            )}
-            {messageCommands && hasCompletedAssistantActions(msg) && (
-              <div className="assistant-actions-row">
-                <AssistantMessageToolbar
-                  threadId={threadId}
-                  message={msg}
-                  regeneratable={msg.id === regeneratableAssistantMessageId}
-                  feedback={messageActionState?.feedbackByMessageId.get(msg.id)}
-                  commands={messageCommands}
-                />
-                {msg.id === regeneratableAssistantMessageId && (
-                  <TurnVariantPicker
-                    threadId={threadId}
-                    activeAssistantMessageId={msg.id}
-                    alternatives={turnAlternatives}
-                    onSwitch={messageCommands.switchTurnVariant}
-                  />
-                )}
-              </div>
-            )}
-            {renderAfterMessage?.(msg)}
-          </>
-        )}
-      </div>
-    )
-  }
-
   return (
     <>
       {header}
@@ -221,7 +98,22 @@ export function ChatView({
                 {intro}
                 {messages.map((msg) => (
                   <MessageScroller.Item key={msg.id} messageId={msg.id}>
-                    {renderMessage(msg)}
+                    <ConversationMessage
+                      threadId={threadId}
+                      message={msg}
+                      showRoleLabel
+                      assistantBubbleClassName="bubble mt-3 mb-1"
+                      renderAssistantBody={renderAssistantBody}
+                      renderAfterMessage={renderAfterMessage}
+                      onRetry={onRetry}
+                      messageActionState={messageActionState}
+                      messageCommands={messageCommands}
+                      editableUserMessageId={editableUserMessageId}
+                      regeneratableAssistantMessageId={
+                        regeneratableAssistantMessageId
+                      }
+                      turnAlternatives={turnAlternatives}
+                    />
                   </MessageScroller.Item>
                 ))}
               </div>
