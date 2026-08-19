@@ -14,9 +14,9 @@ import {
   markdownArtifactInputSchema,
 } from "@/lib/chat/markdown-artifact"
 import type { ResearchPlan, ResearchRoute } from "@/lib/chat/research-router"
-import type {
-  WebResearchActivity,
-  WebResearchSource,
+import {
+  webResearchSourcesFromOutput,
+  type WebResearchActivity,
 } from "@/lib/chat/web-research-activity"
 
 type ProjectTerminalStatus = "completed" | "stopped" | "failed"
@@ -65,22 +65,6 @@ function toolName(part: Record<string, unknown>): string | null {
   if (typeof part.type !== "string" || !part.type.startsWith("tool-"))
     return null
   return part.type.slice("tool-".length)
-}
-
-function sourcesFromOutput(output: unknown): WebResearchSource[] {
-  if (!isRecord(output) || !Array.isArray(output.results)) return []
-  const seen = new Set<string>()
-  return output.results.flatMap((candidate) => {
-    if (!isRecord(candidate) || typeof candidate.url !== "string") return []
-    const url = candidate.url.trim()
-    if (!url || seen.has(url)) return []
-    seen.add(url)
-    const title =
-      typeof candidate.title === "string" && candidate.title.trim()
-        ? candidate.title.trim()
-        : url
-    return [{ title, url }]
-  })
 }
 
 function optionalString(value: unknown): string | undefined {
@@ -156,7 +140,10 @@ export function projectGenerationResult({
         query:
           name === "webSearch" ? optionalString(inputRecord.query) : undefined,
         url: name === "readUrl" ? optionalString(inputRecord.url) : undefined,
-        sources: name === "webSearch" ? sourcesFromOutput(output) : [],
+        sources:
+          name === "webSearch"
+            ? webResearchSourcesFromOutput(output)
+            : [],
       })
     }
   }
