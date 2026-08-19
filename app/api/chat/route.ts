@@ -18,7 +18,6 @@ import { isSearchConfigured } from "@/lib/ai/search"
 import {
   DIRECT_FETCH_SYSTEM_PROMPT,
   RESEARCH_MAX_STEPS,
-  RESEARCH_ROUTER_CONTEXT_MESSAGES,
   RESEARCH_SYSTEM_PROMPT,
   WEB_ACCESS_SYSTEM_PROMPT,
 } from "@/constants/research"
@@ -67,6 +66,10 @@ import { GENERATION_ERRORS } from "@/constants/generation"
 import { compileThreadChatMessages } from "@/lib/thread-chat/application/compile-thread-chat-messages"
 import { threadChatGenerationIntentSchema } from "@/lib/thread-chat/contracts/generation-intent"
 import { surfaceTools } from "@/app/api/chat/surface-tools"
+import {
+  latestUserText,
+  recentConversationText,
+} from "@/app/api/chat/conversation-text"
 
 // AnySearch 搜索与网页深读可能形成多步循环，放宽单次请求时长上限。
 export const maxDuration = 300
@@ -132,31 +135,6 @@ async function finalizeWithRetry(input: FinalizeGenerationInput) {
     }
   }
   throw lastError
-}
-
-/** 只看最后一条 user 消息的文本 part，供高置信首步强制路由。 */
-function latestUserText(messages: UIMessage[]): string {
-  for (let i = messages.length - 1; i >= 0; i--) {
-    const message = messages[i]
-    if (message.role !== "user") continue
-    return message.parts
-      .flatMap((part) => (part.type === "text" ? [part.text] : []))
-      .join("\n")
-  }
-  return ""
-}
-
-/** Router 只取最近少量纯文本上下文，用于理解“这个/它”等指代。 */
-function recentConversationText(messages: UIMessage[]): string {
-  return messages
-    .slice(-RESEARCH_ROUTER_CONTEXT_MESSAGES)
-    .map((message) => {
-      const text = message.parts
-        .flatMap((part) => (part.type === "text" ? [part.text] : []))
-        .join("\n")
-      return `${message.role}: ${text}`
-    })
-    .join("\n")
 }
 
 export async function POST(req: Request) {
