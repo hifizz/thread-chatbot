@@ -41,10 +41,6 @@ import {
   UI_SAVE_DEBOUNCE_MS,
 } from "@/constants/thread-chat"
 import {
-  GENERATION_CLIENT_POLL_MS,
-  GENERATION_HIDDEN_POLL_MS,
-} from "@/constants/generation"
-import {
   isThreadChatModelId,
   resolveThreadChatModelId,
 } from "@/constants/model"
@@ -81,8 +77,8 @@ import {
 } from "./net/persist"
 import type { GenerationSummary } from "./generation/types"
 import type { RecoverableTurn } from "./generation/types"
+import { useGenerationReconciliation } from "./generation/use-generation-reconciliation"
 import { useMessageActions } from "./chat/use-message-actions"
-import { fetchWithAuth } from "@/lib/auth/session-recovery"
 import { BranchableChat } from "./branching/branchable-chat"
 import {
   SelectionBubble,
@@ -279,97 +275,14 @@ export function ThreadChatDemoInner({
     initialMessageFeedbacks,
     commands: chat,
   })
+  useGenerationReconciliation({
+    treeId,
+    store,
+    version,
+    initialGenerations,
+    replacePersistedMessageActions,
+  })
   useEffect(() => () => chat.detachAll(), [chat])
-
-  /* ---------- generation 终态轮询：刷新后不续 token 流，只在完成时原子替换。 ---------- */
-  const generationIdsRef = useRef(
-    new Set(
-      initialGenerations
-        .filter(
-          (generation) =>
-            generation.status === "running" ||
-            generation.status === "stop_requested"
-        )
-        .map((generation) => generation.id)
-    )
-  )
-  useEffect(() => {
-    for (const thread of Object.values(store.getState().threads)) {
-      for (const message of thread.messages) {
-        if (
-          message.role === "assistant" &&
-          (message.status === "pending" || message.status === "streaming") &&
-          message.generationId
-        ) {
-          generationIdsRef.current.add(message.generationId)
-        }
-      }
-    }
-  }, [version, store])
-  useEffect(() => {
-    let cancelled = false
-    let timer: ReturnType<typeof setTimeout> | null = null
-
-    const schedule = () => {
-      if (cancelled) return
-      timer = setTimeout(
-        poll,
-        document.hidden ? GENERATION_HIDDEN_POLL_MS : GENERATION_CLIENT_POLL_MS
-      )
-    }
-    const poll = async () => {
-      let needsTreeReconciliation = false
-      for (const generationId of [...generationIdsRef.current]) {
-        if (cancelled) return
-        try {
-          const res = await fetchWithAuth(
-            `/api/branch-generations/${generationId}`
-          )
-          if (res.status === 404) {
-            generationIdsRef.current.delete(generationId)
-            needsTreeReconciliation = true
-            continue
-          }
-          if (!res.ok) continue
-          const data = (await res.json()) as {
-            generation: GenerationSummary
-          }
-          const generation = data.generation
-          if (
-            generation.status === "running" ||
-            generation.status === "stop_requested"
-          )
-            continue
-
-          generationIdsRef.current.delete(generationId)
-          needsTreeReconciliation = true
-        } catch (error) {
-          console.warn("[thread-chat] generation 轮询失败，将继续重试", error)
-        }
-      }
-      if (needsTreeReconciliation && !cancelled) {
-        const loaded = await loadTree(treeId)
-        if (loaded.state) {
-          const nextState = sanitizeLoadedState(
-            loaded.state,
-            resolveThreadChatModelId,
-            loaded.generations
-          )
-          store.replaceReconciledState(nextState)
-          replacePersistedMessageActions({
-            recoverableTurns: loaded.recoverableTurns,
-            messageFeedbacks: loaded.messageFeedbacks,
-          })
-        }
-      }
-      schedule()
-    }
-    schedule()
-    return () => {
-      cancelled = true
-      if (timer) clearTimeout(timer)
-    }
-  }, [store, treeId, replacePersistedMessageActions])
 
   /* ---------- 防抖存库：version 变化后 1.5s 静默才整树 PUT（流式期间合并为一次写）。
        首屏（version 未变过）不写；卸载时若有 pending 定时器则立即 flush（尽力而为）。
