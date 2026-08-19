@@ -14,9 +14,6 @@
  * treeId 做 UUID 形状校验（安全阀），不合法一律 400。
  */
 
-import { and, eq } from "drizzle-orm"
-import { db } from "@/lib/db"
-import { branchTrees } from "@/lib/db/schema"
 import { isValidTreeId } from "@/lib/chat/tree-id"
 import {
   CUSTOM_TITLE_MAX_LEN,
@@ -39,6 +36,7 @@ import { listMessageFeedbackForTree } from "@/lib/thread-chat-generation/message
 import {
   deleteOwnedTreeIfIdle,
   loadOwnedOrClaimLegacyTree,
+  renameOwnedTree,
   saveOwnedTree,
 } from "@/lib/thread-chat-generation/tree-repository"
 import {
@@ -219,12 +217,12 @@ export async function PATCH(req: Request, { params }: RouteContext) {
     )
 
   // 只写 custom_title（用户意志轨）——防抖 PUT 的派生 title 与之互不踩踏（design D1）
-  const updated = await db
-    .update(branchTrees)
-    .set({ customTitle: title })
-    .where(and(eq(branchTrees.id, treeId), eq(branchTrees.userId, userId)))
-    .returning({ id: branchTrees.id })
-  if (updated.length === 0) return new Response("树不存在", { status: 404 })
+  const renamed = await renameOwnedTree({
+    userId,
+    treeId,
+    customTitle: title,
+  })
+  if (!renamed) return new Response("树不存在", { status: 404 })
   return Response.json({ ok: true })
 }
 

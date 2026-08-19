@@ -131,6 +131,25 @@ export async function saveOwnedTree(input: {
   })
 }
 
+/** 已校验标题的 owner-scoped 用户命名写入；不触碰机器派生 title。 */
+export async function renameOwnedTree(input: {
+  userId: string
+  treeId: string
+  customTitle: string
+}): Promise<boolean> {
+  const [updated] = await db
+    .update(branchTrees)
+    .set({ customTitle: input.customTitle })
+    .where(
+      and(
+        eq(branchTrees.id, input.treeId),
+        eq(branchTrees.userId, input.userId)
+      )
+    )
+    .returning({ id: branchTrees.id })
+  return Boolean(updated)
+}
+
 /**
  * 删除与 generation start 共用 branch_trees 行锁：两者并发时，只可能先删除并让
  * start 得到 not_found，或先创建 generation 并让删除得到 generation_running。
