@@ -212,7 +212,7 @@ await test("variant conflicts do not move the local leaf; success does", async (
   }
 })
 
-await test("feedback command sends the exact generation/value pair", async () => {
+await test("feedback command sends the exact message/value pair", async () => {
   let request
   const harness = controllerWith(async (input, init) => {
     request = { input: String(input), init }
@@ -220,20 +220,28 @@ await test("feedback command sends the exact generation/value pair", async () =>
   })
   try {
     await harness.controller.submitFeedback(
+      "main",
       "22222222-2222-4222-8222-222222222222",
       "negative"
     )
     assert.equal(
       request.input,
-      "/api/branch-generations/22222222-2222-4222-8222-222222222222/feedback"
+      `/api/branch-trees/${treeId}/messages/22222222-2222-4222-8222-222222222222/feedback`
     )
-    assert.deepEqual(JSON.parse(request.init.body), { feedback: "negative" })
+    assert.deepEqual(JSON.parse(request.init.body), {
+      threadId: "main",
+      feedback: "negative",
+    })
 
     await harness.controller.submitFeedback(
+      "main",
       "22222222-2222-4222-8222-222222222222",
       null
     )
-    assert.deepEqual(JSON.parse(request.init.body), { feedback: null })
+    assert.deepEqual(JSON.parse(request.init.body), {
+      threadId: "main",
+      feedback: null,
+    })
   } finally {
     harness.restore()
   }

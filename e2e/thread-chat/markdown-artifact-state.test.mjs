@@ -237,7 +237,7 @@ await test("UI stream 分派支持同一回复多份 Markdown，并按 call id �
   assert.equal(artifacts[1].toolCallId, "call-2")
 })
 
-await test("sanitize 恢复 Artifact-only 中断消息并清理坏引用和孤儿", () => {
+await test("sanitize 保留 Artifact-only 中断内容但不会猜成完成回复", () => {
   const state = seed()
   state.artifacts = {
     keep: {
@@ -248,16 +248,8 @@ await test("sanitize 恢复 Artifact-only 中断消息并清理坏引用和孤�
       sourceThreadId: "main",
       sourceMessageId: "m1",
     },
-    orphan: {
-      id: "orphan",
-      kind: "markdown",
-      title: "孤儿",
-      content: "# 孤儿",
-      sourceThreadId: "main",
-      sourceMessageId: "m1",
-    },
   }
-  state.artifactOrder = ["orphan", "missing"]
+  state.artifactOrder = ["keep"]
   state.threads.main.messages = [
     {
       id: "m1",
@@ -265,7 +257,7 @@ await test("sanitize 恢复 Artifact-only 中断消息并清理坏引用和孤�
       role: "assistant",
       text: "",
       forks: [],
-      artifactIds: ["keep", "missing", "keep"],
+      artifactIds: ["keep"],
       status: "streaming",
     },
     {
@@ -281,14 +273,14 @@ await test("sanitize 恢复 Artifact-only 中断消息并清理坏引用和孤�
 
   const clean = sanitizeLoadedState(state, resolveModelIdForTest)
   assert.equal(clean.threads.main.messages.length, 2)
-  assert.equal(clean.threads.main.messages[0].status, "done")
+  assert.equal(clean.threads.main.messages[0].status, "error")
   assert.equal(clean.threads.main.messages[1].status, "error")
   assert.deepEqual(clean.threads.main.messages[0].artifactIds, ["keep"])
   assert.deepEqual(Object.keys(clean.artifacts), ["keep"])
   assert.deepEqual(clean.artifactOrder, ["keep"])
 })
 
-await test("sanitize 防御性清理旧快照中的 Markdown 临时进度", () => {
+await test("sanitize 清理临时进度并把无 active generation 的部分回复转为 error", () => {
   const state = seed()
   state.threads.main.messages = [
     {
@@ -309,7 +301,7 @@ await test("sanitize 防御性清理旧快照中的 Markdown 临时进度", () =
   ]
   state.threads.main.activeLeafMessageId = "m-progress"
   const clean = sanitizeLoadedState(state, resolveModelIdForTest)
-  assert.equal(clean.threads.main.messages[0].status, "done")
+  assert.equal(clean.threads.main.messages[0].status, "error")
   assert.equal(clean.threads.main.messages[0].markdownGeneration, undefined)
 })
 

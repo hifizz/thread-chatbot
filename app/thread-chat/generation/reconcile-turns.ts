@@ -1,9 +1,10 @@
-import { migrateThreadTreeState } from "../core/message-graph"
+import { parseThreadTreeState } from "../core/message-graph"
 import type { Message, ThreadTreeState } from "../core/types"
 import { GENERATION_ERRORS } from "@/constants/generation"
 import {
   isActiveGenerationStatus,
   type GenerationForReconcile,
+  type GenerationSummary,
   type ReconciledThreadChatTree,
   type RecoverableTurn,
 } from "./types"
@@ -22,6 +23,35 @@ function parentUser(
   )
 }
 
+export class InvalidCompletedMessageGenerationLinkError extends Error {
+  constructor(readonly messageId: string) {
+    super(`Completed assistant message ${messageId} has no generation link`)
+    this.name = "InvalidCompletedMessageGenerationLinkError"
+  }
+}
+
+/** 完成消息可以不冗余 generationId，但服务端必须能反查其完成执行。 */
+export function assertCompletedMessageGenerationLinks(
+  state: ThreadTreeState,
+  generations: readonly GenerationSummary[]
+): void {
+  for (const thread of Object.values(state.threads)) {
+    for (const message of thread.messages) {
+      if (message.role !== "assistant" || message.status !== "done") continue
+      const linked = generations.some(
+        (generation) =>
+          generation.threadId === thread.id &&
+          generation.assistantMessageId === message.id &&
+          generation.status === "completed" &&
+          generation.result?.status === "done" &&
+          (!message.generationId || generation.id === message.generationId)
+      )
+      if (!linked)
+        throw new InvalidCompletedMessageGenerationLinkError(message.id)
+    }
+  }
+}
+
 /**
  * 用 tree + current generation sidecar 得到唯一的加载投影。
  * 函数不修改输入，也不把协调结果反写 DB。
@@ -30,7 +60,7 @@ export function reconcileThreadChatTurns(input: {
   state: ThreadTreeState
   generations: readonly GenerationForReconcile[]
 }): ReconciledThreadChatTree {
-  let state = migrateThreadTreeState(input.state)
+  let state = parseThreadTreeState(input.state)
   const currentGenerations = input.generations.filter(
     (generation) => generation.isCurrent
   )
@@ -91,9 +121,7 @@ export function reconcileThreadChatTurns(input: {
     for (const message of thread.messages) {
       if (
         message.role !== "assistant" ||
-        (message.status !== "pending" && message.status !== "streaming") ||
-        message.text.trim() !== "" ||
-        (message.artifactIds?.length ?? 0) > 0
+        (message.status !== "pending" && message.status !== "streaming")
       )
         continue
 

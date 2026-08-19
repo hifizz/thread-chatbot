@@ -16,9 +16,9 @@
 - **WHEN** 当前 generation 已完成、停止或失败并保存了结构化终态
 - **THEN** 系统 SHALL 先合并该终态结果，再决定 UI 状态，不得提供会启动重复模型调用的孤儿重试入口
 
-#### Scenario: 空 assistant 没有 generation
-- **WHEN** 树中存在 pending 或 streaming 的空 assistant 占位，但没有匹配的当前 generation
-- **THEN** 系统 SHALL 将该 assistant 协调为可重试错误并保留其消息身份，不得在加载时静默删除它
+#### Scenario: 未完成 assistant 没有 generation
+- **WHEN** 树中存在 pending 或 streaming assistant，但没有匹配的当前 generation（无论是否已有部分正文或 Artifact）
+- **THEN** 系统 SHALL 保留该 assistant 的消息身份和已有内容，将其协调为可重试错误，不得在加载时删除它或把部分输出猜成完成消息
 
 #### Scenario: 最后一条 user 没有 assistant 或 generation
 - **WHEN** 某 Thread 的 active leaf 是已提交 user，且不存在以它为 parent 的 assistant 目标或可恢复的当前 generation
@@ -84,9 +84,9 @@
 - **WHEN** 最新轮次存在两个或更多 assistant alternatives 且用户选择另一个版本
 - **THEN** 系统 SHALL 切换完整问答 active path，使对应 user、assistant、feedback、inline Artifact 和分支提示一致显示，不得拼接不同版本的 user 与 assistant
 
-#### Scenario: 加载旧线性树
-- **WHEN** 已保存树没有 message parent 或 active leaf 字段
-- **THEN** 系统 SHALL 按原消息顺序确定性迁移为单路径图，迁移前后可见消息、fork source 和 Artifact 内容保持一致
+#### Scenario: 拒绝旧线性树
+- **WHEN** 已保存树缺少当前 schema version、message parent、active leaf 或 Artifact source identity
+- **THEN** 系统 SHALL 拒绝把它解释或降级为当前消息图，不得执行隐式迁移、猜测 parent/source 或接受旧客户端覆盖；内测数据通过受控清理重新开始
 
 ### Requirement: 消息图和版本选择使用 revision 并发控制
 
@@ -126,31 +126,39 @@
 
 ### Requirement: Assistant 消息提供复制、重新生成与反馈
 
-具有终态展示的 assistant 消息 SHALL 在左下方提供复制 Markdown、重新生成、点赞和点踩操作。复制 SHALL 使用回复正文的原始 Markdown；点赞和点踩 SHALL 互斥并绑定实际被评价的 generation。P0 中只有当前 Thread active path 最后一轮的 assistant 可执行重新生成；重新生成 SHALL 创建 sibling assistant。更早 assistant 的重新生成入口 SHALL 明确禁用或解释其不可用原因，不得破坏性截断后续历史。
+只有 `done` 的 assistant 消息 SHALL 在左下方提供复制 Markdown、重新生成、点赞和点踩操作。复制 SHALL 使用回复正文的原始 Markdown；点赞和点踩 SHALL 互斥并只绑定实际被评价的 `messageId`。`pending`、`streaming`、未完成或 `error` assistant SHALL NOT 提供复制、点赞和点踩，失败恢复使用独立 Retry 入口。P0 中只有当前 Thread active path 最后一轮且已完成的 assistant 可执行重新生成；重新生成 SHALL 创建 sibling assistant。更早 assistant 的重新生成入口 SHALL 明确禁用或解释其不可用原因，不得破坏性截断后续历史。
 
 #### Scenario: 复制 assistant Markdown
 - **WHEN** 用户点击含正文的 assistant 消息复制按钮
 - **THEN** 剪贴板 SHALL 得到该回复的原始 Markdown 正文，并显示有限时长的成功状态
 
-#### Scenario: 重新生成最后一轮终态回复
-- **WHEN** 用户点击当前 Thread 最后一轮 completed、failed 或 stopped assistant 消息的重新生成按钮
+#### Scenario: 重新生成最后一轮完成回复
+- **WHEN** 用户点击当前 Thread 最后一轮 `done` assistant 消息的重新生成按钮
 - **THEN** 系统 SHALL 创建新的 assistant messageId 与 generationId 并切为 active leaf，立即显示等待状态；原终态回复继续作为可切换版本存在，旧 active attempt 的晚到结果不得覆盖新回复
 
 #### Scenario: 历史 assistant 不可破坏性重新生成
 - **WHEN** 用户查看后面仍有对话历史的 assistant 消息
-- **THEN** 系统 SHALL 仍允许复制和评价该 generation，但 SHALL NOT 通过本功能重置该消息、删除后续历史或迁移其子 Thread
+- **THEN** 系统 SHALL 在该消息已经完成时仍允许复制和评价该 message，但 SHALL NOT 通过本功能重置该消息、删除后续历史或迁移其子 Thread
 
 #### Scenario: 无正文不可复制
 - **WHEN** assistant 消息没有可复制的 Markdown 正文
 - **THEN** 复制操作 SHALL 禁用或不显示，不得把错误文案、DOM 文本或独立 Artifact 冒充回复正文写入剪贴板
 
+#### Scenario: 未完成回复不显示产品操作
+- **WHEN** assistant 消息仍为 pending、streaming、error 或其他未完成状态
+- **THEN** 系统 SHALL 隐藏或禁用复制、点赞和点踩；error 消息可显示独立 Retry，但不得把执行失败伪装成已完成且可评价的回复
+
 #### Scenario: 反馈按钮互斥
-- **WHEN** 用户对同一 generation 先点赞后点踩
-- **THEN** 系统 SHALL 将该 generation 的当前反馈更新为 negative，并只显示点踩选中态
+- **WHEN** 用户对同一 assistant message 先点赞后点踩
+- **THEN** 系统 SHALL 将该 message 的当前反馈更新为 negative，并只显示点踩选中态
 
 #### Scenario: 同一反馈重复提交
-- **WHEN** 用户对同一 generation 重复提交相同反馈
+- **WHEN** 用户对同一 assistant message 重复提交相同反馈
 - **THEN** 服务端 SHALL 幂等保存一个结果，UI SHALL 保持同一选中态
+
+#### Scenario: 完成消息不依赖前端 generationId
+- **WHEN** assistant message 已为 `done` 且具有稳定 messageId，但当前 UI view model 没有携带 generationId
+- **THEN** 复制、点赞和点踩 SHALL 正常可用；服务端需要执行数据时 SHALL 通过 messageId 反查，不得提示“没有可评价的 generation”
 
 ### Requirement: 划选子 Thread 永久绑定来源消息版本
 
@@ -192,21 +200,25 @@
 - **WHEN** 用户从 B 切回 A
 - **THEN** Artifact A SHALL 恢复为当前版本资产，原内容和来源信息保持不变
 
-### Requirement: Generation 反馈按用户持久化和隔离
+### Requirement: Message 反馈按用户持久化和隔离
 
-点赞或点踩 SHALL 按 owner 与 generationId 持久化。反馈读取与写入 SHALL 校验当前登录用户；刷新后 SHALL 恢复当前 generation 的反馈状态。重新生成产生的新 generation SHALL 从未反馈状态开始，旧 generation 的反馈记录保留审计但不显示为新答案的反馈。
+点赞或点踩 SHALL 按 owner、tree、thread 与 assistant `messageId` 持久化。反馈读取与写入 SHALL 校验当前登录用户以及消息确实存在于其严格 schema-v2 tree 中；刷新后 SHALL 恢复该 message 的反馈状态。重新生成产生的新 assistant message SHALL 从未反馈状态开始，旧 message 的反馈记录保留但不显示为新答案的反馈。generation 记录不得作为产品反馈的主键或可用性条件。
 
 #### Scenario: 刷新后恢复反馈
 - **WHEN** 用户评价一条回复后刷新同一棵树
-- **THEN** 系统 SHALL 从服务端恢复该回复当前 generation 的点赞或点踩状态
+- **THEN** 系统 SHALL 从服务端恢复该 assistant message 的点赞或点踩状态
 
 #### Scenario: 重新生成不继承反馈
-- **WHEN** 已评价的 assistant 消息被重新生成并产生新的 current generation
-- **THEN** 新答案 SHALL 显示未评价状态，旧 generation 的反馈不得迁移到新 generation
+- **WHEN** 已评价的 assistant 消息被重新生成并产生新的 sibling assistant message
+- **THEN** 新答案 SHALL 显示未评价状态，旧 message 的反馈不得迁移到新 message
 
 #### Scenario: 越权提交反馈
-- **WHEN** 用户尝试读取或修改不属于自己的 generation 反馈
-- **THEN** 系统 SHALL 拒绝请求且不得泄露目标 generation 是否存在
+- **WHEN** 用户尝试读取或修改不属于自己的 tree/message 反馈
+- **THEN** 系统 SHALL 拒绝请求且不得泄露目标 tree 或 message 是否存在
+
+#### Scenario: 已完成系统回复具有执行来源
+- **WHEN** 服务端读取一条由系统生成且状态为 `done` 的 assistant message
+- **THEN** 系统 SHALL 能找到 `assistantMessageId` 指向该 messageId 的 generation 记录；若关联缺失，SHALL 将其视为数据不变量错误而不是可正常反馈的完成消息
 
 ### Requirement: 消息操作在列模式与画布模式保持一致
 

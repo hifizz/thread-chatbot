@@ -11,6 +11,15 @@ import type { ResearchPlan, ResearchRoute } from "@/lib/chat/research-router"
 
 export type Role = "user" | "assistant"
 export type ArtifactKind = "code" | "note" | "markdown"
+export type MessageFeedback = "positive" | "negative"
+
+export interface MessageFeedbackSummary {
+  treeId: string
+  threadId: string
+  messageId: string
+  feedback: MessageFeedback
+  updatedAt: string
+}
 
 export interface Artifact {
   id: string

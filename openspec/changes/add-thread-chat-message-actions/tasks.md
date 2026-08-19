@@ -1,27 +1,27 @@
 ## 1. Freeze contracts and pure behavior
 
 - [x] 1.1 Re-read the repository's installed Next.js guidance before implementation and freeze the public contracts from `design.md`: immutable message-node graph, active leaf, generation start intents, recovery states, action command results, feedback values, and stable server error codes.
-- [x] 1.2 Extend the shared thread-chat TypeScript model with message `parentMessageId`, thread `activeLeafMessageId`, artifact `sourceMessageId`, `ThreadChatGenerationIntent`, `RecoverableTurn`, `MessageActionViewState`, and generation feedback fields without leaking component-local UI state into `ThreadTreeState`.
-- [x] 1.3 Implement and test the idempotent legacy linear-tree migration plus pure `activeMessagePath`, `messagePathTo`, `assistantTurnAlternatives`, inactive-source provenance, and active-path Artifact selectors, including cycle/missing-parent rejection.
+- [x] 1.2 Extend the shared thread-chat TypeScript model with message `parentMessageId`, thread `activeLeafMessageId`, artifact `sourceMessageId`, `ThreadChatGenerationIntent`, `RecoverableTurn`, `MessageActionViewState`, and message feedback summaries without leaking component-local UI state into `ThreadTreeState`.
+- [x] 1.3 Implement and test strict schema-v2 parsing plus pure `activeMessagePath`, `messagePathTo`, `assistantTurnAlternatives`, inactive-source provenance, and active-path Artifact selectors, including cycle/missing-parent rejection.
 - [x] 1.4 Implement a pure `reconcileThreadChatTurns` function that merges persisted tree state with current generations, repairs missing graph nodes/active leaf, and returns explicit recoverable-turn metadata.
 - [x] 1.5 Implement pure active-leaf-turn validation and `prepareRegenerationPatch` helpers that only append sibling/child nodes and move the active leaf without mutating source nodes or deleting Artifacts.
 - [x] 1.6 Extract `compileThreadChatMessages` so current context follows the server-owned active path while inherited child-Thread context follows the exact `forkFromMsgId` source path.
-- [x] 1.7 Add table-driven unit tests covering every reconciliation state, generation intent, legacy migration, stale-PUT graph repair, message alternative, exact fork-source inheritance, Artifact visibility, quote/fork preservation, and context compilation.
+- [x] 1.7 Add table-driven unit tests covering every reconciliation state, generation intent, strict legacy rejection, stale-PUT graph repair, message alternative, exact fork-source inheritance, Artifact visibility, quote/fork preservation, and context compilation.
 
-## 2. Persist feedback and protect tree revisions
+## 2. Persist message feedback and protect tree revisions
 
-- [x] 2.1 Add nullable positive/negative feedback and feedback-updated-at columns to `branch_generations` plus a default-0 monotonic revision on `branch_trees`; generate, review, and apply the migration locally.
-- [x] 2.2 Add owner-scoped repository operations for reading and updating generation feedback, including idempotent writes and switching between positive and negative.
-- [x] 2.3 Add `PUT /api/branch-generations/{generationId}/feedback` with request validation, authentication/ownership checks, and the shared response/error contract.
-- [x] 2.4 Include feedback in generation summaries returned by the tree and generation APIs so refresh restores the selected state.
-- [x] 2.5 Add database and API tests for set, repeat, switch, clear, refresh, unauthorized access, and feedback on a superseded generation.
+- [x] 2.1 Add a message-scoped feedback table keyed by owner/tree/thread/message plus a default-0 monotonic revision on `branch_trees`; generate, review, and apply the migration locally.
+- [x] 2.2 Add owner-scoped repository operations for reading and updating message feedback, including idempotent writes and switching between positive and negative.
+- [x] 2.3 Add `PUT /api/branch-trees/{treeId}/messages/{messageId}/feedback` with request validation, authentication/ownership checks, completed-message validation, and the shared response/error contract.
+- [x] 2.4 Include message feedback summaries in tree reads so refresh restores the selected state without exposing generation identity to the toolbar.
+- [x] 2.5 Add database and API tests for set, repeat, switch, clear, refresh, unauthorized access, and feedback on an inactive completed message variant.
 - [x] 2.6 Return tree revision from GET and require `baseRevision` for graph-tree PUT; update by owner/revision CAS and return stable `tree_revision_conflict` or `revision_required` responses without partial writes.
 - [x] 2.7 Add the owner-scoped active-leaf switch command that validates a latest-turn alternative, updates only that Thread's active leaf, increments revision, and returns the new revision/minimal patch.
 - [x] 2.8 Add concurrency tests for stale whole-tree PUT, stale variant switch, generation-vs-PUT races, refresh persistence, unauthorized switching, and refusal of legacy no-revision writes after schema upgrade.
 
 ## 3. Make regeneration intents atomic on the server
 
-- [x] 3.1 Extend the generation-start request schema compatibly to accept `persisted-turn`, `regenerate-assistant`, `retry-orphan-user`, and `edit-last-user` intents.
+- [x] 3.1 Require every generation-start request to declare one of `persisted-turn`, `regenerate-assistant`, `retry-orphan-user`, and `edit-last-user`; reject missing legacy intent.
 - [x] 3.2 Refactor generation preparation into one database transaction that validates the active-leaf turn, creates the required sibling user and/or sibling assistant with fresh IDs, moves the active leaf, supersedes only an actually running replaced attempt, preserves all terminal source nodes/Artifacts, persists the graph, and creates the new generation plus graph-aware `turnSnapshot`.
 - [x] 3.3 Reject historical or structurally invalid mutations before any model request with stable `invalid_turn`, `not_latest_turn`, `generation_conflict`, or `persistence_failed` responses.
 - [x] 3.4 Extend graph-aware generation snapshots so reconciliation can restore missing new nodes/results without overwriting immutable source messages or overriding a later revision-controlled user variant selection.
@@ -33,7 +33,7 @@
 
 - [x] 4.1 Make the tree GET path call the shared reconciliation function and return `revision` plus per-turn `recoverableTurns` rather than failing the whole tree for a local generation inconsistency.
 - [x] 4.2 Refactor initial load, polling, and generation completion to consume the same reconciliation result instead of maintaining separate sanitize/repair rules.
-- [x] 4.3 Keep active generations visible as background-loading assistant placeholders, merge terminal results, convert empty pending assistants with no generation into retryable errors, and expose last-user-without-assistant as `missing_assistant`.
+- [x] 4.3 Keep active generations visible as background-loading assistant placeholders, merge terminal results, convert any pending/streaming assistant with no generation into a retryable error while preserving partial output, and expose last-user-without-assistant as `missing_assistant`.
 - [x] 4.4 Add regression tests for all four recovery cases and for false positives where a final user message already has a current generation or a valid adjacent assistant.
 
 ## 5. Expose headless message-action commands
@@ -74,3 +74,13 @@
 - [x] 8.5 Refresh during and after generation to verify background continuation, final answer persistence, recoverable-turn UI, stale-PUT graph repair, active-leaf persistence, and idempotent sibling creation.
 - [x] 8.6 Document graph migration/deployment ordering, compatibility and rollback steps, JSONB-size/provenance observability, intent/error/recovery fields, and known P0 latest-turn limitations.
 - [x] 8.7 Replace duplicated action/error/status strings with shared constants, format all touched files at the end, and run strict OpenSpec validation before handoff.
+
+## 9. Remove legacy compatibility and separate message feedback from execution
+
+- [x] 9.1 Update proposal, specification, and design to make `messageId` the only product-feedback identity, keep `generationId` execution-only, require completed assistant messages to have a linked generation record, and explicitly reject legacy message data during the internal-test reset.
+- [x] 9.2 Replace generation feedback columns and endpoints with owner-scoped message feedback persistence keyed by tree/thread/message, including idempotent set, switch, clear, refresh, and non-disclosing ownership checks.
+- [x] 9.3 Remove legacy linear-tree, legacy generation snapshot, optional intent, and no-revision compatibility paths; accept only strict schema-v2 graph state while preserving recoverable handling for failures created by the current schema.
+- [x] 9.4 Change controller and shared column/canvas view state from `feedbackByGenerationId` to `feedbackByMessageId`; use `message.id` for like/dislike and hide copy/feedback controls until an assistant message is complete.
+- [x] 9.5 Add or update unit, repository, API, controller, and component tests for strict graph validation, completed-message/generation linkage, message-scoped feedback, action gating, regeneration isolation, and owner isolation.
+- [x] 9.6 Generate and apply the database migration, then clear only thread-chat tree/generation/message-feedback data while preserving accounts, credits, payments, and unrelated application data.
+- [x] 9.7 Run focused tests, typecheck, lint, build, strict OpenSpec validation, and the mandated `ego-browser nodejs` localhost flow for completed-message feedback, incomplete action gating, regeneration, refresh persistence, and owner isolation.

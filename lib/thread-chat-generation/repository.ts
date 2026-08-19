@@ -1,13 +1,12 @@
 import { and, desc, eq, inArray, lt, max, sql } from "drizzle-orm"
 import type { ThreadTreeState } from "@/app/thread-chat/core/types"
-import { migrateThreadTreeState } from "@/app/thread-chat/core/message-graph"
+import { parseThreadTreeState } from "@/app/thread-chat/core/message-graph"
 import {
   prepareRegenerationPatch,
   type PreparedTurnPatch,
 } from "@/app/thread-chat/core/regeneration"
 import type {
   GenerationResultV1,
-  GenerationFeedback,
   GenerationStatus,
   GenerationSummary,
   GenerationTurnIdentity,
@@ -40,7 +39,7 @@ export class GenerationRepositoryError extends Error {
 export type StartGenerationInput = GenerationTurnIdentity & {
   userId: string
   modelId: string
-  intent?: ThreadChatGenerationIntent
+  intent: ThreadChatGenerationIntent
 }
 
 type GenerationRow = typeof branchGenerations.$inferSelect
@@ -86,7 +85,7 @@ function verifyTurn(
 
   let state: ThreadTreeState
   try {
-    state = migrateThreadTreeState(stateValue)
+    state = parseThreadTreeState(stateValue)
   } catch {
     throw new GenerationRepositoryError(
       "invalid_turn",
@@ -195,10 +194,10 @@ export async function prepareGeneration(
       return { created: false, generation: replayed }
     }
 
-    const intent = input.intent ?? { kind: "persisted-turn" as const }
+    const intent = input.intent
     let state: ThreadTreeState
     try {
-      state = migrateThreadTreeState(tree.state)
+      state = parseThreadTreeState(tree.state)
     } catch {
       throw new GenerationRepositoryError(
         "invalid_turn",
@@ -375,63 +374,6 @@ export async function getGenerationForOwner(
       )
     )
   return row ?? null
-}
-
-export async function getGenerationFeedbackForOwner(
-  userId: string,
-  generationId: string
-): Promise<Pick<GenerationRow, "feedback" | "feedbackUpdatedAt"> | null> {
-  const [row] = await db
-    .select({
-      feedback: branchGenerations.feedback,
-      feedbackUpdatedAt: branchGenerations.feedbackUpdatedAt,
-    })
-    .from(branchGenerations)
-    .where(
-      and(
-        eq(branchGenerations.id, generationId),
-        eq(branchGenerations.userId, userId)
-      )
-    )
-  return row ?? null
-}
-
-/** owner-scoped 幂等反馈替换；允许 terminal/superseded generation。 */
-export async function setGenerationFeedbackForOwner(input: {
-  userId: string
-  generationId: string
-  feedback: GenerationFeedback | null
-}): Promise<GenerationRow | null> {
-  return db.transaction(async (tx) => {
-    const [current] = await tx
-      .select()
-      .from(branchGenerations)
-      .where(
-        and(
-          eq(branchGenerations.id, input.generationId),
-          eq(branchGenerations.userId, input.userId)
-        )
-      )
-    if (!current) return null
-    if (current.feedback === input.feedback) return current
-
-    const now = new Date()
-    const [updated] = await tx
-      .update(branchGenerations)
-      .set({
-        feedback: input.feedback,
-        feedbackUpdatedAt: input.feedback === null ? null : now,
-        updatedAt: now,
-      })
-      .where(
-        and(
-          eq(branchGenerations.id, input.generationId),
-          eq(branchGenerations.userId, input.userId)
-        )
-      )
-      .returning()
-    return updated ?? null
-  })
 }
 
 /** 内部执行观察器使用；不构成对用户暴露的数据接口。 */
@@ -642,6 +584,22 @@ export async function listCurrentGenerationsForTree(
     .orderBy(desc(branchGenerations.updatedAt))
 }
 
+export async function listGenerationsForTree(
+  userId: string,
+  treeId: string
+): Promise<GenerationRow[]> {
+  return db
+    .select()
+    .from(branchGenerations)
+    .where(
+      and(
+        eq(branchGenerations.userId, userId),
+        eq(branchGenerations.treeId, treeId)
+      )
+    )
+    .orderBy(desc(branchGenerations.updatedAt))
+}
+
 export async function treeHasActiveGenerations(
   userId: string,
   treeId: string
@@ -672,8 +630,6 @@ export function toGenerationSummary(row: GenerationRow): GenerationSummary {
     status: row.status,
     updatedAt: row.updatedAt.toISOString(),
     result: row.result,
-    feedback: row.feedback,
-    feedbackUpdatedAt: row.feedbackUpdatedAt?.toISOString() ?? null,
   }
 }
 

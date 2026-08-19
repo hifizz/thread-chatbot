@@ -45,7 +45,7 @@ store 临时进度与完整 Artifact 原子替换、存盘剥离、Artifact-only
 结构化投影与整树合并是无数据库纯测试：
 
 ```bash
-node --experimental-strip-types e2e/thread-chat/generation-persistence.test.mjs
+node --import tsx e2e/thread-chat/generation-persistence.test.mjs
 ```
 
 覆盖正文、Markdown Artifact、联网来源/研究上下文、partial error、空回复、确定性
@@ -56,7 +56,7 @@ repository/finalize 是开发数据库测试；读取 `.env.local` 后运行，�
 与树，并在 `finally` 中级联清理：
 
 ```bash
-node --import tsx e2e/thread-chat/generation-db.test.mjs
+node --env-file=.env.local --import tsx e2e/thread-chat/generation-db.test.mjs
 ```
 
 覆盖并发重复 start、单 current attempt、supersede、Stop-vs-complete、stale heartbeat、
@@ -76,21 +76,24 @@ node --import tsx e2e/thread-chat/message-graph.test.mjs
 node --import tsx e2e/thread-chat/reconcile-turns.test.mjs
 node --import tsx e2e/thread-chat/regeneration-patch.test.mjs
 node --import tsx e2e/thread-chat/message-actions-controller.test.mjs
+node --import tsx e2e/thread-chat/message-action-availability.test.mjs
 ```
 
-覆盖 legacy tree 幂等迁移、active/exact-source path、回复版本、Artifact 来源、恢复状态、
+覆盖 strict schema-v2 拒绝旧线性树、active/exact-source path、回复版本、Artifact 来源、恢复状态、
 不可变 edit/regenerate patch，以及 controller 接受/拒绝/冲突/反馈命令。
 
 以下脚本连接 `.env.local` 的开发数据库并在 `finally` 中清理随机测试用户：
 
 ```bash
-node --import tsx e2e/thread-chat/generation-actions-db.test.mjs
-node --import tsx e2e/thread-chat/tree-revision-db.test.mjs
+node --env-file=.env.local --import tsx e2e/thread-chat/generation-actions-db.test.mjs
+node --env-file=.env.local --import tsx e2e/thread-chat/tree-revision-db.test.mjs
+node --env-file=.env.local --import tsx e2e/thread-chat/message-feedback-db.test.mjs
 ```
 
 覆盖 generation intent 的原子落库、幂等 replay、running attempt supersede、terminal
-source/Artifact 保留，以及 active-leaf CAS、跨用户拒绝、generation-vs-switch revision
-竞态。真实 UI 验收按仓库规则使用 `ego-browser nodejs` 访问 `localhost:4040`，不得用
+source/Artifact 保留、active-leaf CAS、跨用户拒绝、generation-vs-switch revision
+竞态，以及 message feedback 的 set/repeat/switch/clear、完成态约束和 owner isolation。
+真实 UI 验收按仓库规则使用 `ego-browser nodejs` 访问 `localhost:4040`，不得用
 本目录旧的 Playwright 脚本替代本 change 的浏览器验收。
 
 ## Markdown Artifact 浏览器验收（mock API）

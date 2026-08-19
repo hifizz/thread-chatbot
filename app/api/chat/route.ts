@@ -131,21 +131,19 @@ const threadChatPersistenceSchema = z.object({
   userMessageId: z.string().min(1),
   assistantMessageId: z.string().min(1),
   generationId: z.string().uuid(),
-  intent: z
-    .discriminatedUnion("kind", [
-      z.object({ kind: z.literal("persisted-turn") }),
-      z.object({
-        kind: z.literal("regenerate-assistant"),
-        sourceAssistantMessageId: z.string().min(1),
-      }),
-      z.object({ kind: z.literal("retry-orphan-user") }),
-      z.object({
-        kind: z.literal("edit-last-user"),
-        sourceUserMessageId: z.string().min(1),
-        text: z.string().trim().min(1),
-      }),
-    ])
-    .optional(),
+  intent: z.discriminatedUnion("kind", [
+    z.object({ kind: z.literal("persisted-turn") }),
+    z.object({
+      kind: z.literal("regenerate-assistant"),
+      sourceAssistantMessageId: z.string().min(1),
+    }),
+    z.object({ kind: z.literal("retry-orphan-user") }),
+    z.object({
+      kind: z.literal("edit-last-user"),
+      sourceUserMessageId: z.string().min(1),
+      text: z.string().trim().min(1),
+    }),
+  ]),
 })
 
 type ThreadChatPersistence = z.infer<typeof threadChatPersistenceSchema>

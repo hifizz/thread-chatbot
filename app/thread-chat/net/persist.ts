@@ -10,9 +10,9 @@
  *
  * 为什么需要 sanitizeLoadedState：防抖存盘可能恰好在流式中途落盘，而 AbortController
  * 不跨页面存活。服务端 tree GET 会先按 generation sidecar 协调状态；客户端仍做滚动
- * 部署期的防御性清理。正文或有效 Artifact 视为可恢复输出；没有匹配 generation 的
- * 空占位转为可重试 error，不能删除 Retry 所需的 messageId。同时过滤坏消息引用与
- * 无消息归属的孤儿 registry/order 项。
+ * 部署期的防御性收敛。没有匹配 generation 的 pending/streaming 回复一律保留已有
+ * 正文与 Artifact，并转为可重试 error；不能删除 Retry 所需的 messageId，也不能把
+ * 部分输出猜成完整回复。strict-v2 parser 会拒绝坏消息图与无归属 Artifact。
  */
 
 import {
@@ -23,7 +23,7 @@ import {
 } from "@/constants/thread-chat"
 import { isValidTreeId } from "@/lib/chat/tree-id"
 import { fetchWithAuth } from "@/lib/auth/session-recovery"
-import type { ThreadTreeState } from "../core/types"
+import type { MessageFeedbackSummary, ThreadTreeState } from "../core/types"
 import type { GenerationSummary, RecoverableTurn } from "../generation/types"
 import type { PlacementMode, Slot } from "../orchestration/placement"
 import { withoutTransientGenerationState } from "./transient-state"
@@ -58,6 +58,7 @@ export interface LoadedTree {
   revision: number
   customTitle: string | null
   generations: GenerationSummary[]
+  messageFeedbacks: MessageFeedbackSummary[]
   recoverableTurns: RecoverableTurn[]
 }
 
@@ -96,6 +97,7 @@ export async function loadTree(id: string): Promise<LoadedTree> {
         revision: 0,
         customTitle: null,
         generations: [],
+        messageFeedbacks: [],
         recoverableTurns: [],
       }
     }
@@ -107,6 +109,7 @@ export async function loadTree(id: string): Promise<LoadedTree> {
       revision: data.revision ?? 0,
       customTitle: data.customTitle ?? null,
       generations: data.generations ?? [],
+      messageFeedbacks: data.messageFeedbacks ?? [],
       recoverableTurns: data.recoverableTurns ?? [],
     }
   } catch (err) {
@@ -120,6 +123,7 @@ export async function loadTree(id: string): Promise<LoadedTree> {
       revision: 0,
       customTitle: null,
       generations: [],
+      messageFeedbacks: [],
       recoverableTurns: [],
     }
   }

@@ -38,10 +38,7 @@ export function restoreTurnSnapshot(
   if (!userMessage) {
     userMessage = {
       ...structuredClone(snapshot.userMessage),
-      parentMessageId:
-        snapshot.userParentMessageId ??
-        snapshot.userMessage.parentMessageId ??
-        null,
+      parentMessageId: snapshot.userParentMessageId,
     }
     thread.messages.push(userMessage)
   }
@@ -53,10 +50,7 @@ export function restoreTurnSnapshot(
   if (!assistantMessage) {
     assistantMessage = {
       ...structuredClone(snapshot.assistantMessage),
-      parentMessageId:
-        snapshot.assistantParentMessageId ??
-        snapshot.assistantMessage.parentMessageId ??
-        userMessage.id,
+      parentMessageId: snapshot.assistantParentMessageId,
     }
     thread.messages.push(assistantMessage)
   }

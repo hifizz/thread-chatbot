@@ -7,6 +7,7 @@ import {
   integer,
   boolean,
   vector,
+  primaryKey,
 } from "drizzle-orm/pg-core"
 import { sql } from "drizzle-orm"
 import { dbSchema } from "./pg-schema"
@@ -14,11 +15,11 @@ import { EMBEDDING_DIMENSIONS } from "@/constants/rag"
 import { user } from "./auth-schema"
 import type {
   GenerationBillingStatus,
-  GenerationFeedback,
   GenerationResultV1,
   GenerationStatus,
   GenerationTurnSnapshot,
 } from "@/app/thread-chat/generation/types"
+import type { MessageFeedback } from "@/app/thread-chat/core/types"
 
 // 认证与计费表在独立文件中定义，这里统一 re-export，使 drizzle 客户端与迁移能感知它们。
 export * from "./auth-schema"
@@ -102,10 +103,6 @@ export const branchGenerations = dbSchema.table(
       .notNull(),
     result: jsonb("result").$type<GenerationResultV1>(),
     error: text("error"),
-    feedback: text("feedback").$type<GenerationFeedback>(),
-    feedbackUpdatedAt: timestamp("feedback_updated_at", {
-      withTimezone: true,
-    }),
     billingStatus: text("billing_status")
       .$type<GenerationBillingStatus>()
       .notNull()
@@ -142,6 +139,35 @@ export const branchGenerations = dbSchema.table(
       table.status,
       table.heartbeatAt
     ),
+  ]
+)
+
+/** 产品层 assistant message 的当前互斥反馈；不与 generation 执行身份耦合。 */
+export const branchMessageFeedback = dbSchema.table(
+  "branch_message_feedback",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    treeId: text("tree_id")
+      .notNull()
+      .references(() => branchTrees.id, { onDelete: "cascade" }),
+    threadId: text("thread_id").notNull(),
+    messageId: text("message_id").notNull(),
+    feedback: text("feedback").$type<MessageFeedback>().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    primaryKey({
+      name: "branch_message_feedback_pk",
+      columns: [table.userId, table.treeId, table.threadId, table.messageId],
+    }),
+    index("branch_message_feedback_tree_idx").on(table.userId, table.treeId),
   ]
 )
 

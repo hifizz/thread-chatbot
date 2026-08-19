@@ -61,7 +61,11 @@ import {
   threadTitle,
   type TreeRow,
 } from "./core/selectors"
-import type { Message, ThreadTreeState } from "./core/types"
+import type {
+  Message,
+  MessageFeedbackSummary,
+  ThreadTreeState,
+} from "./core/types"
 import { requestBranchTitle } from "./net/branch-title"
 import {
   createChatController,
@@ -156,6 +160,7 @@ export function ThreadChatDemo({ treeId }: { treeId: string }) {
     /** 用户重命名过的标题（未改过为 null）——主线列头副标题优先展示 */
     customTitle: string | null
     generations: GenerationSummary[]
+    messageFeedbacks: MessageFeedbackSummary[]
     recoverableTurns: RecoverableTurn[]
   } | null>(null)
 
@@ -180,6 +185,7 @@ export function ThreadChatDemo({ treeId }: { treeId: string }) {
         ui,
         customTitle: loaded.customTitle,
         generations: loaded.generations,
+        messageFeedbacks: loaded.messageFeedbacks,
         recoverableTurns: loaded.recoverableTurns,
       })
     })()
@@ -202,6 +208,7 @@ export function ThreadChatDemo({ treeId }: { treeId: string }) {
       initialUi={boot.ui}
       initialCustomTitle={boot.customTitle}
       initialGenerations={boot.generations}
+      initialMessageFeedbacks={boot.messageFeedbacks}
       initialRecoverableTurns={boot.recoverableTurns}
     />
   )
@@ -216,6 +223,7 @@ interface ThreadChatDemoInnerProps {
   /** 用户重命名过的标题（未改过为 null）——主线列头副标题优先展示 */
   initialCustomTitle?: string | null
   initialGenerations: GenerationSummary[]
+  initialMessageFeedbacks: MessageFeedbackSummary[]
   initialRecoverableTurns: RecoverableTurn[]
 }
 
@@ -225,6 +233,7 @@ export function ThreadChatDemoInner({
   initialUi,
   initialCustomTitle = null,
   initialGenerations,
+  initialMessageFeedbacks,
   initialRecoverableTurns,
 }: ThreadChatDemoInnerProps) {
   const router = useRouter()
@@ -239,14 +248,13 @@ export function ThreadChatDemoInner({
     () =>
       new Map(initialRecoverableTurns.map((turn) => [turn.userMessageId, turn]))
   )
-  const [feedbackByGenerationId, setFeedbackByGenerationId] = useState(
+  const [feedbackByMessageId, setFeedbackByMessageId] = useState(
     () =>
       new Map(
-        initialGenerations.flatMap((generation) =>
-          generation.feedback
-            ? [[generation.id, generation.feedback] as const]
-            : []
-        )
+        initialMessageFeedbacks.map((entry) => [
+          entry.messageId,
+          entry.feedback,
+        ])
       )
   )
   const messageActionState = useMemo<MessageActionViewState>(() => {
@@ -265,7 +273,6 @@ export function ThreadChatDemoInner({
               latestTurn.assistantMessage.id
             ).map((assistant) => ({
               assistantMessageId: assistant.id,
-              generationId: assistant.generationId,
               derivedThreadCount: thread.children.filter(
                 (childId) =>
                   state.threads[childId]?.forkFromMsgId === assistant.id
@@ -285,13 +292,13 @@ export function ThreadChatDemoInner({
     )
     return {
       recoverableByUserMessageId,
-      feedbackByGenerationId,
+      feedbackByMessageId,
       activePathByThreadId,
       presentationByThreadId,
     }
     // state 对象原地变更，必须用 store version 作为派生键。
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [recoverableByUserMessageId, feedbackByGenerationId, version])
+  }, [recoverableByUserMessageId, feedbackByMessageId, version])
 
   const [toast, setToast] = useState<ToastState | null>(null)
 
@@ -351,17 +358,28 @@ export function ThreadChatDemoInner({
         return result
       },
       switchTurnVariant: chat.switchTurnVariant,
-      async submitFeedback(generationId, feedback) {
-        await chat.submitFeedback(generationId, feedback)
-        setFeedbackByGenerationId((current) => {
+      async submitFeedback(threadId, messageId, feedback) {
+        const previous = feedbackByMessageId.get(messageId)
+        setFeedbackByMessageId((current) => {
           const next = new Map(current)
-          if (feedback) next.set(generationId, feedback)
-          else next.delete(generationId)
+          if (feedback) next.set(messageId, feedback)
+          else next.delete(messageId)
           return next
         })
+        try {
+          await chat.submitFeedback(threadId, messageId, feedback)
+        } catch (error) {
+          setFeedbackByMessageId((current) => {
+            const next = new Map(current)
+            if (previous) next.set(messageId, previous)
+            else next.delete(messageId)
+            return next
+          })
+          throw error
+        }
       },
     }),
-    [chat]
+    [chat, feedbackByMessageId]
   )
   useEffect(() => () => chat.detachAll(), [chat])
 
@@ -445,12 +463,10 @@ export function ThreadChatDemoInner({
               loaded.recoverableTurns.map((turn) => [turn.userMessageId, turn])
             )
           )
-          setFeedbackByGenerationId(
+          setFeedbackByMessageId(
             new Map(
-              loaded.generations.flatMap((generation) =>
-                generation.feedback
-                  ? [[generation.id, generation.feedback] as const]
-                  : []
+              loaded.messageFeedbacks.map(
+                (entry) => [entry.messageId, entry.feedback] as const
               )
             )
           )

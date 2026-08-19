@@ -20,6 +20,13 @@ export interface MessageToolbarAction {
   busy?: boolean
 }
 
+/** disabledReason 只解释真正禁用的按钮；可用按钮始终显示正常动作名称。 */
+export function messageToolbarTooltip(action: MessageToolbarAction): string {
+  return action.disabled
+    ? (action.disabledReason ?? action.label)
+    : action.label
+}
+
 export function MessageToolbar({
   align,
   actions,
@@ -39,7 +46,7 @@ export function MessageToolbar({
           const button = (
             <button
               type="button"
-              className="message-action"
+              className="message-action mt-1"
               aria-label={action.label}
               aria-pressed={action.pressed}
               aria-busy={action.busy || undefined}
@@ -63,7 +70,7 @@ export function MessageToolbar({
                 {action.disabled ? button : undefined}
               </TooltipTrigger>
               <TooltipContent side="top">
-                {action.disabledReason ?? action.label}
+                {messageToolbarTooltip(action)}
               </TooltipContent>
             </Tooltip>
           )

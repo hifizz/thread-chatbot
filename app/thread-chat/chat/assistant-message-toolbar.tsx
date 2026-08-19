@@ -2,7 +2,6 @@
 
 import { useState } from "react"
 import { Check, Copy, RotateCcw, ThumbsDown, ThumbsUp } from "lucide-react"
-import type { GenerationFeedback } from "../generation/types"
 import {
   MESSAGE_ACTION_ERRORS,
   MESSAGE_ACTION_LABELS,
@@ -18,9 +17,6 @@ export function AssistantMessageToolbar({
   feedback,
   commands,
 }: AssistantMessageToolbarProps) {
-  const [selected, setSelected] = useState<GenerationFeedback | undefined>(
-    feedback
-  )
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const { copied, copy } = useCopyMarkdown(setError)
@@ -33,16 +29,12 @@ export function AssistantMessageToolbar({
     if (!result.ok) setError(result.message)
   }
 
-  const submitFeedback = async (next: GenerationFeedback | undefined) => {
-    if (!message.generationId) return
-    const previous = selected
-    setSelected(next)
-    setBusy(next ?? selected ?? "clear")
+  const submitFeedback = async (next: typeof feedback) => {
+    setBusy(next ?? feedback ?? "clear")
     setError(null)
     try {
-      await commands.submitFeedback(message.generationId, next ?? null)
+      await commands.submitFeedback(threadId, message.id, next ?? null)
     } catch {
-      setSelected(previous)
       setError(MESSAGE_ACTION_ERRORS.feedbackSave)
     } finally {
       setBusy(null)
@@ -61,6 +53,8 @@ export function AssistantMessageToolbar({
               : MESSAGE_ACTION_LABELS.copy,
             icon: copied ? Check : Copy,
             onSelect: () => void copy(message.text),
+            disabled: message.text.trim() === "",
+            disabledReason: MESSAGE_ACTION_ERRORS.noMarkdown,
           },
           {
             key: "regenerate",
@@ -77,12 +71,10 @@ export function AssistantMessageToolbar({
             icon: ThumbsUp,
             onSelect: () =>
               void submitFeedback(
-                selected === "positive" ? undefined : "positive"
+                feedback === "positive" ? undefined : "positive"
               ),
-            pressed: selected === "positive",
+            pressed: feedback === "positive",
             busy: busy === "positive",
-            disabled: !message.generationId,
-            disabledReason: MESSAGE_ACTION_ERRORS.feedbackUnavailable,
           },
           {
             key: "negative",
@@ -90,12 +82,10 @@ export function AssistantMessageToolbar({
             icon: ThumbsDown,
             onSelect: () =>
               void submitFeedback(
-                selected === "negative" ? undefined : "negative"
+                feedback === "negative" ? undefined : "negative"
               ),
-            pressed: selected === "negative",
+            pressed: feedback === "negative",
             busy: busy === "negative",
-            disabled: !message.generationId,
-            disabledReason: MESSAGE_ACTION_ERRORS.feedbackUnavailable,
           },
         ]}
       />

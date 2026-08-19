@@ -18,24 +18,22 @@
  *    text-delta / Markdown Artifact 继续到达并正常 finish。因此 onError 不立即判死：只记录 lastError
  *    （后到覆盖先到）并继续收流；终态统一裁决——收到过任何正文即按成功 finish
  *    （瞬时 error 忽略并 console.warn 留痕），正文/Artifact 都没有且有 error 用 lastError
- *    fail，两者都没有且无 error 也 fail。中止同理：已有可渲染输出就保留并 finish。
+ *    fail，两者都没有且无 error 也 fail。中止时即使已有部分输出也落为 error，
+ *    避免未完成消息暴露复制和评价操作；用户可通过错误态的重试入口重新生成。
  */
 
 import type { ThreadStore } from "../core/store"
 import { buildRequestBody } from "./prompt"
 import { consumeUIMessageStream, type UIStreamHandlers } from "./ui-stream"
 import { fetchWithAuth, handleUnauthorized } from "@/lib/auth/session-recovery"
-import type { ArtifactSeed } from "../core/types"
+import type { ArtifactSeed, MessageFeedback } from "../core/types"
 import {
   prepareRegenerationPatch,
   type PreparedTurnPatch,
 } from "../core/regeneration"
 import { hasAssistantOutput } from "./assistant-output"
 import { GENERATION_ERRORS } from "@/constants/generation"
-import type {
-  GenerationFeedback,
-  ThreadChatGenerationIntent,
-} from "../generation/types"
+import type { ThreadChatGenerationIntent } from "../generation/types"
 import { getKnownTreeRevision, setKnownTreeRevision } from "./persist"
 import { activeLeafTurn } from "../core/message-graph"
 
@@ -98,8 +96,9 @@ export interface ThreadMessageActionCommands {
     assistantMessageId: string
   ): Promise<VariantSwitchResult>
   submitFeedback(
-    generationId: string,
-    feedback: GenerationFeedback | null
+    threadId: string,
+    messageId: string,
+    feedback: MessageFeedback | null
   ): Promise<void>
 }
 
@@ -243,12 +242,9 @@ export function createChatController(
       })
     }
 
-    /** 中止时的终态裁决：已有正文保留文本 finish；零正文 fail（可重试） */
+    /** 中止时即使已有部分正文也保持 error，避免把不完整回复开放为可评价终态。 */
     const settleByAbort = () => {
-      settle(() => {
-        if (hasOutput()) store.finishAssistantMessage(threadId, msgId)
-        else store.failAssistantMessage(threadId, msgId, ABORTED_ERROR)
-      })
+      settle(() => store.failAssistantMessage(threadId, msgId, ABORTED_ERROR))
     }
 
     const handlers: UIStreamHandlers = {
@@ -341,8 +337,8 @@ export function createChatController(
           treeId: options.treeId,
           userMessageId,
           generationId,
+          intent: action?.intent ?? { kind: "persisted-turn" },
         })
-        if (action) body.threadChat.intent = action.intent
         const res = await fetch("/api/chat", {
           method: "POST",
           headers: { "content-type": "application/json" },
@@ -722,15 +718,16 @@ export function createChatController(
     },
 
     async submitFeedback(
-      generationId: string,
-      feedback: GenerationFeedback | null
+      threadId: string,
+      messageId: string,
+      feedback: MessageFeedback | null
     ): Promise<void> {
       const res = await fetchWithAuth(
-        `/api/branch-generations/${generationId}/feedback`,
+        `/api/branch-trees/${options.treeId}/messages/${encodeURIComponent(messageId)}/feedback`,
         {
           method: "PUT",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ feedback }),
+          body: JSON.stringify({ threadId, feedback }),
         }
       )
       if (!res.ok) throw new Error(`feedback failed: ${res.status}`)

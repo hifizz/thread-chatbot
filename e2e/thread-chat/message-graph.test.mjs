@@ -10,7 +10,7 @@ import {
   childThreadSourceProvenance,
   messagePathTo,
 } from "../../app/thread-chat/core/message-graph.ts"
-import { migrateThreadTreeState } from "../../app/thread-chat/core/message-graph.ts"
+import { parseThreadTreeState } from "../../app/thread-chat/core/message-graph.ts"
 import { collectInherited } from "../../app/thread-chat/core/selectors.ts"
 import { compileThreadChatMessages } from "../../app/thread-chat/net/message-context.ts"
 
@@ -159,16 +159,10 @@ function graphState() {
   }
 }
 
-await test("legacy linear tree migrates deterministically and idempotently", () => {
-  const migrated = migrateThreadTreeState(legacyState())
-  assert.equal(migrated.schemaVersion, 2)
-  assert.deepEqual(
-    migrated.threads.main.messages.map((message) => message.parentMessageId),
-    [null, "u1"]
-  )
-  assert.equal(migrated.threads.main.activeLeafMessageId, "a1")
-  assert.equal(migrated.artifacts["artifact-a"].sourceMessageId, "a1")
-  assert.deepEqual(migrateThreadTreeState(migrated), migrated)
+await test("legacy linear trees are rejected and schema v2 is idempotent", () => {
+  assert.throws(() => parseThreadTreeState(legacyState()))
+  const state = graphState()
+  assert.deepEqual(parseThreadTreeState(state), state)
 })
 
 await test("active and exact-source paths do not follow creation order", () => {
@@ -256,10 +250,18 @@ for (const [name, mutate] of [
     "missing active leaf",
     (state) => (state.threads.main.activeLeafMessageId = "missing"),
   ],
+  [
+    "missing artifact source",
+    (state) => delete state.artifacts["artifact-a"].sourceMessageId,
+  ],
+  [
+    "unreferenced artifact",
+    (state) => (state.threads.main.messages[1].artifactIds = []),
+  ],
 ]) {
   await test(`schema v2 rejects ${name}`, () => {
     const state = graphState()
     mutate(state)
-    assert.throws(() => migrateThreadTreeState(state))
+    assert.throws(() => parseThreadTreeState(state))
   })
 }

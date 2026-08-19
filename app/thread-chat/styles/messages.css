@@ -146,7 +146,8 @@
   color: var(--ink);
 }
 .tc .message.assistant .bubble p {
-  margin: 0 0 12px;
+  /*p(strong) ~ li 的内容，需要看起来舒服一点*/
+  margin: 12px 0 4px;
 }
 .tc .message.assistant .bubble p:last-child {
   margin-bottom: 0;
