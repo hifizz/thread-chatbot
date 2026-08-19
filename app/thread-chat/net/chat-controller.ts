@@ -36,6 +36,10 @@ import {
   setMessageFeedbackSuccessResponseSchema,
 } from "@/lib/thread-chat/contracts/message-feedback"
 import {
+  switchActiveLeafErrorResponseSchema,
+  switchActiveLeafSuccessResponseSchema,
+} from "@/lib/thread-chat/contracts/switch-active-leaf"
+import {
   prepareRegenerationPatch,
   type PreparedTurnPatch,
 } from "../core/regeneration"
@@ -56,6 +60,8 @@ const ABORTED_ERROR = "已停止生成"
 
 export type MessageActionFailureCode =
   | "not_found"
+  | "invalid_id"
+  | "invalid_request"
   | "invalid_turn"
   | "not_latest_turn"
   | "generation_conflict"
@@ -691,23 +697,27 @@ export function createChatController(
             }),
           }
         )
-        const data = (await res.json().catch(() => null)) as {
-          revision?: number
-          error?: { code?: MessageActionFailureCode; message?: string }
-        } | null
-        if (!res.ok)
+        const responseBody = await res.json().catch(() => null)
+        if (!res.ok) {
+          const failure =
+            switchActiveLeafErrorResponseSchema.safeParse(responseBody)
           return {
             ok: false,
-            code: data?.error?.code ?? "network_error",
-            message: data?.error?.message ?? "切换回复版本失败",
+            code: failure.success ? failure.data.error.code : "network_error",
+            message: failure.success
+              ? failure.data.error.message
+              : "切换回复版本失败",
           }
-        if (typeof data?.revision !== "number")
+        }
+        const success =
+          switchActiveLeafSuccessResponseSchema.safeParse(responseBody)
+        if (!success.success)
           return {
             ok: false,
             code: "network_error",
             message: "服务端未返回新的树修订号",
           }
-        setKnownTreeRevision(options.treeId, data.revision)
+        setKnownTreeRevision(options.treeId, success.data.revision)
         if (!store.setActiveLeaf(threadId, assistantMessageId))
           return {
             ok: false,
@@ -718,7 +728,7 @@ export function createChatController(
           ok: true,
           threadId,
           assistantMessageId,
-          revision: data.revision,
+          revision: success.data.revision,
         }
       } catch {
         return { ok: false, code: "network_error", message: NETWORK_ERROR }

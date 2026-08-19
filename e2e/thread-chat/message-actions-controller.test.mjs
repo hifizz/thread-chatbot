@@ -188,7 +188,10 @@ await test("variant conflicts do not move the local leaf; success does", async (
           },
           { status: 409 }
         )
-      : Response.json({ revision: 9 })
+      : Response.json({
+          revision: 9,
+          thread: { id: "main", activeLeafMessageId: "a2" },
+        })
   })
   try {
     setKnownTreeRevision(treeId, 7)

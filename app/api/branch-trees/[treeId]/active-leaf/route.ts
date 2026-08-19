@@ -1,6 +1,13 @@
-import { z } from "zod"
 import { getCurrentUserId } from "@/lib/auth/server"
 import { isValidTreeId } from "@/lib/chat/tree-id"
+import {
+  SWITCH_ACTIVE_LEAF_ERROR_STATUS,
+  SWITCH_ACTIVE_LEAF_ROUTE_ERRORS,
+  switchActiveLeafErrorResponseSchema,
+  switchActiveLeafRequestSchema,
+  switchActiveLeafSuccessResponseSchema,
+  type SwitchActiveLeafErrorCode,
+} from "@/lib/thread-chat/contracts/switch-active-leaf"
 import {
   switchActiveLeafForOwner,
   TreeCommandError,
@@ -8,56 +15,55 @@ import {
 
 type RouteContext = { params: Promise<{ treeId: string }> }
 
-const bodySchema = z.object({
-  threadId: z.string().trim().min(1),
-  assistantMessageId: z.string().trim().min(1),
-  baseRevision: z.number().int().nonnegative(),
-})
+function activeLeafErrorResponse(
+  code: SwitchActiveLeafErrorCode,
+  message: string,
+  currentRevision?: number
+) {
+  return Response.json(
+    switchActiveLeafErrorResponseSchema.parse({
+      error: {
+        code,
+        message,
+        ...(currentRevision !== undefined ? { currentRevision } : {}),
+      },
+    }),
+    { status: SWITCH_ACTIVE_LEAF_ERROR_STATUS[code] }
+  )
+}
 
 export async function PATCH(req: Request, { params }: RouteContext) {
   const userId = await getCurrentUserId()
-  if (!userId)
-    return Response.json(
-      { error: { code: "unauthorized", message: "请先登录" } },
-      { status: 401 }
-    )
+  if (!userId) {
+    const error = SWITCH_ACTIVE_LEAF_ROUTE_ERRORS.unauthorized
+    return activeLeafErrorResponse(error.code, error.message)
+  }
 
   const { treeId } = await params
-  if (!isValidTreeId(treeId))
-    return Response.json(
-      { error: { code: "invalid_id", message: "treeId 必须是 UUID" } },
-      { status: 400 }
-    )
-  const body = bodySchema.safeParse(await req.json().catch(() => null))
-  if (!body.success)
-    return Response.json(
-      { error: { code: "invalid_request", message: "版本切换参数无效" } },
-      { status: 400 }
-    )
+  if (!isValidTreeId(treeId)) {
+    const error = SWITCH_ACTIVE_LEAF_ROUTE_ERRORS.invalid_id
+    return activeLeafErrorResponse(error.code, error.message)
+  }
+  const body = switchActiveLeafRequestSchema.safeParse(
+    await req.json().catch(() => null)
+  )
+  if (!body.success) {
+    const error = SWITCH_ACTIVE_LEAF_ROUTE_ERRORS.invalid_request
+    return activeLeafErrorResponse(error.code, error.message)
+  }
 
   try {
     return Response.json(
-      await switchActiveLeafForOwner({ userId, treeId, ...body.data })
+      switchActiveLeafSuccessResponseSchema.parse(
+        await switchActiveLeafForOwner({ userId, treeId, ...body.data })
+      )
     )
   } catch (error) {
     if (!(error instanceof TreeCommandError)) throw error
-    const status =
-      error.code === "not_found"
-        ? 404
-        : error.code === "tree_revision_conflict"
-          ? 409
-          : 400
-    return Response.json(
-      {
-        error: {
-          code: error.code,
-          message: error.message,
-          ...(error.currentRevision !== undefined
-            ? { currentRevision: error.currentRevision }
-            : {}),
-        },
-      },
-      { status }
+    return activeLeafErrorResponse(
+      error.code,
+      error.message,
+      error.currentRevision
     )
   }
 }

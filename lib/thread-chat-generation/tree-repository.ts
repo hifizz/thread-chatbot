@@ -5,15 +5,17 @@ import {
   parseThreadTreeState,
 } from "@/lib/thread-chat/domain/message-graph"
 import type { ThreadTreeState } from "@/lib/thread-chat/domain/types"
+import type {
+  SwitchActiveLeafFailureReason,
+  SwitchActiveLeafRequest,
+  SwitchActiveLeafSuccessResponse,
+} from "@/lib/thread-chat/contracts/switch-active-leaf"
 import { db } from "@/lib/db"
 import { branchTrees } from "@/lib/db/schema"
 
-export type TreeCommandErrorCode =
-  "not_found" | "tree_revision_conflict" | "invalid_turn"
-
 export class TreeCommandError extends Error {
   constructor(
-    readonly code: TreeCommandErrorCode,
+    readonly code: SwitchActiveLeafFailureReason,
     message: string,
     readonly currentRevision?: number
   ) {
@@ -22,16 +24,12 @@ export class TreeCommandError extends Error {
   }
 }
 
-export async function switchActiveLeafForOwner(input: {
-  userId: string
-  treeId: string
-  threadId: string
-  assistantMessageId: string
-  baseRevision: number
-}): Promise<{
-  revision: number
-  thread: { id: string; activeLeafMessageId: string }
-}> {
+export async function switchActiveLeafForOwner(
+  input: SwitchActiveLeafRequest & {
+    userId: string
+    treeId: string
+  }
+): Promise<SwitchActiveLeafSuccessResponse> {
   return db.transaction(async (tx) => {
     const locked = await tx.execute(sql`
       select ${branchTrees.id}
