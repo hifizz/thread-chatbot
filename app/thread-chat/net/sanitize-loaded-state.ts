@@ -1,4 +1,5 @@
 import type { Message, Thread, ThreadTreeState } from "../core/types"
+import type { GenerationSummary } from "../generation/types"
 
 /**
  * 纯函数：恢复流式残留并修复 Artifact 三方关系。
@@ -7,9 +8,25 @@ import type { Message, Thread, ThreadTreeState } from "../core/types"
  */
 export function sanitizeLoadedState(
   state: ThreadTreeState,
-  resolveModelId: (modelId: string | undefined) => string
+  resolveModelId: (modelId: string | undefined) => string,
+  activeGenerations: readonly Pick<
+    GenerationSummary,
+    "id" | "threadId" | "assistantMessageId" | "status"
+  >[] = []
 ): ThreadTreeState {
   let changed = false
+  const activeByMessage = new Map(
+    activeGenerations
+      .filter(
+        (generation) =>
+          generation.status === "running" ||
+          generation.status === "stop_requested"
+      )
+      .map((generation) => [
+        `${generation.threadId}:${generation.assistantMessageId}`,
+        generation.id,
+      ])
+  )
   const threads: Record<string, Thread> = {}
   const referencedArtifactIds = new Set<string>()
 
@@ -50,14 +67,40 @@ export function sanitizeLoadedState(
         nextMessage.role === "assistant" &&
         (nextMessage.status === "pending" || nextMessage.status === "streaming")
       ) {
-        threadChanged = true
-        if (nextMessage.text.trim() !== "" || validArtifactIds.length > 0) {
-          nextMessage = { ...nextMessage, status: "done" }
+        const activeGenerationId = activeByMessage.get(
+          `${id}:${nextMessage.id}`
+        )
+        if (activeGenerationId) {
+          if (
+            nextMessage.generationId !== activeGenerationId ||
+            nextMessage.backgroundGeneration !== true
+          ) {
+            nextMessage = {
+              ...nextMessage,
+              generationId: activeGenerationId,
+              backgroundGeneration: true,
+            }
+            threadChanged = true
+          }
           messages.push(nextMessage)
           validArtifactIds.forEach((artifactId) =>
             referencedArtifactIds.add(artifactId)
           )
-        }
+        } else if (
+          nextMessage.text.trim() !== "" ||
+          validArtifactIds.length > 0
+        ) {
+          threadChanged = true
+          nextMessage = {
+            ...nextMessage,
+            status: "done",
+            backgroundGeneration: undefined,
+          }
+          messages.push(nextMessage)
+          validArtifactIds.forEach((artifactId) =>
+            referencedArtifactIds.add(artifactId)
+          )
+        } else threadChanged = true
       } else {
         messages.push(nextMessage)
         validArtifactIds.forEach((artifactId) =>

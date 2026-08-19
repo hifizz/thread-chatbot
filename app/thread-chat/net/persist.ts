@@ -23,6 +23,7 @@ import {
 import { isValidTreeId } from "@/lib/chat/tree-id"
 import { fetchWithAuth } from "@/lib/auth/session-recovery"
 import type { ThreadTreeState } from "../core/types"
+import type { GenerationSummary } from "../generation/types"
 import type { PlacementMode, Slot } from "../orchestration/placement"
 import { withoutTransientGenerationState } from "./transient-state"
 export { sanitizeLoadedState } from "./sanitize-loaded-state"
@@ -54,21 +55,28 @@ export function getLastTreeId(): string | null {
 export interface LoadedTree {
   state: ThreadTreeState | null
   customTitle: string | null
+  generations: GenerationSummary[]
 }
 
 /** GET 整树：未保存过 state 为 null（正常首访路径）；请求失败也降级为空并 console.warn（空树启动） */
 export async function loadTree(id: string): Promise<LoadedTree> {
   try {
     const res = await fetchWithAuth(`/api/branch-trees/${id}`)
+    if (res.status === 404)
+      return { state: null, customTitle: null, generations: [] }
     if (!res.ok) throw new Error(`GET /api/branch-trees ${res.status}`)
     const data = (await res.json()) as LoadedTree
-    return { state: data.state, customTitle: data.customTitle ?? null }
+    return {
+      state: data.state,
+      customTitle: data.customTitle ?? null,
+      generations: data.generations ?? [],
+    }
   } catch (err) {
     console.warn(
       "[thread-chat] 加载分支树失败，以空树降级启动（本次不恢复历史）：",
       err
     )
-    return { state: null, customTitle: null }
+    return { state: null, customTitle: null, generations: [] }
   }
 }
 
@@ -97,20 +105,41 @@ export async function saveTree(
   state: ThreadTreeState,
   title?: string
 ): Promise<void> {
+  const body = JSON.stringify({
+    state: withoutTransientGenerationState(state),
+    title,
+  })
   return enqueueTreeWrite(id, async () => {
     try {
       const res = await fetchWithAuth(`/api/branch-trees/${id}`, {
         method: "PUT",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          state: withoutTransientGenerationState(state),
-          title,
-        }),
+        body,
       })
       if (!res.ok) throw new Error(`PUT /api/branch-trees ${res.status}`)
     } catch (err) {
       console.warn("[thread-chat] 分支树存盘失败（下次变更会再试）：", err)
     }
+  })
+}
+
+/** 发送模型前的严格持久化屏障：与普通防抖写共用 per-tree 写链，但失败必须抛出。 */
+export async function saveTreeStrict(
+  id: string,
+  state: ThreadTreeState,
+  title?: string
+): Promise<void> {
+  const body = JSON.stringify({
+    state: withoutTransientGenerationState(state),
+    title,
+  })
+  return enqueueTreeWrite(id, async () => {
+    const res = await fetchWithAuth(`/api/branch-trees/${id}`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body,
+    })
+    if (!res.ok) throw new Error(`PUT /api/branch-trees ${res.status}`)
   })
 }
 

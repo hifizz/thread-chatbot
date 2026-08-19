@@ -8,12 +8,20 @@
  * · updated_at 降序，limit 100 兜底（v1 不做分页/搜索）。
  */
 
-import { desc, sql } from "drizzle-orm"
+import { desc, eq, sql } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { branchTrees } from "@/lib/db/schema"
 import { TREE_TITLE_FALLBACK } from "@/constants/thread-chat"
+import { getCurrentUserId } from "@/lib/auth/server"
 
 export async function GET() {
+  const userId = await getCurrentUserId()
+  if (!userId)
+    return Response.json(
+      { error: { code: "unauthorized", message: "请先登录" } },
+      { status: 401 }
+    )
+
   const rows = await db
     .select({
       id: branchTrees.id,
@@ -23,6 +31,7 @@ export async function GET() {
       threadCount: sql<number>`(case when jsonb_typeof(${branchTrees.state} -> 'threads') = 'object' then (select count(*) from jsonb_object_keys(${branchTrees.state} -> 'threads')) else 0 end)::int`,
     })
     .from(branchTrees)
+    .where(eq(branchTrees.userId, userId))
     .orderBy(desc(branchTrees.updatedAt))
     .limit(100)
   return Response.json({ trees: rows })

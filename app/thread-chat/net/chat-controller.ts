@@ -24,9 +24,13 @@
 import type { ThreadStore } from "../core/store"
 import { buildRequestBody } from "./prompt"
 import { consumeUIMessageStream, type UIStreamHandlers } from "./ui-stream"
-import { handleUnauthorized } from "@/lib/auth/session-recovery"
+import {
+  fetchWithAuth,
+  handleUnauthorized,
+} from "@/lib/auth/session-recovery"
 import type { ArtifactSeed } from "../core/types"
 import { hasAssistantOutput } from "./assistant-output"
+import { GENERATION_ERRORS } from "@/constants/generation"
 
 /** 页面不可见 / 无 requestAnimationFrame 时的降级刷新间隔（毫秒） */
 const FALLBACK_FLUSH_MS = 50
@@ -48,7 +52,17 @@ function isAbortError(err: unknown): boolean {
   )
 }
 
-export function createChatController(store: ThreadStore) {
+export interface ChatControllerOptions {
+  treeId: string
+  /** 严格整树存盘：失败必须 reject，确保不会调用付费模型。 */
+  persistNow(): Promise<void>
+  onError?(message: string): void
+}
+
+export function createChatController(
+  store: ThreadStore,
+  options: ChatControllerOptions
+) {
   /** 每个会话同一时间只允许一路在飞的流式请求 */
   const inflight = new Map<string, AbortController>()
 
@@ -56,7 +70,12 @@ export function createChatController(store: ThreadStore) {
    * 对某会话的某条 assistant 消息发起真实流式请求。
    * 调用前必须已通过 beginAssistantMessage / resetAssistantMessage 备好目标消息。
    */
-  function startAssistant(threadId: string, msgId: string): void {
+  function startAssistant(
+    threadId: string,
+    msgId: string,
+    userMessageId: string,
+    generationId: string
+  ): void {
     const controller = new AbortController()
     inflight.set(threadId, controller)
     const { signal } = controller
@@ -217,6 +236,21 @@ export function createChatController(store: ThreadStore) {
 
     void (async () => {
       try {
+        try {
+          await options.persistNow()
+        } catch (error) {
+          console.error("[thread-chat] 发送前持久化屏障失败", error)
+          settle(() =>
+            store.failAssistantMessage(
+              threadId,
+              msgId,
+              GENERATION_ERRORS.persistenceBarrier
+            )
+          )
+          return
+        }
+        if (signal.aborted) return
+
         const state = store.getState()
         const thread = state.threads[threadId]
         if (!thread) {
@@ -226,7 +260,11 @@ export function createChatController(store: ThreadStore) {
           return
         }
 
-        const body = buildRequestBody(state, thread, msgId)
+        const body = buildRequestBody(state, thread, msgId, {
+          treeId: options.treeId,
+          userMessageId,
+          generationId,
+        })
         const res = await fetch("/api/chat", {
           method: "POST",
           headers: { "content-type": "application/json" },
@@ -234,6 +272,11 @@ export function createChatController(store: ThreadStore) {
           signal,
         })
 
+        if (res.status === 202) {
+          // 同 generation 请求重放：服务端已在执行或已终态，不启动第二次模型；
+          // 保留 pending，由 generation 轮询取得权威状态。
+          return
+        }
         if (!res.ok || !res.body) {
           // 401：会话已失效——触发自救（登出 + 跳登录），并给出明确文案而非死胡同错误
           if (res.status === 401) void handleUnauthorized()
@@ -273,36 +316,87 @@ export function createChatController(store: ThreadStore) {
     })()
   }
 
-  /** 中止某会话在飞的流式请求（不从 inflight 删除：交由该流的 finally 收尾；
-      有正文保留 finish，零正文标「已停止生成」可重试） */
-  function abortThread(threadId: string): void {
+  /** 只断开本地 fetch 消费者；不会向服务端表达 Stop。 */
+  function detachThread(threadId: string): void {
     inflight.get(threadId)?.abort()
+  }
+
+  function activeAssistant(threadId: string) {
+    const messages = store.getState().threads[threadId]?.messages ?? []
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const message = messages[i]
+      if (
+        message.role === "assistant" &&
+        (message.status === "pending" || message.status === "streaming")
+      )
+        return { message, index: i }
+    }
+    return null
+  }
+
+  async function requestStop(threadId: string): Promise<boolean> {
+    const active = activeAssistant(threadId)
+    const generationId = active?.message.generationId
+    if (!generationId) return false
+    try {
+      const res = await fetchWithAuth(
+        `/api/branch-generations/${generationId}/stop`,
+        { method: "POST" }
+      )
+      if (!res.ok) {
+        options.onError?.(`停止失败（HTTP ${res.status}），生成仍在继续`)
+        return false
+      }
+      detachThread(threadId)
+      return true
+    } catch (error) {
+      console.error("[thread-chat] Stop 请求失败", error)
+      options.onError?.("停止失败，生成仍在继续")
+      return false
+    }
   }
 
   return {
     /** 在会话里发一条用户消息并触发流式回复；同会话已有在飞请求时直接忽略 */
     send(threadId: string, text: string, quote?: { text: string }): void {
-      if (inflight.has(threadId)) return
-      if (!store.appendUserMessage(threadId, text, quote)) return
-      const msgId = store.beginAssistantMessage(threadId)
+      if (inflight.has(threadId) || activeAssistant(threadId)) return
+      const userMessageId = store.appendUserMessage(threadId, text, quote)
+      if (!userMessageId) return
+      const generationId = crypto.randomUUID()
+      const msgId = store.beginAssistantMessage(threadId, generationId)
       if (!msgId) return
-      startAssistant(threadId, msgId)
+      startAssistant(threadId, msgId, userMessageId, generationId)
     },
 
-    /** 重试：先中止在飞的旧流，复位同一条消息（清空正文/错误、回到 pending），再起新流复用该 msgId */
+    /** Retry 是明确替换：先让服务端接受旧 attempt Stop，再用新 generationId 复位同一消息。 */
     retry(threadId: string, msgId: string): void {
-      abortThread(threadId)
-      store.resetAssistantMessage(threadId, msgId)
-      startAssistant(threadId, msgId)
+      void (async () => {
+        const thread = store.getState().threads[threadId]
+        const messageIndex = thread?.messages.findIndex((m) => m.id === msgId)
+        if (!thread || messageIndex == null || messageIndex < 1) return
+        const target = thread.messages[messageIndex]
+        if (
+          (target.status === "pending" || target.status === "streaming") &&
+          target.generationId &&
+          !(await requestStop(threadId))
+        )
+          return
+        detachThread(threadId)
+        const userMessage = thread.messages[messageIndex - 1]
+        if (userMessage?.role !== "user") return
+        const generationId = crypto.randomUUID()
+        store.resetAssistantMessage(threadId, msgId, generationId)
+        startAssistant(threadId, msgId, userMessage.id, generationId)
+      })()
     },
 
-    /** 中止某会话在飞的流式请求（有正文保留 finish；零正文标「已停止生成」可重试） */
-    abort(threadId: string): void {
-      abortThread(threadId)
+    /** 只有该显式操作才请求服务端停止模型；服务端确认后再断开本地流。 */
+    stop(threadId: string): void {
+      void requestStop(threadId)
     },
 
-    /** 中止所有会话在飞的流式请求（壳层卸载时调用） */
-    abortAll(): void {
+    /** 页面卸载只 detach 本地消费者，服务端 generation 继续执行与计费。 */
+    detachAll(): void {
       inflight.forEach((c) => c.abort())
     },
   }

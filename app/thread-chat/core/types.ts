@@ -62,6 +62,10 @@ export interface Message {
   role: Role
   text: string
   forks: Fork[]
+  /** 当前 assistant attempt 的应用 generation id；user 消息不设置。 */
+  generationId?: string
+  /** 本页是通过刷新恢复到该活跃 generation；只用于向用户解释后台仍在继续。 */
+  backgroundGeneration?: boolean
   artifactIds?: string[]
   /** 流式状态：pending（已建消息未收到首个 delta）/ streaming / done / error */
   /** 划选引用（方向 C，用户定稿）：带问开分支时，首条 user 消息结构化携带

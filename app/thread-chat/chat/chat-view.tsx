@@ -12,6 +12,7 @@
 
 import React, { useEffect, useRef } from "react"
 import { MessageScroller } from "@shadcn/react/message-scroller"
+import { GENERATION_BACKGROUND_LABEL } from "@/constants/generation"
 import type { Message } from "../core/types"
 import { ThreadModelSelector } from "./thread-model-selector"
 
@@ -141,11 +142,20 @@ export function ChatView({
           <>
             {(hasVisibleAssistantContent || isWaitingForVisibleOutput) && (
               <div className="bubble" data-role="assistant">
+                {msg.backgroundGeneration && (
+                  <span className="generation-background" role="status">
+                    {GENERATION_BACKGROUND_LABEL}
+                  </span>
+                )}
                 {isWaitingForVisibleOutput ? (
                   <span
                     className="typing"
                     role="status"
-                    aria-label="正在生成回复"
+                    aria-label={
+                      msg.backgroundGeneration
+                        ? GENERATION_BACKGROUND_LABEL
+                        : "正在生成回复"
+                    }
                   >
                     <i />
                     <i />
