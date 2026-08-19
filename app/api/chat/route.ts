@@ -14,13 +14,7 @@ import type { ToolJSONSchema } from "assistant-stream"
 import { resolveAttachmentParts } from "@/lib/chat/resolve-attachments"
 import { readUrlTool, webSearchTool } from "@/lib/chat/research-tools"
 import { isSearchConfigured } from "@/lib/ai/search"
-import {
-  DIRECT_FETCH_SYSTEM_PROMPT,
-  RESEARCH_MAX_STEPS,
-  RESEARCH_SYSTEM_PROMPT,
-  WEB_ACCESS_SYSTEM_PROMPT,
-} from "@/constants/research"
-import { buildThreadChatSystem } from "@/lib/chat/thread-chat-prompt"
+import { RESEARCH_MAX_STEPS } from "@/constants/research"
 import { getCurrentUserId } from "@/lib/auth/server"
 import {
   DEFAULT_MODEL_ID,
@@ -37,7 +31,6 @@ import { isExplicitMarkdownArtifactRequest } from "@/lib/chat/markdown-artifact"
 import {
   createResearchPlan,
   reasoningForResearchRoute,
-  researchPlanExecutionPrompt,
   resolveResearchRoute,
   type ResearchPlan,
   type ResearchRoute,
@@ -65,6 +58,7 @@ import {
 } from "@/app/api/chat/conversation-text"
 import { generationStartErrorResponse } from "@/app/api/chat/generation-start-error"
 import { createToolStepPolicy } from "@/app/api/chat/tool-step-policy"
+import { buildChatSystemPrompt } from "@/app/api/chat/system-prompt"
 
 // AnySearch 搜索与网页深读可能形成多步循环，放宽单次请求时长上限。
 export const maxDuration = 300
@@ -248,24 +242,15 @@ export async function POST(req: Request) {
     // MiniMax 不接受 file part：先把附件（PDF→提取文本，其余→占位说明）转换为 text part
     const resolvedMessages = await resolveAttachmentParts(authoritativeMessages)
 
-    const system = [
-      isThreadChat
-        ? buildThreadChatSystem(authoritativeAnchorText, {
-            enableMarkdownArtifact: markdownArtifactRequested,
-          })
-        : null,
-      researchRoute.mode === "fetch" ? DIRECT_FETCH_SYSTEM_PROMPT : null,
-      researchRoute.mode === "search" || researchRoute.mode === "research"
-        ? WEB_ACCESS_SYSTEM_PROMPT
-        : null,
-      researchRoute.mode === "research" ? RESEARCH_SYSTEM_PROMPT : null,
-      researchPlan ? researchPlanExecutionPrompt(researchPlan) : null,
-      research && !searchReady
-        ? "用户开启了深度研究，但服务端未启用搜索服务，请如实告知该功能暂不可用，并基于已有知识尽力回答。"
-        : null,
-    ]
-      .filter((part): part is string => part !== null)
-      .join("\n\n")
+    const system = buildChatSystemPrompt({
+      threadChat: isThreadChat,
+      anchorText: authoritativeAnchorText,
+      markdownArtifactRequested,
+      researchMode: researchRoute.mode,
+      researchPlan,
+      deepResearchRequested: research,
+      searchReady,
+    })
 
     let capturedUsage: FinalizeGenerationUsage | undefined
     let capturedProviderMetadata: unknown
