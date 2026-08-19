@@ -22,9 +22,8 @@ import {
   MAX_OUTPUT_TOKENS,
 } from "@/constants/model"
 import { resolveChatModel, isModelConfigured } from "@/lib/ai/provider"
-import { hasPositiveBalance, chargeUsage } from "@/lib/billing/credits"
+import { hasPositiveBalance } from "@/lib/billing/credits"
 import { buildUsageMetadata } from "@/lib/billing/usage-meta"
-import { usageCostEvidence } from "@/lib/billing/usage-cost-evidence"
 import { isExplicitMarkdownArtifactRequest } from "@/lib/chat/markdown-artifact"
 import { reasoningForResearchRoute } from "@/lib/chat/research-router"
 import { prepareGeneration } from "@/lib/thread-chat-generation/start-generation-repository"
@@ -34,7 +33,6 @@ import {
   registerGenerationController,
   unregisterGenerationController,
 } from "@/lib/thread-chat-generation/execution"
-import type { FinalizeGenerationUsage } from "@/lib/thread-chat-generation/finalize"
 import { finalizeGenerationWithRetry } from "@/lib/thread-chat-generation/finalize-with-retry"
 import { projectGenerationResult } from "@/lib/thread-chat/application/project-generation-result"
 import { GENERATION_ERRORS } from "@/constants/generation"
@@ -48,6 +46,7 @@ import { createToolStepPolicy } from "@/app/api/chat/tool-step-policy"
 import { buildChatSystemPrompt } from "@/app/api/chat/system-prompt"
 import { resolveResearchContext } from "@/app/api/chat/research-context"
 import { buildChatToolSet } from "@/app/api/chat/tool-set"
+import { createStreamLifecycle } from "@/app/api/chat/stream-lifecycle"
 
 // AnySearch 搜索与网页深读可能形成多步循环，放宽单次请求时长上限。
 export const maxDuration = 300
@@ -207,10 +206,14 @@ export async function POST(req: Request) {
       searchReady,
     })
 
-    let capturedUsage: FinalizeGenerationUsage | undefined
-    let capturedProviderMetadata: unknown
-    let modelStreamError: string | undefined
-    let abortedUsageUnavailable = false
+    const streamLifecycle = createStreamLifecycle({
+      userId,
+      modelId,
+      model,
+      persistentGeneration: isThreadChat,
+      unbilledPreview: isUnbilledPreview,
+      linearThreadId,
+    })
 
     const result = streamText({
       model: chatModel,
@@ -232,71 +235,9 @@ export async function POST(req: Request) {
       }),
       maxOutputTokens: MAX_OUTPUT_TOKENS,
       stopWhen: isStepCount(webToolsEnabled ? RESEARCH_MAX_STEPS : 5),
-      onError: ({ error }) => {
-        modelStreamError =
-          error instanceof Error
-            ? error.message
-            : GENERATION_ERRORS.streamFailed
-        console.error("[chat] 模型流错误:", error)
-      },
-      onAbort: ({ steps }) => {
-        if (!persistence) return
-        const inputTokens = steps.reduce(
-          (total, step) => total + (step.usage.inputTokens ?? 0),
-          0
-        )
-        const outputTokens = steps.reduce(
-          (total, step) => total + (step.usage.outputTokens ?? 0),
-          0
-        )
-        const providerMetadata = steps.at(-1)?.providerMetadata
-        if (steps.length > 0) {
-          capturedUsage = {
-            inputTokens,
-            outputTokens,
-            costEvidence: usageCostEvidence({
-              provider: model.provider,
-              steps,
-              providerMetadata,
-            }),
-          }
-          capturedProviderMetadata = providerMetadata
-        }
-        abortedUsageUnavailable = true
-      },
-      onEnd: async ({ usage, providerMetadata, steps }) => {
-        if (isUnbilledPreview) return
-        const costEvidence = usageCostEvidence({
-          provider: model.provider,
-          steps,
-          providerMetadata,
-        })
-        if (
-          model.provider === "openrouter" &&
-          costEvidence.source !== "openrouter"
-        ) {
-          console.warn(
-            `[chat] OpenRouter 成本元数据不完整，使用静态估值：${model.id}`
-          )
-        }
-        if (persistence) {
-          capturedUsage = {
-            inputTokens: usage.inputTokens ?? 0,
-            outputTokens: usage.outputTokens ?? 0,
-            costEvidence,
-          }
-          capturedProviderMetadata = providerMetadata
-          return
-        }
-        await chargeUsage({
-          userId,
-          model: modelId,
-          inputTokens: usage.inputTokens ?? 0,
-          outputTokens: usage.outputTokens ?? 0,
-          threadId: linearThreadId ?? null,
-          costEvidence,
-        })
-      },
+      onError: streamLifecycle.onError,
+      onAbort: streamLifecycle.onAbort,
+      onEnd: streamLifecycle.onEnd,
     })
 
     const uiStream = createUIMessageStream({
@@ -334,6 +275,12 @@ export async function POST(req: Request) {
       },
       onEnd: persistence
         ? async ({ responseMessage, isAborted, finishReason }) => {
+            const {
+              capturedUsage,
+              capturedProviderMetadata,
+              modelStreamError,
+              abortedUsageUnavailable,
+            } = streamLifecycle.snapshot()
             const failedWithoutFinish =
               finishReason == null && modelStreamError !== undefined
             const requestedTerminal = isAborted
