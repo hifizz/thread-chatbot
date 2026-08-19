@@ -6,8 +6,6 @@ import {
   type PreparedTurnPatch,
 } from "@/lib/thread-chat/domain/regeneration"
 import type {
-  GenerationResultV1,
-  GenerationStatus,
   GenerationTurnIdentity,
   GenerationTurnSnapshot,
   ThreadChatGenerationIntent,
@@ -362,44 +360,4 @@ export async function startGeneration(
   input: StartGenerationInput
 ): Promise<StartGenerationResult> {
   return prepareGeneration(input)
-}
-
-export async function compareAndSetGenerationTerminal(input: {
-  generationId: string
-  status: "completed" | "stopped" | "failed"
-  result: GenerationResultV1
-  error?: string | null
-  billingStatus?: GenerationRow["billingStatus"]
-}): Promise<GenerationRow | null> {
-  const allowedFrom: GenerationStatus[] =
-    input.status === "completed"
-      ? ["running"]
-      : input.status === "stopped"
-        ? ["running", "stop_requested"]
-        : ["running", "stop_requested"]
-  const now = new Date()
-  const [updated] = await db
-    .update(branchGenerations)
-    .set({
-      status: input.status,
-      result: input.result,
-      error: input.error ?? null,
-      billingStatus: input.billingStatus ?? "not_billable",
-      finishedAt: now,
-      updatedAt: now,
-    })
-    .where(
-      and(
-        eq(branchGenerations.id, input.generationId),
-        inArray(branchGenerations.status, allowedFrom)
-      )
-    )
-    .returning()
-  if (updated) return updated
-
-  const [current] = await db
-    .select()
-    .from(branchGenerations)
-    .where(eq(branchGenerations.id, input.generationId))
-  return current ?? null
 }
