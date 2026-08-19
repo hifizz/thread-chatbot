@@ -36,6 +36,12 @@ import type { MessageActionViewState } from "../chat/message-action-types"
 import { accentOf, dotColorOf, dvar } from "../theme"
 import { kickoffQuestion } from "../net/prompt-pure"
 import type { CanvasCardData, CanvasCardNode } from "./canvas-node"
+import {
+  CANVAS_CARD_ANCHOR_CHROME_HEIGHT,
+  CANVAS_CARD_BASE_HEIGHT,
+  CANVAS_CARD_DIMENSIONS,
+  CANVAS_CARD_INNER_WIDTH,
+} from "./canvas-card-dimensions"
 
 /**
  * 跨模式切换存活的画布视图状态宿主（不进 core store）。
@@ -54,18 +60,13 @@ function persistPins(
   host.pins = pins
 }
 
-/* ---------------- 卡片尺寸估算（与 thread-chat.css 的 .canvas-card 同步） ---------------- */
-
-/** 卡宽固定（.canvas-card width） */
-const CARD_W = 280
-/** 内容宽：280 − 13×2 padding − 3 左缘 − 1 右边框 */
-const INNER_W = 250
+/* ---------------- 卡片尺寸估算（精确尺寸与 CSS 共用 canvas-card-dimensions） ---------------- */
 
 /** 粗估文本行数：CJK 记 1 字宽、其余记 0.55；上限与 CSS 的 line-clamp 一致 */
 function estLines(text: string, fontPx: number, maxLines: number): number {
   let units = 0
   for (const ch of text) units += ch.charCodeAt(0) > 0x2e7f ? 1 : 0.55
-  const perLine = Math.max(4, INNER_W / fontPx)
+  const perLine = Math.max(4, CANVAS_CARD_INNER_WIDTH / fontPx)
   return Math.min(maxLines, Math.max(1, Math.ceil(units / perLine)))
 }
 
@@ -74,16 +75,46 @@ function estimateCardHeight(
   d: CanvasCardData,
   reserveFullSummary = false
 ): number {
-  let h = 24 // 上下 padding 11×2 + 上下边框
-  h += 26 // chead：徽章 + 标题一行
-  if (d.subtitle) h += estLines(d.subtitle, 11.5, 2) * 17.5 + 4
-  if (d.anchor) h += estLines(d.anchor, 11.5, 2) * 17.5 + 12 // 引文行 + 内边距 + 下距
+  let h = CANVAS_CARD_BASE_HEIGHT
+  h +=
+    CANVAS_CARD_DIMENSIONS.headerMinHeight +
+    CANVAS_CARD_DIMENSIONS.headerMarginBottom
+  if (d.subtitle)
+    h +=
+      estLines(
+        d.subtitle,
+        CANVAS_CARD_DIMENSIONS.bodyFontSize,
+        CANVAS_CARD_DIMENSIONS.bodyMaxLines
+      ) *
+        CANVAS_CARD_DIMENSIONS.estimatedBodyLineHeight +
+      CANVAS_CARD_DIMENSIONS.subtitleMarginBottom
+  if (d.anchor)
+    h +=
+      estLines(
+        d.anchor,
+        CANVAS_CARD_DIMENSIONS.bodyFontSize,
+        CANVAS_CARD_DIMENSIONS.bodyMaxLines
+      ) *
+        CANVAS_CARD_DIMENSIONS.estimatedBodyLineHeight +
+      CANVAS_CARD_ANCHOR_CHROME_HEIGHT
   // 流式期间按满额（3 行）预留 summary 高度：逐帧变长的摘要跨过 estLines 行数
   // 阈值会让估高突变 → dagre 重排 → 正在就地对话时兄弟节点平移（codex review P2）。
   // 满额预留使整场流式高度恒定，仅收尾一次性落位。
-  if (reserveFullSummary) h += 3 * 19 + 8
-  else if (d.summary) h += estLines(d.summary, 12, 3) * 19 + 8
-  h += 14 // meta 行
+  if (reserveFullSummary)
+    h +=
+      CANVAS_CARD_DIMENSIONS.summaryMaxLines *
+        CANVAS_CARD_DIMENSIONS.estimatedSummaryLineHeight +
+      CANVAS_CARD_DIMENSIONS.summaryMarginBottom
+  else if (d.summary)
+    h +=
+      estLines(
+        d.summary,
+        CANVAS_CARD_DIMENSIONS.summaryFontSize,
+        CANVAS_CARD_DIMENSIONS.summaryMaxLines
+      ) *
+        CANVAS_CARD_DIMENSIONS.estimatedSummaryLineHeight +
+      CANVAS_CARD_DIMENSIONS.summaryMarginBottom
+  h += CANVAS_CARD_DIMENSIONS.estimatedMetaHeight
   return Math.round(h)
 }
 
@@ -161,7 +192,7 @@ function buildBaseGraph(
     const streaming =
       last && (last.status === "pending" || last.status === "streaming")
     const size = {
-      width: CARD_W,
+      width: CANVAS_CARD_DIMENSIONS.width,
       height: estimateCardHeight(data, !!streaming),
     }
     nodes.push({
@@ -210,7 +241,7 @@ function buildBaseGraph(
 
 function layoutPositions(base: BaseGraph): Map<string, XYPosition> {
   const g = new graphlib.Graph<GraphLabel, NodeLabel, EdgeLabel>()
-  // LR 横向布局下语义对调：ranksep = 水平层距（容纳边 label 徽章，卡宽 280 固定、
+  // LR 横向布局下语义对调：ranksep = 水平层距（容纳边 label 徽章，卡宽固定、
   // 无估算误差故不必留太宽）；nodesep = 兄弟卡垂直间距（卡高有估算误差，由它吸收）
   g.setGraph({
     rankdir: "LR",

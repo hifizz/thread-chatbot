@@ -36,6 +36,7 @@ import { ConversationMessage } from "../chat/conversation-message"
 import type { MessageActionViewState } from "../chat/message-action-types"
 import type { ThreadMessageActionCommands } from "../net/chat-controller"
 import { CANVAS_EXPAND_WIDTH } from "./canvas-dimensions"
+import { CANVAS_CARD_DIMENSIONS } from "./canvas-card-dimensions"
 
 /** 会话动作（send/stop/retry）：壳层用 chat-controller 组装后传给画布（D3，零平行实现） */
 export interface CanvasChatActions extends ThreadMessageActionCommands {
@@ -217,7 +218,28 @@ export const CanvasCard = memo(function CanvasCard({
   return (
     <div
       className="canvas-card" /* 选中态样式由 .react-flow__node.selected 提供；此前的条件类拼接丢空格产出 canvas-cardexpanded 单 token，选中即丢全部卡片样式（codex review P1） */
-      style={{ "--accent": data.accent } as React.CSSProperties}
+      style={
+        {
+          "--accent": data.accent,
+          "--canvas-card-width": `${CANVAS_CARD_DIMENSIONS.width}px`,
+          "--canvas-card-padding-block": `${CANVAS_CARD_DIMENSIONS.paddingBlock}px`,
+          "--canvas-card-padding-inline": `${CANVAS_CARD_DIMENSIONS.paddingInline}px`,
+          "--canvas-card-header-min-height": `${CANVAS_CARD_DIMENSIONS.headerMinHeight}px`,
+          "--canvas-card-header-margin-bottom": `${CANVAS_CARD_DIMENSIONS.headerMarginBottom}px`,
+          "--canvas-card-body-font-size": `${CANVAS_CARD_DIMENSIONS.bodyFontSize}px`,
+          "--canvas-card-body-line-height":
+            CANVAS_CARD_DIMENSIONS.bodyLineHeight,
+          "--canvas-card-body-max-lines": CANVAS_CARD_DIMENSIONS.bodyMaxLines,
+          "--canvas-card-anchor-padding-block": `${CANVAS_CARD_DIMENSIONS.anchorPaddingBlock}px`,
+          "--canvas-card-anchor-margin-bottom": `${CANVAS_CARD_DIMENSIONS.anchorMarginBottom}px`,
+          "--canvas-card-summary-font-size": `${CANVAS_CARD_DIMENSIONS.summaryFontSize}px`,
+          "--canvas-card-summary-line-height":
+            CANVAS_CARD_DIMENSIONS.summaryLineHeight,
+          "--canvas-card-summary-max-lines":
+            CANVAS_CARD_DIMENSIONS.summaryMaxLines,
+          "--canvas-card-summary-margin-bottom": `${CANVAS_CARD_DIMENSIONS.summaryMarginBottom}px`,
+        } as React.CSSProperties
+      }
       title={selected ? undefined : "单击：就地展开对话 · 双击：回到列模式打开"}
     >
       {/* LR 横向树：入边锚在左缘、出边锚在右缘（与 dagre rankdir:LR 对应） */}

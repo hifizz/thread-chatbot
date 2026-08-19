@@ -53,15 +53,15 @@
 }
 
 /* thread 卡：与列模式同一套纸墨语言（深度色左缘 / 脚注徽章 / 衬线标题）。
-   尺寸与 use-canvas-layout 的估高常量同步：宽 280、padding 11×13、行高见各行注释 */
+   布局相关尺寸由 CanvasCard 从 canvas-card-dimensions 发布。 */
 .tc .canvas-card {
   position: relative; /* 外挂面板 .canvas-expand 的定位上下文（挂卡下方） */
-  width: 280px;
+  width: var(--canvas-card-width);
   background: #fff;
   border: 1px solid var(--rule-strong);
   border-left: 3px solid var(--accent, #8a8377);
   border-radius: 10px;
-  padding: 11px 13px;
+  padding: var(--canvas-card-padding-block) var(--canvas-card-padding-inline);
   font-family: var(--font-ui);
   box-shadow: 0 4px 14px -9px rgba(30, 26, 20, 0.22);
   cursor: grab;
@@ -84,8 +84,8 @@
   display: flex;
   align-items: center;
   gap: 7px;
-  margin-bottom: 6px;
-  min-height: 20px;
+  margin-bottom: var(--canvas-card-header-margin-bottom);
+  min-height: var(--canvas-card-header-min-height);
 }
 .tc .canvas-card .fn {
   font-family: var(--font-mono);
@@ -111,32 +111,32 @@
   line-height: 1.35;
 }
 .tc .canvas-card .sub {
-  font-size: 11.5px;
-  line-height: 1.5;
+  font-size: var(--canvas-card-body-font-size);
+  line-height: var(--canvas-card-body-line-height);
   color: var(--ink-faint);
   margin-bottom: 4px;
 }
 .tc .canvas-card .anch {
   font-family: var(--font-read);
-  font-size: 11.5px;
-  line-height: 1.5;
+  font-size: var(--canvas-card-body-font-size);
+  line-height: var(--canvas-card-body-line-height);
   color: var(--ink-soft);
   background: color-mix(in srgb, var(--accent, #8a8377) 7%, transparent);
   border-radius: 5px;
-  padding: 3px 6px;
-  margin-bottom: 6px;
+  padding: var(--canvas-card-anchor-padding-block) 6px;
+  margin-bottom: var(--canvas-card-anchor-margin-bottom);
   display: -webkit-box;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: var(--canvas-card-body-max-lines);
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
 .tc .canvas-card .sum {
-  font-size: 12px;
-  line-height: 1.58;
+  font-size: var(--canvas-card-summary-font-size);
+  line-height: var(--canvas-card-summary-line-height);
   color: var(--ink-soft);
-  margin-bottom: 8px;
+  margin-bottom: var(--canvas-card-summary-margin-bottom);
   display: -webkit-box;
-  -webkit-line-clamp: 3;
+  -webkit-line-clamp: var(--canvas-card-summary-max-lines);
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
