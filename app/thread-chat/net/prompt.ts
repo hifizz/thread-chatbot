@@ -24,6 +24,7 @@ import type { Thread, ThreadTreeState } from "../core/types"
 import { kickoffQuestion } from "./prompt-pure"
 import { serializeMessageForModel } from "./message-serialization"
 import type { ThreadChatGenerationIntent } from "../generation/types"
+import type { ThreadChatGenerationIdentity } from "@/lib/thread-chat/contracts/generation-identity"
 import {
   compileThreadChatMessages,
   type UIMessageLike,
@@ -42,15 +43,7 @@ export interface ThreadChatRequestBody {
   /** 当前 Thread 拥有的模型；服务端仍会按统一注册表严格校验。 */
   modelId: string
   /** 模式标记：服务端据此构造纯文本 system（anchorText 非空时追加分支焦点段） */
-  threadChat: {
-    anchorText: string | null
-    treeId: string
-    threadId: string
-    userMessageId: string
-    assistantMessageId: string
-    generationId: string
-    intent: ThreadChatGenerationIntent
-  }
+  threadChat: ThreadChatGenerationIdentity
 }
 
 /**

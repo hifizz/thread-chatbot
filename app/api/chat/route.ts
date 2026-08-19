@@ -11,7 +11,6 @@ import {
 import { after } from "next/server"
 import { frontendTools } from "@assistant-ui/react-ai-sdk"
 import type { ToolJSONSchema } from "assistant-stream"
-import { z } from "zod"
 import { resolveAttachmentParts } from "@/lib/chat/resolve-attachments"
 import { readUrlTool, webSearchTool } from "@/lib/chat/research-tools"
 import { isSearchConfigured } from "@/lib/ai/search"
@@ -64,7 +63,10 @@ import {
 import { projectGenerationResult } from "@/lib/thread-chat/application/project-generation-result"
 import { GENERATION_ERRORS } from "@/constants/generation"
 import { compileThreadChatMessages } from "@/lib/thread-chat/application/compile-thread-chat-messages"
-import { threadChatGenerationIntentSchema } from "@/lib/thread-chat/contracts/generation-intent"
+import {
+  threadChatGenerationIdentitySchema,
+  type ThreadChatGenerationIdentity,
+} from "@/lib/thread-chat/contracts/generation-identity"
 import { surfaceTools } from "@/app/api/chat/surface-tools"
 import {
   latestUserText,
@@ -73,18 +75,6 @@ import {
 
 // AnySearch 搜索与网页深读可能形成多步循环，放宽单次请求时长上限。
 export const maxDuration = 300
-
-const threadChatPersistenceSchema = z.object({
-  anchorText: z.string().nullable().optional(),
-  treeId: z.string().uuid(),
-  threadId: z.string().min(1),
-  userMessageId: z.string().min(1),
-  assistantMessageId: z.string().min(1),
-  generationId: z.string().uuid(),
-  intent: threadChatGenerationIntentSchema,
-})
-
-type ThreadChatPersistence = z.infer<typeof threadChatPersistenceSchema>
 
 function generationStartError(error: unknown): Response {
   if (error instanceof GenerationRepositoryError) {
@@ -189,7 +179,7 @@ export async function POST(req: Request) {
     return Response.json({ error: "额度不足，请充值后再试。" }, { status: 402 })
   }
 
-  let persistence: ThreadChatPersistence | null = null
+  let persistence: ThreadChatGenerationIdentity | null = null
   let authoritativeMessages = messages
   let authoritativeAnchorText: string | null = null
   let preparedRevision: number | null = null
@@ -198,7 +188,7 @@ export async function POST(req: Request) {
     typeof observeGenerationCancellation
   > | null = null
   if (threadChat != null) {
-    const parsed = threadChatPersistenceSchema.safeParse(threadChat)
+    const parsed = threadChatGenerationIdentitySchema.safeParse(threadChat)
     if (!parsed.success) {
       return Response.json(
         {
