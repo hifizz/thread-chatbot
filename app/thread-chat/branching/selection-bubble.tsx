@@ -39,6 +39,7 @@ import {
   useAssistantTextSelection,
   type SelectionInfo,
 } from "./use-assistant-text-selection"
+import { SelectionPlacementMap } from "./selection-placement-map"
 import {
   BUBBLE_GAP,
   BUBBLE_SAFE_PADDING,
@@ -223,78 +224,6 @@ export function SelectionBubble({
     onFork(sel, h, q || undefined)
   }
 
-  /* —— 迷你列条：主线 + 各槽位（+ 插入位置的幽灵格），标注将替换 / 将折叠 / 本列 —— */
-  const ghost = (
-    <span
-      key="ghost"
-      className="smcell ghost"
-      title="新分支将插入此处"
-      aria-hidden="true"
-    >
-      +
-    </span>
-  )
-  const cells: React.ReactNode[] = []
-  if (hasMap) {
-    cells.push(
-      <span
-        key="main"
-        className="smcell main"
-        role="button"
-        aria-disabled="true"
-        title={threadTitle(state, "main")}
-        aria-label={threadTitle(state, "main")}
-      />
-    )
-    const showGhost = preview !== null && preview.replaceId === null
-    slots.forEach((s, i) => {
-      if (showGhost && preview.insertAt === i) cells.push(ghost)
-      const title = threadTitle(state, s.id)
-      const isSrc = s.id === sel.threadId
-      const willReplace = preview?.replaceId === s.id
-      const willFold = preview?.foldId === s.id
-      const cap = willReplace
-        ? isSrc
-          ? "本列·替"
-          : "将替换"
-        : willFold
-          ? isSrc
-            ? "本列·折"
-            : "将折叠"
-          : isSrc
-            ? "本列"
-            : null
-      const toggle = () => setOverride((o) => (o === s.id ? null : s.id))
-      cells.push(
-        <span
-          key={s.id}
-          className={`smcell${s.folded ? "folded" : ""}${isSrc ? "src" : ""}${
-            willReplace ? "will-replace" : ""
-          }${willFold ? "will-fold" : ""}${ov === s.id ? "ov" : ""}`}
-          role="button"
-          tabIndex={s.folded ? -1 : 0}
-          aria-disabled={s.folded ? "true" : undefined}
-          title={title}
-          aria-label={title}
-          onClick={s.folded ? undefined : toggle}
-          onKeyDown={
-            s.folded
-              ? undefined
-              : (e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault()
-                    toggle()
-                  }
-                }
-          }
-        >
-          {cap && <i className="cap">{cap}</i>}
-        </span>
-      )
-    })
-    if (showGhost && preview.insertAt === slots.length) cells.push(ghost)
-  }
-
   return (
     <div
       className="sel-bubble"
@@ -360,14 +289,19 @@ export function SelectionBubble({
             }}
           />
         </div>
-        {hasMap && (
-          <div
-            className="slotmap"
-            role="group"
-            aria-label="新分支的放置目标（点小格指定让位列）"
-          >
-            {cells}
-          </div>
+        {preview && (
+          <SelectionPlacementMap
+            sourceThreadId={sel.threadId}
+            slots={slots}
+            preview={preview}
+            override={ov}
+            titleOf={(threadId) => threadTitle(state, threadId)}
+            onToggleOverride={(threadId) =>
+              setOverride((current) =>
+                current === threadId ? null : threadId
+              )
+            }
+          />
         )}
         {placeHint && (
           <div className="place-hint" aria-live="polite">
