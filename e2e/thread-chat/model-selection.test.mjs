@@ -1,6 +1,6 @@
 /**
  * Thread 模型归属的纯状态用例：
- *   node --experimental-strip-types e2e/thread-chat/model-selection.test.mjs
+ *   node --import tsx e2e/thread-chat/model-selection.test.mjs
  */
 import assert from "node:assert/strict"
 import {
@@ -20,6 +20,7 @@ const resolveModelId = (modelId) =>
 
 function seed(modelId = DEFAULT_MODEL_ID) {
   return {
+    schemaVersion: 2,
     threads: {
       main: {
         id: "main",
@@ -34,12 +35,14 @@ function seed(modelId = DEFAULT_MODEL_ID) {
         messages: [
           {
             id: "m1",
+            parentMessageId: null,
             role: "assistant",
             text: "可分叉的回答",
             forks: [],
             status: "done",
           },
         ],
+        activeLeafMessageId: "m1",
         lastActive: 1,
       },
     },
@@ -85,6 +88,7 @@ function seed(modelId = DEFAULT_MODEL_ID) {
     modelId: "removed-model",
     parentId: "main",
     messages: [],
+    activeLeafMessageId: null,
   }
   legacy.threads.main.children = ["branch"]
 
