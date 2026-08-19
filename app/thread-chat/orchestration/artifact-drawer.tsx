@@ -5,7 +5,7 @@
  * 底部「定位来源会话」走壳层的统一打开意图。
  */
 
-import React from "react"
+import React, { useEffect, useId, useRef } from "react"
 import { FileText, LocateFixed, X } from "lucide-react"
 import type { Artifact, ThreadTreeState } from "../core/types"
 import { MarkdownBody } from "../chat/markdown-body"
@@ -34,6 +34,30 @@ export function ArtifactDrawer({
   onSelect,
   onLocate,
 }: ArtifactDrawerProps) {
+  const titleId = useId()
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null)
+  const returnFocusRef = useRef<HTMLElement | null>(null)
+  const wasOpenRef = useRef(false)
+
+  useEffect(() => {
+    if (open) {
+      if (!wasOpenRef.current) {
+        returnFocusRef.current =
+          document.activeElement instanceof HTMLElement
+            ? document.activeElement
+            : null
+      }
+      wasOpenRef.current = true
+      const frame = requestAnimationFrame(() => closeButtonRef.current?.focus())
+      return () => cancelAnimationFrame(frame)
+    }
+    if (wasOpenRef.current) {
+      wasOpenRef.current = false
+      returnFocusRef.current?.focus()
+      returnFocusRef.current = null
+    }
+  }, [open])
+
   const activeArtifacts = activePathArtifacts(state)
   const visibleArtifacts = activeId
     ? [
@@ -50,11 +74,24 @@ export function ArtifactDrawer({
   const provenance = a ? artifactSourceProvenance(state, a) : null
 
   return (
-    <div className={`art-drawer ${open ? "open" : ""}`} aria-hidden={!open}>
+    <div
+      className={`art-drawer ${open ? "open" : ""}`}
+      role="dialog"
+      aria-modal={false}
+      aria-labelledby={titleId}
+      aria-hidden={!open}
+      inert={!open}
+    >
       <div className="art-head">
         <FileText size={16} color="#6a6357" />
-        <h3>Markdown</h3>
-        <button className="art-x" title="收起抽屉" onClick={onClose}>
+        <h3 id={titleId}>Markdown</h3>
+        <button
+          ref={closeButtonRef}
+          type="button"
+          className="art-x"
+          title="收起抽屉"
+          onClick={onClose}
+        >
           <X size={13} />
         </button>
       </div>
