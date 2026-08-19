@@ -12,7 +12,7 @@ import {
 } from "../../app/thread-chat/core/message-graph.ts"
 import { parseThreadTreeState } from "../../app/thread-chat/core/message-graph.ts"
 import { collectInherited } from "../../app/thread-chat/core/selectors.ts"
-import { compileThreadChatMessages } from "../../app/thread-chat/net/message-context.ts"
+import { compileThreadChatMessages } from "../../lib/thread-chat/application/compile-thread-chat-messages.ts"
 
 async function test(name, fn) {
   await fn()

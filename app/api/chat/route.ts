@@ -67,7 +67,7 @@ import {
 } from "@/lib/thread-chat-generation/finalize"
 import { projectGenerationResult } from "@/lib/thread-chat/application/project-generation-result"
 import { GENERATION_ERRORS } from "@/constants/generation"
-import { compileThreadChatMessages } from "@/app/thread-chat/net/message-context"
+import { compileThreadChatMessages } from "@/lib/thread-chat/application/compile-thread-chat-messages"
 
 // AnySearch 搜索与网页深读可能形成多步循环，放宽单次请求时长上限。
 export const maxDuration = 300
