@@ -1,7 +1,10 @@
 import type { Message, Thread, ThreadTreeState } from "../core/types"
 import { parseThreadTreeState } from "../core/message-graph"
 import { GENERATION_ERRORS } from "@/constants/generation"
-import type { GenerationSummary } from "../generation/types"
+import {
+  isActiveGenerationStatus,
+  type GenerationSummary,
+} from "../generation/types"
 
 /**
  * 纯函数：防御性收敛流式残留并校验 Artifact 三方关系。
@@ -20,11 +23,7 @@ export function sanitizeLoadedState(
   let changed = false
   const activeByMessage = new Map(
     activeGenerations
-      .filter(
-        (generation) =>
-          generation.status === "running" ||
-          generation.status === "stop_requested"
-      )
+      .filter((generation) => isActiveGenerationStatus(generation.status))
       .map((generation) => [
         `${generation.threadId}:${generation.assistantMessageId}`,
         generation.id,

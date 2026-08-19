@@ -1,18 +1,17 @@
 import type { ThreadTreeState } from "../core/types"
-import type { GenerationSummary } from "./types"
+import {
+  isActiveGenerationStatus,
+  type GenerationSummary,
+} from "./types"
 
-export function isGenerationInFlight(
-  status: GenerationSummary["status"]
-): boolean {
-  return status === "running" || status === "stop_requested"
-}
+export { isActiveGenerationStatus as isGenerationInFlight } from "./types"
 
 export function initialGenerationIds(
   generations: readonly GenerationSummary[]
 ): Set<string> {
   return new Set(
     generations
-      .filter((generation) => isGenerationInFlight(generation.status))
+      .filter((generation) => isActiveGenerationStatus(generation.status))
       .map((generation) => generation.id)
   )
 }

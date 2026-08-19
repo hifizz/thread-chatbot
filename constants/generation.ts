@@ -12,13 +12,6 @@ export const ACTIVE_GENERATION_STATUSES = [
   "stop_requested",
 ] as const
 
-export const TERMINAL_GENERATION_STATUSES = [
-  "completed",
-  "stopped",
-  "failed",
-  "superseded",
-] as const
-
 export const GENERATION_BILLING_STATUSES = [
   "pending",
   "settled",
@@ -45,4 +38,3 @@ export const GENERATION_ERRORS = {
 } as const
 
 export const GENERATION_BACKGROUND_LABEL = "正在后台生成，完成后显示"
-

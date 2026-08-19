@@ -1,8 +1,5 @@
 import { and, desc, eq, inArray } from "drizzle-orm"
-import type {
-  GenerationStatus,
-  GenerationSummary,
-} from "@/lib/thread-chat/domain/generation"
+import type { GenerationSummary } from "@/lib/thread-chat/domain/generation"
 import { ACTIVE_GENERATION_STATUSES } from "@/constants/generation"
 import { db } from "@/lib/db"
 import { branchGenerations } from "@/lib/db/schema"
@@ -103,10 +100,4 @@ export function toGenerationSummary(row: GenerationRow): GenerationSummary {
     updatedAt: row.updatedAt.toISOString(),
     result: row.result,
   }
-}
-
-export function isExecutionTerminal(status: GenerationStatus): boolean {
-  return !ACTIVE_GENERATION_STATUSES.includes(
-    status as (typeof ACTIVE_GENERATION_STATUSES)[number]
-  )
 }

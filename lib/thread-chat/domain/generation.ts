@@ -3,6 +3,7 @@ import type {
   GENERATION_BILLING_STATUSES,
   GENERATION_STATUSES,
 } from "@/constants/generation"
+import { ACTIVE_GENERATION_STATUSES } from "@/constants/generation"
 import type { GenerationResultV1 } from "@/lib/thread-chat/contracts/generation-result"
 
 export type GenerationStatus = (typeof GENERATION_STATUSES)[number]
@@ -71,11 +72,7 @@ export interface ReconciledThreadChatTree {
 export function isActiveGenerationStatus(
   status: GenerationStatus
 ): status is "running" | "stop_requested" {
-  return status === "running" || status === "stop_requested"
-}
-
-export function isTerminalGenerationStatus(
-  status: GenerationStatus
-): status is "completed" | "stopped" | "failed" | "superseded" {
-  return !isActiveGenerationStatus(status)
+  return ACTIVE_GENERATION_STATUSES.includes(
+    status as (typeof ACTIVE_GENERATION_STATUSES)[number]
+  )
 }
