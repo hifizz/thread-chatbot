@@ -13,17 +13,15 @@
  */
 
 import React, { useId } from "react"
+import type {
+  TailDir,
+  TailGeo,
+} from "@/lib/thread-chat/domain/selection-bubble"
 
-export type TailDir = "up" | "down"
-
-/** 尾巴几何：aw 半宽 · ah 高 · flare 根部外扩量(凹) · tip 顶点圆角(凸) · R 面板圆角 */
-export interface TailGeo {
-  aw: number
-  ah: number
-  flare: number
-  tip: number
-  R: number
-}
+export type {
+  TailDir,
+  TailGeo,
+} from "@/lib/thread-chat/domain/selection-bubble"
 
 interface PathGeo extends TailGeo {
   W: number

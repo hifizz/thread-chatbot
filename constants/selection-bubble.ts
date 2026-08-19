@@ -6,7 +6,7 @@
  * 这里集中气泡宽度、尾巴形状与安全边距，避免散落在组件里。
  */
 
-import type { TailGeo } from "@/app/thread-chat/branching/bubble-shape"
+import type { TailGeo } from "@/lib/thread-chat/domain/selection-bubble"
 
 /** 气泡面板宽度（固定），对应 smooth-tooltip 的 W */
 export const BUBBLE_W = 260
