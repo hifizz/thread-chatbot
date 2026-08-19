@@ -4,7 +4,7 @@ import { parseThreadTreeState } from "@/lib/thread-chat/domain/message-graph"
 import {
   prepareRegenerationPatch,
   type PreparedTurnPatch,
-} from "@/app/thread-chat/core/regeneration"
+} from "@/lib/thread-chat/domain/regeneration"
 import type {
   GenerationResultV1,
   GenerationStatus,
