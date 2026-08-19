@@ -1,4 +1,4 @@
-import { and, eq, inArray, sql } from "drizzle-orm"
+import { and, eq, inArray, isNull, sql } from "drizzle-orm"
 import { ACTIVE_GENERATION_STATUSES } from "@/constants/generation"
 import {
   activeLeafTurn,
@@ -29,6 +29,44 @@ export type DeleteOwnedTreeResult =
   | "deleted"
   | "not_found"
   | "generation_running"
+
+export type OwnedTreeSnapshot = Pick<
+  typeof branchTrees.$inferSelect,
+  "state" | "customTitle" | "revision"
+>
+
+/** GET 精确 URL 的迁移入口：普通 owner 读取，或原子认领一棵历史无主树。 */
+export async function loadOwnedOrClaimLegacyTree(input: {
+  userId: string
+  treeId: string
+}): Promise<OwnedTreeSnapshot | null> {
+  return db.transaction(async (tx) => {
+    const selection = {
+      state: branchTrees.state,
+      customTitle: branchTrees.customTitle,
+      revision: branchTrees.revision,
+    }
+    const [owned] = await tx
+      .select(selection)
+      .from(branchTrees)
+      .where(
+        and(
+          eq(branchTrees.id, input.treeId),
+          eq(branchTrees.userId, input.userId)
+        )
+      )
+    if (owned) return owned
+
+    const [claimed] = await tx
+      .update(branchTrees)
+      .set({ userId: input.userId })
+      .where(
+        and(eq(branchTrees.id, input.treeId), isNull(branchTrees.userId))
+      )
+      .returning(selection)
+    return claimed ?? null
+  })
+}
 
 /**
  * 删除与 generation start 共用 branch_trees 行锁：两者并发时，只可能先删除并让

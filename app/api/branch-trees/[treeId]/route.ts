@@ -36,7 +36,10 @@ import {
   toGenerationSummary,
 } from "@/lib/thread-chat-generation/query-repository"
 import { listMessageFeedbackForTree } from "@/lib/thread-chat-generation/message-feedback-repository"
-import { deleteOwnedTreeIfIdle } from "@/lib/thread-chat-generation/tree-repository"
+import {
+  deleteOwnedTreeIfIdle,
+  loadOwnedOrClaimLegacyTree,
+} from "@/lib/thread-chat-generation/tree-repository"
 import {
   SAVE_TREE_ERROR_STATUS,
   SAVE_TREE_REVISION_ERRORS,
@@ -79,18 +82,6 @@ function saveTreeErrorResponse(
   )
 }
 
-async function loadOwnedTree(userId: string, treeId: string) {
-  const [owned] = await db
-    .select({
-      state: branchTrees.state,
-      customTitle: branchTrees.customTitle,
-      revision: branchTrees.revision,
-    })
-    .from(branchTrees)
-    .where(and(eq(branchTrees.id, treeId), eq(branchTrees.userId, userId)))
-  return owned ?? null
-}
-
 export async function GET(_req: Request, { params }: RouteContext) {
   const userId = await getCurrentUserId()
   if (!userId) return unauthorized()
@@ -98,7 +89,7 @@ export async function GET(_req: Request, { params }: RouteContext) {
   if (!isValidTreeId(treeId))
     return new Response("treeId 必须是 UUID", { status: 400 })
 
-  const row = await loadOwnedTree(userId, treeId)
+  const row = await loadOwnedOrClaimLegacyTree({ userId, treeId })
   if (!row) return notFound()
 
   await failStaleGenerationsForTree(userId, treeId)
