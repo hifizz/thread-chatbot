@@ -16,8 +16,8 @@
  *
  * 持久化（loader + inner 拆分）：默认导出 ThreadChatDemo 是 loader——挂载后
  * loadTree(treeId) → sanitize → 读工作台记忆，加载完才渲染 ThreadChatDemoInner
- * （store 以已存状态为种子一次性创建，内部编排逻辑零改动）。inner 里订阅 store
- * version，防抖 1.5s 整树 PUT（流式高频跳变合并为结束后一次写）+ 卸载 flush；
+ * （store 以已存状态为种子一次性创建，内部编排逻辑零改动）。inner 订阅 store
+ * version，useTreePersistence 防抖整树 PUT（流式高频跳变合并）+ 卸载 flush；
  * 工作台状态（列槽/列宽/列数/策略/视图）按 treeId 分键防抖写 localStorage。
  * --------------------------------------------------------------------------
  */
@@ -37,7 +37,6 @@ import "./thread-chat.css"
 import {
   POPUP_EXIT_MS,
   THREAD_CHAT_SHORTCUTS,
-  TREE_SAVE_DEBOUNCE_MS,
   UI_SAVE_DEBOUNCE_MS,
 } from "@/constants/thread-chat"
 import {
@@ -68,7 +67,6 @@ import {
   loadUiState,
   rememberTreeId,
   sanitizeLoadedState,
-  saveTree,
   saveTreeStrict,
   saveUiState,
   type TreeUiState,
@@ -79,6 +77,7 @@ import type { GenerationSummary } from "./generation/types"
 import type { RecoverableTurn } from "./generation/types"
 import { useGenerationReconciliation } from "./generation/use-generation-reconciliation"
 import { useMessageActions } from "./chat/use-message-actions"
+import { useTreePersistence } from "./net/use-tree-persistence"
 import { BranchableChat } from "./branching/branchable-chat"
 import {
   SelectionBubble,
@@ -284,40 +283,15 @@ export function ThreadChatDemoInner({
   })
   useEffect(() => () => chat.detachAll(), [chat])
 
-  /* ---------- 防抖存库：version 变化后 1.5s 静默才整树 PUT（流式期间合并为一次写）。
-       首屏（version 未变过）不写；卸载时若有 pending 定时器则立即 flush（尽力而为）。
-       suppressSaveRef：当前树被用户从列表里删除后置真——否则跳转离开时的卸载 flush
-       / 防抖窗口尾巴会把刚删的 DB 行原样复活（工作台 localStorage 同理）。 ---------- */
-  const initialVersionRef = useRef(version)
-  const savePendingRef = useRef(false)
-  const suppressSaveRef = useRef(false)
-  useEffect(() => {
-    if (version === initialVersionRef.current) return
-    savePendingRef.current = true
-    const t = setTimeout(() => {
-      savePendingRef.current = false
-      if (suppressSaveRef.current) return
-      const s = store.getState()
-      void saveTree(treeId, s, deriveTreeTitle(s), () => {
-        showToast("其他标签页已更新，正在重新加载…")
-        window.location.reload()
-      })
-    }, TREE_SAVE_DEBOUNCE_MS)
-    return () => clearTimeout(t)
-  }, [version, treeId, store])
-  useEffect(
-    () => () => {
-      // 仅卸载时执行：防抖窗口内未落盘的变更立即补一次写
-      if (savePendingRef.current && !suppressSaveRef.current) {
-        savePendingRef.current = false
-        const s = store.getState()
-        void saveTree(treeId, s, deriveTreeTitle(s), () => {
-          window.location.reload()
-        })
-      }
+  const { setTreeSaveSuppressed, isTreeSaveSuppressed } = useTreePersistence({
+    treeId,
+    store,
+    version,
+    onRevisionConflict: () => {
+      showToast("其他标签页已更新，正在重新加载…")
+      window.location.reload()
     },
-    [treeId, store]
-  )
+  })
 
   /* ---------- 异步分支标题（D7）：分支首答完成后请求一次 4–8 字语义标题。
        触发条件：非主线、标题仍是默认（锚点截 13 字——已生成过 / 重命名过则跳过，
@@ -407,7 +381,7 @@ export function ThreadChatDemoInner({
        首帧也会写一次，但内容 == 恢复出的初值，幂等无伤。 ---------- */
   useEffect(() => {
     const t = setTimeout(() => {
-      if (suppressSaveRef.current) return // 树已被删除：别把刚清掉的工作台记忆写回去
+      if (isTreeSaveSuppressed()) return // 树已被删除：别把刚清掉的工作台记忆写回去
       saveUiState(treeId, {
         slots: cols.slots,
         widths: cols.widths,
@@ -417,7 +391,15 @@ export function ThreadChatDemoInner({
       })
     }, UI_SAVE_DEBOUNCE_MS)
     return () => clearTimeout(t)
-  }, [treeId, cols.slots, cols.widths, forceCols, mode, viewMode])
+  }, [
+    treeId,
+    cols.slots,
+    cols.widths,
+    forceCols,
+    mode,
+    viewMode,
+    isTreeSaveSuppressed,
+  ])
   /** 画布视图状态宿主（节点 pin 表）：跨「列 ⇄ 画布」切换存活，属视口状态不进 core store。
       与上面的 store 同一模式：useState(初始化函数) 造出的长寿可变对象（type-only import，
       不把画布模块拖进首屏 bundle） */
@@ -886,13 +868,12 @@ export function ThreadChatDemoInner({
           onSuppressCurrentSave={(v) => {
             // 删除前置位（失败恢复）：挡住防抖回调与卸载 flush 的新写；
             // 已在飞的 PUT 由 persist 写链保证先于 DELETE 落库，两头闭环
-            suppressSaveRef.current = v
-            if (v) savePendingRef.current = false
+            setTreeSaveSuppressed(v)
           }}
           onDeleteCurrent={(nextId) => {
             // 当前树已被删除：抑制卸载 flush / 防抖尾巴的回写（否则 DB 行复活），
             // 再跳剩余最近一棵；一棵不剩则开新 UUID。replace 不给被删 URL 留历史。
-            suppressSaveRef.current = true
+            setTreeSaveSuppressed(true)
             closeTreeList()
             router.replace(`/thread-chat/${nextId ?? crypto.randomUUID()}`)
           }}
