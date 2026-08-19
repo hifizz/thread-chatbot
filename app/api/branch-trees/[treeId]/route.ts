@@ -18,7 +18,10 @@ import { and, eq, sql } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { branchTrees } from "@/lib/db/schema"
 import { isValidTreeId } from "@/lib/chat/tree-id"
-import { CUSTOM_TITLE_MAX_LEN } from "@/constants/thread-chat"
+import {
+  CUSTOM_TITLE_MAX_LEN,
+  THREAD_TREE_SCHEMA_VERSION,
+} from "@/constants/thread-chat"
 import { getCurrentUserId } from "@/lib/auth/server"
 import type { ThreadTreeState } from "@/lib/thread-chat/domain/types"
 import { parseThreadTreeState } from "@/lib/thread-chat/domain/message-graph"
@@ -163,10 +166,10 @@ export async function PUT(req: Request, { params }: RouteContext) {
 
   const title = typeof body.title === "string" ? body.title : null
   const incomingSchemaVersion = (state as Record<string, unknown>).schemaVersion
-  if (incomingSchemaVersion !== 2)
+  if (incomingSchemaVersion !== THREAD_TREE_SCHEMA_VERSION)
     return saveTreeErrorResponse(
       "invalid_tree_state",
-      "只接受 schemaVersion=2 的消息图"
+      `只接受 schemaVersion=${THREAD_TREE_SCHEMA_VERSION} 的消息图`
     )
   const command = saveTreeRequestSchema.safeParse(body)
   if (!command.success) {
