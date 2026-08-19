@@ -65,7 +65,7 @@ import {
   type FinalizeGenerationInput,
   type FinalizeGenerationUsage,
 } from "@/lib/thread-chat-generation/finalize"
-import { projectGenerationResult } from "@/app/thread-chat/generation/project-result"
+import { projectGenerationResult } from "@/lib/thread-chat/application/project-generation-result"
 import { GENERATION_ERRORS } from "@/constants/generation"
 import { compileThreadChatMessages } from "@/app/thread-chat/net/message-context"
 
