@@ -10,6 +10,7 @@
 @import "./styles/boot-loading.css";
 @import "./styles/topbar.css";
 @import "./styles/columns.css";
+@import "./styles/columns-collapse.css";
 @import "./styles/messages.css";
 @import "./styles/artifact-card.css";
 @import "./styles/message-actions.css";
@@ -17,11 +18,10 @@
 @import "./styles/composer.css";
 @import "./styles/selection.css";
 @import "./styles/switcher.css";
+@import "./styles/switcher-subtree.css";
 @import "./styles/help-panel.css";
 @import "./styles/drawer.css";
 @import "./styles/toast.css";
-@import "./styles/columns-collapse.css";
-@import "./styles/switcher-subtree.css";
 @import "./styles/canvas.css";
 @import "./styles/scrollbar.css";
 @import "./styles/messages-stream.css";
