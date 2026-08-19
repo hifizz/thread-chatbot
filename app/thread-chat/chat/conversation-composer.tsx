@@ -3,6 +3,7 @@
 import React, { useEffect, useRef } from "react"
 import { ThreadModelSelector } from "./thread-model-selector"
 import {
+  composerMaxHeight,
   composerSubmission,
   shouldSubmitComposerKey,
 } from "./conversation-composer-logic"
@@ -43,7 +44,7 @@ export function ConversationComposer({
 }: ConversationComposerProps) {
   const taRef = useRef<HTMLTextAreaElement | null>(null)
   const canvas = variant === "canvas"
-  const maxHeight = canvas ? 68 : 120
+  const maxHeight = composerMaxHeight(variant)
 
   const doSend = () => {
     const ta = taRef.current
@@ -70,6 +71,9 @@ export function ConversationComposer({
     <textarea
       ref={taRef}
       rows={1}
+      style={
+        { "--composer-max-height": `${maxHeight}px` } as React.CSSProperties
+      }
       placeholder={
         canvas
           ? "就地继续这段会话…"

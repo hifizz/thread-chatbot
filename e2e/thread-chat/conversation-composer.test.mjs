@@ -1,5 +1,6 @@
 import assert from "node:assert/strict"
 import {
+  composerMaxHeight,
   composerSubmission,
   shouldSubmitComposerKey,
 } from "../../app/thread-chat/chat/conversation-composer-logic.ts"
@@ -7,6 +8,8 @@ import {
 assert.equal(composerSubmission("  hello  ", false), "hello")
 assert.equal(composerSubmission("   \n ", false), null)
 assert.equal(composerSubmission("hello", true), null)
+assert.equal(composerMaxHeight("column"), 120)
+assert.equal(composerMaxHeight("canvas"), 68)
 
 assert.equal(
   shouldSubmitComposerKey({

@@ -279,7 +279,7 @@
   font-family: var(--font-ui);
   font-size: 12.5px;
   line-height: 1.45;
-  max-height: 68px; /* 与 canvas-node.tsx 的 COMPOSER_MAX_H 同步 */
+  max-height: var(--composer-max-height);
   min-height: 28px;
 }
 .tc .canvas-expand .cv-composer textarea:focus {
