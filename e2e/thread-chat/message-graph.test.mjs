@@ -242,6 +242,19 @@ for (const [name, mutate] of [
       state.threads.main.messages.push({ ...state.threads.main.messages[0] }),
   ],
   [
+    "cross-thread duplicate ids",
+    (state) => {
+      state.threads.child.messages.push({
+        id: "u1",
+        parentMessageId: null,
+        role: "user",
+        text: "另一个 Thread 的重复 id",
+        forks: [],
+      })
+      state.threads.child.activeLeafMessageId = "u1"
+    },
+  ],
+  [
     "missing parent",
     (state) => (state.threads.main.messages[1].parentMessageId = "missing"),
   ],

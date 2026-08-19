@@ -99,6 +99,7 @@ export function parseThreadTreeState(input: unknown): ThreadTreeState {
     throw new InvalidMessageGraphError("Thread tree has no artifact order")
 
   const artifactOwnerById = new Map<string, string>()
+  const messageIds = new Set<string>()
 
   for (const thread of Object.values(state.threads)) {
     if (!Array.isArray(thread.messages))
@@ -116,6 +117,11 @@ export function parseThreadTreeState(input: unknown): ThreadTreeState {
     }
 
     for (const message of thread.messages) {
+      if (messageIds.has(message.id))
+        throw new InvalidMessageGraphError(
+          `Thread tree contains duplicate message id ${message.id}`
+        )
+      messageIds.add(message.id)
       for (const artifactId of message.artifactIds ?? []) {
         const priorOwner = artifactOwnerById.get(artifactId)
         if (priorOwner && priorOwner !== message.id)
