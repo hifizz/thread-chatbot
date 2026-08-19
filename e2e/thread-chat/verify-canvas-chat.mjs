@@ -27,7 +27,7 @@ import { mkdirSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { chromium } from "playwright-core"
-import { kickoffQuestion } from "../../app/thread-chat/net/prompt-pure.ts"
+import { kickoffQuestion } from "../../lib/thread-chat/application/prompt-policy.ts"
 
 const here = dirname(fileURLToPath(import.meta.url))
 const shotsDir = join(here, "shots")

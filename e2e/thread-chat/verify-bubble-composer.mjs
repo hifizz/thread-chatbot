@@ -28,7 +28,7 @@ import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { chromium } from "playwright-core"
 import { defaultBranchTitle } from "../../app/thread-chat/core/store.ts"
-import { kickoffQuestion } from "../../app/thread-chat/net/prompt-pure.ts"
+import { kickoffQuestion } from "../../lib/thread-chat/application/prompt-policy.ts"
 import { BRANCH_TITLE_GEN_MAX_LEN } from "../../constants/thread-chat.ts"
 
 const here = dirname(fileURLToPath(import.meta.url))
@@ -388,9 +388,7 @@ ok("带问 Enter：分支列打开", true)
   )
   await page.evaluate(() => {
     const cols = document.querySelectorAll(".tc .cols > .column")
-    cols[1]
-      ?.querySelector(".msg-list")
-      ?.dispatchEvent(new Event("scroll"))
+    cols[1]?.querySelector(".msg-list")?.dispatchEvent(new Event("scroll"))
   })
   await page.waitForTimeout(200)
   ok(
@@ -399,9 +397,7 @@ ok("带问 Enter：分支列打开", true)
   )
   await page.evaluate(() => {
     const cols = document.querySelectorAll(".tc .cols > .column")
-    cols[0]
-      ?.querySelector(".msg-list")
-      ?.dispatchEvent(new Event("scroll"))
+    cols[0]?.querySelector(".msg-list")?.dispatchEvent(new Event("scroll"))
   })
   await page.waitForTimeout(200)
   ok(
