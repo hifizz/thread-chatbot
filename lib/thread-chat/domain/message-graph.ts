@@ -45,20 +45,26 @@ function validateThreadGraph(thread: Thread): void {
       throw new InvalidMessageGraphError(
         `Message ${message.id} has a missing parent`
       )
+  }
 
-    const visited = new Set<string>()
+  // 已证实可达根的节点不会被后续起点重复追溯；整图 O(V + E)。
+  const resolved = new Set<string>()
+  for (const message of thread.messages) {
+    if (resolved.has(message.id)) continue
+    const path = new Set<string>()
     let cursor: Message | undefined = message
-    while (cursor) {
-      if (visited.has(cursor.id))
+    while (cursor && !resolved.has(cursor.id)) {
+      if (path.has(cursor.id))
         throw new InvalidMessageGraphError(
           `Thread ${thread.id} contains a message cycle`
         )
-      visited.add(cursor.id)
+      path.add(cursor.id)
       cursor =
         cursor.parentMessageId === null
           ? undefined
           : byId.get(cursor.parentMessageId)
     }
+    for (const id of path) resolved.add(id)
   }
 }
 

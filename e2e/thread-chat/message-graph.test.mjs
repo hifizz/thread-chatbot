@@ -278,3 +278,26 @@ for (const [name, mutate] of [
     assert.throws(() => parseThreadTreeState(state))
   })
 }
+
+await test("deep message chains validate without quadratic ancestor walks", () => {
+  const state = graphState()
+  const messageCount = 20_000
+  state.threads.main.messages = Array.from(
+    { length: messageCount },
+    (_, index) => ({
+      id: `deep-${index}`,
+      parentMessageId: index === 0 ? null : `deep-${index - 1}`,
+      role: index % 2 === 0 ? "user" : "assistant",
+      text: `message ${index}`,
+      forks: [],
+    })
+  )
+  state.threads.main.activeLeafMessageId = `deep-${messageCount - 1}`
+  state.threads.main.children = []
+  delete state.threads.child
+  state.artifacts = {}
+  state.artifactOrder = []
+
+  const parsed = parseThreadTreeState(state)
+  assert.equal(parsed.threads.main.messages.length, messageCount)
+})
