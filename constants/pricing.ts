@@ -6,6 +6,8 @@
 //
 // 金额单位统一为「微元」整数：1 元 = 1_000_000 微元。
 
+import { CHAT_MODELS } from "@/constants/model"
+
 /** 目标利润率（占售价比例）。至少 30%。 */
 export const PROFIT_MARGIN = 0.3
 
@@ -51,6 +53,14 @@ const ARK_CODING_MVP_COST: ModelCost = {
   inputPerMillion: 10,
   outputPerMillion: 40,
 }
+
+/** Ark 注册项统一消费 Coding Plan 估值策略，不在计费表重复维护模型 id。 */
+const ARK_CODING_MODEL_COST = Object.fromEntries(
+  CHAT_MODELS.filter((model) => model.provider === "ark").map((model) => [
+    model.id,
+    ARK_CODING_MVP_COST,
+  ])
+) as Record<string, ModelCost>
 
 export const MODEL_COST: Record<string, ModelCost> = {
   "openrouter-gpt-5.6-luna": {
@@ -136,15 +146,7 @@ export const MODEL_COST: Record<string, ModelCost> = {
     inputPerMillion: 0.15,
     outputPerMillion: 0.6,
   },
-  "doubao-seed-2.1-turbo": ARK_CODING_MVP_COST,
-  "doubao-seed-2.0-lite": ARK_CODING_MVP_COST,
-  "minimax-m2.7": ARK_CODING_MVP_COST,
-  "minimax-m3": ARK_CODING_MVP_COST,
-  "glm-5.3": ARK_CODING_MVP_COST,
-  "deepseek-v4-flash": ARK_CODING_MVP_COST,
-  "deepseek-v4-pro": ARK_CODING_MVP_COST,
-  "kimi-k2.6": ARK_CODING_MVP_COST,
-  "kimi-k2.7-code": ARK_CODING_MVP_COST,
+  ...ARK_CODING_MODEL_COST,
 }
 
 /** 把某币种金额折算成微元。 */
