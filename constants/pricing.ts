@@ -6,7 +6,7 @@
 //
 // 金额单位统一为「微元」整数：1 元 = 1_000_000 微元。
 
-import { CHAT_MODELS } from "@/constants/model"
+import { CHAT_MODELS, isChatModelId, type ChatModelId } from "@/constants/model"
 
 /** 目标利润率（占售价比例）。至少 30%。 */
 export const PROFIT_MARGIN = 0.3
@@ -60,9 +60,9 @@ const ARK_CODING_MODEL_COST = Object.fromEntries(
     model.id,
     ARK_CODING_MVP_COST,
   ])
-) as Record<string, ModelCost>
+) as Partial<Record<ChatModelId, ModelCost>>
 
-export const MODEL_COST: Record<string, ModelCost> = {
+export const MODEL_COST: Readonly<Partial<Record<ChatModelId, ModelCost>>> = {
   "openrouter-gpt-5.6-luna": {
     currency: "USD",
     inputPerMillion: 0.2,
@@ -166,7 +166,7 @@ export function costMicros(
   inputTokens: number,
   outputTokens: number
 ): number {
-  const cost = MODEL_COST[model]
+  const cost = isChatModelId(model) ? MODEL_COST[model] : undefined
   if (!cost) return 0
   const native =
     (inputTokens * cost.inputPerMillion +

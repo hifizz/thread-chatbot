@@ -61,7 +61,7 @@ export type ChatModel = {
   creator?: "anthropic" | "openai" | "moonshotai" | "deepseek" | "qwen" | "x-ai"
 }
 
-export const CHAT_MODELS: readonly ChatModel[] = [
+const CHAT_MODEL_REGISTRY = [
   {
     id: "minimax-m2",
     name: "MiniMax M2",
@@ -326,9 +326,15 @@ export const CHAT_MODELS: readonly ChatModel[] = [
     surfaces: ["thread"],
     creator: "x-ai",
   },
-]
+] as const satisfies readonly ChatModel[]
 
-export const DEFAULT_MODEL_ID = "minimax-m2"
+export type ChatModelEntry = (typeof CHAT_MODEL_REGISTRY)[number]
+export type ChatModelId = ChatModelEntry["id"]
+
+/** 运行时消费者使用宽化视图；字面量 registry 只负责派生精确 id 联合。 */
+export const CHAT_MODELS: readonly ChatModel[] = CHAT_MODEL_REGISTRY
+
+export const DEFAULT_MODEL_ID: ChatModelId = "minimax-m2"
 
 /** 从注册表的产品可见面派生 Thread Chat 选项。 */
 export const THREAD_CHAT_MODELS: readonly ChatModel[] = CHAT_MODELS.filter(
@@ -336,7 +342,8 @@ export const THREAD_CHAT_MODELS: readonly ChatModel[] = CHAT_MODELS.filter(
 )
 
 /** Thread Chat 新建树及旧树模型回退使用的默认模型。 */
-export const DEFAULT_THREAD_CHAT_MODEL_ID = "umapis-claude-opus-4-6"
+export const DEFAULT_THREAD_CHAT_MODEL_ID: ChatModelId =
+  "umapis-claude-opus-4-6"
 
 /**
  * 单次生成的输出 token 上限（安全阀）。
@@ -355,12 +362,12 @@ export function isUnbilledPreviewModel(model: ChatModel): boolean {
   return model.unbilledPreview === true
 }
 
-export function isChatModelId(id: unknown): id is string {
+export function isChatModelId(id: unknown): id is ChatModelId {
   return typeof id === "string" && getChatModel(id) !== undefined
 }
 
 /** Thread Chat 允许写入 Thread 的模型 id。 */
-export function isThreadChatModelId(id: unknown): id is string {
+export function isThreadChatModelId(id: unknown): id is ChatModelId {
   return (
     typeof id === "string" &&
     THREAD_CHAT_MODELS.some((model) => model.id === id)
@@ -368,11 +375,11 @@ export function isThreadChatModelId(id: unknown): id is string {
 }
 
 /** 校验并回退到默认模型，避免请求体传入未知 id。 */
-export function resolveModelId(id: string | undefined): string {
-  return getChatModel(id) ? (id as string) : DEFAULT_MODEL_ID
+export function resolveModelId(id: string | undefined): ChatModelId {
+  return isChatModelId(id) ? id : DEFAULT_MODEL_ID
 }
 
 /** 校验并回退为 Thread Chat 当前可选模型，避免历史树保留已下线选项。 */
-export function resolveThreadChatModelId(id: string | undefined): string {
+export function resolveThreadChatModelId(id: string | undefined): ChatModelId {
   return isThreadChatModelId(id) ? id : DEFAULT_THREAD_CHAT_MODEL_ID
 }
