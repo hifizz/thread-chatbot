@@ -25,7 +25,7 @@
 import type { ThreadStore } from "../core/store"
 import { buildRequestBody } from "./prompt"
 import { consumeUIMessageStream, type UIStreamHandlers } from "./ui-stream"
-import { fetchWithAuth, handleUnauthorized } from "@/lib/auth/session-recovery"
+import { handleUnauthorized } from "@/lib/auth/session-recovery"
 import type {
   ArtifactSeed,
   MessageFeedback,
@@ -42,6 +42,7 @@ import { getKnownTreeRevision, setKnownTreeRevision } from "./persist"
 import { activeLeafTurn } from "../core/message-graph"
 import { submitMessageFeedback } from "./message-feedback-command"
 import { switchActiveLeaf } from "./switch-active-leaf-command"
+import { requestGenerationStop } from "./stop-generation-command"
 import type {
   GenerationActionResult,
   MessageActionFailureCode,
@@ -472,22 +473,13 @@ export function createChatController(
     const active = activeAssistant(threadId)
     const generationId = active?.message.generationId
     if (!generationId) return false
-    try {
-      const res = await fetchWithAuth(
-        `/api/branch-generations/${generationId}/stop`,
-        { method: "POST" }
-      )
-      if (!res.ok) {
-        options.onError?.(`停止失败（HTTP ${res.status}），生成仍在继续`)
-        return false
-      }
-      detachThread(threadId)
-      return true
-    } catch (error) {
-      console.error("[thread-chat] Stop 请求失败", error)
-      options.onError?.("停止失败，生成仍在继续")
+    const result = await requestGenerationStop(generationId)
+    if (!result.ok) {
+      options.onError?.(result.message)
       return false
     }
+    detachThread(threadId)
+    return true
   }
 
   return {
