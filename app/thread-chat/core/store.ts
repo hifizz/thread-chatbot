@@ -7,7 +7,7 @@
  * react-hooks/immutability 等规则的关键：mutation 全部收敛在非 React 代码里。
  */
 
-import type { TextAnchor } from "../branching/text-anchor"
+import type { TextAnchor } from "@/lib/thread-chat/domain/text-anchor"
 import type {
   ArtifactSeed,
   MarkdownGenerationProgress,

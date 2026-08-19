@@ -5,7 +5,7 @@
  * 整棵树 + Artifact 登记表构成 ThreadTreeState，由 core/store.ts 统一变更。
  */
 
-import type { TextAnchor } from "../branching/text-anchor"
+import type { TextAnchor } from "@/lib/thread-chat/domain/text-anchor"
 import type { WebResearchActivity } from "@/lib/chat/web-research-activity"
 import type { ResearchPlan, ResearchRoute } from "@/lib/chat/research-router"
 
