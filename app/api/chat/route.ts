@@ -5,7 +5,6 @@ import {
   createUIMessageStreamResponse,
   isStepCount,
   streamText,
-  tool,
   type ToolSet,
   type UIMessage,
 } from "ai"
@@ -38,10 +37,7 @@ import { hasPositiveBalance, chargeUsage } from "@/lib/billing/credits"
 import { buildUsageMetadata } from "@/lib/billing/usage-meta"
 import {
   isExplicitMarkdownArtifactRequest,
-  MARKDOWN_ARTIFACT_TOOL_DESCRIPTION,
   MARKDOWN_ARTIFACT_TOOL_NAME,
-  markdownArtifactInputSchema,
-  type MarkdownArtifactToolResult,
 } from "@/lib/chat/markdown-artifact"
 import {
   createResearchPlan,
@@ -70,61 +66,10 @@ import { projectGenerationResult } from "@/lib/thread-chat/application/project-g
 import { GENERATION_ERRORS } from "@/constants/generation"
 import { compileThreadChatMessages } from "@/lib/thread-chat/application/compile-thread-chat-messages"
 import { threadChatGenerationIntentSchema } from "@/lib/thread-chat/contracts/generation-intent"
+import { surfaceTools } from "@/app/api/chat/surface-tools"
 
 // AnySearch 搜索与网页深读可能形成多步循环，放宽单次请求时长上限。
 export const maxDuration = 300
-
-const getWeather = tool({
-  description: "Get the current weather for a city.",
-  inputSchema: z.object({
-    location: z.string().describe("City name, e.g. 'San Francisco'"),
-  }),
-  execute: async ({ location }) => {
-    // Deterministic mock reading (hashed from the city name) - no real weather API/key involved.
-    const conditions = [
-      "Sunny",
-      "Partly Cloudy",
-      "Cloudy",
-      "Light Rain",
-      "Clear",
-    ]
-    const seed = [...location].reduce((acc, c) => acc + c.charCodeAt(0), 0)
-    return {
-      location,
-      temperatureF: 55 + (seed % 35),
-      condition: conditions[seed % conditions.length],
-      humidity: 30 + (seed % 50),
-      asOf: new Date().toISOString(),
-    }
-  },
-})
-
-const compareTable = tool({
-  description:
-    "Render a comparison table for two or more items across one or more numeric metrics. Use whenever the user asks to compare things 'in a table' with real numeric data.",
-  inputSchema: z.object({
-    title: z.string(),
-    unit: z.string().optional(),
-    columns: z
-      .array(z.string())
-      .describe("Category labels, e.g. country names"),
-    series: z.array(
-      z.object({
-        name: z.string(),
-        values: z
-          .array(z.number())
-          .describe("One value per column, same order as columns"),
-      })
-    ),
-  }),
-  execute: async (input) => input,
-})
-
-const createMarkdownArtifact = tool({
-  description: MARKDOWN_ARTIFACT_TOOL_DESCRIPTION,
-  inputSchema: markdownArtifactInputSchema,
-  execute: async (): Promise<MarkdownArtifactToolResult> => ({ created: true }),
-})
 
 const threadChatPersistenceSchema = z.object({
   anchorText: z.string().nullable().optional(),
@@ -379,17 +324,16 @@ export async function POST(req: Request) {
           ? { webSearch: webSearchTool, readUrl: readUrlTool }
           : {}
 
-    const allTools: ToolSet = {
+    const allTools = {
       // 普通 ThreadChat 请求完全不暴露 Markdown 工具，避免模型把长回答误判成产物。
       // 只有明确要求独立文章/文档/文件/Markdown 时才挂载并强制使用。
-      ...(isThreadChat
-        ? markdownArtifactRequested
-          ? { [MARKDOWN_ARTIFACT_TOOL_NAME]: createMarkdownArtifact }
-          : {}
-        : { getWeather, compareTable }),
+      ...surfaceTools({
+        threadChat: isThreadChat,
+        markdownArtifactRequested,
+      }),
       ...(webToolsEnabled ? routedWebTools : {}),
       ...frontendTools(tools ?? {}),
-    }
+    } as ToolSet
 
     // MiniMax 不接受 file part：先把附件（PDF→提取文本，其余→占位说明）转换为 text part
     const resolvedMessages = await resolveAttachmentParts(authoritativeMessages)
