@@ -26,12 +26,8 @@ import type { ThreadStore } from "../core/store"
 import { buildRequestBody } from "./prompt"
 import { consumeUIMessageStream } from "./ui-stream"
 import type { MessageFeedback, MessageFeedbackSummary } from "../core/types"
-import {
-  prepareRegenerationPatch,
-  type PreparedTurnPatch,
-} from "../core/regeneration"
+import { prepareRegenerationPatch } from "../core/regeneration"
 import { GENERATION_ERRORS } from "@/constants/generation"
-import type { ThreadChatGenerationIntent } from "../generation/types"
 import { getKnownTreeRevision, setKnownTreeRevision } from "./persist"
 import { activeLeafTurn } from "../core/message-graph"
 import { submitMessageFeedback } from "./message-feedback-command"
@@ -42,6 +38,11 @@ import {
   ABORTED_ERROR,
   createAssistantStreamRuntime,
 } from "./assistant-stream-runtime"
+import {
+  prepareAssistantRetry,
+  type PreparedRegenerationAction,
+  type PreparedRegenerationStart,
+} from "./regeneration-command"
 import type {
   GenerationActionResult,
   VariantSwitchResult,
@@ -116,12 +117,7 @@ export function createChatController(
     msgId: string,
     userMessageId: string,
     generationId: string,
-    action?: {
-      intent: Exclude<ThreadChatGenerationIntent, { kind: "persisted-turn" }>
-      patch: PreparedTurnPatch
-      sourceUserMessageId?: string
-      sourceAssistantMessageId?: string
-    }
+    action?: PreparedRegenerationAction
   ): Promise<GenerationActionResult> {
     const controller = new AbortController()
     inflight.set(threadId, controller)
@@ -270,6 +266,17 @@ export function createChatController(
     inflight.get(threadId)?.abort()
   }
 
+  function startPreparedRegeneration(start: PreparedRegenerationStart) {
+    detachThread(start.threadId)
+    return startAssistant(
+      start.threadId,
+      start.messageId,
+      start.userMessageId,
+      start.generationId,
+      start.action
+    )
+  }
+
   function activeAssistant(threadId: string) {
     const thread = store.getState().threads[threadId]
     if (!thread) return null
@@ -310,83 +317,28 @@ export function createChatController(
 
     /** 兼容旧宿主的 retry 入口；新语义为追加 sibling assistant。 */
     retry(threadId: string, msgId: string): void {
-      const generationId = crypto.randomUUID()
-      const nextAssistantMessageId = crypto.randomUUID()
-      const source = store
-        .getState()
-        .threads[threadId]?.messages.find((message) => message.id === msgId)
-      if (source?.role !== "assistant" || !source.parentMessageId) return
-      const patch = prepareRegenerationPatch(store.getState(), {
+      const prepared = prepareAssistantRetry(store.getState(), {
         threadId,
-        userMessageId: source.parentMessageId,
-        assistantMessageId: nextAssistantMessageId,
-        generationId,
-        intent: {
-          kind: "regenerate-assistant",
-          sourceAssistantMessageId: msgId,
-        },
+        sourceAssistantMessageId: msgId,
+        assistantMessageId: crypto.randomUUID(),
+        generationId: crypto.randomUUID(),
       })
-      if (!patch) return
-      detachThread(threadId)
-      void startAssistant(
-        threadId,
-        nextAssistantMessageId,
-        source.parentMessageId,
-        generationId,
-        {
-          intent: {
-            kind: "regenerate-assistant",
-            sourceAssistantMessageId: msgId,
-          },
-          patch,
-          sourceAssistantMessageId: msgId,
-        }
-      )
+      if (!prepared.ok) return
+      void startPreparedRegeneration(prepared.start)
     },
 
     async retryAssistant(
       threadId: string,
       assistantMessageId: string
     ): Promise<GenerationActionResult> {
-      const generationId = crypto.randomUUID()
-      const nextAssistantMessageId = crypto.randomUUID()
-      const thread = store.getState().threads[threadId]
-      const source = thread?.messages.find(
-        (message) => message.id === assistantMessageId
-      )
-      if (!thread || source?.role !== "assistant" || !source.parentMessageId)
-        return { ok: false, code: "not_found", message: "回复不存在" }
-      const patch = prepareRegenerationPatch(store.getState(), {
+      const prepared = prepareAssistantRetry(store.getState(), {
         threadId,
-        userMessageId: source.parentMessageId,
-        assistantMessageId: nextAssistantMessageId,
-        generationId,
-        intent: {
-          kind: "regenerate-assistant",
-          sourceAssistantMessageId: assistantMessageId,
-        },
+        sourceAssistantMessageId: assistantMessageId,
+        assistantMessageId: crypto.randomUUID(),
+        generationId: crypto.randomUUID(),
       })
-      if (!patch)
-        return {
-          ok: false,
-          code: "not_latest_turn",
-          message: "只能重新生成当前最后一轮回复",
-        }
-      detachThread(threadId)
-      return startAssistant(
-        threadId,
-        nextAssistantMessageId,
-        source.parentMessageId,
-        generationId,
-        {
-          intent: {
-            kind: "regenerate-assistant",
-            sourceAssistantMessageId: assistantMessageId,
-          },
-          patch,
-          sourceAssistantMessageId: assistantMessageId,
-        }
-      )
+      if (!prepared.ok) return prepared
+      return startPreparedRegeneration(prepared.start)
     },
 
     async retryUserTurn(
