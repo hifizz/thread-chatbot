@@ -4,6 +4,7 @@ import { getCurrentUserId } from "@/lib/auth/server"
 import {
   DEFAULT_MODEL_ID,
   getChatModel,
+  isLinearChatModelId,
   isUnbilledPreviewModel,
 } from "@/constants/model"
 import { isModelConfigured } from "@/lib/ai/provider"
@@ -22,6 +23,7 @@ type ChatRequestBody = {
 type ChatRequestContextDependencies = {
   currentUserId: typeof getCurrentUserId
   getModel: typeof getChatModel
+  linearModelAllowed: typeof isLinearChatModelId
   modelConfigured: typeof isModelConfigured
   unbilledPreview: typeof isUnbilledPreviewModel
   positiveBalance: typeof hasPositiveBalance
@@ -30,6 +32,7 @@ type ChatRequestContextDependencies = {
 const defaultDependencies: ChatRequestContextDependencies = {
   currentUserId: getCurrentUserId,
   getModel: getChatModel,
+  linearModelAllowed: isLinearChatModelId,
   modelConfigured: isModelConfigured,
   unbilledPreview: isUnbilledPreviewModel,
   positiveBalance: hasPositiveBalance,
@@ -65,6 +68,15 @@ export async function prepareChatRequestContext(
 
   const modelId = typeof rawModelId === "string" ? rawModelId : DEFAULT_MODEL_ID
   const model = dependencies.getModel(modelId)!
+  if (body.threadChat == null && !dependencies.linearModelAllowed(modelId)) {
+    return {
+      kind: "response" as const,
+      response: Response.json(
+        { error: "该模型不支持线性对话，请选择可用模型后重试。" },
+        { status: 400 }
+      ),
+    }
+  }
   if (!dependencies.modelConfigured(model)) {
     return {
       kind: "response" as const,

@@ -7,6 +7,7 @@ import {
   CHAT_MODELS,
   DEFAULT_THREAD_CHAT_MODEL_ID,
   isThreadChatModelId,
+  isLinearChatModelId,
   THREAD_CHAT_MODELS,
 } from "../../constants/model.ts"
 import { MODEL_COST, costMicros } from "../../constants/pricing.ts"
@@ -117,5 +118,7 @@ function seed(modelId = DEFAULT_MODEL_ID) {
   assert.equal(isThreadChatModelId("minimax-m2"), false)
   assert.equal(isThreadChatModelId("minimax-m2.7"), false)
   assert.equal(isThreadChatModelId("glm-5.3"), true)
+  assert.equal(isLinearChatModelId("minimax-m2"), true)
+  assert.equal(isLinearChatModelId("umapis-claude-opus-4-6"), false)
   console.log("PASS  Thread Chat selector 不展示 M2 与 M2.7")
 }

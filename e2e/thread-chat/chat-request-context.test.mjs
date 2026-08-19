@@ -20,6 +20,7 @@ function dependencies(overrides = {}) {
       id === "known" || id === DEFAULT_MODEL_ID
         ? { id, name: `Model ${id}`, provider: "ark" }
         : undefined,
+    linearModelAllowed: () => true,
     modelConfigured: () => true,
     unbilledPreview: () => false,
     positiveBalance: async () => true,
@@ -60,6 +61,32 @@ const unconfigured = await prepareChatRequestContext(
 assert.equal(unconfigured.kind, "response")
 assert.equal(unconfigured.response.status, 400)
 assert.match((await unconfigured.response.json()).error, /Model known.*未配置/)
+
+let threadOnlyConfigurationChecks = 0
+let threadOnlyBalanceChecks = 0
+const threadOnlyOnLinearSurface = await prepareChatRequestContext(
+  request({ messages, modelId: "known" }),
+  dependencies({
+    linearModelAllowed: () => false,
+    modelConfigured: () => {
+      threadOnlyConfigurationChecks++
+      return true
+    },
+    unbilledPreview: () => true,
+    positiveBalance: async () => {
+      threadOnlyBalanceChecks++
+      return true
+    },
+  })
+)
+assert.equal(threadOnlyOnLinearSurface.kind, "response")
+assert.equal(threadOnlyOnLinearSurface.response.status, 400)
+assert.match(
+  (await threadOnlyOnLinearSurface.response.json()).error,
+  /不支持线性对话/
+)
+assert.equal(threadOnlyConfigurationChecks, 0)
+assert.equal(threadOnlyBalanceChecks, 0)
 
 const insufficient = await prepareChatRequestContext(
   request({ messages, modelId: "known" }),

@@ -374,6 +374,12 @@ export function isThreadChatModelId(id: unknown): id is ChatModelId {
   )
 }
 
+/** 线性聊天允许使用的模型 id；与 Thread surface 一样从注册表派生。 */
+export function isLinearChatModelId(id: unknown): id is ChatModelId {
+  if (typeof id !== "string") return false
+  return getChatModel(id)?.surfaces.includes("linear") === true
+}
+
 /** 校验并回退到默认模型，避免请求体传入未知 id。 */
 export function resolveModelId(id: string | undefined): ChatModelId {
   return isChatModelId(id) ? id : DEFAULT_MODEL_ID
