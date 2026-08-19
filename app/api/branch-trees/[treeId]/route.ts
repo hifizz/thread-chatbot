@@ -25,7 +25,7 @@ import { parseThreadTreeState } from "@/lib/thread-chat/domain/message-graph"
 import {
   assertCompletedMessageGenerationLinks,
   reconcileThreadChatTurns,
-} from "@/app/thread-chat/generation/reconcile-turns"
+} from "@/lib/thread-chat/application/reconcile-turns"
 import {
   failStaleGenerationsForTree,
   listGenerationsForTree,
