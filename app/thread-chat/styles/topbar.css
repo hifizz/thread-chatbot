@@ -58,6 +58,11 @@
   color: var(--d1);
   font-weight: 700;
 }
+.tc .seg button.mode {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
 
 .tc .tbtn {
   font-family: var(--font-mono);

@@ -303,10 +303,3 @@
 .tc .canvas-expand .cv-send.stop {
   background: var(--ink-soft);
 }
-
-/* 顶栏「视图」seg 的图标按钮 */
-.tc .seg button.mode {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-}
