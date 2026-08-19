@@ -38,11 +38,11 @@ import { dc } from "../theme"
 import {
   CanvasActionsContext,
   CanvasCard,
-  EXPAND_W,
   type CanvasActions,
   type CanvasChatActions,
   type CanvasCardNode,
 } from "./canvas-node"
+import { CANVAS_EXPAND_WIDTH } from "./canvas-dimensions"
 import { useCanvasLayout, type CanvasViewState } from "./use-canvas-layout"
 import type { MessageActionViewState } from "../chat/message-action-types"
 
@@ -115,7 +115,7 @@ function CanvasFlow({
       const node = nodesRef.current.find((x) => x.id === id)
       if (!node) return
       selectNode(id)
-      const w = node.initialWidth ?? EXPAND_W
+      const w = node.initialWidth ?? CANVAS_EXPAND_WIDTH
       const h = node.initialHeight ?? 120
       void setCenter(
         node.position.x + w / 2 + FOCUS_OFFSET_X,

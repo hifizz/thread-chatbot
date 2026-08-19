@@ -35,6 +35,7 @@ import { ConversationComposer } from "../chat/conversation-composer"
 import { ConversationMessage } from "../chat/conversation-message"
 import type { MessageActionViewState } from "../chat/message-action-types"
 import type { ThreadMessageActionCommands } from "../net/chat-controller"
+import { CANVAS_EXPAND_WIDTH } from "./canvas-dimensions"
 
 /** 会话动作（send/stop/retry）：壳层用 chat-controller 组装后传给画布（D3，零平行实现） */
 export interface CanvasChatActions extends ThreadMessageActionCommands {
@@ -61,9 +62,6 @@ export interface CanvasActions extends CanvasChatActions {
 
 /** 由 ThreadCanvas 提供、穿过 React Flow 到自定义节点（面板不感知壳层） */
 export const CanvasActionsContext = createContext<CanvasActions | null>(null)
-
-/** 外挂面板宽（与 thread-chat.css 的 .canvas-expand width 同步；比卡宽，setCenter 取中用） */
-export const EXPAND_W = 340
 
 /** 贴底跟滚的释放阈值（px）：距底小于它视为「仍贴底」，流式长高时继续跟 */
 const STICK_THRESHOLD = 40
@@ -129,6 +127,11 @@ function CanvasExpand({
   return (
     <div
       className="canvas-expand nodrag nowheel"
+      style={
+        {
+          "--canvas-expand-width": `${CANVAS_EXPAND_WIDTH}px`,
+        } as React.CSSProperties
+      }
       onDoubleClick={(e) => e.stopPropagation()}
     >
       {/* 划选 DOM 契约与列模式完全一致：.msg-list[data-list] > .message[data-msg-id]
