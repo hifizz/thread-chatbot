@@ -26,7 +26,15 @@ import type { ThreadStore } from "../core/store"
 import { buildRequestBody } from "./prompt"
 import { consumeUIMessageStream, type UIStreamHandlers } from "./ui-stream"
 import { fetchWithAuth, handleUnauthorized } from "@/lib/auth/session-recovery"
-import type { ArtifactSeed, MessageFeedback } from "../core/types"
+import type {
+  ArtifactSeed,
+  MessageFeedback,
+  MessageFeedbackSummary,
+} from "../core/types"
+import {
+  setMessageFeedbackErrorResponseSchema,
+  setMessageFeedbackSuccessResponseSchema,
+} from "@/lib/thread-chat/contracts/message-feedback"
 import {
   prepareRegenerationPatch,
   type PreparedTurnPatch,
@@ -99,7 +107,7 @@ export interface ThreadMessageActionCommands {
     threadId: string,
     messageId: string,
     feedback: MessageFeedback | null
-  ): Promise<void>
+  ): Promise<MessageFeedbackSummary | null>
 }
 
 export type ChatController = ReturnType<typeof createChatController> &
@@ -721,7 +729,7 @@ export function createChatController(
       threadId: string,
       messageId: string,
       feedback: MessageFeedback | null
-    ): Promise<void> {
+    ): Promise<MessageFeedbackSummary | null> {
       const res = await fetchWithAuth(
         `/api/branch-trees/${options.treeId}/messages/${encodeURIComponent(messageId)}/feedback`,
         {
@@ -730,7 +738,20 @@ export function createChatController(
           body: JSON.stringify({ threadId, feedback }),
         }
       )
-      if (!res.ok) throw new Error(`feedback failed: ${res.status}`)
+      const responseBody = await res.json().catch(() => null)
+      if (!res.ok) {
+        const failure =
+          setMessageFeedbackErrorResponseSchema.safeParse(responseBody)
+        throw new Error(
+          failure.success
+            ? failure.data.error.message
+            : `feedback failed: ${res.status}`
+        )
+      }
+      const success =
+        setMessageFeedbackSuccessResponseSchema.safeParse(responseBody)
+      if (!success.success) throw new Error("feedback response invalid")
+      return success.data.feedback
     },
 
     /** 只有该显式操作才请求服务端停止模型；服务端确认后再断开本地流。 */

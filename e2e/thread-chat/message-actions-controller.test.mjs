@@ -216,7 +216,7 @@ await test("feedback command sends the exact message/value pair", async () => {
   let request
   const harness = controllerWith(async (input, init) => {
     request = { input: String(input), init }
-    return Response.json({ ok: true })
+    return Response.json({ feedback: null })
   })
   try {
     await harness.controller.submitFeedback(
@@ -242,6 +242,33 @@ await test("feedback command sends the exact message/value pair", async () => {
       threadId: "main",
       feedback: null,
     })
+  } finally {
+    harness.restore()
+  }
+})
+
+await test("feedback command validates and preserves the server error", async () => {
+  const harness = controllerWith(async () =>
+    Response.json(
+      {
+        error: {
+          code: "message_not_completed",
+          message: "只有已完成的 AI 回复可以评价",
+        },
+      },
+      { status: 409 }
+    )
+  )
+  try {
+    await assert.rejects(
+      () =>
+        harness.controller.submitFeedback(
+          "main",
+          "22222222-2222-4222-8222-222222222222",
+          "positive"
+        ),
+      /只有已完成的 AI 回复可以评价/
+    )
   } finally {
     harness.restore()
   }

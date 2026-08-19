@@ -1,23 +1,17 @@
 import { and, eq } from "drizzle-orm"
 import { parseThreadTreeState } from "@/lib/thread-chat/domain/message-graph"
+import type { ThreadTreeState } from "@/lib/thread-chat/domain/types"
 import type {
   MessageFeedback,
   MessageFeedbackSummary,
-  ThreadTreeState,
-} from "@/lib/thread-chat/domain/types"
+  SetMessageFeedbackResult,
+} from "@/lib/thread-chat/contracts/message-feedback"
 import { db } from "@/lib/db"
 import {
   branchGenerations,
   branchMessageFeedback,
   branchTrees,
 } from "@/lib/db/schema"
-
-type SetMessageFeedbackResult =
-  | { ok: true; feedback: MessageFeedbackSummary | null }
-  | {
-      ok: false
-      reason: "not_found" | "not_completed" | "missing_generation"
-    }
 
 function toSummary(
   row: typeof branchMessageFeedback.$inferSelect

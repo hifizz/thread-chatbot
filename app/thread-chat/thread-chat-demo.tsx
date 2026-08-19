@@ -367,7 +367,7 @@ export function ThreadChatDemoInner({
           return next
         })
         try {
-          await chat.submitFeedback(threadId, messageId, feedback)
+          return await chat.submitFeedback(threadId, messageId, feedback)
         } catch (error) {
           setFeedbackByMessageId((current) => {
             const next = new Map(current)
