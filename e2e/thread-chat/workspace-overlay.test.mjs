@@ -3,6 +3,7 @@ import {
   escapeOverlayTarget,
   popupPosition,
 } from "../../app/thread-chat/orchestration/workspace-overlay-logic.ts"
+import { SWITCHER_DIMENSIONS } from "../../app/thread-chat/orchestration/switcher-dimensions.ts"
 
 assert.equal(
   escapeOverlayTarget({
@@ -39,8 +40,8 @@ assert.deepEqual(
   popupPosition({
     right: 900,
     bottom: 700,
-    panelWidth: 330,
-    panelHeight: 420,
+    panelWidth: SWITCHER_DIMENSIONS.column.width,
+    panelHeight: SWITCHER_DIMENSIONS.column.height,
     viewportWidth: 800,
     viewportHeight: 600,
   }),
@@ -50,8 +51,8 @@ assert.deepEqual(
   popupPosition({
     right: 100,
     bottom: 50,
-    panelWidth: 330,
-    panelHeight: 420,
+    panelWidth: SWITCHER_DIMENSIONS.column.width,
+    panelHeight: SWITCHER_DIMENSIONS.column.height,
     viewportWidth: 800,
     viewportHeight: 600,
   }),

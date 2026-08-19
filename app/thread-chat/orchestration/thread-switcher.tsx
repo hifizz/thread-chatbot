@@ -29,6 +29,7 @@ import {
 import { dotColorOf, dvar } from "../theme"
 import type { Slot } from "./placement"
 import { ShortcutHint } from "./shortcut-hint"
+import { SWITCHER_DIMENSIONS } from "./switcher-dimensions"
 
 /**
  * Dialog 关闭回调的统一策略：Esc 的权威在壳层 keydown 逐层关闭链——
@@ -122,7 +123,14 @@ export function ThreadSwitcher({
 
   const panelClass = isGlobal ? "global" : isSubtree ? "subtree" : "local"
   const panelStyle =
-    mode.kind === "global" ? undefined : { left: mode.x, top: mode.y }
+    mode.kind === "global"
+      ? undefined
+      : ({
+          left: mode.x,
+          top: mode.y,
+          "--swx-panel-width": `${SWITCHER_DIMENSIONS[mode.kind].width}px`,
+          "--swx-panel-height": `${SWITCHER_DIMENSIONS[mode.kind].height}px`,
+        } as React.CSSProperties)
 
   /** 面板内容（三种模式共用）；外壳按模式分别包 Dialog / 定位 div */
   const panelInner = (

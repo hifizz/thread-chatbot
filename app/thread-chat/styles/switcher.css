@@ -72,8 +72,8 @@
   max-height: min(560px, 78vh);
 }
 .tc .swx.local {
-  width: min(330px, 92vw);
-  max-height: 420px;
+  width: min(var(--swx-panel-width), 92vw);
+  max-height: var(--swx-panel-height);
 }
 .tc .swx-search {
   flex: none;

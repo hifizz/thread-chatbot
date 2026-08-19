@@ -5,6 +5,7 @@ import { POPUP_EXIT_MS } from "@/constants/thread-chat"
 import type { SelectionInfo } from "../branching/selection-bubble"
 import type { SwitcherMode } from "./thread-switcher"
 import { escapeOverlayTarget, popupPosition } from "./workspace-overlay-logic"
+import { SWITCHER_DIMENSIONS } from "./switcher-dimensions"
 
 type ClosingOverlay = { n: number; closing?: boolean }
 
@@ -64,11 +65,12 @@ export function useWorkspaceOverlays() {
   const openColumnSwitcher = useCallback(
     (viewportIndex: number, button: HTMLElement) => {
       const rect = button.getBoundingClientRect()
+      const dimensions = SWITCHER_DIMENSIONS.column
       const { x, y } = popupPosition({
         right: rect.right,
         bottom: rect.bottom,
-        panelWidth: 330,
-        panelHeight: 420,
+        panelWidth: dimensions.width,
+        panelHeight: dimensions.height,
         viewportWidth: window.innerWidth,
         viewportHeight: window.innerHeight,
       })
@@ -84,11 +86,12 @@ export function useWorkspaceOverlays() {
   )
   const openSubtree = useCallback((rootId: string, button: HTMLElement) => {
     const rect = button.getBoundingClientRect()
+    const dimensions = SWITCHER_DIMENSIONS.subtree
     const { x, y } = popupPosition({
       right: rect.right,
       bottom: rect.bottom,
-      panelWidth: 340,
-      panelHeight: 400,
+      panelWidth: dimensions.width,
+      panelHeight: dimensions.height,
       viewportWidth: window.innerWidth,
       viewportHeight: window.innerHeight,
     })
