@@ -1,5 +1,5 @@
 import { and, eq } from "drizzle-orm"
-import { parseThreadTreeState } from "@/app/thread-chat/core/message-graph"
+import { parseThreadTreeState } from "@/lib/thread-chat/domain/message-graph"
 import type {
   MessageFeedback,
   MessageFeedbackSummary,

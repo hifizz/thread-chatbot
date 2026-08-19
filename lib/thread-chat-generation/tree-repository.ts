@@ -3,7 +3,7 @@ import {
   activeLeafTurn,
   assistantTurnAlternatives,
   parseThreadTreeState,
-} from "@/app/thread-chat/core/message-graph"
+} from "@/lib/thread-chat/domain/message-graph"
 import type { ThreadTreeState } from "@/lib/thread-chat/domain/types"
 import { db } from "@/lib/db"
 import { branchTrees } from "@/lib/db/schema"

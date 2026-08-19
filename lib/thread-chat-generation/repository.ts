@@ -1,6 +1,6 @@
 import { and, desc, eq, inArray, lt, max, sql } from "drizzle-orm"
 import type { ThreadTreeState } from "@/lib/thread-chat/domain/types"
-import { parseThreadTreeState } from "@/app/thread-chat/core/message-graph"
+import { parseThreadTreeState } from "@/lib/thread-chat/domain/message-graph"
 import {
   prepareRegenerationPatch,
   type PreparedTurnPatch,
