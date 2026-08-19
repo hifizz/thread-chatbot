@@ -1,4 +1,4 @@
-/* ── @/thread-chat/styles ── 折叠细条 col-strip + 列头「子分支」按钮（columns 后续追加，保持原位置） */
+/* ── @/thread-chat/styles ── 折叠细条 col-strip */
 
 /* ---------------- 方案⑤：折叠细条（列满时把 LRU 列原地折成竖条） ---------------- */
 .tc .col-strip {
@@ -58,17 +58,4 @@
 }
 .tc .col-strip:hover .vt {
   color: var(--ink);
-}
-
-/* ---------------- 列头「子分支」按钮（ListTree 图标 + 直接子分支数） ---------------- */
-.tc .cbtn.tree {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-.tc .cbtn.tree .n {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 700;
-  line-height: 1;
 }
