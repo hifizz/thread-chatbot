@@ -14,9 +14,9 @@
  * Artifact 定位来源 / 画布双击节点全部走它——画布模式下先切回列视图（打开 = 去列里读），
  * 列满时按当前策略替换（可撤销）或折叠细条。
  *
- * 持久化（loader + inner 拆分）：默认导出 ThreadChatDemo 是 loader——挂载后
- * loadTree(treeId) → sanitize → 读工作台记忆，加载完才渲染 ThreadChatDemoInner
- * （store 以已存状态为种子一次性创建，内部编排逻辑零改动）。inner 订阅 store
+ * 持久化（loader + inner 拆分）：默认导出 ThreadChatDemo 通过 useThreadChatBoot
+ * 完成远端加载、strict-v2 清理与工作台恢复，随后才渲染 ThreadChatDemoInner
+ * （store 以已存状态为种子一次性创建）。inner 订阅 store
  * version，useTreePersistence 防抖整树 PUT（流式高频跳变合并）+ 卸载 flush；
  * 工作台状态（列槽/列宽/列数/策略/视图）按 treeId 分键防抖写 localStorage。
  * --------------------------------------------------------------------------
@@ -35,11 +35,7 @@ import {
 } from "lucide-react"
 import "./thread-chat.css"
 import { POPUP_EXIT_MS, THREAD_CHAT_SHORTCUTS } from "@/constants/thread-chat"
-import {
-  isThreadChatModelId,
-  resolveThreadChatModelId,
-} from "@/constants/model"
-import { emptySeedState } from "./core/seed"
+import { isThreadChatModelId } from "@/constants/model"
 import { createThreadStore } from "./core/store"
 import { useThreadStore } from "./core/use-thread-store"
 import {
@@ -57,10 +53,6 @@ import { createChatController } from "./net/chat-controller"
 import { kickoffQuestion } from "./net/prompt"
 import {
   deriveTreeTitle,
-  loadTree,
-  loadUiState,
-  rememberTreeId,
-  sanitizeLoadedState,
   saveTreeStrict,
   type TreeUiState,
   type ViewMode,
@@ -72,6 +64,7 @@ import { useGenerationReconciliation } from "./generation/use-generation-reconci
 import { useMessageActions } from "./chat/use-message-actions"
 import { useTreePersistence } from "./net/use-tree-persistence"
 import { useBranchTitles } from "./net/use-branch-titles"
+import { useThreadChatBoot } from "./net/use-thread-chat-boot"
 import { useUiStatePersistence } from "./orchestration/use-ui-state-persistence"
 import { BranchableChat } from "./branching/branchable-chat"
 import {
@@ -138,45 +131,7 @@ function anchoredPos(btn: HTMLElement, w: number, h: number) {
  * treeId 变化由上层路由的 key={treeId} 整体重挂，不在此处处理切树。
  */
 export function ThreadChatDemo({ treeId }: { treeId: string }) {
-  const [boot, setBoot] = useState<{
-    seed: ThreadTreeState
-    ui: TreeUiState | null
-    /** 用户重命名过的标题（未改过为 null）——主线列头副标题优先展示 */
-    customTitle: string | null
-    generations: GenerationSummary[]
-    messageFeedbacks: MessageFeedbackSummary[]
-    recoverableTurns: RecoverableTurn[]
-  } | null>(null)
-
-  useEffect(() => {
-    let cancelled = false
-    ;(async () => {
-      const loaded = await loadTree(treeId)
-      // sanitize：收敛流式中途落盘的非终态 assistant 残留（见 persist.ts 头注）
-      const seed = loaded.state
-        ? sanitizeLoadedState(
-            loaded.state,
-            resolveThreadChatModelId,
-            loaded.generations
-          )
-        : emptySeedState()
-      // 工作台记忆按加载回来的树校验（列引用的 thread 必须存在）
-      const ui = loadUiState(treeId, seed)
-      if (cancelled) return
-      rememberTreeId(treeId) // 成功打开即记为「最近一棵」（裸路径的跳转目标）
-      setBoot({
-        seed,
-        ui,
-        customTitle: loaded.customTitle,
-        generations: loaded.generations,
-        messageFeedbacks: loaded.messageFeedbacks,
-        recoverableTurns: loaded.recoverableTurns,
-      })
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [treeId])
+  const boot = useThreadChatBoot(treeId)
 
   if (!boot) {
     return (
