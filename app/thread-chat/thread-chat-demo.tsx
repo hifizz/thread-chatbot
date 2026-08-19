@@ -27,17 +27,13 @@ import { useRouter } from "next/navigation"
 import React, { useState } from "react"
 import "./thread-chat.css"
 import {
-  activeLeafTurn,
   activePathArtifacts,
-  threadTitle,
-  type TreeRow,
 } from "./core/selectors"
 import type {
   Message,
   MessageFeedbackSummary,
   ThreadTreeState,
 } from "./core/types"
-import { kickoffQuestion } from "./net/prompt"
 import {
   deriveTreeTitle,
   type TreeUiState,
@@ -48,20 +44,12 @@ import { useThreadChatBoot } from "./net/use-thread-chat-boot"
 import { BranchableChat } from "./branching/branchable-chat"
 import {
   SelectionBubble,
-  type SelectionInfo,
 } from "./branching/selection-bubble"
-import {
-  type PlacementHint,
-  type PlacementMode,
-  type Slot,
-} from "./orchestration/placement"
+import { type Slot } from "./orchestration/placement"
 import {
   ThreadColumns,
 } from "./orchestration/thread-columns"
-import {
-  ThreadSwitcher,
-  type SwitcherMode,
-} from "./orchestration/thread-switcher"
+import { ThreadSwitcher } from "./orchestration/thread-switcher"
 import { TreeList } from "./orchestration/tree-list"
 import { ArtifactDrawer } from "./orchestration/artifact-drawer"
 import { HelpPanel, UsageHint } from "./orchestration/help-panel"
@@ -73,6 +61,7 @@ import {
 } from "./orchestration/workspace-toast"
 import { useThreadChatRuntime } from "./orchestration/use-thread-chat-runtime"
 import { useThreadChatWorkspace } from "./orchestration/use-thread-chat-workspace"
+import { createBranchWorkspaceActions } from "./orchestration/branch-workspace-actions"
 
 /** 画布视图层懒加载：React Flow 只在首次进入画布模式时才落地（且跳过 SSR） */
 const ThreadCanvas = dynamic(
@@ -219,127 +208,26 @@ export function ThreadChatDemoInner({
     closeDrawer,
   } = useWorkspaceOverlays()
 
-  /* ---------- 统一意图入口：打开某会话（脚注 / ⌘K / 子树 / 定位来源 / 画布双击都走这里）
-       hint：可选放置提示（⌘ keepSource「保留来源列，开在其右」/ targetId 显式让位列） ---------- */
-  function openBranchUI(
-    id: string,
-    sourceId?: string | null,
-    hint?: PlacementHint
-  ) {
-    // 意图收敛：打开会话 = 去列里读它——画布模式下先切回列视图再放置
-    showColumnsView()
-    if (id === "main") {
-      cols.flashThread("main")
-      return
-    }
-    const eff = cols.openThread(id, sourceId ?? null, hint)
-    if (eff.kind === "replaced") {
-      showToast(
-        `第 ${eff.idx + 2} 列已替换：「${threadTitle(state, eff.replacedId)}」→「${threadTitle(state, id)}」`,
-        () => {
-          cols.restoreSlots(eff.prevSlots)
-          cols.flashThread(eff.replacedId)
-        }
-      )
-    } else if (eff.kind === "folded") {
-      showToast(
-        `已打开「${threadTitle(state, id)}」，「${threadTitle(state, eff.foldedId)}」已折叠为细条`
-      )
-    }
-  }
-
-  /* ---------- 开分支：store.fork + 放置（hint 来自气泡：⌘ / 列条点选）。
-       留空路径不自动发请求：新分支 composer 预填代拟问题，用户改写或回车确认后才走 chat.send；
-       带问路径（气泡输入框 question 非空）：fork + 放置后直接 chat.send——问题成为
-       新分支第 1 条 user 消息并触发流式首答（D1：复用发送链路，store 无 firstQuestion 字段；
-       消息一入树，composerPrefillFor 的「空分支才预填」条件即失效，两条路径互不串扰） ---------- */
-  function handleFork(
-    s: SelectionInfo,
-    hint?: PlacementHint,
-    question?: string
-  ) {
-    const r = store.fork({
-      sourceThreadId: s.threadId,
-      sourceMsgId: s.msgId,
-      anchorText: s.text,
-      // 文本锚点：渲染后 Markdown DOM 上的模糊恢复定位依据
-      anchor: s.anchor,
-    })
-    if (!r) return
-    const q = question?.trim()
-    if (q) chat.send(r.threadId, q, { text: s.text }) // 划选原文随消息结构化落库（方向 C）
-    // 画布内 fork（D4）：不占列槽——不走 cols.openThread（回列后布局与开分支前一致，
-    // 新分支经脚注/⌘K 打开）；置 focusNode 让画布 selectNode + setCenter 平滑跟随
-    if (viewMode === "canvas") {
-      focusCanvasNode(r.threadId)
-      showToast(`已开启分支 · ${r.title}`)
-      return
-    }
-    const eff = cols.openThread(r.threadId, s.threadId, hint)
-    if (eff.kind === "replaced") {
-      showToast(
-        `已开启分支「${r.title}」，替换了第 ${eff.idx + 2} 列的「${threadTitle(state, eff.replacedId)}」`,
-        () => {
-          cols.restoreSlots(eff.prevSlots)
-          cols.flashThread(eff.replacedId)
-        }
-      )
-    } else if (eff.kind === "folded") {
-      showToast(
-        `已开启分支「${r.title}」，「${threadTitle(state, eff.foldedId)}」已折叠为细条`
-      )
-    } else {
-      showToast(`已开启分支 · ${r.title}`)
-    }
-  }
-
-  /* ---------- 列满策略切换（fold → replace 时展开全部细条并裁掉超限列） ---------- */
-  function changeMode(m: PlacementMode) {
-    if (m === mode) return
-    setMode(m)
-    if (m === "replace") {
-      const dropped = cols.normalizeToReplace()
-      if (dropped.length)
-        showToast(
-          `已切回替换⑥：细条全部展开后，超出列数的「${dropped.map((id) => threadTitle(state, id)).join("」「")}」已收起`
-        )
-    }
-  }
-
-  function pickRow(row: TreeRow, m: SwitcherMode) {
-    closeSwitcher()
-    if (m.kind === "column") {
-      if (cols.slots[m.vpIndex]?.id === row.id) {
-        cols.flashThread(row.id)
-        return
-      }
-      cols.navColumn(m.vpIndex, row.id, "swap")
-    } else if (m.kind === "subtree") {
-      openBranchUI(row.id, m.rootId)
-    } else {
-      openBranchUI(row.id, null)
-    }
-  }
-
-  /** 会话是否忙碌：末条消息是 assistant 且仍在 pending/streaming（派生自 state，version 快照天然驱动） */
-  function isThreadBusy(threadId: string): boolean {
-    const thread = state.threads[threadId]
-    if (!thread) return false
-    const last = activeLeafTurn(thread)?.assistantMessage
-    if (!last) return false
-    return (
-      last.role === "assistant" &&
-      (last.status === "pending" || last.status === "streaming")
-    )
-  }
-
-  /** 分支 composer 的预填文案：仅「还没有任何消息的分支」预填代拟首问，待用户回车确认 */
-  function composerPrefillFor(threadId: string): string | undefined {
-    const t = state.threads[threadId]
-    return t?.anchorText && t.messages.length === 0
-      ? kickoffQuestion(t.anchorText)
-      : undefined
-  }
+  const {
+    openBranchUI,
+    handleFork,
+    changeMode,
+    pickRow,
+    isThreadBusy,
+    composerPrefillFor,
+  } = createBranchWorkspaceActions({
+    state,
+    store,
+    chat,
+    columns: cols,
+    viewMode,
+    mode,
+    setMode,
+    showColumnsView,
+    focusCanvasNode,
+    closeSwitcher,
+    showToast,
+  })
 
   /* ---------- 主线 hint 卡片：仅整棵树还没有任何消息时展示（判 main 即可——
        分支必经主线产生），首条消息一出现即随派生状态消失；× 可提前手动关。 ---------- */
