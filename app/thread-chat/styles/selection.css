@@ -195,3 +195,14 @@
 .tc .sel-bubble .smcell.will-fold .cap {
   color: color-mix(in srgb, var(--d2) 55%, #fff);
 }
+
+/* 划选气泡的放置后果提示行：按钮只表达动作，后果在这里单行说明（超长省略） */
+.tc .sel-bubble .place-hint {
+  margin: 6px 2px 0;
+  font-size: 10px;
+  line-height: 1.4;
+  color: #d8d2c4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
