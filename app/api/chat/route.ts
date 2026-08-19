@@ -22,9 +22,9 @@ import {
   MAX_OUTPUT_TOKENS,
 } from "@/constants/model"
 import { resolveChatModel, isModelConfigured } from "@/lib/ai/provider"
-import { openRouterCostUsdFromSteps } from "@/lib/ai/openrouter"
 import { hasPositiveBalance, chargeUsage } from "@/lib/billing/credits"
 import { buildUsageMetadata } from "@/lib/billing/usage-meta"
+import { usageCostEvidence } from "@/lib/billing/usage-cost-evidence"
 import { isExplicitMarkdownArtifactRequest } from "@/lib/chat/markdown-artifact"
 import { reasoningForResearchRoute } from "@/lib/chat/research-router"
 import { prepareGeneration } from "@/lib/thread-chat-generation/start-generation-repository"
@@ -249,28 +249,16 @@ export async function POST(req: Request) {
           (total, step) => total + (step.usage.outputTokens ?? 0),
           0
         )
-        const openRouterCostUsd =
-          model.provider === "openrouter"
-            ? openRouterCostUsdFromSteps(steps)
-            : null
         const providerMetadata = steps.at(-1)?.providerMetadata
-        const gatewayGenerationId =
-          typeof providerMetadata?.gateway?.generationId === "string"
-            ? providerMetadata.gateway.generationId
-            : null
         if (steps.length > 0) {
           capturedUsage = {
             inputTokens,
             outputTokens,
-            costEvidence:
-              openRouterCostUsd != null
-                ? { source: "openrouter", costUsd: openRouterCostUsd }
-                : gatewayGenerationId
-                  ? {
-                      source: "vercel-gateway",
-                      generationId: gatewayGenerationId,
-                    }
-                  : { source: "estimate" },
+            costEvidence: usageCostEvidence({
+              provider: model.provider,
+              steps,
+              providerMetadata,
+            }),
           }
           capturedProviderMetadata = providerMetadata
         }
@@ -278,28 +266,19 @@ export async function POST(req: Request) {
       },
       onEnd: async ({ usage, providerMetadata, steps }) => {
         if (isUnbilledPreview) return
-        const providerGenerationId =
-          typeof providerMetadata?.gateway?.generationId === "string"
-            ? providerMetadata.gateway.generationId
-            : null
-        const openRouterCostUsd =
-          model.provider === "openrouter"
-            ? openRouterCostUsdFromSteps(steps)
-            : null
-        if (model.provider === "openrouter" && openRouterCostUsd == null) {
+        const costEvidence = usageCostEvidence({
+          provider: model.provider,
+          steps,
+          providerMetadata,
+        })
+        if (
+          model.provider === "openrouter" &&
+          costEvidence.source !== "openrouter"
+        ) {
           console.warn(
             `[chat] OpenRouter 成本元数据不完整，使用静态估值：${model.id}`
           )
         }
-        const costEvidence =
-          openRouterCostUsd != null
-            ? ({ source: "openrouter", costUsd: openRouterCostUsd } as const)
-            : providerGenerationId
-              ? ({
-                  source: "vercel-gateway",
-                  generationId: providerGenerationId,
-                } as const)
-              : ({ source: "estimate" } as const)
         if (persistence) {
           capturedUsage = {
             inputTokens: usage.inputTokens ?? 0,
