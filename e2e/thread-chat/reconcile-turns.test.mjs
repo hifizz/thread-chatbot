@@ -3,7 +3,10 @@
  *   node --import tsx e2e/thread-chat/reconcile-turns.test.mjs
  */
 import assert from "node:assert/strict"
-import { reconcileThreadChatTurns } from "../../app/thread-chat/generation/reconcile-turns.ts"
+import {
+  assertCompletedMessageGenerationLinks,
+  reconcileThreadChatTurns,
+} from "../../app/thread-chat/generation/reconcile-turns.ts"
 
 async function test(name, fn) {
   await fn()
@@ -136,6 +139,21 @@ await test("empty pending assistant without generation is retained and recoverab
   ])
 })
 
+await test("partial pending assistant without generation retains output but becomes recoverable", () => {
+  const partial = {
+    ...assistant("a1", "u1", undefined, "streaming"),
+    text: "半截正文",
+  }
+  const reconciled = reconcileThreadChatTurns({
+    state: state([user("u1"), partial], "a1"),
+    generations: [],
+  })
+  const retained = reconciled.state.threads.main.messages.at(-1)
+  assert.equal(retained.text, "半截正文")
+  assert.equal(retained.status, "error")
+  assert.equal(reconciled.recoverableTurns[0].assistantMessageId, "a1")
+})
+
 await test("active orphan user produces a missing-assistant recovery", () => {
   const reconciled = reconcileThreadChatTurns({
     state: state([user("u1")], "u1"),
@@ -169,4 +187,27 @@ await test("repair does not override a later valid assistant selection", () => {
     )
   )
   assert.equal(reconciled.state.threads.main.activeLeafMessageId, "a-old")
+})
+
+await test("done assistant requires a completed generation linked by message id", () => {
+  const completedState = state(
+    [user("u1"), { ...assistant("a1", "u1", undefined, "done"), text: "答案" }],
+    "a1"
+  )
+  assert.throws(() => assertCompletedMessageGenerationLinks(completedState, []))
+  assert.doesNotThrow(() =>
+    assertCompletedMessageGenerationLinks(completedState, [
+      generation({
+        status: "completed",
+        result: {
+          version: 1,
+          generationId: "g1",
+          text: "答案",
+          status: "done",
+          artifactIds: [],
+          artifacts: {},
+        },
+      }),
+    ])
+  )
 })

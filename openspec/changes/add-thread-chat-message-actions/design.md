@@ -1,3 +1,5 @@
+> **身份决策（2026-08-19）**：完整理由与业界对照见 [`message-and-generation-identity-decision.md`](./message-and-generation-identity-decision.md)。本文已按最终选择更新：保留 `generationId` 作为后台执行身份，点赞/点踩只绑定 `messageId`；内测阶段不兼容旧消息数据。
+
 ## Context
 
 - 见 `proposal.md` 与 `specs/thread-chat-message-actions/spec.md`。现有 `thread-chat` 不运行在 assistant-ui 的 message runtime 中：消息真相来自自定义 `ThreadTreeState`/`ThreadStore`，生成行为由 `chat-controller.ts` 驱动。因此 assistant-ui 的 `ActionBarPrimitive`、`ComposerPrimitive` 只能作为交互参考，不能直接挂到当前 `.message/.bubble` DOM 上。
@@ -16,7 +18,7 @@
 - 把 Retry assistant、Retry orphan user、Edit last user + regenerate 统一成可验证、可幂等的 generation start intent。
 - 将已提交消息视为不可变节点；编辑/重新生成创建 sibling 节点并切换 active leaf，使旧回复、旧 Artifact 和由其派生的子 Thread 保持可追溯。
 - 使新 user/assistant 节点与 generation snapshot 一起成为 current active path 的权威增量，抵抗陈旧整树 PUT。
-- 反馈按 generation 持久化；复制、编辑草稿、copied/loading 等纯交互状态不污染持久化树。
+- 反馈按 assistant message 持久化并与整树 JSON 分离；generation 只管理执行、恢复、停止、幂等和计费，复制、编辑草稿、copied/loading 等纯交互状态不污染持久化树。
 
 **Non-Goals:**
 
@@ -38,7 +40,7 @@ branch_trees + current branch_generations
       reconcileThreadChatTurns（纯函数）
           ├─ 修复/合并 assistant
           ├─ 生成 recoverableTurns
-          └─ 汇总 feedbackByGenerationId
+          └─ 验证 completed message/generation 关联
                     │
                     ▼
         GET tree 200 response / client boot
@@ -50,7 +52,7 @@ branch_trees + current branch_generations
 在 `app/thread-chat/generation/types.ts` 扩展共享类型；这些类型不 import React、DOM、数据库或 fetch：
 
 ```ts
-export type GenerationFeedback = "positive" | "negative"
+export type MessageFeedback = "positive" | "negative"
 
 export type RecoverableTurnReason =
   | "missing_assistant"
@@ -65,9 +67,15 @@ export interface RecoverableTurn {
 }
 
 export interface GenerationSummary {
-  // 既有 identity/status/result 字段保持不变
-  feedback?: GenerationFeedback | null
-  feedbackUpdatedAt?: string | null
+  // 只包含 execution identity/status/result；不包含产品反馈
+}
+
+export interface MessageFeedbackSummary {
+  treeId: string
+  threadId: string
+  messageId: string
+  feedback: MessageFeedback
+  updatedAt: string
 }
 
 export interface ReconciledThreadChatTree {
@@ -94,7 +102,7 @@ export function reconcileThreadChatTurns(input: {
 1. 只处理 `isCurrent=true` 的 generation，并先收敛 stale lease。
 2. terminal 且有 result：调用 generationId CAS 合并器。
 3. running/stop_requested 且目标 assistant 缺失：用 `turnSnapshot` 恢复 user/assistant pair；assistant 保持 pending/streaming 并标记 `backgroundGeneration=true`。
-4. 空 pending/streaming assistant 没有匹配 active generation：保留 messageId，转成 `status="error"` 和可重试错误，并产生带 `assistantMessageId` 的 recoverable turn。
+4. pending/streaming assistant 没有匹配 active generation：无论是否已有部分正文或 Artifact，都保留 messageId 和现有内容，转成 `status="error"` 和可重试错误，并产生带 `assistantMessageId` 的 recoverable turn；不得把部分输出猜成完成消息。
 5. 协调完成后若 Thread 的 active leaf 仍是 user，且没有以该 userMessageId 为目标的 active/terminal generation：产生 `missing_assistant` recoverable turn，不伪造持久化 assistant 消息。
 6. 去重键为 `threadId:userMessageId`；同一轮最多一个恢复入口。
 
@@ -106,11 +114,12 @@ export interface LoadedTreeResponse {
   revision: number
   customTitle: string | null
   generations: GenerationSummary[]
+  messageFeedbacks: MessageFeedbackSummary[]
   recoverableTurns: RecoverableTurn[]
 }
 ```
 
-GET 只返回协调后的 projection，不为了展示 error 而写数据库；每次 GET 都能由权威输入得到相同结果。客户端保留一个同函数的防御性调用，用于滚动部署期间兼容旧服务端响应，但不得再维护另一套不同判定规则。
+GET 只返回协调后的 projection，不为了展示 error 而写数据库；每次 GET 都能由权威输入得到相同结果。客户端与服务端共享同一严格协调函数，不接受缺少当前字段的旧响应，也不得维护另一套不同判定规则。协调完成后，任何系统生成且为 `done` 的 assistant message 都必须能在 generation 集合中找到 `assistantMessageId` 关联；缺失关联时返回结构化不变量错误或恢复状态，不能作为正常完成消息开放 feedback。
 
 弃选：只在 React render 中判断最后一条是 user。它看不到 generation sidecar，会把“assistant 丢失但后台仍在跑”误判成失败，也会在列/画布复制规则。
 
@@ -173,7 +182,7 @@ isActiveLeafTurn(thread: Thread, messageId: string): boolean
 
 `assistantTurnAlternatives` 同时覆盖两种 sibling：同一个 user 下的多个 assistant（纯 regenerate），以及同一个上游 parent 下多个 user edit 分支各自产生的 assistant。UI 因而用一个 `TurnVariantPicker` 切换完整问答版本，而不是分别给 user/assistant 两套容易失配的 picker。
 
-加载旧树时运行一次确定性内存迁移：按旧 `messages[]` 顺序补 `parentMessageId`，把最后一条设为 `activeLeafMessageId`，从每条消息的 `artifactIds` 回填 `Artifact.sourceMessageId`，最后写 `schemaVersion=2`。第一次带 revision 的正常 PUT 写回新结构。迁移函数必须幂等，并拒绝环、重复 parent 或不存在的 active leaf。
+服务端和客户端只接受严格 `schemaVersion=2`：每个 message 必须有明确 parent identity，每个 Thread 必须有合法 `activeLeafMessageId`，每个 Artifact 必须有 `sourceMessageId`。不再按数组顺序补 parent、不从 `artifactIds` 猜 source，也不把旧线性树静默升级。内测存量通过受控清理删除；严格解析器拒绝环、重复 ID、缺失 parent/source 和不存在的 active leaf。
 
 `collectInherited` 不再对父 Thread 的数组做 `slice(0, forkIndex + 1)`，而是调用 `messagePathTo(parent, child.forkFromMsgId)`。因此 child Thread X 永远继承到 A 的准确历史，即使父列当前显示 B。`forks[]` 继续挂在 A 上：显示 A 时恢复锚点高亮；显示 B 时不伪造 A 的锚点。
 
@@ -192,7 +201,7 @@ Artifact 生命周期同样绑定不可变 assistant message：A 产生的 Artif
 
 ### D3：所有生成操作使用显式 start intent
 
-扩展 `/api/chat` 的 thread-chat persistence identity，保持旧客户端未传 intent 时等价于 `persisted-turn`：
+扩展 `/api/chat` 的 thread-chat persistence identity，并要求所有 thread-chat 请求显式提供 intent：
 
 ```ts
 export type ThreadChatStartIntent =
@@ -211,7 +220,7 @@ export type ThreadChatStartIntent =
 export interface ThreadChatGenerationRequest
   extends GenerationTurnIdentity {
   anchorText: string | null
-  intent?: ThreadChatStartIntent
+  intent: ThreadChatStartIntent
 }
 ```
 
@@ -219,7 +228,7 @@ export interface ThreadChatGenerationRequest
 
 四类行为：
 
-- `persisted-turn`：普通 send 与兼容旧 Retry；沿用“客户端严格 PUT 后验证”。
+- `persisted-turn`：普通 send；沿用“客户端严格 PUT 后验证”。
 - `regenerate-assistant`：source 必须是 active path 最后一轮 assistant；服务端以其 user parent 创建请求 identity 中的 `assistantMessageId` sibling，不修改 source。
 - `retry-orphan-user`：指定 user 必须是 active leaf，或其后仅有一个由协调层判定为 recoverable 的 assistant；assistant 缺失时使用客户端预生成的 assistantMessageId 插入 child 占位。
 - `edit-last-user`：source user 必须属于 active path 最后一轮；服务端用 trim 后非空的新文本创建请求 identity 中的 `userMessageId` sibling，复制 source 的 role/quote 等用户语义字段但不复制 forks，再创建 identity 中的 `assistantMessageId` child。
@@ -243,11 +252,11 @@ export async function prepareGeneration(
 
 事务在 owner-scoped tree row lock 内完成：
 
-1. 迁移/验证 message graph，确认 source 位于 active path 最后一轮，校验新 ID 在全树未使用。
+1. 严格验证 schema-v2 message graph，确认 source 位于 active path 最后一轮，校验新 ID 在全树未使用。
 2. retry orphan 复用原 user；edit 创建 sibling user；regenerate 复用 source 的 user parent。
-3. 创建全新的空 pending assistant node；除 orphan 已有 recoverable 空占位的兼容路径外，不重置或复用已有 terminal assistant。
+3. 创建全新的空 pending assistant node；retry recoverable empty assistant 可以复用它自身的 message identity，但不重置或复用 terminal assistant。
 4. 将 Thread `activeLeafMessageId` 原子切到新 assistant；旧消息、forks、Artifact registry/order 和 terminal generation 全部保留。
-5. 仅当被替换 attempt 仍 active 时标记 superseded 并让 observer abort；已 terminal 的 A 保持原状态和反馈。
+5. 仅当被替换 attempt 仍 active 时标记 superseded 并让 observer abort；已 terminal 的 A 及其 message feedback 保持原状态。
 6. 将新 generationId 写入新 assistant，更新 `branch_trees.state`。
 7. 用事务内最终新 pair 创建 generation/turnSnapshot；事务提交即构成新的服务端持久化屏障。
 
@@ -267,7 +276,7 @@ export function compileThreadChatMessages(input: {
 
 模块建议为 `app/thread-chat/net/message-context.ts`，只依赖 core selectors、message serialization 和常量，可被客户端与 route handler 导入。当前 Thread 使用 `activeMessagePath`；祖先 Thread 使用 `messagePathTo(parent, child.forkFromMsgId)`，不得从祖先当前 active leaf 推断继承内容。
 
-`prepareGeneration(created=true)` 返回事务内最终 state；`/api/chat` 对所有 thread-chat 请求使用该 state 编译 `resolvedMessages`，而不是把客户端 `messages` 当权威上下文。请求中的 `messages` 暂时保留以兼容旧 body 和类型演进，但 thread-chat 模式不再依赖它决定被编辑的最后一问。线性 assistant-ui 聊天仍沿用原 messages 路径。
+`prepareGeneration(created=true)` 返回事务内最终 state；`/api/chat` 对所有 thread-chat 请求使用该 state 编译 `resolvedMessages`，而不是把客户端 `messages` 当权威上下文。thread-chat body 不保留旧消息 body 的兼容分支；线性 assistant-ui 聊天仍沿用自身 messages 路径。
 
 这保证：服务端保存的编辑文本、generation turnSnapshot、计费对应输入和实际模型上下文是同一份数据。
 
@@ -305,9 +314,9 @@ export interface GenerationTurnSnapshot {
 - `regenerate-assistant` snapshot 保存新 assistant 指向原 user，并声明新 assistant 是 active leaf。
 - `reconcileThreadChatTurns` 发现 current generation 的节点缺失时，按 snapshot 恢复新节点；若节点存在则只合并 generation-owned 字段，不覆盖 forks。
 - generation transaction 提交时把 active leaf 设为新 assistant；此后由 tree revision CAS 保护用户显式版本选择，GET reconciliation 不得根据 generation 时间擅自切换 active leaf。
-- 旧 snapshot 没有 graph 字段时按 legacy 相邻索引恢复，并由内存迁移补 parent/head。
+- 缺少 graph identity 的旧 snapshot 视为无效数据，不按相邻索引猜测 parent/head。
 
-新客户端收到 409 后不得把整个本地 state 自动重试覆盖；先 GET 最新 revision，再按领域命令重新应用尚未保存的安全本地变化。P0 对无法自动 rebase 的普通防抖 PUT显示“其他标签页已更新，已重新加载”，以不丢图为优先。旧客户端未携带 `baseRevision` 时只允许写尚未升级为 message graph 的 legacy tree；一旦 state schemaVersion 升级，返回 `428 revision_required`，防止滚动部署中的旧页面降写。
+新客户端收到 409 后不得把整个本地 state 自动重试覆盖；先 GET 最新 revision，再按领域命令重新应用尚未保存的安全本地变化。P0 对无法自动 rebase 的普通防抖 PUT显示“其他标签页已更新，已重新加载”，以不丢图为优先。任何未携带 `baseRevision` 的整树 PUT 都返回 `428 revision_required`，任何非 schema-v2 state 都返回稳定的无效结构错误。
 
 ### D6：先定义 headless 行为接口，UI 不直接操作 store/fetch
 
@@ -371,8 +380,9 @@ export interface ThreadMessageActionCommands {
     assistantMessageId: string
   ): Promise<VariantSwitchResult>
   submitFeedback(
-    generationId: string,
-    feedback: GenerationFeedback
+    threadId: string,
+    messageId: string,
+    feedback: MessageFeedback | null
   ): Promise<void>
 }
 ```
@@ -399,30 +409,37 @@ applyPreparedTurn(patch: PreparedTurnPatch): void
 
 纯 preparer 与服务端 transaction 使用相同验证和节点创建规则；它只能追加节点和移动 active leaf，不能改写 source 节点或删除 Artifact。客户端在请求等待期间只保存编辑 draft/submitting UI，服务端接受后再把 patch 原子应用到 store 并开始消费流。若请求被拒绝，编辑器保留 draft 和错误，不需要回滚已经持久化的树。
 
-### D7：反馈作为 generation 的一对一可变属性
+### D7：产品反馈按 assistant message 持久化，generation 仅管理执行
 
-在 `branch_generations` 增加：
+新增规范化 `branch_message_feedback` 表；产品反馈不放进 `branch_generations`，也不写入 `ThreadTreeState`：
 
 ```ts
-feedback: "positive" | "negative" | null
-feedbackUpdatedAt: Date | null
+interface BranchMessageFeedback {
+  userId: string
+  treeId: string
+  threadId: string
+  messageId: string
+  feedback: "positive" | "negative"
+  createdAt: Date
+  updatedAt: Date
+}
 ```
 
-不单建 feedback 表：当前产品只需要每位 generation owner 的最新互斥评价，而 generation 已经唯一绑定 owner，旧 generation 行也天然保留旧答案的评价。若未来要记录多次反馈事件、原因或运营审计，再独立事件表。
+主键/唯一键使用 owner + tree + message identity；由于 message 当前存于 tree JSON，写入前 repository 必须 owner-scope 读取 strict-v2 tree，验证 thread/message 存在、role 是 assistant 且 `status="done"`。删除反馈使用 `feedback: null` 并删除记录；同值 PUT 幂等，正负切换覆盖值。
 
-API 使用幂等替换语义：
+API 使用消息资源语义：
 
 ```text
-PUT /api/branch-generations/{generationId}/feedback
-body: { feedback: "positive" | "negative" }
+PUT /api/branch-trees/{treeId}/messages/{messageId}/feedback
+body: { threadId, feedback: "positive" | "negative" | null }
 ```
 
-- 未登录 401；不存在或非 owner 统一 404；非法值 400。
-- 允许评价 owner 的 terminal generation，即使它刚被新 attempt supersede；这保证“点击时看到的答案”仍能按其 generationId 被准确评价。
-- 同值重复 PUT 零语义变化；正负切换覆盖该行值。
-- tree GET 和 generation GET summary 都返回 feedback；新 generation 初始为 null。
+- 未登录 401；tree/message 不存在或非 owner 统一 404；非法值/非 assistant/未完成消息返回稳定 400/409，且不泄露他人资源。
+- tree GET 返回 owner 的 `messageFeedbacks`；generation GET/summary 不返回产品反馈。
+- 新 sibling assistant 使用新的 messageId，天然从未反馈状态开始；旧 message feedback 保留。
+- `done` assistant 的 toolbar 只使用 messageId。服务端需要模型/usage 分析时通过 `branch_generations.assistantMessageId` 反查，不要求浏览器持有 generationId。
 
-客户端不把 feedback 写进 `ThreadTreeState.Message`，避免整树旧快照覆盖 server feedback。`ThreadChatDemoInner` 持有由 summaries 初始化的 `feedbackByGenerationId`，提交时乐观更新、失败回滚并 toast；该 map 作为 view state 同时传给列和画布。
+客户端 `ThreadChatDemoInner` 持有由 tree GET 初始化的 `feedbackByMessageId`，提交时乐观更新、失败回滚并 toast；该 map 作为 view state 同时传给列和画布。
 
 ### D8：组件边界按“行为共享、正文渲染保留”切分
 
@@ -443,7 +460,7 @@ app/thread-chat/chat/
 ```ts
 export interface MessageActionViewState {
   recoverableByUserMessageId: ReadonlyMap<string, RecoverableTurn>
-  feedbackByGenerationId: ReadonlyMap<string, GenerationFeedback>
+  feedbackByMessageId: ReadonlyMap<string, MessageFeedback>
   activePathByThreadId: ReadonlyMap<string, readonly string[]>
 }
 
@@ -462,7 +479,7 @@ export interface AssistantMessageToolbarProps {
   threadId: string
   message: Message
   regeneratable: boolean
-  feedback?: GenerationFeedback
+  feedback?: MessageFeedback
   commands: Pick<
     ThreadMessageActionCommands,
     "retryAssistant" | "submitFeedback"
@@ -474,7 +491,6 @@ export interface TurnVariantPickerProps {
   activeAssistantMessageId: string
   alternatives: readonly {
     assistantMessageId: string
-    generationId?: string
     derivedThreadCount: number
   }[]
   onSwitch: ThreadMessageActionCommands["switchTurnVariant"]
@@ -496,7 +512,7 @@ export interface TurnVariantPickerProps {
 状态语义与 assistant-ui/shadcn 参考保持一致，但由自有组件实现：
 
 - user toolbar：桌面 hover/focus-within 显示；触摸设备保持可发现的操作入口。历史 user 显示复制，编辑按钮禁用并用 tooltip 说明“仅支持编辑最后一轮”。
-- assistant toolbar：终态消息左下展示；历史 assistant 可复制/反馈，重新生成禁用并说明原因。
+- assistant toolbar：仅 `done` 消息左下展示；历史 `done` assistant 可复制/反馈，重新生成禁用并说明原因。pending/streaming/error 不显示 copy/like/dislike，error 使用独立 Retry。
 - Copy：成功切换 `Copy → Check`，不改变持久化数据。
 - Edit submit：按钮进入 submitting，防重复；服务端接受后 editor 关闭，assistant 立即进入 pending/typing；失败则 editor 保留并显示错误。
 - Regenerate：命令提交阶段 refresh 图标旋转；generation 建立后由 message pending/streaming 状态接管 loading。
@@ -515,7 +531,7 @@ export interface TurnVariantPickerProps {
 const messageActions: ThreadMessageActionCommands = chat
 const messageActionState: MessageActionViewState = {
   recoverableByUserMessageId,
-  feedbackByGenerationId,
+  feedbackByMessageId,
 }
 ```
 
@@ -548,19 +564,19 @@ persistence_failed    503  事务未提交、模型未调用
 - **[Artifact drawer 被历史资产淹没]** → 默认按 active path 过滤，已打开历史 tab 保留并标注来源；不以删除用户产物换取界面简洁。
 - **[服务端编译上下文改变客户端/服务端边界]** → 只对 thread-chat 模式启用，线性 assistant-ui 保持原样；抽取现有纯算法并用 golden tests 对比迁移前 body。
 - **[客户端提交 edit 时页面刷新]** → generation transaction 一旦提交即可由既有服务端 consumer 完成；未提交则原树不变，刷新后 editor draft 丢失但不会出现半编辑持久化。
-- **[反馈和整树状态分离增加一份 UI map]** → 以 generationId 为唯一键，由 tree/generation GET 初始化和刷新；不牺牲服务端权威性换取表面简单。
+- **[反馈和整树状态分离增加一份 UI map]** → 以 messageId 为唯一键，由 tree GET 初始化和刷新；不牺牲服务端权威性换取表面简单。
 - **[GET projection 不写 read repair]** → 每次读取都确定性重算，正确性不依赖客户端随后 PUT；重试/编辑成功时 transaction 会自然物化最新 pair。
 - **[原孤儿调用可能已产生供应商费用]** → 新 attempt 仍按自身 generation 独立计费；本 change 不猜测无证据旧 usage，补偿策略属于运营/计费 change。
 
 ## Migration Plan
 
-1. 先部署向后兼容 migration：给 `branch_generations` 增加 nullable feedback/feedback timestamp，并给 `branch_trees` 增加 default 0 的 revision；message graph 字段位于 JSONB，不需要额外 DDL。
-2. 部署幂等 legacy-tree → message-graph 迁移器、active-path selectors 和只读兼容；旧线性树仍能加载，暂不让旧客户端创建 variants。
-3. 部署共享 reconcile、树 GET 的 `recoverableTurns`/feedback 字段、feedback PUT，以及支持新 ID start intent 的 generation transaction；旧客户端未传 intent 时继续走 `persisted-turn`。
-4. 服务端切换 thread-chat 模型上下文为事务内 active path / exact fork source 编译，并运行正常发送、Retry、Artifact、联网研究、分支继承与计费回归。
-5. 部署客户端 view model、controller commands、`TurnVariantPicker`、共享 toolbar/editor 与列/画布接线；此时存量孤儿消息出现恢复入口，regenerate 开始创建不可变 sibling。
-6. 观察 recoverable turn、graph migration error、inactive-source column、tree JSONB size、409、503、重复 generation、feedback error 指标；确认稳定后再考虑历史消息分支式编辑。
-7. 回滚时先关闭创建 variant 的客户端入口，再回滚客户端；服务端继续兼容 legacy 和 graph state。不得把 graph state 降写成线性数组、删除旧节点、DROP feedback 数据或删除 generation sidecar。
+1. 生成 migration：新增 `branch_message_feedback`，移除 `branch_generations.feedback/feedback_updated_at`，保留 `branch_trees.revision` 和 generation sidecar。
+2. 在开发/内测数据库中只清空 `branch_trees`；外键级联清理 generation 与 message feedback。保留账号、积分、支付、附件和其他业务数据。
+3. 同一版本部署 strict-v2 parser、显式 intent/revision API、message feedback repository/API，以及改为 `feedbackByMessageId` 的客户端，避免旧新协议混跑。
+4. 服务端继续以事务内 active path / exact fork source 编译上下文，并验证系统生成的 `done` assistant 能关联 generation 记录。
+5. 运行正常发送、Retry、Artifact、联网研究、分支继承、计费、message feedback、刷新和 owner isolation 回归。
+6. 观察 invalid graph、completed-message linkage、inactive-source column、tree JSONB size、409、503、重复 generation 和 message feedback error 指标。
+7. 回滚只能回滚同一严格版本的代码；不恢复 legacy parser 或 generation-scoped feedback。若 migration 尚未发布可回滚代码，发布后数据结构回滚需要单独 reviewed migration。
 
 ## Open Questions
 

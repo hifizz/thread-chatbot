@@ -1,12 +1,12 @@
 import type { Message, Thread, ThreadTreeState } from "../core/types"
-import { migrateThreadTreeState } from "../core/message-graph"
+import { parseThreadTreeState } from "../core/message-graph"
 import { GENERATION_ERRORS } from "@/constants/generation"
 import type { GenerationSummary } from "../generation/types"
 
 /**
- * 纯函数：防御性收敛流式残留并修复 Artifact 三方关系。
- * 有正文或有效 Artifact 的中断 assistant → done；两者皆空 → 可重试 error。
- * message.artifactIds / registry / artifactOrder 最终只保留互相可达的数据。
+ * 纯函数：防御性收敛流式残留并校验 Artifact 三方关系。
+ * 没有匹配 active generation 的中断 assistant 一律保留内容并转为可重试 error；
+ * 绝不把部分正文或 Artifact 猜成完整回复。
  */
 export function sanitizeLoadedState(
   inputState: ThreadTreeState,
@@ -16,7 +16,7 @@ export function sanitizeLoadedState(
     "id" | "threadId" | "assistantMessageId" | "status"
   >[] = []
 ): ThreadTreeState {
-  const state = migrateThreadTreeState(inputState)
+  const state = parseThreadTreeState(inputState)
   let changed = false
   const activeByMessage = new Map(
     activeGenerations
@@ -92,20 +92,6 @@ export function sanitizeLoadedState(
           validArtifactIds.forEach((artifactId) =>
             referencedArtifactIds.add(artifactId)
           )
-        } else if (
-          nextMessage.text.trim() !== "" ||
-          validArtifactIds.length > 0
-        ) {
-          threadChanged = true
-          nextMessage = {
-            ...nextMessage,
-            status: "done",
-            backgroundGeneration: undefined,
-          }
-          messages.push(nextMessage)
-          validArtifactIds.forEach((artifactId) =>
-            referencedArtifactIds.add(artifactId)
-          )
         } else {
           threadChanged = true
           nextMessage = {
@@ -115,6 +101,9 @@ export function sanitizeLoadedState(
             backgroundGeneration: undefined,
           }
           messages.push(nextMessage)
+          validArtifactIds.forEach((artifactId) =>
+            referencedArtifactIds.add(artifactId)
+          )
         }
       } else {
         messages.push(nextMessage)

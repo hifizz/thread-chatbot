@@ -16,12 +16,9 @@ import { finalizeGeneration } from "../../lib/thread-chat-generation/finalize.ts
 import {
   failStaleGenerationsForTree,
   getGenerationForOwner,
-  getGenerationFeedbackForOwner,
   listCurrentGenerationsForTree,
   requestGenerationStop,
-  setGenerationFeedbackForOwner,
   startGeneration,
-  toGenerationSummary,
 } from "../../lib/thread-chat-generation/repository.ts"
 import { GENERATION_LEASE_MS } from "../../constants/generation.ts"
 
@@ -85,6 +82,7 @@ function startInput(generationId) {
     assistantMessageId: "m2",
     generationId,
     modelId: "glm-5.2",
+    intent: { kind: "persisted-turn" },
   }
 }
 
@@ -239,59 +237,6 @@ async function run() {
   assert.equal(superseded.status, "superseded")
   assert.equal(superseded.result.text, "旧 attempt 的审计结果")
   assert.equal(superseded.billingStatus, "settled")
-
-  const positive = await setGenerationFeedbackForOwner({
-    userId,
-    generationId: generations[3],
-    feedback: "positive",
-  })
-  assert.equal(positive.feedback, "positive")
-  assert.ok(positive.feedbackUpdatedAt instanceof Date)
-  const firstFeedbackAt = positive.feedbackUpdatedAt.getTime()
-  const repeated = await setGenerationFeedbackForOwner({
-    userId,
-    generationId: generations[3],
-    feedback: "positive",
-  })
-  assert.equal(
-    repeated.feedbackUpdatedAt.getTime(),
-    firstFeedbackAt,
-    "同值重复写入必须幂等"
-  )
-  const negative = await setGenerationFeedbackForOwner({
-    userId,
-    generationId: generations[3],
-    feedback: "negative",
-  })
-  assert.equal(negative.feedback, "negative")
-  assert.equal(
-    toGenerationSummary(negative).feedback,
-    "negative",
-    "summary 必须支持刷新恢复"
-  )
-  assert.equal(
-    await setGenerationFeedbackForOwner({
-      userId: otherUserId,
-      generationId: generations[3],
-      feedback: "positive",
-    }),
-    null,
-    "越权反馈应表现为 not found"
-  )
-  const cleared = await setGenerationFeedbackForOwner({
-    userId,
-    generationId: generations[3],
-    feedback: null,
-  })
-  assert.equal(cleared.feedback, null)
-  assert.equal(cleared.feedbackUpdatedAt, null)
-  assert.deepEqual(
-    await getGenerationFeedbackForOwner(userId, generations[3]),
-    {
-      feedback: null,
-      feedbackUpdatedAt: null,
-    }
-  )
 
   await finalizeGeneration({
     generationId: generations[4],

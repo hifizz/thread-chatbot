@@ -2,7 +2,7 @@ import { and, eq, sql } from "drizzle-orm"
 import {
   activeLeafTurn,
   assistantTurnAlternatives,
-  migrateThreadTreeState,
+  parseThreadTreeState,
 } from "@/app/thread-chat/core/message-graph"
 import type { ThreadTreeState } from "@/app/thread-chat/core/types"
 import { db } from "@/lib/db"
@@ -62,7 +62,7 @@ export async function switchActiveLeafForOwner(input: {
 
     let state: ThreadTreeState
     try {
-      state = migrateThreadTreeState(row.state)
+      state = parseThreadTreeState(row.state)
     } catch {
       throw new TreeCommandError("invalid_turn", "分支树消息结构无效")
     }

@@ -57,11 +57,8 @@ function validateThreadGraph(thread: Thread): void {
   }
 }
 
-/**
- * 把旧的线性 messages[] 确定性升级为 schema v2。
- * 输入不会被修改；v2 输入会严格校验而不会猜测修复。
- */
-export function migrateThreadTreeState(input: unknown): ThreadTreeState {
+/** 严格解析 schema-v2 message graph；不迁移、不补字段、不猜测来源。 */
+export function parseThreadTreeState(input: unknown): ThreadTreeState {
   if (typeof input !== "object" || input === null)
     throw new InvalidMessageGraphError("Thread tree state is not an object")
 
@@ -87,21 +84,22 @@ export function migrateThreadTreeState(input: unknown): ThreadTreeState {
   if (!state.threads || typeof state.threads !== "object")
     throw new InvalidMessageGraphError("Thread tree has no thread registry")
 
-  const isLegacy = state.schemaVersion !== THREAD_TREE_SCHEMA_VERSION
+  if (state.schemaVersion !== THREAD_TREE_SCHEMA_VERSION)
+    throw new InvalidMessageGraphError(
+      `Thread tree schema must be ${THREAD_TREE_SCHEMA_VERSION}`
+    )
+  if (!state.artifacts || typeof state.artifacts !== "object")
+    throw new InvalidMessageGraphError("Thread tree has no artifact registry")
+  if (!Array.isArray(state.artifactOrder))
+    throw new InvalidMessageGraphError("Thread tree has no artifact order")
+
   const artifactOwnerById = new Map<string, string>()
 
   for (const thread of Object.values(state.threads)) {
     if (!Array.isArray(thread.messages))
       throw new InvalidMessageGraphError(`Thread ${thread.id} has no messages`)
 
-    if (isLegacy) {
-      let parentMessageId: string | null = null
-      for (const message of thread.messages) {
-        message.parentMessageId = parentMessageId
-        parentMessageId = message.id
-      }
-      thread.activeLeafMessageId = parentMessageId
-    } else if (
+    if (
       thread.messages.some(
         (message) => message.parentMessageId === undefined
       ) ||
@@ -126,13 +124,29 @@ export function migrateThreadTreeState(input: unknown): ThreadTreeState {
     validateThreadGraph(thread as Thread)
   }
 
-  for (const artifact of Object.values(state.artifacts ?? {})) {
+  for (const artifact of Object.values(state.artifacts)) {
+    if (
+      typeof artifact.sourceMessageId !== "string" ||
+      artifact.sourceMessageId.length === 0
+    )
+      throw new InvalidMessageGraphError(
+        `Artifact ${artifact.id} is missing its source message`
+      )
+    const sourceThread = state.threads[artifact.sourceThreadId]
+    const sourceMessage = sourceThread?.messages.find(
+      (message) => message.id === artifact.sourceMessageId
+    )
+    if (!sourceMessage || sourceMessage.role !== "assistant")
+      throw new InvalidMessageGraphError(
+        `Artifact ${artifact.id} has an invalid source message`
+      )
     const discoveredOwner = artifactOwnerById.get(artifact.id)
-    if (!artifact.sourceMessageId && discoveredOwner)
-      artifact.sourceMessageId = discoveredOwner
+    if (discoveredOwner !== artifact.sourceMessageId)
+      throw new InvalidMessageGraphError(
+        `Artifact ${artifact.id} is not referenced by its source message`
+      )
   }
 
-  state.schemaVersion = THREAD_TREE_SCHEMA_VERSION
   return state as ThreadTreeState
 }
 

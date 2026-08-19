@@ -40,7 +40,10 @@ import { ThreadModelSelector } from "../chat/thread-model-selector"
 import { EditableUserMessage } from "../chat/editable-user-message"
 import { AssistantMessageToolbar } from "../chat/assistant-message-toolbar"
 import { TurnVariantPicker } from "../chat/turn-variant-picker"
-import type { MessageActionViewState } from "../chat/message-action-types"
+import {
+  hasCompletedAssistantActions,
+  type MessageActionViewState,
+} from "../chat/message-action-types"
 import type { ThreadMessageActionCommands } from "../net/chat-controller"
 
 /** 会话动作（send/stop/retry）：壳层用 chat-controller 组装后传给画布（D3，零平行实现） */
@@ -280,35 +283,29 @@ function CanvasExpand({
                       </button>
                     </div>
                   )}
-                  {actions &&
-                    msg.status !== "pending" &&
-                    msg.status !== "streaming" && (
-                      <div className="assistant-actions-row">
-                        <AssistantMessageToolbar
-                          threadId={threadId}
-                          message={msg}
-                          regeneratable={
-                            msg.id === presentation?.latestAssistantMessageId
-                          }
-                          feedback={
-                            msg.generationId
-                              ? actions.messageActionState.feedbackByGenerationId.get(
-                                  msg.generationId
-                                )
-                              : undefined
-                          }
-                          commands={actions}
-                        />
-                        {msg.id === presentation?.latestAssistantMessageId && (
-                          <TurnVariantPicker
-                            threadId={threadId}
-                            activeAssistantMessageId={msg.id}
-                            alternatives={presentation?.alternatives ?? []}
-                            onSwitch={actions.switchTurnVariant}
-                          />
+                  {actions && hasCompletedAssistantActions(msg) && (
+                    <div className="assistant-actions-row">
+                      <AssistantMessageToolbar
+                        threadId={threadId}
+                        message={msg}
+                        regeneratable={
+                          msg.id === presentation?.latestAssistantMessageId
+                        }
+                        feedback={actions.messageActionState.feedbackByMessageId.get(
+                          msg.id
                         )}
-                      </div>
-                    )}
+                        commands={actions}
+                      />
+                      {msg.id === presentation?.latestAssistantMessageId && (
+                        <TurnVariantPicker
+                          threadId={threadId}
+                          activeAssistantMessageId={msg.id}
+                          alternatives={presentation?.alternatives ?? []}
+                          onSwitch={actions.switchTurnVariant}
+                        />
+                      )}
+                    </div>
+                  )}
                   {msg.markdownGeneration && (
                     <MarkdownArtifactProgressCard
                       progress={msg.markdownGeneration}

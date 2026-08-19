@@ -18,7 +18,10 @@ import { ThreadModelSelector } from "./thread-model-selector"
 import { EditableUserMessage } from "./editable-user-message"
 import { AssistantMessageToolbar } from "./assistant-message-toolbar"
 import { TurnVariantPicker } from "./turn-variant-picker"
-import type { MessageActionViewState } from "./message-action-types"
+import {
+  hasCompletedAssistantActions,
+  type MessageActionViewState,
+} from "./message-action-types"
 import type { ThreadMessageActionCommands } from "../net/chat-controller"
 
 /** 把 \n 转成 <br/>（assistant 正文按段落渲染时的行内换行） */
@@ -76,7 +79,6 @@ export interface ChatViewProps {
   regeneratableAssistantMessageId?: string
   turnAlternatives?: readonly {
     assistantMessageId: string
-    generationId?: string
     derivedThreadCount: number
   }[]
 }
@@ -172,7 +174,7 @@ export function ChatView({
         ) : (
           <>
             {(hasVisibleAssistantContent || isWaitingForVisibleOutput) && (
-              <div className="bubble" data-role="assistant">
+              <div className="bubble mt-3 mb-1" data-role="assistant">
                 {msg.backgroundGeneration && (
                   <span className="generation-background" role="status">
                     {GENERATION_BACKGROUND_LABEL}
@@ -210,33 +212,25 @@ export function ChatView({
                 </button>
               </div>
             )}
-            {messageCommands &&
-              msg.status !== "pending" &&
-              msg.status !== "streaming" && (
-                <div className="assistant-actions-row">
-                  <AssistantMessageToolbar
+            {messageCommands && hasCompletedAssistantActions(msg) && (
+              <div className="assistant-actions-row">
+                <AssistantMessageToolbar
+                  threadId={threadId}
+                  message={msg}
+                  regeneratable={msg.id === regeneratableAssistantMessageId}
+                  feedback={messageActionState?.feedbackByMessageId.get(msg.id)}
+                  commands={messageCommands}
+                />
+                {msg.id === regeneratableAssistantMessageId && (
+                  <TurnVariantPicker
                     threadId={threadId}
-                    message={msg}
-                    regeneratable={msg.id === regeneratableAssistantMessageId}
-                    feedback={
-                      msg.generationId
-                        ? messageActionState?.feedbackByGenerationId.get(
-                            msg.generationId
-                          )
-                        : undefined
-                    }
-                    commands={messageCommands}
+                    activeAssistantMessageId={msg.id}
+                    alternatives={turnAlternatives}
+                    onSwitch={messageCommands.switchTurnVariant}
                   />
-                  {msg.id === regeneratableAssistantMessageId && (
-                    <TurnVariantPicker
-                      threadId={threadId}
-                      activeAssistantMessageId={msg.id}
-                      alternatives={turnAlternatives}
-                      onSwitch={messageCommands.switchTurnVariant}
-                    />
-                  )}
-                </div>
-              )}
+                )}
+              </div>
+            )}
             {renderAfterMessage?.(msg)}
           </>
         )}

@@ -14,8 +14,6 @@ export type GenerationStatus = (typeof GENERATION_STATUSES)[number]
 export type GenerationBillingStatus =
   (typeof GENERATION_BILLING_STATUSES)[number]
 
-export type GenerationFeedback = "positive" | "negative"
-
 export type RecoverableTurnReason =
   "missing_assistant" | "missing_generation" | "interrupted_generation"
 
@@ -47,15 +45,15 @@ export type GenerationTurnIdentity = {
   generationId: string
 }
 
-/** 服务端从已持久化树中验证后的最小 turn 快照，用于消息被旧快照删掉时读修复。 */
+/** 服务端从严格 schema-v2 树中验证后的最小 turn 快照，用于消息被并发快照删掉时读修复。 */
 export type GenerationTurnSnapshot = {
   threadId: string
   assistantMessageIndex: number
   userMessage: Message
   assistantMessage: Message
-  userParentMessageId?: string | null
-  assistantParentMessageId?: string
-  activatesAssistantMessageId?: string
+  userParentMessageId: string | null
+  assistantParentMessageId: string
+  activatesAssistantMessageId: string
 }
 
 export type GenerationUsageMetadata = {
@@ -92,8 +90,6 @@ export type GenerationSummary = {
   status: GenerationStatus
   updatedAt: string
   result?: GenerationResultV1 | null
-  feedback?: GenerationFeedback | null
-  feedbackUpdatedAt?: string | null
 }
 
 export interface GenerationForReconcile extends GenerationSummary {

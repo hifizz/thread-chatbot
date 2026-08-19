@@ -1,5 +1,5 @@
-import type { Message } from "../core/types"
-import type { GenerationFeedback, RecoverableTurn } from "../generation/types"
+import type { Message, MessageFeedback } from "../core/types"
+import type { RecoverableTurn } from "../generation/types"
 import type { ThreadMessageActionCommands } from "../net/chat-controller"
 import type { SourceProvenance } from "../core/message-graph"
 
@@ -17,16 +17,20 @@ export const MESSAGE_ACTION_ERRORS = {
   clipboard: "复制失败，请检查浏览器剪贴板权限",
   latestUserOnly: "仅支持编辑当前最后一轮",
   latestAssistantOnly: "仅支持重新生成当前最后一轮",
-  feedbackUnavailable: "该回复没有可评价的 generation",
+  noMarkdown: "该回复没有可复制的 Markdown 正文",
   feedbackSave: "反馈保存失败，请重试",
 } as const
+
+/** 未完成回复不暴露复制或评价；失败恢复由独立 Retry 入口负责。 */
+export function hasCompletedAssistantActions(message: Message): boolean {
+  return message.role === "assistant" && message.status === "done"
+}
 
 export interface ThreadMessageActionPresentation {
   latestUserMessageId?: string
   latestAssistantMessageId?: string
   alternatives: readonly {
     assistantMessageId: string
-    generationId?: string
     derivedThreadCount: number
   }[]
   sourceProvenance: SourceProvenance | null
@@ -35,7 +39,7 @@ export interface ThreadMessageActionPresentation {
 /** 列模式和画布模式共享的只读消息操作视图状态。 */
 export interface MessageActionViewState {
   recoverableByUserMessageId: ReadonlyMap<string, RecoverableTurn>
-  feedbackByGenerationId: ReadonlyMap<string, GenerationFeedback>
+  feedbackByMessageId: ReadonlyMap<string, MessageFeedback>
   activePathByThreadId: ReadonlyMap<string, readonly string[]>
   presentationByThreadId: ReadonlyMap<string, ThreadMessageActionPresentation>
 }
@@ -55,7 +59,7 @@ export interface AssistantMessageToolbarProps {
   threadId: string
   message: Message
   regeneratable: boolean
-  feedback?: GenerationFeedback
+  feedback?: MessageFeedback
   commands: Pick<
     ThreadMessageActionCommands,
     "retryAssistant" | "submitFeedback"
@@ -67,7 +71,6 @@ export interface TurnVariantPickerProps {
   activeAssistantMessageId: string
   alternatives: readonly {
     assistantMessageId: string
-    generationId?: string
     derivedThreadCount: number
   }[]
   onSwitch: ThreadMessageActionCommands["switchTurnVariant"]

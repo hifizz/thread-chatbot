@@ -49,7 +49,7 @@ export interface ThreadChatRequestBody {
     userMessageId: string
     assistantMessageId: string
     generationId: string
-    intent?: ThreadChatGenerationIntent
+    intent: ThreadChatGenerationIntent
   }
 }
 
@@ -67,6 +67,7 @@ export function buildRequestBody(
     treeId: string
     userMessageId: string
     generationId: string
+    intent: ThreadChatGenerationIntent
   }
 ): ThreadChatRequestBody {
   const anchor = thread.anchorText?.trim() ? thread.anchorText : null
@@ -86,6 +87,7 @@ export function buildRequestBody(
       userMessageId: identity.userMessageId,
       assistantMessageId: excludeMsgId,
       generationId: identity.generationId,
+      intent: identity.intent,
     },
   }
 }

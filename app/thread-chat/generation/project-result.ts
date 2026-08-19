@@ -170,7 +170,7 @@ export function projectGenerationResult({
   if (terminalStatus === "failed") {
     status = "error"
     resultError = error || GENERATION_ERRORS.streamFailed
-  } else if (terminalStatus === "stopped" && !hasDisplayableOutput) {
+  } else if (terminalStatus === "stopped") {
     status = "error"
     resultError = GENERATION_ERRORS.stopped
   } else if (terminalStatus === "completed" && !hasDisplayableOutput) {
