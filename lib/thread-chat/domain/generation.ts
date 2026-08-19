@@ -6,6 +6,7 @@ import type {
 } from "@/lib/thread-chat/domain/types"
 import type {
   GENERATION_BILLING_STATUSES,
+  GENERATION_RESULT_VERSION,
   GENERATION_STATUSES,
 } from "@/constants/generation"
 import type { ResearchPlan, ResearchRoute } from "@/lib/chat/research-router"
@@ -55,7 +56,7 @@ export type GenerationUsageMetadata = {
 
 /** generation 唯一有权覆盖到 Message / Artifact registry 的字段。 */
 export type GenerationResultV1 = {
-  version: 1
+  version: typeof GENERATION_RESULT_VERSION
   generationId: string
   text: string
   status: MessageStatus

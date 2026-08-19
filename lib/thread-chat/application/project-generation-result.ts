@@ -4,7 +4,10 @@ import type {
   GenerationResultV1,
   GenerationUsageMetadata,
 } from "@/lib/thread-chat/domain/generation"
-import { GENERATION_ERRORS } from "@/constants/generation"
+import {
+  GENERATION_ERRORS,
+  GENERATION_RESULT_VERSION,
+} from "@/constants/generation"
 import {
   MARKDOWN_ARTIFACT_TOOL_NAME,
   markdownArtifactInputSchema,
@@ -181,7 +184,7 @@ export function projectGenerationResult({
   return {
     hasDisplayableOutput,
     result: {
-      version: 1,
+      version: GENERATION_RESULT_VERSION,
       generationId,
       text,
       status,

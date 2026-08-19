@@ -17,6 +17,7 @@ import {
   ACTIVE_GENERATION_STATUSES,
   GENERATION_ERRORS,
   GENERATION_LEASE_MS,
+  GENERATION_RESULT_VERSION,
 } from "@/constants/generation"
 import { db } from "@/lib/db"
 import { branchGenerations, branchTrees } from "@/lib/db/schema"
@@ -491,7 +492,7 @@ export async function compareAndSetGenerationTerminal(input: {
 function staleFailureResult(row: GenerationRow): GenerationResultV1 {
   const partial = row.turnSnapshot.assistantMessage
   return {
-    version: 1,
+    version: GENERATION_RESULT_VERSION,
     generationId: row.id,
     text: partial.text,
     status: "error",

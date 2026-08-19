@@ -9,6 +9,7 @@ import {
 } from "../../app/thread-chat/generation/project-result.ts"
 import { mergeGenerationResult } from "../../app/thread-chat/generation/merge-result.ts"
 import { sanitizeLoadedState } from "../../app/thread-chat/net/sanitize-loaded-state.ts"
+import { GENERATION_RESULT_VERSION } from "../../constants/generation.ts"
 
 async function test(name, fn) {
   await fn()
@@ -121,6 +122,7 @@ await test("正文、Markdown、联网来源和研究上下文投影", () => {
     usage: { inputTokens: 10, outputTokens: 20, totalTokens: 30 },
   })
   assert.equal(projected.hasDisplayableOutput, true)
+  assert.equal(projected.result.version, GENERATION_RESULT_VERSION)
   assert.equal(projected.result.text, "最终正文")
   assert.equal(projected.result.status, "done")
   assert.equal(projected.result.artifactIds.length, 1)
