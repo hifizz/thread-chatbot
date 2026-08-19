@@ -5,10 +5,11 @@
 
 import type { ThreadTreeState } from "./types"
 import { DEFAULT_THREAD_CHAT_MODEL_ID } from "@/constants/model"
+import { THREAD_TREE_SCHEMA_VERSION } from "@/constants/thread-chat"
 
 export function emptySeedState(): ThreadTreeState {
   return {
-    schemaVersion: 2,
+    schemaVersion: THREAD_TREE_SCHEMA_VERSION,
     threads: {
       main: {
         id: "main",

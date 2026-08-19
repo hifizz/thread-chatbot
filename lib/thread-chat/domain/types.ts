@@ -8,6 +8,7 @@
 import type { TextAnchor } from "@/lib/thread-chat/domain/text-anchor"
 import type { WebResearchActivity } from "@/lib/chat/web-research-activity"
 import type { ResearchPlan, ResearchRoute } from "@/lib/chat/research-router"
+import type { THREAD_TREE_SCHEMA_VERSION } from "@/constants/thread-chat"
 export type {
   MessageFeedback,
   MessageFeedbackSummary,
@@ -120,7 +121,7 @@ export interface Thread {
 }
 
 export interface ThreadTreeState {
-  schemaVersion: 2
+  schemaVersion: typeof THREAD_TREE_SCHEMA_VERSION
   threads: Record<string, Thread>
   artifacts: Record<string, Artifact>
   artifactOrder: string[]
