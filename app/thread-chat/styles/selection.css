@@ -50,7 +50,7 @@
   color: #f3efe6;
 }
 /* 可选首问输入框（Phase A 气泡输入框）：深底提亮，单行起步自增高，
-   max-height 68px 与 selection-bubble.tsx 的 JS clamp 同步，超出转内滚 */
+   上限由组件尺寸源发布，超出后转为内部滚动。 */
 .tc .sel-bubble .ask {
   margin: 0 0 9px;
   position: relative;
@@ -69,7 +69,7 @@
   font-family: var(--font-ui);
   font-size: 12.5px;
   line-height: 1.45;
-  max-height: 68px;
+  max-height: var(--selection-question-max-height);
   min-height: 30px;
 }
 .tc .sel-bubble .ask textarea::placeholder {

@@ -34,6 +34,7 @@ import {
 } from "../orchestration/placement"
 import { computePopupPosition, type Rect } from "./bubble-position"
 import { BubbleShape, type TailDir } from "./bubble-shape"
+import { SELECTION_QUESTION_MAX_HEIGHT } from "./selection-composer-dimensions"
 import {
   BUBBLE_GAP,
   BUBBLE_SAFE_PADDING,
@@ -425,14 +426,20 @@ export function SelectionBubble({
             ref={taRef}
             rows={1}
             value={question}
+            style={
+              {
+                "--selection-question-max-height": `${SELECTION_QUESTION_MAX_HEIGHT}px`,
+              } as React.CSSProperties
+            }
             placeholder="就这段问点什么…（可留空）"
             aria-label="就这段划选文字提出你的问题（可留空，留空则预填代拟问题待确认）"
             onChange={(e) => {
               setQuestion(e.target.value)
-              // 自增高：clamp 68px（与 CSS 的 max-height 同步），超出转内滚
+              // 自增高：到达同一尺寸源定义的上限后转为内部滚动。
               const ta = e.currentTarget
               ta.style.height = "auto"
-              ta.style.height = Math.min(ta.scrollHeight, 68) + "px"
+              ta.style.height =
+                Math.min(ta.scrollHeight, SELECTION_QUESTION_MAX_HEIGHT) + "px"
             }}
             onKeyDown={(e) => {
               if (e.key !== "Enter") return
