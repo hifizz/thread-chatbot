@@ -10,11 +10,11 @@
  * 的内容收敛在通道里，纸面 / padding / 边框仍随列通栏；本层不感知列宽。
  */
 
-import React, { useEffect, useRef } from "react"
+import React from "react"
 import { MessageScroller } from "@shadcn/react/message-scroller"
 import { GENERATION_BACKGROUND_LABEL } from "@/constants/generation"
 import type { Message } from "../core/types"
-import { ThreadModelSelector } from "./thread-model-selector"
+import { ConversationComposer } from "./conversation-composer"
 import { EditableUserMessage } from "./editable-user-message"
 import { AssistantMessageToolbar } from "./assistant-message-toolbar"
 import { TurnVariantPicker } from "./turn-variant-picker"
@@ -107,38 +107,6 @@ export function ChatView({
   regeneratableAssistantMessageId,
   turnAlternatives = [],
 }: ChatViewProps) {
-  const taRef = useRef<HTMLTextAreaElement | null>(null)
-
-  const autoGrow = (ta: HTMLTextAreaElement) => {
-    ta.style.height = "auto"
-    ta.style.height = Math.min(ta.scrollHeight, 120) + "px"
-  }
-
-  const doSend = () => {
-    if (busy) return
-    const ta = taRef.current
-    if (!ta) return
-    const v = ta.value.trim()
-    if (!v) return
-    ta.value = ""
-    ta.style.height = "auto"
-    onSend(v)
-    ta.focus()
-    // 发送后不再手动滚——MessageScroller.Provider 的 autoScroll 接管贴底
-  }
-
-  // composer 预填：新开分支时把代拟首问写进输入框并聚焦（光标移到末尾），待用户回车确认。
-  // textarea 是 uncontrolled 且列内 ⇄ 切换会话不一定重挂载，故不用 defaultValue，
-  // 用 effect 命令式写入；只在输入框为空时写，避免覆盖用户已敲的内容。
-  useEffect(() => {
-    const ta = taRef.current
-    if (!ta || !composerPrefill || ta.value !== "") return
-    ta.value = composerPrefill
-    autoGrow(ta)
-    ta.focus()
-    ta.setSelectionRange(ta.value.length, ta.value.length)
-  }, [threadId, composerPrefill])
-
   const renderMessage = (msg: Message) => {
     const hasVisibleText = msg.text.trim().length > 0
     const hasWebResearch = Boolean(msg.webResearch?.length)
@@ -264,53 +232,19 @@ export function ChatView({
           </MessageScroller.Button>
         </MessageScroller.Root>
       </MessageScroller.Provider>
-      <div className={`composer ${isMain ? "" : "branch"}`}>
-        <div className="lane">
-          <div className="box">
-            <div className="prompt-stack">
-              <textarea
-                rows={1}
-                placeholder={isMain ? "继续在主线提问…" : "在这个分支里追问…"}
-                ref={taRef}
-                onInput={(e) => autoGrow(e.currentTarget)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    // IME 守卫：输入法组合态（中文选词中）按 Enter 只做「上屏」，
-                    // 不发送、也不 preventDefault——否则会把已上屏部分发出去，
-                    // 组合中的文字残留在输入框。isComposing 覆盖 Chrome/Firefox
-                    // （组合期间 keydown.isComposing 为 true）；keyCode 229 兜底
-                    // Safari——它在 compositionend 之后才派发这次 Enter keydown，
-                    // isComposing 已是 false，但 keyCode 仍报 229。
-                    const ne = e.nativeEvent
-                    if (ne.isComposing || ne.keyCode === 229) return
-                    e.preventDefault()
-                    doSend()
-                  }
-                }}
-              />
-              <ThreadModelSelector
-                modelId={modelId}
-                disabled={modelSelectorDisabled}
-                disabledReason={modelSelectorDisabledReason}
-                onValueChange={onModelChange}
-              />
-            </div>
-            {busy ? (
-              <button
-                className="send stop"
-                title="停止生成（已收到的内容会保留）"
-                onClick={onStop}
-              >
-                停止
-              </button>
-            ) : (
-              <button className="send" onClick={doSend}>
-                发送
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
+      <ConversationComposer
+        variant="column"
+        threadId={threadId}
+        isMain={isMain}
+        busy={busy}
+        prefill={composerPrefill}
+        modelId={modelId}
+        modelSelectorDisabled={modelSelectorDisabled}
+        modelSelectorDisabledReason={modelSelectorDisabledReason}
+        onModelChange={onModelChange}
+        onSend={onSend}
+        onStop={onStop}
+      />
     </>
   )
 }

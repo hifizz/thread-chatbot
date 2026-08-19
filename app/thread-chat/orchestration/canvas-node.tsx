@@ -36,7 +36,7 @@ import {
   MarkdownArtifactProgressCard,
 } from "./markdown-artifact-card"
 import { WebResearchPanel } from "./web-research-panel"
-import { ThreadModelSelector } from "../chat/thread-model-selector"
+import { ConversationComposer } from "../chat/conversation-composer"
 import { EditableUserMessage } from "../chat/editable-user-message"
 import { AssistantMessageToolbar } from "../chat/assistant-message-toolbar"
 import { TurnVariantPicker } from "../chat/turn-variant-picker"
@@ -75,8 +75,6 @@ export const CanvasActionsContext = createContext<CanvasActions | null>(null)
 /** 外挂面板宽（与 thread-chat.css 的 .canvas-expand width 同步；比卡宽，setCenter 取中用） */
 export const EXPAND_W = 340
 
-/** mini composer 自增高上限（px，与 .cv-composer textarea 的 max-height 同步） */
-const COMPOSER_MAX_H = 68
 /** 贴底跟滚的释放阈值（px）：距底小于它视为「仍贴底」，流式长高时继续跟 */
 const STICK_THRESHOLD = 40
 
@@ -104,12 +102,6 @@ export interface CanvasCardData extends Record<string, unknown> {
 
 export type CanvasCardNode = Node<CanvasCardData, "threadCard">
 
-/** textarea 自增高（clamp 后转内滚），与气泡输入框同款 */
-function autoGrow(ta: HTMLTextAreaElement) {
-  ta.style.height = "auto"
-  ta.style.height = Math.min(ta.scrollHeight, COMPOSER_MAX_H) + "px"
-}
-
 /**
  * 选中节点的外挂对话面板：迷你消息列表（复用列模式渲染与划选契约）+ mini composer。
  * 根元素 nodrag/nowheel（React Flow 类约定）：面板内选字不拖动节点、滚动不缩放画布；
@@ -124,7 +116,6 @@ function CanvasExpand({
 }) {
   const actions = useContext(CanvasActionsContext)
   const listRef = useRef<HTMLDivElement | null>(null)
-  const taRef = useRef<HTMLTextAreaElement | null>(null)
   /** 贴底跟滚开关：用户上滑离底即释放（阅读不被打断），回到底部附近自动恢复 */
   const stickRef = useRef(true)
 
@@ -140,30 +131,6 @@ function CanvasExpand({
     const el = listRef.current
     if (el && stickRef.current) el.scrollTop = el.scrollHeight
   })
-
-  /* composer 预填语义同列模式（chat-view）：只在输入框为空时命令式写入，
-     光标移到末尾，待用户改写或回车确认；消息一入树 prefill 即失效（壳层派生） */
-  useEffect(() => {
-    const ta = taRef.current
-    if (!ta || !data.prefill || ta.value !== "") return
-    ta.value = data.prefill
-    autoGrow(ta)
-    ta.focus({ preventScroll: true })
-    ta.setSelectionRange(ta.value.length, ta.value.length)
-  }, [threadId, data.prefill])
-
-  const doSend = () => {
-    if (busy || !actions) return
-    const ta = taRef.current
-    if (!ta) return
-    const v = ta.value.trim()
-    if (!v) return
-    ta.value = ""
-    ta.style.height = "auto"
-    stickRef.current = true // 发送即回到贴底（与列模式 autoScroll 语义一致）
-    actions.send(threadId, v)
-    ta.focus({ preventScroll: true })
-  }
 
   const state = actions?.getState()
   const presentation =
@@ -337,53 +304,28 @@ function CanvasExpand({
           )
         })}
       </div>
-      <div className="cv-composer">
-        <div className="cv-prompt-stack">
-          {state?.threads[threadId] && (
-            <ThreadModelSelector
-              modelId={state.threads[threadId].modelId}
-              disabled={!data.isMain || busy}
-              compact
-              disabledReason={
-                !data.isMain ? "branch" : busy ? "busy" : undefined
-              }
-              onValueChange={(modelId) =>
-                actions?.setThreadModel(threadId, modelId)
-              }
-            />
-          )}
-          <textarea
-            ref={taRef}
-            rows={1}
-            placeholder="就地继续这段会话…"
-            aria-label="在画布节点里继续对话"
-            onInput={(e) => autoGrow(e.currentTarget)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                // IME 守卫同列模式 composer：组合态 Enter 只做「上屏」不发送；
-                // isComposing 覆盖 Chrome/Firefox，keyCode 229 兜底 Safari
-                const ne = e.nativeEvent
-                if (ne.isComposing || ne.keyCode === 229) return
-                e.preventDefault()
-                doSend()
-              }
-            }}
-          />
-        </div>
-        {busy ? (
-          <button
-            className="cv-send stop"
-            title="停止生成（已收到的内容会保留）"
-            onClick={() => actions?.stop(threadId)}
-          >
-            停止
-          </button>
-        ) : (
-          <button className="cv-send" onClick={doSend}>
-            发送
-          </button>
-        )}
-      </div>
+      <ConversationComposer
+        variant="canvas"
+        threadId={threadId}
+        isMain={data.isMain}
+        busy={busy}
+        prefill={data.prefill}
+        modelId={state?.threads[threadId]?.modelId}
+        modelSelectorDisabled={!data.isMain || busy}
+        modelSelectorDisabledReason={
+          !data.isMain ? "branch" : busy ? "busy" : undefined
+        }
+        onModelChange={
+          actions
+            ? (modelId) => actions.setThreadModel(threadId, modelId)
+            : undefined
+        }
+        onBeforeSend={() => {
+          stickRef.current = true
+        }}
+        onSend={actions ? (text) => actions.send(threadId, text) : undefined}
+        onStop={() => actions?.stop(threadId)}
+      />
     </div>
   )
 }
