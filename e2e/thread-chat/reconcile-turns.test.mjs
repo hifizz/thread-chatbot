@@ -228,3 +228,39 @@ await test("done assistant requires a completed generation linked by message id"
     ])
   )
 })
+
+await test("completed-message link validation scales across large histories", () => {
+  const turnCount = 20_000
+  const messages = []
+  const generations = []
+  for (let index = 0; index < turnCount; index++) {
+    const userMessage = user(`u-${index}`)
+    const assistantMessage = {
+      ...assistant(`a-${index}`, userMessage.id, `g-${index}`, "done"),
+      text: "答案",
+    }
+    messages.push(userMessage, assistantMessage)
+    generations.push(
+      generation({
+        id: `g-${index}`,
+        userMessage,
+        assistantMessage,
+        status: "completed",
+        result: {
+          version: 1,
+          generationId: `g-${index}`,
+          text: "答案",
+          status: "done",
+          artifactIds: [],
+          artifacts: {},
+        },
+      })
+    )
+  }
+  assert.doesNotThrow(() =>
+    assertCompletedMessageGenerationLinks(
+      state(messages, `a-${turnCount - 1}`),
+      generations
+    )
+  )
+})
