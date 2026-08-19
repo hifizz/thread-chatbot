@@ -43,14 +43,12 @@ export function createStreamLifecycle(
   dependencies: StreamLifecycleDependencies = defaultDependencies
 ) {
   let capturedUsage: FinalizeGenerationUsage | undefined
-  let capturedProviderMetadata: unknown
   let modelStreamError: string | undefined
   let abortedUsageUnavailable = false
 
   return {
     onError({ error }: { error: unknown }) {
-      modelStreamError =
-        error instanceof Error ? error.message : GENERATION_ERRORS.streamFailed
+      modelStreamError = GENERATION_ERRORS.streamFailed
       console.error("[chat] 模型流错误:", error)
     },
 
@@ -75,7 +73,6 @@ export function createStreamLifecycle(
             providerMetadata,
           }),
         }
-        capturedProviderMetadata = providerMetadata
       }
       abortedUsageUnavailable = true
     },
@@ -109,7 +106,6 @@ export function createStreamLifecycle(
           outputTokens: usage.outputTokens ?? 0,
           costEvidence,
         }
-        capturedProviderMetadata = providerMetadata
         return
       }
       await dependencies.charge({
@@ -125,7 +121,6 @@ export function createStreamLifecycle(
     snapshot() {
       return {
         capturedUsage,
-        capturedProviderMetadata,
         modelStreamError,
         abortedUsageUnavailable,
       }

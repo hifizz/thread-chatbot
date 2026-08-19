@@ -33,7 +33,6 @@ const generationUsageMetadataSchema = z.object({
   inputTokens: z.number(),
   outputTokens: z.number(),
   totalTokens: z.number().optional(),
-  providerMetadata: z.unknown().optional(),
 })
 
 /** generation result V1 的唯一运行时与 TypeScript 契约。 */

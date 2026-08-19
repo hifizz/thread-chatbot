@@ -46,7 +46,6 @@ export function createGenerationSettlementHandler(
   }) => {
     const {
       capturedUsage,
-      capturedProviderMetadata,
       modelStreamError,
       abortedUsageUnavailable,
     } = streamLifecycle.snapshot()
@@ -71,7 +70,6 @@ export function createGenerationSettlementHandler(
             inputTokens: capturedUsage.inputTokens,
             outputTokens: capturedUsage.outputTokens,
             totalTokens: capturedUsage.inputTokens + capturedUsage.outputTokens,
-            providerMetadata: capturedProviderMetadata,
           }
         : undefined,
     })
@@ -97,7 +95,6 @@ export function createGenerationSettlementHandler(
 export async function settleGenerationInitializationFailure(
   {
     persistence,
-    error,
     usageUnavailable,
   }: {
     persistence: ThreadChatGenerationIdentity
@@ -112,8 +109,7 @@ export async function settleGenerationInitializationFailure(
     assistantMessageId: persistence.assistantMessageId,
     responseMessage: { parts: [] },
     terminalStatus: "failed",
-    error:
-      error instanceof Error ? error.message : GENERATION_ERRORS.streamFailed,
+    error: GENERATION_ERRORS.streamFailed,
   })
   try {
     await dependencies.finalize({

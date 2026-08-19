@@ -37,7 +37,6 @@ async function runSettlement({
       streamLifecycle: {
         snapshot: () => ({
           capturedUsage: undefined,
-          capturedProviderMetadata: undefined,
           modelStreamError: undefined,
           abortedUsageUnavailable: false,
           ...snapshot,
@@ -74,7 +73,6 @@ const aborted = await runSettlement({
   isAborted: true,
   snapshot: {
     capturedUsage: { inputTokens: 3, outputTokens: 5 },
-    capturedProviderMetadata: { gateway: { generationId: "g1" } },
     abortedUsageUnavailable: true,
   },
 })
@@ -83,7 +81,6 @@ assert.deepEqual(aborted[0].input.usage, {
   inputTokens: 3,
   outputTokens: 5,
   totalTokens: 8,
-  providerMetadata: { gateway: { generationId: "g1" } },
 })
 assert.equal(aborted[1].input.outcome, "stopped")
 assert.equal(aborted[1].input.usageUnavailable, true)
@@ -120,7 +117,7 @@ await settleGenerationInitializationFailure(
     },
   }
 )
-assert.equal(initializationCalls[0].input.error, "initialization broke")
+assert.equal(initializationCalls[0].input.error, "生成失败，请重试。")
 assert.equal(initializationCalls[1].input.outcome, "failed")
 assert.equal(initializationCalls[1].input.usageUnavailable, true)
 

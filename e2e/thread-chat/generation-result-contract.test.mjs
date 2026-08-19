@@ -31,6 +31,16 @@ const valid = {
 }
 
 assert.deepEqual(generationResultV1Schema.parse(valid), valid)
+assert.deepEqual(
+  generationResultV1Schema.parse({
+    ...valid,
+    usage: {
+      ...valid.usage,
+      providerMetadata: { gateway: { generationId: "private" } },
+    },
+  }),
+  valid
+)
 
 for (const invalid of [
   { ...valid, version: 2 },

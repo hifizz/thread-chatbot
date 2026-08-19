@@ -34,8 +34,7 @@ try {
       outputTokens: 16,
       costEvidence: { source: "estimate" },
     },
-    capturedProviderMetadata: undefined,
-    modelStreamError: "stream broke",
+    modelStreamError: "生成失败，请重试。",
     abortedUsageUnavailable: true,
   })
 
@@ -43,7 +42,6 @@ try {
   emptyAbort.onAbort({ steps: [] })
   assert.deepEqual(emptyAbort.snapshot(), {
     capturedUsage: undefined,
-    capturedProviderMetadata: undefined,
     modelStreamError: undefined,
     abortedUsageUnavailable: true,
   })
@@ -86,7 +84,6 @@ try {
   })
   assert.deepEqual(linear.snapshot(), {
     capturedUsage: undefined,
-    capturedProviderMetadata: undefined,
     modelStreamError: undefined,
     abortedUsageUnavailable: false,
   })
