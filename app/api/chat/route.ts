@@ -17,7 +17,6 @@ import { getCurrentUserId } from "@/lib/auth/server"
 import {
   DEFAULT_MODEL_ID,
   getChatModel,
-  isThreadChatModelId,
   isUnbilledPreviewModel,
   MAX_OUTPUT_TOKENS,
 } from "@/constants/model"
@@ -26,19 +25,7 @@ import { hasPositiveBalance } from "@/lib/billing/credits"
 import { buildUsageMetadata } from "@/lib/billing/usage-meta"
 import { isExplicitMarkdownArtifactRequest } from "@/lib/chat/markdown-artifact"
 import { reasoningForResearchRoute } from "@/lib/chat/research-router"
-import { prepareGeneration } from "@/lib/thread-chat-generation/start-generation-repository"
-import { toGenerationSummary } from "@/lib/thread-chat-generation/query-repository"
-import {
-  observeGenerationCancellation,
-  registerGenerationController,
-  unregisterGenerationController,
-} from "@/lib/thread-chat-generation/execution"
-import { compileThreadChatMessages } from "@/lib/thread-chat/application/compile-thread-chat-messages"
-import {
-  threadChatGenerationIdentitySchema,
-  type ThreadChatGenerationIdentity,
-} from "@/lib/thread-chat/contracts/generation-identity"
-import { generationStartErrorResponse } from "@/app/api/chat/generation-start-error"
+import { unregisterGenerationController } from "@/lib/thread-chat-generation/execution"
 import { createToolStepPolicy } from "@/app/api/chat/tool-step-policy"
 import { buildChatSystemPrompt } from "@/app/api/chat/system-prompt"
 import { resolveResearchContext } from "@/app/api/chat/research-context"
@@ -48,6 +35,7 @@ import {
   createGenerationSettlementHandler,
   settleGenerationInitializationFailure,
 } from "@/app/api/chat/generation-settlement"
+import { prepareThreadGenerationContext } from "@/app/api/chat/thread-generation-context"
 
 // AnySearch 搜索与网页深读可能形成多步循环，放宽单次请求时长上限。
 export const maxDuration = 300
@@ -104,71 +92,21 @@ export async function POST(req: Request) {
     return Response.json({ error: "额度不足，请充值后再试。" }, { status: 402 })
   }
 
-  let persistence: ThreadChatGenerationIdentity | null = null
-  let authoritativeMessages = messages
-  let authoritativeAnchorText: string | null = null
-  let preparedRevision: number | null = null
-  let generationController: AbortController | null = null
-  let generationObserver: ReturnType<
-    typeof observeGenerationCancellation
-  > | null = null
-  if (threadChat != null) {
-    const parsed = threadChatGenerationIdentitySchema.safeParse(threadChat)
-    if (!parsed.success) {
-      return Response.json(
-        {
-          error: {
-            code: "invalid_generation_identity",
-            message: "thread-chat 请求缺少有效的持久化身份，请刷新页面后重试",
-          },
-        },
-        { status: 400 }
-      )
-    }
-    persistence = parsed.data
-    if (!isThreadChatModelId(modelId)) {
-      return Response.json(
-        {
-          error: {
-            code: "invalid_thread_model",
-            message: "Thread Chat 不允许使用该模型，请刷新页面后重试",
-          },
-        },
-        { status: 400 }
-      )
-    }
-    try {
-      const started = await prepareGeneration({
-        userId,
-        modelId,
-        ...persistence,
-      })
-      if (!started.created) {
-        return Response.json(
-          { generation: toGenerationSummary(started.generation) },
-          { status: 202 }
-        )
-      }
-      preparedRevision = started.revision
-      const committedThread = started.state.threads[persistence.threadId]
-      authoritativeAnchorText = committedThread?.anchorText?.trim()
-        ? committedThread.anchorText
-        : null
-      authoritativeMessages = compileThreadChatMessages({
-        state: started.state,
-        threadId: persistence.threadId,
-        excludeAssistantMessageId: persistence.assistantMessageId,
-      }) as UIMessage[]
-    } catch (error) {
-      return generationStartErrorResponse(error)
-    }
-    generationController = new AbortController()
-    registerGenerationController(persistence.generationId, generationController)
-    generationObserver = observeGenerationCancellation(
-      persistence.generationId,
-      generationController
-    )
-  }
+  const prepared = await prepareThreadGenerationContext({
+    userId,
+    modelId,
+    messages,
+    threadChat,
+  })
+  if (prepared.kind === "response") return prepared.response
+  const {
+    persistence,
+    authoritativeMessages,
+    authoritativeAnchorText,
+    preparedRevision,
+    generationController,
+    generationObserver,
+  } = prepared
 
   try {
     // AnySearch 是当前统一联网层：所有模型都获得相同的搜索与网页深读工具。
