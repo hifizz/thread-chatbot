@@ -32,10 +32,6 @@ import type {
   MessageFeedbackSummary,
 } from "../core/types"
 import {
-  switchActiveLeafErrorResponseSchema,
-  switchActiveLeafSuccessResponseSchema,
-} from "@/lib/thread-chat/contracts/switch-active-leaf"
-import {
   prepareRegenerationPatch,
   type PreparedTurnPatch,
 } from "../core/regeneration"
@@ -45,6 +41,18 @@ import type { ThreadChatGenerationIntent } from "../generation/types"
 import { getKnownTreeRevision, setKnownTreeRevision } from "./persist"
 import { activeLeafTurn } from "../core/message-graph"
 import { submitMessageFeedback } from "./message-feedback-command"
+import { switchActiveLeaf } from "./switch-active-leaf-command"
+import type {
+  GenerationActionResult,
+  MessageActionFailureCode,
+  VariantSwitchResult,
+} from "./message-action-results"
+
+export type {
+  GenerationActionResult,
+  MessageActionFailureCode,
+  VariantSwitchResult,
+} from "./message-action-results"
 
 /** 页面不可见 / 无 requestAnimationFrame 时的降级刷新间隔（毫秒） */
 const FALLBACK_FLUSH_MS = 50
@@ -54,41 +62,6 @@ const NETWORK_ERROR = "网络请求失败，请重试"
 const EMPTY_REPLY_ERROR = "未收到任何回复，请重试"
 /** 零正文时被中止（停止按钮 / 卸载）的错误文案 */
 const ABORTED_ERROR = "已停止生成"
-
-export type MessageActionFailureCode =
-  | "not_found"
-  | "invalid_id"
-  | "invalid_request"
-  | "invalid_thread_model"
-  | "invalid_turn"
-  | "not_latest_turn"
-  | "generation_conflict"
-  | "model_mismatch"
-  | "tree_revision_conflict"
-  | "revision_required"
-  | "persistence_failed"
-  | "unauthorized"
-  | "network_error"
-
-export type GenerationActionResult =
-  | {
-      ok: true
-      generationId: string
-      userMessageId: string
-      assistantMessageId: string
-      sourceUserMessageId?: string
-      sourceAssistantMessageId?: string
-    }
-  | { ok: false; code: MessageActionFailureCode; message: string }
-
-export type VariantSwitchResult =
-  | {
-      ok: true
-      threadId: string
-      assistantMessageId: string
-      revision: number
-    }
-  | { ok: false; code: MessageActionFailureCode; message: string }
 
 export interface ThreadMessageActionCommands {
   retryAssistant(
@@ -683,55 +656,21 @@ export function createChatController(
       threadId: string,
       assistantMessageId: string
     ): Promise<VariantSwitchResult> {
-      try {
-        const res = await fetchWithAuth(
-          `/api/branch-trees/${options.treeId}/active-leaf`,
-          {
-            method: "PATCH",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({
-              threadId,
-              assistantMessageId,
-              baseRevision: getKnownTreeRevision(options.treeId),
-            }),
-          }
-        )
-        const responseBody = await res.json().catch(() => null)
-        if (!res.ok) {
-          const failure =
-            switchActiveLeafErrorResponseSchema.safeParse(responseBody)
-          return {
-            ok: false,
-            code: failure.success ? failure.data.error.code : "network_error",
-            message: failure.success
-              ? failure.data.error.message
-              : "切换回复版本失败",
-          }
-        }
-        const success =
-          switchActiveLeafSuccessResponseSchema.safeParse(responseBody)
-        if (!success.success)
-          return {
-            ok: false,
-            code: "network_error",
-            message: "服务端未返回新的树修订号",
-          }
-        setKnownTreeRevision(options.treeId, success.data.revision)
-        if (!store.setActiveLeaf(threadId, assistantMessageId))
-          return {
-            ok: false,
-            code: "generation_conflict",
-            message: "本地消息图需要刷新",
-          }
+      const result = await switchActiveLeaf({
+        treeId: options.treeId,
+        threadId,
+        assistantMessageId,
+        baseRevision: getKnownTreeRevision(options.treeId),
+      })
+      if (!result.ok) return result
+      setKnownTreeRevision(options.treeId, result.revision)
+      if (!store.setActiveLeaf(threadId, assistantMessageId))
         return {
-          ok: true,
-          threadId,
-          assistantMessageId,
-          revision: success.data.revision,
+          ok: false,
+          code: "generation_conflict",
+          message: "本地消息图需要刷新",
         }
-      } catch {
-        return { ok: false, code: "network_error", message: NETWORK_ERROR }
-      }
+      return result
     },
 
     async submitFeedback(
