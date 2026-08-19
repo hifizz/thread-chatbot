@@ -30,10 +30,7 @@ import React, {
 import { Handle, Position, type Node, type NodeProps } from "@xyflow/react"
 import type { Message, ThreadTreeState } from "../core/types"
 import { AnchoredAssistantBody } from "../branching/anchored-assistant-body"
-import {
-  MarkdownArtifactCard,
-  MarkdownArtifactProgressCard,
-} from "./markdown-artifact-card"
+import { MessageArtifacts } from "./message-artifacts"
 import { ConversationComposer } from "../chat/conversation-composer"
 import { ConversationMessage } from "../chat/conversation-message"
 import type { MessageActionViewState } from "../chat/message-action-types"
@@ -163,33 +160,13 @@ function CanvasExpand({
                 ) : null
               }
               renderAfterMessage={(message) => (
-                <>
-                  {message.markdownGeneration && (
-                    <MarkdownArtifactProgressCard
-                      progress={message.markdownGeneration}
-                      sourceDepth={data.depth}
-                      compact
-                    />
-                  )}
-                  {state &&
-                    actions &&
-                    message.artifactIds?.map((artifactId) => {
-                      const artifact = state.artifacts[artifactId]
-                      if (!artifact) return null
-                      return (
-                        <MarkdownArtifactCard
-                          key={artifactId}
-                          artifact={artifact}
-                          sourceDepth={
-                            state.threads[artifact.sourceThreadId]?.depth ??
-                            null
-                          }
-                          onOpen={actions.openArtifact}
-                          compact
-                        />
-                      )
-                    })}
-                </>
+                <MessageArtifacts
+                  state={state}
+                  message={message}
+                  sourceDepth={data.depth}
+                  compact
+                  onOpen={actions?.openArtifact}
+                />
               )}
               onRetry={(message) => actions?.retry(threadId, message.id)}
               messageActionState={actions?.messageActionState}

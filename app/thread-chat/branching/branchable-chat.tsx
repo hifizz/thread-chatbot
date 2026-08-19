@@ -20,10 +20,7 @@ import {
   threadTitle,
 } from "../core/selectors"
 import { ChatView } from "../chat/chat-view"
-import {
-  MarkdownArtifactCard,
-  MarkdownArtifactProgressCard,
-} from "../orchestration/markdown-artifact-card"
+import { MessageArtifacts } from "../orchestration/message-artifacts"
 import { AnchoredAssistantBody } from "./anchored-assistant-body"
 import type { MessageActionViewState } from "../chat/message-action-types"
 import type { ThreadMessageActionCommands } from "../net/chat-controller"
@@ -113,29 +110,13 @@ export function BranchableChat({
 
   /* ---------- 注入：消息下方的 artifact 卡片 ---------- */
   const renderAfterMessage = (msg: Message) => {
-    const artifacts = (msg.artifactIds ?? []).flatMap((aid) => {
-      const a = state.artifacts[aid]
-      if (!a) return []
-      return [
-        <MarkdownArtifactCard
-          key={aid}
-          artifact={a}
-          sourceDepth={state.threads[a.sourceThreadId]?.depth ?? null}
-          onOpen={onOpenArtifact}
-        />,
-      ]
-    })
-    if (!msg.markdownGeneration && artifacts.length === 0) return null
     return (
-      <>
-        {msg.markdownGeneration ? (
-          <MarkdownArtifactProgressCard
-            progress={msg.markdownGeneration}
-            sourceDepth={thread.depth}
-          />
-        ) : null}
-        {artifacts}
-      </>
+      <MessageArtifacts
+        state={state}
+        message={msg}
+        sourceDepth={thread.depth}
+        onOpen={onOpenArtifact}
+      />
     )
   }
 
