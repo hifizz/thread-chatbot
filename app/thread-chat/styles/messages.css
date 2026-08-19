@@ -25,7 +25,7 @@
    与 .tc 的手稿批注风一致；data-active 由组件依据「是否已在底部」写入。 */
 .tc .scroll-end-btn {
   position: absolute;
-  right: 16px;
+  left: 50%;
   bottom: 14px;
   z-index: 2;
   width: 34px;
@@ -34,27 +34,38 @@
   align-items: center;
   justify-content: center;
   border-radius: 999px;
-  border: 1px solid var(--rule-strong);
-  background: var(--paper);
+  border: 1px solid
+    color-mix(in srgb, var(--rule-strong) 55%, transparent);
+  background: color-mix(in srgb, var(--paper) 30%, transparent);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
   color: var(--ink-soft);
   font-size: 15px;
   line-height: 1;
   cursor: pointer;
   box-shadow: 0 4px 14px -6px rgba(30, 26, 20, 0.35);
   opacity: 1;
-  transform: translateY(0);
+  transform: translateX(-50%) translateY(0);
   transition:
     opacity 0.2s ease,
-    transform 0.2s ease;
+    transform 0.2s ease,
+    border-color 0.2s ease,
+    background-color 0.2s ease;
 }
 .tc .scroll-end-btn:hover {
-  border-color: var(--d1);
-  color: var(--d1);
-  background: #fff;
+  border-color: var(--rule-strong);
+  background: color-mix(in srgb, var(--paper) 90%, transparent);
+  transform: translateX(-50%) translateY(0) scale(1.1);
+}
+.tc .scroll-end-icon {
+  transition: transform 0.2s ease;
+}
+.tc .scroll-end-btn:hover .scroll-end-icon {
+  transform: translateY(2px);
 }
 .tc .scroll-end-btn[data-active="false"] {
   opacity: 0;
-  transform: translateY(6px);
+  transform: translateX(-50%) translateY(6px);
   pointer-events: none;
 }
 .tc .hint {

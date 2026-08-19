@@ -51,7 +51,7 @@ type TrackedCall = {
   input?: unknown
 }
 
-/** 把 AI SDK UI stream 的 Tavily tool chunks 聚合成可渲染、可持久化的活动事件。 */
+/** 把 AI SDK UI stream 的联网 tool chunks 聚合成可渲染、可持久化的活动事件。 */
 export function createWebResearchActivityDispatcher(
   onActivity: (activity: WebResearchActivity) => void
 ): (chunk: unknown) => boolean {

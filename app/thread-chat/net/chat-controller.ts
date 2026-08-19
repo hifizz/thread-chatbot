@@ -193,6 +193,9 @@ export function createChatController(store: ThreadStore) {
       },
       onWebResearchActivity(activity) {
         if (settled || !isOwner()) return
+        // UI 必须把聚合面板插在 tool-input-start 的真实位置。先把此前按帧
+        // 缓冲的 text-delta 落进消息，store 才能记录准确的正文字符偏移。
+        doFlush()
         store.setWebResearchActivity(threadId, msgId, activity)
       },
       onResearchRoute(route) {

@@ -53,7 +53,7 @@ import {
   type ResearchRoute,
 } from "@/lib/chat/research-router"
 
-// Tavily 搜索与网页深读可能形成多步循环，放宽单次请求时长上限。
+// AnySearch 搜索与网页深读可能形成多步循环，放宽单次请求时长上限。
 export const maxDuration = 300
 
 const getWeather = tool({
@@ -185,7 +185,7 @@ export async function POST(req: Request) {
     return Response.json({ error: "额度不足，请充值后再试。" }, { status: 402 })
   }
 
-  // Tavily 是当前统一联网层：所有模型都获得相同的搜索与网页深读工具。
+  // AnySearch 是当前统一联网层：所有模型都获得相同的搜索与网页深读工具。
   // deepResearch 只控制研究提示强度，不再决定工具是否存在。
   const research = deepResearch === true
   const searchReady = isSearchConfigured()
@@ -261,7 +261,7 @@ export async function POST(req: Request) {
     researchRoute.mode === "research" ? RESEARCH_SYSTEM_PROMPT : null,
     researchPlan ? researchPlanExecutionPrompt(researchPlan) : null,
     research && !searchReady
-      ? "用户开启了深度研究，但服务端未配置搜索服务（SEARCH_API_KEY），请如实告知该功能暂不可用，并基于已有知识尽力回答。"
+      ? "用户开启了深度研究，但服务端未启用搜索服务，请如实告知该功能暂不可用，并基于已有知识尽力回答。"
       : null,
   ]
     .filter((part): part is string => part !== null)

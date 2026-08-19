@@ -54,7 +54,7 @@ pnpm dev
 
 以下能力均为按需配置，快速开始不需要它们：
 
-- 深度研究：`SEARCH_API_KEY`（以及可选的 `SEARCH_BASE_URL`）
+- Web 搜索与网页读取：AnySearch 可匿名使用；配置 `ANYSEARCH_API_KEY` 可获得更高配额与限流
 - 附件与 PDF 处理：Cloudflare R2 变量（`R2_ACCOUNT_ID`、`R2_ACCESS_KEY_ID`、`R2_SECRET_ACCESS_KEY`、`R2_BUCKET`）
 - 大文档向量检索：`EMBEDDINGS_BASE_URL`、`EMBEDDINGS_API_KEY`、`EMBEDDINGS_MODEL`，以及 PostgreSQL `pgvector`
 - 其他模型提供商和网关：`.env.example` 中说明的提供商 key、Cloudflare AI Gateway 或 Vercel AI Gateway 变量

@@ -1,20 +1,17 @@
 "use client"
 
-import { type FC, type ReactNode, useMemo, useState } from "react"
+import { type FC, useId, useMemo, useState } from "react"
 import { useAuiState } from "@assistant-ui/react"
 import {
-  TelescopeIcon,
-  SearchIcon,
   BookOpenIcon,
-  ChevronDownIcon,
+  ChevronRightIcon,
+  Clock3Icon,
   GlobeIcon,
-  CheckIcon,
-  ListChecksIcon,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
-// grok DeepSearch 风格的研究过程面板：把当前消息里的 webSearch / readUrl 工具调用
-// 聚成一个可折叠的竖向时间线，展示「搜了什么、读了哪些来源」，完成后收起为摘要。
+// Claude 风格的研究过程面板：把当前消息里的 webSearch / readUrl 工具调用
+// 聚成一个可折叠的竖向时间线，展示「搜了什么、读了哪些来源」，完成后显示结果记录。
 // 直接从消息 parts 读取，不依赖 assistant-ui 的分组行为，稳健。
 
 export const RESEARCH_TOOL_NAMES = new Set(["webSearch", "readUrl"])
@@ -90,7 +87,20 @@ function useResearchSteps(): {
   }, [content])
 }
 
-const SourceChip: FC<{ item: SearchResultItem }> = ({ item }) => {
+function normalizedUrl(url: string): string {
+  try {
+    const parsed = new URL(url)
+    parsed.hash = ""
+    return parsed.toString().replace(/\/$/, "")
+  } catch {
+    return url.replace(/\/$/, "")
+  }
+}
+
+const SourceRow: FC<{ item: SearchResultItem; visited: boolean }> = ({
+  item,
+  visited,
+}) => {
   const host = hostOf(item.url)
   const [imgOk, setImgOk] = useState(true)
   return (
@@ -99,7 +109,7 @@ const SourceChip: FC<{ item: SearchResultItem }> = ({ item }) => {
       target="_blank"
       rel="noreferrer"
       title={item.title || host}
-      className="flex max-w-[13rem] items-center gap-1.5 rounded-full border border-border/60 bg-background/60 px-2 py-1 text-xs transition-colors hover:bg-muted"
+      className="grid py-1.5 grid-cols-[18px_minmax(0,1fr)_auto] items-center gap-1 px-3 text-sm text-[var(--ink-soft,_#6a6357)] transition-colors hover:bg-[var(--paper-2,_#efe9dd)] hover:text-[var(--ink,_#24211b)] focus-visible:bg-[var(--paper-2,_#efe9dd)] focus-visible:outline-none"
     >
       {imgOk ? (
         // eslint-disable-next-line @next/next/no-img-element
@@ -110,28 +120,105 @@ const SourceChip: FC<{ item: SearchResultItem }> = ({ item }) => {
           onError={() => setImgOk(false)}
         />
       ) : (
-        <GlobeIcon className="size-3.5 shrink-0 text-muted-foreground" />
+        <GlobeIcon className="size-3.5 shrink-0 text-[var(--ink-faint,_#a79e8d)]" />
       )}
-      <span className="truncate">{item.title || host}</span>
+      <span className="min-w-0 truncate">{item.title || host}</span>
+      <span className="flex max-w-40 shrink-0 items-center gap-1.5 text-xs text-[var(--ink-faint,_#a79e8d)]">
+        {visited ? (
+          <span title="已读取网页正文" className="inline-flex items-center">
+            <BookOpenIcon className="size-3" />
+            <span className="sr-only">已读取</span>
+          </span>
+        ) : null}
+        <span className="truncate">{host}</span>
+      </span>
     </a>
   )
 }
 
-const TimelineNode: FC<{ running: boolean; children: ReactNode }> = ({
-  running,
-  children,
-}) => (
-  <span
-    className={cn(
-      "relative z-10 flex size-6 shrink-0 items-center justify-center rounded-full border bg-background",
-      running
-        ? "border-primary text-primary"
-        : "border-border text-muted-foreground"
-    )}
-  >
-    {children}
-  </span>
-)
+type ResearchGroup = {
+  id: string
+  kind: "search" | "read"
+  title: string
+  running: boolean
+  results: SearchResultItem[]
+}
+
+function researchGroups(steps: ResearchStep[]): {
+  groups: ResearchGroup[]
+  visitedUrls: Set<string>
+} {
+  const visitedUrls = new Set(
+    steps.flatMap((step) =>
+      step.kind === "read" ? [normalizedUrl(step.url)] : []
+    )
+  )
+  const searchedUrls = new Set(
+    steps.flatMap((step) =>
+      step.kind === "search"
+        ? step.sources.map((source) => normalizedUrl(source.url))
+        : []
+    )
+  )
+  const searchGroups: ResearchGroup[] = []
+  const searchGroupByQuery = new Map<string, ResearchGroup>()
+  steps.forEach((step, index) => {
+    if (step.kind !== "search") return
+    const normalizedQuery = step.query.trim().toLowerCase().replace(/\s+/g, " ")
+    const key = normalizedQuery || `pending-${index}`
+    const existing = searchGroupByQuery.get(key)
+    if (existing) {
+      existing.running ||= step.running
+      const knownUrls = new Set(
+        existing.results.map((source) => normalizedUrl(source.url))
+      )
+      for (const source of step.sources) {
+        const url = normalizedUrl(source.url)
+        if (knownUrls.has(url)) continue
+        knownUrls.add(url)
+        existing.results.push(source)
+      }
+      return
+    }
+
+    const group: ResearchGroup = {
+      id: `search-${index}`,
+      kind: "search",
+      title: step.query || "正在生成搜索词…",
+      running: step.running,
+      results: [...step.sources],
+    }
+    searchGroupByQuery.set(key, group)
+    searchGroups.push(group)
+  })
+
+  // 已失败且没有结果的内部重试不单独暴露给用户；如果全部为空，保留一组作为总体状态。
+  const visibleSearchGroups = searchGroups.filter(
+    (group) => group.running || group.results.length > 0
+  )
+  const groups =
+    visibleSearchGroups.length > 0
+      ? visibleSearchGroups
+      : searchGroups.slice(0, 1)
+  const directReads = steps.filter(
+    (step): step is Extract<ResearchStep, { kind: "read" }> =>
+      step.kind === "read" && !searchedUrls.has(normalizedUrl(step.url))
+  )
+  if (directReads.length > 0) {
+    groups.push({
+      id: "direct-reads",
+      kind: "read",
+      title: "访问网页",
+      running: directReads.some((step) => step.running),
+      results: directReads.map((step) => ({
+        title: hostOf(step.url),
+        url: step.url,
+        snippet: "",
+      })),
+    })
+  }
+  return { groups, visitedUrls }
+}
 
 /** 容器：从消息状态读取研究步骤，交给纯展示组件 */
 export const ResearchProgress: FC = () => {
@@ -144,140 +231,145 @@ export const ResearchProgress: FC = () => {
 export const ResearchPanelView: FC<{
   steps: ResearchStep[]
   anyRunning: boolean
+  complete?: boolean
   title?: string
   completionText?: string
-  plan?: { goal: string; items: string[] }
+  plan?: { goal: string }
 }> = ({
   steps,
   anyRunning,
-  title = "深度研究",
-  completionText = "研究完成，报告见下方",
+  complete,
+  title = "联网搜索",
+  completionText,
   plan,
 }) => {
-  const [open, setOpen] = useState(true)
-
-  const searchCount = steps.filter((s) => s.kind === "search").length
-  const sourceCount = steps.reduce(
-    (n, s) => n + (s.kind === "search" ? s.sources.length : 0),
-    0
-  )
-  const summary = anyRunning
-    ? plan
-      ? `正在执行 ${plan.items.length} 项研究计划…`
-      : "正在查询网络…"
-    : plan
-      ? `已完成 · ${plan.items.length} 个子问题 · ${sourceCount} 个来源`
-      : `已完成 · 检索 ${searchCount} 次 · ${sourceCount} 个来源`
+  const [open, setOpen] = useState(false)
+  const contentId = useId()
+  const { groups, visitedUrls } = useMemo(() => researchGroups(steps), [steps])
+  const isDirectFetch = title === "网页读取"
+  const triggerLabel = anyRunning
+    ? isDirectFetch
+      ? "正在读取网页"
+      : "正在搜索网络"
+    : isDirectFetch
+      ? "已读取网页"
+      : "已搜索网络"
+  const outcome =
+    completionText ??
+    (plan
+      ? `完成了「${plan.goal}」的资料检索与回答。`
+      : `完成了 ${groups.length} 组联网检索并整理了回答。`)
+  // 工具批次之间 anyRunning 会短暂变为 false；最终记录只能在整条回答完成后出现。
+  const showOutcome = complete ?? !anyRunning
 
   return (
-    <div
+    <section
       data-slot="research-panel"
-      className="mt-2 mb-6 overflow-hidden rounded-xl border border-border/60 bg-gradient-to-b from-[color-mix(in_oklab,var(--color-primary)_6%,var(--color-background))] to-background"
+      className="mt-3 mb-3 min-w-0 text-[var(--ink,_#24211b)]"
     >
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left transition-colors hover:bg-muted/40"
+        aria-expanded={open}
+        aria-controls={contentId}
+        className="group flex items-center gap-1.5 rounded-sm py-0.5 text-left text-sm text-[var(--ink-faint,_#a79e8d)] transition-colors hover:text-[var(--ink,_#24211b)] focus-visible:text-[var(--ink,_#24211b)] focus-visible:ring-2 focus-visible:ring-[var(--d1,_#2f7d6b)]/25 focus-visible:outline-none"
       >
-        <span className="flex size-6 items-center justify-center text-primary">
-          <TelescopeIcon className="size-4.5" />
-        </span>
-        <span className="flex flex-1 flex-col">
-          <span className="text-sm font-medium">{title}</span>
-          <span
-            className={cn(
-              "text-xs text-muted-foreground",
-              anyRunning && "shimmer"
-            )}
-          >
-            {summary}
-          </span>
-        </span>
-        <ChevronDownIcon
+        <span className={cn(anyRunning && "shimmer")}>{triggerLabel}</span>
+        <span className="sr-only">{open ? "收起详情" : "展开详情"}</span>
+        <ChevronRightIcon
           className={cn(
-            "size-4 text-muted-foreground transition-transform",
-            open && "rotate-180"
+            "size-3.5 opacity-0 transition-[transform,opacity] duration-150 group-hover:opacity-100 group-focus-visible:opacity-100",
+            open && "rotate-90 opacity-100"
           )}
         />
       </button>
 
-      {open && (
-        <div className="relative flex flex-col gap-3 px-3.5 pt-1 pb-3.5">
-          {/* 竖向时间线 */}
+      {open ? (
+        <div
+          id={contentId}
+          className="relative mt-4 flex min-w-0 flex-col gap-5 pl-0.5"
+        >
           <span
             aria-hidden
-            className="absolute top-2 bottom-4 left-[26px] w-px bg-border"
+            className="absolute top-4 bottom-4 left-[11px] w-px bg-[var(--rule,_#e2dccd)]"
           />
-          {plan && (
-            <div className="relative flex gap-3">
-              <TimelineNode running={false}>
-                <ListChecksIcon className="size-3.5" />
-              </TimelineNode>
-              <div className="flex min-w-0 flex-1 flex-col gap-1 pt-0.5">
-                <span className="text-sm font-medium">{plan.goal}</span>
-                <ol className="list-decimal space-y-0.5 pl-4 text-xs text-muted-foreground">
-                  {plan.items.map((item, index) => (
-                    <li key={`${index}-${item}`} className="break-words">
-                      {item}
-                    </li>
-                  ))}
-                </ol>
+
+          {groups.map((group) => (
+            <div key={group.id} className="relative flex min-w-0 gap-3">
+              <span
+                className={cn(
+                  "relative z-10 flex size-6 shrink-0 items-center justify-center bg-[var(--paper,_#f5f2ea)] text-[var(--ink-faint,_#a79e8d)]",
+                  group.running && "text-[var(--d1,_#2f7d6b)]"
+                )}
+              >
+                {group.kind === "search" ? (
+                  <GlobeIcon className="size-4" />
+                ) : (
+                  <BookOpenIcon className="size-4" />
+                )}
+              </span>
+
+              <div className="min-w-0 flex-1 pt-0.5">
+                <div className="mb-2 flex min-w-0 items-center gap-3 text-sm">
+                  <span
+                    className={cn(
+                      "min-w-0 flex-1 truncate text-[var(--ink-soft,_#6a6357)]",
+                      group.running && "shimmer"
+                    )}
+                    title={group.title}
+                  >
+                    {group.title}
+                  </span>
+                  <span className="shrink-0 text-xs text-[var(--ink-faint,_#a79e8d)]">
+                    {group.running && group.results.length === 0
+                      ? "查询中"
+                      : `${group.results.length} 个结果`}
+                  </span>
+                </div>
+
+                {group.results.length > 0 ? (
+                  <div className="max-h-[198px] [scrollbar-width:thin] [scrollbar-color:var(--rule,_#a79e8d)_transparent] overflow-y-auto rounded-xl border border-[var(--rule,_#e2dccd)] bg-[color-mix(in_srgb,var(--paper,_#f5f2ea)_82%,white)]">
+                    <div role="list">
+                      {group.results.map((source, index) => (
+                        <div
+                          role="listitem"
+                          key={`${source.url}-${index}`}
+                          className=" border-[var(--rule,_#e2dccd)] last:border-b-0"
+                        >
+                          <SourceRow
+                            item={source}
+                            visited={visitedUrls.has(normalizedUrl(source.url))}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div
+                    className={cn(
+                      "text-xs text-[var(--ink-faint,_#a79e8d)]",
+                      group.running && "shimmer"
+                    )}
+                  >
+                    {group.running ? "正在获取结果…" : "暂无可展示结果"}
+                  </div>
+                )}
               </div>
             </div>
-          )}
-          {steps.map((step, i) => (
-            <div key={i} className="relative flex gap-3">
-              {step.kind === "search" ? (
-                <>
-                  <TimelineNode running={step.running}>
-                    <SearchIcon className="size-3.5" />
-                  </TimelineNode>
-                  <div className="flex min-w-0 flex-1 flex-col gap-1.5 pt-0.5">
-                    <span className="text-sm">
-                      <span className="text-muted-foreground">搜索</span>{" "}
-                      <span
-                        className={cn("font-medium", step.running && "shimmer")}
-                      >
-                        {step.query}
-                      </span>
-                    </span>
-                    {step.sources.length > 0 && (
-                      <div className="flex flex-wrap gap-1.5">
-                        {step.sources.map((src, j) => (
-                          <SourceChip key={j} item={src} />
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </>
-              ) : (
-                <>
-                  <TimelineNode running={step.running}>
-                    <BookOpenIcon className="size-3.5" />
-                  </TimelineNode>
-                  <div className="flex min-w-0 flex-1 items-center gap-2 pt-1 text-sm">
-                    <span className="text-muted-foreground">阅读</span>
-                    <a
-                      href={step.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="truncate text-primary hover:underline"
-                    >
-                      {hostOf(step.url)}
-                    </a>
-                  </div>
-                </>
-              )}
-            </div>
           ))}
-          {!anyRunning && (
-            <div className="flex items-center gap-1.5 pl-9 text-xs text-muted-foreground">
-              <CheckIcon className="size-3.5" />
-              {completionText}
+
+          {showOutcome ? (
+            <div className="relative flex min-w-0 gap-3">
+              <span className="relative z-10 flex size-6 shrink-0 items-center justify-center bg-[var(--paper,_#f5f2ea)] text-[var(--ink-faint,_#a79e8d)]">
+                <Clock3Icon className="size-4" />
+              </span>
+              <p className="min-w-0 flex-1 pt-0.5 text-sm text-[var(--ink-soft,_#6a6357)]">
+                {outcome}
+              </p>
             </div>
-          )}
+          ) : null}
         </div>
-      )}
-    </div>
+      ) : null}
+    </section>
   )
 }

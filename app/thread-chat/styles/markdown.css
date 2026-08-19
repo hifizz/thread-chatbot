@@ -26,14 +26,13 @@
 .tc .md-body h4 {
   font-family: var(--font-ui);
   color: var(--ink);
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.35;
   margin: 20px 0 9px;
 }
 .tc .md-body h1 {
-  font-size: 20px;
-  padding-bottom: 5px;
-  border-bottom: 1px solid var(--rule);
+  font-size: 22px;
+  font-weight: 800;
 }
 .tc .md-body h2 {
   font-size: 17px;
