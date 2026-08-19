@@ -5,14 +5,12 @@ import {
   createUIMessageStreamResponse,
   isStepCount,
   streamText,
-  type ToolSet,
   type UIMessage,
 } from "ai"
 import { after } from "next/server"
 import { frontendTools } from "@assistant-ui/react-ai-sdk"
 import type { ToolJSONSchema } from "assistant-stream"
 import { resolveAttachmentParts } from "@/lib/chat/resolve-attachments"
-import { readUrlTool, webSearchTool } from "@/lib/chat/research-tools"
 import { isSearchConfigured } from "@/lib/ai/search"
 import { RESEARCH_MAX_STEPS } from "@/constants/research"
 import { getCurrentUserId } from "@/lib/auth/server"
@@ -45,11 +43,11 @@ import {
   threadChatGenerationIdentitySchema,
   type ThreadChatGenerationIdentity,
 } from "@/lib/thread-chat/contracts/generation-identity"
-import { surfaceTools } from "@/app/api/chat/surface-tools"
 import { generationStartErrorResponse } from "@/app/api/chat/generation-start-error"
 import { createToolStepPolicy } from "@/app/api/chat/tool-step-policy"
 import { buildChatSystemPrompt } from "@/app/api/chat/system-prompt"
 import { resolveResearchContext } from "@/app/api/chat/research-context"
+import { buildChatToolSet } from "@/app/api/chat/tool-set"
 
 // AnySearch 搜索与网页深读可能形成多步循环，放宽单次请求时长上限。
 export const maxDuration = 300
@@ -186,27 +184,15 @@ export async function POST(req: Request) {
         deepResearchRequested: research,
         searchReady,
       })
-    const webToolsEnabled = searchReady && researchRoute.mode !== "answer"
     const markdownArtifactRequested =
       isThreadChat && isExplicitMarkdownArtifactRequest(latestText)
-
-    const routedWebTools: ToolSet =
-      researchRoute.mode === "fetch"
-        ? { readUrl: readUrlTool }
-        : researchRoute.mode === "search" || researchRoute.mode === "research"
-          ? { webSearch: webSearchTool, readUrl: readUrlTool }
-          : {}
-
-    const allTools = {
-      // 普通 ThreadChat 请求完全不暴露 Markdown 工具，避免模型把长回答误判成产物。
-      // 只有明确要求独立文章/文档/文件/Markdown 时才挂载并强制使用。
-      ...surfaceTools({
-        threadChat: isThreadChat,
-        markdownArtifactRequested,
-      }),
-      ...(webToolsEnabled ? routedWebTools : {}),
-      ...frontendTools(tools ?? {}),
-    } as ToolSet
+    const { tools: allTools, webToolsEnabled } = buildChatToolSet({
+      researchMode: researchRoute.mode,
+      searchReady,
+      threadChat: isThreadChat,
+      markdownArtifactRequested,
+      frontendToolSet: frontendTools(tools ?? {}),
+    })
 
     // MiniMax 不接受 file part：先把附件（PDF→提取文本，其余→占位说明）转换为 text part
     const resolvedMessages = await resolveAttachmentParts(authoritativeMessages)
