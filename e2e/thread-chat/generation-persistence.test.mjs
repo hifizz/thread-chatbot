@@ -17,6 +17,7 @@ async function test(name, fn) {
 
 function seed(messages = []) {
   return {
+    schemaVersion: 2,
     threads: {
       main: {
         id: "main",
@@ -29,6 +30,7 @@ function seed(messages = []) {
         footnote: null,
         children: [],
         messages,
+        activeLeafMessageId: messages.at(-1)?.id ?? null,
         lastActive: 0,
       },
     },
@@ -43,12 +45,14 @@ function seed(messages = []) {
 
 const userMessage = {
   id: "m1",
+  parentMessageId: null,
   role: "user",
   text: "生成报告",
   forks: [],
 }
 const assistantMessage = {
   id: "m2",
+  parentMessageId: "m1",
   role: "assistant",
   text: "",
   forks: [],
@@ -89,6 +93,7 @@ await test("正文、Markdown、联网来源和研究上下文投影", () => {
   const projected = projectGenerationResult({
     generationId: "gen-1",
     threadId: "main",
+    assistantMessageId: "m2",
     terminalStatus: "completed",
     responseMessage: {
       parts: [
@@ -106,9 +111,7 @@ await test("正文、Markdown、联网来源和研究上下文投影", () => {
           state: "output-available",
           input: { query: "可靠软件" },
           output: {
-            results: [
-              { title: "Primary", url: "https://example.com/primary" },
-            ],
+            results: [{ title: "Primary", url: "https://example.com/primary" }],
           },
         },
         { type: "data-research-route", data: route },
@@ -146,6 +149,7 @@ await test("partial error 保留正文，空完成回复收敛可重试错误", 
   const partial = projectGenerationResult({
     generationId: "gen-1",
     threadId: "main",
+    assistantMessageId: "m2",
     terminalStatus: "failed",
     error: "provider failed",
     responseMessage: { parts: [{ type: "text", text: "半截正文" }] },
@@ -157,6 +161,7 @@ await test("partial error 保留正文，空完成回复收敛可重试错误", 
   const empty = projectGenerationResult({
     generationId: "gen-empty",
     threadId: "main",
+    assistantMessageId: "m-empty",
     terminalStatus: "completed",
     responseMessage: { parts: [] },
   })
@@ -181,6 +186,7 @@ await test("合并保留 forks、清旧 Artifact 且 patch 重放不重复", () 
     kind: "markdown",
     content: "old",
     sourceThreadId: "main",
+    sourceMessageId: "m2",
   }
   state.artifactOrder = ["old"]
   const id = generationArtifactId("gen-1", "call-md")
@@ -197,6 +203,7 @@ await test("合并保留 forks、清旧 Artifact 且 patch 重放不重复", () 
         kind: "markdown",
         content: "new",
         sourceThreadId: "main",
+        sourceMessageId: "m2",
       },
     },
   }
@@ -254,7 +261,7 @@ await test("目标消息缺失时读修复，旧 attempt 不覆盖新 attempt", 
   )
 })
 
-await test("sanitize 只保留有 active generation 证明的 pending", () => {
+await test("sanitize 保留 pending identity，无 generation 时转可重试错误", () => {
   const state = seed([userMessage, assistantMessage])
   const active = sanitizeLoadedState(state, (id) => id ?? "glm-5.2", [
     {
@@ -268,6 +275,6 @@ await test("sanitize 只保留有 active generation 证明的 pending", () => {
   assert.equal(active.threads.main.messages[1].status, "pending")
 
   const stale = sanitizeLoadedState(state, (id) => id ?? "glm-5.2")
-  assert.equal(stale.threads.main.messages.length, 1)
+  assert.equal(stale.threads.main.messages.length, 2)
+  assert.equal(stale.threads.main.messages[1].status, "error")
 })
-

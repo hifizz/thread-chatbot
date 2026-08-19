@@ -37,6 +37,9 @@ export const THREAD_CHAT_BRANCH_SUFFIX =
  */
 export const INHERITED_CHAR_BUDGET = 6000
 
+/** ThreadTreeState JSONB 中消息 DAG 结构的当前版本。 */
+export const THREAD_TREE_SCHEMA_VERSION = 2 as const
+
 /**
  * 异步分支标题（openspec: add-bubble-composer D7）的生成长度上限（字符）：
  * 提示词要求 4–8 字，服务端对超长输出按此截断兜底。

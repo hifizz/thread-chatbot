@@ -24,13 +24,20 @@
 import type { ThreadStore } from "../core/store"
 import { buildRequestBody } from "./prompt"
 import { consumeUIMessageStream, type UIStreamHandlers } from "./ui-stream"
-import {
-  fetchWithAuth,
-  handleUnauthorized,
-} from "@/lib/auth/session-recovery"
+import { fetchWithAuth, handleUnauthorized } from "@/lib/auth/session-recovery"
 import type { ArtifactSeed } from "../core/types"
+import {
+  prepareRegenerationPatch,
+  type PreparedTurnPatch,
+} from "../core/regeneration"
 import { hasAssistantOutput } from "./assistant-output"
 import { GENERATION_ERRORS } from "@/constants/generation"
+import type {
+  GenerationFeedback,
+  ThreadChatGenerationIntent,
+} from "../generation/types"
+import { getKnownTreeRevision, setKnownTreeRevision } from "./persist"
+import { activeLeafTurn } from "../core/message-graph"
 
 /** 页面不可见 / 无 requestAnimationFrame 时的降级刷新间隔（毫秒） */
 const FALLBACK_FLUSH_MS = 50
@@ -41,7 +48,63 @@ const EMPTY_REPLY_ERROR = "未收到任何回复，请重试"
 /** 零正文时被中止（停止按钮 / 卸载）的错误文案 */
 const ABORTED_ERROR = "已停止生成"
 
-export type ChatController = ReturnType<typeof createChatController>
+export type MessageActionFailureCode =
+  | "not_found"
+  | "invalid_turn"
+  | "not_latest_turn"
+  | "generation_conflict"
+  | "tree_revision_conflict"
+  | "revision_required"
+  | "persistence_failed"
+  | "unauthorized"
+  | "network_error"
+
+export type GenerationActionResult =
+  | {
+      ok: true
+      generationId: string
+      userMessageId: string
+      assistantMessageId: string
+      sourceUserMessageId?: string
+      sourceAssistantMessageId?: string
+    }
+  | { ok: false; code: MessageActionFailureCode; message: string }
+
+export type VariantSwitchResult =
+  | {
+      ok: true
+      threadId: string
+      assistantMessageId: string
+      revision: number
+    }
+  | { ok: false; code: MessageActionFailureCode; message: string }
+
+export interface ThreadMessageActionCommands {
+  retryAssistant(
+    threadId: string,
+    assistantMessageId: string
+  ): Promise<GenerationActionResult>
+  retryUserTurn(
+    threadId: string,
+    userMessageId: string
+  ): Promise<GenerationActionResult>
+  editAndRegenerate(
+    threadId: string,
+    userMessageId: string,
+    text: string
+  ): Promise<GenerationActionResult>
+  switchTurnVariant(
+    threadId: string,
+    assistantMessageId: string
+  ): Promise<VariantSwitchResult>
+  submitFeedback(
+    generationId: string,
+    feedback: GenerationFeedback | null
+  ): Promise<void>
+}
+
+export type ChatController = ReturnType<typeof createChatController> &
+  ThreadMessageActionCommands
 
 /** 判断是否为「中止」类异常 */
 function isAbortError(err: unknown): boolean {
@@ -68,14 +131,20 @@ export function createChatController(
 
   /**
    * 对某会话的某条 assistant 消息发起真实流式请求。
-   * 调用前必须已通过 beginAssistantMessage / resetAssistantMessage 备好目标消息。
+   * 普通发送已由 beginAssistantMessage 备好目标；变体操作在服务端接受后原子应用 patch。
    */
   function startAssistant(
     threadId: string,
     msgId: string,
     userMessageId: string,
-    generationId: string
-  ): void {
+    generationId: string,
+    action?: {
+      intent: Exclude<ThreadChatGenerationIntent, { kind: "persisted-turn" }>
+      patch: PreparedTurnPatch
+      sourceUserMessageId?: string
+      sourceAssistantMessageId?: string
+    }
+  ): Promise<GenerationActionResult> {
     const controller = new AbortController()
     inflight.set(threadId, controller)
     const { signal } = controller
@@ -234,22 +303,30 @@ export function createChatController(
       },
     }
 
-    void (async () => {
+    let streamHandedOff = false
+    return (async () => {
       try {
-        try {
-          await options.persistNow()
-        } catch (error) {
-          console.error("[thread-chat] 发送前持久化屏障失败", error)
-          settle(() =>
-            store.failAssistantMessage(
-              threadId,
-              msgId,
-              GENERATION_ERRORS.persistenceBarrier
+        if (!action) {
+          try {
+            await options.persistNow()
+          } catch (error) {
+            console.error("[thread-chat] 发送前持久化屏障失败", error)
+            settle(() =>
+              store.failAssistantMessage(
+                threadId,
+                msgId,
+                GENERATION_ERRORS.persistenceBarrier
+              )
             )
-          )
-          return
+            return {
+              ok: false,
+              code: "persistence_failed",
+              message: GENERATION_ERRORS.persistenceBarrier,
+            }
+          }
         }
-        if (signal.aborted) return
+        if (signal.aborted)
+          return { ok: false, code: "network_error", message: ABORTED_ERROR }
 
         const state = store.getState()
         const thread = state.threads[threadId]
@@ -257,7 +334,7 @@ export function createChatController(
           settle(() =>
             store.failAssistantMessage(threadId, msgId, "会话不存在")
           )
-          return
+          return { ok: false, code: "not_found", message: "会话不存在" }
         }
 
         const body = buildRequestBody(state, thread, msgId, {
@@ -265,6 +342,7 @@ export function createChatController(
           userMessageId,
           generationId,
         })
+        if (action) body.threadChat.intent = action.intent
         const res = await fetch("/api/chat", {
           method: "POST",
           headers: { "content-type": "application/json" },
@@ -275,21 +353,86 @@ export function createChatController(
         if (res.status === 202) {
           // 同 generation 请求重放：服务端已在执行或已终态，不启动第二次模型；
           // 保留 pending，由 generation 轮询取得权威状态。
-          return
+          if (action) store.applyPreparedTurn(action.patch)
+          return {
+            ok: true,
+            generationId,
+            userMessageId,
+            assistantMessageId: msgId,
+            ...(action?.sourceUserMessageId
+              ? { sourceUserMessageId: action.sourceUserMessageId }
+              : {}),
+            ...(action?.sourceAssistantMessageId
+              ? { sourceAssistantMessageId: action.sourceAssistantMessageId }
+              : {}),
+          }
         }
         if (!res.ok || !res.body) {
           // 401：会话已失效——触发自救（登出 + 跳登录），并给出明确文案而非死胡同错误
           if (res.status === 401) void handleUnauthorized()
-          settle(() =>
-            store.failAssistantMessage(
-              threadId,
-              msgId,
+          const payload = (await res.json().catch(() => null)) as {
+            error?: { code?: MessageActionFailureCode; message?: string }
+          } | null
+          const message =
+            res.status === 401
+              ? "登录已失效，正在跳转登录…"
+              : (payload?.error?.message ?? `请求失败（HTTP ${res.status}）`)
+          if (!action)
+            settle(() => store.failAssistantMessage(threadId, msgId, message))
+          return {
+            ok: false,
+            code:
               res.status === 401
-                ? "登录已失效，正在跳转登录…"
-                : `请求失败（HTTP ${res.status}）`
-            )
-          )
-          return
+                ? "unauthorized"
+                : (payload?.error?.code ?? "network_error"),
+            message,
+          }
+        }
+
+        const revision = Number(res.headers.get("x-thread-tree-revision"))
+        if (Number.isInteger(revision))
+          setKnownTreeRevision(options.treeId, revision)
+        if (action && !store.applyPreparedTurn(action.patch)) {
+          return {
+            ok: false,
+            code: "generation_conflict",
+            message: "服务端已接受生成，但本地消息图需要刷新",
+          }
+        }
+
+        const accepted: GenerationActionResult = {
+          ok: true,
+          generationId,
+          userMessageId,
+          assistantMessageId: msgId,
+          ...(action?.sourceUserMessageId
+            ? { sourceUserMessageId: action.sourceUserMessageId }
+            : {}),
+          ...(action?.sourceAssistantMessageId
+            ? { sourceAssistantMessageId: action.sourceAssistantMessageId }
+            : {}),
+        }
+
+        if (action) {
+          streamHandedOff = true
+          void (async () => {
+            try {
+              await consumeUIMessageStream(res, handlers, signal)
+              if (signal.aborted) settleByAbort()
+              else settleByOutcome()
+            } catch (error) {
+              if (signal.aborted || isAbortError(error)) settleByAbort()
+              else
+                settle(() =>
+                  store.failAssistantMessage(threadId, msgId, NETWORK_ERROR)
+                )
+            } finally {
+              cancelFrame()
+              if (inflight.get(threadId) === controller)
+                inflight.delete(threadId)
+            }
+          })()
+          return accepted
         }
 
         await consumeUIMessageStream(res, handlers, signal)
@@ -300,18 +443,27 @@ export function createChatController(
           // 正常结束时 handlers.onFinish 已 settle（幂等）；这里兜底走同一套终态裁决
           settleByOutcome()
         }
+        return accepted
       } catch (err) {
         if (signal.aborted || isAbortError(err)) {
           settleByAbort() // 中止：有正文保留 finish，零正文标可重试错误
         } else {
-          settle(() =>
-            store.failAssistantMessage(threadId, msgId, NETWORK_ERROR)
-          ) // fetch reject 等
+          if (!action)
+            settle(() =>
+              store.failAssistantMessage(threadId, msgId, NETWORK_ERROR)
+            ) // fetch reject 等
+        }
+        return {
+          ok: false,
+          code: "network_error",
+          message: isAbortError(err) ? ABORTED_ERROR : NETWORK_ERROR,
         }
       } finally {
-        cancelFrame()
-        // 仅当 inflight 仍指向本次 controller 时才清除，避免 retry 竞态误删新流的条目
-        if (inflight.get(threadId) === controller) inflight.delete(threadId)
+        if (!streamHandedOff) {
+          cancelFrame()
+          // 仅当 inflight 仍指向本次 controller 时才清除，避免 retry 竞态误删新流的条目
+          if (inflight.get(threadId) === controller) inflight.delete(threadId)
+        }
       }
     })()
   }
@@ -322,16 +474,16 @@ export function createChatController(
   }
 
   function activeAssistant(threadId: string) {
-    const messages = store.getState().threads[threadId]?.messages ?? []
-    for (let i = messages.length - 1; i >= 0; i--) {
-      const message = messages[i]
-      if (
-        message.role === "assistant" &&
-        (message.status === "pending" || message.status === "streaming")
-      )
-        return { message, index: i }
-    }
-    return null
+    const thread = store.getState().threads[threadId]
+    if (!thread) return null
+    const turn = activeLeafTurn(thread)
+    const message = turn?.assistantMessage
+    if (
+      !message ||
+      (message.status !== "pending" && message.status !== "streaming")
+    )
+      return null
+    return { message, index: thread.messages.indexOf(message) }
   }
 
   async function requestStop(threadId: string): Promise<boolean> {
@@ -365,29 +517,223 @@ export function createChatController(
       const generationId = crypto.randomUUID()
       const msgId = store.beginAssistantMessage(threadId, generationId)
       if (!msgId) return
-      startAssistant(threadId, msgId, userMessageId, generationId)
+      void startAssistant(threadId, msgId, userMessageId, generationId)
     },
 
-    /** Retry 是明确替换：先让服务端接受旧 attempt Stop，再用新 generationId 复位同一消息。 */
+    /** 兼容旧宿主的 retry 入口；新语义为追加 sibling assistant。 */
     retry(threadId: string, msgId: string): void {
-      void (async () => {
-        const thread = store.getState().threads[threadId]
-        const messageIndex = thread?.messages.findIndex((m) => m.id === msgId)
-        if (!thread || messageIndex == null || messageIndex < 1) return
-        const target = thread.messages[messageIndex]
-        if (
-          (target.status === "pending" || target.status === "streaming") &&
-          target.generationId &&
-          !(await requestStop(threadId))
+      const generationId = crypto.randomUUID()
+      const nextAssistantMessageId = crypto.randomUUID()
+      const source = store
+        .getState()
+        .threads[threadId]?.messages.find((message) => message.id === msgId)
+      if (source?.role !== "assistant" || !source.parentMessageId) return
+      const patch = prepareRegenerationPatch(store.getState(), {
+        threadId,
+        userMessageId: source.parentMessageId,
+        assistantMessageId: nextAssistantMessageId,
+        generationId,
+        intent: {
+          kind: "regenerate-assistant",
+          sourceAssistantMessageId: msgId,
+        },
+      })
+      if (!patch) return
+      detachThread(threadId)
+      void startAssistant(
+        threadId,
+        nextAssistantMessageId,
+        source.parentMessageId,
+        generationId,
+        {
+          intent: {
+            kind: "regenerate-assistant",
+            sourceAssistantMessageId: msgId,
+          },
+          patch,
+          sourceAssistantMessageId: msgId,
+        }
+      )
+    },
+
+    async retryAssistant(
+      threadId: string,
+      assistantMessageId: string
+    ): Promise<GenerationActionResult> {
+      const generationId = crypto.randomUUID()
+      const nextAssistantMessageId = crypto.randomUUID()
+      const thread = store.getState().threads[threadId]
+      const source = thread?.messages.find(
+        (message) => message.id === assistantMessageId
+      )
+      if (!thread || source?.role !== "assistant" || !source.parentMessageId)
+        return { ok: false, code: "not_found", message: "回复不存在" }
+      const patch = prepareRegenerationPatch(store.getState(), {
+        threadId,
+        userMessageId: source.parentMessageId,
+        assistantMessageId: nextAssistantMessageId,
+        generationId,
+        intent: {
+          kind: "regenerate-assistant",
+          sourceAssistantMessageId: assistantMessageId,
+        },
+      })
+      if (!patch)
+        return {
+          ok: false,
+          code: "not_latest_turn",
+          message: "只能重新生成当前最后一轮回复",
+        }
+      detachThread(threadId)
+      return startAssistant(
+        threadId,
+        nextAssistantMessageId,
+        source.parentMessageId,
+        generationId,
+        {
+          intent: {
+            kind: "regenerate-assistant",
+            sourceAssistantMessageId: assistantMessageId,
+          },
+          patch,
+          sourceAssistantMessageId: assistantMessageId,
+        }
+      )
+    },
+
+    async retryUserTurn(
+      threadId: string,
+      userMessageId: string
+    ): Promise<GenerationActionResult> {
+      const generationId = crypto.randomUUID()
+      const assistantMessageId = crypto.randomUUID()
+      const patch = prepareRegenerationPatch(store.getState(), {
+        threadId,
+        userMessageId,
+        assistantMessageId,
+        generationId,
+        intent: { kind: "retry-orphan-user" },
+      })
+      if (!patch)
+        return {
+          ok: false,
+          code: "not_latest_turn",
+          message: "该消息已不是可恢复的最后一轮",
+        }
+      detachThread(threadId)
+      return startAssistant(
+        threadId,
+        assistantMessageId,
+        userMessageId,
+        generationId,
+        {
+          intent: { kind: "retry-orphan-user" },
+          patch,
+          sourceUserMessageId: userMessageId,
+        }
+      )
+    },
+
+    async editAndRegenerate(
+      threadId: string,
+      userMessageId: string,
+      text: string
+    ): Promise<GenerationActionResult> {
+      const generationId = crypto.randomUUID()
+      const nextUserMessageId = crypto.randomUUID()
+      const assistantMessageId = crypto.randomUUID()
+      const intent = {
+        kind: "edit-last-user" as const,
+        sourceUserMessageId: userMessageId,
+        text,
+      }
+      const patch = prepareRegenerationPatch(store.getState(), {
+        threadId,
+        userMessageId: nextUserMessageId,
+        assistantMessageId,
+        generationId,
+        intent,
+      })
+      if (!patch)
+        return {
+          ok: false,
+          code: "not_latest_turn",
+          message: "只能编辑当前最后一轮用户消息",
+        }
+      detachThread(threadId)
+      return startAssistant(
+        threadId,
+        assistantMessageId,
+        nextUserMessageId,
+        generationId,
+        { intent, patch, sourceUserMessageId: userMessageId }
+      )
+    },
+
+    async switchTurnVariant(
+      threadId: string,
+      assistantMessageId: string
+    ): Promise<VariantSwitchResult> {
+      try {
+        const res = await fetchWithAuth(
+          `/api/branch-trees/${options.treeId}/active-leaf`,
+          {
+            method: "PATCH",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              threadId,
+              assistantMessageId,
+              baseRevision: getKnownTreeRevision(options.treeId),
+            }),
+          }
         )
-          return
-        detachThread(threadId)
-        const userMessage = thread.messages[messageIndex - 1]
-        if (userMessage?.role !== "user") return
-        const generationId = crypto.randomUUID()
-        store.resetAssistantMessage(threadId, msgId, generationId)
-        startAssistant(threadId, msgId, userMessage.id, generationId)
-      })()
+        const data = (await res.json().catch(() => null)) as {
+          revision?: number
+          error?: { code?: MessageActionFailureCode; message?: string }
+        } | null
+        if (!res.ok)
+          return {
+            ok: false,
+            code: data?.error?.code ?? "network_error",
+            message: data?.error?.message ?? "切换回复版本失败",
+          }
+        if (typeof data?.revision !== "number")
+          return {
+            ok: false,
+            code: "network_error",
+            message: "服务端未返回新的树修订号",
+          }
+        setKnownTreeRevision(options.treeId, data.revision)
+        if (!store.setActiveLeaf(threadId, assistantMessageId))
+          return {
+            ok: false,
+            code: "generation_conflict",
+            message: "本地消息图需要刷新",
+          }
+        return {
+          ok: true,
+          threadId,
+          assistantMessageId,
+          revision: data.revision,
+        }
+      } catch {
+        return { ok: false, code: "network_error", message: NETWORK_ERROR }
+      }
+    },
+
+    async submitFeedback(
+      generationId: string,
+      feedback: GenerationFeedback | null
+    ): Promise<void> {
+      const res = await fetchWithAuth(
+        `/api/branch-generations/${generationId}/feedback`,
+        {
+          method: "PUT",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ feedback }),
+        }
+      )
+      if (!res.ok) throw new Error(`feedback failed: ${res.status}`)
     },
 
     /** 只有该显式操作才请求服务端停止模型；服务端确认后再断开本地流。 */

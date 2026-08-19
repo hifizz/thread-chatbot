@@ -20,6 +20,7 @@ import {
   mergeGenerationResult,
   type MergeGenerationResultInput,
 } from "../generation/merge-result"
+import type { PreparedTurnPatch } from "./regeneration"
 
 export interface ForkInput {
   /** 在哪个会话里划选的 */
@@ -73,21 +74,13 @@ export function createThreadStore(
   /** 登记一个 artifact（含 id 分配与 tab 顺序），不发通知 */
   const registerSilently = (
     sourceThreadId: string,
+    sourceMessageId: string,
     seed_: ArtifactSeed
   ): string => {
     const id = "a" + state.seq++
-    state.artifacts[id] = { id, sourceThreadId, ...seed_ }
+    state.artifacts[id] = { id, sourceThreadId, sourceMessageId, ...seed_ }
     state.artifactOrder.push(id)
     return id
-  }
-
-  /** 删除一条消息名下的全部 artifact，不发通知（retry 原子复位用）。 */
-  const removeMessageArtifactsSilently = (message: Message): void => {
-    if (!message.artifactIds?.length) return
-    const removing = new Set(message.artifactIds)
-    removing.forEach((id) => delete state.artifacts[id])
-    state.artifactOrder = state.artifactOrder.filter((id) => !removing.has(id))
-    message.artifactIds = undefined
   }
 
   /** 从尾部反向查找消息（流式目标通常是最新消息，反向查找更快） */
@@ -117,6 +110,47 @@ export function createThreadStore(
       notify()
     },
 
+    /** 服务端已接受的生成 patch：一次通知内只追加节点并切换 head。 */
+    applyPreparedTurn(patch: PreparedTurnPatch): boolean {
+      const thread = state.threads[patch.threadId]
+      if (!thread) return false
+      const existingIds = new Set(thread.messages.map((message) => message.id))
+      if (patch.addedMessages.some((message) => existingIds.has(message.id)))
+        return false
+      thread.messages.push(
+        ...patch.addedMessages.map((message) => structuredClone(message))
+      )
+      thread.activeLeafMessageId = patch.nextActiveLeafMessageId
+      touchSilently(patch.threadId)
+      notify()
+      return true
+    },
+
+    setActiveLeaf(threadId: string, assistantMessageId: string): boolean {
+      const thread = state.threads[threadId]
+      const target = thread?.messages.find(
+        (message) =>
+          message.id === assistantMessageId && message.role === "assistant"
+      )
+      if (!thread || !target) return false
+      thread.activeLeafMessageId = target.id
+      touchSilently(threadId)
+      notify()
+      return true
+    },
+
+    /**
+     * 用服务端已经协调过的整树替换当前投影。对象身份保持不变，避免让订阅者和
+     * controller 持有失效引用；该入口只供 revision-aware 的 GET/轮询恢复使用。
+     */
+    replaceReconciledState(nextState: ThreadTreeState): void {
+      const next = structuredClone(nextState)
+      for (const key of Object.keys(state))
+        delete state[key as keyof ThreadTreeState]
+      Object.assign(state, next)
+      notify()
+    },
+
     /** 从一条消息的划选文字上开出新分支；新分支消息为空，首条回复由 chat-controller 触发流式生成 */
     fork(input: ForkInput): ForkResult | null {
       const parent = state.threads[input.sourceThreadId]
@@ -140,6 +174,7 @@ export function createThreadStore(
         footnote: state.footnoteCounter,
         children: [],
         messages: [],
+        activeLeafMessageId: null,
         lastActive: 0,
       }
       parent.children.push(id)
@@ -166,11 +201,13 @@ export function createThreadStore(
       const id = "m" + state.seq++
       t.messages.push({
         id,
+        parentMessageId: t.activeLeafMessageId,
         role: "user",
         text,
         forks: [],
         ...(quote ? { quote } : {}),
       })
+      t.activeLeafMessageId = id
       touchSilently(threadId)
       notify()
       return id
@@ -186,6 +223,7 @@ export function createThreadStore(
       const id = "m" + state.seq++
       t.messages.push({
         id,
+        parentMessageId: t.activeLeafMessageId,
         role: "assistant",
         text: "",
         forks: [],
@@ -193,6 +231,7 @@ export function createThreadStore(
         backgroundGeneration: undefined,
         status: "pending",
       })
+      t.activeLeafMessageId = id
       notify()
       return id
     },
@@ -265,11 +304,7 @@ export function createThreadStore(
     },
 
     /** 保存复杂研究的可审计计划摘要，不保存或展示模型原始思维链。 */
-    setResearchPlan(
-      threadId: string,
-      msgId: string,
-      plan: ResearchPlan
-    ): void {
+    setResearchPlan(threadId: string, msgId: string, plan: ResearchPlan): void {
       const thread = state.threads[threadId]
       if (!thread) return
       const message = findMessageFromTail(thread.messages, msgId)
@@ -316,30 +351,6 @@ export function createThreadStore(
       notify()
     },
 
-    /** 重试前重置消息：清空正文与错误，回到 pending，复用同一 msgId */
-    resetAssistantMessage(
-      threadId: string,
-      msgId: string,
-      generationId?: string
-    ): void {
-      const t = state.threads[threadId]
-      if (!t) return
-      const msg = findMessageFromTail(t.messages, msgId)
-      if (!msg) return
-      removeMessageArtifactsSilently(msg)
-      msg.text = ""
-      msg.generationId = generationId
-      msg.backgroundGeneration = undefined
-      msg.status = "pending"
-      msg.error = undefined
-      msg.markdownGeneration = undefined
-      msg.webResearch = undefined
-      msg.webResearchTextOffset = undefined
-      msg.researchRoute = undefined
-      msg.researchPlan = undefined
-      notify()
-    },
-
     /** 轮询/加载终态的 generationId CAS 合并；旧 attempt 返回 false 且零写入。 */
     applyGenerationResult(input: MergeGenerationResultInput): boolean {
       const merged = mergeGenerationResult(state, input)
@@ -376,8 +387,12 @@ export function createThreadStore(
     },
 
     /** 单独登记一个 artifact（fork 之外的入口，预留） */
-    registerArtifact(sourceThreadId: string, seed_: ArtifactSeed): string {
-      const id = registerSilently(sourceThreadId, seed_)
+    registerArtifact(
+      sourceThreadId: string,
+      sourceMessageId: string,
+      seed_: ArtifactSeed
+    ): string {
+      const id = registerSilently(sourceThreadId, sourceMessageId, seed_)
       notify()
       return id
     },
@@ -392,7 +407,7 @@ export function createThreadStore(
       if (!thread) return null
       const message = findMessageFromTail(thread.messages, messageId)
       if (!message || message.role !== "assistant") return null
-      const id = registerSilently(threadId, seed_)
+      const id = registerSilently(threadId, messageId, seed_)
       message.artifactIds = [...(message.artifactIds ?? []), id]
       message.markdownGeneration = undefined
       // 完整工具输入已经到达：即使尚无正文，也不再显示 pending 三点占位。

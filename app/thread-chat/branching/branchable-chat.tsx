@@ -13,7 +13,12 @@
 import React, { useCallback, useEffect, useReducer, useRef } from "react"
 import { ListTree } from "lucide-react"
 import type { Message, ThreadTreeState } from "../core/types"
-import { collectInherited, lineage, threadTitle } from "../core/selectors"
+import {
+  activeMessagePath,
+  collectInherited,
+  lineage,
+  threadTitle,
+} from "../core/selectors"
 import { dc } from "../theme"
 import { ChatView } from "../chat/chat-view"
 import { MarkdownBody } from "../chat/markdown-body"
@@ -25,6 +30,8 @@ import {
 import { WebResearchPanel } from "../orchestration/web-research-panel"
 // 锚点在「渲染后的 Markdown DOM」上模糊恢复定位（position→exact→fuzzy），与纯文本解耦
 import { clearHighlights, locateAnchor, paintRange } from "./text-anchor"
+import type { MessageActionViewState } from "../chat/message-action-types"
+import type { ThreadMessageActionCommands } from "../net/chat-controller"
 
 export interface BranchableChatProps {
   state: ThreadTreeState
@@ -55,6 +62,8 @@ export interface BranchableChatProps {
   /** 根 Thread 模型切换意图；分支 selector 仍由本层锁定。 */
   onModelChange: (modelId: string) => void
   onSend: (text: string) => void
+  messageActionState?: MessageActionViewState
+  messageCommands?: ThreadMessageActionCommands
 }
 
 export function BranchableChat({
@@ -74,6 +83,8 @@ export function BranchableChat({
   composerPrefill,
   onModelChange,
   onSend,
+  messageActionState,
+  messageCommands,
 }: BranchableChatProps) {
   const thread = state.threads[threadId]
   if (!thread) return null
@@ -81,6 +92,18 @@ export function BranchableChat({
   const chain = isMain ? [] : lineage(state, threadId)
   const inherited = isMain ? [] : collectInherited(state, thread)
   const childCount = thread.children.length
+  const presentation = messageActionState?.presentationByThreadId.get(threadId)
+  const sourceProvenance = presentation?.sourceProvenance ?? null
+  const visibleMessages = messageActionState
+    ? (messageActionState.activePathByThreadId.get(threadId) ?? []).flatMap(
+        (messageId) => {
+          const message = thread.messages.find(
+            (candidate) => candidate.id === messageId
+          )
+          return message ? [message] : []
+        }
+      )
+    : activeMessagePath(thread)
 
   /* ---------- 注入：assistant 正文（Markdown 渲染 + 渲染后手绘锚点高亮/脚注） ---------- */
   const renderAssistantBody = (msg: Message) => {
@@ -121,8 +144,7 @@ export function BranchableChat({
         />,
       ]
     })
-    if (!msg.markdownGeneration && artifacts.length === 0)
-      return null
+    if (!msg.markdownGeneration && artifacts.length === 0) return null
     return (
       <>
         {msg.markdownGeneration ? (
@@ -218,6 +240,33 @@ export function BranchableChat({
           </span>
           <q>{thread.anchorText}</q>
         </div>
+        {sourceProvenance && !sourceProvenance.isOnActivePath && (
+          <div className="inactive-source">
+            <span>
+              基于回复
+              {sourceProvenance.alternativeIndex === null
+                ? ""
+                : " " +
+                  (sourceProvenance.alternativeIndex + 1) +
+                  "/" +
+                  sourceProvenance.alternativeCount}{" "}
+              · 当前未展示
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                if (!thread.parentId || !thread.forkFromMsgId) return
+                void messageCommands
+                  ?.switchTurnVariant(thread.parentId, thread.forkFromMsgId)
+                  .then((result) => {
+                    if (result.ok) onOpenThread(thread.parentId!)
+                  })
+              }}
+            >
+              查看来源
+            </button>
+          </div>
+        )}
       </div>
       <details className="inherited">
         <summary>
@@ -238,7 +287,7 @@ export function BranchableChat({
   return (
     <ChatView
       threadId={threadId}
-      messages={thread.messages}
+      messages={visibleMessages}
       isMain={isMain}
       header={header}
       banner={banner}
@@ -256,6 +305,11 @@ export function BranchableChat({
       }
       onModelChange={onModelChange}
       onSend={onSend}
+      messageActionState={messageActionState}
+      messageCommands={messageCommands}
+      editableUserMessageId={presentation?.latestUserMessageId}
+      regeneratableAssistantMessageId={presentation?.latestAssistantMessageId}
+      turnAlternatives={presentation?.alternatives}
     />
   )
 }
@@ -385,9 +439,7 @@ export function AnchoredMarkdown({
   }
 
   const normalizedInsertAt =
-    insertAt == null
-      ? null
-      : Math.max(0, Math.min(insertAt, msg.text.length))
+    insertAt == null ? null : Math.max(0, Math.min(insertAt, msg.text.length))
   const insertIsVisible =
     insert != null &&
     normalizedInsertAt != null &&

@@ -28,34 +28,40 @@ function messageReferenceCounts(state: ThreadTreeState): Map<string, number> {
   return counts
 }
 
-function repairTargetMessage(
-  messages: Message[],
-  input: MergeGenerationResultInput
-): number {
-  const desiredIndex = Math.min(
-    Math.max(input.turnSnapshot.assistantMessageIndex, 0),
-    messages.length
+export function restoreTurnSnapshot(
+  thread: ThreadTreeState["threads"][string],
+  snapshot: GenerationTurnSnapshot
+): { userMessage: Message; assistantMessage: Message } | null {
+  let userMessage = thread.messages.find(
+    (message) => message.id === snapshot.userMessage.id
   )
-  const userExists = messages.some(
-    (message) => message.id === input.turnSnapshot.userMessage.id
-  )
-  if (!userExists) {
-    messages.splice(
-      Math.max(0, desiredIndex - 1),
-      0,
-      structuredClone(input.turnSnapshot.userMessage)
-    )
+  if (!userMessage) {
+    userMessage = {
+      ...structuredClone(snapshot.userMessage),
+      parentMessageId:
+        snapshot.userParentMessageId ??
+        snapshot.userMessage.parentMessageId ??
+        null,
+    }
+    thread.messages.push(userMessage)
   }
-  const repairedIndex = Math.min(
-    Math.max(input.turnSnapshot.assistantMessageIndex, 0),
-    messages.length
+  if (userMessage.role !== "user") return null
+
+  let assistantMessage = thread.messages.find(
+    (message) => message.id === snapshot.assistantMessage.id
   )
-  messages.splice(
-    repairedIndex,
-    0,
-    structuredClone(input.turnSnapshot.assistantMessage)
-  )
-  return repairedIndex
+  if (!assistantMessage) {
+    assistantMessage = {
+      ...structuredClone(snapshot.assistantMessage),
+      parentMessageId:
+        snapshot.assistantParentMessageId ??
+        snapshot.assistantMessage.parentMessageId ??
+        userMessage.id,
+    }
+    thread.messages.push(assistantMessage)
+  }
+  if (assistantMessage.role !== "assistant") return null
+  return { userMessage, assistantMessage }
 }
 
 /**
@@ -76,7 +82,12 @@ export function mergeGenerationResult(
     (message) => message.id === input.assistantMessageId
   )
   if (messageIndex === -1) {
-    messageIndex = repairTargetMessage(thread.messages, input)
+    const repaired = restoreTurnSnapshot(thread, input.turnSnapshot)
+    if (!repaired || repaired.assistantMessage.id !== input.assistantMessageId)
+      return state
+    messageIndex = thread.messages.findIndex(
+      (message) => message.id === input.assistantMessageId
+    )
   }
   const message = thread.messages[messageIndex]
   if (!message || message.role !== "assistant") return state
@@ -89,7 +100,12 @@ export function mergeGenerationResult(
   const newArtifacts: Record<string, Artifact> = {}
   for (const id of newArtifactIds) {
     const artifact = input.result.artifacts[id]
-    if (artifact) newArtifacts[id] = structuredClone(artifact)
+    if (artifact)
+      newArtifacts[id] = {
+        ...structuredClone(artifact),
+        sourceThreadId: input.threadId,
+        sourceMessageId: input.assistantMessageId,
+      }
   }
 
   for (const oldId of oldArtifactIds) {

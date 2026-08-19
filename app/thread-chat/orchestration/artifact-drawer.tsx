@@ -10,6 +10,10 @@ import { FileText, LocateFixed, X } from "lucide-react"
 import type { Artifact, ThreadTreeState } from "../core/types"
 import { MarkdownBody } from "../chat/markdown-body"
 import { dotColorOf } from "../theme"
+import {
+  activePathArtifacts,
+  artifactSourceProvenance,
+} from "../core/selectors"
 
 export interface ArtifactDrawerProps {
   state: ThreadTreeState
@@ -19,7 +23,7 @@ export interface ArtifactDrawerProps {
   onClose: () => void
   onSelect: (id: string) => void
   /** 定位来源会话（壳层用 openBranchUI 打开） */
-  onLocate: (threadId: string) => void
+  onLocate: (threadId: string, sourceMessageId: string) => void
 }
 
 export function ArtifactDrawer({
@@ -30,11 +34,20 @@ export function ArtifactDrawer({
   onSelect,
   onLocate,
 }: ArtifactDrawerProps) {
+  const activeArtifacts = activePathArtifacts(state)
+  const visibleArtifacts = activeId
+    ? [
+        ...activeArtifacts,
+        ...(!activeArtifacts.some((artifact) => artifact.id === activeId) &&
+        state.artifacts[activeId]
+          ? [state.artifacts[activeId]]
+          : []),
+      ]
+    : activeArtifacts
   const a: Artifact | null =
-    (activeId && state.artifacts[activeId]) ||
-    state.artifacts[state.artifactOrder[0]] ||
-    null
+    (activeId && state.artifacts[activeId]) || visibleArtifacts[0] || null
   const src = a ? state.threads[a.sourceThreadId] : null
+  const provenance = a ? artifactSourceProvenance(state, a) : null
 
   return (
     <div className={`art-drawer ${open ? "open" : ""}`} aria-hidden={!open}>
@@ -45,11 +58,10 @@ export function ArtifactDrawer({
           <X size={13} />
         </button>
       </div>
-      {state.artifactOrder.length > 0 && (
+      {visibleArtifacts.length > 0 && (
         <div className="art-tabs">
-          {state.artifactOrder.map((aid) => {
-            const art = state.artifacts[aid]
-            if (!art) return null
+          {visibleArtifacts.map((art) => {
+            const aid = art.id
             const sb = state.threads[art.sourceThreadId]
             return (
               <button
@@ -65,6 +77,9 @@ export function ArtifactDrawer({
               >
                 <span className="dot" />
                 {art.title}
+                {!artifactSourceProvenance(state, art).isOnActivePath && (
+                  <span className="historical-artifact">历史版本</span>
+                )}
               </button>
             )
           })}
@@ -99,11 +114,18 @@ export function ArtifactDrawer({
           <span className="nm">
             来源会话：{src.title}
             {src.footnote !== null ? ` · 脚注 ${src.footnote}` : ""}
+            {provenance && !provenance.isOnActivePath
+              ? ` · 来自回复 ${
+                  provenance.alternativeIndex === null
+                    ? "?"
+                    : provenance.alternativeIndex + 1
+                }/${provenance.alternativeCount} · 历史版本`
+              : ""}
           </span>
           <button
             className="loc"
             title="打开产生这个 Markdown 的会话"
-            onClick={() => onLocate(src.id)}
+            onClick={() => onLocate(src.id, a.sourceMessageId)}
           >
             <LocateFixed size={10} />
             定位来源会话

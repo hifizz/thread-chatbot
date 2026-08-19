@@ -20,26 +20,21 @@
  * 的风格，也避免把 ai 的 UIMessage 泛型（带 metadata/dataParts 等）拖进客户端类型面。
  */
 
-import { INHERITED_CHAR_BUDGET } from "@/constants/thread-chat"
-import { collectInherited } from "../core/selectors"
-import type { Message, Thread, ThreadTreeState } from "../core/types"
-import {
-  applyInheritedBudget,
-  kickoffQuestion,
-  omittedNoticeText,
-} from "./prompt-pure"
+import type { Thread, ThreadTreeState } from "../core/types"
+import { kickoffQuestion } from "./prompt-pure"
 import { serializeMessageForModel } from "./message-serialization"
+import type { ThreadChatGenerationIntent } from "../generation/types"
+import {
+  compileThreadChatMessages,
+  type UIMessageLike,
+} from "./message-context"
 
 // kickoff 文案模板定义在叶子模块 prompt-pure.ts（e2e 需 node 直载），这里保持原导入面
 export { kickoffQuestion }
 export { serializeMessageForModel }
 
 /** 发给 /api/chat 的最小消息形状（结构匹配 ai 的 UIMessage，仅用纯文本 part） */
-export interface UIMessageLike {
-  id: string
-  role: "user" | "assistant"
-  parts: { type: "text"; text: string }[]
-}
+export type { UIMessageLike } from "./message-context"
 
 /** /api/chat 的 thread-chat 模式请求体 */
 export interface ThreadChatRequestBody {
@@ -54,13 +49,8 @@ export interface ThreadChatRequestBody {
     userMessageId: string
     assistantMessageId: string
     generationId: string
+    intent?: ThreadChatGenerationIntent
   }
-}
-
-/** 一条领域消息是否应进入 payload（滤掉 error 与空正文 assistant） */
-function includable(message: Message, serialized: string | null): boolean {
-  if (message.status === "error") return false
-  return message.role === "user" || serialized !== null
 }
 
 /**
@@ -80,53 +70,11 @@ export function buildRequestBody(
   }
 ): ThreadChatRequestBody {
   const anchor = thread.anchorText?.trim() ? thread.anchorText : null
-  const messages: UIMessageLike[] = []
-
-  // 1. 继承的上文（D8：字符总预算约束——超预算从最旧丢弃、保底 1 条，
-  //    发生丢弃时在继承段最前插入一条省略说明；当前会话消息不参与截断）
-  const inherited: UIMessageLike[] = []
-  for (const m of collectInherited(state, thread)) {
-    const text = serializeMessageForModel(state, m)
-    if (!includable(m, text) || text === null) continue
-    // 继承段同样做 quote-aware 序列化（codex review P2）：父分支的带引用裸问题
-    // （如「这是什么意思？」）被更深分支继承时，若丢掉 quote 前缀，「就近指代」
-    // 歧义会在继承段原样复活——与当前会话消息用同一条拼接规则
-    inherited.push({
-      id: `inh-${m.id}`,
-      role: m.role,
-      parts: [{ type: "text", text }],
-    })
-  }
-  const { kept, omitted } = applyInheritedBudget(
-    inherited,
-    (m) => m.parts[0].text,
-    INHERITED_CHAR_BUDGET
-  )
-  if (omitted > 0) {
-    messages.push({
-      id: "inh-omitted",
-      role: "user",
-      parts: [{ type: "text", text: omittedNoticeText(omitted) }],
-    })
-  }
-  messages.push(...kept)
-
-  // 2. 当前会话已有消息（排除流式占位 / error / 空 assistant）。
-  //    grounding 由消息级 quote 字段驱动（方向 C，用户定稿）：带 quote 的消息在
-  //    发送线上拼「就我划选的这段话」前缀——裸问题「这是什么意思？」紧跟长上文时，
-  //    模型会按就近原则把指代解析到上一条消息结尾（实测复现），前缀让指代确定落到
-  //    划选原文。绑定关系是数据（msg.quote）而非代码规则；UI 渲染引用条、store/DB
-  //    存原话与 quote 字段，拼接措辞可演进而数据不变。
-  for (const m of thread.messages) {
-    if (m.id === excludeMsgId) continue
-    const text = serializeMessageForModel(state, m)
-    if (!includable(m, text) || text === null) continue
-    messages.push({
-      id: m.id,
-      role: m.role,
-      parts: [{ type: "text", text }],
-    })
-  }
+  const messages = compileThreadChatMessages({
+    state,
+    threadId: thread.id,
+    excludeAssistantMessageId: excludeMsgId,
+  })
 
   return {
     messages,

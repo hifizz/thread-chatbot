@@ -9,9 +9,10 @@
  * · localStorage / fetch 只允许在客户端（effect 或事件回调）里调用本模块的函数。
  *
  * 为什么需要 sanitizeLoadedState：防抖存盘可能恰好在流式中途落盘，而 AbortController
- * 不跨页面存活——重载后没有任何东西会把 pending/streaming 的 assistant 消息推进到终态，
- * 不收敛就是永远转圈的僵尸气泡。正文或有效 Artifact 均视为可恢复输出；空占位删除，
- * 同时过滤坏消息引用与无消息归属的孤儿 registry/order 项。
+ * 不跨页面存活。服务端 tree GET 会先按 generation sidecar 协调状态；客户端仍做滚动
+ * 部署期的防御性清理。正文或有效 Artifact 视为可恢复输出；没有匹配 generation 的
+ * 空占位转为可重试 error，不能删除 Retry 所需的 messageId。同时过滤坏消息引用与
+ * 无消息归属的孤儿 registry/order 项。
  */
 
 import {
@@ -23,7 +24,7 @@ import {
 import { isValidTreeId } from "@/lib/chat/tree-id"
 import { fetchWithAuth } from "@/lib/auth/session-recovery"
 import type { ThreadTreeState } from "../core/types"
-import type { GenerationSummary } from "../generation/types"
+import type { GenerationSummary, RecoverableTurn } from "../generation/types"
 import type { PlacementMode, Slot } from "../orchestration/placement"
 import { withoutTransientGenerationState } from "./transient-state"
 export { sanitizeLoadedState } from "./sanitize-loaded-state"
@@ -54,29 +55,73 @@ export function getLastTreeId(): string | null {
 /** loadTree 的返回：state = 整树（未保存过为 null）；customTitle = 用户重命名过的标题（未改过为 null） */
 export interface LoadedTree {
   state: ThreadTreeState | null
+  revision: number
   customTitle: string | null
   generations: GenerationSummary[]
+  recoverableTurns: RecoverableTurn[]
+}
+
+const revisionByTreeId = new Map<string, number>()
+
+export class TreeRevisionError extends Error {
+  constructor(
+    readonly code: "tree_revision_conflict" | "revision_required",
+    readonly currentRevision?: number
+  ) {
+    super(
+      code === "tree_revision_conflict"
+        ? "该对话已在其他页面更新"
+        : "当前页面缺少树修订号"
+    )
+    this.name = "TreeRevisionError"
+  }
+}
+
+export function getKnownTreeRevision(treeId: string): number {
+  return revisionByTreeId.get(treeId) ?? 0
+}
+
+export function setKnownTreeRevision(treeId: string, revision: number): void {
+  revisionByTreeId.set(treeId, revision)
 }
 
 /** GET 整树：未保存过 state 为 null（正常首访路径）；请求失败也降级为空并 console.warn（空树启动） */
 export async function loadTree(id: string): Promise<LoadedTree> {
   try {
     const res = await fetchWithAuth(`/api/branch-trees/${id}`)
-    if (res.status === 404)
-      return { state: null, customTitle: null, generations: [] }
+    if (res.status === 404) {
+      setKnownTreeRevision(id, 0)
+      return {
+        state: null,
+        revision: 0,
+        customTitle: null,
+        generations: [],
+        recoverableTurns: [],
+      }
+    }
     if (!res.ok) throw new Error(`GET /api/branch-trees ${res.status}`)
     const data = (await res.json()) as LoadedTree
+    setKnownTreeRevision(id, data.revision ?? 0)
     return {
       state: data.state,
+      revision: data.revision ?? 0,
       customTitle: data.customTitle ?? null,
       generations: data.generations ?? [],
+      recoverableTurns: data.recoverableTurns ?? [],
     }
   } catch (err) {
     console.warn(
       "[thread-chat] 加载分支树失败，以空树降级启动（本次不恢复历史）：",
       err
     )
-    return { state: null, customTitle: null, generations: [] }
+    setKnownTreeRevision(id, 0)
+    return {
+      state: null,
+      revision: 0,
+      customTitle: null,
+      generations: [],
+      recoverableTurns: [],
+    }
   }
 }
 
@@ -103,21 +148,37 @@ function enqueueTreeWrite<T>(id: string, task: () => Promise<T>): Promise<T> {
 export async function saveTree(
   id: string,
   state: ThreadTreeState,
-  title?: string
+  title?: string,
+  onRevisionConflict?: (error: TreeRevisionError) => void
 ): Promise<void> {
-  const body = JSON.stringify({
-    state: withoutTransientGenerationState(state),
-    title,
-  })
+  const persistedState = withoutTransientGenerationState(state)
   return enqueueTreeWrite(id, async () => {
     try {
       const res = await fetchWithAuth(`/api/branch-trees/${id}`, {
         method: "PUT",
         headers: { "content-type": "application/json" },
-        body,
+        body: JSON.stringify({
+          state: persistedState,
+          title,
+          baseRevision: getKnownTreeRevision(id),
+        }),
       })
+      const data = (await res.json().catch(() => null)) as {
+        revision?: number
+        error?: { code?: string }
+        currentRevision?: number
+      } | null
+      if (res.status === 409)
+        throw new TreeRevisionError(
+          "tree_revision_conflict",
+          data?.currentRevision
+        )
+      if (res.status === 428) throw new TreeRevisionError("revision_required")
       if (!res.ok) throw new Error(`PUT /api/branch-trees ${res.status}`)
+      if (typeof data?.revision === "number")
+        setKnownTreeRevision(id, data.revision)
     } catch (err) {
+      if (err instanceof TreeRevisionError) onRevisionConflict?.(err)
       console.warn("[thread-chat] 分支树存盘失败（下次变更会再试）：", err)
     }
   })
@@ -129,17 +190,31 @@ export async function saveTreeStrict(
   state: ThreadTreeState,
   title?: string
 ): Promise<void> {
-  const body = JSON.stringify({
-    state: withoutTransientGenerationState(state),
-    title,
-  })
+  const persistedState = withoutTransientGenerationState(state)
   return enqueueTreeWrite(id, async () => {
     const res = await fetchWithAuth(`/api/branch-trees/${id}`, {
       method: "PUT",
       headers: { "content-type": "application/json" },
-      body,
+      body: JSON.stringify({
+        state: persistedState,
+        title,
+        baseRevision: getKnownTreeRevision(id),
+      }),
     })
+    const data = (await res.json().catch(() => null)) as {
+      revision?: number
+      error?: { code?: string }
+      currentRevision?: number
+    } | null
+    if (res.status === 409)
+      throw new TreeRevisionError(
+        "tree_revision_conflict",
+        data?.currentRevision
+      )
+    if (res.status === 428) throw new TreeRevisionError("revision_required")
     if (!res.ok) throw new Error(`PUT /api/branch-trees ${res.status}`)
+    if (typeof data?.revision === "number")
+      setKnownTreeRevision(id, data.revision)
   })
 }
 

@@ -14,6 +14,7 @@ import { EMBEDDING_DIMENSIONS } from "@/constants/rag"
 import { user } from "./auth-schema"
 import type {
   GenerationBillingStatus,
+  GenerationFeedback,
   GenerationResultV1,
   GenerationStatus,
   GenerationTurnSnapshot,
@@ -63,6 +64,7 @@ export const branchTrees = dbSchema.table(
     // title——两条写路径互不踩踏；对外展示一律 coalesce(custom_title, title)。
     customTitle: text("custom_title"),
     state: jsonb("state").notNull(), // 完整 ThreadTreeState
+    revision: integer("revision").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -100,6 +102,10 @@ export const branchGenerations = dbSchema.table(
       .notNull(),
     result: jsonb("result").$type<GenerationResultV1>(),
     error: text("error"),
+    feedback: text("feedback").$type<GenerationFeedback>(),
+    feedbackUpdatedAt: timestamp("feedback_updated_at", {
+      withTimezone: true,
+    }),
     billingStatus: text("billing_status")
       .$type<GenerationBillingStatus>()
       .notNull()
@@ -131,10 +137,7 @@ export const branchGenerations = dbSchema.table(
       table.treeId,
       table.isCurrent
     ),
-    index("branch_generations_user_status_idx").on(
-      table.userId,
-      table.status
-    ),
+    index("branch_generations_user_status_idx").on(table.userId, table.status),
     index("branch_generations_heartbeat_idx").on(
       table.status,
       table.heartbeatAt
