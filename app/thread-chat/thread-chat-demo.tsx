@@ -26,7 +26,6 @@ import dynamic from "next/dynamic"
 import { useRouter } from "next/navigation"
 import React, { useCallback, useEffect, useRef, useState } from "react"
 import "./thread-chat.css"
-import { POPUP_EXIT_MS } from "@/constants/thread-chat"
 import { isThreadChatModelId } from "@/constants/model"
 import { createThreadStore } from "./core/store"
 import { useThreadStore } from "./core/use-thread-store"
@@ -82,6 +81,7 @@ import { TreeList } from "./orchestration/tree-list"
 import { ArtifactDrawer } from "./orchestration/artifact-drawer"
 import { HelpPanel, UsageHint } from "./orchestration/help-panel"
 import { ThreadChatTopbar } from "./orchestration/thread-chat-topbar"
+import { useWorkspaceOverlays } from "./orchestration/use-workspace-overlays"
 // type-only：不把画布模块（React Flow）拖进首屏 bundle
 import type { CanvasChatActions } from "./orchestration/canvas-node"
 import type { CanvasViewState } from "./orchestration/use-canvas-layout"
@@ -105,15 +105,6 @@ const EMPTY_SLOTS: Slot[] = []
 interface ToastState {
   msg: string
   undo?: () => void
-}
-
-/** 把面板锚定在按钮下方（夹在视口内），w/h 为面板预估尺寸 */
-function anchoredPos(btn: HTMLElement, w: number, h: number) {
-  const rect = btn.getBoundingClientRect()
-  const x = Math.max(8, Math.min(rect.right - w, window.innerWidth - (w + 8)))
-  let y = rect.bottom + 6
-  if (y + h > window.innerHeight) y = Math.max(8, window.innerHeight - (h + 10))
-  return { x, y }
 }
 
 /**
@@ -311,36 +302,28 @@ export function ThreadChatDemoInner({
   /* ---------- 其余 UI 状态 ---------- */
   /* 首次内联提示：仅「未关过 && 还没开始聊」时可见；顶栏帮助另走 Dialog。 */
   const [hintDismissed, setHintDismissed] = useState(false)
-  const [sel, setSel] = useState<SelectionInfo | null>(null)
-  /** closing = 正在播放退场动画（Dialog 置 open=false / local 面板加 .closing），
-      到点（POPUP_EXIT_MS）由下方 effect 真正卸载 */
-  const [switcher, setSwitcher] = useState<
-    (SwitcherMode & { n: number; closing?: boolean }) | null
-  >(null)
-  const swSeq = useRef(0)
-  /** 会话列表弹层：非 null = 打开（n 为重挂 key，每次打开归零内部状态并现拉数据） */
-  const [treeList, setTreeList] = useState<{
-    n: number
-    closing?: boolean
-  } | null>(null)
-  const tlSeq = useRef(0)
-  /** Help Dialog：与会话列表/会话树相同的 closing 动画 + 延迟卸载模型。 */
-  const [helpPanel, setHelpPanel] = useState<{
-    n: number
-    closing?: boolean
-  } | null>(null)
-  const helpSeq = useRef(0)
-  /** .tc 根元素：Dialog 弹层的 Portal 挂载点（保住 .tc 作用域的选择器与 CSS 变量） */
-  const tcRootRef = useRef<HTMLDivElement | null>(null)
-  const [drawerOpen, setDrawerOpen] = useState(false)
-  const [activeArt, setActiveArt] = useState<string | null>(null)
-  const openArtifact = useCallback(
-    (artifactId: string) => {
-      setActiveArt(artifactId)
-      setDrawerOpen(true)
-    },
-    [setActiveArt, setDrawerOpen]
-  )
+  const {
+    rootRef: tcRootRef,
+    selection: sel,
+    setSelection: setSel,
+    switcher,
+    closeSwitcher,
+    toggleGlobalSwitcher,
+    openColumnSwitcher,
+    openSubtree,
+    treeList,
+    closeTreeList,
+    toggleTreeList,
+    helpPanel,
+    closeHelpPanel,
+    openHelpPanel,
+    drawerOpen,
+    activeArtifactId: activeArt,
+    setActiveArtifactId: setActiveArt,
+    openArtifact,
+    toggleDrawer,
+    closeDrawer,
+  } = useWorkspaceOverlays()
 
   /* ---------- 统一意图入口：打开某会话（脚注 / ⌘K / 子树 / 定位来源 / 画布双击都走这里）
        hint：可选放置提示（⌘ keepSource「保留来源列，开在其右」/ targetId 显式让位列） ---------- */
@@ -429,50 +412,6 @@ export function ThreadChatDemoInner({
     }
   }
 
-  /* ---------- 切换器 / 子树面板（互斥：同一时间只开一个；每次打开重挂归零）
-       关闭不再直接卸载：先置 closing 播放退场动画，POPUP_EXIT_MS 后由 effect 卸载。
-       重开会换成新对象（closing 归零），旧计时器被 effect cleanup 自动清掉。 ---------- */
-  const closeSwitcher = useCallback(() => {
-    setSwitcher((sw) => (sw && !sw.closing ? { ...sw, closing: true } : sw))
-  }, [])
-  const closeTreeList = useCallback(() => {
-    setTreeList((v) => (v && !v.closing ? { ...v, closing: true } : v))
-  }, [])
-  const closeHelpPanel = useCallback(() => {
-    setHelpPanel((v) => (v && !v.closing ? { ...v, closing: true } : v))
-  }, [setHelpPanel])
-  useEffect(() => {
-    if (!switcher?.closing) return
-    const t = setTimeout(() => setSwitcher(null), POPUP_EXIT_MS)
-    return () => clearTimeout(t)
-  }, [switcher])
-  useEffect(() => {
-    if (!treeList?.closing) return
-    const t = setTimeout(() => setTreeList(null), POPUP_EXIT_MS)
-    return () => clearTimeout(t)
-  }, [treeList])
-  useEffect(() => {
-    if (!helpPanel?.closing) return
-    const t = setTimeout(() => setHelpPanel(null), POPUP_EXIT_MS)
-    return () => clearTimeout(t)
-  }, [helpPanel])
-
-  const toggleGlobalSwitcher = useCallback(() => {
-    setSwitcher((sw) =>
-      // 全局面板开着 → 动画关闭；关着 / 关闭中 / 开的是局部面板 → （重新）打开全局
-      sw?.kind === "global" && !sw.closing
-        ? { ...sw, closing: true }
-        : { kind: "global", n: ++swSeq.current }
-    )
-  }, [])
-  function openColumnSwitcher(vpIndex: number, btn: HTMLElement) {
-    const { x, y } = anchoredPos(btn, 330, 420)
-    setSwitcher({ kind: "column", vpIndex, x, y, n: ++swSeq.current })
-  }
-  function openSubtree(rootId: string, btn: HTMLElement) {
-    const { x, y } = anchoredPos(btn, 340, 400)
-    setSwitcher({ kind: "subtree", rootId, x, y, n: ++swSeq.current })
-  }
   function pickRow(row: TreeRow, m: SwitcherMode) {
     closeSwitcher()
     if (m.kind === "column") {
@@ -487,47 +426,6 @@ export function ThreadChatDemoInner({
       openBranchUI(row.id, null)
     }
   }
-
-  const toggleTreeList = useCallback(() => {
-    setTreeList((v) =>
-      v && !v.closing ? { ...v, closing: true } : { n: ++tlSeq.current }
-    )
-  }, [])
-
-  /* ---------- 快捷键：⌘⇧K 对话列表 / ⌘K 会话树 / Esc 逐层关闭
-       （帮助弹层在关闭链最外层：帮助 → 列表 → 气泡 → 面板 → 抽屉） ---------- */
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
-        e.preventDefault()
-        if (e.shiftKey) toggleTreeList()
-        else toggleGlobalSwitcher()
-        return
-      }
-      if (e.key === "Escape") {
-        // 逐层关闭链的唯一权威：Dialog 内建的 Esc 关闭已在 dialogCloseToShell 里
-        // 取消并放行冒泡，事件最终只在这里被消费（closing 中的弹层视同已关闭）
-        if (helpPanel && !helpPanel.closing) closeHelpPanel()
-        else if (treeList && !treeList.closing) closeTreeList()
-        else if (sel) setSel(null)
-        else if (switcher && !switcher.closing) closeSwitcher()
-        else if (drawerOpen) setDrawerOpen(false)
-      }
-    }
-    document.addEventListener("keydown", onKey)
-    return () => document.removeEventListener("keydown", onKey)
-  }, [
-    sel,
-    switcher,
-    drawerOpen,
-    treeList,
-    helpPanel,
-    toggleGlobalSwitcher,
-    toggleTreeList,
-    closeSwitcher,
-    closeTreeList,
-    closeHelpPanel,
-  ])
 
   /** 会话是否忙碌：末条消息是 assistant 且仍在 pending/streaming（派生自 state，version 快照天然驱动） */
   function isThreadBusy(threadId: string): boolean {
@@ -582,13 +480,13 @@ export function ThreadChatDemoInner({
           router.push(`/thread-chat/${crypto.randomUUID()}`)
         }}
         onToggleTreeList={toggleTreeList}
-        onOpenHelp={() => setHelpPanel({ n: ++helpSeq.current })}
+        onOpenHelp={openHelpPanel}
         onShowColumns={showColumnsView}
         onShowCanvas={() => setViewMode("canvas")}
         onForceCols={setForceCols}
         onPlacementModeChange={changeMode}
         onToggleThreadTree={toggleGlobalSwitcher}
-        onToggleMarkdown={() => setDrawerOpen((open) => !open)}
+        onToggleMarkdown={toggleDrawer}
       />
 
       {viewMode === "columns" ? (
@@ -711,7 +609,7 @@ export function ThreadChatDemoInner({
         state={state}
         open={drawerOpen}
         activeId={activeArt}
-        onClose={() => setDrawerOpen(false)}
+        onClose={closeDrawer}
         onSelect={setActiveArt}
         onLocate={(threadId, sourceMessageId) => {
           const sourceThread = state.threads[threadId]
