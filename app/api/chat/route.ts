@@ -5,23 +5,14 @@ import {
   createUIMessageStreamResponse,
   isStepCount,
   streamText,
-  type UIMessage,
 } from "ai"
 import { after } from "next/server"
 import { frontendTools } from "@assistant-ui/react-ai-sdk"
-import type { ToolJSONSchema } from "assistant-stream"
 import { resolveAttachmentParts } from "@/lib/chat/resolve-attachments"
 import { isSearchConfigured } from "@/lib/ai/search"
 import { RESEARCH_MAX_STEPS } from "@/constants/research"
-import { getCurrentUserId } from "@/lib/auth/server"
-import {
-  DEFAULT_MODEL_ID,
-  getChatModel,
-  isUnbilledPreviewModel,
-  MAX_OUTPUT_TOKENS,
-} from "@/constants/model"
-import { resolveChatModel, isModelConfigured } from "@/lib/ai/provider"
-import { hasPositiveBalance } from "@/lib/billing/credits"
+import { MAX_OUTPUT_TOKENS } from "@/constants/model"
+import { resolveChatModel } from "@/lib/ai/provider"
 import { buildUsageMetadata } from "@/lib/billing/usage-meta"
 import { isExplicitMarkdownArtifactRequest } from "@/lib/chat/markdown-artifact"
 import { reasoningForResearchRoute } from "@/lib/chat/research-router"
@@ -36,61 +27,25 @@ import {
   settleGenerationInitializationFailure,
 } from "@/app/api/chat/generation-settlement"
 import { prepareThreadGenerationContext } from "@/app/api/chat/thread-generation-context"
+import { prepareChatRequestContext } from "@/app/api/chat/request-context"
 
 // AnySearch 搜索与网页深读可能形成多步循环，放宽单次请求时长上限。
 export const maxDuration = 300
 
 export async function POST(req: Request) {
-  // 1) 鉴权：未登录直接拒绝
-  const userId = await getCurrentUserId()
-  if (!userId) {
-    return Response.json(
-      { error: "请先登录后再使用对话功能。" },
-      { status: 401 }
-    )
-  }
-
+  const requestContext = await prepareChatRequestContext(req)
+  if (requestContext.kind === "response") return requestContext.response
   const {
+    userId,
     messages,
     tools,
     deepResearch,
     threadChat,
-    modelId: rawModelId,
-    id: linearThreadId,
-  }: {
-    messages: UIMessage[]
-    tools?: Record<string, ToolJSONSchema>
-    deepResearch?: boolean
-    /** thread-chat 分支对话页的模式标记：system 由服务端按锚点原文构造 */
-    threadChat?: unknown
-    modelId?: unknown
-    id?: string
-  } = await req.json()
-
-  // 2) 解析并校验所选模型
-  if (
-    rawModelId !== undefined &&
-    (typeof rawModelId !== "string" || !getChatModel(rawModelId))
-  ) {
-    return Response.json({ error: "未知或无效的模型。" }, { status: 400 })
-  }
-  const modelId = typeof rawModelId === "string" ? rawModelId : DEFAULT_MODEL_ID
-  const model = getChatModel(modelId)!
-  if (!isModelConfigured(model)) {
-    return Response.json(
-      {
-        error: `模型「${model.name}」未配置，请联系管理员在服务端配置对应 API Key 或可用网关。`,
-      },
-      { status: 400 }
-    )
-  }
-
-  const isUnbilledPreview = isUnbilledPreviewModel(model)
-
-  // 3) 计费拦截：未计费预览模型不依赖用户余额。
-  if (!isUnbilledPreview && !(await hasPositiveBalance(userId))) {
-    return Response.json({ error: "额度不足，请充值后再试。" }, { status: 402 })
-  }
+    linearThreadId,
+    modelId,
+    model,
+    isUnbilledPreview,
+  } = requestContext
 
   const prepared = await prepareThreadGenerationContext({
     userId,
