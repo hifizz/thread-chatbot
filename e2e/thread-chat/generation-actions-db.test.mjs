@@ -18,7 +18,7 @@ const initialState = {
   threads: {
     main: {
       id: "main",
-      modelId: "glm-5.2",
+      modelId: "glm-5.3",
       parentId: null,
       depth: 0,
       title: "主线",
@@ -71,7 +71,7 @@ const baseInput = {
   userId,
   treeId,
   threadId: "main",
-  modelId: "glm-5.2",
+  modelId: "glm-5.3",
 }
 
 async function run() {
@@ -86,6 +86,29 @@ async function run() {
     userId,
     state: initialState,
   })
+
+  await assert.rejects(
+    prepareGeneration({
+      ...baseInput,
+      modelId: "deepseek-v4-pro",
+      userMessageId: "u1",
+      assistantMessageId: "a-model-mismatch",
+      generationId: randomUUID(),
+      intent: {
+        kind: "regenerate-assistant",
+        sourceAssistantMessageId: "a1",
+      },
+    }),
+    (error) =>
+      error instanceof GenerationRepositoryError &&
+      error.code === "model_mismatch"
+  )
+  const [afterModelMismatch] = await db
+    .select({ state: branchTrees.state, revision: branchTrees.revision })
+    .from(branchTrees)
+    .where(eq(branchTrees.id, treeId))
+  assert.equal(afterModelMismatch.revision, 0)
+  assert.equal(afterModelMismatch.state.threads.main.messages.length, 2)
 
   const regenerated = await prepareGeneration({
     ...baseInput,

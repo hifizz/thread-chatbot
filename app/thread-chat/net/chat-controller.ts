@@ -65,6 +65,7 @@ export type MessageActionFailureCode =
   | "invalid_turn"
   | "not_latest_turn"
   | "generation_conflict"
+  | "model_mismatch"
   | "tree_revision_conflict"
   | "revision_required"
   | "persistence_failed"

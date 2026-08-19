@@ -28,6 +28,7 @@ export class GenerationRepositoryError extends Error {
     readonly code:
       | "not_found"
       | "generation_conflict"
+      | "model_mismatch"
       | "invalid_turn"
       | "not_latest_turn"
       | "persistence_failed",
@@ -182,6 +183,25 @@ export async function prepareGeneration(
       throw new GenerationRepositoryError("not_found", "分支树不存在")
     }
 
+    const intent = input.intent
+    let state: ThreadTreeState
+    try {
+      state = parseThreadTreeState(tree.state)
+    } catch {
+      throw new GenerationRepositoryError(
+        "invalid_turn",
+        "已保存的分支树消息图无效"
+      )
+    }
+    const targetThread = state.threads[input.threadId]
+    if (!targetThread)
+      throw new GenerationRepositoryError("invalid_turn", "目标会话不存在")
+    if (targetThread.modelId !== input.modelId)
+      throw new GenerationRepositoryError(
+        "model_mismatch",
+        "请求模型与目标会话不一致，请刷新后重试"
+      )
+
     const [replayed] = await tx
       .select()
       .from(branchGenerations)
@@ -196,16 +216,6 @@ export async function prepareGeneration(
       return { created: false, generation: replayed }
     }
 
-    const intent = input.intent
-    let state: ThreadTreeState
-    try {
-      state = parseThreadTreeState(tree.state)
-    } catch {
-      throw new GenerationRepositoryError(
-        "invalid_turn",
-        "已保存的分支树消息图无效"
-      )
-    }
     let patch: PreparedTurnPatch | undefined
     let revision = tree.revision
     if (intent.kind !== "persisted-turn") {
