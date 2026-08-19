@@ -132,3 +132,5 @@ export function createStreamLifecycle(
     },
   }
 }
+
+export type StreamLifecycle = ReturnType<typeof createStreamLifecycle>

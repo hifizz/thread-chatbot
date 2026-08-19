@@ -33,9 +33,6 @@ import {
   registerGenerationController,
   unregisterGenerationController,
 } from "@/lib/thread-chat-generation/execution"
-import { finalizeGenerationWithRetry } from "@/lib/thread-chat-generation/finalize-with-retry"
-import { projectGenerationResult } from "@/lib/thread-chat/application/project-generation-result"
-import { GENERATION_ERRORS } from "@/constants/generation"
 import { compileThreadChatMessages } from "@/lib/thread-chat/application/compile-thread-chat-messages"
 import {
   threadChatGenerationIdentitySchema,
@@ -47,6 +44,10 @@ import { buildChatSystemPrompt } from "@/app/api/chat/system-prompt"
 import { resolveResearchContext } from "@/app/api/chat/research-context"
 import { buildChatToolSet } from "@/app/api/chat/tool-set"
 import { createStreamLifecycle } from "@/app/api/chat/stream-lifecycle"
+import {
+  createGenerationSettlementHandler,
+  settleGenerationInitializationFailure,
+} from "@/app/api/chat/generation-settlement"
 
 // AnySearch 搜索与网页深读可能形成多步循环，放宽单次请求时长上限。
 export const maxDuration = 300
@@ -274,56 +275,13 @@ export async function POST(req: Request) {
         )
       },
       onEnd: persistence
-        ? async ({ responseMessage, isAborted, finishReason }) => {
-            const {
-              capturedUsage,
-              capturedProviderMetadata,
-              modelStreamError,
-              abortedUsageUnavailable,
-            } = streamLifecycle.snapshot()
-            const failedWithoutFinish =
-              finishReason == null && modelStreamError !== undefined
-            const requestedTerminal = isAborted
-              ? "stopped"
-              : failedWithoutFinish
-                ? "failed"
-                : "completed"
-            const projected = projectGenerationResult({
-              generationId: persistence.generationId,
-              threadId: persistence.threadId,
-              assistantMessageId: persistence.assistantMessageId,
-              responseMessage,
-              terminalStatus: requestedTerminal,
-              error: modelStreamError,
-              researchRoute,
-              researchPlan: researchPlan ?? undefined,
-              usage: capturedUsage
-                ? {
-                    inputTokens: capturedUsage.inputTokens,
-                    outputTokens: capturedUsage.outputTokens,
-                    totalTokens:
-                      capturedUsage.inputTokens + capturedUsage.outputTokens,
-                    providerMetadata: capturedProviderMetadata,
-                  }
-                : undefined,
-            })
-            const outcome =
-              requestedTerminal === "completed" &&
-              !projected.hasDisplayableOutput
-                ? "failed"
-                : requestedTerminal
-            await finalizeGenerationWithRetry({
-              generationId: persistence.generationId,
-              outcome,
-              result: projected.result,
-              error: projected.result.error ?? modelStreamError,
-              usage: isUnbilledPreview ? undefined : capturedUsage,
-              usageUnavailable:
-                !isUnbilledPreview &&
-                (abortedUsageUnavailable ||
-                  (requestedTerminal !== "completed" && !capturedUsage)),
-            })
-          }
+        ? createGenerationSettlementHandler({
+            persistence,
+            researchRoute,
+            researchPlan,
+            unbilledPreview: isUnbilledPreview,
+            streamLifecycle,
+          })
         : undefined,
     })
 
@@ -359,31 +317,11 @@ export async function POST(req: Request) {
         persistence.generationId,
         generationController
       )
-      const projected = projectGenerationResult({
-        generationId: persistence.generationId,
-        threadId: persistence.threadId,
-        assistantMessageId: persistence.assistantMessageId,
-        responseMessage: { parts: [] },
-        terminalStatus: "failed",
-        error:
-          error instanceof Error
-            ? error.message
-            : GENERATION_ERRORS.streamFailed,
+      await settleGenerationInitializationFailure({
+        persistence,
+        error,
+        usageUnavailable: !isUnbilledPreview,
       })
-      try {
-        await finalizeGenerationWithRetry({
-          generationId: persistence.generationId,
-          outcome: "failed",
-          result: projected.result,
-          error: projected.result.error,
-          usageUnavailable: !isUnbilledPreview,
-        })
-      } catch (finalizeError) {
-        console.error(
-          "[thread-chat-generation] 请求初始化失败后的终态保存失败",
-          { generationId: persistence.generationId, finalizeError }
-        )
-      }
     }
     console.error("[chat] 请求初始化失败", error)
     return Response.json({ error: "生成初始化失败，请重试。" }, { status: 500 })
