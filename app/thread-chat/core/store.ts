@@ -139,18 +139,6 @@ export function createThreadStore(
       return true
     },
 
-    /**
-     * 用服务端已经协调过的整树替换当前投影。对象身份保持不变，避免让订阅者和
-     * controller 持有失效引用；该入口只供 revision-aware 的 GET/轮询恢复使用。
-     */
-    replaceReconciledState(nextState: ThreadTreeState): void {
-      const next = structuredClone(nextState)
-      for (const key of Object.keys(state))
-        delete state[key as keyof ThreadTreeState]
-      Object.assign(state, next)
-      notify()
-    },
-
     /** 从一条消息的划选文字上开出新分支；新分支消息为空，首条回复由 chat-controller 触发流式生成 */
     fork(input: ForkInput): ForkResult | null {
       const parent = state.threads[input.sourceThreadId]

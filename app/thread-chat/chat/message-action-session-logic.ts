@@ -20,6 +20,15 @@ export function withoutRecoverableTurn(
   return next
 }
 
+export function withRecoverableTurn(
+  current: ReadonlyMap<string, RecoverableTurn>,
+  turn: RecoverableTurn
+) {
+  const next = new Map(current)
+  next.set(turn.userMessageId, turn)
+  return next
+}
+
 export function withMessageFeedback(
   current: ReadonlyMap<string, MessageFeedback>,
   messageId: string,

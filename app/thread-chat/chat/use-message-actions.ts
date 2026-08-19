@@ -9,6 +9,7 @@ import {
   indexMessageFeedbacks,
   indexRecoverableTurns,
   withMessageFeedback,
+  withRecoverableTurn,
   withoutRecoverableTurn,
 } from "./message-action-session-logic"
 
@@ -86,23 +87,17 @@ export function useMessageActions({
     [commands, feedbackByMessageId]
   )
 
-  const replacePersistedMessageActions = useCallback(
-    ({
-      recoverableTurns,
-      messageFeedbacks,
-    }: {
-      recoverableTurns: RecoverableTurn[]
-      messageFeedbacks: MessageFeedbackSummary[]
-    }) => {
-      setRecoverableByUserMessageId(indexRecoverableTurns(recoverableTurns))
-      setFeedbackByMessageId(indexMessageFeedbacks(messageFeedbacks))
-    },
+  const registerRecoverableTurn = useCallback(
+    (turn: RecoverableTurn) =>
+      setRecoverableByUserMessageId((current) =>
+        withRecoverableTurn(current, turn)
+      ),
     []
   )
 
   return {
     messageActionState,
     messageCommands,
-    replacePersistedMessageActions,
+    registerRecoverableTurn,
   }
 }

@@ -12,7 +12,7 @@ export type MergeGenerationResultInput = {
   threadId: string
   assistantMessageId: string
   generationId: string
-  turnSnapshot: GenerationTurnSnapshot
+  turnSnapshot?: GenerationTurnSnapshot
   result: GenerationResultV1
 }
 
@@ -76,6 +76,7 @@ export function mergeGenerationResult(
     (message) => message.id === input.assistantMessageId
   )
   if (messageIndex === -1) {
+    if (!input.turnSnapshot) return state
     const repaired = restoreTurnSnapshot(thread, input.turnSnapshot)
     if (!repaired || repaired.assistantMessage.id !== input.assistantMessageId)
       return state

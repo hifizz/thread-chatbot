@@ -3,35 +3,30 @@
 import { useEffect, useRef } from "react"
 import {
   GENERATION_CLIENT_POLL_MS,
+  GENERATION_ERRORS,
   GENERATION_HIDDEN_POLL_MS,
 } from "@/constants/generation"
-import { resolveThreadChatModelId } from "@/constants/model"
 import { fetchWithAuth } from "@/lib/auth/session-recovery"
-import type { MessageFeedbackSummary } from "../core/types"
 import type { ThreadStore } from "../core/store"
 import type { GenerationSummary, RecoverableTurn } from "./types"
 import {
   initialGenerationIds,
   isGenerationInFlight,
   messageGenerationIds,
+  missingGenerationTurn,
+  terminalGenerationResultInput,
 } from "./generation-reconciliation-logic"
-import { loadTree, sanitizeLoadedState } from "../net/persist"
 
 export function useGenerationReconciliation({
-  treeId,
   store,
   version,
   initialGenerations,
-  replacePersistedMessageActions,
+  registerRecoverableTurn,
 }: {
-  treeId: string
   store: ThreadStore
   version: number
   initialGenerations: GenerationSummary[]
-  replacePersistedMessageActions(input: {
-    recoverableTurns: RecoverableTurn[]
-    messageFeedbacks: MessageFeedbackSummary[]
-  }): void
+  registerRecoverableTurn(turn: RecoverableTurn): void
 }) {
   const generationIdsRef = useRef(initialGenerationIds(initialGenerations))
 
@@ -52,7 +47,6 @@ export function useGenerationReconciliation({
       )
     }
     const poll = async () => {
-      let needsTreeReconciliation = false
       for (const generationId of [...generationIdsRef.current]) {
         if (cancelled) return
         try {
@@ -61,7 +55,18 @@ export function useGenerationReconciliation({
           )
           if (response.status === 404) {
             generationIdsRef.current.delete(generationId)
-            needsTreeReconciliation = true
+            const recoverable = missingGenerationTurn(
+              store.getState(),
+              generationId
+            )
+            if (recoverable) {
+              store.failAssistantMessage(
+                recoverable.threadId,
+                recoverable.assistantMessageId,
+                GENERATION_ERRORS.backgroundInterrupted
+              )
+              registerRecoverableTurn(recoverable)
+            }
             continue
           }
           if (!response.ok) continue
@@ -71,25 +76,10 @@ export function useGenerationReconciliation({
           if (isGenerationInFlight(data.generation.status)) continue
 
           generationIdsRef.current.delete(generationId)
-          needsTreeReconciliation = true
+          const resultInput = terminalGenerationResultInput(data.generation)
+          if (resultInput) store.applyGenerationResult(resultInput)
         } catch (error) {
           console.warn("[thread-chat] generation 轮询失败，将继续重试", error)
-        }
-      }
-      if (needsTreeReconciliation && !cancelled) {
-        const loaded = await loadTree(treeId)
-        if (loaded.state) {
-          store.replaceReconciledState(
-            sanitizeLoadedState(
-              loaded.state,
-              resolveThreadChatModelId,
-              loaded.generations
-            )
-          )
-          replacePersistedMessageActions({
-            recoverableTurns: loaded.recoverableTurns,
-            messageFeedbacks: loaded.messageFeedbacks,
-          })
         }
       }
       schedule()
@@ -99,5 +89,5 @@ export function useGenerationReconciliation({
       cancelled = true
       if (timer) clearTimeout(timer)
     }
-  }, [store, treeId, replacePersistedMessageActions])
+  }, [store, registerRecoverableTurn])
 }

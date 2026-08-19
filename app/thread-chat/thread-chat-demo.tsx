@@ -188,7 +188,7 @@ export function ThreadChatDemoInner({
   const {
     messageActionState,
     messageCommands,
-    replacePersistedMessageActions,
+    registerRecoverableTurn,
   } = useMessageActions({
     state,
     version,
@@ -197,11 +197,10 @@ export function ThreadChatDemoInner({
     commands: chat,
   })
   useGenerationReconciliation({
-    treeId,
     store,
     version,
     initialGenerations,
-    replacePersistedMessageActions,
+    registerRecoverableTurn,
   })
   useEffect(() => () => chat.detachAll(), [chat])
 
