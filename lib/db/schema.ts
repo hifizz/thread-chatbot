@@ -18,7 +18,7 @@ import type {
   GenerationResultV1,
   GenerationStatus,
   GenerationTurnSnapshot,
-} from "@/app/thread-chat/generation/types"
+} from "@/lib/thread-chat/domain/generation"
 import type { MessageFeedback } from "@/lib/thread-chat/domain/types"
 
 // 认证与计费表在独立文件中定义，这里统一 re-export，使 drizzle 客户端与迁移能感知它们。

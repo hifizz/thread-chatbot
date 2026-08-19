@@ -12,7 +12,7 @@ import type {
   GenerationTurnIdentity,
   GenerationTurnSnapshot,
   ThreadChatGenerationIntent,
-} from "@/app/thread-chat/generation/types"
+} from "@/lib/thread-chat/domain/generation"
 import {
   ACTIVE_GENERATION_STATUSES,
   GENERATION_ERRORS,

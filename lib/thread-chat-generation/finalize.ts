@@ -2,12 +2,9 @@ import { and, eq, inArray, sql } from "drizzle-orm"
 import type {
   GenerationBillingStatus,
   GenerationResultV1,
-} from "@/app/thread-chat/generation/types"
+} from "@/lib/thread-chat/domain/generation"
 import { ACTIVE_GENERATION_STATUSES } from "@/constants/generation"
-import {
-  chargeUsageOnce,
-  type UsageCostEvidence,
-} from "@/lib/billing/credits"
+import { chargeUsageOnce, type UsageCostEvidence } from "@/lib/billing/credits"
 import { db } from "@/lib/db"
 import { branchGenerations } from "@/lib/db/schema"
 
@@ -104,4 +101,3 @@ export async function finalizeGeneration(input: FinalizeGenerationInput) {
     return updated ?? row
   })
 }
-
