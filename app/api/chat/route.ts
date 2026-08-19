@@ -52,11 +52,8 @@ import {
   registerGenerationController,
   unregisterGenerationController,
 } from "@/lib/thread-chat-generation/execution"
-import {
-  finalizeGeneration,
-  type FinalizeGenerationInput,
-  type FinalizeGenerationUsage,
-} from "@/lib/thread-chat-generation/finalize"
+import type { FinalizeGenerationUsage } from "@/lib/thread-chat-generation/finalize"
+import { finalizeGenerationWithRetry } from "@/lib/thread-chat-generation/finalize-with-retry"
 import { projectGenerationResult } from "@/lib/thread-chat/application/project-generation-result"
 import { GENERATION_ERRORS } from "@/constants/generation"
 import { compileThreadChatMessages } from "@/lib/thread-chat/application/compile-thread-chat-messages"
@@ -73,26 +70,6 @@ import { generationStartErrorResponse } from "@/app/api/chat/generation-start-er
 
 // AnySearch 搜索与网页深读可能形成多步循环，放宽单次请求时长上限。
 export const maxDuration = 300
-
-async function finalizeWithRetry(input: FinalizeGenerationInput) {
-  let lastError: unknown
-  for (let attempt = 1; attempt <= 3; attempt++) {
-    try {
-      return await finalizeGeneration(input)
-    } catch (error) {
-      lastError = error
-      console.error("[thread-chat-generation] finalize 失败", {
-        generationId: input.generationId,
-        attempt,
-        error,
-      })
-      if (attempt < 3) {
-        await new Promise((resolve) => setTimeout(resolve, attempt * 150))
-      }
-    }
-  }
-  throw lastError
-}
 
 export async function POST(req: Request) {
   // 1) 鉴权：未登录直接拒绝
@@ -513,7 +490,7 @@ export async function POST(req: Request) {
               !projected.hasDisplayableOutput
                 ? "failed"
                 : requestedTerminal
-            await finalizeWithRetry({
+            await finalizeGenerationWithRetry({
               generationId: persistence.generationId,
               outcome,
               result: projected.result,
@@ -572,7 +549,7 @@ export async function POST(req: Request) {
             : GENERATION_ERRORS.streamFailed,
       })
       try {
-        await finalizeWithRetry({
+        await finalizeGenerationWithRetry({
           generationId: persistence.generationId,
           outcome: "failed",
           result: projected.result,
