@@ -306,3 +306,19 @@
 .tc .acard.compact .go {
   display: none;
 }
+
+/* user 气泡内的划选引用条：随提问消息落库并随消息呈现。 */
+.tc .message.user .msg-quote {
+  margin: 0 0 6px;
+  padding: 3px 8px;
+  border-left: 2px solid color-mix(in srgb, var(--ink) 35%, transparent);
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+  border-radius: 4px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: color-mix(in srgb, var(--ink) 72%, transparent);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
