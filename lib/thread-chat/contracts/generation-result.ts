@@ -3,7 +3,7 @@ import { GENERATION_RESULT_VERSION } from "@/constants/generation"
 import {
   researchPlanSchema,
   researchRouteSchema,
-} from "@/lib/chat/research-router"
+} from "@/lib/chat/research-contract"
 
 const artifactSchema = z.object({
   id: z.string(),
