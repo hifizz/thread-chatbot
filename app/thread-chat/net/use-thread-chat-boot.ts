@@ -9,7 +9,7 @@ import {
   rememberTreeId,
   type TreeUiState,
 } from "./persist"
-import { threadChatBootSeed } from "./thread-chat-boot"
+import { threadChatBootSeedOrFallback } from "./thread-chat-boot"
 
 export interface ThreadChatBoot {
   seed: ThreadTreeState
@@ -27,7 +27,7 @@ export function useThreadChatBoot(treeId: string): ThreadChatBoot | null {
     let cancelled = false
     ;(async () => {
       const loaded = await loadTree(treeId)
-      const seed = threadChatBootSeed(loaded)
+      const seed = threadChatBootSeedOrFallback(loaded)
       const ui = loadUiState(treeId, seed)
       if (cancelled) return
       rememberTreeId(treeId)
