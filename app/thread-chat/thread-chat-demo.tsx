@@ -82,6 +82,10 @@ import { ArtifactDrawer } from "./orchestration/artifact-drawer"
 import { HelpPanel, UsageHint } from "./orchestration/help-panel"
 import { ThreadChatTopbar } from "./orchestration/thread-chat-topbar"
 import { useWorkspaceOverlays } from "./orchestration/use-workspace-overlays"
+import {
+  useWorkspaceToast,
+  WorkspaceToast,
+} from "./orchestration/workspace-toast"
 // type-only：不把画布模块（React Flow）拖进首屏 bundle
 import type { CanvasChatActions } from "./orchestration/canvas-node"
 import type { CanvasViewState } from "./orchestration/use-canvas-layout"
@@ -101,11 +105,6 @@ const SUBTITLE_FALLBACK = "新对话"
 /** 画布模式喂给划选气泡的空列槽（稳定引用）：画布 fork 不占列槽（D4），
     气泡据此不渲染迷你列条（hasMap=false），提交路径由 handleFork 按视图分流 */
 const EMPTY_SLOTS: Slot[] = []
-
-interface ToastState {
-  msg: string
-  undo?: () => void
-}
 
 /**
  * 默认导出的 loader：先完成远端加载（GET → sanitize → 读工作台记忆）再渲染 inner。
@@ -165,16 +164,7 @@ export function ThreadChatDemoInner({
   )
   const version = useThreadStore(store)
   const state = store.getState()
-  const [toast, setToast] = useState<ToastState | null>(null)
-
-  function showToast(msg: string, undo?: () => void) {
-    setToast({ msg, undo })
-  }
-  useEffect(() => {
-    if (!toast) return
-    const t = setTimeout(() => setToast(null), toast.undo ? 5200 : 2600)
-    return () => clearTimeout(t)
-  }, [toast])
+  const { toast, showToast, dismissToast } = useWorkspaceToast()
 
   /* ---------- 聊天控制器：发送屏障 / Retry / 显式 Stop（真实 /api/chat SSE） ---------- */
   const [chat] = useState(() =>
@@ -626,20 +616,7 @@ export function ThreadChatDemoInner({
         }}
       />
 
-      <div className={`toast ${toast ? "show" : ""}`}>
-        <span>{toast?.msg}</span>
-        {toast?.undo && (
-          <button
-            className="undo"
-            onClick={() => {
-              toast.undo?.()
-              setToast(null)
-            }}
-          >
-            撤销
-          </button>
-        )}
-      </div>
+      <WorkspaceToast toast={toast} onDismiss={dismissToast} />
     </div>
   )
 }
