@@ -139,6 +139,28 @@ export function extractHttpUrls(text: string): string[] {
   return [...new Set((text.match(URL_PATTERN) ?? []).map(trimUrlPunctuation))]
 }
 
+function explicitlyDisablesWeb(text: string): boolean {
+  return /(?:不要|无需|不用|禁止).{0,8}(?:联网|搜索|检索|访问网络)|\b(?:do\s+not|don'?t|without)\s+(?:browse|search|use\s+the\s+web)\b/i.test(
+    text
+  )
+}
+
+/** “总结这个链接”等跟进从最近对话恢复 URL；普通总结仍保持本地回答。 */
+export function contextualUrlFollowUpRoute(
+  latestUserText: string,
+  recentConversation: string
+): ResearchRoute | null {
+  if (explicitlyDisablesWeb(latestUserText)) return null
+  if (extractHttpUrls(latestUserText).length > 0) return null
+  const refersToPage =
+    /(?:总结|翻译|分析|解读|概括|改写).{0,16}(?:(?:这个|这篇|该|上面|之前)(?:链接|网页|页面|网址)|(?:链接|网页|页面|网址)(?:内容)?)|\b(?:summari[sz]e|translate|analy[sz]e|explain)\b.{0,24}\b(?:(?:this|that|the|previous)\s+)?(?:link|url|page)\b/i.test(
+      latestUserText
+    )
+  if (!refersToPage) return null
+  const urls = extractHttpUrls(recentConversation).slice(-4)
+  return urls.length > 0 ? route("fetch", "explicit_url", { urls }) : null
+}
+
 function route(
   mode: ResearchRouteMode,
   reasonCode: ResearchRoute["reasonCode"],
@@ -159,11 +181,7 @@ export function deterministicResearchRoute(
   const normalized = text.trim()
   if (!normalized) return route("answer", "no_web_needed")
 
-  if (
-    /(?:不要|无需|不用|禁止).{0,8}(?:联网|搜索|检索|访问网络)|\b(?:do\s+not|don'?t|without)\s+(?:browse|search|use\s+the\s+web)\b/i.test(
-      normalized
-    )
-  )
+  if (explicitlyDisablesWeb(normalized))
     return route("answer", "no_web_needed")
 
   const urls = extractHttpUrls(normalized)
@@ -217,6 +235,12 @@ export async function resolveResearchRoute({
   recentConversation,
   searchReady,
 }: ResolveResearchRouteInput): Promise<ResearchRoute> {
+  const contextualFollowUp = contextualUrlFollowUpRoute(
+    latestUserText,
+    recentConversation
+  )
+  if (contextualFollowUp)
+    return normalizeModelRoute(contextualFollowUp, searchReady)
   const deterministic = deterministicResearchRoute(latestUserText)
   if (deterministic)
     return normalizeModelRoute(deterministic, searchReady)
