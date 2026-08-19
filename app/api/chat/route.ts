@@ -33,10 +33,7 @@ import { resolveChatModel, isModelConfigured } from "@/lib/ai/provider"
 import { openRouterCostUsdFromSteps } from "@/lib/ai/openrouter"
 import { hasPositiveBalance, chargeUsage } from "@/lib/billing/credits"
 import { buildUsageMetadata } from "@/lib/billing/usage-meta"
-import {
-  isExplicitMarkdownArtifactRequest,
-  MARKDOWN_ARTIFACT_TOOL_NAME,
-} from "@/lib/chat/markdown-artifact"
+import { isExplicitMarkdownArtifactRequest } from "@/lib/chat/markdown-artifact"
 import {
   createResearchPlan,
   reasoningForResearchRoute,
@@ -67,6 +64,7 @@ import {
   recentConversationText,
 } from "@/app/api/chat/conversation-text"
 import { generationStartErrorResponse } from "@/app/api/chat/generation-start-error"
+import { createToolStepPolicy } from "@/app/api/chat/tool-step-policy"
 
 // AnySearch 搜索与网页深读可能形成多步循环，放宽单次请求时长上限。
 export const maxDuration = 300
@@ -287,53 +285,11 @@ export async function POST(req: Request) {
       tools: allTools,
       // 明确 Markdown 交付请求只强制第 0 步启动工具调用；后续步骤仍保留工具，
       // 让模型在用户要求多份独立文档时，为每份文档分别创建一个 Artifact。
-      prepareStep:
-        isThreadChat || webToolsEnabled
-          ? ({ stepNumber }) => {
-              const activeWebTools =
-                researchRoute.mode === "fetch"
-                  ? ["readUrl"]
-                  : researchRoute.mode === "search" ||
-                      researchRoute.mode === "research"
-                    ? ["webSearch", "readUrl"]
-                    : []
-              const activeTools = isThreadChat
-                ? [
-                    ...(markdownArtifactRequested
-                      ? [MARKDOWN_ARTIFACT_TOOL_NAME]
-                      : []),
-                    ...activeWebTools,
-                  ]
-                : activeWebTools
-
-              if (stepNumber === 0 && researchRoute.mode === "fetch") {
-                return {
-                  activeTools,
-                  toolChoice: { type: "tool" as const, toolName: "readUrl" },
-                }
-              }
-              if (
-                stepNumber === 0 &&
-                (researchRoute.mode === "search" ||
-                  researchRoute.mode === "research")
-              ) {
-                return {
-                  activeTools,
-                  toolChoice: { type: "tool" as const, toolName: "webSearch" },
-                }
-              }
-              if (stepNumber === 0 && markdownArtifactRequested) {
-                return {
-                  activeTools,
-                  toolChoice: {
-                    type: "tool" as const,
-                    toolName: MARKDOWN_ARTIFACT_TOOL_NAME,
-                  },
-                }
-              }
-              return activeTools.length > 0 ? { activeTools } : undefined
-            }
-          : undefined,
+      prepareStep: createToolStepPolicy({
+        isThreadChat,
+        markdownArtifactRequested,
+        researchMode: researchRoute.mode,
+      }),
       maxOutputTokens: MAX_OUTPUT_TOKENS,
       stopWhen: isStepCount(webToolsEnabled ? RESEARCH_MAX_STEPS : 5),
       onError: ({ error }) => {
