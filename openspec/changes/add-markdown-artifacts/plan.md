@@ -32,10 +32,10 @@ export function normalizeMarkdownArtifactInput(
   input: MarkdownArtifactInput
 ): MarkdownArtifactInput
 
-export function isExplicitMarkdownDeliverableRequest(text: string): boolean
+export function isExplicitMarkdownArtifactRequest(text: string): boolean
 ```
 
-`normalizeMarkdownArtifactInput` 只 trim 标题/正文并拆除覆盖整份内容的单个外层 `markdown`/`md` fence，不修改内部 fence。`isExplicitMarkdownDeliverableRequest` 只处理高置信强制路由；完整的中英文及等价语义识别仍由双语 tool description + system instruction 完成。
+`normalizeMarkdownArtifactInput` 只 trim 标题/正文并拆除覆盖整份内容的单个外层 `markdown`/`md` fence，不修改内部 fence。`isExplicitMarkdownArtifactRequest` 只处理高置信强制路由；完整的中英文及等价语义识别仍由双语 tool description + system instruction 完成。
 
 ### 1.2 领域模型
 
