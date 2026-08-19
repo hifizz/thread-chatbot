@@ -1,5 +1,6 @@
-import type { UIMessage } from "ai"
+import { safeValidateUIMessages, type UIMessage } from "ai"
 import type { ToolJSONSchema } from "assistant-stream"
+import { z } from "zod"
 import { getCurrentUserId } from "@/lib/auth/server"
 import {
   DEFAULT_MODEL_ID,
@@ -18,6 +19,22 @@ type ChatRequestBody = {
   threadChat?: unknown
   modelId?: unknown
   id?: string
+}
+
+const chatRequestEnvelopeSchema = z.object({
+  messages: z.unknown(),
+  tools: z.record(z.string(), z.unknown()).optional(),
+  deepResearch: z.boolean().optional(),
+  threadChat: z.unknown().optional(),
+  modelId: z.unknown().optional(),
+  id: z.string().optional(),
+})
+
+function invalidChatRequest(message: string) {
+  return {
+    kind: "response" as const,
+    response: Response.json({ error: message }, { status: 400 }),
+  }
 }
 
 type ChatRequestContextDependencies = {
@@ -54,7 +71,31 @@ export async function prepareChatRequestContext(
     }
   }
 
-  const body = (await req.json()) as ChatRequestBody
+  let input: unknown
+  try {
+    input = await req.json()
+  } catch {
+    return invalidChatRequest("请求体必须是有效 JSON。")
+  }
+  const envelope = chatRequestEnvelopeSchema.safeParse(input)
+  if (!envelope.success)
+    return invalidChatRequest("请求体缺少有效的 messages。")
+
+  const validatedMessages = await safeValidateUIMessages({
+    messages: envelope.data.messages,
+  })
+  if (
+    !validatedMessages.success ||
+    validatedMessages.data.length === 0 ||
+    validatedMessages.data.some((message) => message.role === "system")
+  )
+    return invalidChatRequest("messages 必须是非空的 user/assistant 消息数组。")
+
+  const body: ChatRequestBody = {
+    ...envelope.data,
+    messages: validatedMessages.data,
+    tools: envelope.data.tools as Record<string, ToolJSONSchema> | undefined,
+  }
   const rawModelId = body.modelId
   if (
     rawModelId !== undefined &&

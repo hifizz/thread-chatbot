@@ -42,6 +42,28 @@ assert.equal(unauthorized.kind, "response")
 assert.equal(unauthorized.response.status, 401)
 assert.equal(parsedWithoutAuth, false)
 
+const malformed = await prepareChatRequestContext(
+  new Request("http://localhost/api/chat", {
+    method: "POST",
+    body: "{",
+  }),
+  dependencies()
+)
+assert.equal(malformed.kind, "response")
+assert.equal(malformed.response.status, 400)
+
+for (const body of [
+  null,
+  {},
+  { messages: [] },
+  { messages: [{ id: "s1", role: "system", parts: [] }] },
+  { messages: [{ id: "u1", role: "user", parts: [{ type: "text" }] }] },
+]) {
+  const invalidBody = await prepareChatRequestContext(request(body), dependencies())
+  assert.equal(invalidBody.kind, "response")
+  assert.equal(invalidBody.response.status, 400)
+}
+
 for (const modelId of [42, "missing"]) {
   const invalid = await prepareChatRequestContext(
     request({ messages, modelId }),
