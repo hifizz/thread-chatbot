@@ -25,16 +25,8 @@
 import dynamic from "next/dynamic"
 import { useRouter } from "next/navigation"
 import React, { useCallback, useEffect, useRef, useState } from "react"
-import {
-  CircleHelp,
-  Columns3,
-  FileText,
-  ListTodo,
-  Network,
-  Waypoints,
-} from "lucide-react"
 import "./thread-chat.css"
-import { POPUP_EXIT_MS, THREAD_CHAT_SHORTCUTS } from "@/constants/thread-chat"
+import { POPUP_EXIT_MS } from "@/constants/thread-chat"
 import { isThreadChatModelId } from "@/constants/model"
 import { createThreadStore } from "./core/store"
 import { useThreadStore } from "./core/use-thread-store"
@@ -88,9 +80,8 @@ import {
 } from "./orchestration/thread-switcher"
 import { TreeList } from "./orchestration/tree-list"
 import { ArtifactDrawer } from "./orchestration/artifact-drawer"
-import { AccountButton } from "./orchestration/account-button"
 import { HelpPanel, UsageHint } from "./orchestration/help-panel"
-import { ShortcutHint } from "./orchestration/shortcut-hint"
+import { ThreadChatTopbar } from "./orchestration/thread-chat-topbar"
 // type-only：不把画布模块（React Flow）拖进首屏 bundle
 import type { CanvasChatActions } from "./orchestration/canvas-node"
 import type { CanvasViewState } from "./orchestration/use-canvas-layout"
@@ -574,121 +565,31 @@ export function ThreadChatDemoInner({
 
   return (
     <div className="tc" ref={tcRootRef}>
-      <div className="topbar">
-        <button
-          className="tbtn"
-          title="开启一棵全新的分支对话树（当前对话已自动保存，可经其 URL 随时回访）"
-          onClick={() => {
-            // 当前树还没聊过 = 已经是"新对话"：无操作（URL 不变、不再生成新 id），
-            // 轻提示告知即可——反复点按钮不该让空树的 URL 一直变（用户反馈）
-            if (!mainHasMessage) {
-              showToast("当前就是全新对话，直接开聊吧")
-              return
-            }
-            router.push(`/thread-chat/${crypto.randomUUID()}`)
-          }}
-        >
-          新对话
-        </button>
-        <button
-          className="tbtn"
-          title="查看全部对话，可切换 / 重命名 / 删除（⌘⇧K）"
-          onClick={toggleTreeList}
-        >
-          <ListTodo size={13} />
-          对话列表
-          <ShortcutHint {...THREAD_CHAT_SHORTCUTS.openTreeList} />
-        </button>
-        <div className="brand">
-          <span className="mark">Thread Chat</span>
-        </div>
-        <div className="spacer" />
-        {(viewMode === "canvas" || !hintVisible) && (
-          <button
-            className="tbtn help"
-            title="使用提示"
-            onClick={() => setHelpPanel({ n: ++helpSeq.current })}
-          >
-            <CircleHelp size={14} />
-          </button>
-        )}
-        <div className="seg" title="列 = 并排深读；画布 = 纵览整棵会话树">
-          <button
-            className={`mode ${viewMode === "columns" ? "on" : ""}`}
-            title="列视图：并排深读多个会话"
-            onClick={showColumnsView}
-          >
-            <Columns3 size={12} />列
-          </button>
-          <button
-            className={`mode ${viewMode === "canvas" ? "on" : ""}`}
-            title="画布视图：纵览整棵会话树，单击节点就地对话，双击回到列模式"
-            onClick={() => setViewMode("canvas")}
-          >
-            <Waypoints size={12} />
-            画布
-          </button>
-        </div>
-        {viewMode === "columns" && (
-          <>
-            <div
-              className="seg"
-              title={
-                winW === null
-                  ? undefined
-                  : `列数：视口 ${winW}px，约每 ${COL_MIN_W}px 一列`
-              }
-            >
-              {(["auto", 2, 3, 4] as const).map((v) => (
-                <button
-                  key={v}
-                  className={
-                    (v === "auto" ? forceCols === null : forceCols === v)
-                      ? "on"
-                      : ""
-                  }
-                  onClick={() => setForceCols(v === "auto" ? null : v)}
-                >
-                  {v === "auto" ? "自适应" : v}
-                </button>
-              ))}
-            </div>
-            <div className="seg" title="列满时的放置策略">
-              <button
-                className={mode === "replace" ? "on" : ""}
-                onClick={() => changeMode("replace")}
-              >
-                替换⑥
-              </button>
-              <button
-                className={mode === "fold" ? "on" : ""}
-                onClick={() => changeMode("fold")}
-              >
-                细条⑤
-              </button>
-            </div>
-          </>
-        )}
-        <button
-          className="tbtn"
-          title="搜索并打开任意会话（⌘K）"
-          onClick={toggleGlobalSwitcher}
-        >
-          <Network size={13} />
-          会话树{branchCount > 0 ? ` · ${branchCount}` : ""}
-          <ShortcutHint {...THREAD_CHAT_SHORTCUTS.openThreadTree} />
-        </button>
-        <button
-          className="tbtn"
-          title="打开 / 收起 Markdown 面板"
-          onClick={() => setDrawerOpen((v) => !v)}
-        >
-          <FileText size={13} />
-          Markdown
-          <span className="cnt">{markdownCount}</span>
-        </button>
-        <AccountButton />
-      </div>
+      <ThreadChatTopbar
+        viewMode={viewMode}
+        showHelp={viewMode === "canvas" || !hintVisible}
+        windowWidth={winW}
+        forceCols={forceCols}
+        placementMode={mode}
+        branchCount={branchCount}
+        markdownCount={markdownCount}
+        onNewConversation={() => {
+          // 空树已经是新对话；反复点击不应让 URL 持续变化。
+          if (!mainHasMessage) {
+            showToast("当前就是全新对话，直接开聊吧")
+            return
+          }
+          router.push(`/thread-chat/${crypto.randomUUID()}`)
+        }}
+        onToggleTreeList={toggleTreeList}
+        onOpenHelp={() => setHelpPanel({ n: ++helpSeq.current })}
+        onShowColumns={showColumnsView}
+        onShowCanvas={() => setViewMode("canvas")}
+        onForceCols={setForceCols}
+        onPlacementModeChange={changeMode}
+        onToggleThreadTree={toggleGlobalSwitcher}
+        onToggleMarkdown={() => setDrawerOpen((open) => !open)}
+      />
 
       {viewMode === "columns" ? (
         <ThreadColumns
