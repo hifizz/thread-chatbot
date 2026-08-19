@@ -87,12 +87,14 @@ node --import tsx e2e/thread-chat/message-action-availability.test.mjs
 ```bash
 node --env-file=.env.local --import tsx e2e/thread-chat/generation-actions-db.test.mjs
 node --env-file=.env.local --import tsx e2e/thread-chat/tree-revision-db.test.mjs
+node --env-file=.env.local --import tsx e2e/thread-chat/tree-deletion-db.test.mjs
 node --env-file=.env.local --import tsx e2e/thread-chat/message-feedback-db.test.mjs
 ```
 
 覆盖 generation intent 的原子落库、幂等 replay、running attempt supersede、terminal
 source/Artifact 保留、active-leaf CAS、跨用户拒绝、generation-vs-switch revision
-竞态，以及 message feedback 的 set/repeat/switch/clear、完成态约束和 owner isolation。
+竞态、删除与 generation start 的行锁串行化及幂等删除，以及 message feedback 的
+set/repeat/switch/clear、完成态约束和 owner isolation。
 真实 UI 验收按仓库规则使用 `ego-browser nodejs` 访问 `localhost:4040`，不得用
 本目录旧的 Playwright 脚本替代本 change 的浏览器验收。
 

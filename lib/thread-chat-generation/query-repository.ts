@@ -1,6 +1,5 @@
-import { and, desc, eq, inArray } from "drizzle-orm"
+import { and, desc, eq } from "drizzle-orm"
 import type { GenerationSummary } from "@/lib/thread-chat/domain/generation"
-import { ACTIVE_GENERATION_STATUSES } from "@/constants/generation"
 import { db } from "@/lib/db"
 import { branchGenerations } from "@/lib/db/schema"
 
@@ -67,24 +66,6 @@ export async function listGenerationsForTree(
       )
     )
     .orderBy(desc(branchGenerations.updatedAt))
-}
-
-export async function treeHasActiveGenerations(
-  userId: string,
-  treeId: string
-): Promise<boolean> {
-  const [row] = await db
-    .select({ id: branchGenerations.id })
-    .from(branchGenerations)
-    .where(
-      and(
-        eq(branchGenerations.userId, userId),
-        eq(branchGenerations.treeId, treeId),
-        inArray(branchGenerations.status, ACTIVE_GENERATION_STATUSES)
-      )
-    )
-    .limit(1)
-  return Boolean(row)
 }
 
 export function toGenerationSummary(row: GenerationRow): GenerationSummary {

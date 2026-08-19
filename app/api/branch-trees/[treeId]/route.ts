@@ -34,9 +34,9 @@ import {
   listGenerationsForTree,
   listCurrentGenerationsForTree,
   toGenerationSummary,
-  treeHasActiveGenerations,
 } from "@/lib/thread-chat-generation/query-repository"
 import { listMessageFeedbackForTree } from "@/lib/thread-chat-generation/message-feedback-repository"
+import { deleteOwnedTreeIfIdle } from "@/lib/thread-chat-generation/tree-repository"
 import {
   SAVE_TREE_ERROR_STATUS,
   SAVE_TREE_REVISION_ERRORS,
@@ -281,12 +281,8 @@ export async function DELETE(_req: Request, { params }: RouteContext) {
   if (!isValidTreeId(treeId))
     return new Response("treeId 必须是 UUID", { status: 400 })
 
-  const [owned] = await db
-    .select({ id: branchTrees.id })
-    .from(branchTrees)
-    .where(and(eq(branchTrees.id, treeId), eq(branchTrees.userId, userId)))
-  if (!owned) return notFound()
-  if (await treeHasActiveGenerations(userId, treeId)) {
+  const outcome = await deleteOwnedTreeIfIdle({ userId, treeId })
+  if (outcome === "generation_running") {
     return Response.json(
       {
         error: {
@@ -297,8 +293,5 @@ export async function DELETE(_req: Request, { params }: RouteContext) {
       { status: 409 }
     )
   }
-  await db
-    .delete(branchTrees)
-    .where(and(eq(branchTrees.id, treeId), eq(branchTrees.userId, userId)))
   return Response.json({ ok: true })
 }

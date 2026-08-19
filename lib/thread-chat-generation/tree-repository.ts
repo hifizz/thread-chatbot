@@ -1,4 +1,5 @@
-import { and, eq, sql } from "drizzle-orm"
+import { and, eq, inArray, sql } from "drizzle-orm"
+import { ACTIVE_GENERATION_STATUSES } from "@/constants/generation"
 import {
   activeLeafTurn,
   assistantTurnAlternatives,
@@ -11,7 +12,7 @@ import type {
   SwitchActiveLeafSuccessResponse,
 } from "@/lib/thread-chat/contracts/switch-active-leaf"
 import { db } from "@/lib/db"
-import { branchTrees } from "@/lib/db/schema"
+import { branchGenerations, branchTrees } from "@/lib/db/schema"
 
 export class TreeCommandError extends Error {
   constructor(
@@ -22,6 +23,55 @@ export class TreeCommandError extends Error {
     super(message)
     this.name = "TreeCommandError"
   }
+}
+
+export type DeleteOwnedTreeResult =
+  | "deleted"
+  | "not_found"
+  | "generation_running"
+
+/**
+ * 删除与 generation start 共用 branch_trees 行锁：两者并发时，只可能先删除并让
+ * start 得到 not_found，或先创建 generation 并让删除得到 generation_running。
+ */
+export async function deleteOwnedTreeIfIdle(input: {
+  userId: string
+  treeId: string
+}): Promise<DeleteOwnedTreeResult> {
+  return db.transaction(async (tx) => {
+    const locked = await tx.execute(sql`
+      select ${branchTrees.id}
+      from ${branchTrees}
+      where ${branchTrees.id} = ${input.treeId}
+        and ${branchTrees.userId} = ${input.userId}
+      for update
+    `)
+    if (locked.length === 0) return "not_found"
+
+    const [activeGeneration] = await tx
+      .select({ id: branchGenerations.id })
+      .from(branchGenerations)
+      .where(
+        and(
+          eq(branchGenerations.userId, input.userId),
+          eq(branchGenerations.treeId, input.treeId),
+          inArray(branchGenerations.status, ACTIVE_GENERATION_STATUSES)
+        )
+      )
+      .limit(1)
+    if (activeGeneration) return "generation_running"
+
+    const [deleted] = await tx
+      .delete(branchTrees)
+      .where(
+        and(
+          eq(branchTrees.id, input.treeId),
+          eq(branchTrees.userId, input.userId)
+        )
+      )
+      .returning({ id: branchTrees.id })
+    return deleted ? "deleted" : "not_found"
+  })
 }
 
 export async function switchActiveLeafForOwner(
