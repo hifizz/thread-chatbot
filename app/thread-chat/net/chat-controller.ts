@@ -43,6 +43,7 @@ import { submitMessageFeedback } from "./message-feedback-command"
 import { switchActiveLeaf } from "./switch-active-leaf-command"
 import { requestGenerationStop } from "./stop-generation-command"
 import { requestChatGeneration } from "./chat-generation-command"
+import { createAssistantDeltaBuffer } from "./assistant-delta-buffer"
 import type {
   GenerationActionResult,
   VariantSwitchResult,
@@ -54,8 +55,6 @@ export type {
   VariantSwitchResult,
 } from "./message-action-results"
 
-/** 页面不可见 / 无 requestAnimationFrame 时的降级刷新间隔（毫秒） */
-const FALLBACK_FLUSH_MS = 50
 /** 网络异常（非中止）的兜底错误文案 */
 const NETWORK_ERROR = "网络请求失败，请重试"
 /** 流正常结束但一个正文字符都没收到时的错误文案（空回复转正为可重试错误） */
@@ -137,63 +136,21 @@ export function createChatController(
     /** 本次流是否仍是该会话的当前在飞流（retry 会用新 controller 顶替旧的） */
     const isOwner = () => inflight.get(threadId) === controller
 
-    // ---- 合帧缓冲 ----
-    let pending = ""
-    let pendingMarkdownProgress:
-      Parameters<ThreadStore["setMarkdownGenerationProgress"]>[2] | null = null
-    let frame: number | null = null
-    let usingRAF = false
-
-    const doFlush = () => {
-      if (!pending && !pendingMarkdownProgress) return
-      if (!isOwner()) {
-        pending = "" // 已被新流顶替：丢弃残余，不写旧消息
-        pendingMarkdownProgress = null
-        return
-      }
-      if (pending) {
-        const delta = pending
-        pending = ""
-        store.appendAssistantDelta(threadId, msgId, delta)
-      }
-      if (pendingMarkdownProgress) {
-        const progress = pendingMarkdownProgress
-        pendingMarkdownProgress = null
-        store.setMarkdownGenerationProgress(threadId, msgId, progress)
-      }
-    }
-    const onFrame = () => {
-      frame = null
-      doFlush()
-    }
-    const canUseRAF = () =>
-      typeof requestAnimationFrame !== "undefined" &&
-      !(typeof document !== "undefined" && document.hidden)
-    const schedule = () => {
-      if (frame !== null) return
-      if (canUseRAF()) {
-        usingRAF = true
-        frame = requestAnimationFrame(onFrame)
-      } else {
-        usingRAF = false
-        frame = setTimeout(onFrame, FALLBACK_FLUSH_MS) as unknown as number
-      }
-    }
-    const cancelFrame = () => {
-      if (frame === null) return
-      if (usingRAF) cancelAnimationFrame(frame)
-      else clearTimeout(frame)
-      frame = null
-    }
+    const deltaBuffer = createAssistantDeltaBuffer({
+      store,
+      threadId,
+      messageId: msgId,
+      isOwner,
+    })
 
     // ---- 终态收敛（只结算一次；非归属者只清理不写消息）----
     let settled = false
     const settle = (apply: () => void) => {
       if (settled) return
       settled = true
-      cancelFrame()
+      deltaBuffer.cancel()
       if (!isOwner()) return // 已被 retry 顶替：不触碰新流的消息
-      doFlush() // 先 flush 残余文本，再落终态
+      deltaBuffer.flush() // 先 flush 残余文本，再落终态
       apply()
     }
 
@@ -237,22 +194,15 @@ export function createChatController(
       onTextDelta(delta) {
         if (settled) return
         receivedChars += delta.replace(/\s/g, "").length
-        pending += delta
-        schedule()
+        deltaBuffer.appendText(delta)
       },
       onMarkdownArtifactProgress(event) {
         if (settled || !isOwner()) return
-        if (event.phase === "starting") {
-          pendingMarkdownProgress = null
-          store.setMarkdownGenerationProgress(threadId, msgId, event)
-          return
-        }
-        pendingMarkdownProgress = event
-        schedule()
+        deltaBuffer.setMarkdownProgress(event)
       },
       onMarkdownArtifact(event) {
         if (settled || !isOwner()) return
-        pendingMarkdownProgress = null
+        deltaBuffer.clearMarkdownProgress()
         const seed: ArtifactSeed = {
           kind: "markdown",
           title: event.input.title,
@@ -265,7 +215,7 @@ export function createChatController(
         if (settled || !isOwner()) return
         // UI 必须把聚合面板插在 tool-input-start 的真实位置。先把此前按帧
         // 缓冲的 text-delta 落进消息，store 才能记录准确的正文字符偏移。
-        doFlush()
+        deltaBuffer.flush()
         store.setWebResearchActivity(threadId, msgId, activity)
       },
       onResearchRoute(route) {
@@ -392,7 +342,7 @@ export function createChatController(
                   store.failAssistantMessage(threadId, msgId, NETWORK_ERROR)
                 )
             } finally {
-              cancelFrame()
+              deltaBuffer.cancel()
               if (inflight.get(threadId) === controller)
                 inflight.delete(threadId)
             }
@@ -425,7 +375,7 @@ export function createChatController(
         }
       } finally {
         if (!streamHandedOff) {
-          cancelFrame()
+          deltaBuffer.cancel()
           // 仅当 inflight 仍指向本次 controller 时才清除，避免 retry 竞态误删新流的条目
           if (inflight.get(threadId) === controller) inflight.delete(threadId)
         }
