@@ -14,7 +14,7 @@
  * treeId 做 UUID 形状校验（安全阀），不合法一律 400。
  */
 
-import { and, eq, sql } from "drizzle-orm"
+import { and, eq } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { branchTrees } from "@/lib/db/schema"
 import { isValidTreeId } from "@/lib/chat/tree-id"
@@ -39,6 +39,7 @@ import { listMessageFeedbackForTree } from "@/lib/thread-chat-generation/message
 import {
   deleteOwnedTreeIfIdle,
   loadOwnedOrClaimLegacyTree,
+  saveOwnedTree,
 } from "@/lib/thread-chat-generation/tree-repository"
 import {
   SAVE_TREE_ERROR_STATUS,
@@ -177,50 +178,12 @@ export async function PUT(req: Request, { params }: RouteContext) {
       "消息图包含无效的 parent、active leaf 或 Artifact source"
     )
   }
-  const now = new Date()
-  const saved = await db.transaction(async (tx) => {
-    const expectedRevision = command.data.baseRevision
-    const [updated] = await tx
-      .update(branchTrees)
-      .set({
-        state: validatedState,
-        title,
-        revision: sql`${branchTrees.revision} + 1`,
-        updatedAt: now,
-      })
-      .where(
-        and(
-          eq(branchTrees.id, treeId),
-          eq(branchTrees.userId, userId),
-          eq(branchTrees.revision, expectedRevision)
-        )
-      )
-      .returning({ revision: branchTrees.revision })
-    if (updated) return { kind: "saved" as const, revision: updated.revision }
-
-    const [existing] = await tx
-      .select({ revision: branchTrees.revision })
-      .from(branchTrees)
-      .where(and(eq(branchTrees.id, treeId), eq(branchTrees.userId, userId)))
-    if (existing)
-      return { kind: "conflict" as const, revision: existing.revision }
-    if (expectedRevision !== 0) return { kind: "not_found" as const }
-
-    const [inserted] = await tx
-      .insert(branchTrees)
-      .values({
-        id: treeId,
-        userId,
-        state: validatedState,
-        title,
-        revision: 1,
-        updatedAt: now,
-      })
-      .onConflictDoNothing({ target: branchTrees.id })
-      .returning({ revision: branchTrees.revision })
-    return inserted
-      ? { kind: "saved" as const, revision: inserted.revision }
-      : { kind: "not_found" as const }
+  const saved = await saveOwnedTree({
+    userId,
+    treeId,
+    state: validatedState,
+    title,
+    baseRevision: command.data.baseRevision,
   })
   if (saved.kind === "not_found") return notFound()
   if (saved.kind === "conflict") {

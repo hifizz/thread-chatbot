@@ -35,6 +35,11 @@ export type OwnedTreeSnapshot = Pick<
   "state" | "customTitle" | "revision"
 >
 
+export type SaveOwnedTreeResult =
+  | { kind: "saved"; revision: number }
+  | { kind: "conflict"; revision: number }
+  | { kind: "not_found" }
+
 /** GET 精确 URL 的迁移入口：普通 owner 读取，或原子认领一棵历史无主树。 */
 export async function loadOwnedOrClaimLegacyTree(input: {
   userId: string
@@ -65,6 +70,64 @@ export async function loadOwnedOrClaimLegacyTree(input: {
       )
       .returning(selection)
     return claimed ?? null
+  })
+}
+
+/** owner + revision CAS 的整树写入；新树只允许 baseRevision=0 时绑定当前用户。 */
+export async function saveOwnedTree(input: {
+  userId: string
+  treeId: string
+  state: ThreadTreeState
+  title: string | null
+  baseRevision: number
+}): Promise<SaveOwnedTreeResult> {
+  const now = new Date()
+  return db.transaction(async (tx) => {
+    const [updated] = await tx
+      .update(branchTrees)
+      .set({
+        state: input.state,
+        title: input.title,
+        revision: sql`${branchTrees.revision} + 1`,
+        updatedAt: now,
+      })
+      .where(
+        and(
+          eq(branchTrees.id, input.treeId),
+          eq(branchTrees.userId, input.userId),
+          eq(branchTrees.revision, input.baseRevision)
+        )
+      )
+      .returning({ revision: branchTrees.revision })
+    if (updated) return { kind: "saved", revision: updated.revision }
+
+    const [existing] = await tx
+      .select({ revision: branchTrees.revision })
+      .from(branchTrees)
+      .where(
+        and(
+          eq(branchTrees.id, input.treeId),
+          eq(branchTrees.userId, input.userId)
+        )
+      )
+    if (existing) return { kind: "conflict", revision: existing.revision }
+    if (input.baseRevision !== 0) return { kind: "not_found" }
+
+    const [inserted] = await tx
+      .insert(branchTrees)
+      .values({
+        id: input.treeId,
+        userId: input.userId,
+        state: input.state,
+        title: input.title,
+        revision: 1,
+        updatedAt: now,
+      })
+      .onConflictDoNothing({ target: branchTrees.id })
+      .returning({ revision: branchTrees.revision })
+    return inserted
+      ? { kind: "saved", revision: inserted.revision }
+      : { kind: "not_found" }
   })
 }
 
