@@ -78,9 +78,15 @@ export function ThreadChatTopbar({
           <CircleHelp size={14} />
         </button>
       )}
-      <div className="seg" title="列 = 并排深读；画布 = 纵览整棵会话树">
+      <div
+        className="seg"
+        role="group"
+        aria-label="视图模式"
+        title="列 = 并排深读；画布 = 纵览整棵会话树"
+      >
         <button
           className={`mode ${viewMode === "columns" ? "on" : ""}`}
+          aria-pressed={viewMode === "columns"}
           title="列视图：并排深读多个会话"
           onClick={onShowColumns}
         >
@@ -88,6 +94,7 @@ export function ThreadChatTopbar({
         </button>
         <button
           className={`mode ${viewMode === "canvas" ? "on" : ""}`}
+          aria-pressed={viewMode === "canvas"}
           title="画布视图：纵览整棵会话树，单击节点就地对话，双击回到列模式"
           onClick={onShowCanvas}
         >
@@ -99,6 +106,8 @@ export function ThreadChatTopbar({
         <>
           <div
             className="seg"
+            role="group"
+            aria-label="列数"
             title={
               windowWidth === null
                 ? undefined
@@ -109,6 +118,7 @@ export function ThreadChatTopbar({
               <button
                 key={choice.value}
                 className={choice.active ? "on" : ""}
+                aria-pressed={choice.active}
                 onClick={() =>
                   onForceCols(choice.value === "auto" ? null : choice.value)
                 }
@@ -117,15 +127,22 @@ export function ThreadChatTopbar({
               </button>
             ))}
           </div>
-          <div className="seg" title="列满时的放置策略">
+          <div
+            className="seg"
+            role="group"
+            aria-label="列满时的放置策略"
+            title="列满时的放置策略"
+          >
             <button
               className={placementMode === "replace" ? "on" : ""}
+              aria-pressed={placementMode === "replace"}
               onClick={() => onPlacementModeChange("replace")}
             >
               替换⑥
             </button>
             <button
               className={placementMode === "fold" ? "on" : ""}
+              aria-pressed={placementMode === "fold"}
               onClick={() => onPlacementModeChange("fold")}
             >
               细条⑤

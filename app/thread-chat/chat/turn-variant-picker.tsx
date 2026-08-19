@@ -24,7 +24,11 @@ export function TurnVariantPicker({
   const active = alternatives[activeIndex]
 
   return (
-    <div className="turn-variant-picker" aria-label="回复版本切换">
+    <div
+      className="turn-variant-picker"
+      role="group"
+      aria-label="回复版本切换"
+    >
       <button
         type="button"
         aria-label="上一个回复版本"
