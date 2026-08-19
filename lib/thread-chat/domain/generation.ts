@@ -25,18 +25,7 @@ export interface RecoverableTurn {
   reason: RecoverableTurnReason
 }
 
-export type ThreadChatGenerationIntent =
-  | { kind: "persisted-turn" }
-  | {
-      kind: "regenerate-assistant"
-      sourceAssistantMessageId: string
-    }
-  | { kind: "retry-orphan-user" }
-  | {
-      kind: "edit-last-user"
-      sourceUserMessageId: string
-      text: string
-    }
+export type { ThreadChatGenerationIntent } from "@/lib/thread-chat/contracts/generation-intent"
 
 export type GenerationTurnIdentity = {
   treeId: string

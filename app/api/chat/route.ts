@@ -68,6 +68,7 @@ import {
 import { projectGenerationResult } from "@/lib/thread-chat/application/project-generation-result"
 import { GENERATION_ERRORS } from "@/constants/generation"
 import { compileThreadChatMessages } from "@/lib/thread-chat/application/compile-thread-chat-messages"
+import { threadChatGenerationIntentSchema } from "@/lib/thread-chat/contracts/generation-intent"
 
 // AnySearch 搜索与网页深读可能形成多步循环，放宽单次请求时长上限。
 export const maxDuration = 300
@@ -131,19 +132,7 @@ const threadChatPersistenceSchema = z.object({
   userMessageId: z.string().min(1),
   assistantMessageId: z.string().min(1),
   generationId: z.string().uuid(),
-  intent: z.discriminatedUnion("kind", [
-    z.object({ kind: z.literal("persisted-turn") }),
-    z.object({
-      kind: z.literal("regenerate-assistant"),
-      sourceAssistantMessageId: z.string().min(1),
-    }),
-    z.object({ kind: z.literal("retry-orphan-user") }),
-    z.object({
-      kind: z.literal("edit-last-user"),
-      sourceUserMessageId: z.string().min(1),
-      text: z.string().trim().min(1),
-    }),
-  ]),
+  intent: threadChatGenerationIntentSchema,
 })
 
 type ThreadChatPersistence = z.infer<typeof threadChatPersistenceSchema>
