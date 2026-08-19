@@ -87,6 +87,11 @@
   flex: none;
   background: var(--dc, #8a8377);
 }
+.tc .historical-artifact {
+  margin-left: 4px;
+  color: var(--ink-faint);
+  font-size: 9px;
+}
 .tc .art-tab.on {
   border-color: var(--dc, #8a8377);
   color: var(--ink);
