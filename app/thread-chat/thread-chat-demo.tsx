@@ -54,10 +54,7 @@ import { useThreadStore } from "./core/use-thread-store"
 import {
   hasRenderableAssistantOutput,
   activeLeafTurn,
-  activeMessagePath,
   activePathArtifacts,
-  assistantTurnAlternatives,
-  childThreadSourceProvenance,
   threadTitle,
   type TreeRow,
 } from "./core/selectors"
@@ -88,6 +85,7 @@ import {
 import type { GenerationSummary } from "./generation/types"
 import type { RecoverableTurn } from "./generation/types"
 import type { MessageActionViewState } from "./chat/message-action-types"
+import { buildMessageActionViewState } from "./chat/message-action-presentation"
 import { fetchWithAuth } from "@/lib/auth/session-recovery"
 import { BranchableChat } from "./branching/branchable-chat"
 import {
@@ -258,44 +256,11 @@ export function ThreadChatDemoInner({
       )
   )
   const messageActionState = useMemo<MessageActionViewState>(() => {
-    const activePathByThreadId = new Map(
-      Object.values(state.threads).map((thread) => [
-        thread.id,
-        activeMessagePath(thread).map((message) => message.id),
-      ])
-    )
-    const presentationByThreadId = new Map(
-      Object.values(state.threads).map((thread) => {
-        const latestTurn = activeLeafTurn(thread)
-        const alternatives = latestTurn?.assistantMessage
-          ? assistantTurnAlternatives(
-              thread,
-              latestTurn.assistantMessage.id
-            ).map((assistant) => ({
-              assistantMessageId: assistant.id,
-              derivedThreadCount: thread.children.filter(
-                (childId) =>
-                  state.threads[childId]?.forkFromMsgId === assistant.id
-              ).length,
-            }))
-          : []
-        return [
-          thread.id,
-          {
-            latestUserMessageId: latestTurn?.userMessage.id,
-            latestAssistantMessageId: latestTurn?.assistantMessage?.id,
-            alternatives,
-            sourceProvenance: childThreadSourceProvenance(state, thread.id),
-          },
-        ] as const
-      })
-    )
-    return {
+    return buildMessageActionViewState({
+      state,
       recoverableByUserMessageId,
       feedbackByMessageId,
-      activePathByThreadId,
-      presentationByThreadId,
-    }
+    })
     // state 对象原地变更，必须用 store version 作为派生键。
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [recoverableByUserMessageId, feedbackByMessageId, version])
