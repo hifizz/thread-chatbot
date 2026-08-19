@@ -16,6 +16,7 @@
 @import "./styles/composer.css";
 @import "./styles/selection.css";
 @import "./styles/switcher.css";
+@import "./styles/help-panel.css";
 @import "./styles/drawer.css";
 @import "./styles/toast.css";
 @import "./styles/columns-collapse.css";
