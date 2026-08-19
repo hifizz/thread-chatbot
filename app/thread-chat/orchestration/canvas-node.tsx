@@ -37,9 +37,14 @@ import {
 } from "./markdown-artifact-card"
 import { WebResearchPanel } from "./web-research-panel"
 import { ThreadModelSelector } from "../chat/thread-model-selector"
+import { EditableUserMessage } from "../chat/editable-user-message"
+import { AssistantMessageToolbar } from "../chat/assistant-message-toolbar"
+import { TurnVariantPicker } from "../chat/turn-variant-picker"
+import type { MessageActionViewState } from "../chat/message-action-types"
+import type { ThreadMessageActionCommands } from "../net/chat-controller"
 
 /** 会话动作（send/stop/retry）：壳层用 chat-controller 组装后传给画布（D3，零平行实现） */
-export interface CanvasChatActions {
+export interface CanvasChatActions extends ThreadMessageActionCommands {
   /** 发一条用户消息并触发流式回复（同会话已有在飞请求时由 controller 忽略） */
   send: (threadId: string, text: string) => void
   /** 经服务端确认的显式 Stop；普通页面卸载不调用。 */
@@ -58,6 +63,7 @@ export interface CanvasActions extends CanvasChatActions {
   getState: () => ThreadTreeState
   /** 根 Thread 切换模型；store 会拒绝所有分支写入。 */
   setThreadModel: (threadId: string, modelId: string) => void
+  messageActionState: MessageActionViewState
 }
 
 /** 由 ThreadCanvas 提供、穿过 React Flow 到自定义节点（面板不感知壳层） */
@@ -157,6 +163,8 @@ function CanvasExpand({
   }
 
   const state = actions?.getState()
+  const presentation =
+    actions?.messageActionState.presentationByThreadId.get(threadId)
 
   return (
     <div
@@ -193,22 +201,24 @@ function CanvasExpand({
               data-msg-id={msg.id}
             >
               {msg.role === "user" ? (
-                <div className="bubble" data-role="user">
-                  {msg.quote && (
-                    <div className="msg-quote">{msg.quote.text}</div>
-                  )}
-                  {msg.text}
-                </div>
+                actions ? (
+                  <EditableUserMessage
+                    threadId={threadId}
+                    message={msg}
+                    editable={msg.id === presentation?.latestUserMessageId}
+                    recovery={actions.messageActionState.recoverableByUserMessageId.get(
+                      msg.id
+                    )}
+                    commands={actions}
+                  />
+                ) : null
               ) : (
                 <>
                   {(hasVisibleAssistantContent ||
                     isWaitingForVisibleOutput) && (
                     <div className="bubble" data-role="assistant">
                       {msg.backgroundGeneration && (
-                        <span
-                          className="generation-background"
-                          role="status"
-                        >
+                        <span className="generation-background" role="status">
                           {GENERATION_BACKGROUND_LABEL}
                         </span>
                       )}
@@ -270,6 +280,35 @@ function CanvasExpand({
                       </button>
                     </div>
                   )}
+                  {actions &&
+                    msg.status !== "pending" &&
+                    msg.status !== "streaming" && (
+                      <div className="assistant-actions-row">
+                        <AssistantMessageToolbar
+                          threadId={threadId}
+                          message={msg}
+                          regeneratable={
+                            msg.id === presentation?.latestAssistantMessageId
+                          }
+                          feedback={
+                            msg.generationId
+                              ? actions.messageActionState.feedbackByGenerationId.get(
+                                  msg.generationId
+                                )
+                              : undefined
+                          }
+                          commands={actions}
+                        />
+                        {msg.id === presentation?.latestAssistantMessageId && (
+                          <TurnVariantPicker
+                            threadId={threadId}
+                            activeAssistantMessageId={msg.id}
+                            alternatives={presentation?.alternatives ?? []}
+                            onSwitch={actions.switchTurnVariant}
+                          />
+                        )}
+                      </div>
+                    )}
                   {msg.markdownGeneration && (
                     <MarkdownArtifactProgressCard
                       progress={msg.markdownGeneration}

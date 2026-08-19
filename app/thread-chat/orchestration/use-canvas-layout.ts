@@ -32,6 +32,7 @@ import {
 import type { ThreadTreeState } from "../core/types"
 import type { ThreadStore } from "../core/store"
 import { validArtifactsOfMessage } from "../core/selectors"
+import type { MessageActionViewState } from "../chat/message-action-types"
 import { accentOf, dotColorOf, dvar } from "../theme"
 import { kickoffQuestion } from "../net/prompt-pure"
 import type { CanvasCardData, CanvasCardNode } from "./canvas-node"
@@ -101,12 +102,16 @@ interface BaseGraph {
 
 function buildBaseGraph(
   state: ThreadTreeState,
-  mainSubtitle: string | null
+  mainSubtitle: string | null,
+  messageActionState: MessageActionViewState
 ): BaseGraph {
   const artifactCountOf = new Map<string, number>()
+  const activeMessageIds = new Set(
+    [...messageActionState.activePathByThreadId.values()].flat()
+  )
   state.artifactOrder.forEach((aid) => {
     const a = state.artifacts[aid]
-    if (a?.kind === "markdown")
+    if (a?.kind === "markdown" && activeMessageIds.has(a.sourceMessageId))
       artifactCountOf.set(
         a.sourceThreadId,
         (artifactCountOf.get(a.sourceThreadId) ?? 0) + 1
@@ -121,7 +126,13 @@ function buildBaseGraph(
   const walk = (id: string) => {
     const t = state.threads[id]
     if (!t) return
-    const last = t.messages[t.messages.length - 1]
+    const visibleMessages = (
+      messageActionState.activePathByThreadId.get(t.id) ?? []
+    ).flatMap((messageId) => {
+      const message = t.messages.find((candidate) => candidate.id === messageId)
+      return message ? [message] : []
+    })
+    const last = visibleMessages[visibleMessages.length - 1]
     const lastMarkdown = last
       ? validArtifactsOfMessage(state, last).find(
           (artifact) => artifact.kind === "markdown"
@@ -135,13 +146,13 @@ function buildBaseGraph(
       footnote: t.footnote,
       anchor: t.anchorText ? clip(t.anchorText, 40) : null,
       summary: last ? clip(last.text || lastMarkdown?.title || "", 90) : "",
-      msgCount: t.messages.length,
+      msgCount: visibleMessages.length,
       artifactCount: artifactCountOf.get(t.id) ?? 0,
       accent: accentOf(t),
       dot: dotColorOf(t),
       // 外挂面板（Phase 2）：完整消息引用 + 空分支的 composer 预填（语义同列模式
       // composerPrefillFor——消息一入树条件即失效，带问 / 预填两路互不串扰）
-      messages: t.messages,
+      messages: visibleMessages,
       prefill:
         t.anchorText && t.messages.length === 0
           ? kickoffQuestion(t.anchorText)
@@ -236,6 +247,7 @@ export interface UseCanvasLayoutArgs {
   mainSubtitle?: string
   /** 视图状态宿主：pins 借它跨画布挂载/卸载存活（壳层持有的稳定可变对象） */
   viewState: CanvasViewState
+  messageActionState: MessageActionViewState
 }
 
 export function useCanvasLayout({
@@ -243,6 +255,7 @@ export function useCanvasLayout({
   version,
   mainSubtitle,
   viewState,
+  messageActionState,
 }: UseCanvasLayoutArgs) {
   /** hook 内的 pins 快照驱动重渲；viewState.pins 是它的长寿镜像（事件回调里读写） */
   const [pins, setPins] = useState<ReadonlyMap<string, XYPosition>>(
@@ -257,8 +270,8 @@ export function useCanvasLayout({
   )
   /* 结构 + 展示数据：仅随快照重派生（data 引用稳定，拖拽/选中不重建） */
   const base = useMemo(
-    () => buildBaseGraph(snap.state, mainSubtitle ?? null),
-    [snap, mainSubtitle]
+    () => buildBaseGraph(snap.state, mainSubtitle ?? null, messageActionState),
+    [snap, mainSubtitle, messageActionState]
   )
   /* dagre 坐标：只依赖结构 */
   const autoPos = useMemo(() => layoutPositions(base), [base])

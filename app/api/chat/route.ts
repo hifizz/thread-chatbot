@@ -14,10 +14,7 @@ import { frontendTools } from "@assistant-ui/react-ai-sdk"
 import type { ToolJSONSchema } from "assistant-stream"
 import { z } from "zod"
 import { resolveAttachmentParts } from "@/lib/chat/resolve-attachments"
-import {
-  readUrlTool,
-  webSearchTool,
-} from "@/lib/chat/research-tools"
+import { readUrlTool, webSearchTool } from "@/lib/chat/research-tools"
 import { isSearchConfigured } from "@/lib/ai/search"
 import {
   DIRECT_FETCH_SYSTEM_PROMPT,
@@ -55,7 +52,7 @@ import {
 } from "@/lib/chat/research-router"
 import {
   GenerationRepositoryError,
-  startGeneration,
+  prepareGeneration,
   toGenerationSummary,
 } from "@/lib/thread-chat-generation/repository"
 import {
@@ -70,6 +67,7 @@ import {
 } from "@/lib/thread-chat-generation/finalize"
 import { projectGenerationResult } from "@/app/thread-chat/generation/project-result"
 import { GENERATION_ERRORS } from "@/constants/generation"
+import { compileThreadChatMessages } from "@/app/thread-chat/net/message-context"
 
 // AnySearch 搜索与网页深读可能形成多步循环，放宽单次请求时长上限。
 export const maxDuration = 300
@@ -133,6 +131,21 @@ const threadChatPersistenceSchema = z.object({
   userMessageId: z.string().min(1),
   assistantMessageId: z.string().min(1),
   generationId: z.string().uuid(),
+  intent: z
+    .discriminatedUnion("kind", [
+      z.object({ kind: z.literal("persisted-turn") }),
+      z.object({
+        kind: z.literal("regenerate-assistant"),
+        sourceAssistantMessageId: z.string().min(1),
+      }),
+      z.object({ kind: z.literal("retry-orphan-user") }),
+      z.object({
+        kind: z.literal("edit-last-user"),
+        sourceUserMessageId: z.string().min(1),
+        text: z.string().trim().min(1),
+      }),
+    ])
+    .optional(),
 })
 
 type ThreadChatPersistence = z.infer<typeof threadChatPersistenceSchema>
@@ -146,14 +159,21 @@ function generationStartError(error: unknown): Response {
           message: error.message,
         },
       },
-      { status: error.code === "not_found" ? 404 : 409 }
+      {
+        status:
+          error.code === "not_found"
+            ? 404
+            : error.code === "persistence_failed"
+              ? 503
+              : 409,
+      }
     )
   }
   console.error("[thread-chat-generation] start transaction 失败", error)
   return Response.json(
     {
       error: {
-        code: "generation_start_failed",
+        code: "persistence_failed",
         message: "无法建立生成任务，尚未调用模型",
       },
     },
@@ -259,6 +279,9 @@ export async function POST(req: Request) {
   }
 
   let persistence: ThreadChatPersistence | null = null
+  let authoritativeMessages = messages
+  let authoritativeAnchorText: string | null = null
+  let preparedRevision: number | null = null
   let generationController: AbortController | null = null
   let generationObserver: ReturnType<
     typeof observeGenerationCancellation
@@ -278,7 +301,7 @@ export async function POST(req: Request) {
     }
     persistence = parsed.data
     try {
-      const started = await startGeneration({
+      const started = await prepareGeneration({
         userId,
         modelId,
         ...persistence,
@@ -289,6 +312,16 @@ export async function POST(req: Request) {
           { status: 202 }
         )
       }
+      preparedRevision = started.revision
+      const committedThread = started.state.threads[persistence.threadId]
+      authoritativeAnchorText = committedThread?.anchorText?.trim()
+        ? committedThread.anchorText
+        : null
+      authoritativeMessages = compileThreadChatMessages({
+        state: started.state,
+        threadId: persistence.threadId,
+        excludeAssistantMessageId: persistence.assistantMessageId,
+      }) as UIMessage[]
     } catch (error) {
       return generationStartError(error)
     }
@@ -301,343 +334,346 @@ export async function POST(req: Request) {
   }
 
   try {
-
-  // AnySearch 是当前统一联网层：所有模型都获得相同的搜索与网页深读工具。
-  // deepResearch 只控制研究提示强度，不再决定工具是否存在。
-  const research = deepResearch === true
-  const searchReady = isSearchConfigured()
-  const isThreadChat = persistence != null
-  const latestText = latestUserText(messages)
-  const chatModel = resolveChatModel(modelId)
-  const researchRoute: ResearchRoute = research
-    ? searchReady
-      ? {
-          mode: "research",
-          reasonCode: "multi_source_research",
-          urls: [],
-          suggestedQueries: [],
-        }
-      : {
-          mode: "answer",
-          reasonCode: "search_unavailable",
-          urls: [],
-          suggestedQueries: [],
-        }
-    : await resolveResearchRoute({
-        model: chatModel,
-        latestUserText: latestText,
-        recentConversation: recentConversationText(messages),
-        searchReady,
-      })
-  const researchPlan: ResearchPlan | null =
-    researchRoute.mode === "research"
-      ? await createResearchPlan({
-          model: chatModel,
-          userRequest: latestText,
-          route: researchRoute,
-        })
-      : null
-  const webToolsEnabled =
-    searchReady && researchRoute.mode !== "answer"
-  const markdownArtifactRequested =
-    isThreadChat &&
-    isExplicitMarkdownArtifactRequest(latestText)
-
-  const routedWebTools: ToolSet =
-    researchRoute.mode === "fetch"
-      ? { readUrl: readUrlTool }
-      : researchRoute.mode === "search" || researchRoute.mode === "research"
-        ? { webSearch: webSearchTool, readUrl: readUrlTool }
-        : {}
-
-  const allTools: ToolSet = {
-    // 普通 ThreadChat 请求完全不暴露 Markdown 工具，避免模型把长回答误判成产物。
-    // 只有明确要求独立文章/文档/文件/Markdown 时才挂载并强制使用。
-    ...(isThreadChat
-      ? markdownArtifactRequested
-        ? { [MARKDOWN_ARTIFACT_TOOL_NAME]: createMarkdownArtifact }
-        : {}
-      : { getWeather, compareTable }),
-    ...(webToolsEnabled ? routedWebTools : {}),
-    ...frontendTools(tools ?? {}),
-  }
-
-  // MiniMax 不接受 file part：先把附件（PDF→提取文本，其余→占位说明）转换为 text part
-  const resolvedMessages = await resolveAttachmentParts(messages)
-
-  const system = [
-    isThreadChat
-      ? buildThreadChatSystem(persistence?.anchorText ?? null, {
-          enableMarkdownArtifact: markdownArtifactRequested,
-        })
-      : null,
-    researchRoute.mode === "fetch" ? DIRECT_FETCH_SYSTEM_PROMPT : null,
-    researchRoute.mode === "search" || researchRoute.mode === "research"
-      ? WEB_ACCESS_SYSTEM_PROMPT
-      : null,
-    researchRoute.mode === "research" ? RESEARCH_SYSTEM_PROMPT : null,
-    researchPlan ? researchPlanExecutionPrompt(researchPlan) : null,
-    research && !searchReady
-      ? "用户开启了深度研究，但服务端未启用搜索服务，请如实告知该功能暂不可用，并基于已有知识尽力回答。"
-      : null,
-  ]
-    .filter((part): part is string => part !== null)
-    .join("\n\n")
-
-  let capturedUsage: FinalizeGenerationUsage | undefined
-  let capturedProviderMetadata: unknown
-  let modelStreamError: string | undefined
-  let abortedUsageUnavailable = false
-
-  const result = streamText({
-    model: chatModel,
-    ...(generationController
-      ? { abortSignal: generationController.signal }
-      : {}),
-    reasoning: reasoningForResearchRoute(researchRoute.mode),
-    system,
-    messages: await convertToModelMessages(resolvedMessages, {
-      tools: allTools,
-    }),
-    tools: allTools,
-    // 明确 Markdown 交付请求只强制第 0 步启动工具调用；后续步骤仍保留工具，
-    // 让模型在用户要求多份独立文档时，为每份文档分别创建一个 Artifact。
-    prepareStep:
-      isThreadChat || webToolsEnabled
-        ? ({ stepNumber }) => {
-            const activeWebTools =
-              researchRoute.mode === "fetch"
-                ? ["readUrl"]
-                : researchRoute.mode === "search" ||
-                    researchRoute.mode === "research"
-                  ? ["webSearch", "readUrl"]
-                  : []
-            const activeTools = isThreadChat
-              ? [
-                  ...(markdownArtifactRequested
-                    ? [MARKDOWN_ARTIFACT_TOOL_NAME]
-                    : []),
-                  ...activeWebTools,
-                ]
-              : activeWebTools
-
-            if (stepNumber === 0 && researchRoute.mode === "fetch") {
-              return {
-                activeTools,
-                toolChoice: { type: "tool" as const, toolName: "readUrl" },
-              }
-            }
-            if (
-              stepNumber === 0 &&
-              (researchRoute.mode === "search" ||
-                researchRoute.mode === "research")
-            ) {
-              return {
-                activeTools,
-                toolChoice: { type: "tool" as const, toolName: "webSearch" },
-              }
-            }
-            if (stepNumber === 0 && markdownArtifactRequested) {
-              return {
-                activeTools,
-                toolChoice: {
-                  type: "tool" as const,
-                  toolName: MARKDOWN_ARTIFACT_TOOL_NAME,
-                },
-              }
-            }
-            return activeTools.length > 0 ? { activeTools } : undefined
+    // AnySearch 是当前统一联网层：所有模型都获得相同的搜索与网页深读工具。
+    // deepResearch 只控制研究提示强度，不再决定工具是否存在。
+    const research = deepResearch === true
+    const searchReady = isSearchConfigured()
+    const isThreadChat = persistence != null
+    const latestText = latestUserText(authoritativeMessages)
+    const chatModel = resolveChatModel(modelId)
+    const researchRoute: ResearchRoute = research
+      ? searchReady
+        ? {
+            mode: "research",
+            reasonCode: "multi_source_research",
+            urls: [],
+            suggestedQueries: [],
           }
-        : undefined,
-    maxOutputTokens: MAX_OUTPUT_TOKENS,
-    stopWhen: isStepCount(webToolsEnabled ? RESEARCH_MAX_STEPS : 5),
-    onError: ({ error }) => {
-      modelStreamError =
-        error instanceof Error ? error.message : GENERATION_ERRORS.streamFailed
-      console.error("[chat] 模型流错误:", error)
-    },
-    onAbort: ({ steps }) => {
-      if (!persistence) return
-      const inputTokens = steps.reduce(
-        (total, step) => total + (step.usage.inputTokens ?? 0),
-        0
-      )
-      const outputTokens = steps.reduce(
-        (total, step) => total + (step.usage.outputTokens ?? 0),
-        0
-      )
-      const openRouterCostUsd =
-        model.provider === "openrouter"
-          ? openRouterCostUsdFromSteps(steps)
-          : null
-      const providerMetadata = steps.at(-1)?.providerMetadata
-      const gatewayGenerationId =
-        typeof providerMetadata?.gateway?.generationId === "string"
-          ? providerMetadata.gateway.generationId
-          : null
-      if (steps.length > 0) {
-        capturedUsage = {
-          inputTokens,
-          outputTokens,
-          costEvidence:
-            openRouterCostUsd != null
-              ? { source: "openrouter", costUsd: openRouterCostUsd }
-              : gatewayGenerationId
-                ? {
-                    source: "vercel-gateway",
-                    generationId: gatewayGenerationId,
-                  }
-                : { source: "estimate" },
-        }
-        capturedProviderMetadata = providerMetadata
-      }
-      abortedUsageUnavailable = true
-    },
-    onEnd: async ({ usage, providerMetadata, steps }) => {
-      if (isUnbilledPreview) return
-      const providerGenerationId =
-        typeof providerMetadata?.gateway?.generationId === "string"
-          ? providerMetadata.gateway.generationId
-          : null
-      const openRouterCostUsd =
-        model.provider === "openrouter"
-          ? openRouterCostUsdFromSteps(steps)
-          : null
-      if (model.provider === "openrouter" && openRouterCostUsd == null) {
-        console.warn(
-          `[chat] OpenRouter 成本元数据不完整，使用静态估值：${model.id}`
-        )
-      }
-      const costEvidence =
-        openRouterCostUsd != null
-          ? ({ source: "openrouter", costUsd: openRouterCostUsd } as const)
-          : providerGenerationId
-            ? ({
-                source: "vercel-gateway",
-                generationId: providerGenerationId,
-              } as const)
-            : ({ source: "estimate" } as const)
-      if (persistence) {
-        capturedUsage = {
-          inputTokens: usage.inputTokens ?? 0,
-          outputTokens: usage.outputTokens ?? 0,
-          costEvidence,
-        }
-        capturedProviderMetadata = providerMetadata
-        return
-      }
-      await chargeUsage({
-        userId,
-        model: modelId,
-        inputTokens: usage.inputTokens ?? 0,
-        outputTokens: usage.outputTokens ?? 0,
-        threadId: linearThreadId ?? null,
-        costEvidence,
-      })
-    },
-  })
+        : {
+            mode: "answer",
+            reasonCode: "search_unavailable",
+            urls: [],
+            suggestedQueries: [],
+          }
+      : await resolveResearchRoute({
+          model: chatModel,
+          latestUserText: latestText,
+          recentConversation: recentConversationText(authoritativeMessages),
+          searchReady,
+        })
+    const researchPlan: ResearchPlan | null =
+      researchRoute.mode === "research"
+        ? await createResearchPlan({
+            model: chatModel,
+            userRequest: latestText,
+            route: researchRoute,
+          })
+        : null
+    const webToolsEnabled = searchReady && researchRoute.mode !== "answer"
+    const markdownArtifactRequested =
+      isThreadChat && isExplicitMarkdownArtifactRequest(latestText)
 
-  const uiStream = createUIMessageStream({
-    ...(persistence
-      ? {
-          originalMessages: resolvedMessages,
-          generateId: () => persistence.assistantMessageId,
-        }
-      : {}),
-    execute: ({ writer }) => {
-      writer.write({
-        type: "data-research-route",
-        id: "research-route",
-        data: researchRoute,
-      })
-      if (researchPlan) {
-        writer.write({
-          type: "data-research-plan",
-          id: "research-plan",
-          data: researchPlan,
-        })
-      }
-      writer.merge(
-        result.toUIMessageStream({
-          onError: (error) => {
-            console.error("[chat] 流内错误:", error)
-            return "An error occurred."
-          },
-          messageMetadata: ({ part }) =>
-            part.type === "finish"
-              ? buildUsageMetadata(modelId, part.totalUsage)
-              : undefined,
-        })
-      )
-    },
-    onEnd: persistence
-      ? async ({ responseMessage, isAborted, finishReason }) => {
-          const failedWithoutFinish =
-            finishReason == null && modelStreamError !== undefined
-          const requestedTerminal = isAborted
-            ? "stopped"
-            : failedWithoutFinish
-              ? "failed"
-              : "completed"
-          const projected = projectGenerationResult({
-            generationId: persistence.generationId,
-            threadId: persistence.threadId,
-            responseMessage,
-            terminalStatus: requestedTerminal,
-            error: modelStreamError,
-            researchRoute,
-            researchPlan: researchPlan ?? undefined,
-            usage: capturedUsage
-              ? {
-                  inputTokens: capturedUsage.inputTokens,
-                  outputTokens: capturedUsage.outputTokens,
-                  totalTokens:
-                    capturedUsage.inputTokens + capturedUsage.outputTokens,
-                  providerMetadata: capturedProviderMetadata,
+    const routedWebTools: ToolSet =
+      researchRoute.mode === "fetch"
+        ? { readUrl: readUrlTool }
+        : researchRoute.mode === "search" || researchRoute.mode === "research"
+          ? { webSearch: webSearchTool, readUrl: readUrlTool }
+          : {}
+
+    const allTools: ToolSet = {
+      // 普通 ThreadChat 请求完全不暴露 Markdown 工具，避免模型把长回答误判成产物。
+      // 只有明确要求独立文章/文档/文件/Markdown 时才挂载并强制使用。
+      ...(isThreadChat
+        ? markdownArtifactRequested
+          ? { [MARKDOWN_ARTIFACT_TOOL_NAME]: createMarkdownArtifact }
+          : {}
+        : { getWeather, compareTable }),
+      ...(webToolsEnabled ? routedWebTools : {}),
+      ...frontendTools(tools ?? {}),
+    }
+
+    // MiniMax 不接受 file part：先把附件（PDF→提取文本，其余→占位说明）转换为 text part
+    const resolvedMessages = await resolveAttachmentParts(authoritativeMessages)
+
+    const system = [
+      isThreadChat
+        ? buildThreadChatSystem(authoritativeAnchorText, {
+            enableMarkdownArtifact: markdownArtifactRequested,
+          })
+        : null,
+      researchRoute.mode === "fetch" ? DIRECT_FETCH_SYSTEM_PROMPT : null,
+      researchRoute.mode === "search" || researchRoute.mode === "research"
+        ? WEB_ACCESS_SYSTEM_PROMPT
+        : null,
+      researchRoute.mode === "research" ? RESEARCH_SYSTEM_PROMPT : null,
+      researchPlan ? researchPlanExecutionPrompt(researchPlan) : null,
+      research && !searchReady
+        ? "用户开启了深度研究，但服务端未启用搜索服务，请如实告知该功能暂不可用，并基于已有知识尽力回答。"
+        : null,
+    ]
+      .filter((part): part is string => part !== null)
+      .join("\n\n")
+
+    let capturedUsage: FinalizeGenerationUsage | undefined
+    let capturedProviderMetadata: unknown
+    let modelStreamError: string | undefined
+    let abortedUsageUnavailable = false
+
+    const result = streamText({
+      model: chatModel,
+      ...(generationController
+        ? { abortSignal: generationController.signal }
+        : {}),
+      reasoning: reasoningForResearchRoute(researchRoute.mode),
+      system,
+      messages: await convertToModelMessages(resolvedMessages, {
+        tools: allTools,
+      }),
+      tools: allTools,
+      // 明确 Markdown 交付请求只强制第 0 步启动工具调用；后续步骤仍保留工具，
+      // 让模型在用户要求多份独立文档时，为每份文档分别创建一个 Artifact。
+      prepareStep:
+        isThreadChat || webToolsEnabled
+          ? ({ stepNumber }) => {
+              const activeWebTools =
+                researchRoute.mode === "fetch"
+                  ? ["readUrl"]
+                  : researchRoute.mode === "search" ||
+                      researchRoute.mode === "research"
+                    ? ["webSearch", "readUrl"]
+                    : []
+              const activeTools = isThreadChat
+                ? [
+                    ...(markdownArtifactRequested
+                      ? [MARKDOWN_ARTIFACT_TOOL_NAME]
+                      : []),
+                    ...activeWebTools,
+                  ]
+                : activeWebTools
+
+              if (stepNumber === 0 && researchRoute.mode === "fetch") {
+                return {
+                  activeTools,
+                  toolChoice: { type: "tool" as const, toolName: "readUrl" },
                 }
-              : undefined,
-          })
-          const outcome =
-            requestedTerminal === "completed" &&
-            !projected.hasDisplayableOutput
-              ? "failed"
-              : requestedTerminal
-          await finalizeWithRetry({
-            generationId: persistence.generationId,
-            outcome,
-            result: projected.result,
-            error: projected.result.error ?? modelStreamError,
-            usage: isUnbilledPreview ? undefined : capturedUsage,
-            usageUnavailable:
-              !isUnbilledPreview &&
-              (abortedUsageUnavailable ||
-                (requestedTerminal !== "completed" && !capturedUsage)),
-          })
+              }
+              if (
+                stepNumber === 0 &&
+                (researchRoute.mode === "search" ||
+                  researchRoute.mode === "research")
+              ) {
+                return {
+                  activeTools,
+                  toolChoice: { type: "tool" as const, toolName: "webSearch" },
+                }
+              }
+              if (stepNumber === 0 && markdownArtifactRequested) {
+                return {
+                  activeTools,
+                  toolChoice: {
+                    type: "tool" as const,
+                    toolName: MARKDOWN_ARTIFACT_TOOL_NAME,
+                  },
+                }
+              }
+              return activeTools.length > 0 ? { activeTools } : undefined
+            }
+          : undefined,
+      maxOutputTokens: MAX_OUTPUT_TOKENS,
+      stopWhen: isStepCount(webToolsEnabled ? RESEARCH_MAX_STEPS : 5),
+      onError: ({ error }) => {
+        modelStreamError =
+          error instanceof Error
+            ? error.message
+            : GENERATION_ERRORS.streamFailed
+        console.error("[chat] 模型流错误:", error)
+      },
+      onAbort: ({ steps }) => {
+        if (!persistence) return
+        const inputTokens = steps.reduce(
+          (total, step) => total + (step.usage.inputTokens ?? 0),
+          0
+        )
+        const outputTokens = steps.reduce(
+          (total, step) => total + (step.usage.outputTokens ?? 0),
+          0
+        )
+        const openRouterCostUsd =
+          model.provider === "openrouter"
+            ? openRouterCostUsdFromSteps(steps)
+            : null
+        const providerMetadata = steps.at(-1)?.providerMetadata
+        const gatewayGenerationId =
+          typeof providerMetadata?.gateway?.generationId === "string"
+            ? providerMetadata.gateway.generationId
+            : null
+        if (steps.length > 0) {
+          capturedUsage = {
+            inputTokens,
+            outputTokens,
+            costEvidence:
+              openRouterCostUsd != null
+                ? { source: "openrouter", costUsd: openRouterCostUsd }
+                : gatewayGenerationId
+                  ? {
+                      source: "vercel-gateway",
+                      generationId: gatewayGenerationId,
+                    }
+                  : { source: "estimate" },
+          }
+          capturedProviderMetadata = providerMetadata
         }
-      : undefined,
-  })
-
-  return createUIMessageStreamResponse({
-    stream: uiStream,
-    consumeSseStream: ({ stream }) => {
-      after(async () => {
-        await consumeStream({
-          stream,
-          onError: (error) => {
-            console.error("[chat] 服务端 UI stream 消费失败", error)
-          },
-        })
-        generationObserver?.stop()
-        if (generationObserver) await generationObserver.done
-        if (persistence && generationController) {
-          unregisterGenerationController(
-            persistence.generationId,
-            generationController
+        abortedUsageUnavailable = true
+      },
+      onEnd: async ({ usage, providerMetadata, steps }) => {
+        if (isUnbilledPreview) return
+        const providerGenerationId =
+          typeof providerMetadata?.gateway?.generationId === "string"
+            ? providerMetadata.gateway.generationId
+            : null
+        const openRouterCostUsd =
+          model.provider === "openrouter"
+            ? openRouterCostUsdFromSteps(steps)
+            : null
+        if (model.provider === "openrouter" && openRouterCostUsd == null) {
+          console.warn(
+            `[chat] OpenRouter 成本元数据不完整，使用静态估值：${model.id}`
           )
         }
-      })
-    },
-  })
+        const costEvidence =
+          openRouterCostUsd != null
+            ? ({ source: "openrouter", costUsd: openRouterCostUsd } as const)
+            : providerGenerationId
+              ? ({
+                  source: "vercel-gateway",
+                  generationId: providerGenerationId,
+                } as const)
+              : ({ source: "estimate" } as const)
+        if (persistence) {
+          capturedUsage = {
+            inputTokens: usage.inputTokens ?? 0,
+            outputTokens: usage.outputTokens ?? 0,
+            costEvidence,
+          }
+          capturedProviderMetadata = providerMetadata
+          return
+        }
+        await chargeUsage({
+          userId,
+          model: modelId,
+          inputTokens: usage.inputTokens ?? 0,
+          outputTokens: usage.outputTokens ?? 0,
+          threadId: linearThreadId ?? null,
+          costEvidence,
+        })
+      },
+    })
+
+    const uiStream = createUIMessageStream({
+      ...(persistence
+        ? {
+            originalMessages: resolvedMessages,
+            generateId: () => persistence.assistantMessageId,
+          }
+        : {}),
+      execute: ({ writer }) => {
+        writer.write({
+          type: "data-research-route",
+          id: "research-route",
+          data: researchRoute,
+        })
+        if (researchPlan) {
+          writer.write({
+            type: "data-research-plan",
+            id: "research-plan",
+            data: researchPlan,
+          })
+        }
+        writer.merge(
+          result.toUIMessageStream({
+            onError: (error) => {
+              console.error("[chat] 流内错误:", error)
+              return "An error occurred."
+            },
+            messageMetadata: ({ part }) =>
+              part.type === "finish"
+                ? buildUsageMetadata(modelId, part.totalUsage)
+                : undefined,
+          })
+        )
+      },
+      onEnd: persistence
+        ? async ({ responseMessage, isAborted, finishReason }) => {
+            const failedWithoutFinish =
+              finishReason == null && modelStreamError !== undefined
+            const requestedTerminal = isAborted
+              ? "stopped"
+              : failedWithoutFinish
+                ? "failed"
+                : "completed"
+            const projected = projectGenerationResult({
+              generationId: persistence.generationId,
+              threadId: persistence.threadId,
+              assistantMessageId: persistence.assistantMessageId,
+              responseMessage,
+              terminalStatus: requestedTerminal,
+              error: modelStreamError,
+              researchRoute,
+              researchPlan: researchPlan ?? undefined,
+              usage: capturedUsage
+                ? {
+                    inputTokens: capturedUsage.inputTokens,
+                    outputTokens: capturedUsage.outputTokens,
+                    totalTokens:
+                      capturedUsage.inputTokens + capturedUsage.outputTokens,
+                    providerMetadata: capturedProviderMetadata,
+                  }
+                : undefined,
+            })
+            const outcome =
+              requestedTerminal === "completed" &&
+              !projected.hasDisplayableOutput
+                ? "failed"
+                : requestedTerminal
+            await finalizeWithRetry({
+              generationId: persistence.generationId,
+              outcome,
+              result: projected.result,
+              error: projected.result.error ?? modelStreamError,
+              usage: isUnbilledPreview ? undefined : capturedUsage,
+              usageUnavailable:
+                !isUnbilledPreview &&
+                (abortedUsageUnavailable ||
+                  (requestedTerminal !== "completed" && !capturedUsage)),
+            })
+          }
+        : undefined,
+    })
+
+    const response = createUIMessageStreamResponse({
+      stream: uiStream,
+      consumeSseStream: ({ stream }) => {
+        after(async () => {
+          await consumeStream({
+            stream,
+            onError: (error) => {
+              console.error("[chat] 服务端 UI stream 消费失败", error)
+            },
+          })
+          generationObserver?.stop()
+          if (generationObserver) await generationObserver.done
+          if (persistence && generationController) {
+            unregisterGenerationController(
+              persistence.generationId,
+              generationController
+            )
+          }
+        })
+      },
+    })
+    if (preparedRevision !== null)
+      response.headers.set("x-thread-tree-revision", String(preparedRevision))
+    return response
   } catch (error) {
     generationController?.abort(error)
     generationObserver?.stop()
@@ -649,10 +685,13 @@ export async function POST(req: Request) {
       const projected = projectGenerationResult({
         generationId: persistence.generationId,
         threadId: persistence.threadId,
+        assistantMessageId: persistence.assistantMessageId,
         responseMessage: { parts: [] },
         terminalStatus: "failed",
         error:
-          error instanceof Error ? error.message : GENERATION_ERRORS.streamFailed,
+          error instanceof Error
+            ? error.message
+            : GENERATION_ERRORS.streamFailed,
       })
       try {
         await finalizeWithRetry({
@@ -670,9 +709,6 @@ export async function POST(req: Request) {
       }
     }
     console.error("[chat] 请求初始化失败", error)
-    return Response.json(
-      { error: "生成初始化失败，请重试。" },
-      { status: 500 }
-    )
+    return Response.json({ error: "生成初始化失败，请重试。" }, { status: 500 })
   }
 }

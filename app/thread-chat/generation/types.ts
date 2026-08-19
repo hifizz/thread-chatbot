@@ -14,6 +14,31 @@ export type GenerationStatus = (typeof GENERATION_STATUSES)[number]
 export type GenerationBillingStatus =
   (typeof GENERATION_BILLING_STATUSES)[number]
 
+export type GenerationFeedback = "positive" | "negative"
+
+export type RecoverableTurnReason =
+  "missing_assistant" | "missing_generation" | "interrupted_generation"
+
+export interface RecoverableTurn {
+  threadId: string
+  userMessageId: string
+  assistantMessageId?: string
+  reason: RecoverableTurnReason
+}
+
+export type ThreadChatGenerationIntent =
+  | { kind: "persisted-turn" }
+  | {
+      kind: "regenerate-assistant"
+      sourceAssistantMessageId: string
+    }
+  | { kind: "retry-orphan-user" }
+  | {
+      kind: "edit-last-user"
+      sourceUserMessageId: string
+      text: string
+    }
+
 export type GenerationTurnIdentity = {
   treeId: string
   threadId: string
@@ -28,6 +53,9 @@ export type GenerationTurnSnapshot = {
   assistantMessageIndex: number
   userMessage: Message
   assistantMessage: Message
+  userParentMessageId?: string | null
+  assistantParentMessageId?: string
+  activatesAssistantMessageId?: string
 }
 
 export type GenerationUsageMetadata = {
@@ -64,6 +92,17 @@ export type GenerationSummary = {
   status: GenerationStatus
   updatedAt: string
   result?: GenerationResultV1 | null
+  feedback?: GenerationFeedback | null
+  feedbackUpdatedAt?: string | null
+}
+
+export interface GenerationForReconcile extends GenerationSummary {
+  turnSnapshot: GenerationTurnSnapshot
+}
+
+export interface ReconciledThreadChatTree {
+  state: import("@/app/thread-chat/core/types").ThreadTreeState
+  recoverableTurns: RecoverableTurn[]
 }
 
 export function isActiveGenerationStatus(
@@ -77,4 +116,3 @@ export function isTerminalGenerationStatus(
 ): status is "completed" | "stopped" | "failed" | "superseded" {
   return !isActiveGenerationStatus(status)
 }
-

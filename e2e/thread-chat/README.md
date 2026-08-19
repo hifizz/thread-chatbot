@@ -67,6 +67,32 @@ node --import tsx e2e/thread-chat/generation-db.test.mjs
 结果。明确 Stop 才会中止；普通刷新不得产生 stopped。P0 不恢复错过的逐 token 动画，只
 恢复后台状态和最终答案。
 
+## 消息操作与轻量消息 DAG
+
+无需浏览器的纯行为测试：
+
+```bash
+node --import tsx e2e/thread-chat/message-graph.test.mjs
+node --import tsx e2e/thread-chat/reconcile-turns.test.mjs
+node --import tsx e2e/thread-chat/regeneration-patch.test.mjs
+node --import tsx e2e/thread-chat/message-actions-controller.test.mjs
+```
+
+覆盖 legacy tree 幂等迁移、active/exact-source path、回复版本、Artifact 来源、恢复状态、
+不可变 edit/regenerate patch，以及 controller 接受/拒绝/冲突/反馈命令。
+
+以下脚本连接 `.env.local` 的开发数据库并在 `finally` 中清理随机测试用户：
+
+```bash
+node --import tsx e2e/thread-chat/generation-actions-db.test.mjs
+node --import tsx e2e/thread-chat/tree-revision-db.test.mjs
+```
+
+覆盖 generation intent 的原子落库、幂等 replay、running attempt supersede、terminal
+source/Artifact 保留，以及 active-leaf CAS、跨用户拒绝、generation-vs-switch revision
+竞态。真实 UI 验收按仓库规则使用 `ego-browser nodejs` 访问 `localhost:4040`，不得用
+本目录旧的 Playwright 脚本替代本 change 的浏览器验收。
+
 ## Markdown Artifact 浏览器验收（mock API）
 
 前提：dev server 与本机 Chrome。脚本在浏览器层 mock 对话与整树持久化 API，不需要
@@ -158,8 +184,8 @@ CHROMIUM_PATH=... BASE_URL=http://localhost:4040 node e2e/thread-chat/verify-per
   仍在 → DB 行断言（state.threads 含 main+分支、派生标题非空、空树不写库）。
   截图 `shots/persist-restored.png`。
 - **sanitize（4 断言）**：node 直接往 `branch_trees` 写含 `streaming` 半截正文 +
-  `pending` 空占位的脏快照 → 加载后半截消息以正文显示为 done、空占位被删、无转圈、
-  composer 非忙碌（测试行随后清理）。
+  `pending` 空占位的脏快照 → 加载后半截消息以正文显示为 done、空占位转成可重试
+  error、无转圈、composer 非忙碌（测试行随后清理）。
 - **降级（5 断言）**：playwright 拦截 `/api/branch-trees/**` 返回 500 → 页面仍以
   空树打开、console.warn 留痕、真实聊天照常、PUT 失败仅警告不打断。
 

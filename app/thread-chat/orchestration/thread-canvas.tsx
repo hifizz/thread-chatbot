@@ -44,6 +44,7 @@ import {
   type CanvasCardNode,
 } from "./canvas-node"
 import { useCanvasLayout, type CanvasViewState } from "./use-canvas-layout"
+import type { MessageActionViewState } from "../chat/message-action-types"
 
 /** nodeTypes 稳定引用：模块级定义，避免 React Flow 整树重挂（skill 契约 #4） */
 const nodeTypes = { threadCard: CanvasCard }
@@ -74,6 +75,7 @@ export interface ThreadCanvasProps {
   onOpenArtifact: (artifactId: string) => void
   /** 会话动作（send/abort/retry）：壳层用 chat-controller 组装（D3，同一发送链路） */
   chat: CanvasChatActions
+  messageActionState: MessageActionViewState
   /** 画布内 fork 的视口跟随指令：壳层每次 fork 置 {id, n}（n 递增去重），
       新节点入树后 selectNode + setCenter 平滑跟随（D4）；离开画布时壳层清空 */
   focusNode?: { id: string; n: number } | null
@@ -86,6 +88,7 @@ function CanvasFlow({
   onOpenThread,
   onOpenArtifact,
   chat,
+  messageActionState,
   focusNode,
 }: ThreadCanvasProps) {
   const version = useThreadStore(store)
@@ -95,6 +98,7 @@ function CanvasFlow({
       version,
       mainSubtitle,
       viewState,
+      messageActionState,
     })
   const { fitView, setCenter, getZoom } = useReactFlow()
 
@@ -134,8 +138,9 @@ function CanvasFlow({
       openArtifact: onOpenArtifact,
       getState: store.getState,
       setThreadModel: store.setThreadModel,
+      messageActionState,
     }),
-    [chat, focusThread, onOpenArtifact, store]
+    [chat, focusThread, messageActionState, onOpenArtifact, store]
   )
 
   /* 画布内 fork：新节点入树后聚焦（ref 去重——effect 依赖含 nodes，每个 version

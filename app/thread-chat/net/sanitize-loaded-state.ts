@@ -1,19 +1,22 @@
 import type { Message, Thread, ThreadTreeState } from "../core/types"
+import { migrateThreadTreeState } from "../core/message-graph"
+import { GENERATION_ERRORS } from "@/constants/generation"
 import type { GenerationSummary } from "../generation/types"
 
 /**
- * 纯函数：恢复流式残留并修复 Artifact 三方关系。
- * 有正文或有效 Artifact 的中断 assistant → done；两者皆空 → 删除。
+ * 纯函数：防御性收敛流式残留并修复 Artifact 三方关系。
+ * 有正文或有效 Artifact 的中断 assistant → done；两者皆空 → 可重试 error。
  * message.artifactIds / registry / artifactOrder 最终只保留互相可达的数据。
  */
 export function sanitizeLoadedState(
-  state: ThreadTreeState,
+  inputState: ThreadTreeState,
   resolveModelId: (modelId: string | undefined) => string,
   activeGenerations: readonly Pick<
     GenerationSummary,
     "id" | "threadId" | "assistantMessageId" | "status"
   >[] = []
 ): ThreadTreeState {
+  const state = migrateThreadTreeState(inputState)
   let changed = false
   const activeByMessage = new Map(
     activeGenerations
@@ -41,7 +44,10 @@ export function sanitizeLoadedState(
         message.role === "assistant"
           ? [...new Set(message.artifactIds ?? [])].filter((artifactId) => {
               const artifact = state.artifacts[artifactId]
-              return artifact?.sourceThreadId === id
+              return (
+                artifact?.sourceThreadId === id &&
+                artifact.sourceMessageId === message.id
+              )
             })
           : []
       const hadArtifactIds = (message.artifactIds?.length ?? 0) > 0
@@ -100,7 +106,16 @@ export function sanitizeLoadedState(
           validArtifactIds.forEach((artifactId) =>
             referencedArtifactIds.add(artifactId)
           )
-        } else threadChanged = true
+        } else {
+          threadChanged = true
+          nextMessage = {
+            ...nextMessage,
+            status: "error",
+            error: GENERATION_ERRORS.backgroundInterrupted,
+            backgroundGeneration: undefined,
+          }
+          messages.push(nextMessage)
+        }
       } else {
         messages.push(nextMessage)
         validArtifactIds.forEach((artifactId) =>
@@ -110,9 +125,7 @@ export function sanitizeLoadedState(
       threadChanged ||= artifactRefsChanged || hasTransientGeneration
     }
 
-    threads[id] = threadChanged
-      ? { ...thread, modelId, messages }
-      : thread
+    threads[id] = threadChanged ? { ...thread, modelId, messages } : thread
     changed ||= threadChanged
   }
 

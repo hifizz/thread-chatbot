@@ -4,6 +4,19 @@
  */
 
 import type { Artifact, Message, Thread, ThreadTreeState } from "./types"
+import { messagePathTo } from "./message-graph"
+
+export {
+  activeMessagePath,
+  activeLeafTurn,
+  activePathArtifacts,
+  artifactSourceProvenance,
+  assistantTurnAlternatives,
+  childThreadSourceProvenance,
+  isActiveLeafTurn,
+  messagePathTo,
+  sourceMessageProvenance,
+} from "./message-graph"
 
 /** 消息引用且当前 registry 中真实存在的 Artifact（坏引用静默过滤）。 */
 export function validArtifactsOfMessage(
@@ -51,8 +64,9 @@ export function collectInherited(
   if (!thread.parentId) return []
   const parent = state.threads[thread.parentId]
   if (!parent) return []
-  const i = parent.messages.findIndex((m) => m.id === thread.forkFromMsgId)
-  const upto = parent.messages.slice(0, i + 1)
+  const upto = thread.forkFromMsgId
+    ? messagePathTo(parent, thread.forkFromMsgId)
+    : []
   return parent.parentId === null
     ? upto
     : [...collectInherited(state, parent), ...upto]

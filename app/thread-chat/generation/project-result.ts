@@ -20,6 +20,7 @@ type ProjectTerminalStatus = "completed" | "stopped" | "failed"
 export type ProjectGenerationResultInput = {
   generationId: string
   threadId: string
+  assistantMessageId: string
   responseMessage: Pick<UIMessage, "parts">
   terminalStatus: ProjectTerminalStatus
   error?: string
@@ -85,6 +86,7 @@ function optionalString(value: unknown): string | undefined {
 export function projectGenerationResult({
   generationId,
   threadId,
+  assistantMessageId,
   responseMessage,
   terminalStatus,
   error,
@@ -130,6 +132,7 @@ export function projectGenerationResult({
       artifacts[id] = {
         id,
         sourceThreadId: threadId,
+        sourceMessageId: assistantMessageId,
         kind: "markdown",
         title: parsed.data.title,
         content: parsed.data.content,
@@ -186,9 +189,7 @@ export function projectGenerationResult({
       artifactIds,
       artifacts,
       ...(webResearch.length > 0 ? { webResearch } : {}),
-      ...(webResearchTextOffset !== undefined
-        ? { webResearchTextOffset }
-        : {}),
+      ...(webResearchTextOffset !== undefined ? { webResearchTextOffset } : {}),
       ...(researchRoute ? { researchRoute } : {}),
       ...(researchPlan ? { researchPlan } : {}),
       ...(usage ? { usage } : {}),

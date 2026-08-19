@@ -15,14 +15,15 @@
  * treeId 做 UUID 形状校验（安全阀），不合法一律 400。
  */
 
-import { and, eq, isNull } from "drizzle-orm"
+import { and, eq, isNull, sql } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { branchTrees } from "@/lib/db/schema"
 import { isValidTreeId } from "@/lib/chat/tree-id"
 import { CUSTOM_TITLE_MAX_LEN } from "@/constants/thread-chat"
 import { getCurrentUserId } from "@/lib/auth/server"
 import type { ThreadTreeState } from "@/app/thread-chat/core/types"
-import { mergeGenerationResult } from "@/app/thread-chat/generation/merge-result"
+import { migrateThreadTreeState } from "@/app/thread-chat/core/message-graph"
+import { reconcileThreadChatTurns } from "@/app/thread-chat/generation/reconcile-turns"
 import {
   failStaleGenerationsForTree,
   listCurrentGenerationsForTree,
@@ -52,11 +53,10 @@ async function loadOwnedOrClaimedTree(userId: string, treeId: string) {
       .select({
         state: branchTrees.state,
         customTitle: branchTrees.customTitle,
+        revision: branchTrees.revision,
       })
       .from(branchTrees)
-      .where(
-        and(eq(branchTrees.id, treeId), eq(branchTrees.userId, userId))
-      )
+      .where(and(eq(branchTrees.id, treeId), eq(branchTrees.userId, userId)))
     if (owned) return owned
 
     // 精确 URL 的一次性历史迁移认领；并发时只有一个 UPDATE 能成功。
@@ -67,6 +67,7 @@ async function loadOwnedOrClaimedTree(userId: string, treeId: string) {
       .returning({
         state: branchTrees.state,
         customTitle: branchTrees.customTitle,
+        revision: branchTrees.revision,
       })
     return claimed ?? null
   })
@@ -84,21 +85,33 @@ export async function GET(_req: Request, { params }: RouteContext) {
 
   await failStaleGenerationsForTree(userId, treeId)
   const generations = await listCurrentGenerationsForTree(userId, treeId)
-  let state = row.state as ThreadTreeState
-  for (const generation of generations) {
-    if (!generation.result) continue
-    state = mergeGenerationResult(state, {
-      threadId: generation.threadId,
-      assistantMessageId: generation.assistantMessageId,
-      generationId: generation.id,
-      turnSnapshot: generation.turnSnapshot,
-      result: generation.result,
+  let reconciled
+  try {
+    reconciled = reconcileThreadChatTurns({
+      state: row.state as ThreadTreeState,
+      generations: generations.map((generation) => ({
+        ...toGenerationSummary(generation),
+        turnSnapshot: generation.turnSnapshot,
+      })),
     })
+  } catch (error) {
+    console.error("[thread-chat] 消息图读取协调失败", { treeId, error })
+    return Response.json(
+      {
+        error: {
+          code: "invalid_tree_state",
+          message: "分支树消息结构无效",
+        },
+      },
+      { status: 500 }
+    )
   }
   return Response.json({
-    state,
+    state: reconciled.state,
+    revision: row.revision,
     customTitle: row.customTitle,
     generations: generations.map(toGenerationSummary),
+    recoverableTurns: reconciled.recoverableTurns,
   })
 }
 
@@ -109,7 +122,7 @@ export async function PUT(req: Request, { params }: RouteContext) {
   if (!isValidTreeId(treeId))
     return new Response("treeId 必须是 UUID", { status: 400 })
 
-  let body: { state?: unknown; title?: unknown }
+  let body: { state?: unknown; title?: unknown; baseRevision?: unknown }
   try {
     body = await req.json()
   } catch {
@@ -125,26 +138,140 @@ export async function PUT(req: Request, { params }: RouteContext) {
     return new Response("state.threads 必须是对象", { status: 400 })
 
   const title = typeof body.title === "string" ? body.title : null
+  const incomingSchemaVersion = (state as Record<string, unknown>).schemaVersion
+  const baseRevision = body.baseRevision
+  if (
+    incomingSchemaVersion === 2 &&
+    (!Number.isInteger(baseRevision) || (baseRevision as number) < 0)
+  )
+    return Response.json(
+      {
+        error: {
+          code: "revision_required",
+          message: "消息图存盘必须携带 baseRevision",
+        },
+      },
+      { status: 428 }
+    )
+
+  let validatedState = state
+  if (incomingSchemaVersion === 2) {
+    try {
+      validatedState = migrateThreadTreeState(state)
+    } catch {
+      return Response.json(
+        {
+          error: {
+            code: "invalid_tree_state",
+            message: "消息图包含无效的 parent 或 active leaf",
+          },
+        },
+        { status: 400 }
+      )
+    }
+  }
   const now = new Date()
   const saved = await db.transaction(async (tx) => {
+    if (Number.isInteger(baseRevision)) {
+      const expectedRevision = baseRevision as number
+      const [updated] = await tx
+        .update(branchTrees)
+        .set({
+          state: validatedState,
+          title,
+          revision: sql`${branchTrees.revision} + 1`,
+          updatedAt: now,
+        })
+        .where(
+          and(
+            eq(branchTrees.id, treeId),
+            eq(branchTrees.userId, userId),
+            eq(branchTrees.revision, expectedRevision)
+          )
+        )
+        .returning({ revision: branchTrees.revision })
+      if (updated) return { kind: "saved" as const, revision: updated.revision }
+
+      const [existing] = await tx
+        .select({ revision: branchTrees.revision })
+        .from(branchTrees)
+        .where(and(eq(branchTrees.id, treeId), eq(branchTrees.userId, userId)))
+      if (existing)
+        return { kind: "conflict" as const, revision: existing.revision }
+      if (expectedRevision !== 0) return { kind: "not_found" as const }
+
+      const [inserted] = await tx
+        .insert(branchTrees)
+        .values({
+          id: treeId,
+          userId,
+          state: validatedState,
+          title,
+          revision: 1,
+          updatedAt: now,
+        })
+        .onConflictDoNothing({ target: branchTrees.id })
+        .returning({ revision: branchTrees.revision })
+      if (inserted)
+        return { kind: "saved" as const, revision: inserted.revision }
+      return { kind: "not_found" as const }
+    }
+
+    // 滚动部署兼容：旧客户端只能继续写未升级的 legacy tree。
+    const [existing] = await tx
+      .select({ state: branchTrees.state, revision: branchTrees.revision })
+      .from(branchTrees)
+      .where(and(eq(branchTrees.id, treeId), eq(branchTrees.userId, userId)))
+    if (
+      existing &&
+      (existing.state as { schemaVersion?: unknown }).schemaVersion === 2
+    )
+      return { kind: "revision_required" as const }
     const [updated] = await tx
       .update(branchTrees)
-      .set({ state, title, updatedAt: now })
-      .where(
-        and(eq(branchTrees.id, treeId), eq(branchTrees.userId, userId))
-      )
-      .returning({ id: branchTrees.id })
-    if (updated) return true
+      .set({ state: validatedState, title, updatedAt: now })
+      .where(and(eq(branchTrees.id, treeId), eq(branchTrees.userId, userId)))
+      .returning({ revision: branchTrees.revision })
+    if (updated) return { kind: "saved" as const, revision: updated.revision }
 
     const [inserted] = await tx
       .insert(branchTrees)
-      .values({ id: treeId, userId, state, title, updatedAt: now })
+      .values({
+        id: treeId,
+        userId,
+        state: validatedState,
+        title,
+        updatedAt: now,
+      })
       .onConflictDoNothing({ target: branchTrees.id })
-      .returning({ id: branchTrees.id })
-    return Boolean(inserted)
+      .returning({ revision: branchTrees.revision })
+    return inserted
+      ? { kind: "saved" as const, revision: inserted.revision }
+      : { kind: "not_found" as const }
   })
-  if (!saved) return notFound()
-  return Response.json({ ok: true })
+  if (saved.kind === "not_found") return notFound()
+  if (saved.kind === "revision_required")
+    return Response.json(
+      {
+        error: {
+          code: "revision_required",
+          message: "该树已升级，请刷新后再保存",
+        },
+      },
+      { status: 428 }
+    )
+  if (saved.kind === "conflict")
+    return Response.json(
+      {
+        error: {
+          code: "tree_revision_conflict",
+          message: "该对话已在其他页面更新",
+          currentRevision: saved.revision,
+        },
+      },
+      { status: 409 }
+    )
+  return Response.json({ ok: true, revision: saved.revision })
 }
 
 export async function PATCH(req: Request, { params }: RouteContext) {

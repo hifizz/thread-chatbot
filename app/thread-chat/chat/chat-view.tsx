@@ -15,6 +15,11 @@ import { MessageScroller } from "@shadcn/react/message-scroller"
 import { GENERATION_BACKGROUND_LABEL } from "@/constants/generation"
 import type { Message } from "../core/types"
 import { ThreadModelSelector } from "./thread-model-selector"
+import { EditableUserMessage } from "./editable-user-message"
+import { AssistantMessageToolbar } from "./assistant-message-toolbar"
+import { TurnVariantPicker } from "./turn-variant-picker"
+import type { MessageActionViewState } from "./message-action-types"
+import type { ThreadMessageActionCommands } from "../net/chat-controller"
 
 /** 把 \n 转成 <br/>（assistant 正文按段落渲染时的行内换行） */
 export function withBreaks(s: string, keyBase: string): React.ReactNode[] {
@@ -65,6 +70,15 @@ export interface ChatViewProps {
   modelSelectorDisabledReason?: "branch" | "busy"
   onModelChange: (modelId: string) => void
   onSend: (text: string) => void
+  messageActionState?: MessageActionViewState
+  messageCommands?: ThreadMessageActionCommands
+  editableUserMessageId?: string
+  regeneratableAssistantMessageId?: string
+  turnAlternatives?: readonly {
+    assistantMessageId: string
+    generationId?: string
+    derivedThreadCount: number
+  }[]
 }
 
 export function ChatView({
@@ -85,6 +99,11 @@ export function ChatView({
   modelSelectorDisabledReason,
   onModelChange,
   onSend,
+  messageActionState,
+  messageCommands,
+  editableUserMessageId,
+  regeneratableAssistantMessageId,
+  turnAlternatives = [],
 }: ChatViewProps) {
   const taRef = useRef<HTMLTextAreaElement | null>(null)
 
@@ -134,10 +153,22 @@ export function ChatView({
       <div key={msg.id} className={`message ${msg.role}`} data-msg-id={msg.id}>
         <div className="who">{msg.role === "user" ? "你" : "AI"}</div>
         {msg.role === "user" ? (
-          <div className="bubble" data-role="user">
-            {msg.quote && <div className="msg-quote">{msg.quote.text}</div>}
-            {msg.text}
-          </div>
+          messageCommands ? (
+            <EditableUserMessage
+              threadId={threadId}
+              message={msg}
+              editable={msg.id === editableUserMessageId}
+              recovery={messageActionState?.recoverableByUserMessageId.get(
+                msg.id
+              )}
+              commands={messageCommands}
+            />
+          ) : (
+            <div className="bubble" data-role="user">
+              {msg.quote && <div className="msg-quote">{msg.quote.text}</div>}
+              {msg.text}
+            </div>
+          )
         ) : (
           <>
             {(hasVisibleAssistantContent || isWaitingForVisibleOutput) && (
@@ -179,6 +210,33 @@ export function ChatView({
                 </button>
               </div>
             )}
+            {messageCommands &&
+              msg.status !== "pending" &&
+              msg.status !== "streaming" && (
+                <div className="assistant-actions-row">
+                  <AssistantMessageToolbar
+                    threadId={threadId}
+                    message={msg}
+                    regeneratable={msg.id === regeneratableAssistantMessageId}
+                    feedback={
+                      msg.generationId
+                        ? messageActionState?.feedbackByGenerationId.get(
+                            msg.generationId
+                          )
+                        : undefined
+                    }
+                    commands={messageCommands}
+                  />
+                  {msg.id === regeneratableAssistantMessageId && (
+                    <TurnVariantPicker
+                      threadId={threadId}
+                      activeAssistantMessageId={msg.id}
+                      alternatives={turnAlternatives}
+                      onSwitch={messageCommands.switchTurnVariant}
+                    />
+                  )}
+                </div>
+              )}
             {renderAfterMessage?.(msg)}
           </>
         )}

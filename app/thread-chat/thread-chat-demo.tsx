@@ -24,7 +24,7 @@
 
 import dynamic from "next/dynamic"
 import { useRouter } from "next/navigation"
-import React, { useCallback, useEffect, useRef, useState } from "react"
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   CircleHelp,
   Columns3,
@@ -42,7 +42,6 @@ import {
 } from "@/constants/thread-chat"
 import {
   GENERATION_CLIENT_POLL_MS,
-  GENERATION_ERRORS,
   GENERATION_HIDDEN_POLL_MS,
 } from "@/constants/generation"
 import {
@@ -54,12 +53,20 @@ import { createThreadStore, defaultBranchTitle } from "./core/store"
 import { useThreadStore } from "./core/use-thread-store"
 import {
   hasRenderableAssistantOutput,
+  activeLeafTurn,
+  activeMessagePath,
+  activePathArtifacts,
+  assistantTurnAlternatives,
+  childThreadSourceProvenance,
   threadTitle,
   type TreeRow,
 } from "./core/selectors"
 import type { Message, ThreadTreeState } from "./core/types"
 import { requestBranchTitle } from "./net/branch-title"
-import { createChatController } from "./net/chat-controller"
+import {
+  createChatController,
+  type ThreadMessageActionCommands,
+} from "./net/chat-controller"
 import { kickoffQuestion, serializeMessageForModel } from "./net/prompt"
 import {
   deriveTreeTitle,
@@ -72,8 +79,11 @@ import {
   saveUiState,
   type TreeUiState,
   type ViewMode,
+  TreeRevisionError,
 } from "./net/persist"
 import type { GenerationSummary } from "./generation/types"
+import type { RecoverableTurn } from "./generation/types"
+import type { MessageActionViewState } from "./chat/message-action-types"
 import { fetchWithAuth } from "@/lib/auth/session-recovery"
 import { BranchableChat } from "./branching/branchable-chat"
 import {
@@ -146,6 +156,7 @@ export function ThreadChatDemo({ treeId }: { treeId: string }) {
     /** 用户重命名过的标题（未改过为 null）——主线列头副标题优先展示 */
     customTitle: string | null
     generations: GenerationSummary[]
+    recoverableTurns: RecoverableTurn[]
   } | null>(null)
 
   useEffect(() => {
@@ -169,6 +180,7 @@ export function ThreadChatDemo({ treeId }: { treeId: string }) {
         ui,
         customTitle: loaded.customTitle,
         generations: loaded.generations,
+        recoverableTurns: loaded.recoverableTurns,
       })
     })()
     return () => {
@@ -190,6 +202,7 @@ export function ThreadChatDemo({ treeId }: { treeId: string }) {
       initialUi={boot.ui}
       initialCustomTitle={boot.customTitle}
       initialGenerations={boot.generations}
+      initialRecoverableTurns={boot.recoverableTurns}
     />
   )
 }
@@ -203,6 +216,7 @@ interface ThreadChatDemoInnerProps {
   /** 用户重命名过的标题（未改过为 null）——主线列头副标题优先展示 */
   initialCustomTitle?: string | null
   initialGenerations: GenerationSummary[]
+  initialRecoverableTurns: RecoverableTurn[]
 }
 
 export function ThreadChatDemoInner({
@@ -211,6 +225,7 @@ export function ThreadChatDemoInner({
   initialUi,
   initialCustomTitle = null,
   initialGenerations,
+  initialRecoverableTurns,
 }: ThreadChatDemoInnerProps) {
   const router = useRouter()
 
@@ -220,6 +235,63 @@ export function ThreadChatDemoInner({
   )
   const version = useThreadStore(store)
   const state = store.getState()
+  const [recoverableByUserMessageId, setRecoverableByUserMessageId] = useState(
+    () =>
+      new Map(initialRecoverableTurns.map((turn) => [turn.userMessageId, turn]))
+  )
+  const [feedbackByGenerationId, setFeedbackByGenerationId] = useState(
+    () =>
+      new Map(
+        initialGenerations.flatMap((generation) =>
+          generation.feedback
+            ? [[generation.id, generation.feedback] as const]
+            : []
+        )
+      )
+  )
+  const messageActionState = useMemo<MessageActionViewState>(() => {
+    const activePathByThreadId = new Map(
+      Object.values(state.threads).map((thread) => [
+        thread.id,
+        activeMessagePath(thread).map((message) => message.id),
+      ])
+    )
+    const presentationByThreadId = new Map(
+      Object.values(state.threads).map((thread) => {
+        const latestTurn = activeLeafTurn(thread)
+        const alternatives = latestTurn?.assistantMessage
+          ? assistantTurnAlternatives(
+              thread,
+              latestTurn.assistantMessage.id
+            ).map((assistant) => ({
+              assistantMessageId: assistant.id,
+              generationId: assistant.generationId,
+              derivedThreadCount: thread.children.filter(
+                (childId) =>
+                  state.threads[childId]?.forkFromMsgId === assistant.id
+              ).length,
+            }))
+          : []
+        return [
+          thread.id,
+          {
+            latestUserMessageId: latestTurn?.userMessage.id,
+            latestAssistantMessageId: latestTurn?.assistantMessage?.id,
+            alternatives,
+            sourceProvenance: childThreadSourceProvenance(state, thread.id),
+          },
+        ] as const
+      })
+    )
+    return {
+      recoverableByUserMessageId,
+      feedbackByGenerationId,
+      activePathByThreadId,
+      presentationByThreadId,
+    }
+    // state 对象原地变更，必须用 store version 作为派生键。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recoverableByUserMessageId, feedbackByGenerationId, version])
 
   const [toast, setToast] = useState<ToastState | null>(null)
 
@@ -238,10 +310,58 @@ export function ThreadChatDemoInner({
       treeId,
       persistNow: () => {
         const current = store.getState()
-        return saveTreeStrict(treeId, current, deriveTreeTitle(current))
+        return saveTreeStrict(treeId, current, deriveTreeTitle(current)).catch(
+          (error) => {
+            if (error instanceof TreeRevisionError) {
+              showToast("其他标签页已更新，正在重新加载…")
+              window.location.reload()
+            }
+            throw error
+          }
+        )
       },
       onError: (message) => showToast(message),
     })
+  )
+  const messageCommands = useMemo<ThreadMessageActionCommands>(
+    () => ({
+      retryAssistant: chat.retryAssistant,
+      async retryUserTurn(threadId, userMessageId) {
+        const result = await chat.retryUserTurn(threadId, userMessageId)
+        if (result.ok)
+          setRecoverableByUserMessageId((current) => {
+            const next = new Map(current)
+            next.delete(userMessageId)
+            return next
+          })
+        return result
+      },
+      async editAndRegenerate(threadId, userMessageId, text) {
+        const result = await chat.editAndRegenerate(
+          threadId,
+          userMessageId,
+          text
+        )
+        if (result.ok)
+          setRecoverableByUserMessageId((current) => {
+            const next = new Map(current)
+            next.delete(userMessageId)
+            return next
+          })
+        return result
+      },
+      switchTurnVariant: chat.switchTurnVariant,
+      async submitFeedback(generationId, feedback) {
+        await chat.submitFeedback(generationId, feedback)
+        setFeedbackByGenerationId((current) => {
+          const next = new Map(current)
+          if (feedback) next.set(generationId, feedback)
+          else next.delete(generationId)
+          return next
+        })
+      },
+    }),
+    [chat]
   )
   useEffect(() => () => chat.detachAll(), [chat])
 
@@ -278,12 +398,11 @@ export function ThreadChatDemoInner({
       if (cancelled) return
       timer = setTimeout(
         poll,
-        document.hidden
-          ? GENERATION_HIDDEN_POLL_MS
-          : GENERATION_CLIENT_POLL_MS
+        document.hidden ? GENERATION_HIDDEN_POLL_MS : GENERATION_CLIENT_POLL_MS
       )
     }
     const poll = async () => {
+      let needsTreeReconciliation = false
       for (const generationId of [...generationIdsRef.current]) {
         if (cancelled) return
         try {
@@ -292,17 +411,7 @@ export function ThreadChatDemoInner({
           )
           if (res.status === 404) {
             generationIdsRef.current.delete(generationId)
-            for (const thread of Object.values(store.getState().threads)) {
-              const message = thread.messages.find(
-                (candidate) => candidate.generationId === generationId
-              )
-              if (message)
-                store.failAssistantMessage(
-                  thread.id,
-                  message.id,
-                  GENERATION_ERRORS.backgroundInterrupted
-                )
-            }
+            needsTreeReconciliation = true
             continue
           }
           if (!res.ok) continue
@@ -317,34 +426,34 @@ export function ThreadChatDemoInner({
             continue
 
           generationIdsRef.current.delete(generationId)
-          if (!generation.isCurrent || !generation.result) continue
-          const current = store.getState()
-          const thread = current.threads[generation.threadId]
-          const assistantIndex = thread?.messages.findIndex(
-            (message) => message.id === generation.assistantMessageId
-          )
-          if (!thread || assistantIndex == null || assistantIndex < 1) continue
-          const assistantMessage = thread.messages[assistantIndex]
-          const userMessage = thread.messages[assistantIndex - 1]
-          if (
-            assistantMessage?.role !== "assistant" ||
-            userMessage?.role !== "user"
-          )
-            continue
-          store.applyGenerationResult({
-            threadId: generation.threadId,
-            assistantMessageId: generation.assistantMessageId,
-            generationId,
-            turnSnapshot: {
-              threadId: generation.threadId,
-              assistantMessageIndex: assistantIndex,
-              userMessage,
-              assistantMessage,
-            },
-            result: generation.result,
-          })
+          needsTreeReconciliation = true
         } catch (error) {
           console.warn("[thread-chat] generation 轮询失败，将继续重试", error)
+        }
+      }
+      if (needsTreeReconciliation && !cancelled) {
+        const loaded = await loadTree(treeId)
+        if (loaded.state) {
+          const nextState = sanitizeLoadedState(
+            loaded.state,
+            resolveThreadChatModelId,
+            loaded.generations
+          )
+          store.replaceReconciledState(nextState)
+          setRecoverableByUserMessageId(
+            new Map(
+              loaded.recoverableTurns.map((turn) => [turn.userMessageId, turn])
+            )
+          )
+          setFeedbackByGenerationId(
+            new Map(
+              loaded.generations.flatMap((generation) =>
+                generation.feedback
+                  ? [[generation.id, generation.feedback] as const]
+                  : []
+              )
+            )
+          )
         }
       }
       schedule()
@@ -354,7 +463,7 @@ export function ThreadChatDemoInner({
       cancelled = true
       if (timer) clearTimeout(timer)
     }
-  }, [store])
+  }, [store, treeId])
 
   /* ---------- 防抖存库：version 变化后 1.5s 静默才整树 PUT（流式期间合并为一次写）。
        首屏（version 未变过）不写；卸载时若有 pending 定时器则立即 flush（尽力而为）。
@@ -370,7 +479,10 @@ export function ThreadChatDemoInner({
       savePendingRef.current = false
       if (suppressSaveRef.current) return
       const s = store.getState()
-      void saveTree(treeId, s, deriveTreeTitle(s))
+      void saveTree(treeId, s, deriveTreeTitle(s), () => {
+        showToast("其他标签页已更新，正在重新加载…")
+        window.location.reload()
+      })
     }, TREE_SAVE_DEBOUNCE_MS)
     return () => clearTimeout(t)
   }, [version, treeId, store])
@@ -380,7 +492,9 @@ export function ThreadChatDemoInner({
       if (savePendingRef.current && !suppressSaveRef.current) {
         savePendingRef.current = false
         const s = store.getState()
-        void saveTree(treeId, s, deriveTreeTitle(s))
+        void saveTree(treeId, s, deriveTreeTitle(s), () => {
+          window.location.reload()
+        })
       }
     },
     [treeId, store]
@@ -463,6 +577,11 @@ export function ThreadChatDemoInner({
     send: chat.send,
     stop: chat.stop,
     retry: chat.retry,
+    retryAssistant: messageCommands.retryAssistant,
+    retryUserTurn: messageCommands.retryUserTurn,
+    editAndRegenerate: messageCommands.editAndRegenerate,
+    switchTurnVariant: messageCommands.switchTurnVariant,
+    submitFeedback: messageCommands.submitFeedback,
   }))
 
   /* ---------- 工作台状态记忆（D7）：五项变化 ~300ms 轻防抖写 localStorage（按 treeId 分键）。
@@ -719,9 +838,10 @@ export function ThreadChatDemoInner({
 
   /** 会话是否忙碌：末条消息是 assistant 且仍在 pending/streaming（派生自 state，version 快照天然驱动） */
   function isThreadBusy(threadId: string): boolean {
-    const msgs = state.threads[threadId]?.messages
-    if (!msgs?.length) return false
-    const last = msgs[msgs.length - 1]
+    const thread = state.threads[threadId]
+    if (!thread) return false
+    const last = activeLeafTurn(thread)?.assistantMessage
+    if (!last) return false
     return (
       last.role === "assistant" &&
       (last.status === "pending" || last.status === "streaming")
@@ -745,8 +865,8 @@ export function ThreadChatDemoInner({
 
   /* ---------- 顶栏数据 ---------- */
   const branchCount = Object.keys(state.threads).length - 1
-  const markdownCount = state.artifactOrder.reduce(
-    (count, id) => count + (state.artifacts[id]?.kind === "markdown" ? 1 : 0),
+  const markdownCount = activePathArtifacts(state).reduce(
+    (count, artifact) => count + (artifact.kind === "markdown" ? 1 : 0),
     0
   )
 
@@ -902,6 +1022,8 @@ export function ThreadChatDemoInner({
               onRetry={(msg: Message) => chat.retry(threadId, msg.id)}
               onStop={() => chat.stop(threadId)}
               onSend={(text) => chat.send(threadId, text)}
+              messageActionState={messageActionState}
+              messageCommands={messageCommands}
             />
           )}
         />
@@ -911,6 +1033,7 @@ export function ThreadChatDemoInner({
           mainSubtitle={mainSubtitle}
           viewState={canvasViewState}
           chat={canvasChat}
+          messageActionState={messageActionState}
           focusNode={focusNode}
           onOpenThread={(id) => openBranchUI(id, null)}
           onOpenArtifact={openArtifact}
@@ -988,7 +1111,19 @@ export function ThreadChatDemoInner({
         activeId={activeArt}
         onClose={() => setDrawerOpen(false)}
         onSelect={setActiveArt}
-        onLocate={(threadId) => openBranchUI(threadId, null)}
+        onLocate={(threadId, sourceMessageId) => {
+          const sourceThread = state.threads[threadId]
+          if (
+            sourceThread &&
+            sourceThread.activeLeafMessageId !== sourceMessageId
+          )
+            void chat
+              .switchTurnVariant(threadId, sourceMessageId)
+              .then((result) => {
+                if (result.ok) openBranchUI(threadId, null)
+              })
+          else openBranchUI(threadId, null)
+        }}
       />
 
       <div className={`toast ${toast ? "show" : ""}`}>

@@ -8,6 +8,7 @@ import { DEFAULT_THREAD_CHAT_MODEL_ID } from "@/constants/model"
 
 export function emptySeedState(): ThreadTreeState {
   return {
+    schemaVersion: 2,
     threads: {
       main: {
         id: "main",
@@ -20,6 +21,7 @@ export function emptySeedState(): ThreadTreeState {
         footnote: null,
         children: [],
         messages: [],
+        activeLeafMessageId: null,
         lastActive: 1,
       },
     },

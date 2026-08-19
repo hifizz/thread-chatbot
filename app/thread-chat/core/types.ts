@@ -20,10 +20,15 @@ export interface Artifact {
   content: string
   /** 产生该 artifact 的会话（main 或分支 id） */
   sourceThreadId: string
+  /** 产生该 artifact 的不可变 assistant 消息节点。 */
+  sourceMessageId: string
 }
 
 /** 尚未落库的 artifact 内容（种子），落库时由 store 补全 id / 来源会话 */
-export type ArtifactSeed = Omit<Artifact, "id" | "sourceThreadId">
+export type ArtifactSeed = Omit<
+  Artifact,
+  "id" | "sourceThreadId" | "sourceMessageId"
+>
 
 /** 挂在消息原文上的分支锚点：一段被划选的文字 + 对应脚注号 + 目标会话 */
 export interface Fork {
@@ -59,6 +64,8 @@ export interface MarkdownGenerationProgress {
 
 export interface Message {
   id: string
+  /** 同一 Thread 内的父消息；终态节点创建后不得改写。 */
+  parentMessageId: string | null
   role: Role
   text: string
   forks: Fork[]
@@ -100,12 +107,16 @@ export interface Thread {
   forkFromMsgId: string | null
   footnote: number | null
   children: string[]
+  /** 保存该 Thread 的全部消息节点，顺序为创建顺序。 */
   messages: Message[]
+  /** 当前可见消息路径的末端节点。 */
+  activeLeafMessageId: string | null
   /** 单调递增的活跃计数，用于「列满时替换 / 折叠最久未使用列」 */
   lastActive: number
 }
 
 export interface ThreadTreeState {
+  schemaVersion: 2
   threads: Record<string, Thread>
   artifacts: Record<string, Artifact>
   artifactOrder: string[]

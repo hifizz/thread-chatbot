@@ -16,9 +16,12 @@ import { finalizeGeneration } from "../../lib/thread-chat-generation/finalize.ts
 import {
   failStaleGenerationsForTree,
   getGenerationForOwner,
+  getGenerationFeedbackForOwner,
   listCurrentGenerationsForTree,
   requestGenerationStop,
+  setGenerationFeedbackForOwner,
   startGeneration,
+  toGenerationSummary,
 } from "../../lib/thread-chat-generation/repository.ts"
 import { GENERATION_LEASE_MS } from "../../constants/generation.ts"
 
@@ -30,6 +33,7 @@ const generations = Array.from({ length: 5 }, () => randomUUID())
 
 function stateFor(generationId) {
   return {
+    schemaVersion: 2,
     seq: 3,
     tick: 1,
     recents: [],
@@ -45,10 +49,18 @@ function stateFor(generationId) {
         footnote: null,
         children: [],
         lastActive: 1,
+        activeLeafMessageId: "m2",
         messages: [
-          { id: "m1", role: "user", text: "测试问题", forks: [] },
+          {
+            id: "m1",
+            parentMessageId: null,
+            role: "user",
+            text: "测试问题",
+            forks: [],
+          },
           {
             id: "m2",
+            parentMessageId: "m1",
             role: "assistant",
             text: "",
             forks: [],
@@ -150,7 +162,10 @@ async function run() {
     "新 attempt 必须 supersede 旧 current"
   )
   const currentAfterRetry = await listCurrentGenerationsForTree(userId, treeId)
-  assert.deepEqual(currentAfterRetry.map((row) => row.id), [generations[1]])
+  assert.deepEqual(
+    currentAfterRetry.map((row) => row.id),
+    [generations[1]]
+  )
 
   await Promise.all([
     requestGenerationStop(userId, generations[1]),
@@ -225,6 +240,59 @@ async function run() {
   assert.equal(superseded.result.text, "旧 attempt 的审计结果")
   assert.equal(superseded.billingStatus, "settled")
 
+  const positive = await setGenerationFeedbackForOwner({
+    userId,
+    generationId: generations[3],
+    feedback: "positive",
+  })
+  assert.equal(positive.feedback, "positive")
+  assert.ok(positive.feedbackUpdatedAt instanceof Date)
+  const firstFeedbackAt = positive.feedbackUpdatedAt.getTime()
+  const repeated = await setGenerationFeedbackForOwner({
+    userId,
+    generationId: generations[3],
+    feedback: "positive",
+  })
+  assert.equal(
+    repeated.feedbackUpdatedAt.getTime(),
+    firstFeedbackAt,
+    "同值重复写入必须幂等"
+  )
+  const negative = await setGenerationFeedbackForOwner({
+    userId,
+    generationId: generations[3],
+    feedback: "negative",
+  })
+  assert.equal(negative.feedback, "negative")
+  assert.equal(
+    toGenerationSummary(negative).feedback,
+    "negative",
+    "summary 必须支持刷新恢复"
+  )
+  assert.equal(
+    await setGenerationFeedbackForOwner({
+      userId: otherUserId,
+      generationId: generations[3],
+      feedback: "positive",
+    }),
+    null,
+    "越权反馈应表现为 not found"
+  )
+  const cleared = await setGenerationFeedbackForOwner({
+    userId,
+    generationId: generations[3],
+    feedback: null,
+  })
+  assert.equal(cleared.feedback, null)
+  assert.equal(cleared.feedbackUpdatedAt, null)
+  assert.deepEqual(
+    await getGenerationFeedbackForOwner(userId, generations[3]),
+    {
+      feedback: null,
+      feedbackUpdatedAt: null,
+    }
+  )
+
   await finalizeGeneration({
     generationId: generations[4],
     outcome: "completed",
@@ -253,4 +321,3 @@ try {
   await db.delete(user).where(eq(user.id, userId))
   await db.delete(user).where(eq(user.id, otherUserId))
 }
-
