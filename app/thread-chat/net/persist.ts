@@ -27,7 +27,9 @@ import type { MessageFeedbackSummary, ThreadTreeState } from "../core/types"
 import type { GenerationSummary, RecoverableTurn } from "../generation/types"
 import type { PlacementMode, Slot } from "../orchestration/placement"
 import { withoutTransientGenerationState } from "./transient-state"
+import { readSaveTreeRevision, TreeRevisionError } from "./save-tree-response"
 export { sanitizeLoadedState } from "./sanitize-loaded-state"
+export { TreeRevisionError } from "./save-tree-response"
 
 export { isValidTreeId }
 
@@ -63,20 +65,6 @@ export interface LoadedTree {
 }
 
 const revisionByTreeId = new Map<string, number>()
-
-export class TreeRevisionError extends Error {
-  constructor(
-    readonly code: "tree_revision_conflict" | "revision_required",
-    readonly currentRevision?: number
-  ) {
-    super(
-      code === "tree_revision_conflict"
-        ? "该对话已在其他页面更新"
-        : "当前页面缺少树修订号"
-    )
-    this.name = "TreeRevisionError"
-  }
-}
 
 export function getKnownTreeRevision(treeId: string): number {
   return revisionByTreeId.get(treeId) ?? 0
@@ -167,20 +155,8 @@ export async function saveTree(
           baseRevision: getKnownTreeRevision(id),
         }),
       })
-      const data = (await res.json().catch(() => null)) as {
-        revision?: number
-        error?: { code?: string }
-        currentRevision?: number
-      } | null
-      if (res.status === 409)
-        throw new TreeRevisionError(
-          "tree_revision_conflict",
-          data?.currentRevision
-        )
-      if (res.status === 428) throw new TreeRevisionError("revision_required")
-      if (!res.ok) throw new Error(`PUT /api/branch-trees ${res.status}`)
-      if (typeof data?.revision === "number")
-        setKnownTreeRevision(id, data.revision)
+      const revision = await readSaveTreeRevision(res)
+      if (revision !== null) setKnownTreeRevision(id, revision)
     } catch (err) {
       if (err instanceof TreeRevisionError) onRevisionConflict?.(err)
       console.warn("[thread-chat] 分支树存盘失败（下次变更会再试）：", err)
@@ -205,20 +181,8 @@ export async function saveTreeStrict(
         baseRevision: getKnownTreeRevision(id),
       }),
     })
-    const data = (await res.json().catch(() => null)) as {
-      revision?: number
-      error?: { code?: string }
-      currentRevision?: number
-    } | null
-    if (res.status === 409)
-      throw new TreeRevisionError(
-        "tree_revision_conflict",
-        data?.currentRevision
-      )
-    if (res.status === 428) throw new TreeRevisionError("revision_required")
-    if (!res.ok) throw new Error(`PUT /api/branch-trees ${res.status}`)
-    if (typeof data?.revision === "number")
-      setKnownTreeRevision(id, data.revision)
+    const revision = await readSaveTreeRevision(res)
+    if (revision !== null) setKnownTreeRevision(id, revision)
   })
 }
 

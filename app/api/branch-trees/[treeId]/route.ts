@@ -34,6 +34,14 @@ import {
   treeHasActiveGenerations,
 } from "@/lib/thread-chat-generation/repository"
 import { listMessageFeedbackForTree } from "@/lib/thread-chat-generation/message-feedback-repository"
+import {
+  SAVE_TREE_ERROR_STATUS,
+  SAVE_TREE_REVISION_ERRORS,
+  saveTreeErrorResponseSchema,
+  saveTreeRequestSchema,
+  saveTreeSuccessResponseSchema,
+  type SaveTreeErrorCode,
+} from "@/lib/thread-chat/contracts/save-tree"
 
 type RouteContext = { params: Promise<{ treeId: string }> }
 
@@ -48,6 +56,23 @@ function notFound() {
   return Response.json(
     { error: { code: "not_found", message: "分支树不存在" } },
     { status: 404 }
+  )
+}
+
+function saveTreeErrorResponse(
+  code: SaveTreeErrorCode,
+  message: string,
+  currentRevision?: number
+) {
+  return Response.json(
+    saveTreeErrorResponseSchema.parse({
+      error: {
+        code,
+        message,
+        ...(currentRevision !== undefined ? { currentRevision } : {}),
+      },
+    }),
+    { status: SAVE_TREE_ERROR_STATUS[code] }
   )
 }
 
@@ -138,45 +163,29 @@ export async function PUT(req: Request, { params }: RouteContext) {
 
   const title = typeof body.title === "string" ? body.title : null
   const incomingSchemaVersion = (state as Record<string, unknown>).schemaVersion
-  const baseRevision = body.baseRevision
   if (incomingSchemaVersion !== 2)
-    return Response.json(
-      {
-        error: {
-          code: "invalid_tree_state",
-          message: "只接受 schemaVersion=2 的消息图",
-        },
-      },
-      { status: 400 }
+    return saveTreeErrorResponse(
+      "invalid_tree_state",
+      "只接受 schemaVersion=2 的消息图"
     )
-  if (!Number.isInteger(baseRevision) || (baseRevision as number) < 0)
-    return Response.json(
-      {
-        error: {
-          code: "revision_required",
-          message: "消息图存盘必须携带 baseRevision",
-        },
-      },
-      { status: 428 }
-    )
+  const command = saveTreeRequestSchema.safeParse(body)
+  if (!command.success) {
+    const error = SAVE_TREE_REVISION_ERRORS.revision_required
+    return saveTreeErrorResponse(error.code, error.message)
+  }
 
   let validatedState: ThreadTreeState
   try {
     validatedState = parseThreadTreeState(state)
   } catch {
-    return Response.json(
-      {
-        error: {
-          code: "invalid_tree_state",
-          message: "消息图包含无效的 parent、active leaf 或 Artifact source",
-        },
-      },
-      { status: 400 }
+    return saveTreeErrorResponse(
+      "invalid_tree_state",
+      "消息图包含无效的 parent、active leaf 或 Artifact source"
     )
   }
   const now = new Date()
   const saved = await db.transaction(async (tx) => {
-    const expectedRevision = baseRevision as number
+    const expectedRevision = command.data.baseRevision
     const [updated] = await tx
       .update(branchTrees)
       .set({
@@ -220,18 +229,16 @@ export async function PUT(req: Request, { params }: RouteContext) {
       : { kind: "not_found" as const }
   })
   if (saved.kind === "not_found") return notFound()
-  if (saved.kind === "conflict")
-    return Response.json(
-      {
-        error: {
-          code: "tree_revision_conflict",
-          message: "该对话已在其他页面更新",
-          currentRevision: saved.revision,
-        },
-      },
-      { status: 409 }
-    )
-  return Response.json({ ok: true, revision: saved.revision })
+  if (saved.kind === "conflict") {
+    const error = SAVE_TREE_REVISION_ERRORS.tree_revision_conflict
+    return saveTreeErrorResponse(error.code, error.message, saved.revision)
+  }
+  return Response.json(
+    saveTreeSuccessResponseSchema.parse({
+      ok: true,
+      revision: saved.revision,
+    })
+  )
 }
 
 export async function PATCH(req: Request, { params }: RouteContext) {
