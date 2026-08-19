@@ -2,7 +2,7 @@ import {
   GENERATION_CANCEL_POLL_MS,
   GENERATION_HEARTBEAT_MS,
 } from "@/constants/generation"
-import { heartbeatGeneration } from "@/lib/thread-chat-generation/repository"
+import { heartbeatGeneration } from "@/lib/thread-chat-generation/execution-state-repository"
 import { getGenerationExecutionState } from "@/lib/thread-chat-generation/query-repository"
 
 declare global {

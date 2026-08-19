@@ -1,6 +1,6 @@
 import { getCurrentUserId } from "@/lib/auth/server"
 import { isValidTreeId } from "@/lib/chat/tree-id"
-import { requestGenerationStop } from "@/lib/thread-chat-generation/repository"
+import { requestGenerationStop } from "@/lib/thread-chat-generation/execution-state-repository"
 import { toGenerationSummary } from "@/lib/thread-chat-generation/query-repository"
 import { abortGenerationLocally } from "@/lib/thread-chat-generation/execution"
 

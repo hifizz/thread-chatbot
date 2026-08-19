@@ -15,9 +15,9 @@ import {
 import { finalizeGeneration } from "../../lib/thread-chat-generation/finalize.ts"
 import {
   failStaleGenerationsForTree,
-  requestGenerationStop,
   startGeneration,
 } from "../../lib/thread-chat-generation/repository.ts"
+import { requestGenerationStop } from "../../lib/thread-chat-generation/execution-state-repository.ts"
 import {
   getGenerationForOwner,
   listCurrentGenerationsForTree,
