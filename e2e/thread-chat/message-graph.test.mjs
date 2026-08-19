@@ -89,7 +89,9 @@ function graphState() {
             parentMessageId: "u1",
             role: "assistant",
             text: "版本 A",
-            forks: [],
+            forks: [
+              { text: "版本 A", num: 1, threadId: "child", depth: 1 },
+            ],
             artifactIds: ["artifact-a"],
           },
           {
@@ -270,6 +272,51 @@ for (const [name, mutate] of [
   [
     "unreferenced artifact",
     (state) => (state.threads.main.messages[1].artifactIds = []),
+  ],
+  ["missing main thread", (state) => delete state.threads.main],
+  [
+    "thread registry id mismatch",
+    (state) => (state.threads.child.id = "other"),
+  ],
+  ["second thread root", (state) => (state.threads.child.parentId = null)],
+  ["thread depth mismatch", (state) => (state.threads.child.depth = 2)],
+  [
+    "missing parent child backlink",
+    (state) => (state.threads.main.children = []),
+  ],
+  [
+    "unknown child",
+    (state) => state.threads.main.children.push("missing"),
+  ],
+  [
+    "duplicate child",
+    (state) => state.threads.main.children.push("child"),
+  ],
+  [
+    "missing thread fork source",
+    (state) => (state.threads.child.forkFromMsgId = "missing"),
+  ],
+  [
+    "missing message fork backlink",
+    (state) => (state.threads.main.messages[1].forks = []),
+  ],
+  [
+    "mismatched message fork metadata",
+    (state) => (state.threads.main.messages[1].forks[0].depth = 9),
+  ],
+  [
+    "thread cycle",
+    (state) => {
+      state.threads.child.parentId = "grandchild"
+      state.threads.child.children = ["grandchild"]
+      state.threads.grandchild = {
+        ...structuredClone(state.threads.child),
+        id: "grandchild",
+        parentId: "child",
+        children: ["child"],
+      }
+      state.threads.main.children = []
+    },
   ],
 ]) {
   await test(`schema v2 rejects ${name}`, () => {

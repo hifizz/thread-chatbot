@@ -68,6 +68,105 @@ function validateThreadGraph(thread: Thread): void {
   }
 }
 
+function validateThreadTopology(threads: Record<string, Thread>): void {
+  const main = threads.main
+  if (!main)
+    throw new InvalidMessageGraphError("Thread tree has no main thread")
+
+  for (const [registryId, thread] of Object.entries(threads)) {
+    if (thread.id !== registryId)
+      throw new InvalidMessageGraphError(
+        `Thread registry key ${registryId} does not match id ${thread.id}`
+      )
+    if (!Array.isArray(thread.children))
+      throw new InvalidMessageGraphError(`Thread ${thread.id} has no children`)
+    if (new Set(thread.children).size !== thread.children.length)
+      throw new InvalidMessageGraphError(
+        `Thread ${thread.id} contains duplicate children`
+      )
+    if (thread.id === "main") {
+      if (thread.parentId !== null || thread.depth !== 0)
+        throw new InvalidMessageGraphError(
+          "Main thread must be the depth-0 root"
+        )
+    } else if (thread.parentId === null || !threads[thread.parentId]) {
+      throw new InvalidMessageGraphError(
+        `Thread ${thread.id} has a missing parent`
+      )
+    }
+  }
+
+  const resolved = new Set<string>()
+  for (const thread of Object.values(threads)) {
+    if (resolved.has(thread.id)) continue
+    const path = new Set<string>()
+    let cursor: Thread | undefined = thread
+    while (cursor && !resolved.has(cursor.id)) {
+      if (path.has(cursor.id))
+        throw new InvalidMessageGraphError("Thread tree contains a cycle")
+      path.add(cursor.id)
+      cursor = cursor.parentId === null ? undefined : threads[cursor.parentId]
+    }
+    for (const id of path) resolved.add(id)
+  }
+
+  for (const thread of Object.values(threads)) {
+    for (const childId of thread.children) {
+      const child = threads[childId]
+      if (!child || child.parentId !== thread.id)
+        throw new InvalidMessageGraphError(
+          `Thread ${thread.id} has an invalid child ${childId}`
+        )
+    }
+    for (const message of thread.messages) {
+      for (const fork of message.forks) {
+        const child = threads[fork.threadId]
+        if (
+          !child ||
+          child.parentId !== thread.id ||
+          child.forkFromMsgId !== message.id ||
+          child.depth !== fork.depth ||
+          child.footnote !== fork.num ||
+          child.anchorText !== fork.text
+        )
+          throw new InvalidMessageGraphError(
+            `Message ${message.id} has an invalid thread fork ${fork.threadId}`
+          )
+      }
+    }
+    if (thread.id === "main") continue
+    if (thread.parentId === null)
+      throw new InvalidMessageGraphError(
+        `Thread ${thread.id} has a missing parent`
+      )
+    const parent = threads[thread.parentId]
+    if (!parent.children.includes(thread.id))
+      throw new InvalidMessageGraphError(
+        `Thread ${thread.id} is missing from its parent children`
+      )
+    if (thread.depth !== parent.depth + 1)
+      throw new InvalidMessageGraphError(
+        `Thread ${thread.id} has an invalid depth`
+      )
+    const sourceMessage = parent.messages.find(
+      (message) => message.id === thread.forkFromMsgId
+    )
+    const sourceFork = sourceMessage?.forks.find(
+      (fork) => fork.threadId === thread.id
+    )
+    if (
+      !sourceMessage ||
+      !sourceFork ||
+      sourceFork.depth !== thread.depth ||
+      sourceFork.num !== thread.footnote ||
+      sourceFork.text !== thread.anchorText
+    )
+      throw new InvalidMessageGraphError(
+        `Thread ${thread.id} has an invalid fork source`
+      )
+  }
+}
+
 /** 严格解析 schema-v2 message graph；不迁移、不补字段、不猜测来源。 */
 export function parseThreadTreeState(input: unknown): ThreadTreeState {
   if (typeof input !== "object" || input === null)
@@ -92,7 +191,11 @@ export function parseThreadTreeState(input: unknown): ThreadTreeState {
     >
   }
 
-  if (!state.threads || typeof state.threads !== "object")
+  if (
+    !state.threads ||
+    typeof state.threads !== "object" ||
+    Array.isArray(state.threads)
+  )
     throw new InvalidMessageGraphError("Thread tree has no thread registry")
 
   if (state.schemaVersion !== THREAD_TREE_SCHEMA_VERSION)
@@ -140,6 +243,8 @@ export function parseThreadTreeState(input: unknown): ThreadTreeState {
 
     validateThreadGraph(thread as Thread)
   }
+
+  validateThreadTopology(state.threads as Record<string, Thread>)
 
   for (const artifact of Object.values(state.artifacts)) {
     if (
