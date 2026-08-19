@@ -26,7 +26,6 @@ import type { ThreadStore } from "../core/store"
 import { buildRequestBody } from "./prompt"
 import { consumeUIMessageStream } from "./ui-stream"
 import type { MessageFeedback, MessageFeedbackSummary } from "../core/types"
-import { prepareRegenerationPatch } from "../core/regeneration"
 import { GENERATION_ERRORS } from "@/constants/generation"
 import { getKnownTreeRevision, setKnownTreeRevision } from "./persist"
 import { activeLeafTurn } from "../core/message-graph"
@@ -40,6 +39,7 @@ import {
 } from "./assistant-stream-runtime"
 import {
   prepareAssistantRetry,
+  prepareUserEdit,
   prepareUserTurnRetry,
   type PreparedRegenerationAction,
   type PreparedRegenerationStart,
@@ -361,35 +361,16 @@ export function createChatController(
       userMessageId: string,
       text: string
     ): Promise<GenerationActionResult> {
-      const generationId = crypto.randomUUID()
-      const nextUserMessageId = crypto.randomUUID()
-      const assistantMessageId = crypto.randomUUID()
-      const intent = {
-        kind: "edit-last-user" as const,
+      const prepared = prepareUserEdit(store.getState(), {
+        threadId,
         sourceUserMessageId: userMessageId,
         text,
-      }
-      const patch = prepareRegenerationPatch(store.getState(), {
-        threadId,
-        userMessageId: nextUserMessageId,
-        assistantMessageId,
-        generationId,
-        intent,
+        userMessageId: crypto.randomUUID(),
+        assistantMessageId: crypto.randomUUID(),
+        generationId: crypto.randomUUID(),
       })
-      if (!patch)
-        return {
-          ok: false,
-          code: "not_latest_turn",
-          message: "只能编辑当前最后一轮用户消息",
-        }
-      detachThread(threadId)
-      return startAssistant(
-        threadId,
-        assistantMessageId,
-        nextUserMessageId,
-        generationId,
-        { intent, patch, sourceUserMessageId: userMessageId }
-      )
+      if (!prepared.ok) return prepared
+      return startPreparedRegeneration(prepared.start)
     },
 
     async switchTurnVariant(

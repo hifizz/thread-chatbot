@@ -119,3 +119,51 @@ export function prepareUserTurnRetry(
     },
   }
 }
+
+/** 为“编辑最后一条 user 后重新生成”准备 user+assistant 追加 patch。 */
+export function prepareUserEdit(
+  state: ThreadTreeState,
+  input: {
+    threadId: string
+    sourceUserMessageId: string
+    text: string
+    userMessageId: string
+    assistantMessageId: string
+    generationId: string
+  }
+): RegenerationPreparationResult {
+  const intent = {
+    kind: "edit-last-user" as const,
+    sourceUserMessageId: input.sourceUserMessageId,
+    text: input.text,
+  }
+  const patch = prepareRegenerationPatch(state, {
+    threadId: input.threadId,
+    userMessageId: input.userMessageId,
+    assistantMessageId: input.assistantMessageId,
+    generationId: input.generationId,
+    intent,
+  })
+  if (!patch) {
+    return {
+      ok: false,
+      code: "not_latest_turn",
+      message: "只能编辑当前最后一轮用户消息",
+    }
+  }
+
+  return {
+    ok: true,
+    start: {
+      threadId: input.threadId,
+      messageId: input.assistantMessageId,
+      userMessageId: input.userMessageId,
+      generationId: input.generationId,
+      action: {
+        intent,
+        patch,
+        sourceUserMessageId: input.sourceUserMessageId,
+      },
+    },
+  }
+}
