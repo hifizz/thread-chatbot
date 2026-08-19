@@ -2,7 +2,8 @@
 /**
  * branching/selection-bubble —— 划选 assistant 消息文字 → 迷你气泡 → 开分支。
  *
- * document 级监听 + 命令式 DOM Selection 读取（这部分天然绕不开命令式 API）。
+ * document 级划选监听与命令式 DOM Selection 读取由
+ * useAssistantTextSelection 封装；本组件组合气泡状态、定位、放置预览与提交 UI。
  * 气泡的开合状态由上层持有（sel / onSelChange），以便 Esc 逐层关闭链能先关它。
  *
  * 放置控制（存在 ≥1 个分支列时显示，见任务「打开到哪一列」）：
@@ -25,16 +26,19 @@ import React, { useEffect, useLayoutEffect, useRef, useState } from "react"
 import { GitMerge } from "lucide-react"
 import type { ThreadTreeState } from "../core/types"
 import { threadTitle } from "../core/selectors"
-import { describeRange, type TextAnchor } from "./text-anchor"
 import {
   previewPlacement,
   type PlacementHint,
   type PlacementMode,
   type Slot,
 } from "../orchestration/placement"
-import { computePopupPosition, type Rect } from "./bubble-position"
+import { computePopupPosition } from "./bubble-position"
 import { BubbleShape, type TailDir } from "./bubble-shape"
 import { SELECTION_QUESTION_MAX_HEIGHT } from "./selection-composer-dimensions"
+import {
+  useAssistantTextSelection,
+  type SelectionInfo,
+} from "./use-assistant-text-selection"
 import {
   BUBBLE_GAP,
   BUBBLE_SAFE_PADDING,
@@ -43,17 +47,7 @@ import {
   BUBBLE_W,
 } from "@/constants/selection-bubble"
 
-export interface SelectionInfo {
-  text: string
-  threadId: string
-  msgId: string
-  /** 选区包围盒（viewport 坐标）：喂 floating-popup 定位模型，气泡围绕它择位 */
-  rect: Rect
-  /** 划选结束（mouseup）那一刻是否按着 ⌘/Ctrl：作为修饰键跟踪的初值 */
-  meta?: boolean
-  /** 文本锚点（在渲染后的 .md-body 上以 describeRange 生成）：渲染后重定位高亮用 */
-  anchor: TextAnchor
-}
+export type { SelectionInfo } from "./use-assistant-text-selection"
 
 export interface SelectionBubbleProps {
   state: ThreadTreeState
@@ -79,6 +73,11 @@ export function SelectionBubble({
   maxExpanded,
   lastActiveOf,
 }: SelectionBubbleProps) {
+  useAssistantTextSelection({
+    state,
+    selection: sel,
+    onSelectionChange: onSelChange,
+  })
   /** 迷你列条点选的让位列（override）；气泡隐藏 / 换一段划选时清空 */
   const [override, setOverride] = useState<string | null>(null)
   /** ⌘/Ctrl 是否按住（实时跟踪，目标与按钮文案随之切换） */
@@ -122,99 +121,6 @@ export function SelectionBubble({
     ta.style.height = ""
     ta.focus({ preventScroll: true })
   }, [sel])
-
-  /* 划选监听：mouseup 结算选区并定位气泡；外部 mousedown / resize 隐藏 */
-  useEffect(() => {
-    const onMouseUp = (e: MouseEvent) => {
-      if ((e.target as HTMLElement).closest?.(".sel-bubble")) return
-      const meta = e.metaKey || e.ctrlKey
-      // 等浏览器把 Selection 结算完再读（与拖选结束存在竞态）
-      setTimeout(() => {
-        const s = window.getSelection()
-        const txt = s?.toString().trim() ?? ""
-        if (!s || !txt || txt.length < 2) {
-          onSelChange(null)
-          return
-        }
-        const node = s.anchorNode
-        if (!node) return
-        const base =
-          node.nodeType === Node.TEXT_NODE
-            ? (node as Text).parentElement
-            : (node as HTMLElement)
-        // 以命中的 assistant Markdown 容器 .md-body 为锚点坐标系容器
-        const mdRoot = base?.closest?.(".md-body") as HTMLElement | null
-        if (!mdRoot) {
-          onSelChange(null)
-          return
-        }
-        const listEl = mdRoot.closest(".msg-list") as HTMLElement | null
-        const msgEl = mdRoot.closest(".message") as HTMLElement | null
-        const threadId = listEl?.dataset.list
-        const msgId = msgEl?.dataset.msgId
-        if (!threadId || !msgId) return
-        const msg = state.threads[threadId]?.messages.find(
-          (m) => m.id === msgId
-        )
-        if (!msg) {
-          onSelChange(null)
-          return
-        }
-
-        /* —— 采集锚点：以 .md-body（渲染后的 Markdown DOM）为坐标系，describeRange
-           生成 { quote:{exact,prefix,suffix}, position }。text 取 quote.exact，与锚点解耦，
-           渲染后经 locateAnchor 三层降级重定位。describeRange 成功即视为有效。 */
-        const anchor = describeRange(mdRoot, s.getRangeAt(0))
-        if (!anchor || anchor.quote.exact.trim().length < 2) {
-          onSelChange(null)
-          return
-        }
-        const text = anchor.quote.exact
-
-        // 只存选区包围盒；气泡实际落点交给 floating-popup 模型在测得高度后计算
-        const r = s.getRangeAt(0).getBoundingClientRect()
-        onSelChange({
-          text,
-          threadId,
-          msgId,
-          rect: { left: r.left, top: r.top, width: r.width, height: r.height },
-          meta,
-          anchor,
-        })
-      }, 10)
-    }
-    const onMouseDown = (e: MouseEvent) => {
-      if (!(e.target as HTMLElement).closest?.(".sel-bubble")) onSelChange(null)
-    }
-    const onResize = () => onSelChange(null)
-    document.addEventListener("mouseup", onMouseUp)
-    document.addEventListener("mousedown", onMouseDown)
-    window.addEventListener("resize", onResize)
-    return () => {
-      document.removeEventListener("mouseup", onMouseUp)
-      document.removeEventListener("mousedown", onMouseDown)
-      window.removeEventListener("resize", onResize)
-    }
-  }, [state, onSelChange])
-
-  /* 滚动只在会改变来源选区 viewport 坐标时关闭气泡：
-     · 来源消息列 / 外层列容器 / document 滚动会让已存 rect 失效，关闭；
-     · 其他消息列（尤其最右侧流式回复的自动贴底）不移动来源选区，放行；
-     · 气泡内部 textarea 自增高后的内滚同样放行，避免丢输入。 */
-  useEffect(() => {
-    if (!sel) return
-    const onScroll = (e: Event) => {
-      const target = e.target
-      if (target instanceof Element) {
-        if (target.closest(".sel-bubble")) return
-        const list = target.closest<HTMLElement>(".msg-list[data-list]")
-        if (list && list.dataset.list !== sel.threadId) return
-      }
-      onSelChange(null)
-    }
-    document.addEventListener("scroll", onScroll, true)
-    return () => document.removeEventListener("scroll", onScroll, true)
-  }, [sel, onSelChange])
 
   /* 气泡打开期间跟踪 ⌘/Ctrl 起落（keydown/keyup 都带 metaKey/ctrlKey 快照） */
   useEffect(() => {
