@@ -1,16 +1,9 @@
-import type {
-  Artifact,
-  Message,
-  MessageStatus,
-  ThreadTreeState,
-} from "@/lib/thread-chat/domain/types"
+import type { Message, ThreadTreeState } from "@/lib/thread-chat/domain/types"
 import type {
   GENERATION_BILLING_STATUSES,
-  GENERATION_RESULT_VERSION,
   GENERATION_STATUSES,
 } from "@/constants/generation"
-import type { ResearchPlan, ResearchRoute } from "@/lib/chat/research-router"
-import type { WebResearchActivity } from "@/lib/chat/web-research-activity"
+import type { GenerationResultV1 } from "@/lib/thread-chat/contracts/generation-result"
 
 export type GenerationStatus = (typeof GENERATION_STATUSES)[number]
 export type GenerationBillingStatus =
@@ -47,28 +40,11 @@ export type GenerationTurnSnapshot = {
   activatesAssistantMessageId: string
 }
 
-export type GenerationUsageMetadata = {
-  inputTokens: number
-  outputTokens: number
-  totalTokens?: number
-  providerMetadata?: unknown
-}
+export type { GenerationResultV1 } from "@/lib/thread-chat/contracts/generation-result"
 
-/** generation 唯一有权覆盖到 Message / Artifact registry 的字段。 */
-export type GenerationResultV1 = {
-  version: typeof GENERATION_RESULT_VERSION
-  generationId: string
-  text: string
-  status: MessageStatus
-  error?: string
-  artifactIds: string[]
-  artifacts: Record<string, Artifact>
-  webResearch?: WebResearchActivity[]
-  webResearchTextOffset?: number
-  researchRoute?: ResearchRoute
-  researchPlan?: ResearchPlan
-  usage?: GenerationUsageMetadata
-}
+export type GenerationUsageMetadata = NonNullable<
+  import("@/lib/thread-chat/contracts/generation-result").GenerationResultV1["usage"]
+>
 
 export type GenerationSummary = {
   id: string

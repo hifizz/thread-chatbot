@@ -4,6 +4,7 @@ import type {
   GenerationResultV1,
   GenerationUsageMetadata,
 } from "@/lib/thread-chat/domain/generation"
+import { generationResultV1Schema } from "@/lib/thread-chat/contracts/generation-result"
 import {
   GENERATION_ERRORS,
   GENERATION_RESULT_VERSION,
@@ -183,7 +184,7 @@ export function projectGenerationResult({
 
   return {
     hasDisplayableOutput,
-    result: {
+    result: generationResultV1Schema.parse({
       version: GENERATION_RESULT_VERSION,
       generationId,
       text,
@@ -196,6 +197,6 @@ export function projectGenerationResult({
       ...(researchRoute ? { researchRoute } : {}),
       ...(researchPlan ? { researchPlan } : {}),
       ...(usage ? { usage } : {}),
-    },
+    }),
   }
 }

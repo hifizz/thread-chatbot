@@ -13,6 +13,7 @@ import type {
   GenerationTurnSnapshot,
   ThreadChatGenerationIntent,
 } from "@/lib/thread-chat/domain/generation"
+import { generationResultV1Schema } from "@/lib/thread-chat/contracts/generation-result"
 import {
   ACTIVE_GENERATION_STATUSES,
   GENERATION_ERRORS,
@@ -491,7 +492,7 @@ export async function compareAndSetGenerationTerminal(input: {
 
 function staleFailureResult(row: GenerationRow): GenerationResultV1 {
   const partial = row.turnSnapshot.assistantMessage
-  return {
+  return generationResultV1Schema.parse({
     version: GENERATION_RESULT_VERSION,
     generationId: row.id,
     text: partial.text,
@@ -503,7 +504,7 @@ function staleFailureResult(row: GenerationRow): GenerationResultV1 {
     webResearchTextOffset: partial.webResearchTextOffset,
     researchRoute: partial.researchRoute,
     researchPlan: partial.researchPlan,
-  }
+  })
 }
 
 export async function failStaleGenerationsForTree(
