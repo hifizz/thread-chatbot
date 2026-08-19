@@ -1,9 +1,7 @@
 import { getCurrentUserId } from "@/lib/auth/server"
 import { isValidTreeId } from "@/lib/chat/tree-id"
-import {
-  requestGenerationStop,
-  toGenerationSummary,
-} from "@/lib/thread-chat-generation/repository"
+import { requestGenerationStop } from "@/lib/thread-chat-generation/repository"
+import { toGenerationSummary } from "@/lib/thread-chat-generation/query-repository"
 import { abortGenerationLocally } from "@/lib/thread-chat-generation/execution"
 
 type RouteContext = { params: Promise<{ generationId: string }> }

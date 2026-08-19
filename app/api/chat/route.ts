@@ -54,8 +54,8 @@ import {
 import {
   GenerationRepositoryError,
   prepareGeneration,
-  toGenerationSummary,
 } from "@/lib/thread-chat-generation/repository"
+import { toGenerationSummary } from "@/lib/thread-chat-generation/query-repository"
 import {
   observeGenerationCancellation,
   registerGenerationController,

@@ -2,15 +2,12 @@ import {
   GENERATION_CANCEL_POLL_MS,
   GENERATION_HEARTBEAT_MS,
 } from "@/constants/generation"
-import {
-  getGenerationExecutionState,
-  heartbeatGeneration,
-} from "@/lib/thread-chat-generation/repository"
+import { heartbeatGeneration } from "@/lib/thread-chat-generation/repository"
+import { getGenerationExecutionState } from "@/lib/thread-chat-generation/query-repository"
 
 declare global {
   var __threadChatGenerationAbortControllers:
-    | Map<string, AbortController>
-    | undefined
+    Map<string, AbortController> | undefined
 }
 
 const controllers =
@@ -90,4 +87,3 @@ export function observeGenerationCancellation(
     },
   }
 }
-

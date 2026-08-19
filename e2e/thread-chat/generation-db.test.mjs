@@ -15,11 +15,13 @@ import {
 import { finalizeGeneration } from "../../lib/thread-chat-generation/finalize.ts"
 import {
   failStaleGenerationsForTree,
-  getGenerationForOwner,
-  listCurrentGenerationsForTree,
   requestGenerationStop,
   startGeneration,
 } from "../../lib/thread-chat-generation/repository.ts"
+import {
+  getGenerationForOwner,
+  listCurrentGenerationsForTree,
+} from "../../lib/thread-chat-generation/query-repository.ts"
 import { GENERATION_LEASE_MS } from "../../constants/generation.ts"
 
 const suffix = randomUUID()

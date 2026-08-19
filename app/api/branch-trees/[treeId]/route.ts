@@ -26,13 +26,13 @@ import {
   assertCompletedMessageGenerationLinks,
   reconcileThreadChatTurns,
 } from "@/lib/thread-chat/application/reconcile-turns"
+import { failStaleGenerationsForTree } from "@/lib/thread-chat-generation/repository"
 import {
-  failStaleGenerationsForTree,
   listGenerationsForTree,
   listCurrentGenerationsForTree,
   toGenerationSummary,
   treeHasActiveGenerations,
-} from "@/lib/thread-chat-generation/repository"
+} from "@/lib/thread-chat-generation/query-repository"
 import { listMessageFeedbackForTree } from "@/lib/thread-chat-generation/message-feedback-repository"
 import {
   SAVE_TREE_ERROR_STATUS,
