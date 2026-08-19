@@ -9,7 +9,7 @@
  *
  * Phase 2 节点内对话（openspec: add-canvas-conversations）：选中节点在卡片下方
  * 展开「外挂面板」CanvasExpand——绝对定位、不参与 dagre 布局（展开零重排，D1）；
- * 消息渲染复用列模式全套（AnchoredMarkdown：MarkdownBody + SmoothText + 锚点
+ * 消息渲染复用列模式全套（AnchoredAssistantBody：Markdown + SmoothText + 锚点
  * 手绘 effect，D2）并挂列模式的划选 DOM 契约（.msg-list[data-list] /
  * .message[data-msg-id] / .bubble[data-role]），document 级划选气泡零改动生效；
  * 发送 / 停止 / 重试经 CanvasActionsContext 直达壳层 chat-controller（D3）；
@@ -29,12 +29,11 @@ import React, {
 } from "react"
 import { Handle, Position, type Node, type NodeProps } from "@xyflow/react"
 import type { Message, ThreadTreeState } from "../core/types"
-import { AnchoredMarkdown } from "../branching/anchored-markdown"
+import { AnchoredAssistantBody } from "../branching/anchored-assistant-body"
 import {
   MarkdownArtifactCard,
   MarkdownArtifactProgressCard,
 } from "./markdown-artifact-card"
-import { WebResearchPanel } from "./web-research-panel"
 import { ConversationComposer } from "../chat/conversation-composer"
 import { ConversationMessage } from "../chat/conversation-message"
 import type { MessageActionViewState } from "../chat/message-action-types"
@@ -148,7 +147,6 @@ function CanvasExpand({
         }}
       >
         {data.messages.map((msg) => {
-          const hasWebResearch = Boolean(msg.webResearch?.length)
           return (
             <ConversationMessage
               key={msg.id}
@@ -157,25 +155,10 @@ function CanvasExpand({
               renderUserFallback={() => null}
               renderAssistantBody={(message) =>
                 state && actions ? (
-                  <AnchoredMarkdown
+                  <AnchoredAssistantBody
                     state={state}
-                    msg={message}
+                    message={message}
                     onOpenThread={(id) => actions.focusThread(id)}
-                    insertAt={
-                      hasWebResearch
-                        ? (message.webResearchTextOffset ?? 0)
-                        : undefined
-                    }
-                    insert={
-                      hasWebResearch ? (
-                        <WebResearchPanel
-                          activities={message.webResearch ?? []}
-                          route={message.researchRoute}
-                          plan={message.researchPlan}
-                          complete={message.status === "done"}
-                        />
-                      ) : undefined
-                    }
                   />
                 ) : null
               }

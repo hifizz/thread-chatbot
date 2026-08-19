@@ -24,8 +24,7 @@ import {
   MarkdownArtifactCard,
   MarkdownArtifactProgressCard,
 } from "../orchestration/markdown-artifact-card"
-import { WebResearchPanel } from "../orchestration/web-research-panel"
-import { AnchoredMarkdown } from "./anchored-markdown"
+import { AnchoredAssistantBody } from "./anchored-assistant-body"
 import type { MessageActionViewState } from "../chat/message-action-types"
 import type { ThreadMessageActionCommands } from "../net/chat-controller"
 
@@ -103,25 +102,11 @@ export function BranchableChat({
 
   /* ---------- 注入：assistant 正文（Markdown 渲染 + 渲染后手绘锚点高亮/脚注） ---------- */
   const renderAssistantBody = (msg: Message) => {
-    const activities = msg.webResearch ?? []
     return (
-      <AnchoredMarkdown
+      <AnchoredAssistantBody
         state={state}
-        msg={msg}
+        message={msg}
         onOpenThread={onOpenThread}
-        insertAt={
-          activities.length > 0 ? (msg.webResearchTextOffset ?? 0) : undefined
-        }
-        insert={
-          activities.length > 0 ? (
-            <WebResearchPanel
-              activities={activities}
-              route={msg.researchRoute}
-              plan={msg.researchPlan}
-              complete={msg.status === "done"}
-            />
-          ) : undefined
-        }
       />
     )
   }
