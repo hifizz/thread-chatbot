@@ -45,10 +45,7 @@ import {
   type ResearchPlan,
   type ResearchRoute,
 } from "@/lib/chat/research-router"
-import {
-  GenerationRepositoryError,
-  prepareGeneration,
-} from "@/lib/thread-chat-generation/start-generation-repository"
+import { prepareGeneration } from "@/lib/thread-chat-generation/start-generation-repository"
 import { toGenerationSummary } from "@/lib/thread-chat-generation/query-repository"
 import {
   observeGenerationCancellation,
@@ -72,40 +69,10 @@ import {
   latestUserText,
   recentConversationText,
 } from "@/app/api/chat/conversation-text"
+import { generationStartErrorResponse } from "@/app/api/chat/generation-start-error"
 
 // AnySearch 搜索与网页深读可能形成多步循环，放宽单次请求时长上限。
 export const maxDuration = 300
-
-function generationStartError(error: unknown): Response {
-  if (error instanceof GenerationRepositoryError) {
-    return Response.json(
-      {
-        error: {
-          code: error.code,
-          message: error.message,
-        },
-      },
-      {
-        status:
-          error.code === "not_found"
-            ? 404
-            : error.code === "persistence_failed"
-              ? 503
-              : 409,
-      }
-    )
-  }
-  console.error("[thread-chat-generation] start transaction 失败", error)
-  return Response.json(
-    {
-      error: {
-        code: "persistence_failed",
-        message: "无法建立生成任务，尚未调用模型",
-      },
-    },
-    { status: 503 }
-  )
-}
 
 async function finalizeWithRetry(input: FinalizeGenerationInput) {
   let lastError: unknown
@@ -235,7 +202,7 @@ export async function POST(req: Request) {
         excludeAssistantMessageId: persistence.assistantMessageId,
       }) as UIMessage[]
     } catch (error) {
-      return generationStartError(error)
+      return generationStartErrorResponse(error)
     }
     generationController = new AbortController()
     registerGenerationController(persistence.generationId, generationController)
