@@ -24,11 +24,8 @@
 
 import dynamic from "next/dynamic"
 import { useRouter } from "next/navigation"
-import React, { useCallback, useEffect, useRef, useState } from "react"
+import React, { useCallback, useRef, useState } from "react"
 import "./thread-chat.css"
-import { isThreadChatModelId } from "@/constants/model"
-import { createThreadStore } from "./core/store"
-import { useThreadStore } from "./core/use-thread-store"
 import {
   activeLeafTurn,
   activePathArtifacts,
@@ -40,21 +37,14 @@ import type {
   MessageFeedbackSummary,
   ThreadTreeState,
 } from "./core/types"
-import { createChatController } from "./net/chat-controller"
 import { kickoffQuestion } from "./net/prompt"
 import {
   deriveTreeTitle,
-  saveTreeStrict,
   type TreeUiState,
   type ViewMode,
-  TreeRevisionError,
 } from "./net/persist"
 import type { GenerationSummary } from "./generation/types"
 import type { RecoverableTurn } from "./generation/types"
-import { useGenerationReconciliation } from "./generation/use-generation-reconciliation"
-import { useMessageActions } from "./chat/use-message-actions"
-import { useTreePersistence } from "./net/use-tree-persistence"
-import { useBranchTitles } from "./net/use-branch-titles"
 import { useThreadChatBoot } from "./net/use-thread-chat-boot"
 import { useUiStatePersistence } from "./orchestration/use-ui-state-persistence"
 import { BranchableChat } from "./branching/branchable-chat"
@@ -86,6 +76,7 @@ import {
   useWorkspaceToast,
   WorkspaceToast,
 } from "./orchestration/workspace-toast"
+import { useThreadChatRuntime } from "./orchestration/use-thread-chat-runtime"
 // type-only：不把画布模块（React Flow）拖进首屏 bundle
 import type { CanvasChatActions } from "./orchestration/canvas-node"
 import type { CanvasViewState } from "./orchestration/use-canvas-layout"
@@ -158,62 +149,23 @@ export function ThreadChatDemoInner({
 }: ThreadChatDemoInnerProps) {
   const router = useRouter()
 
-  /* ---------- 会话树：外部可变 store，version 快照驱动重渲 ---------- */
-  const [store] = useState(() =>
-    createThreadStore(initialState, isThreadChatModelId)
-  )
-  const version = useThreadStore(store)
-  const state = store.getState()
   const { toast, showToast, dismissToast } = useWorkspaceToast()
-
-  /* ---------- 聊天控制器：发送屏障 / Retry / 显式 Stop（真实 /api/chat SSE） ---------- */
-  const [chat] = useState(() =>
-    createChatController(store, {
-      treeId,
-      persistNow: () => {
-        const current = store.getState()
-        return saveTreeStrict(treeId, current, deriveTreeTitle(current)).catch(
-          (error) => {
-            if (error instanceof TreeRevisionError) {
-              showToast("其他标签页已更新，正在重新加载…")
-              window.location.reload()
-            }
-            throw error
-          }
-        )
-      },
-      onError: (message) => showToast(message),
-    })
-  )
   const {
+    store,
+    state,
+    chat,
     messageActionState,
     messageCommands,
-    registerRecoverableTurn,
-  } = useMessageActions({
-    state,
-    version,
-    initialRecoverableTurns,
-    initialMessageFeedbacks,
-    commands: chat,
-  })
-  useGenerationReconciliation({
-    store,
-    version,
-    initialGenerations,
-    registerRecoverableTurn,
-  })
-  useEffect(() => () => chat.detachAll(), [chat])
-
-  const { setTreeSaveSuppressed, isTreeSaveSuppressed } = useTreePersistence({
+    setTreeSaveSuppressed,
+    isTreeSaveSuppressed,
+  } = useThreadChatRuntime({
     treeId,
-    store,
-    version,
-    onRevisionConflict: () => {
-      showToast("其他标签页已更新，正在重新加载…")
-      window.location.reload()
-    },
+    initialState,
+    initialGenerations,
+    initialMessageFeedbacks,
+    initialRecoverableTurns,
+    onToast: showToast,
   })
-  useBranchTitles({ store, version })
 
   /* ---------- 自适应列数（SSR 阶段 winW=null，顶栏显示「列数」占位） ---------- */
   const winW = useWindowWidth()
