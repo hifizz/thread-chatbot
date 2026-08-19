@@ -28,13 +28,7 @@ import { openRouterCostUsdFromSteps } from "@/lib/ai/openrouter"
 import { hasPositiveBalance, chargeUsage } from "@/lib/billing/credits"
 import { buildUsageMetadata } from "@/lib/billing/usage-meta"
 import { isExplicitMarkdownArtifactRequest } from "@/lib/chat/markdown-artifact"
-import {
-  createResearchPlan,
-  reasoningForResearchRoute,
-  resolveResearchRoute,
-  type ResearchPlan,
-  type ResearchRoute,
-} from "@/lib/chat/research-router"
+import { reasoningForResearchRoute } from "@/lib/chat/research-router"
 import { prepareGeneration } from "@/lib/thread-chat-generation/start-generation-repository"
 import { toGenerationSummary } from "@/lib/thread-chat-generation/query-repository"
 import {
@@ -52,13 +46,10 @@ import {
   type ThreadChatGenerationIdentity,
 } from "@/lib/thread-chat/contracts/generation-identity"
 import { surfaceTools } from "@/app/api/chat/surface-tools"
-import {
-  latestUserText,
-  recentConversationText,
-} from "@/app/api/chat/conversation-text"
 import { generationStartErrorResponse } from "@/app/api/chat/generation-start-error"
 import { createToolStepPolicy } from "@/app/api/chat/tool-step-policy"
 import { buildChatSystemPrompt } from "@/app/api/chat/system-prompt"
+import { resolveResearchContext } from "@/app/api/chat/research-context"
 
 // AnySearch 搜索与网页深读可能形成多步循环，放宽单次请求时长上限。
 export const maxDuration = 300
@@ -187,36 +178,14 @@ export async function POST(req: Request) {
     const research = deepResearch === true
     const searchReady = isSearchConfigured()
     const isThreadChat = persistence != null
-    const latestText = latestUserText(authoritativeMessages)
     const chatModel = resolveChatModel(modelId)
-    const researchRoute: ResearchRoute = research
-      ? searchReady
-        ? {
-            mode: "research",
-            reasonCode: "multi_source_research",
-            urls: [],
-            suggestedQueries: [],
-          }
-        : {
-            mode: "answer",
-            reasonCode: "search_unavailable",
-            urls: [],
-            suggestedQueries: [],
-          }
-      : await resolveResearchRoute({
-          model: chatModel,
-          latestUserText: latestText,
-          recentConversation: recentConversationText(authoritativeMessages),
-          searchReady,
-        })
-    const researchPlan: ResearchPlan | null =
-      researchRoute.mode === "research"
-        ? await createResearchPlan({
-            model: chatModel,
-            userRequest: latestText,
-            route: researchRoute,
-          })
-        : null
+    const { latestText, researchRoute, researchPlan } =
+      await resolveResearchContext({
+        model: chatModel,
+        messages: authoritativeMessages,
+        deepResearchRequested: research,
+        searchReady,
+      })
     const webToolsEnabled = searchReady && researchRoute.mode !== "answer"
     const markdownArtifactRequested =
       isThreadChat && isExplicitMarkdownArtifactRequest(latestText)
