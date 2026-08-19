@@ -24,17 +24,12 @@
 
 import type { ThreadStore } from "../core/store"
 import { buildRequestBody } from "./prompt"
-import { consumeUIMessageStream, type UIStreamHandlers } from "./ui-stream"
-import type {
-  ArtifactSeed,
-  MessageFeedback,
-  MessageFeedbackSummary,
-} from "../core/types"
+import { consumeUIMessageStream } from "./ui-stream"
+import type { MessageFeedback, MessageFeedbackSummary } from "../core/types"
 import {
   prepareRegenerationPatch,
   type PreparedTurnPatch,
 } from "../core/regeneration"
-import { hasAssistantOutput } from "./assistant-output"
 import { GENERATION_ERRORS } from "@/constants/generation"
 import type { ThreadChatGenerationIntent } from "../generation/types"
 import { getKnownTreeRevision, setKnownTreeRevision } from "./persist"
@@ -43,7 +38,10 @@ import { submitMessageFeedback } from "./message-feedback-command"
 import { switchActiveLeaf } from "./switch-active-leaf-command"
 import { requestGenerationStop } from "./stop-generation-command"
 import { requestChatGeneration } from "./chat-generation-command"
-import { createAssistantDeltaBuffer } from "./assistant-delta-buffer"
+import {
+  ABORTED_ERROR,
+  createAssistantStreamRuntime,
+} from "./assistant-stream-runtime"
 import type {
   GenerationActionResult,
   VariantSwitchResult,
@@ -57,10 +55,6 @@ export type {
 
 /** 网络异常（非中止）的兜底错误文案 */
 const NETWORK_ERROR = "网络请求失败，请重试"
-/** 流正常结束但一个正文字符都没收到时的错误文案（空回复转正为可重试错误） */
-const EMPTY_REPLY_ERROR = "未收到任何回复，请重试"
-/** 零正文时被中止（停止按钮 / 卸载）的错误文案 */
-const ABORTED_ERROR = "已停止生成"
 
 export interface ThreadMessageActionCommands {
   retryAssistant(
@@ -136,104 +130,12 @@ export function createChatController(
     /** 本次流是否仍是该会话的当前在飞流（retry 会用新 controller 顶替旧的） */
     const isOwner = () => inflight.get(threadId) === controller
 
-    const deltaBuffer = createAssistantDeltaBuffer({
+    const streamRuntime = createAssistantStreamRuntime({
       store,
       threadId,
       messageId: msgId,
       isOwner,
     })
-
-    // ---- 终态收敛（只结算一次；非归属者只清理不写消息）----
-    let settled = false
-    const settle = (apply: () => void) => {
-      if (settled) return
-      settled = true
-      deltaBuffer.cancel()
-      if (!isOwner()) return // 已被 retry 顶替：不触碰新流的消息
-      deltaBuffer.flush() // 先 flush 残余文本，再落终态
-      apply()
-    }
-
-    // ---- error chunk 容错：只记录不判死，终态统一裁决（见文件头说明）----
-    let lastError: string | null = null
-    /** 本次流累计收到的正文字符数（含尚在 pending 缓冲里的） */
-    let receivedChars = 0
-    /** 已成功原子绑定到目标消息的 Artifact 数 */
-    let attachedArtifactCount = 0
-    const hasOutput = () =>
-      hasAssistantOutput({
-        receivedTextChars: receivedChars,
-        attachedArtifactCount,
-      })
-
-    /** 流「正常走完」时的终态裁决：有正文即成功；零正文一律 fail（可重试） */
-    const settleByOutcome = () => {
-      settle(() => {
-        if (hasOutput()) {
-          if (lastError !== null)
-            console.warn(
-              "[thread-chat] 流中出现瞬时 error chunk（已忽略）:",
-              lastError
-            )
-          store.finishAssistantMessage(threadId, msgId)
-        } else if (lastError !== null) {
-          store.failAssistantMessage(threadId, msgId, lastError)
-        } else {
-          // 空回复转正为错误：可点「重试」，而不是留一个静默完成的空气泡
-          store.failAssistantMessage(threadId, msgId, EMPTY_REPLY_ERROR)
-        }
-      })
-    }
-
-    /** 中止时即使已有部分正文也保持 error，避免把不完整回复开放为可评价终态。 */
-    const settleByAbort = () => {
-      settle(() => store.failAssistantMessage(threadId, msgId, ABORTED_ERROR))
-    }
-
-    const handlers: UIStreamHandlers = {
-      onTextDelta(delta) {
-        if (settled) return
-        receivedChars += delta.replace(/\s/g, "").length
-        deltaBuffer.appendText(delta)
-      },
-      onMarkdownArtifactProgress(event) {
-        if (settled || !isOwner()) return
-        deltaBuffer.setMarkdownProgress(event)
-      },
-      onMarkdownArtifact(event) {
-        if (settled || !isOwner()) return
-        deltaBuffer.clearMarkdownProgress()
-        const seed: ArtifactSeed = {
-          kind: "markdown",
-          title: event.input.title,
-          content: event.input.content,
-        }
-        if (store.attachArtifactToMessage(threadId, msgId, seed) !== null)
-          attachedArtifactCount++
-      },
-      onWebResearchActivity(activity) {
-        if (settled || !isOwner()) return
-        // UI 必须把聚合面板插在 tool-input-start 的真实位置。先把此前按帧
-        // 缓冲的 text-delta 落进消息，store 才能记录准确的正文字符偏移。
-        deltaBuffer.flush()
-        store.setWebResearchActivity(threadId, msgId, activity)
-      },
-      onResearchRoute(route) {
-        if (settled || !isOwner()) return
-        store.setResearchRoute(threadId, msgId, route)
-      },
-      onResearchPlan(plan) {
-        if (settled || !isOwner()) return
-        store.setResearchPlan(threadId, msgId, plan)
-      },
-      onError(message) {
-        if (settled) return
-        lastError = message // 不立即 settle：可能是瞬时噪声，正文还会继续到达（后到覆盖先到）
-      },
-      onFinish() {
-        settleByOutcome()
-      },
-    }
 
     let streamHandedOff = false
     return (async () => {
@@ -243,13 +145,7 @@ export function createChatController(
             await options.persistNow()
           } catch (error) {
             console.error("[thread-chat] 发送前持久化屏障失败", error)
-            settle(() =>
-              store.failAssistantMessage(
-                threadId,
-                msgId,
-                GENERATION_ERRORS.persistenceBarrier
-              )
-            )
+            streamRuntime.fail(GENERATION_ERRORS.persistenceBarrier)
             return {
               ok: false,
               code: "persistence_failed",
@@ -263,9 +159,7 @@ export function createChatController(
         const state = store.getState()
         const thread = state.threads[threadId]
         if (!thread) {
-          settle(() =>
-            store.failAssistantMessage(threadId, msgId, "会话不存在")
-          )
+          streamRuntime.fail("会话不存在")
           return { ok: false, code: "not_found", message: "会话不存在" }
         }
 
@@ -294,14 +188,7 @@ export function createChatController(
           }
         }
         if (command.kind === "rejected") {
-          if (!action)
-            settle(() =>
-              store.failAssistantMessage(
-                threadId,
-                msgId,
-                command.failure.message
-              )
-            )
+          if (!action) streamRuntime.fail(command.failure.message)
           return command.failure
         }
         const res = command.response
@@ -332,17 +219,15 @@ export function createChatController(
           streamHandedOff = true
           void (async () => {
             try {
-              await consumeUIMessageStream(res, handlers, signal)
-              if (signal.aborted) settleByAbort()
-              else settleByOutcome()
+              await consumeUIMessageStream(res, streamRuntime.handlers, signal)
+              if (signal.aborted) streamRuntime.settleByAbort()
+              else streamRuntime.settleByOutcome()
             } catch (error) {
-              if (signal.aborted || isAbortError(error)) settleByAbort()
-              else
-                settle(() =>
-                  store.failAssistantMessage(threadId, msgId, NETWORK_ERROR)
-                )
+              if (signal.aborted || isAbortError(error))
+                streamRuntime.settleByAbort()
+              else streamRuntime.fail(NETWORK_ERROR)
             } finally {
-              deltaBuffer.cancel()
+              streamRuntime.cancel()
               if (inflight.get(threadId) === controller)
                 inflight.delete(threadId)
             }
@@ -350,23 +235,20 @@ export function createChatController(
           return accepted
         }
 
-        await consumeUIMessageStream(res, handlers, signal)
+        await consumeUIMessageStream(res, streamRuntime.handlers, signal)
         if (signal.aborted) {
           // 被 abort：consume 静默返回、onFinish 不触发——有正文保留 finish，零正文标可重试错误
-          settleByAbort()
+          streamRuntime.settleByAbort()
         } else {
           // 正常结束时 handlers.onFinish 已 settle（幂等）；这里兜底走同一套终态裁决
-          settleByOutcome()
+          streamRuntime.settleByOutcome()
         }
         return accepted
       } catch (err) {
         if (signal.aborted || isAbortError(err)) {
-          settleByAbort() // 中止：有正文保留 finish，零正文标可重试错误
+          streamRuntime.settleByAbort() // 中止：有正文保留 finish，零正文标可重试错误
         } else {
-          if (!action)
-            settle(() =>
-              store.failAssistantMessage(threadId, msgId, NETWORK_ERROR)
-            ) // fetch reject 等
+          if (!action) streamRuntime.fail(NETWORK_ERROR) // fetch reject 等
         }
         return {
           ok: false,
@@ -375,7 +257,7 @@ export function createChatController(
         }
       } finally {
         if (!streamHandedOff) {
-          deltaBuffer.cancel()
+          streamRuntime.cancel()
           // 仅当 inflight 仍指向本次 controller 时才清除，避免 retry 竞态误删新流的条目
           if (inflight.get(threadId) === controller) inflight.delete(threadId)
         }
