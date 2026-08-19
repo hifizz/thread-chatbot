@@ -29,7 +29,7 @@ import React, {
 } from "react"
 import { Handle, Position, type Node, type NodeProps } from "@xyflow/react"
 import type { Message, ThreadTreeState } from "../core/types"
-import { AnchoredMarkdown } from "../branching/branchable-chat"
+import { AnchoredMarkdown } from "../branching/anchored-markdown"
 import {
   MarkdownArtifactCard,
   MarkdownArtifactProgressCard,
