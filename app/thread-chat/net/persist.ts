@@ -137,6 +137,24 @@ function enqueueTreeWrite<T>(id: string, task: () => Promise<T>): Promise<T> {
   return run
 }
 
+async function writeTree(
+  id: string,
+  state: ThreadTreeState,
+  title?: string
+): Promise<void> {
+  const res = await fetchWithAuth(`/api/branch-trees/${id}`, {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      state,
+      title,
+      baseRevision: getKnownTreeRevision(id),
+    }),
+  })
+  const revision = await readSaveTreeRevision(res)
+  if (revision !== null) setKnownTreeRevision(id, revision)
+}
+
 export async function saveTree(
   id: string,
   state: ThreadTreeState,
@@ -146,17 +164,7 @@ export async function saveTree(
   const persistedState = withoutTransientGenerationState(state)
   return enqueueTreeWrite(id, async () => {
     try {
-      const res = await fetchWithAuth(`/api/branch-trees/${id}`, {
-        method: "PUT",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          state: persistedState,
-          title,
-          baseRevision: getKnownTreeRevision(id),
-        }),
-      })
-      const revision = await readSaveTreeRevision(res)
-      if (revision !== null) setKnownTreeRevision(id, revision)
+      await writeTree(id, persistedState, title)
     } catch (err) {
       if (err instanceof TreeRevisionError) onRevisionConflict?.(err)
       console.warn("[thread-chat] 分支树存盘失败（下次变更会再试）：", err)
@@ -171,19 +179,7 @@ export async function saveTreeStrict(
   title?: string
 ): Promise<void> {
   const persistedState = withoutTransientGenerationState(state)
-  return enqueueTreeWrite(id, async () => {
-    const res = await fetchWithAuth(`/api/branch-trees/${id}`, {
-      method: "PUT",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        state: persistedState,
-        title,
-        baseRevision: getKnownTreeRevision(id),
-      }),
-    })
-    const revision = await readSaveTreeRevision(res)
-    if (revision !== null) setKnownTreeRevision(id, revision)
-  })
+  return enqueueTreeWrite(id, () => writeTree(id, persistedState, title))
 }
 
 /* ---------------- 树列表 / 重命名 / 删除（会话列表 UI，openspec: add-tree-list-ui） ---------------- */
