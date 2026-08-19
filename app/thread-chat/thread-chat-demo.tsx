@@ -24,7 +24,7 @@
 
 import dynamic from "next/dynamic"
 import { useRouter } from "next/navigation"
-import React, { useCallback, useRef, useState } from "react"
+import React, { useState } from "react"
 import "./thread-chat.css"
 import {
   activeLeafTurn,
@@ -41,12 +41,10 @@ import { kickoffQuestion } from "./net/prompt"
 import {
   deriveTreeTitle,
   type TreeUiState,
-  type ViewMode,
 } from "./net/persist"
 import type { GenerationSummary } from "./generation/types"
 import type { RecoverableTurn } from "./generation/types"
 import { useThreadChatBoot } from "./net/use-thread-chat-boot"
-import { useUiStatePersistence } from "./orchestration/use-ui-state-persistence"
 import { BranchableChat } from "./branching/branchable-chat"
 import {
   SelectionBubble,
@@ -58,10 +56,7 @@ import {
   type Slot,
 } from "./orchestration/placement"
 import {
-  COL_MIN_W,
   ThreadColumns,
-  useColumnSlots,
-  useWindowWidth,
 } from "./orchestration/thread-columns"
 import {
   ThreadSwitcher,
@@ -77,9 +72,7 @@ import {
   WorkspaceToast,
 } from "./orchestration/workspace-toast"
 import { useThreadChatRuntime } from "./orchestration/use-thread-chat-runtime"
-// type-only：不把画布模块（React Flow）拖进首屏 bundle
-import type { CanvasChatActions } from "./orchestration/canvas-node"
-import type { CanvasViewState } from "./orchestration/use-canvas-layout"
+import { useThreadChatWorkspace } from "./orchestration/use-thread-chat-workspace"
 
 /** 画布视图层懒加载：React Flow 只在首次进入画布模式时才落地（且跳过 SSR） */
 const ThreadCanvas = dynamic(
@@ -167,69 +160,29 @@ export function ThreadChatDemoInner({
     onToast: showToast,
   })
 
-  /* ---------- 自适应列数（SSR 阶段 winW=null，顶栏显示「列数」占位） ---------- */
-  const winW = useWindowWidth()
-  const [forceCols, setForceCols] = useState<number | null>(
-    initialUi?.forceCols ?? null
-  )
-  const autoCols =
-    winW === null ? 3 : Math.max(2, Math.min(4, Math.floor(winW / COL_MIN_W)))
-  const totalCols = forceCols ?? autoCols
-  const maxExpanded = totalCols - 1
-
-  /* ---------- 列槽编排：放置策略（替换⑥ / 细条⑤）+ 槽位状态 ---------- */
-  const [mode, setMode] = useState<PlacementMode>(initialUi?.mode ?? "replace")
-  const cols = useColumnSlots({
-    store,
+  const {
+    windowWidth: winW,
+    forceCols,
+    setForceCols,
     maxExpanded,
     mode,
-    initialSlots: initialUi?.slots,
-    initialWidths: initialUi?.widths,
-  })
-
-  /* ---------- 视图形态：列（深读）| 画布（纵览全树 + 节点内对话） ---------- */
-  const [viewMode, setViewMode] = useState<ViewMode>(
-    initialUi?.viewMode ?? "columns"
-  )
-  /* 画布内 fork 的视口跟随指令（D4）：{id, n} 置值 → 画布 selectNode + setCenter。
-     n 递增去重；属视口态不入档。 */
-  const [focusNode, setFocusNode] = useState<{ id: string; n: number } | null>(
-    null
-  )
-  const focusSeq = useRef(0)
-  /** 切回列视图的统一出口：顺手清 focusNode——CanvasFlow 卸载会重置其去重 ref，
-      残留指令会在下次进画布时误触发一次跟随动画 */
-  const showColumnsView = useCallback(() => {
-    setViewMode("columns")
-    setFocusNode(null)
-  }, [setViewMode, setFocusNode])
-  /** 画布节点面板的会话动作（D3）：同一 chat-controller，无平行发送通道 */
-  const [canvasChat] = useState<CanvasChatActions>(() => ({
-    send: chat.send,
-    stop: chat.stop,
-    retry: chat.retry,
-    retryAssistant: messageCommands.retryAssistant,
-    retryUserTurn: messageCommands.retryUserTurn,
-    editAndRegenerate: messageCommands.editAndRegenerate,
-    switchTurnVariant: messageCommands.switchTurnVariant,
-    submitFeedback: messageCommands.submitFeedback,
-  }))
-
-  useUiStatePersistence({
-    treeId,
-    slots: cols.slots,
-    widths: cols.widths,
-    forceCols,
-    mode,
+    setMode,
+    columns: cols,
     viewMode,
+    setViewMode,
+    focusNode,
+    focusCanvasNode,
+    showColumnsView,
+    canvasChat,
+    canvasViewState,
+  } = useThreadChatWorkspace({
+    treeId,
+    store,
+    chat,
+    messageCommands,
+    initialUi,
     isSaveSuppressed: isTreeSaveSuppressed,
   })
-  /** 画布视图状态宿主（节点 pin 表）：跨「列 ⇄ 画布」切换存活，属视口状态不进 core store。
-      与上面的 store 同一模式：useState(初始化函数) 造出的长寿可变对象（type-only import，
-      不把画布模块拖进首屏 bundle） */
-  const [canvasViewState] = useState<CanvasViewState>(() => ({
-    pins: new Map(),
-  }))
 
   /* ---------- 主线列头副标题：customTitle（用户重命名）→ 派生标题（首条消息即更新）→ 兜底 ----------
        customTitle 本地态由对话列表的 onRenamedCurrent 同步（重命名当前树立即生效，无需重载） */
@@ -318,7 +271,7 @@ export function ThreadChatDemoInner({
     // 画布内 fork（D4）：不占列槽——不走 cols.openThread（回列后布局与开分支前一致，
     // 新分支经脚注/⌘K 打开）；置 focusNode 让画布 selectNode + setCenter 平滑跟随
     if (viewMode === "canvas") {
-      setFocusNode({ id: r.threadId, n: ++focusSeq.current })
+      focusCanvasNode(r.threadId)
       showToast(`已开启分支 · ${r.title}`)
       return
     }
