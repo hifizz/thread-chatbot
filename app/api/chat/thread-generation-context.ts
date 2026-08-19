@@ -9,6 +9,7 @@ import {
 import { toGenerationSummary } from "@/lib/thread-chat-generation/query-repository"
 import { prepareGeneration } from "@/lib/thread-chat-generation/start-generation-repository"
 import { generationStartErrorResponse } from "@/app/api/chat/generation-start-error"
+import type { MessageActionFailureResponse } from "@/lib/thread-chat/contracts/message-action-failure"
 
 type ThreadGenerationContextInput = {
   userId: string
@@ -66,7 +67,7 @@ export async function prepareThreadGenerationContext(
             code: "invalid_generation_identity",
             message: "thread-chat 请求缺少有效的持久化身份，请刷新页面后重试",
           },
-        },
+        } satisfies MessageActionFailureResponse,
         { status: 400 }
       ),
     }
@@ -81,7 +82,7 @@ export async function prepareThreadGenerationContext(
             code: "invalid_thread_model",
             message: "Thread Chat 不允许使用该模型，请刷新页面后重试",
           },
-        },
+        } satisfies MessageActionFailureResponse,
         { status: 400 }
       ),
     }

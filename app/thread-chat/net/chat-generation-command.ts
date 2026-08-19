@@ -1,8 +1,6 @@
 import { handleUnauthorized } from "@/lib/auth/session-recovery"
-import type {
-  GenerationActionResult,
-  MessageActionFailureCode,
-} from "./message-action-results"
+import { messageActionFailureResponseSchema } from "@/lib/thread-chat/contracts/message-action-failure"
+import type { GenerationActionResult } from "./message-action-results"
 
 type ChatGenerationCommandInput = {
   body: unknown
@@ -42,13 +40,20 @@ export async function requestChatGeneration(
   if (res.status === 202) return { kind: "replayed" }
   if (!res.ok || !res.body) {
     if (res.status === 401) void dependencies.unauthorized()
-    const payload = (await res.json().catch(() => null)) as {
-      error?: { code?: MessageActionFailureCode; message?: string }
-    } | null
+    const payload = await res.json().catch(() => null)
+    const structured = messageActionFailureResponseSchema.safeParse(payload)
+    const stringMessage =
+      typeof payload === "object" &&
+      payload !== null &&
+      typeof (payload as Record<string, unknown>).error === "string"
+        ? ((payload as Record<string, unknown>).error as string)
+        : null
     const message =
       res.status === 401
         ? "登录已失效，正在跳转登录…"
-        : (payload?.error?.message ?? `请求失败（HTTP ${res.status}）`)
+        : structured.success
+          ? structured.data.error.message
+          : (stringMessage ?? `请求失败（HTTP ${res.status}）`)
     return {
       kind: "rejected",
       failure: {
@@ -56,7 +61,9 @@ export async function requestChatGeneration(
         code:
           res.status === 401
             ? "unauthorized"
-            : (payload?.error?.code ?? "network_error"),
+            : structured.success
+              ? structured.data.error.code
+              : "network_error",
         message,
       },
     }

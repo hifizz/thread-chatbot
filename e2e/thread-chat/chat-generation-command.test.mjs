@@ -64,6 +64,48 @@ assert.deepEqual(rejected, {
   failure: { ok: false, code: "generation_conflict", message: "冲突" },
 })
 
+const invalidIdentity = await requestChatGeneration(
+  { body, signal: controller.signal },
+  {
+    fetch: async () =>
+      Response.json(
+        {
+          error: {
+            code: "invalid_generation_identity",
+            message: "请刷新页面后重试",
+          },
+        },
+        { status: 400 }
+      ),
+    unauthorized() {},
+  }
+)
+assert.deepEqual(invalidIdentity, {
+  kind: "rejected",
+  failure: {
+    ok: false,
+    code: "invalid_generation_identity",
+    message: "请刷新页面后重试",
+  },
+})
+
+const stringError = await requestChatGeneration(
+  { body, signal: controller.signal },
+  {
+    fetch: async () =>
+      Response.json({ error: "额度不足，请充值后再试。" }, { status: 402 }),
+    unauthorized() {},
+  }
+)
+assert.deepEqual(stringError, {
+  kind: "rejected",
+  failure: {
+    ok: false,
+    code: "network_error",
+    message: "额度不足，请充值后再试。",
+  },
+})
+
 let unauthorizedCalls = 0
 const unauthorized = await requestChatGeneration(
   { body, signal: controller.signal },
