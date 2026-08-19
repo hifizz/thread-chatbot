@@ -176,15 +176,15 @@ function CanvasExpand({
       >
         {data.messages.map((msg) => {
           const hasVisibleText = msg.text.trim().length > 0
+          const hasWebResearch = Boolean(msg.webResearch?.length)
+          const hasVisibleAssistantContent = hasVisibleText || hasWebResearch
           const isWaitingForVisibleOutput =
             msg.role === "assistant" &&
             (msg.status === "pending" || msg.status === "streaming") &&
-            !hasVisibleText &&
+            !hasVisibleAssistantContent &&
             !msg.artifactIds?.length &&
             !msg.markdownGeneration &&
-            !msg.webResearch?.length &&
-            !msg.researchPlan &&
-            (!msg.researchRoute || msg.researchRoute.mode === "answer")
+            !msg.webResearch?.length
           return (
             <div
               key={msg.id}
@@ -200,13 +200,8 @@ function CanvasExpand({
                 </div>
               ) : (
                 <>
-                  <WebResearchPanel
-                    activities={msg.webResearch ?? []}
-                    route={msg.researchRoute}
-                    plan={msg.researchPlan}
-                    status={msg.status}
-                  />
-                  {(hasVisibleText || isWaitingForVisibleOutput) && (
+                  {(hasVisibleAssistantContent ||
+                    isWaitingForVisibleOutput) && (
                     <div className="bubble" data-role="assistant">
                       {isWaitingForVisibleOutput ? (
                         <span
@@ -227,6 +222,21 @@ function CanvasExpand({
                               state={state}
                               msg={msg}
                               onOpenThread={(id) => actions.focusThread(id)}
+                              insertAt={
+                                hasWebResearch
+                                  ? (msg.webResearchTextOffset ?? 0)
+                                  : undefined
+                              }
+                              insert={
+                                hasWebResearch ? (
+                                  <WebResearchPanel
+                                    activities={msg.webResearch ?? []}
+                                    route={msg.researchRoute}
+                                    plan={msg.researchPlan}
+                                    complete={msg.status === "done"}
+                                  />
+                                ) : undefined
+                              }
                             />
                           )}
                           {msg.status === "streaming" && hasVisibleText && (

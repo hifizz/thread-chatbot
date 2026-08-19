@@ -1,73 +1,137 @@
-// 可配置的 Web 搜索 / 网页抽取 provider，默认 Tavily（面向 AI/RAG 场景，/search 直接返回正文快照，
-// 另有 /extract 抽取整页正文）。未配置 SEARCH_API_KEY 时深度研究降级为不可用。
-// 换用其它兼容服务可改 SEARCH_BASE_URL，但响应解析以 Tavily 结构为准。
+import {
+  ANYSEARCH_CLIENT_HEADER,
+  ANYSEARCH_MCP_API_URL,
+  ANYSEARCH_PROVIDER_NAME,
+  ANYSEARCH_SEARCH_API_URL,
+  ANYSEARCH_SEARCH_RESULT_CHAR_LIMIT,
+  ANYSEARCH_SEARCH_RESULT_LIMIT,
+} from "@/constants/research"
+
+// AnySearch 的 REST 搜索返回结构化 JSON；MCP extract 返回清洗后的 Markdown。
+// API Key 可选：未配置 ANYSEARCH_API_KEY 时，服务会自动使用较低配额的匿名访问。
 
 export type SearchResult = {
   title: string
   url: string
-  /** 正文快照（Tavily /search 直接返回，通常足够回答） */
-  content: string
+  snippet: string
 }
 
+/** AnySearch 支持匿名访问，因此联网工具不依赖本地凭据也可启用。 */
 export function isSearchConfigured() {
-  return Boolean(process.env.SEARCH_API_KEY)
+  return true
 }
 
-function baseUrl() {
-  return process.env.SEARCH_BASE_URL ?? "https://api.tavily.com"
+type SearchProviderOperation = "search" | "extract"
+
+function logSearchProvider(operation: SearchProviderOperation) {
+  if (process.env.NODE_ENV !== "development") return
+
+  console.info(
+    `[web-research] provider=${ANYSEARCH_PROVIDER_NAME} operation=${operation}`
+  )
 }
 
 function authHeaders(): Record<string, string> {
-  return {
+  const headers: Record<string, string> = {
     "Content-Type": "application/json",
-    Authorization: `Bearer ${process.env.SEARCH_API_KEY}`,
+    "X-Anysearch-Client": ANYSEARCH_CLIENT_HEADER,
   }
+  const apiKey = process.env.ANYSEARCH_API_KEY?.trim()
+  if (apiKey) headers.Authorization = `Bearer ${apiKey}`
+  return headers
 }
 
-type TavilySearchResponse = {
-  answer?: string
-  results?: { title?: string; url?: string; content?: string }[]
+type AnySearchResult = {
+  title?: string
+  url?: string
+  snippet?: string
+  content?: string
 }
 
-/** 联网搜索：返回带正文快照的结果列表 */
+type AnySearchSearchResponse = {
+  code?: number
+  message?: string
+  data?: {
+    results?: AnySearchResult[]
+  }
+  // 兼容官网文档展示的未包 data 形式；线上实测响应目前使用 data.results。
+  results?: AnySearchResult[]
+}
+
+function providerError(action: string, status: number, message?: string) {
+  const detail = message?.trim() ? `：${message.trim()}` : ""
+  return new Error(`AnySearch ${action}失败（HTTP ${status}）${detail}`)
+}
+
+/** 联网搜索：返回轻量摘要；需要正文时由模型继续调用 readUrl。 */
 export async function webSearch(
   query: string,
   maxResults = 5
-): Promise<{ answer?: string; results: SearchResult[] }> {
-  const res = await fetch(`${baseUrl()}/search`, {
+): Promise<{ results: SearchResult[] }> {
+  const resultLimit = Math.max(
+    1,
+    Math.min(maxResults, ANYSEARCH_SEARCH_RESULT_LIMIT)
+  )
+  logSearchProvider("search")
+  const res = await fetch(ANYSEARCH_SEARCH_API_URL, {
     method: "POST",
     headers: authHeaders(),
     body: JSON.stringify({
       query,
-      max_results: maxResults,
-      search_depth: "advanced",
-      include_answer: true,
+      max_results: resultLimit,
+      format: "json",
     }),
   })
-  if (!res.ok) throw new Error(`搜索失败（HTTP ${res.status}）`)
-  const data = (await res.json()) as TavilySearchResponse
-  const results = (data.results ?? [])
-    .filter((r): r is Required<typeof r> => Boolean(r.url))
-    .map((r) => ({
-      title: r.title ?? r.url,
-      url: r.url,
-      content: r.content ?? "",
-    }))
-  return { answer: data.answer, results }
+  const data = (await res.json()) as AnySearchSearchResponse
+  if (!res.ok || (data.code !== undefined && data.code !== 0)) {
+    throw providerError("搜索", res.status, data.message)
+  }
+
+  const results = (data.data?.results ?? data.results ?? [])
+    .filter((result): result is AnySearchResult & { url: string } =>
+      Boolean(result.url?.trim())
+    )
+    .map((result) => {
+      const url = result.url.trim()
+      const snippet = result.snippet?.trim() || result.content?.trim() || ""
+      return {
+        title: result.title?.trim() || url,
+        url,
+        snippet: snippet.slice(0, ANYSEARCH_SEARCH_RESULT_CHAR_LIMIT),
+      }
+    })
+
+  return { results }
 }
 
-type TavilyExtractResponse = {
-  results?: { url?: string; raw_content?: string }[]
+type AnySearchMcpResponse = {
+  error?: { message?: string }
+  result?: {
+    content?: { type?: string; text?: string }[]
+  }
 }
 
-/** 抽取单个网页的正文（搜索快照不够时按需深读） */
+/** 抽取单个 HTML 网页的正文；AnySearch 直接返回 Markdown。 */
 export async function extractUrl(url: string): Promise<string> {
-  const res = await fetch(`${baseUrl()}/extract`, {
+  logSearchProvider("extract")
+  const res = await fetch(ANYSEARCH_MCP_API_URL, {
     method: "POST",
     headers: authHeaders(),
-    body: JSON.stringify({ urls: [url] }),
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "tools/call",
+      params: { name: "extract", arguments: { url } },
+    }),
   })
-  if (!res.ok) throw new Error(`网页抽取失败（HTTP ${res.status}）`)
-  const data = (await res.json()) as TavilyExtractResponse
-  return data.results?.[0]?.raw_content ?? ""
+  const data = (await res.json()) as AnySearchMcpResponse
+  if (!res.ok || data.error) {
+    throw providerError("网页抽取", res.status, data.error?.message)
+  }
+
+  const text = data.result?.content?.find(
+    (item) => item.type === "text" && typeof item.text === "string"
+  )?.text
+  if (!text) throw new Error("AnySearch 网页抽取失败：服务未返回正文")
+  return text
 }

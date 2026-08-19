@@ -1,16 +1,16 @@
 # Web Search Demo 阶段说明
 
-更新日期：2026-08-18
+更新日期：2026-08-19
 
-本文记录第一阶段联网 Demo 的实际能力边界。它用于验证“聊天模型通过 Tavily 搜索和读取网页，再把结果用于回答”的主链路，不代表最终的智能研究架构。
+本文记录第一阶段联网 Demo 的实际能力边界。它用于验证“聊天模型通过 AnySearch 搜索和读取网页，再把结果用于回答”的主链路，不代表最终的智能研究架构。
 
 ## 当前已完成
 
 ### 1. 统一的 Web Search 与 Web Fetch
 
-- 服务端通过 `SEARCH_API_KEY` 接入 Tavily。
-- `webSearch` 使用 Tavily Advanced Search，单次最多返回 8 个结果。
-- `readUrl` 使用 Tavily Extract 抽取网页正文，单页最多向模型注入 8,000 字符。
+- 服务端通过 AnySearch REST Search 与 MCP Extract 接入联网能力；`ANYSEARCH_API_KEY` 可选，留空时使用匿名额度。
+- `webSearch` 单次最多向模型返回 8 个结果，每条结果只注入轻量摘要。
+- `readUrl` 使用 AnySearch Extract 抽取 HTML 网页并返回 Markdown，单页最多向模型注入 8,000 字符。
 - 普通聊天和深度研究都可以获得联网工具，不再只依赖单独的 Deep Research 开关。
 - 单轮最多允许 20 个模型/工具步骤，用于优先验证效果；该上限只是异常循环熔断，不是最终成本策略。
 
@@ -41,10 +41,10 @@
 
 ## 使用方式
 
-服务端至少需要配置：
+匿名额度无需配置即可使用；如需更高配额与限流，在服务端配置：
 
 ```dotenv
-SEARCH_API_KEY=tvly-...
+ANYSEARCH_API_KEY=as_sk_...
 ```
 
 测试 UMAPIS Claude 时还需要：

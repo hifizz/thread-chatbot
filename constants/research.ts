@@ -1,5 +1,18 @@
 // 深度研究（deep research）相关配置。
 
+/** AnySearch 通用 Web Search 的 REST 入口。 */
+export const ANYSEARCH_SEARCH_API_URL = "https://api.anysearch.com/v1/search"
+/** AnySearch URL Extract 的 JSON-RPC/MCP 入口。 */
+export const ANYSEARCH_MCP_API_URL = "https://api.anysearch.com/mcp"
+/** 统一用于开发日志和后续 provider 路由的显示名称。 */
+export const ANYSEARCH_PROVIDER_NAME = "AnySearch"
+/** 标记服务端调用来源，便于 AnySearch 侧诊断。 */
+export const ANYSEARCH_CLIENT_HEADER = "thread-chat/1.0"
+/** REST Search 单次结果上限；官网当前文档为 20。 */
+export const ANYSEARCH_SEARCH_RESULT_LIMIT = 20
+/** 每条搜索摘要注入模型的字符上限，正文按需交给 readUrl。 */
+export const ANYSEARCH_SEARCH_RESULT_CHAR_LIMIT = 2000
+
 /** 多步工具循环的最大步数（含工具调用与最终综合）。Demo 阶段放宽，仍保留防死循环熔断。 */
 export const RESEARCH_MAX_STEPS = 20
 /** 单次 webSearch 返回的结果数 */

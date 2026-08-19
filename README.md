@@ -98,7 +98,7 @@ Open <http://localhost:4040/thread-chat> to enter the Thread Chat workspace. Sig
 
 The following features are opt-in and are not required for the quick start:
 
-- Deep research: `SEARCH_API_KEY` (and optionally `SEARCH_BASE_URL`)
+- Web search and page fetch: AnySearch works anonymously; set `ANYSEARCH_API_KEY` for higher quotas and rate limits
 - Attachments and PDF processing: Cloudflare R2 variables (`R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`)
 - Large-document vector retrieval: `EMBEDDINGS_BASE_URL`, `EMBEDDINGS_API_KEY`, and `EMBEDDINGS_MODEL`, plus PostgreSQL `pgvector`
 - Additional model providers and gateways: provider keys, Cloudflare AI Gateway, or Vercel AI Gateway variables documented in `.env.example`

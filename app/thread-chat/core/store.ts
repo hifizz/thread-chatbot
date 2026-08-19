@@ -215,7 +215,7 @@ export function createThreadStore(
       notify()
     },
 
-    /** 聚合 Tavily 搜索/深读状态；同一 toolCallId 原位更新，保持真实调用顺序。 */
+    /** 聚合联网搜索/深读状态；同一 toolCallId 原位更新，保持真实调用顺序。 */
     setWebResearchActivity(
       threadId: string,
       msgId: string,
@@ -228,6 +228,8 @@ export function createThreadStore(
       if (message.status === "done" || message.status === "error") return
 
       const activities = message.webResearch ?? []
+      if (message.webResearchTextOffset == null)
+        message.webResearchTextOffset = message.text.length
       const index = activities.findIndex(
         (item) => item.toolCallId === activity.toolCallId
       )
@@ -317,6 +319,7 @@ export function createThreadStore(
       msg.error = undefined
       msg.markdownGeneration = undefined
       msg.webResearch = undefined
+      msg.webResearchTextOffset = undefined
       msg.researchRoute = undefined
       msg.researchPlan = undefined
       notify()

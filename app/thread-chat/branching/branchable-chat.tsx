@@ -83,19 +83,29 @@ export function BranchableChat({
   const childCount = thread.children.length
 
   /* ---------- 注入：assistant 正文（Markdown 渲染 + 渲染后手绘锚点高亮/脚注） ---------- */
-  const renderAssistantBody = (msg: Message) => (
-    <AnchoredMarkdown state={state} msg={msg} onOpenThread={onOpenThread} />
-  )
-
-  /* ---------- 注入：正文前的研究计划与联网活动（按真实调用顺序） ---------- */
-  const renderBeforeAssistantBody = (msg: Message) => (
-    <WebResearchPanel
-      activities={msg.webResearch ?? []}
-      route={msg.researchRoute}
-      plan={msg.researchPlan}
-      status={msg.status}
-    />
-  )
+  const renderAssistantBody = (msg: Message) => {
+    const activities = msg.webResearch ?? []
+    return (
+      <AnchoredMarkdown
+        state={state}
+        msg={msg}
+        onOpenThread={onOpenThread}
+        insertAt={
+          activities.length > 0 ? (msg.webResearchTextOffset ?? 0) : undefined
+        }
+        insert={
+          activities.length > 0 ? (
+            <WebResearchPanel
+              activities={activities}
+              route={msg.researchRoute}
+              plan={msg.researchPlan}
+              complete={msg.status === "done"}
+            />
+          ) : undefined
+        }
+      />
+    )
+  }
 
   /* ---------- 注入：消息下方的 artifact 卡片 ---------- */
   const renderAfterMessage = (msg: Message) => {
@@ -234,7 +244,6 @@ export function BranchableChat({
       banner={banner}
       intro={intro}
       renderAssistantBody={renderAssistantBody}
-      renderBeforeAssistantBody={renderBeforeAssistantBody}
       renderAfterMessage={renderAfterMessage}
       busy={busy}
       onRetry={onRetry}
@@ -280,10 +289,15 @@ export function AnchoredMarkdown({
   state,
   msg,
   onOpenThread,
+  insertAt,
+  insert,
 }: {
   state: ThreadTreeState
   msg: Message
   onOpenThread: (targetId: string, opts?: { keepSource?: boolean }) => void
+  /** 在流事件记录的正文字符偏移处插入工具活动；缺省时渲染普通单段 Markdown。 */
+  insertAt?: number
+  insert?: React.ReactNode
 }) {
   const hostRef = useRef<HTMLDivElement | null>(null)
   // forksKey 只随 fork 的增删与编号变化——source 未变、仅新增 fork 时也能触发重绘
@@ -302,21 +316,36 @@ export function AnchoredMarkdown({
   useEffect(() => {
     const host = hostRef.current
     if (!host) return
-    const md = host.querySelector<HTMLElement>(".md-body")
-    if (!md) return
+    const markdownBodies = [...host.querySelectorAll<HTMLElement>(".md-body")]
+    if (markdownBodies.length === 0) return
 
     const wipe = () => {
-      clearHighlights(md)
-      md.querySelectorAll("sup.fn-mark").forEach((n) => n.remove())
+      markdownBodies.forEach((md) => {
+        clearHighlights(md)
+        md.querySelectorAll("sup.fn-mark").forEach((n) => n.remove())
+      })
     }
     wipe()
 
     // 高亮仍在飞或当前是流式 plaintext 时，绝不手改 React 即将 reconcile 的代码 DOM。
-    if (active || md.dataset.contentSettled !== "true") return wipe
+    if (
+      active ||
+      markdownBodies.some((md) => md.dataset.contentSettled !== "true")
+    )
+      return wipe
 
     for (const fork of msg.forks) {
       if (!fork.anchor) continue
-      const located = locateAnchor(md, fork.anchor)
+      let md: HTMLElement | null = null
+      let located: ReturnType<typeof locateAnchor> = null
+      for (const candidate of markdownBodies) {
+        located = locateAnchor(candidate, fork.anchor)
+        if (located) {
+          md = candidate
+          break
+        }
+      }
+      if (!md) continue
       if (!located) continue // 定位失败：静默跳过（fuzzy 默认阈值 0.7）
       const color = `color-mix(in srgb, var(--d${dc(fork.depth)}) 20%, transparent)`
       paintRange(located.range, fork.threadId, color)
@@ -355,13 +384,38 @@ export function AnchoredMarkdown({
     onOpenThread(id, { keepSource: e.metaKey || e.ctrlKey })
   }
 
+  const normalizedInsertAt =
+    insertAt == null
+      ? null
+      : Math.max(0, Math.min(insertAt, msg.text.length))
+  const insertIsVisible =
+    insert != null &&
+    normalizedInsertAt != null &&
+    renderedSource.length >= normalizedInsertAt
+  const beforeInsert = insertIsVisible
+    ? renderedSource.slice(0, normalizedInsertAt)
+    : renderedSource
+  const afterInsert = insertIsVisible
+    ? renderedSource.slice(normalizedInsertAt)
+    : ""
+
   return (
     <div ref={hostRef} onClick={onClick}>
-      <MarkdownBody
-        source={renderedSource}
-        streaming={active}
-        onContentSettled={onContentSettled}
-      />
+      {beforeInsert ? (
+        <MarkdownBody
+          source={beforeInsert}
+          streaming={active}
+          onContentSettled={onContentSettled}
+        />
+      ) : null}
+      {insertIsVisible ? insert : null}
+      {afterInsert ? (
+        <MarkdownBody
+          source={afterInsert}
+          streaming={active}
+          onContentSettled={onContentSettled}
+        />
+      ) : null}
     </div>
   )
 }

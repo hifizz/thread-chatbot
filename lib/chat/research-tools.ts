@@ -13,15 +13,14 @@ export const webSearchTool = tool({
     query: z.string().describe("检索关键词或问题，尽量具体"),
   }),
   execute: async ({ query }) => {
-    const { answer, results } = await webSearch(query, SEARCH_MAX_RESULTS)
+    const { results } = await webSearch(query, SEARCH_MAX_RESULTS)
     // 返回给模型的结构：带 url 的结果列表，供其继续深读或引用
     return {
       query,
-      answer,
       results: results.map((r) => ({
         title: r.title,
         url: r.url,
-        snippet: r.content,
+        snippet: r.snippet,
       })),
     }
   },

@@ -55,7 +55,7 @@
 | `search` | 最新事实、明确要求检索、少量搜索即可回答 | `webSearch`、`readUrl` | 强制搜索 |
 | `research` | 多来源调研、复杂比较、交叉核验 | `webSearch`、`readUrl` | 先 Planner，再强制搜索 |
 
-显式“不要联网”优先于其他规则。没有配置 Tavily 时，联网路由会降级为直接回答，并标记 `search_unavailable`。
+显式“不要联网”优先于其他规则。AnySearch 未配置 API Key 时使用匿名额度，不会仅因缺少凭据降级为直接回答。
 
 ### 2. 分级推理控制
 
@@ -94,14 +94,19 @@ UMAPIS Opus 4.6 的 Anthropic-compatible Endpoint 可以完成结构化任务，
 
 ### 5. 研究计划与活动 UI
 
-- 复杂研究先显示目标和子问题，再显示搜索与阅读步骤。
-- 联网活动位于最终回答正文之前，符合当前“工具先执行、正文后生成”的真实顺序。
+- 联网记录默认收起为浅色“正在/已搜索网络”；Hover 或键盘聚焦时文字加深并显示右箭头，展开后箭头向下旋转。
+- 展开内容按每次搜索 Query 分组，展示结果数量、页面标题、域名和已深读标记；每组最多显示 4.5 行并独立滚动。
+- 工具结束后在时间线末尾显示一条基于研究目标或查询词生成的确定性完成记录，不增加额外模型请求。
+- 联网活动记录第一次工具事件到达时的正文字符偏移，并在该位置插入聚合面板；模型先输出说明文字再调用工具时，面板不会被错误提升到消息顶部。
+- 后续多次搜索和阅读仍更新同一个面板，避免把内部调用拆成大量重复卡片。
 - `fetch`、`search`、`research` 使用不同面板标题。
 - 消息等待态识别计划和联网路由，不再同时显示无意义的三点占位。
 - 计划、路由和联网来源随消息持久化，刷新后可以恢复。
 - UI 只展示可审计的结构化计划，不展示原始 CoT。
 
-## UMAPIS Opus 4.6 + Tavily 真实验收
+## UMAPIS Opus 4.6 + 联网工具真实验收
+
+以下模型多步链路数据来自切换 AnySearch 之前的 Tavily 验收；当前 AnySearch REST Search 与 MCP Extract 已分别通过匿名端到端适配器验证，完整模型压力测试尚未重跑。
 
 ### Planner 验收
 
@@ -122,9 +127,9 @@ UMAPIS Opus 4.6 的 Anthropic-compatible Endpoint 可以完成结构化任务，
 UMAPIS Opus 4.6
   → streamText
   → webSearch
-  → Tavily Search
+  → Search provider
   → readUrl
-  → Tavily Extract
+  → Extract provider
   → UI Message Stream
   → 最终带来源回答
 ```
@@ -152,7 +157,7 @@ UMAPIS Opus 4.6
 6. **供应商能力差异**：reasoning、结构化输出和工具流在不同兼容端点上的实现并不完全一致，需要建立模型能力矩阵。
 7. **失败恢复有限**：目前有 Schema 兜底，但还缺少每个工具调用的超时、重试退避、部分结果继续回答和供应商 fallback。
 8. **安全仍需加固**：需要进一步限制 URL 协议、处理网页 Prompt Injection、设置内容类型/大小策略，并明确外部正文是不可信数据。
-9. **不是完整浏览器**：Tavily Extract 不能代替登录态、JavaScript 交互、下载文件、Git clone 或代码仓库级分析。
+9. **不是完整浏览器**：AnySearch Extract 不能代替登录态、JavaScript 交互、下载文件、Git clone 或代码仓库级分析。
 
 ## 后续实施建议
 
@@ -193,6 +198,6 @@ UMAPIS Opus 4.6
 
 ## 当前结论
 
-第二阶段已经验证了核心方向：由规则和当前模型共同完成智能路由，按模式控制工具和 reasoning，复杂研究使用结构化 Planner，并由 UMAPIS Opus 4.6 + Tavily 完成真实多步研究。
+第二阶段已经验证了核心方向：由规则和当前模型共同完成智能路由，按模式控制工具和 reasoning，复杂研究使用结构化 Planner。历史多步验收使用 UMAPIS Opus 4.6 + Tavily；当前联网 provider 已切换为 AnySearch，并完成 Search/Fetch 适配器实测。
 
 下一阶段不应继续单纯扩大搜索上限，而应优先补齐可观测性、预算控制、证据账本和有状态 Executor。这样才能在保持回答质量的同时，把延迟、成本和失败模式收敛到生产可控范围。

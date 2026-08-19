@@ -52,7 +52,7 @@ export interface UIStreamHandlers {
   onMarkdownArtifact(event: MarkdownArtifactStreamEvent): void
   /** Markdown 工具开始或参数增量解析后的临时进度（不持久化） */
   onMarkdownArtifactProgress(event: MarkdownArtifactProgressEvent): void
-  /** Tavily 搜索/深读调用的聚合状态与来源结果。 */
+  /** 联网搜索/深读调用的聚合状态与来源结果。 */
   onWebResearchActivity(activity: WebResearchActivity): void
   /** 后端编排器给出的结构化联网路由。 */
   onResearchRoute(route: ResearchRoute): void
