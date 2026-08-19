@@ -34,11 +34,7 @@ import {
   Waypoints,
 } from "lucide-react"
 import "./thread-chat.css"
-import {
-  POPUP_EXIT_MS,
-  THREAD_CHAT_SHORTCUTS,
-  UI_SAVE_DEBOUNCE_MS,
-} from "@/constants/thread-chat"
+import { POPUP_EXIT_MS, THREAD_CHAT_SHORTCUTS } from "@/constants/thread-chat"
 import {
   isThreadChatModelId,
   resolveThreadChatModelId,
@@ -68,7 +64,6 @@ import {
   rememberTreeId,
   sanitizeLoadedState,
   saveTreeStrict,
-  saveUiState,
   type TreeUiState,
   type ViewMode,
   TreeRevisionError,
@@ -78,6 +73,7 @@ import type { RecoverableTurn } from "./generation/types"
 import { useGenerationReconciliation } from "./generation/use-generation-reconciliation"
 import { useMessageActions } from "./chat/use-message-actions"
 import { useTreePersistence } from "./net/use-tree-persistence"
+import { useUiStatePersistence } from "./orchestration/use-ui-state-persistence"
 import { BranchableChat } from "./branching/branchable-chat"
 import {
   SelectionBubble,
@@ -377,29 +373,15 @@ export function ThreadChatDemoInner({
     submitFeedback: messageCommands.submitFeedback,
   }))
 
-  /* ---------- 工作台状态记忆（D7）：五项变化 ~300ms 轻防抖写 localStorage（按 treeId 分键）。
-       首帧也会写一次，但内容 == 恢复出的初值，幂等无伤。 ---------- */
-  useEffect(() => {
-    const t = setTimeout(() => {
-      if (isTreeSaveSuppressed()) return // 树已被删除：别把刚清掉的工作台记忆写回去
-      saveUiState(treeId, {
-        slots: cols.slots,
-        widths: cols.widths,
-        forceCols,
-        mode,
-        viewMode,
-      })
-    }, UI_SAVE_DEBOUNCE_MS)
-    return () => clearTimeout(t)
-  }, [
+  useUiStatePersistence({
     treeId,
-    cols.slots,
-    cols.widths,
+    slots: cols.slots,
+    widths: cols.widths,
     forceCols,
     mode,
     viewMode,
-    isTreeSaveSuppressed,
-  ])
+    isSaveSuppressed: isTreeSaveSuppressed,
+  })
   /** 画布视图状态宿主（节点 pin 表）：跨「列 ⇄ 画布」切换存活，属视口状态不进 core store。
       与上面的 store 同一模式：useState(初始化函数) 造出的长寿可变对象（type-only import，
       不把画布模块拖进首屏 bundle） */
