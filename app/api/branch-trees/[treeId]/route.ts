@@ -20,7 +20,7 @@ import { branchTrees } from "@/lib/db/schema"
 import { isValidTreeId } from "@/lib/chat/tree-id"
 import { CUSTOM_TITLE_MAX_LEN } from "@/constants/thread-chat"
 import { getCurrentUserId } from "@/lib/auth/server"
-import type { ThreadTreeState } from "@/app/thread-chat/core/types"
+import type { ThreadTreeState } from "@/lib/thread-chat/domain/types"
 import { parseThreadTreeState } from "@/app/thread-chat/core/message-graph"
 import {
   assertCompletedMessageGenerationLinks,

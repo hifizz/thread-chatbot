@@ -4,7 +4,7 @@ import type {
   MessageFeedback,
   MessageFeedbackSummary,
   ThreadTreeState,
-} from "@/app/thread-chat/core/types"
+} from "@/lib/thread-chat/domain/types"
 import { db } from "@/lib/db"
 import {
   branchGenerations,

@@ -4,7 +4,7 @@ import {
   assistantTurnAlternatives,
   parseThreadTreeState,
 } from "@/app/thread-chat/core/message-graph"
-import type { ThreadTreeState } from "@/app/thread-chat/core/types"
+import type { ThreadTreeState } from "@/lib/thread-chat/domain/types"
 import { db } from "@/lib/db"
 import { branchTrees } from "@/lib/db/schema"
 
