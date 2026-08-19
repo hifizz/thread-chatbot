@@ -32,10 +32,6 @@ import type {
   MessageFeedbackSummary,
 } from "../core/types"
 import {
-  setMessageFeedbackErrorResponseSchema,
-  setMessageFeedbackSuccessResponseSchema,
-} from "@/lib/thread-chat/contracts/message-feedback"
-import {
   switchActiveLeafErrorResponseSchema,
   switchActiveLeafSuccessResponseSchema,
 } from "@/lib/thread-chat/contracts/switch-active-leaf"
@@ -48,6 +44,7 @@ import { GENERATION_ERRORS } from "@/constants/generation"
 import type { ThreadChatGenerationIntent } from "../generation/types"
 import { getKnownTreeRevision, setKnownTreeRevision } from "./persist"
 import { activeLeafTurn } from "../core/message-graph"
+import { submitMessageFeedback } from "./message-feedback-command"
 
 /** 页面不可见 / 无 requestAnimationFrame 时的降级刷新间隔（毫秒） */
 const FALLBACK_FLUSH_MS = 50
@@ -742,28 +739,12 @@ export function createChatController(
       messageId: string,
       feedback: MessageFeedback | null
     ): Promise<MessageFeedbackSummary | null> {
-      const res = await fetchWithAuth(
-        `/api/branch-trees/${options.treeId}/messages/${encodeURIComponent(messageId)}/feedback`,
-        {
-          method: "PUT",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ threadId, feedback }),
-        }
-      )
-      const responseBody = await res.json().catch(() => null)
-      if (!res.ok) {
-        const failure =
-          setMessageFeedbackErrorResponseSchema.safeParse(responseBody)
-        throw new Error(
-          failure.success
-            ? failure.data.error.message
-            : `feedback failed: ${res.status}`
-        )
-      }
-      const success =
-        setMessageFeedbackSuccessResponseSchema.safeParse(responseBody)
-      if (!success.success) throw new Error("feedback response invalid")
-      return success.data.feedback
+      return submitMessageFeedback({
+        treeId: options.treeId,
+        threadId,
+        messageId,
+        feedback,
+      })
     },
 
     /** 只有该显式操作才请求服务端停止模型；服务端确认后再断开本地流。 */
