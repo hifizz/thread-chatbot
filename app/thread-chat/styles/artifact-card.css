@@ -36,6 +36,7 @@
   min-width: 0;
 }
 .tc .acard .t .n {
+  display: block;
   font-size: 13px;
   font-weight: 600;
   color: var(--ink);
@@ -44,6 +45,7 @@
   text-overflow: ellipsis;
 }
 .tc .acard .t .k {
+  display: block;
   font-family: var(--font-mono);
   font-size: 10px;
   color: var(--ink-faint);
@@ -76,6 +78,7 @@
   animation: tc-progress-spin 1s linear infinite;
 }
 .tc .acard-progress .progress-heading {
+  display: block;
   margin-top: 3px;
   color: var(--ink-soft);
   font-size: 11px;

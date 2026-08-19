@@ -46,14 +46,14 @@ export function MarkdownArtifactProgressCard({
         </span>
       </span>
       <span className="t">
-        <span className="n" style={{ display: "block" }}>
+        <span className="n">
           {progress.partialTitle ?? "正在生成 Markdown"}
         </span>
-        <span className="k progress-detail" style={{ display: "block" }}>
+        <span className="k progress-detail">
           {detail}
         </span>
         {progress.headings.length > 0 ? (
-          <span className="progress-heading" style={{ display: "block" }}>
+          <span className="progress-heading">
             最近章节 · {progress.headings.join(" / ")}
           </span>
         ) : null}
@@ -90,10 +90,10 @@ export function MarkdownArtifactCard({
         )}
       </span>
       <span className="t">
-        <span className="n" style={{ display: "block" }}>
+        <span className="n">
           {artifact.title}
         </span>
-        <span className="k" style={{ display: "block" }}>
+        <span className="k">
           {isMarkdown
             ? "MARKDOWN"
             : `ARTIFACT · ${artifact.kind === "code" ? (artifact.lang ?? "code") : "note"}`}
