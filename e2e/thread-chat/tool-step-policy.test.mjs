@@ -1,5 +1,11 @@
 import assert from "node:assert/strict"
 import { createToolStepPolicy } from "../../app/api/chat/tool-step-policy.ts"
+import { researchToolNames } from "../../app/api/chat/research-tool-capabilities.ts"
+
+assert.deepEqual(researchToolNames("answer"), [])
+assert.deepEqual(researchToolNames("fetch"), ["readUrl"])
+assert.deepEqual(researchToolNames("search"), ["webSearch", "readUrl"])
+assert.deepEqual(researchToolNames("research"), ["webSearch", "readUrl"])
 
 assert.equal(
   createToolStepPolicy({

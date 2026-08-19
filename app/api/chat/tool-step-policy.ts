@@ -1,5 +1,9 @@
 import { MARKDOWN_ARTIFACT_TOOL_NAME } from "@/lib/chat/markdown-artifact"
 import type { ResearchRoute } from "@/lib/chat/research-router"
+import {
+  researchToolNames,
+  type ResearchToolName,
+} from "@/app/api/chat/research-tool-capabilities"
 
 type ToolStepPolicyInput = {
   isThreadChat: boolean
@@ -7,8 +11,7 @@ type ToolStepPolicyInput = {
   researchMode: ResearchRoute["mode"]
 }
 
-type RoutedToolName =
-  "readUrl" | "webSearch" | typeof MARKDOWN_ARTIFACT_TOOL_NAME
+type RoutedToolName = ResearchToolName | typeof MARKDOWN_ARTIFACT_TOOL_NAME
 
 type ToolStep = {
   activeTools: RoutedToolName[]
@@ -27,12 +30,7 @@ export function createToolStepPolicy({
   markdownArtifactRequested,
   researchMode,
 }: ToolStepPolicyInput) {
-  const activeWebTools: RoutedToolName[] =
-    researchMode === "fetch"
-      ? ["readUrl"]
-      : researchMode === "search" || researchMode === "research"
-        ? ["webSearch", "readUrl"]
-        : []
+  const activeWebTools = [...researchToolNames(researchMode)]
   const activeTools: RoutedToolName[] = isThreadChat
     ? [
         ...(markdownArtifactRequested ? [MARKDOWN_ARTIFACT_TOOL_NAME] : []),
@@ -43,19 +41,10 @@ export function createToolStepPolicy({
   if (activeTools.length === 0) return undefined
 
   return ({ stepNumber }: { stepNumber: number }): ToolStep => {
-    if (stepNumber === 0 && researchMode === "fetch") {
+    if (stepNumber === 0 && activeWebTools.length > 0) {
       return {
         activeTools,
-        toolChoice: { type: "tool", toolName: "readUrl" },
-      }
-    }
-    if (
-      stepNumber === 0 &&
-      (researchMode === "search" || researchMode === "research")
-    ) {
-      return {
-        activeTools,
-        toolChoice: { type: "tool", toolName: "webSearch" },
+        toolChoice: { type: "tool", toolName: activeWebTools[0] },
       }
     }
     if (stepNumber === 0 && markdownArtifactRequested) {

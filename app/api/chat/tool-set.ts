@@ -2,6 +2,12 @@ import type { ToolSet } from "ai"
 import { readUrlTool, webSearchTool } from "@/lib/chat/research-tools"
 import type { ResearchRoute } from "@/lib/chat/research-router"
 import { surfaceTools } from "@/app/api/chat/surface-tools"
+import { researchToolNames } from "@/app/api/chat/research-tool-capabilities"
+
+const RESEARCH_TOOLS = {
+  readUrl: readUrlTool,
+  webSearch: webSearchTool,
+}
 
 type ChatToolSetInput = {
   researchMode: ResearchRoute["mode"]
@@ -21,12 +27,9 @@ export function buildChatToolSet({
   frontendToolSet,
 }: ChatToolSetInput): { tools: ToolSet; webToolsEnabled: boolean } {
   const webToolsEnabled = searchReady && researchMode !== "answer"
-  const routedWebTools: ToolSet =
-    researchMode === "fetch"
-      ? { readUrl: readUrlTool }
-      : researchMode === "search" || researchMode === "research"
-        ? { webSearch: webSearchTool, readUrl: readUrlTool }
-        : {}
+  const routedWebTools = Object.fromEntries(
+    researchToolNames(researchMode).map((name) => [name, RESEARCH_TOOLS[name]])
+  ) as ToolSet
 
   return {
     webToolsEnabled,
