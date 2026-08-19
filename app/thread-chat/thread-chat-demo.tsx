@@ -24,7 +24,7 @@
 
 import dynamic from "next/dynamic"
 import { useRouter } from "next/navigation"
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import React, { useCallback, useEffect, useRef, useState } from "react"
 import {
   CircleHelp,
   Columns3,
@@ -64,10 +64,7 @@ import type {
   ThreadTreeState,
 } from "./core/types"
 import { requestBranchTitle } from "./net/branch-title"
-import {
-  createChatController,
-  type ThreadMessageActionCommands,
-} from "./net/chat-controller"
+import { createChatController } from "./net/chat-controller"
 import { kickoffQuestion, serializeMessageForModel } from "./net/prompt"
 import {
   deriveTreeTitle,
@@ -84,8 +81,7 @@ import {
 } from "./net/persist"
 import type { GenerationSummary } from "./generation/types"
 import type { RecoverableTurn } from "./generation/types"
-import type { MessageActionViewState } from "./chat/message-action-types"
-import { buildMessageActionViewState } from "./chat/message-action-presentation"
+import { useMessageActions } from "./chat/use-message-actions"
 import { fetchWithAuth } from "@/lib/auth/session-recovery"
 import { BranchableChat } from "./branching/branchable-chat"
 import {
@@ -242,29 +238,6 @@ export function ThreadChatDemoInner({
   )
   const version = useThreadStore(store)
   const state = store.getState()
-  const [recoverableByUserMessageId, setRecoverableByUserMessageId] = useState(
-    () =>
-      new Map(initialRecoverableTurns.map((turn) => [turn.userMessageId, turn]))
-  )
-  const [feedbackByMessageId, setFeedbackByMessageId] = useState(
-    () =>
-      new Map(
-        initialMessageFeedbacks.map((entry) => [
-          entry.messageId,
-          entry.feedback,
-        ])
-      )
-  )
-  const messageActionState = useMemo<MessageActionViewState>(() => {
-    return buildMessageActionViewState({
-      state,
-      recoverableByUserMessageId,
-      feedbackByMessageId,
-    })
-    // state 对象原地变更，必须用 store version 作为派生键。
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [recoverableByUserMessageId, feedbackByMessageId, version])
-
   const [toast, setToast] = useState<ToastState | null>(null)
 
   function showToast(msg: string, undo?: () => void) {
@@ -295,57 +268,17 @@ export function ThreadChatDemoInner({
       onError: (message) => showToast(message),
     })
   )
-  const messageCommands = useMemo<ThreadMessageActionCommands>(
-    () => ({
-      retryAssistant: chat.retryAssistant,
-      async retryUserTurn(threadId, userMessageId) {
-        const result = await chat.retryUserTurn(threadId, userMessageId)
-        if (result.ok)
-          setRecoverableByUserMessageId((current) => {
-            const next = new Map(current)
-            next.delete(userMessageId)
-            return next
-          })
-        return result
-      },
-      async editAndRegenerate(threadId, userMessageId, text) {
-        const result = await chat.editAndRegenerate(
-          threadId,
-          userMessageId,
-          text
-        )
-        if (result.ok)
-          setRecoverableByUserMessageId((current) => {
-            const next = new Map(current)
-            next.delete(userMessageId)
-            return next
-          })
-        return result
-      },
-      switchTurnVariant: chat.switchTurnVariant,
-      async submitFeedback(threadId, messageId, feedback) {
-        const previous = feedbackByMessageId.get(messageId)
-        setFeedbackByMessageId((current) => {
-          const next = new Map(current)
-          if (feedback) next.set(messageId, feedback)
-          else next.delete(messageId)
-          return next
-        })
-        try {
-          return await chat.submitFeedback(threadId, messageId, feedback)
-        } catch (error) {
-          setFeedbackByMessageId((current) => {
-            const next = new Map(current)
-            if (previous) next.set(messageId, previous)
-            else next.delete(messageId)
-            return next
-          })
-          throw error
-        }
-      },
-    }),
-    [chat, feedbackByMessageId]
-  )
+  const {
+    messageActionState,
+    messageCommands,
+    replacePersistedMessageActions,
+  } = useMessageActions({
+    state,
+    version,
+    initialRecoverableTurns,
+    initialMessageFeedbacks,
+    commands: chat,
+  })
   useEffect(() => () => chat.detachAll(), [chat])
 
   /* ---------- generation 终态轮询：刷新后不续 token 流，只在完成时原子替换。 ---------- */
@@ -423,18 +356,10 @@ export function ThreadChatDemoInner({
             loaded.generations
           )
           store.replaceReconciledState(nextState)
-          setRecoverableByUserMessageId(
-            new Map(
-              loaded.recoverableTurns.map((turn) => [turn.userMessageId, turn])
-            )
-          )
-          setFeedbackByMessageId(
-            new Map(
-              loaded.messageFeedbacks.map(
-                (entry) => [entry.messageId, entry.feedback] as const
-              )
-            )
-          )
+          replacePersistedMessageActions({
+            recoverableTurns: loaded.recoverableTurns,
+            messageFeedbacks: loaded.messageFeedbacks,
+          })
         }
       }
       schedule()
@@ -444,7 +369,7 @@ export function ThreadChatDemoInner({
       cancelled = true
       if (timer) clearTimeout(timer)
     }
-  }, [store, treeId])
+  }, [store, treeId, replacePersistedMessageActions])
 
   /* ---------- 防抖存库：version 变化后 1.5s 静默才整树 PUT（流式期间合并为一次写）。
        首屏（version 未变过）不写；卸载时若有 pending 定时器则立即 flush（尽力而为）。
