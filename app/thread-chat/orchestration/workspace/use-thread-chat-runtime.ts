@@ -85,7 +85,7 @@ export function useThreadChatRuntime({
     version,
     onRevisionConflict: reloadAfterRevisionConflict,
   })
-  useBranchTitles({ store, version })
+  useBranchTitles({ treeId, store, version })
 
   return {
     store,

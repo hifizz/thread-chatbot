@@ -360,6 +360,18 @@ export function createThreadStore(
       notify()
     },
 
+    /**
+     * 原子记录一次自动标题生成尝试。该标记随整棵树持久化，失败也不在刷新后重试，
+     * 以避免可选功能反复消耗模型配额。
+     */
+    markTitleGenerationAttempted(threadId: string): boolean {
+      const t = state.threads[threadId]
+      if (!t || t.titleGenerationAttempted) return false
+      t.titleGenerationAttempted = true
+      notify()
+      return true
+    },
+
     /** MVP 模型策略：仅根 Thread 可切换；分支由 fork 继承且保持锁定。 */
     setThreadModel(threadId: string, modelId: string): void {
       const thread = state.threads[threadId]

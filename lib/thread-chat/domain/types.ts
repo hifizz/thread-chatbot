@@ -118,6 +118,11 @@ export interface Thread {
   activeLeafMessageId: string | null
   /** 单调递增的活跃计数，用于「列满时替换 / 折叠最久未使用列」 */
   lastActive: number
+  /**
+   * 分支标题生成是否已自动触发过。无论模型是否成功都保留，避免页面刷新后重复
+   * 发起付费请求；缺省值代表历史数据尚未尝试。
+   */
+  titleGenerationAttempted?: true
 }
 
 export interface ThreadTreeState {

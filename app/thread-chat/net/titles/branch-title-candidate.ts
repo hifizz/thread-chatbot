@@ -14,6 +14,7 @@ export function branchTitleCandidate(
   thread: Thread
 ): BranchTitleCandidate | null {
   if (!thread.parentId || !thread.anchorText) return null
+  if (thread.titleGenerationAttempted) return null
   if (thread.title !== defaultBranchTitle(thread.anchorText)) return null
 
   const question = thread.messages.find((message) => message.role === "user")

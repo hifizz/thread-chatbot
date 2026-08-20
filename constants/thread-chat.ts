@@ -40,12 +40,6 @@ export const INHERITED_CHAR_BUDGET = 6000
 /** ThreadTreeState JSONB 中消息 DAG 结构的当前版本。 */
 export const THREAD_TREE_SCHEMA_VERSION = 2 as const
 
-/**
- * 异步分支标题（openspec: add-bubble-composer D7）的生成长度上限（字符）：
- * 提示词要求 4–8 字，服务端对超长输出按此截断兜底。
- */
-export const BRANCH_TITLE_GEN_MAX_LEN = 8
-
 /* ---------------- 分支树持久化（DB + localStorage） ---------------- */
 
 /** localStorage：裸路径 /thread-chat 的跳转目标——最近打开的一棵树的 treeId */
@@ -53,6 +47,13 @@ export const LAST_TREE_ID_KEY = "thread-chat:last-tree-id"
 
 /** localStorage：每棵树的工作台状态（列槽/列宽/列数/放置策略/视图），按 treeId 分键 */
 export const TREE_UI_KEY_PREFIX = "thread-chat:ui:"
+
+/**
+ * sessionStorage：本标签页中某个分支已触发过标题生成，避免状态尚未落库时刷新页面
+ * 又发起一次模型请求。持久化状态仍以 Thread.titleGenerationAttempted 为准。
+ */
+export const BRANCH_TITLE_ATTEMPT_STORAGE_KEY_PREFIX =
+  "thread-chat:branch-title-attempt:"
 
 /** store version 变化后的整树存库防抖（毫秒）：流式高频跳变合并为结束后一次 PUT */
 export const TREE_SAVE_DEBOUNCE_MS = 1500
