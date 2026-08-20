@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useRef, useState } from "react"
+import { useCallback, useMemo, useRef, useState } from "react"
 import type { ThreadStore } from "../core/store"
 import type {
   ChatController,
@@ -60,16 +60,19 @@ export function useThreadChatWorkspace({
     setFocusNode({ id, n: ++focusSequence.current })
   }, [])
 
-  const [canvasChat] = useState<CanvasChatActions>(() => ({
-    send: chat.send,
-    stop: chat.stop,
-    retry: chat.retry,
-    retryAssistant: messageCommands.retryAssistant,
-    retryUserTurn: messageCommands.retryUserTurn,
-    editAndRegenerate: messageCommands.editAndRegenerate,
-    switchTurnVariant: messageCommands.switchTurnVariant,
-    submitFeedback: messageCommands.submitFeedback,
-  }))
+  const canvasChat = useMemo<CanvasChatActions>(
+    () => ({
+      send: chat.send,
+      stop: chat.stop,
+      retry: chat.retry,
+      retryAssistant: messageCommands.retryAssistant,
+      retryUserTurn: messageCommands.retryUserTurn,
+      editAndRegenerate: messageCommands.editAndRegenerate,
+      switchTurnVariant: messageCommands.switchTurnVariant,
+      submitFeedback: messageCommands.submitFeedback,
+    }),
+    [chat, messageCommands]
+  )
   const [canvasViewState] = useState<CanvasViewState>(() => ({
     pins: new Map(),
   }))

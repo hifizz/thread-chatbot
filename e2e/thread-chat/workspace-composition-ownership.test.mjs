@@ -26,6 +26,9 @@ assert.doesNotMatch(shell, /focusSeq/)
 assert.match(workspace, /focusCanvasNode/)
 assert.match(workspace, /CanvasChatActions/)
 assert.match(workspace, /CanvasViewState/)
+assert.match(workspace, /useMemo<CanvasChatActions>/)
+assert.match(workspace, /\[chat, messageCommands\]/)
+assert.doesNotMatch(workspace, /useState<CanvasChatActions>/)
 
 console.log(
   "PASS  page shell consumes one composed column/canvas workspace capability"
