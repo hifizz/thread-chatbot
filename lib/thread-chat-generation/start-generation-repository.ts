@@ -67,7 +67,8 @@ function isThreadTreeState(value: unknown): value is ThreadTreeState {
 
 function verifyTurn(
   stateValue: unknown,
-  input: GenerationTurnIdentity
+  input: GenerationTurnIdentity,
+  intent: ThreadChatGenerationIntent
 ): GenerationTurnSnapshot {
   if (!isThreadTreeState(stateValue)) {
     throw new GenerationRepositoryError(
@@ -116,6 +117,7 @@ function verifyTurn(
   }
 
   return {
+    intent: structuredClone(intent),
     threadId: input.threadId,
     assistantMessageIndex,
     userMessage: structuredClone(userMessage),
@@ -126,6 +128,29 @@ function verifyTurn(
   }
 }
 
+function generationIntentMatches(
+  stored: ThreadChatGenerationIntent | undefined,
+  received: ThreadChatGenerationIntent
+): boolean {
+  if (!stored || stored.kind !== received.kind) return false
+  switch (received.kind) {
+    case "persisted-turn":
+    case "retry-orphan-user":
+      return true
+    case "regenerate-assistant":
+      return (
+        stored.kind === received.kind &&
+        stored.sourceAssistantMessageId === received.sourceAssistantMessageId
+      )
+    case "edit-last-user":
+      return (
+        stored.kind === received.kind &&
+        stored.sourceUserMessageId === received.sourceUserMessageId &&
+        stored.text === received.text
+      )
+  }
+}
+
 function assertReplayMatches(row: GenerationRow, input: StartGenerationInput) {
   if (
     row.userId !== input.userId ||
@@ -133,7 +158,8 @@ function assertReplayMatches(row: GenerationRow, input: StartGenerationInput) {
     row.threadId !== input.threadId ||
     row.userMessageId !== input.userMessageId ||
     row.assistantMessageId !== input.assistantMessageId ||
-    row.modelId !== input.modelId
+    row.modelId !== input.modelId ||
+    !generationIntentMatches(row.turnSnapshot.intent, input.intent)
   ) {
     throw new GenerationRepositoryError(
       "generation_conflict",
@@ -310,7 +336,7 @@ export async function prepareGeneration(
         )
     }
 
-    const turnSnapshot = verifyTurn(state, input)
+    const turnSnapshot = verifyTurn(state, input, input.intent)
     const [attemptRow] = await tx
       .select({ value: max(branchGenerations.attempt) })
       .from(branchGenerations)

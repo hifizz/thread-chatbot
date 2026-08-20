@@ -5,6 +5,7 @@ import type {
 } from "@/constants/generation"
 import { ACTIVE_GENERATION_STATUSES } from "@/constants/generation"
 import type { GenerationResultV1 } from "@/lib/thread-chat/contracts/generation-result"
+import type { ThreadChatGenerationIntent } from "@/lib/thread-chat/contracts/generation-intent"
 
 export type GenerationStatus = (typeof GENERATION_STATUSES)[number]
 export type GenerationBillingStatus =
@@ -32,6 +33,7 @@ export type GenerationTurnIdentity = {
 
 /** 服务端从严格 schema-v2 树中验证后的最小 turn 快照，用于消息被并发快照删掉时读修复。 */
 export type GenerationTurnSnapshot = {
+  intent: ThreadChatGenerationIntent
   threadId: string
   assistantMessageIndex: number
   userMessage: Message

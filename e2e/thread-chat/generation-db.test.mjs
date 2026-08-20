@@ -175,6 +175,16 @@ async function run() {
     1,
     "并发重复 start 只能创建一次"
   )
+  await assert.rejects(
+    startGeneration({
+      ...startInput(generations[0]),
+      intent: { kind: "retry-orphan-user" },
+    }),
+    (error) =>
+      error instanceof GenerationRepositoryError &&
+      error.code === "generation_conflict",
+    "同 generation ID 的不同 intent 不得伪装成幂等重放"
+  )
   assert.equal(
     (await listCurrentGenerationsForTree(userId, treeId)).length,
     1,
