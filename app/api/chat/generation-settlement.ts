@@ -44,11 +44,8 @@ export function createGenerationSettlementHandler(
     isAborted: boolean
     finishReason?: string | null
   }) => {
-    const {
-      capturedUsage,
-      modelStreamError,
-      abortedUsageUnavailable,
-    } = streamLifecycle.snapshot()
+    const { capturedUsage, modelStreamError, abortedUsageUnavailable } =
+      streamLifecycle.snapshot()
     const failedWithoutFinish =
       finishReason == null && modelStreamError !== undefined
     const requestedTerminal = isAborted
@@ -84,9 +81,7 @@ export function createGenerationSettlementHandler(
       error: projected.result.error ?? modelStreamError,
       usage: unbilledPreview ? undefined : capturedUsage,
       usageUnavailable:
-        !unbilledPreview &&
-        (abortedUsageUnavailable ||
-          (requestedTerminal !== "completed" && !capturedUsage)),
+        !unbilledPreview && (abortedUsageUnavailable || !capturedUsage),
     })
   }
 }

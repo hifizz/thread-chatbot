@@ -64,6 +64,11 @@ async function runSettlement({
 const completed = await runSettlement()
 assert.equal(completed[0].input.terminalStatus, "completed")
 assert.equal(completed[1].input.outcome, "completed")
+assert.equal(
+  completed[1].input.usageUnavailable,
+  true,
+  "付费 generation 完成但缺少 usage 时必须进入待对账状态"
+)
 
 const empty = await runSettlement({ hasDisplayableOutput: false })
 assert.equal(empty[0].input.terminalStatus, "completed")
