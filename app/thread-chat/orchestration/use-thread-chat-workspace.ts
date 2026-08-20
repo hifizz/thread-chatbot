@@ -7,7 +7,7 @@ import type {
   ThreadMessageActionCommands,
 } from "../net/chat-controller"
 import type { TreeUiState, ViewMode } from "../net/persist"
-import type { CanvasChatActions } from "./canvas-node"
+import type { CanvasChatActions } from "./canvas-actions"
 import type { CanvasViewState } from "./use-canvas-layout"
 import { useColumnSlots } from "./use-column-slots"
 import { useColumnViewport } from "./use-column-viewport"

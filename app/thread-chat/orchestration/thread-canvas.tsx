@@ -37,11 +37,10 @@ import { useThreadStore } from "../core/use-thread-store"
 import { dc } from "../theme"
 import {
   CanvasActionsContext,
-  CanvasCard,
   type CanvasActions,
   type CanvasChatActions,
-  type CanvasCardNode,
-} from "./canvas-node"
+} from "./canvas-actions"
+import { CanvasCard, type CanvasCardNode } from "./canvas-node"
 import { CANVAS_EXPAND_WIDTH } from "./canvas-dimensions"
 import { useCanvasLayout, type CanvasViewState } from "./use-canvas-layout"
 import type { MessageActionViewState } from "../chat/message-action-types"
