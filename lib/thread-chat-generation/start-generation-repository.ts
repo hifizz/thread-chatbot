@@ -206,6 +206,27 @@ export async function prepareGeneration(
       return { created: false, generation: replayed }
     }
 
+    if (intent.kind === "persisted-turn") {
+      const [otherActiveGeneration] = await tx
+        .select({ id: branchGenerations.id })
+        .from(branchGenerations)
+        .where(
+          and(
+            eq(branchGenerations.treeId, input.treeId),
+            eq(branchGenerations.threadId, input.threadId),
+            eq(branchGenerations.isCurrent, true),
+            inArray(branchGenerations.status, ACTIVE_GENERATION_STATUSES),
+            sql`${branchGenerations.assistantMessageId} <> ${input.assistantMessageId}`
+          )
+        )
+        .limit(1)
+      if (otherActiveGeneration)
+        throw new GenerationRepositoryError(
+          "generation_conflict",
+          "目标会话已有正在执行的生成，请等待完成或明确停止后重试"
+        )
+    }
+
     let patch: PreparedTurnPatch | undefined
     let revision = tree.revision
     if (intent.kind !== "persisted-turn") {

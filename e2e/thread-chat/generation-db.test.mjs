@@ -13,7 +13,10 @@ import {
   getBalanceMicros,
 } from "../../lib/billing/credits.ts"
 import { finalizeGeneration } from "../../lib/thread-chat-generation/finalize.ts"
-import { startGeneration } from "../../lib/thread-chat-generation/start-generation-repository.ts"
+import {
+  GenerationRepositoryError,
+  startGeneration,
+} from "../../lib/thread-chat-generation/start-generation-repository.ts"
 import { requestGenerationStop } from "../../lib/thread-chat-generation/execution-state-repository.ts"
 import { failStaleGenerationsForTree } from "../../lib/thread-chat-generation/stale-generation-repository.ts"
 import {
@@ -26,7 +29,7 @@ const suffix = randomUUID()
 const userId = `generation-db-test-${suffix}`
 const otherUserId = `generation-db-test-other-${suffix}`
 const treeId = randomUUID()
-const generations = Array.from({ length: 5 }, () => randomUUID())
+const generations = Array.from({ length: 6 }, () => randomUUID())
 
 function stateFor(generationId) {
   return {
@@ -84,6 +87,30 @@ function startInput(generationId) {
     modelId: "glm-5.2",
     intent: { kind: "persisted-turn" },
   }
+}
+
+function alternateTurnState(generationId, activeGenerationId) {
+  const state = stateFor(activeGenerationId)
+  state.threads.main.messages.push(
+    {
+      id: "m3",
+      parentMessageId: null,
+      role: "user",
+      text: "另一个标签页的问题",
+      forks: [],
+    },
+    {
+      id: "m4",
+      parentMessageId: "m3",
+      role: "assistant",
+      text: "",
+      forks: [],
+      generationId,
+      status: "pending",
+    }
+  )
+  state.threads.main.activeLeafMessageId = "m4"
+  return state
 }
 
 function resultFor(generationId, text = "测试回复") {
@@ -149,6 +176,30 @@ async function run() {
     await requestGenerationStop(otherUserId, generations[0]),
     null,
     "跨用户 Stop 应表现为 404/null"
+  )
+
+  await db
+    .update(branchTrees)
+    .set({
+      state: alternateTurnState(generations[5], generations[0]),
+      updatedAt: new Date(),
+    })
+    .where(eq(branchTrees.id, treeId))
+  await assert.rejects(
+    startGeneration({
+      ...startInput(generations[5]),
+      userMessageId: "m3",
+      assistantMessageId: "m4",
+    }),
+    (error) =>
+      error instanceof GenerationRepositoryError &&
+      error.code === "generation_conflict",
+    "同一 thread 的另一 active generation 必须阻止普通 start"
+  )
+  assert.equal(
+    await getGenerationForOwner(userId, generations[5]),
+    null,
+    "被拒绝的普通 start 不得建立第二条付费 generation"
   )
 
   await persistPlaceholder(generations[1])
