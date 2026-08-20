@@ -13,7 +13,7 @@ import type { ViewMode } from "../net/persist"
 import type { PlacementMode } from "./placement"
 import { AccountButton } from "./account-button"
 import { ShortcutHint } from "./shortcut-hint"
-import { COL_MIN_W } from "./thread-columns"
+import { COL_MIN_W } from "./use-column-viewport"
 import { columnCountChoices } from "./thread-chat-topbar-logic"
 
 export function ThreadChatTopbar({

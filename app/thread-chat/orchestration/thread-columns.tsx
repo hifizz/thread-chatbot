@@ -12,26 +12,11 @@
  * flex 解算逐列等于所存宽度，所见即所存），见 use-column-resize 头注。
  */
 
-import React, { useSyncExternalStore } from "react"
+import React from "react"
 import type { Thread, ThreadTreeState } from "../core/types"
 import { accentOf } from "../theme"
 import type { Slot } from "./placement"
 import { useColumnResize, type ColumnResizeHandlers } from "./use-column-resize"
-
-/** 约每 430px 一列（自适应列数的换算基准） */
-export const COL_MIN_W = 430
-
-/* ---------------- 窗口宽度（外部 store：SSR 快照为 null，避免 hydration mismatch） ---------------- */
-const subscribeResize = (cb: () => void) => {
-  window.addEventListener("resize", cb)
-  return () => window.removeEventListener("resize", cb)
-}
-const getWinW = (): number | null => window.innerWidth
-const getServerWinW = (): number | null => null
-
-export function useWindowWidth(): number | null {
-  return useSyncExternalStore(subscribeResize, getWinW, getServerWinW)
-}
 
 /* ---------------- 列容器组件 ---------------- */
 

@@ -15,7 +15,7 @@ const workspace = await readFile(
 
 assert.match(shell, /useThreadChatWorkspace\(/)
 for (const capability of [
-  "useWindowWidth",
+  "useColumnViewport",
   "useColumnSlots",
   "useUiStatePersistence",
 ]) {
