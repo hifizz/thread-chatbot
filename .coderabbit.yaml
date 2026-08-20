@@ -1,0 +1,19 @@
+# CodeRabbit configuration
+# 自动 review 配置示例：允许对 codex/*（以及其它列出的分支模式）触发自动 review。
+# 注意：下面的字段为常用配置示例；请以 CodeRabbit 控制台或官方文档为准，如有必要可调整字段名或层级。
+
+reviews:
+  # 是否在 PR 中显示 review 状态消息
+  review_status: true
+
+  auto_review:
+    # 全局开关：开启后 CodeRabbit 会在匹配分支上自动运行 review
+    enabled: true
+    # 支持的分支模式（glob）：将 codex/ 下的所有分支包含进来
+    branches:
+      - "codex/**"
+      # 如需对所有分支生效，可取消注释下一行
+      # - "*"
+
+# 可选：自定义 review 配置（例如 profile），按需打开
+#profile: CHILL
