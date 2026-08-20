@@ -285,6 +285,41 @@ async function run() {
     "failed",
     "过期 heartbeat 必须收敛 failed"
   )
+  const staleBeforeLateFinalize = await getGenerationForOwner(
+    userId,
+    generations[2]
+  )
+  await finalizeGeneration({
+    generationId: generations[2],
+    outcome: "completed",
+    result: resultFor(generations[2], "租约失败后的迟到结果"),
+    usage: { inputTokens: 80, outputTokens: 20 },
+  })
+  const staleAfterLateFinalize = await getGenerationForOwner(
+    userId,
+    generations[2]
+  )
+  assert.equal(staleAfterLateFinalize.status, "failed")
+  assert.deepEqual(
+    staleAfterLateFinalize.result,
+    staleBeforeLateFinalize.result,
+    "迟到 finalize 不得用完成结果改写用户已看到的租约失败"
+  )
+  assert.equal(
+    staleAfterLateFinalize.billingStatus,
+    "settled",
+    "迟到的权威 usage 仍必须完成幂等记账"
+  )
+  assert.equal(
+    (
+      await db
+        .select()
+        .from(usageRecords)
+        .where(eq(usageRecords.appGenerationId, generations[2]))
+    ).length,
+    1,
+    "迟到 usage 只能生成一条记账记录"
+  )
 
   await ensureUserCredits(userId)
   const balanceBefore = await getBalanceMicros(userId)

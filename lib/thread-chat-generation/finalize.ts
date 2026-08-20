@@ -4,7 +4,11 @@ import type {
   GenerationResultV1,
 } from "@/lib/thread-chat/domain/generation"
 import { ACTIVE_GENERATION_STATUSES } from "@/constants/generation"
-import { chargeUsageOnce, type UsageCostEvidence } from "@/lib/billing/credits"
+import {
+  chargeUsageOnce,
+  type BillingTransaction,
+  type UsageCostEvidence,
+} from "@/lib/billing/credits"
 import { db } from "@/lib/db"
 import { branchGenerations } from "@/lib/db/schema"
 
@@ -23,6 +27,30 @@ export type FinalizeGenerationInput = {
   usageUnavailable?: boolean
 }
 
+type GenerationBillingIdentity = {
+  id: string
+  userId: string
+  modelId: string
+  threadId: string
+  assistantMessageId: string
+}
+
+async function settleGenerationUsage(
+  tx: BillingTransaction,
+  generation: GenerationBillingIdentity,
+  usage: FinalizeGenerationUsage
+) {
+  await chargeUsageOnce(tx, generation.id, {
+    userId: generation.userId,
+    model: generation.modelId,
+    inputTokens: usage.inputTokens,
+    outputTokens: usage.outputTokens,
+    threadId: generation.threadId,
+    messageId: generation.assistantMessageId,
+    costEvidence: usage.costEvidence,
+  })
+}
+
 export async function finalizeGeneration(input: FinalizeGenerationInput) {
   return db.transaction(async (tx) => {
     const locked = await tx.execute(sql`
@@ -39,8 +67,17 @@ export async function finalizeGeneration(input: FinalizeGenerationInput) {
       .where(eq(branchGenerations.id, input.generationId))
     if (!row) return null
 
-    // 已经由另一回调收口：直接返回，usage 唯一键也会提供第二层保护。
-    if (["completed", "stopped", "failed"].includes(row.status)) return row
+    // 终态不可逆；迟到的权威 usage 仍需补记账，但不得改写用户已看到的结果。
+    if (["completed", "stopped", "failed"].includes(row.status)) {
+      if (!input.usage || row.billingStatus === "settled") return row
+      await settleGenerationUsage(tx, row, input.usage)
+      const [updated] = await tx
+        .update(branchGenerations)
+        .set({ billingStatus: "settled", updatedAt: new Date() })
+        .where(eq(branchGenerations.id, input.generationId))
+        .returning()
+      return updated ?? row
+    }
 
     let terminalStatus = input.outcome
     if (row.status === "superseded" || !row.isCurrent) {
@@ -51,15 +88,7 @@ export async function finalizeGeneration(input: FinalizeGenerationInput) {
 
     let billingStatus: GenerationBillingStatus = "not_billable"
     if (input.usage) {
-      await chargeUsageOnce(tx, input.generationId, {
-        userId: row.userId,
-        model: row.modelId,
-        inputTokens: input.usage.inputTokens,
-        outputTokens: input.usage.outputTokens,
-        threadId: row.threadId,
-        messageId: row.assistantMessageId,
-        costEvidence: input.usage.costEvidence,
-      })
+      await settleGenerationUsage(tx, row, input.usage)
       billingStatus = "settled"
     } else if (input.usageUnavailable) {
       billingStatus = "usage_unavailable"
