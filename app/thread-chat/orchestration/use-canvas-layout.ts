@@ -6,7 +6,8 @@
  * 派生链（skill 契约 #11/#12：受控 nodes/edges、永不原地改对象）：
  * · base（结构 + 展示数据 + 尺寸估算）仅随 store version 重派生——state 对象原地
  *   修改、引用永不变化（见 core/use-thread-store 头注），必须以 version 为 memo key；
- * · autoPos（dagre LR 自动布局，根在左、分支向右）只依赖 base，拖拽 / 选中不会重跑 dagre；
+ * · autoPos（dagre LR 自动布局，根在左、分支向右）按节点尺寸与边做语义缓存，
+ *   流式正文、拖拽与选中变化都不会重跑 dagre；
  * · nodes = base × (pin 覆盖坐标 ?? dagre 坐标) × 选中态，三层 useMemo 逐级缓存。
  *
  * pin 语义：节点一旦被手动拖动即写入 pins 覆盖表；树变化重新布局时只有未 pin
@@ -22,13 +23,6 @@ import type {
   OnNodesChange,
   XYPosition,
 } from "@xyflow/react"
-import {
-  graphlib,
-  layout as dagreLayout,
-  type EdgeLabel,
-  type GraphLabel,
-  type NodeLabel,
-} from "@dagrejs/dagre"
 import type { ThreadTreeState } from "../core/types"
 import type { ThreadStore } from "../core/store"
 import { messagesByIdOrder, validArtifactsOfMessage } from "../core/selectors"
@@ -42,6 +36,7 @@ import {
   CANVAS_CARD_DIMENSIONS,
   CANVAS_CARD_INNER_WIDTH,
 } from "./canvas-card-dimensions"
+import { canvasLayoutPositions } from "./canvas-layout"
 
 /**
  * 跨模式切换存活的画布视图状态宿主（不进 core store）。
@@ -235,37 +230,6 @@ function buildBaseGraph(
   return { nodes, edges, sizes }
 }
 
-/* ---------------- dagre LR 自动布局（思维导图形态：根在左、层级向右铺开） ---------------- */
-
-function layoutPositions(base: BaseGraph): Map<string, XYPosition> {
-  const g = new graphlib.Graph<GraphLabel, NodeLabel, EdgeLabel>()
-  // LR 横向布局下语义对调：ranksep = 水平层距（容纳边 label 徽章，卡宽固定、
-  // 无估算误差故不必留太宽）；nodesep = 兄弟卡垂直间距（卡高有估算误差，由它吸收）
-  g.setGraph({
-    rankdir: "LR",
-    nodesep: 40,
-    ranksep: 110,
-    marginx: 24,
-    marginy: 24,
-  })
-  g.setDefaultEdgeLabel(() => ({}))
-  base.nodes.forEach((n) => {
-    const s = base.sizes.get(n.id)!
-    g.setNode(n.id, { width: s.width, height: s.height }) // 传副本，dagre 会往 label 里写 x/y
-  })
-  base.edges.forEach((e) => g.setEdge(e.source, e.target))
-  dagreLayout(g)
-
-  const out = new Map<string, XYPosition>()
-  base.nodes.forEach((n) => {
-    const p = g.node(n.id)
-    const s = base.sizes.get(n.id)!
-    // dagre 给的是节点中心，React Flow 期望左上角
-    out.set(n.id, { x: (p.x ?? 0) - s.width / 2, y: (p.y ?? 0) - s.height / 2 })
-  })
-  return out
-}
-
 /* ---------------- hook ---------------- */
 
 export interface UseCanvasLayoutArgs {
@@ -302,8 +266,18 @@ export function useCanvasLayout({
     () => buildBaseGraph(snap.state, mainSubtitle ?? null, messageActionState),
     [snap, mainSubtitle, messageActionState]
   )
-  /* dagre 坐标：只依赖结构 */
-  const autoPos = useMemo(() => layoutPositions(base), [base])
+  /* Dagre 坐标：展示数据可逐 token 更新，语义布局输入相同则命中有界缓存。 */
+  const autoPos = useMemo(
+    () =>
+      canvasLayoutPositions({
+        nodes: base.nodes.map((node) => ({
+          id: node.id,
+          ...base.sizes.get(node.id)!,
+        })),
+        edges: base.edges.map(({ source, target }) => ({ source, target })),
+      }),
+    [base]
+  )
   /* 受控 nodes：pin 覆盖 dagre，未 pin 节点在树变化时自动重排 */
   const nodes = useMemo<CanvasCardNode[]>(
     () =>
