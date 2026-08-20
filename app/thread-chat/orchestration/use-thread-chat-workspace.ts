@@ -2,10 +2,8 @@
 
 import { useCallback, useMemo, useRef, useState } from "react"
 import type { ThreadStore } from "../core/store"
-import type {
-  ChatController,
-  ThreadMessageActionCommands,
-} from "../net/chat-controller"
+import type { ThreadMessageActionCommands } from "../chat/message-action-commands"
+import type { ChatController } from "../net/chat-controller"
 import type { TreeUiState, ViewMode } from "../net/persist"
 import type { CanvasChatActions } from "./canvas-actions"
 import type { CanvasViewState } from "./use-canvas-layout"

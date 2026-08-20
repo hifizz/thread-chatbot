@@ -4,7 +4,7 @@ import {
   type PreparedTurnPatch,
 } from "../core/regeneration"
 import type { ThreadChatGenerationIntent } from "../generation/types"
-import type { GenerationActionResult } from "./message-action-results"
+import type { GenerationActionResult } from "../chat/message-action-commands"
 
 export type PreparedRegenerationAction = {
   intent: Exclude<ThreadChatGenerationIntent, { kind: "persisted-turn" }>

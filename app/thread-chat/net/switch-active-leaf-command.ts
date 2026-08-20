@@ -3,7 +3,7 @@ import {
   switchActiveLeafErrorResponseSchema,
   switchActiveLeafSuccessResponseSchema,
 } from "@/lib/thread-chat/contracts/switch-active-leaf"
-import type { VariantSwitchResult } from "./message-action-results"
+import type { VariantSwitchResult } from "../chat/message-action-commands"
 
 const NETWORK_ERROR = "网络请求失败，请重试"
 

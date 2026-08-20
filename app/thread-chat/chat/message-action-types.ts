@@ -1,6 +1,6 @@
 import type { Message, MessageFeedback } from "../core/types"
 import type { RecoverableTurn } from "../generation/types"
-import type { ThreadMessageActionCommands } from "../net/chat-controller"
+import type { ThreadMessageActionCommands } from "./message-action-commands"
 import type { SourceProvenance } from "../core/message-graph"
 
 export const MESSAGE_ACTION_LABELS = {

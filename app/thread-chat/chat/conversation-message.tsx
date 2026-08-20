@@ -3,7 +3,7 @@
 import React from "react"
 import { GENERATION_BACKGROUND_LABEL } from "@/constants/generation"
 import type { Message } from "../core/types"
-import type { ThreadMessageActionCommands } from "../net/chat-controller"
+import type { ThreadMessageActionCommands } from "./message-action-commands"
 import { AssistantMessageToolbar } from "./assistant-message-toolbar"
 import { assistantMessagePresentation } from "./conversation-message-logic"
 import { EditableUserMessage } from "./editable-user-message"

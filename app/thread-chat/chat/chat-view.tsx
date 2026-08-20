@@ -16,7 +16,7 @@ import type { Message } from "../core/types"
 import { ConversationComposer } from "./conversation-composer"
 import { ConversationMessage } from "./conversation-message"
 import type { MessageActionViewState } from "./message-action-types"
-import type { ThreadMessageActionCommands } from "../net/chat-controller"
+import type { ThreadMessageActionCommands } from "./message-action-commands"
 
 export interface ChatViewProps {
   /** 会话 id：写到 .msg-list 的 data-list 上（划选气泡靠它反查消息） */

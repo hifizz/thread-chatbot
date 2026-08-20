@@ -24,7 +24,7 @@ import { ChatView } from "../chat/chat-view"
 import { MessageArtifacts } from "../orchestration/message-artifacts"
 import { AnchoredAssistantBody } from "./anchored-assistant-body"
 import type { MessageActionViewState } from "../chat/message-action-types"
-import type { ThreadMessageActionCommands } from "../net/chat-controller"
+import type { ThreadMessageActionCommands } from "../chat/message-action-commands"
 
 export interface BranchableChatProps {
   state: ThreadTreeState

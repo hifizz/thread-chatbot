@@ -1,6 +1,6 @@
 import { handleUnauthorized } from "@/lib/auth/session-recovery"
 import { messageActionFailureResponseSchema } from "@/lib/thread-chat/contracts/message-action-failure"
-import type { GenerationActionResult } from "./message-action-results"
+import type { GenerationActionResult } from "../chat/message-action-commands"
 
 type ChatGenerationCommandInput = {
   body: unknown

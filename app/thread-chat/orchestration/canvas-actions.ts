@@ -3,7 +3,7 @@
 import { createContext } from "react"
 import type { ThreadTreeState } from "../core/types"
 import type { MessageActionViewState } from "../chat/message-action-types"
-import type { ThreadMessageActionCommands } from "../net/chat-controller"
+import type { ThreadMessageActionCommands } from "../chat/message-action-commands"
 
 /** 壳层用 chat-controller 组装后注入画布的会话动作。 */
 export interface CanvasChatActions extends ThreadMessageActionCommands {

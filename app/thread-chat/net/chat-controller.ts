@@ -47,42 +47,18 @@ import {
 import { createLocalGenerationExecutions } from "./local-generation-executions"
 import type {
   GenerationActionResult,
+  ThreadMessageActionCommands,
   VariantSwitchResult,
-} from "./message-action-results"
+} from "../chat/message-action-commands"
 
 export type {
   GenerationActionResult,
   MessageActionFailureCode,
   VariantSwitchResult,
-} from "./message-action-results"
+} from "../chat/message-action-commands"
 
 /** 网络异常（非中止）的兜底错误文案 */
 const NETWORK_ERROR = "网络请求失败，请重试"
-
-export interface ThreadMessageActionCommands {
-  retryAssistant(
-    threadId: string,
-    assistantMessageId: string
-  ): Promise<GenerationActionResult>
-  retryUserTurn(
-    threadId: string,
-    userMessageId: string
-  ): Promise<GenerationActionResult>
-  editAndRegenerate(
-    threadId: string,
-    userMessageId: string,
-    text: string
-  ): Promise<GenerationActionResult>
-  switchTurnVariant(
-    threadId: string,
-    assistantMessageId: string
-  ): Promise<VariantSwitchResult>
-  submitFeedback(
-    threadId: string,
-    messageId: string,
-    feedback: MessageFeedback | null
-  ): Promise<MessageFeedbackSummary | null>
-}
 
 export type ChatController = ReturnType<typeof createChatController> &
   ThreadMessageActionCommands
