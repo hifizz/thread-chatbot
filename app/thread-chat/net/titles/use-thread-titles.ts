@@ -1,13 +1,13 @@
 "use client"
 
 import { useEffect, useRef } from "react"
-import { BRANCH_TITLE_ATTEMPT_STORAGE_KEY_PREFIX } from "@/constants/thread-chat"
+import { THREAD_TITLE_ATTEMPT_STORAGE_KEY_PREFIX } from "@/constants/thread-chat"
 import type { ThreadStore } from "../../core/store"
-import { requestBranchTitle } from "./branch-title"
-import { branchTitleCandidate } from "./branch-title-candidate"
+import { requestThreadTitle } from "./thread-title"
+import { threadTitleCandidate } from "./thread-title-candidate"
 
 function attemptStorageKey(treeId: string, threadId: string): string {
-  return `${BRANCH_TITLE_ATTEMPT_STORAGE_KEY_PREFIX}${treeId}:${threadId}`
+  return `${THREAD_TITLE_ATTEMPT_STORAGE_KEY_PREFIX}${treeId}:${threadId}`
 }
 
 function hasAttemptInCurrentTab(treeId: string, threadId: string): boolean {
@@ -26,7 +26,8 @@ function rememberAttemptInCurrentTab(treeId: string, threadId: string): void {
   }
 }
 
-export function useBranchTitles({
+/** 主线与分支都只自动生成一次标题；主线首条用户消息可立即触发。 */
+export function useThreadTitles({
   treeId,
   store,
   version,
@@ -42,19 +43,19 @@ export function useBranchTitles({
     for (const thread of Object.values(state.threads)) {
       if (requestedThreadIdsRef.current.has(thread.id)) continue
       if (hasAttemptInCurrentTab(treeId, thread.id)) continue
-      const candidate = branchTitleCandidate(state, thread)
+      const candidate = threadTitleCandidate(state, thread)
       if (!candidate) continue
 
       if (!store.markTitleGenerationAttempted(candidate.threadId)) continue
       requestedThreadIdsRef.current.add(candidate.threadId)
       rememberAttemptInCurrentTab(treeId, candidate.threadId)
-      void requestBranchTitle(candidate.input)
+      void requestThreadTitle(candidate.input)
         .then((title) => {
-          if (title) store.setThreadTitle(candidate.threadId, title)
+          if (title) store.setGeneratedThreadTitle(candidate.threadId, title)
         })
         .catch((error) => {
           console.warn(
-            "[thread-chat] 分支标题生成失败（保留默认标题）：",
+            "[thread-chat] 会话标题生成失败（保留回退标题）：",
             error
           )
         })

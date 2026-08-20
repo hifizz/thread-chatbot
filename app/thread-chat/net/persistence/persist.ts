@@ -243,9 +243,14 @@ export function cleanupAfterTreeDelete(id: string): void {
   }
 }
 
-/** 派生树标题：main 首条 user 消息前 TREE_TITLE_MAX_LEN 字，无则兜底文案 */
+/**
+ * 派生树标题：优先使用主线成功生成的完整语义标题；未生成或生成失败时回退到首条
+ * user 消息的前 TREE_TITLE_MAX_LEN 字，无消息则使用兜底文案。
+ */
 export function deriveTreeTitle(state: ThreadTreeState): string {
-  const firstUser = state.threads.main?.messages.find((m) => m.role === "user")
+  const main = state.threads.main
+  if (main?.titleGenerated && main.title.trim()) return main.title.trim()
+  const firstUser = main?.messages.find((m) => m.role === "user")
   const text = firstUser?.text.trim()
   return text ? text.slice(0, TREE_TITLE_MAX_LEN) : TREE_TITLE_FALLBACK
 }

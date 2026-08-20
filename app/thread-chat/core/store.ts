@@ -348,21 +348,23 @@ export function createThreadStore(
       return true
     },
 
-    /** 替换某会话的标题（异步分支标题 D7：首答完成后由模型生成语义标题）。
-        原子更新 + notify，列头 / ⌘K / 画布 / 面包屑随 version 重渲同步；
-        随整树防抖存盘自然持久化。空白或未变化时不通知。 */
-    setThreadTitle(threadId: string, title: string): void {
+    /**
+     * 写入模型成功生成的语义标题。成功状态与“已尝试”分离：主线失败时继续使用
+     * 首条消息派生的回退标题。更新随整树防抖存盘，列头和会话列表同步重渲。
+     */
+    setGeneratedThreadTitle(threadId: string, title: string): void {
       const t = state.threads[threadId]
       if (!t) return
       const v = title.trim()
-      if (!v || t.title === v) return
+      if (!v || (t.title === v && t.titleGenerated)) return
       t.title = v
+      t.titleGenerated = true
       notify()
     },
 
     /**
-     * 原子记录一次自动标题生成尝试。该标记随整棵树持久化，失败也不在刷新后重试，
-     * 以避免可选功能反复消耗模型配额。
+     * 原子记录一次主线或分支自动标题生成尝试。该标记随整棵树持久化，失败也不在
+     * 刷新后重试，以避免可选功能反复消耗模型配额。
      */
     markTitleGenerationAttempted(threadId: string): boolean {
       const t = state.threads[threadId]

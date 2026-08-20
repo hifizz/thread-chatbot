@@ -165,7 +165,7 @@ export function ThreadChatDemoInner({
     isSaveSuppressed: isTreeSaveSuppressed,
   })
 
-  /* ---------- 主线列头副标题：customTitle（用户重命名）→ 派生标题（首条消息即更新）→ 兜底 ----------
+  /* ---------- 主线列头副标题：customTitle（用户重命名）→ 自动标题 / 派生回退 → 兜底 ----------
        customTitle 本地态由对话列表的 onRenamedCurrent 同步（重命名当前树立即生效，无需重载） */
   const [customTitle, setCustomTitle] = useState<string | null>(
     initialCustomTitle

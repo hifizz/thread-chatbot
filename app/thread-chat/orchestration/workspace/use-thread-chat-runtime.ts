@@ -14,7 +14,7 @@ import {
   saveTreeStrict,
   TreeRevisionError,
 } from "../../net/persistence/persist"
-import { useBranchTitles } from "../../net/titles/use-branch-titles"
+import { useThreadTitles } from "../../net/titles/use-thread-titles"
 import { useTreePersistence } from "../../net/persistence/use-tree-persistence"
 
 /**
@@ -85,7 +85,7 @@ export function useThreadChatRuntime({
     version,
     onRevisionConflict: reloadAfterRevisionConflict,
   })
-  useBranchTitles({ treeId, store, version })
+  useThreadTitles({ treeId, store, version })
 
   return {
     store,

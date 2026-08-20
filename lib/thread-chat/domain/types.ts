@@ -1,7 +1,8 @@
 /**
  * Thread Chat 会话树领域类型（headless，纯 TS，不含任何 React / DOM 概念）。
  *
- * 命名约定：一次「会话」称为 Thread（原型时期叫 Branch），主线也是一个 Thread（id 固定 "main"）。
+ * 命名约定：一次「会话」称为 Thread；Thread Tree 由唯一 MainThread 与零个或多个
+ * ForkedThread 组成，Fork 表示节点间的分叉关系。
  * 整棵树 + Artifact 登记表构成 ThreadTreeState，由应用层 store 统一变更。
  */
 
@@ -119,10 +120,12 @@ export interface Thread {
   /** 单调递增的活跃计数，用于「列满时替换 / 折叠最久未使用列」 */
   lastActive: number
   /**
-   * 分支标题生成是否已自动触发过。无论模型是否成功都保留，避免页面刷新后重复
-   * 发起付费请求；缺省值代表历史数据尚未尝试。
+   * 主线或分支标题生成是否已自动触发过。无论模型是否成功都保留，避免页面刷新后
+   * 重复发起付费请求；缺省值代表历史数据尚未尝试。
    */
   titleGenerationAttempted?: true
+  /** 自动标题是否已成功生成；与“已尝试”分离，使主线可在失败时保留派生回退标题。 */
+  titleGenerated?: true
 }
 
 export interface ThreadTreeState {
