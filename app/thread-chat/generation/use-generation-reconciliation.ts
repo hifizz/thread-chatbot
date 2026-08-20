@@ -22,11 +22,13 @@ export function useGenerationReconciliation({
   version,
   initialGenerations,
   registerRecoverableTurn,
+  isGenerationStreamingLocally,
 }: {
   store: ThreadStore
   version: number
   initialGenerations: GenerationSummary[]
   registerRecoverableTurn(turn: RecoverableTurn): void
+  isGenerationStreamingLocally(generationId: string): boolean
 }) {
   const generationIdsRef = useRef(initialGenerationIds(initialGenerations))
 
@@ -49,6 +51,8 @@ export function useGenerationReconciliation({
     const poll = async () => {
       for (const generationId of [...generationIdsRef.current]) {
         if (cancelled) return
+        // 本页已有 SSE 消费者时不发重复 GET；流结束/断开后下一轮恢复权威协调。
+        if (isGenerationStreamingLocally(generationId)) continue
         try {
           const response = await fetchWithAuth(
             `/api/branch-generations/${generationId}`
@@ -89,5 +93,5 @@ export function useGenerationReconciliation({
       cancelled = true
       if (timer) clearTimeout(timer)
     }
-  }, [store, registerRecoverableTurn])
+  }, [store, registerRecoverableTurn, isGenerationStreamingLocally])
 }

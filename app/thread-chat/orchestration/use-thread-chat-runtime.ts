@@ -4,10 +4,7 @@ import { useEffect, useState } from "react"
 import { isThreadChatModelId } from "@/constants/model"
 import { createThreadStore } from "../core/store"
 import { useThreadStore } from "../core/use-thread-store"
-import type {
-  MessageFeedbackSummary,
-  ThreadTreeState,
-} from "../core/types"
+import type { MessageFeedbackSummary, ThreadTreeState } from "../core/types"
 import type { GenerationSummary, RecoverableTurn } from "../generation/types"
 import { useGenerationReconciliation } from "../generation/use-generation-reconciliation"
 import { useMessageActions } from "../chat/use-message-actions"
@@ -65,22 +62,20 @@ export function useThreadChatRuntime({
       onError: onToast,
     })
   )
-  const {
-    messageActionState,
-    messageCommands,
-    registerRecoverableTurn,
-  } = useMessageActions({
-    state,
-    version,
-    initialRecoverableTurns,
-    initialMessageFeedbacks,
-    commands: chat,
-  })
+  const { messageActionState, messageCommands, registerRecoverableTurn } =
+    useMessageActions({
+      state,
+      version,
+      initialRecoverableTurns,
+      initialMessageFeedbacks,
+      commands: chat,
+    })
   useGenerationReconciliation({
     store,
     version,
     initialGenerations,
     registerRecoverableTurn,
+    isGenerationStreamingLocally: chat.isGenerationStreamingLocally,
   })
   useEffect(() => () => chat.detachAll(), [chat])
 

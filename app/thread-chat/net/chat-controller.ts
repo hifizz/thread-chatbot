@@ -44,6 +44,7 @@ import {
   type PreparedRegenerationAction,
   type PreparedRegenerationStart,
 } from "./regeneration-command"
+import { createLocalGenerationExecutions } from "./local-generation-executions"
 import type {
   GenerationActionResult,
   VariantSwitchResult,
@@ -106,8 +107,8 @@ export function createChatController(
   store: ThreadStore,
   options: ChatControllerOptions
 ) {
-  /** 每个会话同一时间只允许一路在飞的流式请求 */
-  const inflight = new Map<string, AbortController>()
+  /** 每个会话同一时间只允许一路在飞，并供后台协调排除本页已有的 SSE。 */
+  const localExecutions = createLocalGenerationExecutions()
 
   /**
    * 对某会话的某条 assistant 消息发起真实流式请求。
@@ -120,12 +121,9 @@ export function createChatController(
     generationId: string,
     action?: PreparedRegenerationAction
   ): Promise<GenerationActionResult> {
-    const controller = new AbortController()
-    inflight.set(threadId, controller)
+    const execution = localExecutions.begin(threadId, generationId)
+    const { controller, isOwner } = execution
     const { signal } = controller
-
-    /** 本次流是否仍是该会话的当前在飞流（retry 会用新 controller 顶替旧的） */
-    const isOwner = () => inflight.get(threadId) === controller
 
     const streamRuntime = createAssistantStreamRuntime({
       store,
@@ -225,8 +223,7 @@ export function createChatController(
               else streamRuntime.fail(NETWORK_ERROR)
             } finally {
               streamRuntime.cancel()
-              if (inflight.get(threadId) === controller)
-                inflight.delete(threadId)
+              localExecutions.clearIfOwner(threadId, controller)
             }
           })()
           return accepted
@@ -256,7 +253,7 @@ export function createChatController(
         if (!streamHandedOff) {
           streamRuntime.cancel()
           // 仅当 inflight 仍指向本次 controller 时才清除，避免 retry 竞态误删新流的条目
-          if (inflight.get(threadId) === controller) inflight.delete(threadId)
+          localExecutions.clearIfOwner(threadId, controller)
         }
       }
     })()
@@ -264,7 +261,7 @@ export function createChatController(
 
   /** 只断开本地 fetch 消费者；不会向服务端表达 Stop。 */
   function detachThread(threadId: string): void {
-    inflight.get(threadId)?.abort()
+    localExecutions.detach(threadId)
   }
 
   function startPreparedRegeneration(start: PreparedRegenerationStart) {
@@ -307,7 +304,8 @@ export function createChatController(
   return {
     /** 在会话里发一条用户消息并触发流式回复；同会话已有在飞请求时直接忽略 */
     send(threadId: string, text: string, quote?: { text: string }): void {
-      if (inflight.has(threadId) || activeAssistant(threadId)) return
+      if (localExecutions.hasThread(threadId) || activeAssistant(threadId))
+        return
       const userMessageId = store.appendUserMessage(threadId, text, quote)
       if (!userMessageId) return
       const generationId = crypto.randomUUID()
@@ -414,7 +412,12 @@ export function createChatController(
 
     /** 页面卸载只 detach 本地消费者，服务端 generation 继续执行与计费。 */
     detachAll(): void {
-      inflight.forEach((c) => c.abort())
+      localExecutions.detachAll()
+    },
+
+    /** reconciliation 用：本页已有 SSE 消费者时不再为同一 generation 发轮询 GET。 */
+    isGenerationStreamingLocally(generationId: string): boolean {
+      return localExecutions.isGenerationActive(generationId)
     },
   }
 }
