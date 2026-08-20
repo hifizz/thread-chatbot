@@ -173,6 +173,20 @@ export async function prepareGeneration(
       throw new GenerationRepositoryError("not_found", "分支树不存在")
     }
 
+    const [replayed] = await tx
+      .select()
+      .from(branchGenerations)
+      .where(
+        and(
+          eq(branchGenerations.id, input.generationId),
+          eq(branchGenerations.userId, input.userId)
+        )
+      )
+    if (replayed) {
+      assertReplayMatches(replayed, input)
+      return { created: false, generation: replayed }
+    }
+
     const intent = input.intent
     let state: ThreadTreeState
     try {
@@ -191,20 +205,6 @@ export async function prepareGeneration(
         "model_mismatch",
         "请求模型与目标会话不一致，请刷新后重试"
       )
-
-    const [replayed] = await tx
-      .select()
-      .from(branchGenerations)
-      .where(
-        and(
-          eq(branchGenerations.id, input.generationId),
-          eq(branchGenerations.userId, input.userId)
-        )
-      )
-    if (replayed) {
-      assertReplayMatches(replayed, input)
-      return { created: false, generation: replayed }
-    }
 
     if (intent.kind === "persisted-turn") {
       const [otherActiveGeneration] = await tx

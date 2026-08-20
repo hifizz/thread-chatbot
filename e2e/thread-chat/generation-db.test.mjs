@@ -178,6 +178,21 @@ async function run() {
     "跨用户 Stop 应表现为 404/null"
   )
 
+  const changedModelState = stateFor(generations[0])
+  changedModelState.threads.main.modelId = "deepseek-v4-pro"
+  await db
+    .update(branchTrees)
+    .set({ state: changedModelState, updatedAt: new Date() })
+    .where(eq(branchTrees.id, treeId))
+  const replayAfterModelChange = await startGeneration(
+    startInput(generations[0])
+  )
+  assert.equal(
+    replayAfterModelChange.created,
+    false,
+    "已创建 generation 的幂等重放不得依赖树的后续模型状态"
+  )
+
   await db
     .update(branchTrees)
     .set({
