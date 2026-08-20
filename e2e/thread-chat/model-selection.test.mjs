@@ -89,10 +89,19 @@ function seed(modelId = DEFAULT_MODEL_ID) {
     id: "branch",
     modelId: "removed-model",
     parentId: "main",
+    depth: 1,
+    anchorText: "可分叉",
+    forkFromMsgId: "m1",
+    footnote: 1,
+    children: [],
     messages: [],
     activeLeafMessageId: null,
   }
   legacy.threads.main.children = ["branch"]
+  legacy.threads.main.messages[0].forks = [
+    { text: "可分叉", num: 1, threadId: "branch", depth: 1 },
+  ]
+  legacy.footnoteCounter = 1
 
   const clean = sanitizeLoadedState(legacy, resolveModelId)
   assert.equal(clean.threads.main.modelId, DEFAULT_MODEL_ID)
