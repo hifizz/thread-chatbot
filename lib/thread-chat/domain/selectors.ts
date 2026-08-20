@@ -29,6 +29,27 @@ export function validArtifactsOfMessage(
   })
 }
 
+/**
+ * 按调用方给定的 id 顺序还原消息；不存在的 id 静默过滤。
+ *
+ * active path 同时被列模式与画布模式消费。这里一次建索引，避免各视图分别用
+ * messages.find(...) 做 O(path × messages) 的重复扫描。
+ */
+export function messagesByIdOrder(
+  messages: readonly Message[],
+  messageIds: readonly string[]
+): Message[] {
+  const messageById = new Map<string, Message>()
+  for (const message of messages) {
+    // 合法树内 id 唯一；保留首项也让该 selector 对未校验输入保持 find 的旧语义。
+    if (!messageById.has(message.id)) messageById.set(message.id, message)
+  }
+  return messageIds.flatMap((id) => {
+    const message = messageById.get(id)
+    return message ? [message] : []
+  })
+}
+
 /** assistant 的有效输出 = 非空正文或至少一个有效 Artifact。 */
 export function hasRenderableAssistantOutput(
   state: ThreadTreeState,

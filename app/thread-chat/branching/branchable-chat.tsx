@@ -17,6 +17,7 @@ import {
   activeMessagePath,
   collectInherited,
   lineage,
+  messagesByIdOrder,
   threadTitle,
 } from "../core/selectors"
 import { ChatView } from "../chat/chat-view"
@@ -87,13 +88,9 @@ export function BranchableChat({
   const presentation = messageActionState?.presentationByThreadId.get(threadId)
   const sourceProvenance = presentation?.sourceProvenance ?? null
   const visibleMessages = messageActionState
-    ? (messageActionState.activePathByThreadId.get(threadId) ?? []).flatMap(
-        (messageId) => {
-          const message = thread.messages.find(
-            (candidate) => candidate.id === messageId
-          )
-          return message ? [message] : []
-        }
+    ? messagesByIdOrder(
+        thread.messages,
+        messageActionState.activePathByThreadId.get(threadId) ?? []
       )
     : activeMessagePath(thread)
 

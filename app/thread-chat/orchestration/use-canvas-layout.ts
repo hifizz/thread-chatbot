@@ -31,7 +31,7 @@ import {
 } from "@dagrejs/dagre"
 import type { ThreadTreeState } from "../core/types"
 import type { ThreadStore } from "../core/store"
-import { validArtifactsOfMessage } from "../core/selectors"
+import { messagesByIdOrder, validArtifactsOfMessage } from "../core/selectors"
 import type { MessageActionViewState } from "../chat/message-action-types"
 import { accentOf, dotColorOf, dvar } from "../theme"
 import { kickoffQuestion } from "../net/prompt-pure"
@@ -157,12 +157,10 @@ function buildBaseGraph(
   const walk = (id: string) => {
     const t = state.threads[id]
     if (!t) return
-    const visibleMessages = (
+    const visibleMessages = messagesByIdOrder(
+      t.messages,
       messageActionState.activePathByThreadId.get(t.id) ?? []
-    ).flatMap((messageId) => {
-      const message = t.messages.find((candidate) => candidate.id === messageId)
-      return message ? [message] : []
-    })
+    )
     const last = visibleMessages[visibleMessages.length - 1]
     const lastMarkdown = last
       ? validArtifactsOfMessage(state, last).find(
