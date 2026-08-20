@@ -8,11 +8,8 @@
  * · updated_at 降序，limit 100 兜底（v1 不做分页/搜索）。
  */
 
-import { desc, eq, sql } from "drizzle-orm"
-import { db } from "@/lib/db"
-import { branchTrees } from "@/lib/db/schema"
-import { TREE_TITLE_FALLBACK } from "@/constants/thread-chat"
 import { getCurrentUserId } from "@/lib/auth/server"
+import { listOwnedTreeSummaries } from "@/lib/thread-chat-generation/tree-repository"
 
 export async function GET() {
   const userId = await getCurrentUserId()
@@ -22,17 +19,6 @@ export async function GET() {
       { status: 401 }
     )
 
-  const rows = await db
-    .select({
-      id: branchTrees.id,
-      title: sql<string>`coalesce(${branchTrees.customTitle}, ${branchTrees.title}, ${TREE_TITLE_FALLBACK})`,
-      updatedAt: branchTrees.updatedAt,
-      // jsonb_typeof 防御：threads 非对象的历史毒行不再让整个列表 500（写入侧已校验，此处兜底）
-      threadCount: sql<number>`(case when jsonb_typeof(${branchTrees.state} -> 'threads') = 'object' then (select count(*) from jsonb_object_keys(${branchTrees.state} -> 'threads')) else 0 end)::int`,
-    })
-    .from(branchTrees)
-    .where(eq(branchTrees.userId, userId))
-    .orderBy(desc(branchTrees.updatedAt))
-    .limit(100)
+  const rows = await listOwnedTreeSummaries(userId)
   return Response.json({ trees: rows })
 }

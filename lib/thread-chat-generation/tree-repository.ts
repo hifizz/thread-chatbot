@@ -1,5 +1,6 @@
-import { and, eq, inArray, isNull, sql } from "drizzle-orm"
+import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm"
 import { ACTIVE_GENERATION_STATUSES } from "@/constants/generation"
+import { TREE_TITLE_FALLBACK } from "@/constants/thread-chat"
 import {
   activeLeafTurn,
   assistantTurnAlternatives,
@@ -26,9 +27,7 @@ export class TreeCommandError extends Error {
 }
 
 export type DeleteOwnedTreeResult =
-  | "deleted"
-  | "not_found"
-  | "generation_running"
+  "deleted" | "not_found" | "generation_running"
 
 export type OwnedTreeSnapshot = Pick<
   typeof branchTrees.$inferSelect,
@@ -39,6 +38,31 @@ export type SaveOwnedTreeResult =
   | { kind: "saved"; revision: number }
   | { kind: "conflict"; revision: number }
   | { kind: "not_found" }
+
+export interface OwnedTreeSummary {
+  id: string
+  title: string
+  updatedAt: Date
+  threadCount: number
+}
+
+/** 会话列表用的 owner-scoped 轻量投影；不把整棵 JSON state 带出仓储。 */
+export async function listOwnedTreeSummaries(
+  userId: string
+): Promise<OwnedTreeSummary[]> {
+  return db
+    .select({
+      id: branchTrees.id,
+      title: sql<string>`coalesce(${branchTrees.customTitle}, ${branchTrees.title}, ${TREE_TITLE_FALLBACK})`,
+      updatedAt: branchTrees.updatedAt,
+      // 历史毒行的 threads 不是对象时返回 0，不能让一行数据打挂整个列表。
+      threadCount: sql<number>`(case when jsonb_typeof(${branchTrees.state} -> 'threads') = 'object' then (select count(*) from jsonb_object_keys(${branchTrees.state} -> 'threads')) else 0 end)::int`,
+    })
+    .from(branchTrees)
+    .where(eq(branchTrees.userId, userId))
+    .orderBy(desc(branchTrees.updatedAt))
+    .limit(100)
+}
 
 /** GET 精确 URL 的迁移入口：普通 owner 读取，或原子认领一棵历史无主树。 */
 export async function loadOwnedOrClaimLegacyTree(input: {
@@ -65,9 +89,7 @@ export async function loadOwnedOrClaimLegacyTree(input: {
     const [claimed] = await tx
       .update(branchTrees)
       .set({ userId: input.userId })
-      .where(
-        and(eq(branchTrees.id, input.treeId), isNull(branchTrees.userId))
-      )
+      .where(and(eq(branchTrees.id, input.treeId), isNull(branchTrees.userId)))
       .returning(selection)
     return claimed ?? null
   })
