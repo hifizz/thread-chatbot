@@ -68,7 +68,7 @@ Thread Chat 提供 13 个固定走 OpenRouter 的内部模型 id：`openrouter-g
 
 ## UMAPIS 预览模型
 
-Thread Chat Prompt 输入关联的模型选择器提供 `umapis-claude-opus-4-6`、`umapis-claude-sonnet-5`、`umapis-gpt-5.6-sol` 和 `umapis-gpt-5.6-terra`。Claude 模型配置 `UMAPIS_API_KEY_CLAUDE`，GPT 模型配置 `UMAPIS_API_KEY_GPT`；`UMAPIS_BASE_URL` 可选，可填写站点根路径或 `/v1` API 根路径。请求保持上游默认行为，不发送 Effort 参数。这些模型是未计费预览：不要求用户余额为正、不扣额度、不展示未经验证的价格。Effort 配置与 UMAPIS 计费由后续 spec 单独定义。
+Thread Chat Prompt 输入关联的模型选择器提供 `constants/model.ts` 中注册的 UMAPIS Claude 与 GPT 预览模型。Claude 模型配置 `UMAPIS_API_KEY_CLAUDE`，GPT 模型配置 `UMAPIS_API_KEY_GPT`；`UMAPIS_BASE_URL` 可选，可填写站点根路径或 `/v1` API 根路径。请求保持上游默认行为，不发送 Effort 参数。这些模型是未计费预览：不要求用户余额为正、不扣额度、不展示未经验证的价格。Effort 配置与 UMAPIS 计费由后续 spec 单独定义。
 
 ## 架构
 

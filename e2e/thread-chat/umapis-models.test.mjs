@@ -20,13 +20,25 @@ import {
 
 const expectedModels = [
   ["claude-opus-4-6", "claude"],
+  ["claude-opus-4-6-thinking", "claude"],
+  ["claude-sonnet-4-6", "claude"],
+  ["claude-sonnet-4-6-thinking", "claude"],
+  ["claude-opus-4-7", "claude"],
+  ["claude-opus-4-7-thinking", "claude"],
+  ["claude-fable-5", "claude"],
+  ["claude-opus-5", "claude"],
   ["claude-sonnet-5", "claude"],
+  ["claude-opus-4-8", "claude"],
+  ["claude-opus-4-8-thinking", "claude"],
+  ["claude-haiku-4-5", "claude"],
+  ["gemini-3.7-flash", "claude"],
+  ["grok-4.6", "claude"],
   ["gpt-5.6-sol", "gpt"],
   ["gpt-5.6-terra", "gpt"],
 ]
 const models = CHAT_MODELS.filter((model) => model.provider === "umapis")
 
-assert.equal(models.length, 4)
+assert.equal(models.length, expectedModels.length)
 assert.deepEqual(
   [...UMAPIS_MODEL_IDS],
   expectedModels.map(([id]) => id)

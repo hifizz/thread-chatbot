@@ -19,9 +19,27 @@ export const OPENROUTER_MODEL_IDS = [
 ] as const
 
 export type OpenRouterModelId = (typeof OPENROUTER_MODEL_IDS)[number]
-export const UMAPIS_MODEL_IDS = [
+export const UMAPIS_CLAUDE_MODEL_IDS = [
   "claude-opus-4-6",
+  "claude-opus-4-6-thinking",
+  "claude-sonnet-4-6",
+  "claude-sonnet-4-6-thinking",
+  "claude-opus-4-7",
+  "claude-opus-4-7-thinking",
+  "claude-fable-5",
+  "claude-opus-5",
   "claude-sonnet-5",
+  "claude-opus-4-8",
+  "claude-opus-4-8-thinking",
+  "claude-haiku-4-5",
+  "gemini-3.7-flash",
+  "grok-4.6",
+] as const
+
+export type UMAPISClaudeModelId = (typeof UMAPIS_CLAUDE_MODEL_IDS)[number]
+
+export const UMAPIS_MODEL_IDS = [
+  ...UMAPIS_CLAUDE_MODEL_IDS,
   "gpt-5.6-sol",
   "gpt-5.6-terra",
 ] as const
@@ -59,6 +77,25 @@ export type ChatModel = {
   surfaces: readonly ChatModelSurface[]
   /** 仅用于展示分组，不参与鉴权和路由。 */
   creator?: "anthropic" | "openai" | "moonshotai" | "deepseek" | "qwen" | "x-ai"
+}
+
+/** 用统一的 Claude 组配置注册 UMAPIS 未计费预览模型。 */
+function createUmapisClaudeModel<const TModelId extends UMAPISClaudeModelId>(
+  upstreamModel: TModelId,
+  name: string
+) {
+  return {
+    id: `umapis-${upstreamModel}` as const,
+    name: `UMAPIS · ${name}`,
+    description: "UMAPIS 预览（Claude 组）",
+    provider: "umapis",
+    upstreamModel,
+    reasoningTransport: "native",
+    umapisCredentialGroup: "claude",
+    unbilledPreview: true,
+    surfaces: ["thread"],
+    creator: "anthropic",
+  } as const satisfies ChatModel
 }
 
 const CHAT_MODEL_REGISTRY = [
@@ -161,30 +198,32 @@ const CHAT_MODEL_REGISTRY = [
     upstreamModel: "kimi-k2.7-code",
     surfaces: ["linear", "thread"],
   },
-  {
-    id: "umapis-claude-opus-4-6",
-    name: "UMAPIS · Claude Opus 4.6",
-    description: "UMAPIS 预览（Claude 组）",
-    provider: "umapis",
-    upstreamModel: "claude-opus-4-6",
-    reasoningTransport: "native",
-    umapisCredentialGroup: "claude",
-    unbilledPreview: true,
-    surfaces: ["thread"],
-    creator: "anthropic",
-  },
-  {
-    id: "umapis-claude-sonnet-5",
-    name: "UMAPIS · Claude Sonnet 5",
-    description: "UMAPIS 预览（Claude 组）",
-    provider: "umapis",
-    upstreamModel: "claude-sonnet-5",
-    reasoningTransport: "native",
-    umapisCredentialGroup: "claude",
-    unbilledPreview: true,
-    surfaces: ["thread"],
-    creator: "anthropic",
-  },
+  createUmapisClaudeModel("claude-opus-4-6", "Claude Opus 4.6"),
+  createUmapisClaudeModel(
+    "claude-opus-4-6-thinking",
+    "Claude Opus 4.6 Thinking"
+  ),
+  createUmapisClaudeModel("claude-sonnet-4-6", "Claude Sonnet 4.6"),
+  createUmapisClaudeModel(
+    "claude-sonnet-4-6-thinking",
+    "Claude Sonnet 4.6 Thinking"
+  ),
+  createUmapisClaudeModel("claude-opus-4-7", "Claude Opus 4.7"),
+  createUmapisClaudeModel(
+    "claude-opus-4-7-thinking",
+    "Claude Opus 4.7 Thinking"
+  ),
+  createUmapisClaudeModel("claude-fable-5", "Claude Fable 5"),
+  createUmapisClaudeModel("claude-opus-5", "Claude Opus 5"),
+  createUmapisClaudeModel("claude-sonnet-5", "Claude Sonnet 5"),
+  createUmapisClaudeModel("claude-opus-4-8", "Claude Opus 4.8"),
+  createUmapisClaudeModel(
+    "claude-opus-4-8-thinking",
+    "Claude Opus 4.8 Thinking"
+  ),
+  createUmapisClaudeModel("claude-haiku-4-5", "Claude Haiku 4.5"),
+  createUmapisClaudeModel("gemini-3.7-flash", "Gemini 3.7 Flash"),
+  createUmapisClaudeModel("grok-4.6", "Grok 4.6"),
   {
     id: "umapis-gpt-5.6-sol",
     name: "UMAPIS · GPT-5.6 Sol",

@@ -28,6 +28,13 @@ const MODEL_FAMILY_ORDER = [
   "doubao",
 ] as const
 
+/** UMAPIS 优先展示，OpenRouter 收在列表末尾，其余 provider 保持中间层。 */
+function modelProviderIndex(provider: string): number {
+  if (provider === "umapis") return 0
+  if (provider === "openrouter") return 2
+  return 1
+}
+
 function modelFamilyIndex(upstreamModel: string): number {
   const normalizedName = upstreamModel.toLowerCase()
   const familyIndex = MODEL_FAMILY_ORDER.findIndex((family) =>
@@ -45,6 +52,8 @@ const THREAD_CHAT_MODEL_OPTIONS: readonly ModelOption[] =
   THREAD_CHAT_MODELS.map((model, registryIndex) => ({ model, registryIndex }))
     .sort(
       (left, right) =>
+        modelProviderIndex(left.model.provider) -
+          modelProviderIndex(right.model.provider) ||
         modelFamilyIndex(left.model.upstreamModel) -
           modelFamilyIndex(right.model.upstreamModel) ||
         left.registryIndex - right.registryIndex

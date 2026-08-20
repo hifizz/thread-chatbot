@@ -112,7 +112,7 @@ Thread Chat offers thirteen fixed OpenRouter-backed internal model IDs: `openrou
 
 ## UMAPIS preview models
 
-The Thread Chat Prompt input model selector includes `umapis-claude-opus-4-6`, `umapis-claude-sonnet-5`, `umapis-gpt-5.6-sol`, and `umapis-gpt-5.6-terra`. Set `UMAPIS_API_KEY_CLAUDE` for the Claude models and `UMAPIS_API_KEY_GPT` for the GPT models; `UMAPIS_BASE_URL` is optional and accepts either the site root or the `/v1` API root. Requests use the upstream default behavior and do not send an Effort parameter. These models are unbilled previews: they do not require a positive user balance, do not debit credits, and do not display an unverified price. Effort configuration and UMAPIS billing belong to a later spec.
+The Thread Chat Prompt input model selector includes the UMAPIS Claude and GPT preview models registered in `constants/model.ts`. Set `UMAPIS_API_KEY_CLAUDE` for the Claude models and `UMAPIS_API_KEY_GPT` for the GPT models; `UMAPIS_BASE_URL` is optional and accepts either the site root or the `/v1` API root. Requests use the upstream default behavior and do not send an Effort parameter. These models are unbilled previews: they do not require a positive user balance, do not debit credits, and do not display an unverified price. Effort configuration and UMAPIS billing belong to a later spec.
 
 ## Architecture
 
