@@ -9,7 +9,8 @@ import type {
 import type { TreeUiState, ViewMode } from "../net/persist"
 import type { CanvasChatActions } from "./canvas-node"
 import type { CanvasViewState } from "./use-canvas-layout"
-import { COL_MIN_W, useColumnSlots, useWindowWidth } from "./thread-columns"
+import { COL_MIN_W, useWindowWidth } from "./thread-columns"
+import { useColumnSlots } from "./use-column-slots"
 import type { PlacementMode } from "./placement"
 import { useUiStatePersistence } from "./use-ui-state-persistence"
 
@@ -39,9 +40,7 @@ export function useThreadChatWorkspace({
       : Math.max(2, Math.min(4, Math.floor(windowWidth / COL_MIN_W)))
   const totalCols = forceCols ?? autoCols
   const maxExpanded = totalCols - 1
-  const [mode, setMode] = useState<PlacementMode>(
-    initialUi?.mode ?? "replace"
-  )
+  const [mode, setMode] = useState<PlacementMode>(initialUi?.mode ?? "replace")
   const columns = useColumnSlots({
     store,
     maxExpanded,

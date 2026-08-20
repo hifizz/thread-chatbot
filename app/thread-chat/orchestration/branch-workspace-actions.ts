@@ -4,12 +4,9 @@ import type { ThreadTreeState } from "../core/types"
 import type { SelectionInfo } from "../branching/use-assistant-text-selection"
 import { kickoffQuestion } from "../net/prompt"
 import type { ChatController } from "../net/chat-controller"
-import type {
-  PlacementHint,
-  PlacementMode,
-} from "./placement"
+import type { PlacementHint, PlacementMode } from "./placement"
 import type { SwitcherMode } from "./thread-switcher"
-import type { useColumnSlots } from "./thread-columns"
+import type { useColumnSlots } from "./use-column-slots"
 import type { ViewMode } from "../net/persist"
 
 type ColumnWorkspace = ReturnType<typeof useColumnSlots>
@@ -86,11 +83,7 @@ export function createBranchWorkspaceActions({
       showToast(`已开启分支 · ${fork.title}`)
       return
     }
-    const effect = columns.openThread(
-      fork.threadId,
-      selection.threadId,
-      hint
-    )
+    const effect = columns.openThread(fork.threadId, selection.threadId, hint)
     if (effect.kind === "replaced") {
       showToast(
         `已开启分支「${fork.title}」，替换了第 ${effect.idx + 2} 列的「${threadTitle(state, effect.replacedId)}」`,
