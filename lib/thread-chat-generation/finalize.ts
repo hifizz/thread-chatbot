@@ -101,7 +101,8 @@ export async function finalizeGeneration(input: FinalizeGenerationInput) {
         .set({
           result: input.result,
           error: input.error ?? null,
-          billingStatus,
+          billingStatus:
+            row.billingStatus === "settled" ? "settled" : billingStatus,
           finishedAt: row.finishedAt ?? now,
           updatedAt: now,
         })

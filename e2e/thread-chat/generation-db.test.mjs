@@ -363,6 +363,31 @@ async function run() {
   assert.equal(superseded.billingStatus, "settled")
 
   await finalizeGeneration({
+    generationId: generations[3],
+    outcome: "failed",
+    result: supersededResult,
+  })
+  const supersededAfterUsageFreeReplay = await getGenerationForOwner(
+    userId,
+    generations[3]
+  )
+  assert.equal(
+    supersededAfterUsageFreeReplay.billingStatus,
+    "settled",
+    "无 usage 的重复 finalize 不得降级既有 settled 账单"
+  )
+  assert.equal(
+    (
+      await db
+        .select()
+        .from(usageRecords)
+        .where(eq(usageRecords.appGenerationId, generations[3]))
+    ).length,
+    1,
+    "无 usage 的重复 finalize 不得改变已结算流水"
+  )
+
+  await finalizeGeneration({
     generationId: generations[4],
     outcome: "completed",
     result: resultFor(generations[4]),
