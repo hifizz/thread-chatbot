@@ -1,5 +1,5 @@
 import assert from "node:assert/strict"
-import { submitMessageFeedback } from "../../app/thread-chat/net/message-feedback-command.ts"
+import { submitMessageFeedback } from "../../app/thread-chat/net/commands/message-feedback-command.ts"
 
 const treeId = "11111111-1111-4111-8111-111111111111"
 const messageId = "message/with space"

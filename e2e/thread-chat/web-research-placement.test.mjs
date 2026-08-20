@@ -1,5 +1,5 @@
 import assert from "node:assert/strict"
-import { webResearchPlacement } from "../../app/thread-chat/branching/web-research-placement.ts"
+import { webResearchPlacement } from "../../app/thread-chat/branching/assistant/web-research-placement.ts"
 
 const empty = webResearchPlacement({ webResearchTextOffset: 12 })
 assert.deepEqual(empty, { activities: [], insertAt: undefined })

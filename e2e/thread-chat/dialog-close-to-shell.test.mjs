@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import { readFile } from "node:fs/promises"
 import test from "node:test"
 
-import { dialogCloseToShell } from "../../app/thread-chat/orchestration/dialog-close-to-shell.ts"
+import { dialogCloseToShell } from "../../app/thread-chat/orchestration/overlays/dialog-close-to-shell.ts"
 
 const details = (reason) => {
   const calls = []
@@ -50,15 +50,23 @@ await test("non-Escape close reasons notify the shell once", () => {
 })
 
 await test("all Dialog consumers import the shared bridge", async () => {
-  const sources = await Promise.all(
-    ["thread-switcher.tsx", "tree-list.tsx", "help-panel.tsx"].map((file) =>
-      readFile(
-        new URL(`../../app/thread-chat/orchestration/${file}`, import.meta.url),
-        "utf8"
-      )
-    )
-  )
+  const consumers = [
+    {
+      path: "../../app/thread-chat/orchestration/navigation/thread-switcher.tsx",
+      importPattern: /from "\.\.\/overlays\/dialog-close-to-shell"/,
+    },
+    {
+      path: "../../app/thread-chat/orchestration/navigation/tree-list.tsx",
+      importPattern: /from "\.\.\/overlays\/dialog-close-to-shell"/,
+    },
+    {
+      path: "../../app/thread-chat/orchestration/overlays/help-panel.tsx",
+      importPattern: /from "\.\/dialog-close-to-shell"/,
+    },
+  ]
 
-  for (const source of sources)
-    assert.match(source, /from "\.\/dialog-close-to-shell"/)
+  for (const consumer of consumers) {
+    const source = await readFile(new URL(consumer.path, import.meta.url), "utf8")
+    assert.match(source, consumer.importPattern)
+  }
 })

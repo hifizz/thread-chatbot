@@ -21,10 +21,10 @@ import {
   threadTitle,
 } from "../core/selectors"
 import { ChatView } from "../chat/chat-view"
-import { MessageArtifacts } from "../orchestration/message-artifacts"
-import { AnchoredAssistantBody } from "./anchored-assistant-body"
-import type { MessageActionViewState } from "../chat/message-action-types"
-import type { ThreadMessageActionCommands } from "../chat/message-action-commands"
+import { MessageArtifacts } from "../orchestration/artifacts/message-artifacts"
+import { AnchoredAssistantBody } from "./assistant/anchored-assistant-body"
+import type { MessageActionViewState } from "../chat/actions/message-action-types"
+import type { ThreadMessageActionCommands } from "../chat/actions/message-action-commands"
 
 export interface BranchableChatProps {
   state: ThreadTreeState

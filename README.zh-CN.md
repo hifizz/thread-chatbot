@@ -77,9 +77,10 @@ Thread Chat Prompt 输入关联的模型选择器提供 `umapis-claude-opus-4-6`
 | 边界   | 位置                                                                 | 职责                                                     |
 | ------ | -------------------------------------------------------------------- | -------------------------------------------------------- |
 | 核心   | [`app/thread-chat/core/`](./app/thread-chat/core/)                   | 对话树状态、选择器和分支对话 store                       |
-| 分支   | [`app/thread-chat/branching/`](./app/thread-chat/branching/)         | 文本选择、锚点、上下文分支和分支感知的聊天渲染           |
-| 编排   | [`app/thread-chat/orchestration/`](./app/thread-chat/orchestration/) | 多列工作区、树画布、切换、交付物和工作台控件             |
-| 网络   | [`app/thread-chat/net/`](./app/thread-chat/net/)                     | 树加载、清理、防抖持久化、提示词和流式 UI 事件           |
+| 分支   | [`app/thread-chat/branching/`](./app/thread-chat/branching/)         | `selection/` 管文本锚点与划选交互，`assistant/` 管分支感知渲染 |
+| 对话   | [`app/thread-chat/chat/`](./app/thread-chat/chat/)                   | 用 `message/`、`composer/`、`actions/` 聚合三个对话功能集 |
+| 编排   | [`app/thread-chat/orchestration/`](./app/thread-chat/orchestration/) | 用 `canvas/`、`columns/`、`navigation/`、`artifacts/`、`overlays/`、`workspace/` 组合工作台 |
+| 网络   | [`app/thread-chat/net/`](./app/thread-chat/net/)                     | 用 `boot/`、`commands/`、`persistence/`、`prompt/`、`stream/`、`titles/` 隔离客户端 I/O |
 | 服务端 | [`app/api/`](./app/api/) 和 [`lib/chat/`](./lib/chat/)               | 认证、模型流式输出、工具处理、分支树 API、附件和研究工具 |
 
 仓库内提供了更详细的设计材料：

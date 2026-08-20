@@ -8,7 +8,7 @@ import {
 import {
   readSaveTreeRevision,
   TreeRevisionError,
-} from "../../app/thread-chat/net/save-tree-response.ts"
+} from "../../app/thread-chat/net/persistence/save-tree-response.ts"
 
 assert.equal(
   saveTreeRequestSchema.safeParse({

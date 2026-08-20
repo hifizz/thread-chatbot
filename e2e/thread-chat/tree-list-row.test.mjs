@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server"
 import test from "node:test"
 
 import { CUSTOM_TITLE_MAX_LEN } from "../../constants/thread-chat.ts"
-import { TreeListRow } from "../../app/thread-chat/orchestration/tree-list-row.tsx"
+import { TreeListRow } from "../../app/thread-chat/orchestration/navigation/tree-list-row.tsx"
 
 const noop = () => {}
 const baseProps = {
@@ -69,7 +69,7 @@ await test("confirming row exposes the destructive second step", () => {
 await test("tree list composes the row instead of owning its icon actions", async () => {
   const source = await readFile(
     new URL(
-      "../../app/thread-chat/orchestration/tree-list.tsx",
+      "../../app/thread-chat/orchestration/navigation/tree-list.tsx",
       import.meta.url
     ),
     "utf8"

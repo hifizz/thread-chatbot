@@ -1,5 +1,5 @@
 import assert from "node:assert/strict"
-import { selectMessageArtifacts } from "../../app/thread-chat/orchestration/message-artifacts-logic.ts"
+import { selectMessageArtifacts } from "../../app/thread-chat/orchestration/artifacts/message-artifacts-logic.ts"
 
 const first = { id: "artifact-1", sourceThreadId: "main" }
 const second = { id: "artifact-2", sourceThreadId: "branch-1" }

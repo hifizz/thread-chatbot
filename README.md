@@ -121,9 +121,10 @@ The project is a Next.js 16 App Router application using React, TypeScript, Tail
 | Boundary      | Location                                                             | Responsibility                                                                                    |
 | ------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
 | Core          | [`app/thread-chat/core/`](./app/thread-chat/core/)                   | Tree state, selectors, and the branch-conversation store                                          |
-| Branching     | [`app/thread-chat/branching/`](./app/thread-chat/branching/)         | Text selection, anchors, contextual branches, and branch-aware chat rendering                     |
-| Orchestration | [`app/thread-chat/orchestration/`](./app/thread-chat/orchestration/) | Column workspace, tree canvas, switching, artifacts, and workbench controls                       |
-| Network       | [`app/thread-chat/net/`](./app/thread-chat/net/)                     | Tree loading, sanitization, debounced persistence, prompts, and streaming UI events               |
+| Branching     | [`app/thread-chat/branching/`](./app/thread-chat/branching/)         | `selection/` owns text anchors and selection UI; `assistant/` owns branch-aware assistant rendering |
+| Chat          | [`app/thread-chat/chat/`](./app/thread-chat/chat/)                   | `message/`, `composer/`, and `actions/` group the three conversation feature sets                 |
+| Orchestration | [`app/thread-chat/orchestration/`](./app/thread-chat/orchestration/) | `canvas/`, `columns/`, `navigation/`, `artifacts/`, `overlays/`, and `workspace/` compose the workbench |
+| Network       | [`app/thread-chat/net/`](./app/thread-chat/net/)                     | `boot/`, `commands/`, `persistence/`, `prompt/`, `stream/`, and `titles/` isolate client-side I/O |
 | Server        | [`app/api/`](./app/api/) and [`lib/chat/`](./lib/chat/)              | Authentication, model streaming, tool handling, branch-tree APIs, attachments, and research tools |
 
 Detailed design material is available in the repository:

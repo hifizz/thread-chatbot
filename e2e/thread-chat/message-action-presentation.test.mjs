@@ -1,5 +1,5 @@
 import assert from "node:assert/strict"
-import { buildMessageActionViewState } from "../../app/thread-chat/chat/message-action-presentation.ts"
+import { buildMessageActionViewState } from "../../app/thread-chat/chat/actions/message-action-presentation.ts"
 
 const state = {
   threads: {

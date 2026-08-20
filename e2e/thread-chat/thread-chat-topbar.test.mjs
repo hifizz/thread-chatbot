@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { readFile } from "node:fs/promises"
-import { columnCountChoices } from "../../app/thread-chat/orchestration/thread-chat-topbar-logic.ts"
+import { columnCountChoices } from "../../app/thread-chat/orchestration/navigation/thread-chat-topbar-logic.ts"
 
 assert.deepEqual(columnCountChoices(null), [
   { value: "auto", label: "自适应", active: true },
@@ -16,14 +16,14 @@ assert.deepEqual(
 const [topbar, variantPicker] = await Promise.all([
   readFile(
     new URL(
-      "../../app/thread-chat/orchestration/thread-chat-topbar.tsx",
+      "../../app/thread-chat/orchestration/navigation/thread-chat-topbar.tsx",
       import.meta.url
     ),
     "utf8"
   ),
   readFile(
     new URL(
-      "../../app/thread-chat/chat/turn-variant-picker.tsx",
+      "../../app/thread-chat/chat/actions/turn-variant-picker.tsx",
       import.meta.url
     ),
     "utf8"

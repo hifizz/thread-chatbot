@@ -28,9 +28,9 @@
 
 ## Impact
 
-- `app/thread-chat/branching/selection-bubble.tsx`（输入框 + 键位 + 文案态 + scroll 放行，~80–100 行）
+- `app/thread-chat/branching/selection/selection-bubble.tsx`（输入框 + 键位 + 文案态 + scroll 放行，~80–100 行）
 - `app/thread-chat/thread-chat-demo.tsx`（`handleFork` 加可选 `question` 参数：有问则 fork 后 `chat.send`，~15 行）
-- `app/thread-chat/net/prompt.ts`（kickoff 文案 + 继承段预算截断，~35 行）
+- `app/thread-chat/net/prompt/prompt.ts`（kickoff 文案 + 继承段预算截断，~35 行）
 - `app/thread-chat/core/{types,store}.ts`（`Message.quote` 可选字段 + `appendUserMessage`/`chat.send` 透传；新 mutator `setThreadTitle`）
 - `app/thread-chat/chat/chat-view.tsx` 与 `orchestration/canvas-node.tsx`（user 气泡引用条渲染）
 - 新增小路由 `app/api/branch-title/route.ts`（4–8 字标题生成，用 `lib/ai/minimax.ts` 的裸模型 `minimaxModel`，照主聊天 generateTitle 先例）+ `net/persist.ts` 或 net/ 客户端函数（~40 行）

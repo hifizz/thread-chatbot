@@ -23,39 +23,42 @@
  */
 
 import type { ThreadStore } from "../core/store"
-import { buildRequestBody } from "./prompt"
-import { consumeUIMessageStream } from "./ui-stream"
+import { buildRequestBody } from "./prompt/prompt"
+import { consumeUIMessageStream } from "./stream/ui-stream"
 import type { MessageFeedback, MessageFeedbackSummary } from "../core/types"
 import { GENERATION_ERRORS } from "@/constants/generation"
-import { getKnownTreeRevision, setKnownTreeRevision } from "./persist"
+import {
+  getKnownTreeRevision,
+  setKnownTreeRevision,
+} from "./persistence/persist"
 import { activeLeafTurn } from "../core/message-graph"
-import { submitMessageFeedback } from "./message-feedback-command"
-import { switchActiveLeaf } from "./switch-active-leaf-command"
-import { requestGenerationStop } from "./stop-generation-command"
-import { requestChatGeneration } from "./chat-generation-command"
+import { submitMessageFeedback } from "./commands/message-feedback-command"
+import { switchActiveLeaf } from "./commands/switch-active-leaf-command"
+import { requestGenerationStop } from "./commands/stop-generation-command"
+import { requestChatGeneration } from "./commands/chat-generation-command"
 import {
   ABORTED_ERROR,
   createAssistantStreamRuntime,
-} from "./assistant-stream-runtime"
+} from "./stream/assistant-stream-runtime"
 import {
   prepareAssistantRetry,
   prepareUserEdit,
   prepareUserTurnRetry,
   type PreparedRegenerationAction,
   type PreparedRegenerationStart,
-} from "./regeneration-command"
-import { createLocalGenerationExecutions } from "./local-generation-executions"
+} from "./commands/regeneration-command"
+import { createLocalGenerationExecutions } from "./stream/local-generation-executions"
 import type {
   GenerationActionResult,
   ThreadMessageActionCommands,
   VariantSwitchResult,
-} from "../chat/message-action-commands"
+} from "../chat/actions/message-action-commands"
 
 export type {
   GenerationActionResult,
   MessageActionFailureCode,
   VariantSwitchResult,
-} from "../chat/message-action-commands"
+} from "../chat/actions/message-action-commands"
 
 /** 网络异常（非中止）的兜底错误文案 */
 const NETWORK_ERROR = "网络请求失败，请重试"

@@ -2,8 +2,8 @@ import assert from "node:assert/strict"
 import {
   escapeOverlayTarget,
   popupPosition,
-} from "../../app/thread-chat/orchestration/workspace-overlay-logic.ts"
-import { SWITCHER_DIMENSIONS } from "../../app/thread-chat/orchestration/switcher-dimensions.ts"
+} from "../../app/thread-chat/orchestration/overlays/workspace-overlay-logic.ts"
+import { SWITCHER_DIMENSIONS } from "../../app/thread-chat/orchestration/navigation/switcher-dimensions.ts"
 
 assert.equal(
   escapeOverlayTarget({

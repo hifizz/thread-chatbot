@@ -1,10 +1,10 @@
 import assert from "node:assert/strict"
 import { createThreadStore } from "../../app/thread-chat/core/store.ts"
 import { prepareRegenerationPatch } from "../../app/thread-chat/core/regeneration.ts"
-import { hasAssistantOutput } from "../../app/thread-chat/net/assistant-output.ts"
-import { serializeMessageForModel } from "../../app/thread-chat/net/message-serialization.ts"
-import { sanitizeLoadedState } from "../../app/thread-chat/net/sanitize-loaded-state.ts"
-import { withoutTransientGenerationState } from "../../app/thread-chat/net/transient-state.ts"
+import { hasAssistantOutput } from "../../app/thread-chat/net/stream/assistant-output.ts"
+import { serializeMessageForModel } from "../../app/thread-chat/net/prompt/message-serialization.ts"
+import { sanitizeLoadedState } from "../../app/thread-chat/net/persistence/sanitize-loaded-state.ts"
+import { withoutTransientGenerationState } from "../../app/thread-chat/net/persistence/transient-state.ts"
 import {
   createMarkdownArtifactEventDispatcher,
   createMarkdownArtifactProgressDispatcher,

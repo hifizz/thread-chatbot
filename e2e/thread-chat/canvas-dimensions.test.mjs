@@ -1,17 +1,17 @@
 import assert from "node:assert/strict"
 import { readFileSync } from "node:fs"
-import { CANVAS_EXPAND_WIDTH } from "../../app/thread-chat/orchestration/canvas-dimensions.ts"
+import { CANVAS_EXPAND_WIDTH } from "../../app/thread-chat/orchestration/canvas/canvas-dimensions.ts"
 
 const expand = readFileSync(
   new URL(
-    "../../app/thread-chat/orchestration/canvas-expand.tsx",
+    "../../app/thread-chat/orchestration/canvas/canvas-expand.tsx",
     import.meta.url
   ),
   "utf8"
 )
 const canvas = readFileSync(
   new URL(
-    "../../app/thread-chat/orchestration/thread-canvas.tsx",
+    "../../app/thread-chat/orchestration/canvas/thread-canvas.tsx",
     import.meta.url
   ),
   "utf8"

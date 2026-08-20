@@ -1,5 +1,5 @@
 import assert from "node:assert/strict"
-import { prepareUserTurnRetry } from "../../app/thread-chat/net/regeneration-command.ts"
+import { prepareUserTurnRetry } from "../../app/thread-chat/net/commands/regeneration-command.ts"
 
 function state(messages, activeLeafMessageId) {
   return {

@@ -4,28 +4,28 @@ import { readFile } from "node:fs/promises"
 const [node, expand, actions, canvas] = await Promise.all([
   readFile(
     new URL(
-      "../../app/thread-chat/orchestration/canvas-node.tsx",
+      "../../app/thread-chat/orchestration/canvas/canvas-node.tsx",
       import.meta.url
     ),
     "utf8"
   ),
   readFile(
     new URL(
-      "../../app/thread-chat/orchestration/canvas-expand.tsx",
+      "../../app/thread-chat/orchestration/canvas/canvas-expand.tsx",
       import.meta.url
     ),
     "utf8"
   ),
   readFile(
     new URL(
-      "../../app/thread-chat/orchestration/canvas-actions.ts",
+      "../../app/thread-chat/orchestration/canvas/canvas-actions.ts",
       import.meta.url
     ),
     "utf8"
   ),
   readFile(
     new URL(
-      "../../app/thread-chat/orchestration/thread-canvas.tsx",
+      "../../app/thread-chat/orchestration/canvas/thread-canvas.tsx",
       import.meta.url
     ),
     "utf8"

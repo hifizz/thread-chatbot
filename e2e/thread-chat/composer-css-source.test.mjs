@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs"
 
 const component = readFileSync(
   new URL(
-    "../../app/thread-chat/chat/conversation-composer.tsx",
+    "../../app/thread-chat/chat/composer/conversation-composer.tsx",
     import.meta.url
   ),
   "utf8"

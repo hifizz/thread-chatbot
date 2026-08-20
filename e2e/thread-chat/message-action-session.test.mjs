@@ -4,7 +4,7 @@ import {
   indexRecoverableTurns,
   withMessageFeedback,
   withoutRecoverableTurn,
-} from "../../app/thread-chat/chat/message-action-session-logic.ts"
+} from "../../app/thread-chat/chat/actions/message-action-session-logic.ts"
 
 const recoverableTurn = {
   userMessageId: "user-1",

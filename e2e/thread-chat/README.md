@@ -12,7 +12,7 @@
 node --experimental-strip-types e2e/thread-chat/text-anchor.test.mjs
 ```
 
-覆盖 `app/thread-chat/branching/text-anchor.ts` 纯字符串层的三层降级定位
+覆盖 `app/thread-chat/branching/selection/text-anchor.ts` 纯字符串层的三层降级定位
 （position → exact → fuzzy）：position 直接命中、exact 多处命中经 prefix/suffix
 上下文消歧、**fuzzy 原文被改几个字后仍以 score≥阈值 命中正确区间**、
 阈值抬高 / 彻底无关锚点判定丢失（返回 null）、fuzzySubstring 单字错漏容忍。
@@ -23,7 +23,7 @@ node --experimental-strip-types e2e/thread-chat/text-anchor.test.mjs
 node --experimental-strip-types e2e/thread-chat/prompt-budget.test.mjs
 ```
 
-覆盖 `app/thread-chat/net/prompt-pure.ts` 的继承段预算截断（openspec:
+覆盖 `app/thread-chat/net/prompt/prompt-pure.ts` 的继承段预算截断（openspec:
 add-bubble-composer D8）：预算内不截断、超预算从最旧整条丢弃（顺序保持）、
 恰好等于预算的边界、**最新 1 条独超预算仍保留（保底 1 条）**、省略说明与
 kickoff 文案形状。

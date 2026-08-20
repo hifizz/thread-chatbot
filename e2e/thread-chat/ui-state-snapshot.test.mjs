@@ -1,5 +1,5 @@
 import assert from "node:assert/strict"
-import { createTreeUiStateSnapshot } from "../../app/thread-chat/orchestration/ui-state-snapshot.ts"
+import { createTreeUiStateSnapshot } from "../../app/thread-chat/orchestration/workspace/ui-state-snapshot.ts"
 
 const slots = [{ id: "main", folded: false }]
 const widths = { main: 420 }

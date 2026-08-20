@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { readFile } from "node:fs/promises"
-import { createBranchWorkspaceActions } from "../../app/thread-chat/orchestration/branch-workspace-actions.ts"
+import { createBranchWorkspaceActions } from "../../app/thread-chat/orchestration/workspace/branch-workspace-actions.ts"
 
 const state = {
   threads: {

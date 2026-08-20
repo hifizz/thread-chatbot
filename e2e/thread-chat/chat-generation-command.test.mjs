@@ -1,5 +1,5 @@
 import assert from "node:assert/strict"
-import { requestChatGeneration } from "../../app/thread-chat/net/chat-generation-command.ts"
+import { requestChatGeneration } from "../../app/thread-chat/net/commands/chat-generation-command.ts"
 
 const body = { messages: [{ role: "user", parts: [] }] }
 const controller = new AbortController()

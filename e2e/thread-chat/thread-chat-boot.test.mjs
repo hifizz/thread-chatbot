@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import {
   threadChatBootSeed,
   threadChatBootSeedOrFallback,
-} from "../../app/thread-chat/net/thread-chat-boot.ts"
+} from "../../app/thread-chat/net/boot/thread-chat-boot.ts"
 
 const empty = threadChatBootSeed({ state: null, generations: [] })
 assert.equal(empty.schemaVersion, 2)

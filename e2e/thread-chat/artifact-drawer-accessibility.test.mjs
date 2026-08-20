@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises"
 
 const source = await readFile(
   new URL(
-    "../../app/thread-chat/orchestration/artifact-drawer.tsx",
+    "../../app/thread-chat/orchestration/artifacts/artifact-drawer.tsx",
     import.meta.url
   ),
   "utf8"

@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import { readFile } from "node:fs/promises"
 import test from "node:test"
 
-import { canvasLayoutPositions } from "../../app/thread-chat/orchestration/canvas-layout.ts"
+import { canvasLayoutPositions } from "../../app/thread-chat/orchestration/canvas/canvas-layout.ts"
 
 const spec = (childHeight = 120) => ({
   nodes: [
@@ -31,14 +31,14 @@ await test("a node dimension change produces a new layout result", () => {
 await test("the React hook delegates Dagre ownership to the layout module", async () => {
   const hook = await readFile(
     new URL(
-      "../../app/thread-chat/orchestration/use-canvas-layout.ts",
+      "../../app/thread-chat/orchestration/canvas/use-canvas-layout.ts",
       import.meta.url
     ),
     "utf8"
   )
   const layout = await readFile(
     new URL(
-      "../../app/thread-chat/orchestration/canvas-layout.ts",
+      "../../app/thread-chat/orchestration/canvas/canvas-layout.ts",
       import.meta.url
     ),
     "utf8"

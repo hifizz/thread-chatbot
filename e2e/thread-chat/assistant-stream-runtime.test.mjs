@@ -1,5 +1,5 @@
 import assert from "node:assert/strict"
-import { createAssistantStreamRuntime } from "../../app/thread-chat/net/assistant-stream-runtime.ts"
+import { createAssistantStreamRuntime } from "../../app/thread-chat/net/stream/assistant-stream-runtime.ts"
 
 function harness({ owner = true, artifactId = "artifact-1" } = {}) {
   const calls = []

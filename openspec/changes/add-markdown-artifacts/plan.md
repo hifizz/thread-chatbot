@@ -85,7 +85,7 @@ export function hasRenderableAssistantOutput(
 
 ### 1.3 AI SDK UI stream 边界
 
-修改 `app/thread-chat/net/ui-stream.ts`：
+修改 `app/thread-chat/net/stream/ui-stream.ts`：
 
 ```ts
 export interface ToolInputAvailableChunk {
@@ -160,7 +160,7 @@ const seed: ArtifactSeed = {
 
 ### 1.6 模型上下文接口
 
-修改 `app/thread-chat/net/prompt.ts`：
+修改 `app/thread-chat/net/prompt/prompt.ts`：
 
 ```ts
 export function serializeMessageForModel(
@@ -183,7 +183,7 @@ Artifact-only assistant 消息返回非空字符串，必须进入当前线程�
 
 ### 1.7 UI 组件接口
 
-新增共享卡片，例如 `app/thread-chat/orchestration/markdown-artifact-card.tsx`：
+新增共享卡片，例如 `app/thread-chat/orchestration/artifacts/markdown-artifact-card.tsx`：
 
 ```ts
 export interface MarkdownArtifactCardProps {

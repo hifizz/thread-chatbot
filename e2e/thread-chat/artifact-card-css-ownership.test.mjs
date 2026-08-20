@@ -11,7 +11,7 @@ const artifactCard = readFileSync(
 )
 const artifactComponent = readFileSync(
   new URL(
-    "../../app/thread-chat/orchestration/markdown-artifact-card.tsx",
+    "../../app/thread-chat/orchestration/artifacts/markdown-artifact-card.tsx",
     import.meta.url
   ),
   "utf8"

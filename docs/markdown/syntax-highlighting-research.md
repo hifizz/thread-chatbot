@@ -26,7 +26,7 @@ Assistant UI 的渲染时机与这套方案基本一致。需要针对本项目�
 
 ### 2.1 Thread Chat
 
-`app/thread-chat/chat/markdown-body.tsx` 使用：
+`app/thread-chat/chat/message/markdown-body.tsx` 使用：
 
 - `react-markdown`
 - `remark-gfm`

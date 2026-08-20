@@ -12,7 +12,7 @@
 
 ## 3. 客户端：路由 + 持久化层
 
-- [x] 3.1 新增 `app/thread-chat/net/persist.ts`：`isValidTreeId(id)`（UUID 形状校验）、`rememberTreeId(id)` / `getLastTreeId()`（localStorage「最近一棵」读写）、`loadTree(id)`（GET，失败返回 null 并 console.warn）、`saveTree(id, state, title?)`（PUT，失败 console.warn 不抛）、`sanitizeLoadedState(state)`（assistant 非终态收敛：有正文→done、空占位→删除；纯函数，文件头注释说明为什么需要）
+- [x] 3.1 新增 `app/thread-chat/net/persistence/persist.ts`：`isValidTreeId(id)`（UUID 形状校验）、`rememberTreeId(id)` / `getLastTreeId()`（localStorage「最近一棵」读写）、`loadTree(id)`（GET，失败返回 null 并 console.warn）、`saveTree(id, state, title?)`（PUT，失败 console.warn 不抛）、`sanitizeLoadedState(state)`（assistant 非终态收敛：有正文→done、空占位→删除；纯函数，文件头注释说明为什么需要）
 - [x] 3.2 路由改造：新增 `app/thread-chat/[treeId]/page.tsx`（server component，`await params` 取 treeId、UUID 校验不合法 `notFound()`，metadata 沿用，渲染客户端 loader）；原 `app/thread-chat/page.tsx` 改为入口跳板（客户端 effect：`getLastTreeId() ?? randomUUID()` → `router.replace`，渲染 `.tc` 风格一行占位）
 - [x] 3.3 `thread-chat-demo.tsx` 拆分：现组件改名 `ThreadChatDemoInner`，props 加 `initialState: ThreadTreeState` 与 `treeId: string`，`createThreadStore(initialState)`；内部其余逻辑（编排/放置/画布/⌘K/controller）一律不动
 - [x] 3.4 loader（接收 treeId prop）：挂载 effect 里 `loadTree(treeId) → sanitize → setSeed`（失败/null → `emptySeedState()` 降级 + console.warn）+ `rememberTreeId(treeId)`；加载中渲染 `.tc` 风格一行占位；加载完渲染 inner。localStorage/fetch 只在 effect 里碰

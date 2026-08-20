@@ -1,8 +1,8 @@
 /**
  * constants/selection-bubble —— 划选气泡的几何参数。
  *
- * 定位走 floating-popup 模型（app/thread-chat/branching/bubble-position.ts），
- * 外轮廓与尾巴走 smooth-tooltip 模型（app/thread-chat/branching/bubble-shape.tsx）。
+ * 定位走 floating-popup 模型（app/thread-chat/branching/selection/bubble-position.ts），
+ * 外轮廓与尾巴走 smooth-tooltip 模型（app/thread-chat/branching/selection/bubble-shape.tsx）。
  * 这里集中气泡宽度、尾巴形状与安全边距，避免散落在组件里。
  */
 

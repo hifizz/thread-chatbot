@@ -9,7 +9,7 @@
 import { useEffect } from "react"
 import { useRouter } from "next/navigation"
 import "./thread-chat.css"
-import { getLastTreeId } from "./net/persist"
+import { getLastTreeId } from "./net/persistence/persist"
 
 export function TreeRedirect() {
   const router = useRouter()

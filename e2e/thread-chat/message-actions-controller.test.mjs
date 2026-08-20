@@ -5,7 +5,7 @@
 import assert from "node:assert/strict"
 import { createThreadStore } from "../../app/thread-chat/core/store.ts"
 import { createChatController } from "../../app/thread-chat/net/chat-controller.ts"
-import { setKnownTreeRevision } from "../../app/thread-chat/net/persist.ts"
+import { setKnownTreeRevision } from "../../app/thread-chat/net/persistence/persist.ts"
 
 const treeId = "11111111-1111-4111-8111-111111111111"
 

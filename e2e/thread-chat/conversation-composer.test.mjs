@@ -3,7 +3,7 @@ import {
   composerMaxHeight,
   composerSubmission,
   shouldSubmitComposerKey,
-} from "../../app/thread-chat/chat/conversation-composer-logic.ts"
+} from "../../app/thread-chat/chat/composer/conversation-composer-logic.ts"
 
 assert.equal(composerSubmission("  hello  ", false), "hello")
 assert.equal(composerSubmission("   \n ", false), null)

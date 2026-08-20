@@ -1,5 +1,5 @@
 import assert from "node:assert/strict"
-import { assistantMessagePresentation } from "../../app/thread-chat/chat/conversation-message-logic.ts"
+import { assistantMessagePresentation } from "../../app/thread-chat/chat/message/conversation-message-logic.ts"
 
 function assistant(overrides = {}) {
   return {

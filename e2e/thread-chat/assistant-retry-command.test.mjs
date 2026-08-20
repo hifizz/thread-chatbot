@@ -1,5 +1,5 @@
 import assert from "node:assert/strict"
-import { prepareAssistantRetry } from "../../app/thread-chat/net/regeneration-command.ts"
+import { prepareAssistantRetry } from "../../app/thread-chat/net/commands/regeneration-command.ts"
 
 function state(activeLeafMessageId = "a1") {
   return {

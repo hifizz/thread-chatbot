@@ -26,46 +26,38 @@ import dynamic from "next/dynamic"
 import { useRouter } from "next/navigation"
 import React, { useState } from "react"
 import "./thread-chat.css"
-import {
-  activePathArtifacts,
-} from "./core/selectors"
+import { activePathArtifacts } from "./core/selectors"
 import type {
   Message,
   MessageFeedbackSummary,
   ThreadTreeState,
 } from "./core/types"
-import {
-  deriveTreeTitle,
-  type TreeUiState,
-} from "./net/persist"
+import { deriveTreeTitle, type TreeUiState } from "./net/persistence/persist"
 import type { GenerationSummary } from "./generation/types"
 import type { RecoverableTurn } from "./generation/types"
-import { useThreadChatBoot } from "./net/use-thread-chat-boot"
+import { useThreadChatBoot } from "./net/boot/use-thread-chat-boot"
 import { BranchableChat } from "./branching/branchable-chat"
-import {
-  SelectionBubble,
-} from "./branching/selection-bubble"
-import { type Slot } from "./orchestration/placement"
-import {
-  ThreadColumns,
-} from "./orchestration/thread-columns"
-import { ThreadSwitcher } from "./orchestration/thread-switcher"
-import { TreeList } from "./orchestration/tree-list"
-import { ArtifactDrawer } from "./orchestration/artifact-drawer"
-import { HelpPanel, UsageHint } from "./orchestration/help-panel"
-import { ThreadChatTopbar } from "./orchestration/thread-chat-topbar"
-import { useWorkspaceOverlays } from "./orchestration/use-workspace-overlays"
+import { SelectionBubble } from "./branching/selection/selection-bubble"
+import { type Slot } from "./orchestration/columns/placement"
+import { ThreadColumns } from "./orchestration/columns/thread-columns"
+import { ThreadSwitcher } from "./orchestration/navigation/thread-switcher"
+import { TreeList } from "./orchestration/navigation/tree-list"
+import { ArtifactDrawer } from "./orchestration/artifacts/artifact-drawer"
+import { HelpPanel, UsageHint } from "./orchestration/overlays/help-panel"
+import { ThreadChatTopbar } from "./orchestration/navigation/thread-chat-topbar"
+import { useWorkspaceOverlays } from "./orchestration/overlays/use-workspace-overlays"
 import {
   useWorkspaceToast,
   WorkspaceToast,
-} from "./orchestration/workspace-toast"
-import { useThreadChatRuntime } from "./orchestration/use-thread-chat-runtime"
-import { useThreadChatWorkspace } from "./orchestration/use-thread-chat-workspace"
-import { createBranchWorkspaceActions } from "./orchestration/branch-workspace-actions"
+} from "./orchestration/overlays/workspace-toast"
+import { useThreadChatRuntime } from "./orchestration/workspace/use-thread-chat-runtime"
+import { useThreadChatWorkspace } from "./orchestration/workspace/use-thread-chat-workspace"
+import { createBranchWorkspaceActions } from "./orchestration/workspace/branch-workspace-actions"
 
 /** 画布视图层懒加载：React Flow 只在首次进入画布模式时才落地（且跳过 SSR） */
 const ThreadCanvas = dynamic(
-  () => import("./orchestration/thread-canvas").then((m) => m.ThreadCanvas),
+  () =>
+    import("./orchestration/canvas/thread-canvas").then((m) => m.ThreadCanvas),
   {
     ssr: false,
     loading: () => <div className="canvas-loading">画布加载中…</div>,

@@ -12,7 +12,7 @@ import {
 } from "../../constants/model.ts"
 import { MODEL_COST, costMicros } from "../../constants/pricing.ts"
 import { createThreadStore } from "../../app/thread-chat/core/store.ts"
-import { sanitizeLoadedState } from "../../app/thread-chat/net/sanitize-loaded-state.ts"
+import { sanitizeLoadedState } from "../../app/thread-chat/net/persistence/sanitize-loaded-state.ts"
 
 const DEFAULT_MODEL_ID = DEFAULT_THREAD_CHAT_MODEL_ID
 const validIds = new Set(THREAD_CHAT_MODELS.map((model) => model.id))

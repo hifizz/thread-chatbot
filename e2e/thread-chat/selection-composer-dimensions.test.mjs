@@ -2,10 +2,10 @@ import assert from "node:assert/strict"
 import { readFile } from "node:fs/promises"
 import test from "node:test"
 
-import { SELECTION_QUESTION_MAX_HEIGHT } from "../../app/thread-chat/branching/selection-composer-dimensions.ts"
+import { SELECTION_QUESTION_MAX_HEIGHT } from "../../app/thread-chat/branching/selection/selection-composer-dimensions.ts"
 
 const componentUrl = new URL(
-  "../../app/thread-chat/branching/selection-bubble.tsx",
+  "../../app/thread-chat/branching/selection/selection-bubble.tsx",
   import.meta.url
 )
 const cssUrl = new URL(

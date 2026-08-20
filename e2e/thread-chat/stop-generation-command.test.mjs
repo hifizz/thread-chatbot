@@ -1,5 +1,5 @@
 import assert from "node:assert/strict"
-import { requestGenerationStop } from "../../app/thread-chat/net/stop-generation-command.ts"
+import { requestGenerationStop } from "../../app/thread-chat/net/commands/stop-generation-command.ts"
 
 const generationId = "11111111-1111-4111-8111-111111111111"
 let request

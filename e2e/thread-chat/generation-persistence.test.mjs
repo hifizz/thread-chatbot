@@ -8,7 +8,7 @@ import {
   projectGenerationResult,
 } from "../../app/thread-chat/generation/project-result.ts"
 import { mergeGenerationResult } from "../../app/thread-chat/generation/merge-result.ts"
-import { sanitizeLoadedState } from "../../app/thread-chat/net/sanitize-loaded-state.ts"
+import { sanitizeLoadedState } from "../../app/thread-chat/net/persistence/sanitize-loaded-state.ts"
 import { GENERATION_RESULT_VERSION } from "../../constants/generation.ts"
 
 async function test(name, fn) {

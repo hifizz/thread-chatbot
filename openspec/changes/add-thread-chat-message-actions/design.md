@@ -274,7 +274,7 @@ export function compileThreadChatMessages(input: {
 }): UIMessageLike[]
 ```
 
-模块建议为 `app/thread-chat/net/message-context.ts`，只依赖 core selectors、message serialization 和常量，可被客户端与 route handler 导入。当前 Thread 使用 `activeMessagePath`；祖先 Thread 使用 `messagePathTo(parent, child.forkFromMsgId)`，不得从祖先当前 active leaf 推断继承内容。
+模块建议为 `app/thread-chat/net/prompt/message-context.ts`，只依赖 core selectors、message serialization 和常量，可被客户端与 route handler 导入。当前 Thread 使用 `activeMessagePath`；祖先 Thread 使用 `messagePathTo(parent, child.forkFromMsgId)`，不得从祖先当前 active leaf 推断继承内容。
 
 `prepareGeneration(created=true)` 返回事务内最终 state；`/api/chat` 对所有 thread-chat 请求使用该 state 编译 `resolvedMessages`，而不是把客户端 `messages` 当权威上下文。thread-chat body 不保留旧消息 body 的兼容分支；线性 assistant-ui 聊天仍沿用自身 messages 路径。
 

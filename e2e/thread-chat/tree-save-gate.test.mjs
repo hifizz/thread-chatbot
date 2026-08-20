@@ -1,5 +1,5 @@
 import assert from "node:assert/strict"
-import { createTreeSaveGate } from "../../app/thread-chat/net/tree-save-gate.ts"
+import { createTreeSaveGate } from "../../app/thread-chat/net/persistence/tree-save-gate.ts"
 
 const normal = createTreeSaveGate()
 normal.markPending()

@@ -7,10 +7,10 @@ import {
   saveTree,
   saveTreeStrict,
   setKnownTreeRevision,
-} from "../../app/thread-chat/net/persist.ts"
+} from "../../app/thread-chat/net/persistence/persist.ts"
 
 const source = await readFile(
-  new URL("../../app/thread-chat/net/persist.ts", import.meta.url),
+  new URL("../../app/thread-chat/net/persistence/persist.ts", import.meta.url),
   "utf8"
 )
 assert.equal(

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict"
-import { workspaceToastDuration } from "../../app/thread-chat/orchestration/workspace-toast-logic.ts"
+import { workspaceToastDuration } from "../../app/thread-chat/orchestration/overlays/workspace-toast-logic.ts"
 
 assert.equal(workspaceToastDuration({ message: "saved" }), 2600)
 assert.equal(workspaceToastDuration({ message: "replaced", undo() {} }), 5200)

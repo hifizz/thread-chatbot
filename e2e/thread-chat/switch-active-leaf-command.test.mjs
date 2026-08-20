@@ -1,5 +1,5 @@
 import assert from "node:assert/strict"
-import { switchActiveLeaf } from "../../app/thread-chat/net/switch-active-leaf-command.ts"
+import { switchActiveLeaf } from "../../app/thread-chat/net/commands/switch-active-leaf-command.ts"
 
 const input = {
   treeId: "11111111-1111-4111-8111-111111111111",

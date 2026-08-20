@@ -1,5 +1,5 @@
 import assert from "node:assert/strict"
-import { branchTitleCandidate } from "../../app/thread-chat/net/branch-title-candidate.ts"
+import { branchTitleCandidate } from "../../app/thread-chat/net/titles/branch-title-candidate.ts"
 import { defaultBranchTitle } from "../../app/thread-chat/core/store.ts"
 
 const anchorText = "a sufficiently long selected passage"

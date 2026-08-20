@@ -13,10 +13,10 @@
 import React from "react"
 import { MessageScroller } from "@shadcn/react/message-scroller"
 import type { Message } from "../core/types"
-import { ConversationComposer } from "./conversation-composer"
-import { ConversationMessage } from "./conversation-message"
-import type { MessageActionViewState } from "./message-action-types"
-import type { ThreadMessageActionCommands } from "./message-action-commands"
+import { ConversationComposer } from "./composer/conversation-composer"
+import { ConversationMessage } from "./message/conversation-message"
+import type { MessageActionViewState } from "./actions/message-action-types"
+import type { ThreadMessageActionCommands } from "./actions/message-action-commands"
 
 export interface ChatViewProps {
   /** 会话 id：写到 .msg-list 的 data-list 上（划选气泡靠它反查消息） */

@@ -7,7 +7,7 @@ const shell = await readFile(
 )
 const workspace = await readFile(
   new URL(
-    "../../app/thread-chat/orchestration/use-thread-chat-workspace.ts",
+    "../../app/thread-chat/orchestration/workspace/use-thread-chat-workspace.ts",
     import.meta.url
   ),
   "utf8"

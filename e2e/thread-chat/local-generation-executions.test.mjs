@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import { readFile } from "node:fs/promises"
 import test from "node:test"
 
-import { createLocalGenerationExecutions } from "../../app/thread-chat/net/local-generation-executions.ts"
+import { createLocalGenerationExecutions } from "../../app/thread-chat/net/stream/local-generation-executions.ts"
 
 await test("local generation registry tracks ownership and active generation ids", () => {
   const executions = createLocalGenerationExecutions()
@@ -53,7 +53,7 @@ await test("reconciliation skips only generations with a local SSE owner", async
     ),
     readFile(
       new URL(
-        "../../app/thread-chat/orchestration/use-thread-chat-runtime.ts",
+        "../../app/thread-chat/orchestration/workspace/use-thread-chat-runtime.ts",
         import.meta.url
       ),
       "utf8"

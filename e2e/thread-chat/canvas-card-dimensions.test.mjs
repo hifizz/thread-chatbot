@@ -6,14 +6,14 @@ import {
   CANVAS_CARD_BASE_HEIGHT,
   CANVAS_CARD_DIMENSIONS,
   CANVAS_CARD_INNER_WIDTH,
-} from "../../app/thread-chat/orchestration/canvas-card-dimensions.ts"
+} from "../../app/thread-chat/orchestration/canvas/canvas-card-dimensions.ts"
 
 const layoutUrl = new URL(
-  "../../app/thread-chat/orchestration/use-canvas-layout.ts",
+  "../../app/thread-chat/orchestration/canvas/use-canvas-layout.ts",
   import.meta.url
 )
 const nodeUrl = new URL(
-  "../../app/thread-chat/orchestration/canvas-node.tsx",
+  "../../app/thread-chat/orchestration/canvas/canvas-node.tsx",
   import.meta.url
 )
 const cssUrl = new URL(

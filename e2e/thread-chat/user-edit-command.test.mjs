@@ -1,5 +1,5 @@
 import assert from "node:assert/strict"
-import { prepareUserEdit } from "../../app/thread-chat/net/regeneration-command.ts"
+import { prepareUserEdit } from "../../app/thread-chat/net/commands/regeneration-command.ts"
 
 function state(activeLeafMessageId = "a1") {
   return {

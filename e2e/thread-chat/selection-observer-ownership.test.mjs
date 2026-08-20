@@ -2,12 +2,12 @@ import assert from "node:assert/strict"
 import { readFile } from "node:fs/promises"
 
 const component = await readFile(
-  new URL("../../app/thread-chat/branching/selection-bubble.tsx", import.meta.url),
+  new URL("../../app/thread-chat/branching/selection/selection-bubble.tsx", import.meta.url),
   "utf8"
 )
 const observer = await readFile(
   new URL(
-    "../../app/thread-chat/branching/use-assistant-text-selection.ts",
+    "../../app/thread-chat/branching/selection/use-assistant-text-selection.ts",
     import.meta.url
   ),
   "utf8"

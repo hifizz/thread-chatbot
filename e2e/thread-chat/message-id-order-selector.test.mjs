@@ -55,7 +55,7 @@ await test("column and canvas views consume the shared message id selector", asy
     ),
     readFile(
       new URL(
-        "../../app/thread-chat/orchestration/use-canvas-layout.ts",
+        "../../app/thread-chat/orchestration/canvas/use-canvas-layout.ts",
         import.meta.url
       ),
       "utf8"

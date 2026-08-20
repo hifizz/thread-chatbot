@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { readFile } from "node:fs/promises"
 
-import { SWITCHER_DIMENSIONS } from "../../app/thread-chat/orchestration/switcher-dimensions.ts"
+import { SWITCHER_DIMENSIONS } from "../../app/thread-chat/orchestration/navigation/switcher-dimensions.ts"
 
 assert.deepEqual(SWITCHER_DIMENSIONS, {
   column: { width: 330, height: 420 },
@@ -10,11 +10,11 @@ assert.deepEqual(SWITCHER_DIMENSIONS, {
 
 const [hook, component, localCss, subtreeCss] = await Promise.all([
   readFile(
-    new URL("../../app/thread-chat/orchestration/use-workspace-overlays.ts", import.meta.url),
+    new URL("../../app/thread-chat/orchestration/overlays/use-workspace-overlays.ts", import.meta.url),
     "utf8"
   ),
   readFile(
-    new URL("../../app/thread-chat/orchestration/thread-switcher.tsx", import.meta.url),
+    new URL("../../app/thread-chat/orchestration/navigation/thread-switcher.tsx", import.meta.url),
     "utf8"
   ),
   readFile(new URL("../../app/thread-chat/styles/switcher.css", import.meta.url), "utf8"),

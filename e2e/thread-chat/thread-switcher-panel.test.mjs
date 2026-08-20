@@ -4,7 +4,7 @@ import React from "react"
 import { renderToStaticMarkup } from "react-dom/server"
 import test from "node:test"
 
-import { ThreadSwitcherPanel } from "../../app/thread-chat/orchestration/thread-switcher-panel.tsx"
+import { ThreadSwitcherPanel } from "../../app/thread-chat/orchestration/navigation/thread-switcher-panel.tsx"
 
 const thread = (overrides) => ({
   id: "main",
@@ -82,7 +82,7 @@ await test("subtree panel owns its title, empty state, and compact footer", () =
 await test("switcher shell delegates shared panel state and row rendering", async () => {
   const shell = await readFile(
     new URL(
-      "../../app/thread-chat/orchestration/thread-switcher.tsx",
+      "../../app/thread-chat/orchestration/navigation/thread-switcher.tsx",
       import.meta.url
     ),
     "utf8"

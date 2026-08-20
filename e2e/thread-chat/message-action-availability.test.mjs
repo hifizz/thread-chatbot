@@ -3,8 +3,8 @@
  *   node --import tsx e2e/thread-chat/message-action-availability.test.mjs
  */
 import assert from "node:assert/strict"
-import { hasCompletedAssistantActions } from "../../app/thread-chat/chat/message-action-types.ts"
-import { messageToolbarTooltip } from "../../app/thread-chat/chat/message-toolbar.tsx"
+import { hasCompletedAssistantActions } from "../../app/thread-chat/chat/actions/message-action-types.ts"
+import { messageToolbarTooltip } from "../../app/thread-chat/chat/actions/message-toolbar.tsx"
 
 const message = (status, text = "回复") => ({
   id: "assistant-message-id",

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict"
-import { createAssistantDeltaBuffer } from "../../app/thread-chat/net/assistant-delta-buffer.ts"
+import { createAssistantDeltaBuffer } from "../../app/thread-chat/net/stream/assistant-delta-buffer.ts"
 
 function harness() {
   const calls = []
