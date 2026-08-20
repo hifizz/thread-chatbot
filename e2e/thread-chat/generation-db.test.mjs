@@ -34,7 +34,7 @@ const userId = `generation-db-test-${suffix}`
 const otherUserId = `generation-db-test-other-${suffix}`
 const treeId = randomUUID()
 const otherTreeId = randomUUID()
-const generations = Array.from({ length: 7 }, () => randomUUID())
+const generations = Array.from({ length: 8 }, () => randomUUID())
 
 function stateFor(generationId) {
   return {
@@ -422,6 +422,29 @@ async function run() {
       )
     )
   assert.equal(active.length, 0)
+
+  await persistPlaceholder(generations[7])
+  await startGeneration(startInput(generations[7]))
+  assert.equal(
+    (await getGenerationForOwner(userId, generations[4])).billingStatus,
+    "usage_unavailable"
+  )
+  await finalizeGeneration({
+    generationId: generations[4],
+    outcome: "failed",
+    result: resultFor(generations[4], "待对账 attempt 的重复收口"),
+  })
+  assert.equal(
+    (await getGenerationForOwner(userId, generations[4])).billingStatus,
+    "usage_unavailable",
+    "无 usage 的 superseded 重放不得清除既有待对账状态"
+  )
+  await finalizeGeneration({
+    generationId: generations[7],
+    outcome: "completed",
+    result: resultFor(generations[7]),
+    usageUnavailable: true,
+  })
 
   console.log(
     "PASS  repository 并发重放/current、Stop 竞态、supersede、stale、越权与 finalize 幂等计费"

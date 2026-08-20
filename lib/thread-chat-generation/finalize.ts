@@ -35,6 +35,22 @@ type GenerationBillingIdentity = {
   assistantMessageId: string
 }
 
+const BILLING_STATUS_PROGRESS: Record<GenerationBillingStatus, number> = {
+  pending: 0,
+  not_billable: 1,
+  usage_unavailable: 2,
+  settled: 3,
+}
+
+function advanceBillingStatus(
+  current: GenerationBillingStatus,
+  candidate: GenerationBillingStatus
+): GenerationBillingStatus {
+  return BILLING_STATUS_PROGRESS[candidate] > BILLING_STATUS_PROGRESS[current]
+    ? candidate
+    : current
+}
+
 async function settleGenerationUsage(
   tx: BillingTransaction,
   generation: GenerationBillingIdentity,
@@ -101,8 +117,7 @@ export async function finalizeGeneration(input: FinalizeGenerationInput) {
         .set({
           result: input.result,
           error: input.error ?? null,
-          billingStatus:
-            row.billingStatus === "settled" ? "settled" : billingStatus,
+          billingStatus: advanceBillingStatus(row.billingStatus, billingStatus),
           finishedAt: row.finishedAt ?? now,
           updatedAt: now,
         })
