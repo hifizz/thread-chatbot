@@ -71,7 +71,11 @@ export function getKnownTreeRevision(treeId: string): number {
 }
 
 export function setKnownTreeRevision(treeId: string, revision: number): void {
-  revisionByTreeId.set(treeId, revision)
+  const current = revisionByTreeId.get(treeId)
+  revisionByTreeId.set(
+    treeId,
+    current === undefined ? revision : Math.max(current, revision)
+  )
 }
 
 /** GET 整树：未保存过 state 为 null（正常首访路径）；请求失败也降级为空并 console.warn（空树启动） */
@@ -229,6 +233,7 @@ export async function deleteTree(id: string): Promise<void> {
 
 /** 删除某棵树后的本地善后（design D4）：清工作台记忆；「最近一棵」若指向它则清除 */
 export function cleanupAfterTreeDelete(id: string): void {
+  revisionByTreeId.delete(id)
   try {
     localStorage.removeItem(uiKeyOf(id))
     if (localStorage.getItem(LAST_TREE_ID_KEY) === id)

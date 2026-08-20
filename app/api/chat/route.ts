@@ -138,7 +138,7 @@ export async function POST(req: Request) {
       ...(generationController
         ? { abortSignal: generationController.signal }
         : {}),
-      reasoning: reasoningForResearchRoute(researchRoute.mode),
+      reasoning: reasoningForResearchRoute(researchRoute.mode, model),
       system,
       messages: await convertToModelMessages(resolvedMessages, {
         tools: allTools,

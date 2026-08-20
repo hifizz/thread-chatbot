@@ -10,6 +10,7 @@ import {
   RESEARCH_ROUTER_MAX_OUTPUT_TOKENS,
   RESEARCH_ROUTER_SYSTEM_PROMPT,
 } from "@/constants/research"
+import type { ChatModel } from "@/constants/model"
 import { MODEL_CALL_PURPOSE } from "@/constants/model-call"
 import {
   withModelCallLogging,
@@ -358,8 +359,17 @@ export async function createResearchPlan({
 }
 
 export function reasoningForResearchRoute(
-  mode: ResearchRouteMode
-): "provider-default" | "medium" | "high" {
+  mode: ResearchRouteMode,
+  model?: Pick<ChatModel, "provider" | "umapisCredentialGroup">
+): "provider-default" | "none" | "medium" | "high" {
+  // UMAPIS 的 Anthropic 兼容端点可能不返回可供下一工具步骤回放的 signed
+  // reasoning metadata；多步联网时显式关闭，避免丢弃历史 reasoning 并逐步告警。
+  if (
+    model?.provider === "umapis" &&
+    model.umapisCredentialGroup === "claude" &&
+    mode !== "answer"
+  )
+    return "none"
   if (mode === "research") return "high"
   if (mode === "search" || mode === "fetch") return "medium"
   return "provider-default"

@@ -31,20 +31,25 @@ try {
   setKnownTreeRevision(treeId, 0)
   await saveTreeStrict(treeId, emptySeedState(), "strict")
   await saveTree(treeId, emptySeedState(), "best effort")
+  // /api/chat 可能在上面的第二次存盘之后才返回启动时捕获的旧 revision；
+  // 旧响应不得让下一次存盘倒退到已经失效的 baseRevision。
+  setKnownTreeRevision(treeId, 1)
+  await saveTreeStrict(treeId, emptySeedState(), "after stale response")
 } finally {
   globalThis.fetch = originalFetch
 }
 
-assert.equal(calls.length, 2)
+assert.equal(calls.length, 3)
 assert.deepEqual(
   calls.map((call) => [call.init.method, call.body.title, call.body.baseRevision]),
   [
     ["PUT", "strict", 0],
     ["PUT", "best effort", 1],
+    ["PUT", "after stale response", 2],
   ]
 )
-assert.equal(getKnownTreeRevision(treeId), 2)
+assert.equal(getKnownTreeRevision(treeId), 3)
 
 console.log(
-  "PASS  strict and best-effort tree saves share one revision-aware PUT primitive"
+  "PASS  tree saves share one PUT primitive and stale responses cannot regress revision"
 )
