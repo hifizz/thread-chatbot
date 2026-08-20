@@ -21,7 +21,7 @@
  */
 
 import React, { useEffect, useState } from "react"
-import { Check, ListTodo, Pencil, Trash2, X } from "lucide-react"
+import { ListTodo } from "lucide-react"
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog"
 import { Dialog, DialogPortal } from "@/components/ui/dialog"
 import {
@@ -30,6 +30,7 @@ import {
 } from "@/constants/thread-chat"
 import { dialogCloseToShell } from "./thread-switcher"
 import { ShortcutHint } from "./shortcut-hint"
+import { TreeListRow } from "./tree-list-row"
 import {
   cleanupAfterTreeDelete,
   deleteTree,
@@ -59,22 +60,6 @@ export interface TreeListProps {
   closing?: boolean
   /** Dialog Portal 的挂载点（.tc 根）：保证 .swx / .tlx 选择器与纸面 CSS 变量继续生效 */
   container?: React.RefObject<HTMLElement | null>
-}
-
-/** 相对时间：「刚刚 / N 分钟前 / N 小时前 / N 天前 / M月D日」 */
-function relativeTime(iso: string): string {
-  const t = new Date(iso).getTime()
-  if (Number.isNaN(t)) return ""
-  const diff = Date.now() - t
-  const min = Math.floor(diff / 60_000)
-  if (min < 1) return "刚刚"
-  if (min < 60) return `${min} 分钟前`
-  const hr = Math.floor(min / 60)
-  if (hr < 24) return `${hr} 小时前`
-  const day = Math.floor(hr / 24)
-  if (day < 30) return `${day} 天前`
-  const d = new Date(t)
-  return `${d.getMonth() + 1}月${d.getDate()}日`
 }
 
 export function TreeList({
@@ -243,112 +228,30 @@ export function TreeList({
                 const editing = editingId === item.id
                 const confirming = confirmId === item.id
                 return (
-                  <div
+                  <TreeListRow
                     key={item.id}
-                    className={`swx-row tlx-row ${isCurrent ? "cur" : ""}`}
-                    onClick={() => {
-                      if (editing || confirming || deletingId === item.id)
-                        return
+                    item={item}
+                    isCurrent={isCurrent}
+                    unsaved={unsaved}
+                    editing={editing}
+                    confirming={confirming}
+                    deleting={deletingId === item.id}
+                    draft={draft}
+                    onSelect={() => {
                       onClose()
                       if (!isCurrent) onSwitch(item.id)
                     }}
-                  >
-                    <span className="dot" />
-                    {editing ? (
-                      <input
-                        className="tlx-edit"
-                        autoFocus
-                        value={draft}
-                        maxLength={CUSTOM_TITLE_MAX_LEN}
-                        onFocus={(e) => e.currentTarget.select()}
-                        onChange={(e) => setDraft(e.target.value)}
-                        onClick={(e) => e.stopPropagation()}
-                        onBlur={() => setEditingId(null)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            e.preventDefault()
-                            commitEdit(item.id)
-                          }
-                          // Esc 由上面的捕获期监听统一处理（取消编辑并拦下冒泡）
-                        }}
-                      />
-                    ) : (
-                      <>
-                        <span className="t">{item.title}</span>
-                        {unsaved && (
-                          <span className="st tlx-unsaved">未保存</span>
-                        )}
-                        {isCurrent && !unsaved && (
-                          <span className="st">当前</span>
-                        )}
-                        <span className="tlx-meta">
-                          {item.threadCount > 1 && (
-                            <span
-                              className="tlx-badge"
-                              title={`${item.threadCount - 1} 个分支`}
-                            >
-                              ⑂ {item.threadCount - 1}
-                            </span>
-                          )}
-                          {item.updatedAt && (
-                            <span className="tlx-time">
-                              {relativeTime(item.updatedAt)}
-                            </span>
-                          )}
-                        </span>
-                        <span
-                          className="tlx-acts"
-                          onClick={(e) => e.stopPropagation()}
-                          onMouseDown={(e) => e.stopPropagation()}
-                        >
-                          {confirming ? (
-                            <>
-                              <button
-                                className="tlx-act danger confirm"
-                                title="确认删除（不可撤销）"
-                                onClick={() => void doDelete(item.id)}
-                              >
-                                <Check size={12} />
-                                确认删除
-                              </button>
-                              <button
-                                className="tlx-act"
-                                title="取消"
-                                onClick={() => setConfirmId(null)}
-                              >
-                                <X size={12} />
-                              </button>
-                            </>
-                          ) : (
-                            <>
-                              {!unsaved && (
-                                <button
-                                  className="tlx-act"
-                                  title="重命名"
-                                  onClick={() => startEdit(item)}
-                                >
-                                  <Pencil size={12} />
-                                </button>
-                              )}
-                              {!unsaved && (
-                                <button
-                                  className="tlx-act danger"
-                                  title="删除此对话"
-                                  disabled={deletingId === item.id}
-                                  onClick={() => {
-                                    setEditingId(null)
-                                    setConfirmId(item.id)
-                                  }}
-                                >
-                                  <Trash2 size={12} />
-                                </button>
-                              )}
-                            </>
-                          )}
-                        </span>
-                      </>
-                    )}
-                  </div>
+                    onDraftChange={setDraft}
+                    onCancelEdit={() => setEditingId(null)}
+                    onCommitEdit={() => commitEdit(item.id)}
+                    onStartEdit={() => startEdit(item)}
+                    onRequestDelete={() => {
+                      setEditingId(null)
+                      setConfirmId(item.id)
+                    }}
+                    onConfirmDelete={() => void doDelete(item.id)}
+                    onCancelDelete={() => setConfirmId(null)}
+                  />
                 )
               })}
             {items !== null && rows.length === 1 && rows[0].unsaved && (
