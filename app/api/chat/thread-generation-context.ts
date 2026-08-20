@@ -1,7 +1,6 @@
 import type { UIMessage } from "ai"
-import { isThreadChatModelId } from "@/constants/model"
 import { compileThreadChatMessages } from "@/lib/thread-chat/application/compile-thread-chat-messages"
-import { threadChatGenerationIdentitySchema } from "@/lib/thread-chat/contracts/generation-identity"
+import type { ThreadChatGenerationIdentity } from "@/lib/thread-chat/contracts/generation-identity"
 import {
   observeGenerationCancellation,
   registerGenerationController,
@@ -17,12 +16,11 @@ type ThreadGenerationContextInput = {
   userId: string
   modelId: string
   messages: UIMessage[]
-  threadChat: unknown
+  threadChat?: ThreadChatGenerationIdentity
   unbilledPreview: boolean
 }
 
 type ThreadGenerationContextDependencies = {
-  threadModelAllowed: typeof isThreadChatModelId
   prepare: typeof prepareGeneration
   summarize: typeof toGenerationSummary
   compile: typeof compileThreadChatMessages
@@ -35,7 +33,6 @@ type ThreadGenerationContextDependencies = {
 }
 
 const defaultDependencies: ThreadGenerationContextDependencies = {
-  threadModelAllowed: isThreadChatModelId,
   prepare: prepareGeneration,
   summarize: toGenerationSummary,
   compile: compileThreadChatMessages,
@@ -70,36 +67,7 @@ export async function prepareThreadGenerationContext(
     }
   }
 
-  const parsed = threadChatGenerationIdentitySchema.safeParse(threadChat)
-  if (!parsed.success) {
-    return {
-      kind: "response" as const,
-      response: Response.json(
-        {
-          error: {
-            code: "invalid_generation_identity",
-            message: "thread-chat 请求缺少有效的持久化身份，请刷新页面后重试",
-          },
-        } satisfies MessageActionFailureResponse,
-        { status: 400 }
-      ),
-    }
-  }
-  const persistence = parsed.data
-  if (!dependencies.threadModelAllowed(modelId)) {
-    return {
-      kind: "response" as const,
-      response: Response.json(
-        {
-          error: {
-            code: "invalid_thread_model",
-            message: "Thread Chat 不允许使用该模型，请刷新页面后重试",
-          },
-        } satisfies MessageActionFailureResponse,
-        { status: 400 }
-      ),
-    }
-  }
+  const persistence = threadChat
 
   let started: Awaited<ReturnType<typeof dependencies.prepare>>
   try {

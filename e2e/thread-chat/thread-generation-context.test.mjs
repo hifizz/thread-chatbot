@@ -15,7 +15,6 @@ const identity = {
 
 function dependencies(overrides = {}) {
   return {
-    threadModelAllowed: () => true,
     async prepare() {
       assert.fail("prepare should be overridden for a valid Thread request")
     },
@@ -44,38 +43,6 @@ assert.equal(linear.kind, "ready")
 assert.equal(linear.persistence, null)
 assert.equal(linear.authoritativeMessages, messages)
 assert.equal(linear.generationController, null)
-
-const invalidIdentity = await prepareThreadGenerationContext(
-  {
-    userId: "user-1",
-    modelId: "glm-5.3",
-    messages,
-    threadChat: { treeId: "invalid" },
-  },
-  dependencies()
-)
-assert.equal(invalidIdentity.kind, "response")
-assert.equal(invalidIdentity.response.status, 400)
-assert.equal(
-  (await invalidIdentity.response.json()).error.code,
-  "invalid_generation_identity"
-)
-
-const invalidModel = await prepareThreadGenerationContext(
-  {
-    userId: "user-1",
-    modelId: "minimax-m2",
-    messages,
-    threadChat: identity,
-  },
-  dependencies({ threadModelAllowed: () => false })
-)
-assert.equal(invalidModel.kind, "response")
-assert.equal(invalidModel.response.status, 400)
-assert.equal(
-  (await invalidModel.response.json()).error.code,
-  "invalid_thread_model"
-)
 
 const existingGeneration = { id: identity.generationId, status: "streaming" }
 const duplicate = await prepareThreadGenerationContext(
@@ -199,5 +166,5 @@ assert.equal(
 assert.equal(initializationSettlements[0].usageUnavailable, true)
 
 console.log(
-  "PASS  thread generation context owns identity, surface, idempotency, authoritative state, cancellation, and mapped failures"
+  "PASS  thread generation context owns start idempotency, authoritative state, cancellation, and post-start settlement"
 )
