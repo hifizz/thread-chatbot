@@ -44,6 +44,17 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
+type GenerationExecutionState = Awaited<
+  ReturnType<typeof getGenerationExecutionState>
+>
+
+/** DB 权威状态中只有 current running attempt 仍被允许继续消耗模型执行。 */
+export function shouldContinueGenerationExecution(
+  execution: GenerationExecutionState
+): boolean {
+  return execution?.status === "running" && execution.isCurrent
+}
+
 export function observeGenerationCancellation(
   generationId: string,
   controller: AbortController
@@ -56,12 +67,7 @@ export function observeGenerationCancellation(
       if (stopped || controller.signal.aborted) break
       try {
         const execution = await getGenerationExecutionState(generationId)
-        if (
-          !execution ||
-          execution.status === "stop_requested" ||
-          execution.status === "superseded" ||
-          !execution.isCurrent
-        ) {
+        if (!shouldContinueGenerationExecution(execution)) {
           controller.abort(
             new DOMException("Generation stopped by server state", "AbortError")
           )

@@ -13,6 +13,7 @@ import {
   getBalanceMicros,
 } from "../../lib/billing/credits.ts"
 import { finalizeGeneration } from "../../lib/thread-chat-generation/finalize.ts"
+import { observeGenerationCancellation } from "../../lib/thread-chat-generation/execution.ts"
 import {
   GenerationRepositoryError,
   startGeneration,
@@ -23,7 +24,10 @@ import {
   getGenerationForOwner,
   listCurrentGenerationsForTree,
 } from "../../lib/thread-chat-generation/query-repository.ts"
-import { GENERATION_LEASE_MS } from "../../constants/generation.ts"
+import {
+  GENERATION_CANCEL_POLL_MS,
+  GENERATION_LEASE_MS,
+} from "../../constants/generation.ts"
 
 const suffix = randomUUID()
 const userId = `generation-db-test-${suffix}`
@@ -284,6 +288,21 @@ async function run() {
     (await getGenerationForOwner(userId, generations[2])).status,
     "failed",
     "过期 heartbeat 必须收敛 failed"
+  )
+  const terminalController = new AbortController()
+  const terminalObserver = observeGenerationCancellation(
+    generations[2],
+    terminalController
+  )
+  await new Promise((resolve) =>
+    setTimeout(resolve, GENERATION_CANCEL_POLL_MS + 250)
+  )
+  terminalObserver.stop()
+  await terminalObserver.done
+  assert.equal(
+    terminalController.signal.aborted,
+    true,
+    "DB 已收敛终态时仍在运行的执行必须由 observer 中止"
   )
   const staleBeforeLateFinalize = await getGenerationForOwner(
     userId,
