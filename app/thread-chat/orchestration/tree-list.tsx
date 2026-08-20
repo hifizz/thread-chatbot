@@ -28,7 +28,7 @@ import {
   CUSTOM_TITLE_MAX_LEN,
   THREAD_CHAT_SHORTCUTS,
 } from "@/constants/thread-chat"
-import { dialogCloseToShell } from "./thread-switcher"
+import { dialogCloseToShell } from "./dialog-close-to-shell"
 import { ShortcutHint } from "./shortcut-hint"
 import { TreeListRow } from "./tree-list-row"
 import {

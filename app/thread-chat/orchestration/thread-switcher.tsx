@@ -13,25 +13,10 @@ import type { ThreadTreeState } from "../core/types"
 import type { TreeRow } from "../core/selectors"
 import type { Slot } from "./placement"
 import { SWITCHER_DIMENSIONS } from "./switcher-dimensions"
+import { dialogCloseToShell } from "./dialog-close-to-shell"
 import { ThreadSwitcherPanel, type SwitcherMode } from "./thread-switcher-panel"
 
 export type { SwitcherMode } from "./thread-switcher-panel"
-
-/**
- * Dialog 关闭回调的统一策略：Esc 的权威在壳层 keydown 逐层关闭链。
- * 取消 Dialog 内建 Esc 并放行冒泡，其余关闭原因照常回壳层。
- */
-export function dialogCloseToShell(onClose: () => void) {
-  return (open: boolean, details: DialogPrimitive.Root.ChangeEventDetails) => {
-    if (open) return
-    if (details.reason === "escape-key") {
-      details.cancel()
-      details.allowPropagation()
-      return
-    }
-    onClose()
-  }
-}
 
 export interface ThreadSwitcherProps {
   state: ThreadTreeState

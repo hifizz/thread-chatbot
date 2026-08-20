@@ -5,7 +5,7 @@ import { CircleHelp, Highlighter } from "lucide-react"
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog"
 import { Dialog, DialogPortal } from "@/components/ui/dialog"
 import { THREAD_CHAT_SHORTCUTS } from "@/constants/thread-chat"
-import { dialogCloseToShell } from "./thread-switcher"
+import { dialogCloseToShell } from "./dialog-close-to-shell"
 import { ShortcutHint } from "./shortcut-hint"
 
 /** 首次内联提示与手动 Help Dialog 共用的功能要点。 */
@@ -16,7 +16,8 @@ function UsageTips() {
         <h3 className="helpx-section-title">分支对话</h3>
         <ul>
           <li>
-            <b>划选 AI 回复里的文字</b>开分支，输入框预填相关问题，改写后回车确认
+            <b>划选 AI 回复里的文字</b>
+            开分支，输入框预填相关问题，改写后回车确认
           </li>
           <li>
             按住 <ShortcutHint {...THREAD_CHAT_SHORTCUTS.keepSourceColumn} />
