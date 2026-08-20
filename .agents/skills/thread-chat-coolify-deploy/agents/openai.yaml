@@ -1,0 +1,4 @@
+interface:
+  display_name: "Thread Chat Coolify Deploy"
+  short_description: "Safely deploy and operate thread-chat on Coolify"
+  default_prompt: "Use $thread-chat-coolify-deploy to deploy thread-chat to development and production on Coolify."
