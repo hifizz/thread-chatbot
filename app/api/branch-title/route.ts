@@ -1,6 +1,8 @@
 import { generateText } from "ai"
 import { BRANCH_TITLE_GEN_MAX_LEN } from "@/constants/thread-chat"
+import { MODEL_CALL_PURPOSE } from "@/constants/model-call"
 import { isMinimaxConfigured, minimaxModel } from "@/lib/ai/minimax"
+import { withModelCallLogging } from "@/lib/ai/model-call-logger"
 
 /**
  * POST /api/branch-title —— 异步分支标题生成（openspec: add-bubble-composer D7）。
@@ -77,7 +79,11 @@ export async function POST(req: Request) {
 
   try {
     const { text } = await generateText({
-      model: minimaxModel(),
+      model: withModelCallLogging(
+        minimaxModel(),
+        MODEL_CALL_PURPOSE.branchTitle,
+        { requestId: crypto.randomUUID() }
+      ),
       prompt: buildPrompt(anchorText, question, answer),
     })
     return Response.json({ title: sanitizeTitle(text) })

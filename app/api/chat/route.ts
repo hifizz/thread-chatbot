@@ -12,7 +12,12 @@ import { resolveAttachmentParts } from "@/lib/chat/resolve-attachments"
 import { isSearchConfigured } from "@/lib/ai/search"
 import { RESEARCH_MAX_STEPS } from "@/constants/research"
 import { MAX_OUTPUT_TOKENS } from "@/constants/model"
+import { MODEL_CALL_PURPOSE } from "@/constants/model-call"
 import { resolveChatModel } from "@/lib/ai/provider"
+import {
+  withModelCallLogging,
+  type ModelCallTrace,
+} from "@/lib/ai/model-call-logger"
 import { buildUsageMetadata } from "@/lib/billing/usage-meta"
 import { isExplicitMarkdownArtifactRequest } from "@/lib/chat/markdown-artifact"
 import { reasoningForResearchRoute } from "@/lib/chat/research-router"
@@ -71,12 +76,26 @@ export async function POST(req: Request) {
     const searchReady = isSearchConfigured()
     const isThreadChat = persistence != null
     const chatModel = resolveChatModel(modelId)
+    const modelCallTrace: ModelCallTrace = {
+      requestId: crypto.randomUUID(),
+      ...(persistence
+        ? {
+            treeId: persistence.treeId,
+            threadId: persistence.threadId,
+            generationId: persistence.generationId,
+            assistantMessageId: persistence.assistantMessageId,
+          }
+        : linearThreadId
+          ? { threadId: linearThreadId }
+          : {}),
+    }
     const { latestText, researchRoute, researchPlan } =
       await resolveResearchContext({
         model: chatModel,
         messages: authoritativeMessages,
         deepResearchRequested: research,
         searchReady,
+        modelCallTrace,
       })
     const markdownArtifactRequested =
       isThreadChat && isExplicitMarkdownArtifactRequest(latestText)
@@ -111,7 +130,11 @@ export async function POST(req: Request) {
     })
 
     const result = streamText({
-      model: chatModel,
+      model: withModelCallLogging(
+        chatModel,
+        MODEL_CALL_PURPOSE.chatAnswer,
+        modelCallTrace
+      ),
       ...(generationController
         ? { abortSignal: generationController.signal }
         : {}),

@@ -1,4 +1,5 @@
 import type { LanguageModel, UIMessage } from "ai"
+import type { ModelCallTrace } from "@/lib/ai/model-call-logger"
 import {
   createResearchPlan,
   resolveResearchRoute,
@@ -14,6 +15,7 @@ type ResearchContextInput = {
   messages: UIMessage[]
   deepResearchRequested: boolean
   searchReady: boolean
+  modelCallTrace?: ModelCallTrace
 }
 
 type ResearchContextDependencies = {
@@ -28,7 +30,13 @@ const defaultDependencies: ResearchContextDependencies = {
 
 /** 解析一次请求的联网路由与可选研究计划，不执行实际搜索。 */
 export async function resolveResearchContext(
-  { model, messages, deepResearchRequested, searchReady }: ResearchContextInput,
+  {
+    model,
+    messages,
+    deepResearchRequested,
+    searchReady,
+    modelCallTrace,
+  }: ResearchContextInput,
   dependencies: ResearchContextDependencies = defaultDependencies
 ) {
   const latestText = latestUserText(messages)
@@ -51,6 +59,7 @@ export async function resolveResearchContext(
         latestUserText: latestText,
         recentConversation: recentConversationText(messages),
         searchReady,
+        modelCallTrace,
       })
   const researchPlan =
     researchRoute.mode === "research"
@@ -58,6 +67,7 @@ export async function resolveResearchContext(
           model,
           userRequest: latestText,
           route: researchRoute,
+          modelCallTrace,
         })
       : null
 

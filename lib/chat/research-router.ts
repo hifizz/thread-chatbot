@@ -10,6 +10,11 @@ import {
   RESEARCH_ROUTER_MAX_OUTPUT_TOKENS,
   RESEARCH_ROUTER_SYSTEM_PROMPT,
 } from "@/constants/research"
+import { MODEL_CALL_PURPOSE } from "@/constants/model-call"
+import {
+  withModelCallLogging,
+  type ModelCallTrace,
+} from "@/lib/ai/model-call-logger"
 import {
   researchPlanSchema,
   researchRouteSchema,
@@ -32,6 +37,7 @@ export interface ResolveResearchRouteInput {
   latestUserText: string
   recentConversation: string
   searchReady: boolean
+  modelCallTrace?: ModelCallTrace
 }
 
 function errorSummary(error: unknown): string {
@@ -234,6 +240,7 @@ export async function resolveResearchRoute({
   latestUserText,
   recentConversation,
   searchReady,
+  modelCallTrace,
 }: ResolveResearchRouteInput): Promise<ResearchRoute> {
   const contextualFollowUp = contextualUrlFollowUpRoute(
     latestUserText,
@@ -248,7 +255,11 @@ export async function resolveResearchRoute({
 
   try {
     const result = await generateText({
-      model,
+      model: withModelCallLogging(
+        model,
+        MODEL_CALL_PURPOSE.researchRoute,
+        modelCallTrace
+      ),
       reasoning: "low",
       system: RESEARCH_ROUTER_SYSTEM_PROMPT,
       prompt: [
@@ -282,14 +293,20 @@ export async function createResearchPlan({
   model,
   userRequest,
   route: resolvedRoute,
+  modelCallTrace,
 }: {
   model: LanguageModel
   userRequest: string
   route: ResearchRoute
+  modelCallTrace?: ModelCallTrace
 }): Promise<ResearchPlan> {
   try {
     const result = await generateText({
-      model,
+      model: withModelCallLogging(
+        model,
+        MODEL_CALL_PURPOSE.researchPlan,
+        modelCallTrace
+      ),
       reasoning: "high",
       system: RESEARCH_PLANNER_SYSTEM_PROMPT,
       prompt: [

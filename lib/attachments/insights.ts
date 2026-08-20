@@ -1,5 +1,7 @@
 import { generateText } from "ai"
 import { minimaxModel } from "@/lib/ai/minimax"
+import { MODEL_CALL_PURPOSE } from "@/constants/model-call"
+import { withModelCallLogging } from "@/lib/ai/model-call-logger"
 import {
   INSIGHTS_INPUT_CHAR_LIMIT,
   SUGGESTED_QUESTION_COUNT,
@@ -63,7 +65,11 @@ export async function generateInsights(
   if (!text.trim()) return null
 
   const { text: raw } = await generateText({
-    model: minimaxModel(),
+    model: withModelCallLogging(
+      minimaxModel(),
+      MODEL_CALL_PURPOSE.attachmentInsights,
+      { requestId: crypto.randomUUID() }
+    ),
     prompt: buildPrompt(text),
   })
   return parseInsights(raw)
