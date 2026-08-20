@@ -128,6 +128,7 @@ function verifyTurn(
 
 function assertReplayMatches(row: GenerationRow, input: StartGenerationInput) {
   if (
+    row.userId !== input.userId ||
     row.treeId !== input.treeId ||
     row.threadId !== input.threadId ||
     row.userMessageId !== input.userMessageId ||
@@ -176,12 +177,7 @@ export async function prepareGeneration(
     const [replayed] = await tx
       .select()
       .from(branchGenerations)
-      .where(
-        and(
-          eq(branchGenerations.id, input.generationId),
-          eq(branchGenerations.userId, input.userId)
-        )
-      )
+      .where(eq(branchGenerations.id, input.generationId))
     if (replayed) {
       assertReplayMatches(replayed, input)
       return { created: false, generation: replayed }

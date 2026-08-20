@@ -29,7 +29,8 @@ const suffix = randomUUID()
 const userId = `generation-db-test-${suffix}`
 const otherUserId = `generation-db-test-other-${suffix}`
 const treeId = randomUUID()
-const generations = Array.from({ length: 6 }, () => randomUUID())
+const otherTreeId = randomUUID()
+const generations = Array.from({ length: 7 }, () => randomUUID())
 
 function stateFor(generationId) {
   return {
@@ -146,12 +147,20 @@ async function run() {
       emailVerified: true,
     },
   ])
-  await db.insert(branchTrees).values({
-    id: treeId,
-    userId,
-    title: "generation db test",
-    state: stateFor(generations[0]),
-  })
+  await db.insert(branchTrees).values([
+    {
+      id: treeId,
+      userId,
+      title: "generation db test",
+      state: stateFor(generations[0]),
+    },
+    {
+      id: otherTreeId,
+      userId: otherUserId,
+      title: "generation db other",
+      state: stateFor(generations[6]),
+    },
+  ])
 
   const concurrentReplay = await Promise.all([
     startGeneration(startInput(generations[0])),
@@ -176,6 +185,20 @@ async function run() {
     await requestGenerationStop(otherUserId, generations[0]),
     null,
     "跨用户 Stop 应表现为 404/null"
+  )
+
+  await startGeneration({
+    ...startInput(generations[6]),
+    userId: otherUserId,
+    treeId: otherTreeId,
+  })
+  await persistPlaceholder(generations[6])
+  await assert.rejects(
+    startGeneration(startInput(generations[6])),
+    (error) =>
+      error instanceof GenerationRepositoryError &&
+      error.code === "generation_conflict",
+    "跨用户 generation ID 碰撞必须返回受控冲突"
   )
 
   const changedModelState = stateFor(generations[0])
