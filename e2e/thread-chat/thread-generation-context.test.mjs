@@ -23,7 +23,9 @@ function dependencies(overrides = {}) {
     compile: () => [],
     createController: () => new AbortController(),
     register() {},
+    unregister() {},
     observe: () => ({ stop() {}, done: Promise.resolve() }),
+    async settleInitializationFailure() {},
     startErrorResponse: () => Response.json({ mapped: true }, { status: 409 }),
     ...overrides,
   }
@@ -161,6 +163,40 @@ const mappedFailure = await prepareThreadGenerationContext(
 assert.equal(mappedFailure.kind, "response")
 assert.equal(mappedFailure.response.status, 409)
 assert.deepEqual(await mappedFailure.response.json(), { mapped: true })
+
+const initializationSettlements = []
+const initializationFailure = await prepareThreadGenerationContext(
+  {
+    userId: "user-1",
+    modelId: "glm-5.3",
+    messages,
+    threadChat: identity,
+    unbilledPreview: false,
+  },
+  dependencies({
+    async prepare() {
+      return {
+        created: true,
+        revision: 8,
+        state: { threads: { main: { anchorText: null } } },
+      }
+    },
+    compile() {
+      throw new Error("compile failed after generation creation")
+    },
+    async settleInitializationFailure(input) {
+      initializationSettlements.push(input)
+    },
+  })
+)
+assert.equal(initializationFailure.kind, "response")
+assert.equal(initializationFailure.response.status, 500)
+assert.equal(initializationSettlements.length, 1)
+assert.equal(
+  initializationSettlements[0].persistence.generationId,
+  identity.generationId
+)
+assert.equal(initializationSettlements[0].usageUnavailable, true)
 
 console.log(
   "PASS  thread generation context owns identity, surface, idempotency, authoritative state, cancellation, and mapped failures"

@@ -52,6 +52,7 @@ export async function POST(req: Request) {
     modelId,
     messages,
     threadChat,
+    unbilledPreview: isUnbilledPreview,
   })
   if (prepared.kind === "response") return prepared.response
   const {

@@ -5,10 +5,12 @@ import { threadChatGenerationIdentitySchema } from "@/lib/thread-chat/contracts/
 import {
   observeGenerationCancellation,
   registerGenerationController,
+  unregisterGenerationController,
 } from "@/lib/thread-chat-generation/execution"
 import { toGenerationSummary } from "@/lib/thread-chat-generation/query-repository"
 import { prepareGeneration } from "@/lib/thread-chat-generation/start-generation-repository"
 import { generationStartErrorResponse } from "@/app/api/chat/generation-start-error"
+import { settleGenerationInitializationFailure } from "@/app/api/chat/generation-settlement"
 import type { MessageActionFailureResponse } from "@/lib/thread-chat/contracts/message-action-failure"
 
 type ThreadGenerationContextInput = {
@@ -16,6 +18,7 @@ type ThreadGenerationContextInput = {
   modelId: string
   messages: UIMessage[]
   threadChat: unknown
+  unbilledPreview: boolean
 }
 
 type ThreadGenerationContextDependencies = {
@@ -25,8 +28,10 @@ type ThreadGenerationContextDependencies = {
   compile: typeof compileThreadChatMessages
   createController(): AbortController
   register: typeof registerGenerationController
+  unregister: typeof unregisterGenerationController
   observe: typeof observeGenerationCancellation
   startErrorResponse: typeof generationStartErrorResponse
+  settleInitializationFailure: typeof settleGenerationInitializationFailure
 }
 
 const defaultDependencies: ThreadGenerationContextDependencies = {
@@ -36,13 +41,21 @@ const defaultDependencies: ThreadGenerationContextDependencies = {
   compile: compileThreadChatMessages,
   createController: () => new AbortController(),
   register: registerGenerationController,
+  unregister: unregisterGenerationController,
   observe: observeGenerationCancellation,
   startErrorResponse: generationStartErrorResponse,
+  settleInitializationFailure: settleGenerationInitializationFailure,
 }
 
 /** 校验并准备一次线性或持久化 Thread generation 的权威请求上下文。 */
 export async function prepareThreadGenerationContext(
-  { userId, modelId, messages, threadChat }: ThreadGenerationContextInput,
+  {
+    userId,
+    modelId,
+    messages,
+    threadChat,
+    unbilledPreview,
+  }: ThreadGenerationContextInput,
   dependencies: ThreadGenerationContextDependencies = defaultDependencies
 ) {
   if (threadChat == null) {
@@ -88,22 +101,32 @@ export async function prepareThreadGenerationContext(
     }
   }
 
+  let started: Awaited<ReturnType<typeof dependencies.prepare>>
   try {
-    const started = await dependencies.prepare({
+    started = await dependencies.prepare({
       userId,
       modelId,
       ...persistence,
     })
-    if (!started.created) {
-      return {
-        kind: "response" as const,
-        response: Response.json(
-          { generation: dependencies.summarize(started.generation) },
-          { status: 202 }
-        ),
-      }
+  } catch (error) {
+    return {
+      kind: "response" as const,
+      response: dependencies.startErrorResponse(error),
     }
+  }
+  if (!started.created) {
+    return {
+      kind: "response" as const,
+      response: Response.json(
+        { generation: dependencies.summarize(started.generation) },
+        { status: 202 }
+      ),
+    }
+  }
 
+  let generationController: AbortController | null = null
+  let registered = false
+  try {
     const committedThread = started.state.threads[persistence.threadId]
     const authoritativeAnchorText = committedThread?.anchorText?.trim()
       ? committedThread.anchorText
@@ -113,8 +136,9 @@ export async function prepareThreadGenerationContext(
       threadId: persistence.threadId,
       excludeAssistantMessageId: persistence.assistantMessageId,
     }) as UIMessage[]
-    const generationController = dependencies.createController()
+    generationController = dependencies.createController()
     dependencies.register(persistence.generationId, generationController)
+    registered = true
     const generationObserver = dependencies.observe(
       persistence.generationId,
       generationController
@@ -130,9 +154,25 @@ export async function prepareThreadGenerationContext(
       generationObserver,
     }
   } catch (error) {
+    generationController?.abort(error)
+    if (registered && generationController)
+      dependencies.unregister(persistence.generationId, generationController)
+    await dependencies.settleInitializationFailure({
+      persistence,
+      error,
+      usageUnavailable: !unbilledPreview,
+    })
     return {
       kind: "response" as const,
-      response: dependencies.startErrorResponse(error),
+      response: Response.json(
+        {
+          error: {
+            code: "network_error",
+            message: "生成初始化失败，请重试。",
+          },
+        } satisfies MessageActionFailureResponse,
+        { status: 500 }
+      ),
     }
   }
 }
