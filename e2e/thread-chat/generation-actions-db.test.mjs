@@ -40,7 +40,7 @@ const initialState = {
           parentMessageId: "u1",
           role: "assistant",
           text: "原答案",
-          forks: [{ text: "锚点", num: 1, threadId: "b1", depth: 1 }],
+          forks: [],
           artifactIds: ["artifact-a"],
           generationId: randomUUID(),
           status: "done",
