@@ -69,6 +69,12 @@
 - [ ] 6.3 验证切换后回滚工具不会执行 canonical → ThreadTree 反向同步，也不会把落后 legacy 数据恢复为权威。
 - [ ] 6.4 在声明观察窗口内完成逐日完整性/计费审计，并由负责人批准进入遗留删除阶段。
 
+### 第 6.1/6.2 阶段本地审计基础（不等同生产 dashboard）
+
+- `pnpm audit:conversation-cutover-health` 只读输出 canonical Generation 状态/年龄/checkpoint、billing、outbox、command、usage 对账，以及 legacy 行数、运行时代码引用和可用时的 `pg_stat_statements` 聚合；不输出 Message/SQL 正文或凭据。
+- authority mismatch、HTTP command error、revision/idempotency conflict 和 legacy route 请求率无法由数据库证明，工具显式报告 unavailable；生产必须接入日志/指标平台，不能把“不可见”写成“零”。
+- dashboard 指标、维度、每日证据和放行原则记录在 `docs/architecture/issue-34-observability-runbook.md`。由于尚无目标阈值、负责人、平台告警和真实观察窗口，6.1、6.2、6.4 保持未完成。
+
 ### 第 6.3 阶段本地保护（不等同目标环境验证）
 
 - 新增只读前滚恢复规划器：首个 canonical 写入前只允许“零 canonical 写入”的 legacy abort；首写之后强制保持 canonical authority，只允许 canonical 备份恢复或前滚修复。

@@ -29,6 +29,7 @@
     "audit:conversation-domain": "node scripts/audit-thread-tree-boundary.mjs",
     "audit:legacy-conversations": "node --experimental-strip-types scripts/audit-legacy-conversations.ts",
     "audit:legacy-conversation-deletion": "node scripts/audit-legacy-conversation-deletion.mjs",
+    "audit:conversation-cutover-health": "node scripts/audit-conversation-cutover-health.mjs",
     "import:legacy-conversations": "tsx scripts/import-legacy-conversations.ts",
     "reset:approved-conversations": "tsx scripts/reset-approved-conversations.ts",
     "plan:conversation-forward-recovery": "tsx scripts/plan-conversation-forward-recovery.ts",
