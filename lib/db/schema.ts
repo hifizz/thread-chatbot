@@ -20,6 +20,12 @@ import type {
   GenerationTurnSnapshot,
 } from "@/lib/thread-chat/domain/generation"
 import type { MessageFeedback } from "@/lib/thread-chat/domain/types"
+import type {
+  LifecycleStatus,
+  MessageContent,
+  MessageContentState,
+  MessageRole,
+} from "@/lib/thread-chat/domain/conversation-model"
 
 // 认证与计费表在独立文件中定义，这里统一 re-export，使 drizzle 客户端与迁移能感知它们。
 export * from "./auth-schema"
@@ -47,6 +53,236 @@ export const attachments = dbSchema.table("attachments", {
     .notNull()
     .defaultNow(),
 })
+
+// Issue #34 的规范 Conversation 写模型。迁移期间这些表默认不承载生产写入；旧的
+// branch_trees 仍保留到 retire-thread-tree-authority 完成。关系型约束的可延迟部分
+// 位于对应 Drizzle SQL migration 中。
+export const workspaces = dbSchema.table(
+  "workspaces",
+  {
+    id: text("id").primaryKey(),
+    revision: integer("revision").notNull().default(0),
+    lifecycle: text("lifecycle").$type<LifecycleStatus>().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [index("workspaces_lifecycle_idx").on(table.lifecycle)]
+)
+
+export const workspaceMembers = dbSchema.table(
+  "workspace_members",
+  {
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    role: text("role", { enum: ["owner", "member"] }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    primaryKey({
+      name: "workspace_members_pk",
+      columns: [table.workspaceId, table.userId],
+    }),
+    index("workspace_members_user_id_idx").on(table.userId),
+  ]
+)
+
+export const projects = dbSchema.table(
+  "projects",
+  {
+    id: text("id").primaryKey(),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    revision: integer("revision").notNull().default(0),
+    lifecycle: text("lifecycle").$type<LifecycleStatus>().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("projects_workspace_id_id_uq").on(table.workspaceId, table.id),
+    index("projects_workspace_lifecycle_idx").on(
+      table.workspaceId,
+      table.lifecycle
+    ),
+  ]
+)
+
+export const conversations = dbSchema.table(
+  "conversations",
+  {
+    id: text("id").primaryKey(),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    rootThreadId: text("root_thread_id").notNull(),
+    autoTitle: text("auto_title"),
+    customTitle: text("custom_title"),
+    revision: integer("revision").notNull().default(0),
+    lifecycle: text("lifecycle").$type<LifecycleStatus>().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("conversations_project_id_id_uq").on(table.projectId, table.id),
+    index("conversations_project_updated_idx").on(
+      table.projectId,
+      table.updatedAt
+    ),
+    index("conversations_project_lifecycle_idx").on(
+      table.projectId,
+      table.lifecycle
+    ),
+  ]
+)
+
+export const conversationThreads = dbSchema.table(
+  "conversation_threads",
+  {
+    id: text("id").primaryKey(),
+    conversationId: text("conversation_id")
+      .notNull()
+      .references(() => conversations.id, { onDelete: "cascade" }),
+    modelId: text("model_id").notNull(),
+    localTitle: text("local_title"),
+    revision: integer("revision").notNull().default(0),
+    lifecycle: text("lifecycle").$type<LifecycleStatus>().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("conversation_threads_id_conversation_id_uq").on(
+      table.id,
+      table.conversationId
+    ),
+    index("conversation_threads_conversation_created_idx").on(
+      table.conversationId,
+      table.createdAt
+    ),
+  ]
+)
+
+export const conversationTurns = dbSchema.table(
+  "conversation_turns",
+  {
+    id: text("id").primaryKey(),
+    threadId: text("thread_id")
+      .notNull()
+      .references(() => conversationThreads.id, { onDelete: "cascade" }),
+    position: integer("position").notNull(),
+    activeUserMessageId: text("active_user_message_id").notNull(),
+    activeAssistantMessageId: text("active_assistant_message_id").notNull(),
+    revision: integer("revision").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("conversation_turns_id_thread_id_uq").on(
+      table.id,
+      table.threadId
+    ),
+    uniqueIndex("conversation_turns_thread_position_uq").on(
+      table.threadId,
+      table.position
+    ),
+    index("conversation_turns_active_user_idx").on(table.activeUserMessageId),
+    index("conversation_turns_active_assistant_idx").on(
+      table.activeAssistantMessageId
+    ),
+  ]
+)
+
+export const conversationMessages = dbSchema.table(
+  "conversation_messages",
+  {
+    id: text("id").primaryKey(),
+    threadId: text("thread_id").notNull(),
+    turnId: text("turn_id").notNull(),
+    role: text("role").$type<MessageRole>().notNull(),
+    content: jsonb("content").$type<MessageContent>().notNull(),
+    contentState: text("content_state").$type<MessageContentState>().notNull(),
+    variantOfMessageId: text("variant_of_message_id"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("conversation_messages_id_thread_id_uq").on(
+      table.id,
+      table.threadId
+    ),
+    uniqueIndex("conversation_messages_id_thread_turn_uq").on(
+      table.id,
+      table.threadId,
+      table.turnId
+    ),
+    index("conversation_messages_turn_created_idx").on(
+      table.turnId,
+      table.createdAt,
+      table.id
+    ),
+    index("conversation_messages_variant_source_idx").on(
+      table.variantOfMessageId
+    ),
+  ]
+)
+
+export const threadForks = dbSchema.table(
+  "thread_forks",
+  {
+    id: text("id").primaryKey(),
+    conversationId: text("conversation_id")
+      .notNull()
+      .references(() => conversations.id, { onDelete: "cascade" }),
+    parentThreadId: text("parent_thread_id").notNull(),
+    sourceMessageId: text("source_message_id").notNull(),
+    childThreadId: text("child_thread_id").notNull(),
+    anchor: jsonb("anchor"),
+    createdBy: text("created_by")
+      .notNull()
+      .references(() => user.id, { onDelete: "restrict" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("thread_forks_child_thread_uq").on(table.childThreadId),
+    index("thread_forks_parent_source_idx").on(
+      table.parentThreadId,
+      table.sourceMessageId
+    ),
+    index("thread_forks_conversation_created_idx").on(
+      table.conversationId,
+      table.createdAt
+    ),
+  ]
+)
 
 // 分支对话树（app/thread-chat）的整棵树持久化：一棵树一行，state 存完整
 // ThreadTreeState（JSON）。与上面 assistant-ui 线性模型的 threads/messages 表分开，
