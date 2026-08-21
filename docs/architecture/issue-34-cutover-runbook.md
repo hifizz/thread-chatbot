@@ -60,6 +60,12 @@ define-conversation-domain-model
 
 本地临时库演练已覆盖完整 reset SQL：在 canonical 备份恢复副本中删除审批 scope 内实体后强制回滚，13 张 cutover 表的合并指纹在前后完全一致，并验证关联的 5 条 `usage_records` 未被删除。该证据只证明工具路径，不构成目标环境的数据丢弃批准。
 
+## 回滚边界：首个 canonical 写入是不可逆时刻
+
+用 `pnpm plan:conversation-forward-recovery -- --request-file <incident.json>` 生成只读恢复计划。首个 canonical 写入之前，只能在确认 canonical 写入仍为零后中止 cutover 并回到 `legacy + read-only`；首个 canonical 写入之后，规划器会拒绝 legacy authority、`canonical → legacy` 同步和 legacy 备份，只允许保持 canonical authority、进入 read-only、恢复已验证的 canonical 备份或部署前滚修复，并使用新 epoch 恢复流量。
+
+该规划器不直接修改部署或数据库；目标环境仍需把 incident、批准、首写时间、备份恢复证明、执行日志和 smoke 结果放入证据包。
+
 - [ ] 原子切换 canonical server/client epoch，运行行为矩阵关键 smoke。
 - [ ] 确认首个 canonical 生产写入时间；此后禁止恢复落后的 legacy 权威。
 - [ ] 观察期内 legacy route/query 为 0，完整性与计费对账连续通过。

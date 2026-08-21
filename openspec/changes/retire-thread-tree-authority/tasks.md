@@ -69,6 +69,12 @@
 - [ ] 6.3 验证切换后回滚工具不会执行 canonical → ThreadTree 反向同步，也不会把落后 legacy 数据恢复为权威。
 - [ ] 6.4 在声明观察窗口内完成逐日完整性/计费审计，并由负责人批准进入遗留删除阶段。
 
+### 第 6.3 阶段本地保护（不等同目标环境验证）
+
+- 新增只读前滚恢复规划器：首个 canonical 写入前只允许“零 canonical 写入”的 legacy abort；首写之后强制保持 canonical authority，只允许 canonical 备份恢复或前滚修复。
+- schema 与运行时规则共同拒绝 `canonical → legacy`、legacy 备份恢复为权威、重新启用 branch-tree 写入和复用故障 epoch；自动测试覆盖合法/非法路径。
+- 6.3 保持未完成：尚未在正式切换后的目标环境用真实 incident、首写时间、备份恢复证明和执行日志验证该门禁。
+
 ## 7. 删除遗留运行时代码
 
 - [ ] 7.1 删除 canonical build 中的 `ThreadTreeState`、魔法 `main`、parent/children/Message forks/depth/activeLeaf 等重复领域事实和 selector。
