@@ -10,6 +10,7 @@
 
 import { getCurrentUserId } from "@/lib/auth/server"
 import { listOwnedTreeSummaries } from "@/lib/thread-chat-generation/tree-repository"
+import { legacyProtocolGate } from "@/lib/thread-chat/cutover/conversation-authority"
 
 export async function GET() {
   const userId = await getCurrentUserId()
@@ -18,6 +19,11 @@ export async function GET() {
       { error: { code: "unauthorized", message: "请先登录" } },
       { status: 401 }
     )
+  const gate = legacyProtocolGate({
+    mutation: false,
+    protocol: "branch-tree-list",
+  })
+  if (gate) return gate
 
   const rows = await listOwnedTreeSummaries(userId)
   return Response.json({ trees: rows })

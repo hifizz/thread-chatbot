@@ -1,9 +1,9 @@
 /**
- * Thread Chat 会话树领域类型（headless，纯 TS，不含任何 React / DOM 概念）。
+ * @deprecated Issue #34 迁移期间保留的遗留 ThreadTreeState 契约。
  *
- * 命名约定：一次「会话」称为 Thread；Thread Tree 由唯一 MainThread 与零个或多个
- * ForkedThread 组成，Fork 表示节点间的分叉关系。
- * 整棵树 + Artifact 登记表构成 ThreadTreeState，由应用层 store 统一变更。
+ * 当前线上旧路径仍读取这些类型；新的领域与应用代码必须改用
+ * conversation-model.ts，并只允许通过 lib/thread-chat/legacy/ 的只读适配器
+ * 读取本模型。不得新增规范模型写回 ThreadTreeState 的路径。
  */
 
 import type { TextAnchor } from "@/lib/thread-chat/domain/text-anchor"

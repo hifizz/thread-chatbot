@@ -33,6 +33,7 @@ import {
 } from "@/app/api/chat/generation-settlement"
 import { prepareThreadGenerationContext } from "@/app/api/chat/thread-generation-context"
 import { prepareChatRequestContext } from "@/app/api/chat/request-context"
+import { legacyProtocolGate } from "@/lib/thread-chat/cutover/conversation-authority"
 
 // AnySearch 搜索与网页深读可能形成多步循环，放宽单次请求时长上限。
 export const maxDuration = 300
@@ -51,6 +52,11 @@ export async function POST(req: Request) {
     model,
     isUnbilledPreview,
   } = requestContext
+
+  if (threadChat) {
+    const gate = legacyProtocolGate({ mutation: true, protocol: "chat-tree" })
+    if (gate) return gate
+  }
 
   const prepared = await prepareThreadGenerationContext({
     userId,

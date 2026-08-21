@@ -1,5 +1,9 @@
 # Phase A：划选气泡内输入框（fork 首条消息策略收口）
 
+## 架构状态
+
+划选、带问开分支和标题体验继续有效；Fork 的最终写入必须创建规范 ThreadFork，Message 引用属于版本化内容，而列放置仍是客户端 UI workspace。旧 `Message.forks` 与整树存盘仅是 Issue #34 迁移前实现，依赖 `define-conversation-domain-model`、`add-conversation-command-api` 和 `normalize-conversation-client-state` 迁移。
+
 ## Why
 
 用户划选开分支时有两个真实痛点（用户点名）：① 气泡里没有输入框——想带着自己的问题开分支，得先开空分支再改写预填文案，多一跳；② 分支首答的代拟问题「请围绕我划选的这段话展开讲解…先解释它本身的含义…」偏百科词条式、缺「衔接上文继续分析」的暗示，模型容易答成孤立词条（继承上文本身在 payload 里，经 verify-live 断言长期验证——问题在问法不在链路）。参考分支（playground `claude/thread-chat-upgrade-research-joe0d6`，commit a9c3cbc）已验证过这套交互，本变更按我们的架构（chat-controller 发送、服务端 system、composer 预填流）落地。

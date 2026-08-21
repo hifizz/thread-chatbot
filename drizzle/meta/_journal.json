@@ -29,6 +29,76 @@
       "when": 1787150821829,
       "tag": "0003_strong_bulldozer",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1787333636786,
+      "tag": "0004_wild_scarlet_witch",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1787334385592,
+      "tag": "0005_fix-canonical-reparenting",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1787334458710,
+      "tag": "0006_fix-turn-role-validation",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1787334734551,
+      "tag": "0007_protect-root-thread-identity",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1787335260786,
+      "tag": "0008_noisy_random",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1787336864651,
+      "tag": "0009_marvelous_lady_bullseye",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1787341794929,
+      "tag": "0010_smiling_wolfpack",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1787342117009,
+      "tag": "0011_swift_taskmaster",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1787344456848,
+      "tag": "0012_needy_colonel_america",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1787344507672,
+      "tag": "0013_jazzy_tiger_shark",
+      "breakpoints": true
     }
   ]
 }

@@ -1,5 +1,9 @@
 # 会话列表 UI（分支树的列表、重命名与删除）
 
+## 架构状态
+
+列表、重命名和删除行为继续有效，但列表资源最终是 Conversation，而不是一行整树 JSON。标题双轨会迁移为 Conversation 标题契约；线程数与更新时间由规范实体投影。该迁移依赖 `define-conversation-domain-model`、`normalize-conversation-persistence` 和 `normalize-conversation-client-state`。
+
 ## Why
 
 多树能力已由「URL 即身份」上线（add-branch-tree-persistence），但发现性只有书签/浏览器历史——用户看不到自己有哪些树、找不回没记 URL 的对话，测试/随手开的树也无法清理，DB 只进不出。需要一个树级别的列表入口，补全「多会话」的最后一环。

@@ -1,5 +1,7 @@
 ## Why
 
+> 架构状态：Markdown 交付与渲染行为继续有效；随 `ThreadTreeState` 整树 JSON 持久化只是 Issue #34 迁移前实现。来源身份先迁移为规范 Message/Generation 与 Artifact provenance，是否提升为 ProjectFile 由基础迁移后的独立提案决定。
+
 ThreadChat 已经能把普通 assistant 正文渲染成 Markdown，也保留了 Artifact registry、消息卡片和右侧抽屉，但真实对话链路不挂 Artifact 工具且会丢弃所有工具流事件，因此用户无法要求模型生成一份可独立打开、持久化和继续修改的 Markdown 文档。现在需要接通这条链路，让中英文及等价自然语言表达的 Markdown 交付请求稳定落成消息流内的 Markdown 卡片。
 
 ## What Changes

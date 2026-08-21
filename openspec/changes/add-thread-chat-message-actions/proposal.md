@@ -36,3 +36,6 @@
 - 数据库：反馈使用独立 message feedback 记录，不写入 generation，也不写整树 JSON；`branch_trees` 使用单调 revision，整树 PUT、生成事务和 active-leaf 切换使用 CAS，避免旧标签页覆盖消息图或版本选择。
 - 测试：覆盖空占位、孤儿 user、运行中/终态 generation、完成消息与 generation 关联、刷新恢复、复制状态、编辑发送、Retry attempt、消息版本切换、旧版本派生分栏和 Artifact 可达性、message feedback 持久化、越权访问，以及列/画布一致性。
 - 依赖：以 `persist-thread-chat-generations` 已实现的服务端 generation 身份、owner 校验和持久化屏障为前置，不引入新的第三方运行时或外部服务。
+# 架构状态
+
+本变更的消息操作、恢复与反馈产品行为继续有效；其中 message 父子图、`activeLeafMessageId`、整树 CAS 和 JSON 内部 ID 是 Issue #34 迁移前实现。规范 Turn/Message 变体、稳定身份与命令语义依赖 `define-conversation-domain-model`、`add-conversation-command-api` 和 `normalize-conversation-client-state`，整树写入最终由 `retire-thread-tree-authority` 移除。

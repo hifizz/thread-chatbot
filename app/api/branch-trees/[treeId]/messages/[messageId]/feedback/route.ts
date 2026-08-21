@@ -7,6 +7,7 @@ import {
   setMessageFeedbackSuccessResponseSchema,
 } from "@/lib/thread-chat/contracts/message-feedback"
 import { setMessageFeedbackForOwner } from "@/lib/thread-chat-generation/message-feedback-repository"
+import { legacyProtocolGate } from "@/lib/thread-chat/cutover/conversation-authority"
 
 type RouteContext = {
   params: Promise<{ treeId: string; messageId: string }>
@@ -27,6 +28,11 @@ export async function PUT(req: Request, { params }: RouteContext) {
   const { treeId, messageId } = await params
   if (!isValidTreeId(treeId) || messageId.trim() === "")
     return feedbackErrorResponse("invalid_id")
+  const gate = legacyProtocolGate({
+    mutation: true,
+    protocol: "branch-message-feedback",
+  })
+  if (gate) return gate
 
   const body = setMessageFeedbackRequestSchema.safeParse(
     await req.json().catch(() => null)
