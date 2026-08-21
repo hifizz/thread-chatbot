@@ -19,7 +19,7 @@ for (const capability of [
   "saveTreeStrict",
   "useGenerationReconciliation",
   "useTreePersistence",
-  "useBranchTitles",
+  "useThreadTitles",
 ]) {
   assert.doesNotMatch(shell, new RegExp(`${capability}\\(`))
   assert.match(runtime, new RegExp(`${capability}\\(`))

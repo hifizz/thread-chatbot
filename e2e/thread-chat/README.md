@@ -218,8 +218,8 @@ CHROMIUM_PATH=... BASE_URL=http://localhost:4040 \
 assistant 流式首答、composer 无预填、payload 契约（threadChat.anchorText /
 user 原文入 messages）→ 留空 Enter：composer 预填 `kickoffQuestion()` 期望值、
 消息区为空、2 秒内无 /api/chat POST → ⌘Enter keepSource：来源列保留、新列开在
-紧邻右侧 → **分支首答完成后标题异步变为 ≤8 字语义标题（非锚点截断）、刷新后
-仍在（随树持久化）、全程 /api/branch-title 恰好一次**。深树继承段预算的纯函数
+紧邻右侧 → **分支首答完成后标题异步变为完整语义标题（非锚点截断）、刷新后
+仍在（随树持久化）、全程 /api/title 恰好一次**。深树继承段预算的纯函数
 用例见上方 prompt-budget.test.mjs。截图 `shots/bc-*.png`。
 
 ## 画布节点内对话验收（openspec: add-canvas-conversations）

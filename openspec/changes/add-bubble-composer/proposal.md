@@ -31,9 +31,9 @@
 - `app/thread-chat/branching/selection/selection-bubble.tsx`（输入框 + 键位 + 文案态 + scroll 放行，~80–100 行）
 - `app/thread-chat/thread-chat-demo.tsx`（`handleFork` 加可选 `question` 参数：有问则 fork 后 `chat.send`，~15 行）
 - `app/thread-chat/net/prompt/prompt.ts`（kickoff 文案 + 继承段预算截断，~35 行）
-- `app/thread-chat/core/{types,store}.ts`（`Message.quote` 可选字段 + `appendUserMessage`/`chat.send` 透传；新 mutator `setThreadTitle`）
+- `app/thread-chat/core/{types,store}.ts`（`Message.quote` 可选字段 + `appendUserMessage`/`chat.send` 透传；标题成功后调用 `setGeneratedThreadTitle`）
 - `app/thread-chat/chat/chat-view.tsx` 与 `orchestration/canvas-node.tsx`（user 气泡引用条渲染）
-- 新增小路由 `app/api/branch-title/route.ts`（4–8 字标题生成，用 `lib/ai/minimax.ts` 的裸模型 `minimaxModel`，照主聊天 generateTitle 先例）+ `net/persist.ts` 或 net/ 客户端函数（~40 行）
+- 通过统一路由 `app/api/title/route.ts` 为分支生成完整语义标题，请求显式携带 `kind: "branch"`，客户端复用统一标题请求与持久化流程。
 - `app/thread-chat/thread-chat.css`（输入区样式 + 气泡贴底翻转阈值随高度调整，~20 行）
 - `e2e/thread-chat/verify-bubble-composer.mjs`（新入库脚本，断言面参考 playground verify6）
 - **不改**：fork 数据模型（无 firstQuestion 字段——发送走 chat-controller 天然成为首条 user 消息，划选引用经 `quote` 字段随消息携带）、/api/chat、锚点/持久化机制（quote 与标题变更随整树存盘自然持久化）。

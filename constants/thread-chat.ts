@@ -51,10 +51,10 @@ export const TREE_UI_KEY_PREFIX = "thread-chat:ui:"
 /**
  * sessionStorage：本标签页中某个主线或分支已触发过标题生成，避免状态尚未落库时
  * 刷新页面又发起一次模型请求。持久化状态仍以 Thread.titleGenerationAttempted 为准。
- * 键名保持兼容，避免刚升级页面的既有分支再次请求。
+ * 标题接口已统一，不保留旧分支标题键名的兼容路径。
  */
 export const THREAD_TITLE_ATTEMPT_STORAGE_KEY_PREFIX =
-  "thread-chat:branch-title-attempt:"
+  "thread-chat:title-attempt:"
 
 /** store version 变化后的整树存库防抖（毫秒）：流式高频跳变合并为结束后一次 PUT */
 export const TREE_SAVE_DEBOUNCE_MS = 1500
