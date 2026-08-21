@@ -80,7 +80,7 @@
 
 - [x] 8.1 审计 `branch_trees`、`branch_generations` 及名称相似表的全部 FK、job、查询和备份依赖，形成精确删除清单。
 - [ ] 8.2 在备份保留/恢复验证和零依赖门禁通过后，执行分阶段不可逆迁移删除确认遗留表、列、索引和约束。
-- [ ] 8.3 建立旧 OpenSpec supersession map；保留已完成历史，明确记录 `persist-thread-chat-generations` 未完成项被新 lifecycle/cutover 替代，不补勾任务。
+- [x] 8.3 建立旧 OpenSpec supersession map；保留已完成历史，明确记录 `persist-thread-chat-generations` 未完成项被新 lifecycle/cutover 替代，不补勾任务。
 - [ ] 8.4 按依赖顺序归档新 changes，验证最终 specs 以 Project → Conversation → Thread 模型和 canonical capabilities 为权威。
 - [ ] 8.5 运行最终 `pnpm openspec:validate`、schema 漂移检查、生产 smoke 和数据完整性/计费审计并记录结果。
 
@@ -90,3 +90,9 @@
 - 本地三张 legacy 表分别为 19 个 Tree、37 个 Generation、1 条 feedback；5 条 `usage_records` 通过无 FK 的 `app_generation_id` 引用 legacy Generation，物理删除时必须保留账单流水。
 - 精确删除清单记录在 `docs/architecture/issue-34-legacy-deletion-inventory.md`。产品运行时、cutover 运维工具、历史迁移/快照和备份指纹采用不同处置；禁止 `DROP ... CASCADE` 或改写历史迁移。
 - 8.2 仍被 5.x 正式 cutover、6.x 观察窗口、7.x 运行时清理、目标环境复审和备份恢复批准阻塞；本次没有执行任何物理删除。
+
+### 第 8.3 阶段规范替代映射
+
+- `supersession-map.md` 明确了旧 branch-tree persistence、tree list 数据源、Generation sidecar、Message DAG identity、canvas 与 Artifact provenance 到六个 canonical changes 的替代关系，同时保留 composer/Markdown/actions/help 等仍正确的产品能力。
+- `persist-thread-chat-generations` 的 4.5、7.4、10.3、10.4、10.6、10.8 逐项映射到新 lifecycle/persistence/API/client/cutover 证据，原任务保持 `[ ]`，没有篡改历史完成状态。
+- 文档记录新 change 的依赖归档顺序；由于目标环境 cutover、观察和物理删除尚未完成，8.4 仍保持未完成。
