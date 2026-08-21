@@ -9,6 +9,7 @@ import {
 import { getCurrentUserId } from "../../auth/server"
 import {
   ConversationCommandError,
+  isConversationCommandError,
   type CommandSuccess,
   type CommandEnvelope,
   type CommandScope,
@@ -143,7 +144,7 @@ export function queryResponse(data: unknown, revision?: number): Response {
 export function routeErrorResponse(error: unknown): Response {
   const requestId = randomUUID()
   let normalized: ConversationCommandError
-  if (error instanceof ConversationCommandError) normalized = error
+  if (isConversationCommandError(error)) normalized = error
   else if (error instanceof CanonicalGenerationServiceError)
     normalized = new ConversationCommandError(
       error.code === "not_found"

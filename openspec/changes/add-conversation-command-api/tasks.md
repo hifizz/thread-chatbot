@@ -45,8 +45,8 @@
 ## 验证记录（2026-08-22）
 
 - `pnpm test:conversation-command-api`：通过 59 项数据库断言，覆盖 root → A → B → C、无 Message 复制、不同幂等键并发发送/Fork 的 revision 互斥、事务回滚、变体、Stop、归档/恢复/删除，以及 outbox → canonical executor → checkpoint/终态。
-- `pnpm test:conversation-command-contract`：4/4 通过，覆盖 owner 伪造、Header 映射、稳定错误状态和成功 envelope/ETag。
-- 真实登录态 HTTP 路由：创建与等价重放均为 200，旧 revision 为 409，发送、Generation 查询、Stop、快照为 200，owner 伪造为 400；专用数据库夹具已清理。
+- `pnpm test:conversation-command-contract`：5/5 通过，覆盖 owner 伪造、Header 映射、稳定错误状态、跨 Next.js bundle 应用错误识别和成功 envelope/ETag。
+- `pnpm test:conversation-http-api -- --real-model`：31 项真实 HTTP + 本地 PostgreSQL 断言通过；使用邮箱密码测试账号（未使用 Google）覆盖 authority、401、创建/幂等重放/同键异载荷 409、ETag/If-Match、重命名、删除、真实 `glm-5.3` Generation 终态与 Message feedback，测试数据完成清理。
 - Ego Browser：使用 `glm-5.3` 发送“只回复：Command API 回归通过”，模型正确回复，刷新后用户消息、助手回复和模型选择均保持。
 - 回归：领域模型 8/8、规范持久化 26 项、Generation 单元 6/6、Generation 数据库 49 项、遗留审计 2/2 均通过。
 - `pnpm typecheck`、目标文件 ESLint（0 warning）和 `pnpm openspec:validate`（31/31 strict）均通过。

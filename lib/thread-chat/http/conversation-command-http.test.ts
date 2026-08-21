@@ -93,6 +93,26 @@ test("错误分类只把真实冲突映射为 409", async () => {
   conversationErrorTransportSchema.parse(await version.json())
 })
 
+test("错误边界跨 bundle 结构识别受控应用错误并拒绝未知错误码", async () => {
+  const foreignError = Object.assign(new Error("幂等冲突"), {
+    name: "ConversationCommandError",
+    code: "idempotency_conflict",
+    details: {},
+  })
+  const spoofedError = Object.assign(new Error("伪造冲突"), {
+    name: "ConversationCommandError",
+    code: "drop_database",
+    details: {},
+  })
+  assert.equal(routeErrorResponse(foreignError).status, 409)
+  const spoofed = routeErrorResponse(spoofedError)
+  assert.equal(spoofed.status, 500)
+  assert.equal(
+    (await spoofed.json()).error.code,
+    "internal"
+  )
+})
+
 test("成功 envelope 按显式并发作用域返回 ETag", async () => {
   const result: CommandSuccess = {
     schemaVersion: 1,

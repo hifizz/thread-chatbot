@@ -17,6 +17,7 @@
     "test:conversation-generation-unit": "tsx --test lib/thread-chat/domain/conversation-generation.test.ts lib/thread-chat/generation/canonical-generation-execution.test.ts lib/thread-chat/generation/canonical-ai-generation-executor.test.ts",
     "test:conversation-generation": "tsx scripts/test-conversation-generation.ts",
     "test:conversation-command-api": "tsx scripts/test-conversation-command-api.ts",
+    "test:conversation-http-api": "tsx scripts/test-conversation-http-api.ts",
     "test:conversation-command-contract": "tsx --test lib/thread-chat/http/conversation-command-http.test.ts",
     "test:conversation-client": "tsx --test lib/thread-chat/client/normalized-conversation-store.test.ts",
     "test:conversation-authority": "tsx --test lib/thread-chat/cutover/conversation-authority.test.ts lib/thread-chat/cutover/conversation-drain.test.ts lib/thread-chat/cutover/legacy-conversation-import.test.ts",

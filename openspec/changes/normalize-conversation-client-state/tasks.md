@@ -56,8 +56,9 @@
 - `pnpm test:conversation-domain`：8/8 通过。
 - `pnpm test:conversation-generation-unit`：7/7 通过；覆盖较早 Turn 重新生成时排除当前 Thread 后续消息。
 - `pnpm test:conversation-client`：13/13 通过；覆盖原子快照、A → B → C、历史 Fork 来源、细粒度通知、幂等/冲突、GenerationCoordinator、稳定反馈 ID、Markdown/研究活动/Artifact 来源。
-- `pnpm test:conversation-command-contract`：4/4 通过。
+- `pnpm test:conversation-command-contract`：5/5 通过，包含跨 Next.js bundle 的稳定错误映射回归。
 - `pnpm test:conversation-generation`：52 项数据库断言通过；模型标识为 `glm-5.3`，覆盖浏览器断线后继续执行、Stop partial、持久化 `incomplete` 正文与研究活动、计费 exactly-once。
 - `pnpm test:conversation-persistence`：26 项数据库断言通过；`root → A → B → C` 快照稳定且无整树写端口。
 - `pnpm test:conversation-command-api`：69 项数据库断言通过；覆盖 outbox exactly-once、命令并发、嵌套 Fork、反馈权限/完成态/Generation 关联/幂等更新与删除。
+- `pnpm test:conversation-http-api -- --real-model`：31 项通过；从邮箱密码认证、HTTP headers/错误码一路落到本地 PostgreSQL，并实际以 `glm-5.3` 完成 Generation 和反馈回读。
 - Ego Browser 任务空间 79：真实 GLM 5.3 发送、流式完成和刷新恢复；重新生成与变体选择；A → B → C 三列；3 节点/2 边画布；Conversation 与 Thread 标题、归档/恢复；复制状态；按稳定 Message ID 点赞并经 API 回读、刷新恢复；页面无错误提示。

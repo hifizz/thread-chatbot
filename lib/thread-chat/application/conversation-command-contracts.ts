@@ -76,6 +76,39 @@ export class ConversationCommandError extends Error {
   }
 }
 
+/** 跨 Next.js bundle 识别受控应用错误；不能依赖可能重复加载的 class identity。 */
+export function isConversationCommandError(
+  error: unknown
+): error is ConversationCommandError {
+  if (!(error instanceof Error)) return false
+  const candidate = error as Error & {
+    readonly code?: unknown
+    readonly details?: unknown
+  }
+  return (
+    candidate.name === "ConversationCommandError" &&
+    typeof candidate.code === "string" &&
+    [
+      "invalid_request",
+      "unauthenticated",
+      "forbidden",
+      "not_found",
+      "version_conflict",
+      "idempotency_conflict",
+      "state_conflict",
+      "semantic_validation",
+      "fork_required",
+      "conversation_action_required",
+      "rate_limited",
+      "maintenance",
+      "internal",
+    ].includes(candidate.code) &&
+    !!candidate.details &&
+    typeof candidate.details === "object" &&
+    !Array.isArray(candidate.details)
+  )
+}
+
 export interface CanonicalEntityDelta {
   readonly upsert: {
     readonly conversations?: readonly Conversation[]

@@ -44,7 +44,7 @@
 - `read-only` 维护模式拒绝会产生新事实的 legacy/canonical 写入；legacy GET 改为纯 owner 读取，不再认领无主树，也不借读取执行 stale 修复。Generation Stop 保留用于排空。
 - 旧整树、active-leaf、Message feedback、legacy chat Generation 和 Generation sidecar 在 canonical authority 下统一返回 `410 legacy_protocol_retired`，并输出不含正文的协议名与 epoch 遥测。
 - `pnpm check:conversation-cutover-drain` 只读检查 legacy/canonical 非终态 Generation、待结算计费与 canonical outbox；任一非零以退出码 2 阻止 cutover。本地实测五项均为 0、`ready=true`。
-- 自动验证：typecheck；domain 8/8；Generation unit 7/7；authority/drain/import 6/6；client 14/14；command contract 4/4；数据库 persistence/Generation/command API 分别 26/52/69 assertions；OpenSpec strict 31/31；canonical production build 成功。Ego Browser 实测健康三元组为 `canonical / 1 / local-issue34-20260822`，匹配后 3 列页面与 composer 加载成功；旧整树与旧 Generation 查询均返回 410。
+- 自动验证：typecheck；domain 8/8；Generation unit 7/7；authority/drain/import 6/6；client 14/14；command contract 5/5；数据库 persistence/Generation/command API 分别 26/52/69 assertions；真实 HTTP + 本地 PostgreSQL + 邮箱认证 + `glm-5.3` 31 assertions；OpenSpec strict 31/31；canonical production build 成功。Ego Browser 实测健康三元组为 `canonical / 1 / local-issue34-20260822`，匹配后 3 列页面与 composer 加载成功；旧整树与旧 Generation 查询均返回 410。
 - 本记录只证明第 4 阶段的实现和本地隔离验收，不代表第 5 阶段的生产维护、备份、正式切换或批准已经发生。
 
 ## 5. Cutover 演练与正式执行
