@@ -13,6 +13,8 @@
     "lint": "eslint",
     "format": "prettier --write \"**/*.{ts,tsx}\"",
     "typecheck": "tsc --noEmit",
+    "test:conversation-domain": "node --experimental-strip-types --test lib/thread-chat/domain/conversation-model.test.ts",
+    "audit:conversation-domain": "node scripts/audit-thread-tree-boundary.mjs",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:reset-schema": "node scripts/reset-thread-chat-schema.mjs",

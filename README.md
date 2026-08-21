@@ -120,7 +120,9 @@ The project is a Next.js 16 App Router application using React, TypeScript, Tail
 
 | Boundary      | Location                                                             | Responsibility                                                                                    |
 | ------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| Core          | [`app/thread-chat/core/`](./app/thread-chat/core/)                   | Tree state, selectors, and the branch-conversation store                                          |
+| Legacy core   | [`app/thread-chat/core/`](./app/thread-chat/core/)                   | Issue #34 迁移期间的临时整树权威、选择器与 branch-conversation store；不是目标领域模型             |
+| Domain        | [`lib/thread-chat/domain/`](./lib/thread-chat/domain/)               | 规范 Conversation 实体、不变量、标题与变体选择契约                                                |
+| Legacy import | [`lib/thread-chat/legacy/`](./lib/thread-chat/legacy/)               | 遗留 Thread Tree 到规范 Conversation 快照的单向只读投影                                           |
 | Branching     | [`app/thread-chat/branching/`](./app/thread-chat/branching/)         | `selection/` owns text anchors and selection UI; `assistant/` owns branch-aware assistant rendering |
 | Chat          | [`app/thread-chat/chat/`](./app/thread-chat/chat/)                   | `message/`, `composer/`, and `actions/` group the three conversation feature sets                 |
 | Orchestration | [`app/thread-chat/orchestration/`](./app/thread-chat/orchestration/) | `canvas/`, `columns/`, `navigation/`, `artifacts/`, `overlays/`, and `workspace/` compose the workbench |
@@ -131,6 +133,8 @@ Detailed design material is available in the repository:
 
 - [ChatPDF research](./docs/chatpdf/01-调研报告.md) and [design](./docs/chatpdf/02-设计方案.md)
 - [Deep research design](./docs/deep-research/设计说明.md)
+- [Conversation 领域术语与迁移边界](./docs/architecture/conversation-domain-glossary.md)
+- [Issue #34 后续迁移输入清单](./docs/architecture/conversation-migration-inputs.md)
 - [OpenSpec change records](./openspec/changes/)
 - [Project development guidance](./CLAUDE.md)
 

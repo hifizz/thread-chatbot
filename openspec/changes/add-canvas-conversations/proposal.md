@@ -1,5 +1,9 @@
 # 画布 Phase 2：节点内继续对话 + 画布内划选开分支
 
+## 架构状态
+
+画布交互继续有效，但节点关系应从 Conversation 的 Thread/ThreadFork 规范实体派生，视口、展开和选中状态只属于客户端 UI workspace。此变更不得继续把旧树字段作为关系权威，迁移依赖 `define-conversation-domain-model` 与 `normalize-conversation-client-state`。
+
 ## Why
 
 画布目前是只读地图（Phase 1 + LR 横向）：看得见全树、双击才能回列继续。要把画布变成**工作台**——在节点里直接读最近消息、继续追问、甚至划选开新分支，不来回切视图。参考分支（playground `claude/thread-chat-upgrade-research-joe0d6` commit 54b5a89，净增 ~200 行产品代码 + 145 行测试）已把三大难题踩平：React Flow 手势与选字共处（nodrag/nowheel）、划选气泡在 zoom 变换下的定位（fixed 天然免疫）、节点展开零重排（外挂面板不参与 dagre 布局）。本变更按我们的架构（MarkdownBody/SmoothText/text-anchor/chat-controller/LR 布局）落地。

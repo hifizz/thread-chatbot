@@ -1,10 +1,7 @@
-import type {
-  Artifact,
-  Message,
-  Thread,
-  ThreadTreeState,
-} from "@/lib/thread-chat/domain/types"
-import { THREAD_TREE_SCHEMA_VERSION } from "@/constants/thread-chat"
+import type { Artifact, Message, Thread, ThreadTreeState } from "./types.ts"
+import { THREAD_TREE_SCHEMA_VERSION } from "../../../constants/thread-chat.ts"
+
+// @deprecated 仅用于 Issue #34 迁移前的遗留整树读取与校验。
 
 export class InvalidMessageGraphError extends Error {
   constructor(message: string) {
