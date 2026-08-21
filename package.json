@@ -28,6 +28,7 @@
     "test:legacy-conversation-audit": "node --experimental-strip-types --test lib/thread-chat/legacy/audit-thread-tree.test.ts",
     "audit:conversation-domain": "node scripts/audit-thread-tree-boundary.mjs",
     "audit:legacy-conversations": "node --experimental-strip-types scripts/audit-legacy-conversations.ts",
+    "audit:legacy-conversation-deletion": "node scripts/audit-legacy-conversation-deletion.mjs",
     "import:legacy-conversations": "tsx scripts/import-legacy-conversations.ts",
     "reset:approved-conversations": "tsx scripts/reset-approved-conversations.ts",
     "db:generate": "drizzle-kit generate",
