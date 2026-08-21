@@ -1,4 +1,5 @@
 import { CanonicalGenerationServiceError } from "../application/conversation-generation-service"
+import { resolveConversationAuthority } from "../cutover/conversation-authority"
 
 export type CanonicalGenerationAuthority =
   "disabled" | "isolated-test" | "canonical"
@@ -11,19 +12,15 @@ export interface CanonicalGenerationPolicy {
 export function resolveCanonicalGenerationPolicy(
   environment: NodeJS.ProcessEnv = process.env
 ): CanonicalGenerationPolicy {
-  const value = environment.CONVERSATION_GENERATION_AUTHORITY?.trim()
-  const authority: CanonicalGenerationAuthority =
-    !value || value === "disabled"
-      ? "disabled"
-      : value === "isolated-test" || value === "canonical"
-        ? value
-        : (() => {
-            throw new Error(`未知 CONVERSATION_GENERATION_AUTHORITY：${value}`)
-          })()
+  const deployment = resolveConversationAuthority(environment)
   return {
-    authority,
-    legacyAuthorityEnabled:
-      environment.BRANCH_GENERATION_AUTHORITY_ENABLED !== "false",
+    authority:
+      deployment.authority === "canonical"
+        ? deployment.isolatedTest
+          ? "isolated-test"
+          : "canonical"
+        : "disabled",
+    legacyAuthorityEnabled: deployment.authority === "legacy",
   }
 }
 

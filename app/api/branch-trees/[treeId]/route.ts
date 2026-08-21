@@ -34,6 +34,7 @@ import {
 import { listMessageFeedbackForTree } from "@/lib/thread-chat-generation/message-feedback-repository"
 import {
   deleteOwnedTreeIfIdle,
+  loadOwnedTree,
   loadOwnedOrClaimLegacyTree,
   renameOwnedTree,
   saveOwnedTree,
@@ -46,6 +47,10 @@ import {
   saveTreeSuccessResponseSchema,
   type SaveTreeErrorCode,
 } from "@/lib/thread-chat/contracts/save-tree"
+import {
+  legacyProtocolGate,
+  resolveConversationAuthority,
+} from "@/lib/thread-chat/cutover/conversation-authority"
 
 type RouteContext = { params: Promise<{ treeId: string }> }
 
@@ -86,11 +91,22 @@ export async function GET(_req: Request, { params }: RouteContext) {
   const { treeId } = await params
   if (!isValidTreeId(treeId))
     return new Response("treeId 必须是 UUID", { status: 400 })
+  const gate = legacyProtocolGate({
+    mutation: false,
+    protocol: "branch-tree-read",
+  })
+  if (gate) return gate
 
-  const row = await loadOwnedOrClaimLegacyTree({ userId, treeId })
+  const authority = resolveConversationAuthority()
+  const row =
+    authority.maintenanceMode === "read-only"
+      ? await loadOwnedTree({ userId, treeId })
+      : await loadOwnedOrClaimLegacyTree({ userId, treeId })
   if (!row) return notFound()
 
-  await failStaleGenerationsForTree(userId, treeId)
+  // read-only 维护窗口不能借 GET 清理 stale generation，从而偷偷制造新事实。
+  if (authority.maintenanceMode === "off")
+    await failStaleGenerationsForTree(userId, treeId)
   const [generations, messageFeedbacks] = await Promise.all([
     listCurrentGenerationsForTree(userId, treeId),
     listMessageFeedbackForTree(userId, treeId),
@@ -105,10 +121,7 @@ export async function GET(_req: Request, { params }: RouteContext) {
         turnSnapshot: generation.turnSnapshot,
       })),
     })
-    assertCompletedMessageGenerationLinks(
-      reconciled.state,
-      generationSummaries
-    )
+    assertCompletedMessageGenerationLinks(reconciled.state, generationSummaries)
   } catch (error) {
     console.error("[thread-chat] 消息图读取协调失败", { treeId, error })
     return Response.json(
@@ -137,6 +150,11 @@ export async function PUT(req: Request, { params }: RouteContext) {
   const { treeId } = await params
   if (!isValidTreeId(treeId))
     return new Response("treeId 必须是 UUID", { status: 400 })
+  const gate = legacyProtocolGate({
+    mutation: true,
+    protocol: "branch-tree-save",
+  })
+  if (gate) return gate
 
   let body: { state?: unknown; title?: unknown; baseRevision?: unknown }
   try {
@@ -201,6 +219,11 @@ export async function PATCH(req: Request, { params }: RouteContext) {
   const { treeId } = await params
   if (!isValidTreeId(treeId))
     return new Response("treeId 必须是 UUID", { status: 400 })
+  const gate = legacyProtocolGate({
+    mutation: true,
+    protocol: "branch-tree-rename",
+  })
+  if (gate) return gate
 
   let body: { title?: unknown }
   try {
@@ -231,6 +254,11 @@ export async function DELETE(_req: Request, { params }: RouteContext) {
   const { treeId } = await params
   if (!isValidTreeId(treeId))
     return new Response("treeId 必须是 UUID", { status: 400 })
+  const gate = legacyProtocolGate({
+    mutation: true,
+    protocol: "branch-tree-delete",
+  })
+  if (gate) return gate
 
   const outcome = await deleteOwnedTreeIfIdle({ userId, treeId })
   if (outcome === "generation_running") {

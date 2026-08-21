@@ -11,22 +11,24 @@
 
 | 指标 | 数量 |
 | --- | ---: |
-| 遗留树 | 18 |
-| 已有 owner | 18 |
+| 遗留树 | 19 |
+| 已有 owner | 19 |
 | 无 owner | 0 |
-| 可直接映射 | 18 |
-| 需修复 | 0 |
+| 可直接映射 | 15 |
+| 需修复 | 4 |
 | 拒绝 | 0 |
-| Thread | 21 |
-| Turn | 32 |
-| Message | 67 |
+| Thread | 22 |
+| Turn | 34 |
+| Message | 71 |
 | Fork | 3 |
 | Artifact | 0 |
-| Generation 辅助记录 | 35 |
+| Generation 辅助记录 | 37 |
 | Message feedback | 1 |
 
-所有稳定审计错误码的计数均为 0。逐树 dry-run 同时生成了确定性的 Conversation、Thread 与 Message ID 映射。
+结构、归属、Fork、active leaf、Artifact 和反馈错误均为 0。审计新增发现 5 条早期 Generation sidecar 没有 `turn_snapshot.intent`，分布在 4 棵树，稳定错误码为 `generation_intent_missing`。导入器不会隐式猜测：dry-run 将它们逐条列入 repair 清单；写入模式只有在审批文件明确包含 `missing-generation-intent-as-send` 时，才把这些已终态记录按最弱的 `send` 来源语义保留，且绝不据此重新调用模型。
+
+逐树 dry-run 同时生成持久的 `(legacyTreeId, entityType, localId) → canonicalId` 映射计划。当前计划为 19 个 Conversation、187 个实体，摘要为 `ee3736d92957dd4090f8fd8e765f01f4f3c84ca01aaed86db67416b15c860eb1`。
 
 ## 对最终切换的含义
 
-当前本地证据表明，18 棵遗留树都满足已知结构、归属、Fork、active leaf、Generation 与反馈引用不变量，因此技术上可以一次性导入，不需要因污染数据强制重置。这个结论只适用于本次审计的本地目标；最终 `retire-thread-tree-authority` 在每个待切换环境必须重新执行同一只读审计，再决定迁移或重置，不能把本地结果外推为生产事实。
+当前本地证据表明，19 棵遗留树均无拒绝级污染，15 棵可直接导入，另外 4 棵只需上述 5 条可枚举的来源语义修复，因此技术上适合确定性导入，不需要重置。完整导入已在单一数据库事务中对 19 棵树逐 Conversation 写入、校验、重复写入验证幂等，最后强制回滚；回滚后映射账本和 `legacy:%` Conversation 均为 0。这个结论只适用于本次本地目标；正式环境仍须重新审计、备份并单独批准。

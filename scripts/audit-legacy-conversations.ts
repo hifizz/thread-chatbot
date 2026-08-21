@@ -17,15 +17,24 @@ try {
   const generations = await sql<
     readonly {
       id: string
+      user_id: string
       tree_id: string
       thread_id: string
       user_message_id: string
       assistant_message_id: string
+      intent_present: boolean
     }[]
-  >`SELECT id, tree_id, thread_id, user_message_id, assistant_message_id FROM thread_chat.branch_generations ORDER BY tree_id, id`
+  >`SELECT id, user_id, tree_id, thread_id, user_message_id, assistant_message_id,
+      (turn_snapshot ? 'intent') AS intent_present
+    FROM thread_chat.branch_generations ORDER BY tree_id, id`
   const feedback = await sql<
-    readonly { tree_id: string; thread_id: string; message_id: string }[]
-  >`SELECT tree_id, thread_id, message_id FROM thread_chat.branch_message_feedback ORDER BY tree_id, thread_id, message_id`
+    readonly {
+      user_id: string
+      tree_id: string
+      thread_id: string
+      message_id: string
+    }[]
+  >`SELECT user_id, tree_id, thread_id, message_id FROM thread_chat.branch_message_feedback ORDER BY tree_id, thread_id, message_id`
 
   const reports = trees.map((tree) =>
     auditLegacyConversation({
@@ -36,6 +45,8 @@ try {
         .filter((generation) => generation.tree_id === tree.id)
         .map((generation) => ({
           id: generation.id,
+          ownerUserId: generation.user_id,
+          intentPresent: generation.intent_present,
           threadId: generation.thread_id,
           userMessageId: generation.user_message_id,
           assistantMessageId: generation.assistant_message_id,
@@ -43,6 +54,7 @@ try {
       feedback: feedback
         .filter((entry) => entry.tree_id === tree.id)
         .map((entry) => ({
+          ownerUserId: entry.user_id,
           threadId: entry.thread_id,
           messageId: entry.message_id,
         })),

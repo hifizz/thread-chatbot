@@ -1,4 +1,5 @@
 import { ConversationCommandError } from "../application/conversation-command-contracts"
+import { resolveConversationAuthority } from "../cutover/conversation-authority"
 
 export type ConversationCommandApiAuthority =
   "disabled" | "isolated-test" | "canonical"
@@ -11,19 +12,15 @@ export interface ConversationCommandApiPolicy {
 export function resolveConversationCommandApiPolicy(
   environment: NodeJS.ProcessEnv = process.env
 ): ConversationCommandApiPolicy {
-  const value = environment.CONVERSATION_COMMAND_API_AUTHORITY?.trim()
-  const authority: ConversationCommandApiAuthority =
-    !value || value === "disabled"
-      ? "disabled"
-      : value === "isolated-test" || value === "canonical"
-        ? value
-        : (() => {
-            throw new Error(`未知 CONVERSATION_COMMAND_API_AUTHORITY：${value}`)
-          })()
+  const deployment = resolveConversationAuthority(environment)
   return {
-    authority,
-    legacyAuthorityEnabled:
-      environment.BRANCH_TREE_AUTHORITY_ENABLED !== "false",
+    authority:
+      deployment.authority === "canonical"
+        ? deployment.isolatedTest
+          ? "isolated-test"
+          : "canonical"
+        : "disabled",
+    legacyAuthorityEnabled: deployment.authority === "legacy",
   }
 }
 

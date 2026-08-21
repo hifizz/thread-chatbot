@@ -12,6 +12,7 @@ import {
   switchActiveLeafForOwner,
   TreeCommandError,
 } from "@/lib/thread-chat-generation/tree-repository"
+import { legacyProtocolGate } from "@/lib/thread-chat/cutover/conversation-authority"
 
 type RouteContext = { params: Promise<{ treeId: string }> }
 
@@ -44,6 +45,11 @@ export async function PATCH(req: Request, { params }: RouteContext) {
     const error = SWITCH_ACTIVE_LEAF_ROUTE_ERRORS.invalid_id
     return activeLeafErrorResponse(error.code, error.message)
   }
+  const gate = legacyProtocolGate({
+    mutation: true,
+    protocol: "branch-tree-active-leaf",
+  })
+  if (gate) return gate
   const body = switchActiveLeafRequestSchema.safeParse(
     await req.json().catch(() => null)
   )

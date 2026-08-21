@@ -60,7 +60,7 @@ export interface ProjectLegacyThreadTreeInput {
   readonly state: ThreadTreeState
 }
 
-interface LegacyIdMap {
+export interface LegacyIdMap {
   readonly thread: (legacyId: string) => ThreadId
   readonly message: (legacyId: string) => MessageId
   readonly turn: (legacyThreadId: string, groupKey: string) => TurnId
@@ -74,7 +74,7 @@ function legacySegment(value: string): string {
   return encodeURIComponent(value)
 }
 
-function createLegacyIdMap(input: {
+export function createLegacyIdMap(input: {
   readonly legacyTreeId: string
   readonly conversationId: ConversationId
 }): LegacyIdMap {

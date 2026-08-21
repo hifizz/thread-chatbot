@@ -1,4 +1,5 @@
 import { ConversationRepositoryError } from "../application/conversation-repository"
+import { resolveConversationAuthority } from "../cutover/conversation-authority"
 
 export type CanonicalPersistenceWriteMode =
   "disabled" | "isolated-test" | "canonical"
@@ -11,25 +12,15 @@ export interface CanonicalPersistencePolicy {
 export function resolveCanonicalPersistencePolicy(
   environment: NodeJS.ProcessEnv = process.env
 ): CanonicalPersistencePolicy {
-  const configured = environment.CONVERSATION_PERSISTENCE_WRITE_MODE?.trim()
-  const writeMode: CanonicalPersistenceWriteMode =
-    configured === undefined || configured === ""
-      ? "disabled"
-      : configured === "disabled" ||
-          configured === "isolated-test" ||
-          configured === "canonical"
-        ? configured
-        : (() => {
-            throw new ConversationRepositoryError(
-              "canonical_writes_disabled",
-              `未知 CONVERSATION_PERSISTENCE_WRITE_MODE：${configured}`
-            )
-          })()
-
+  const deployment = resolveConversationAuthority(environment)
   return {
-    writeMode,
-    legacyWritesEnabled:
-      environment.THREAD_TREE_LEGACY_WRITES_ENABLED !== "false",
+    writeMode:
+      deployment.authority === "canonical"
+        ? deployment.isolatedTest
+          ? "isolated-test"
+          : "canonical"
+        : "disabled",
+    legacyWritesEnabled: deployment.authority === "legacy",
   }
 }
 

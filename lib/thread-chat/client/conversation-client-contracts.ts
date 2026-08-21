@@ -22,6 +22,15 @@ const contentState = z.enum([
   "failed",
 ])
 
+export const conversationAuthorityStateSchema = z
+  .object({
+    authority: z.enum(["legacy", "canonical"]),
+    schemaVersion: z.number().int().positive(),
+    epoch: z.string().trim().min(1),
+    maintenanceMode: z.enum(["off", "read-only"]),
+  })
+  .strict()
+
 const jsonValueSchema: z.ZodType<unknown> = z.lazy(() =>
   z.union([
     z.string(),

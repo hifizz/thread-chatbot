@@ -64,6 +64,27 @@ export async function listOwnedTreeSummaries(
     .limit(100)
 }
 
+/** 维护窗口使用的纯读取路径：只读当前用户已拥有的数据，绝不认领历史无主行。 */
+export async function loadOwnedTree(input: {
+  userId: string
+  treeId: string
+}): Promise<OwnedTreeSnapshot | null> {
+  const [owned] = await db
+    .select({
+      state: branchTrees.state,
+      customTitle: branchTrees.customTitle,
+      revision: branchTrees.revision,
+    })
+    .from(branchTrees)
+    .where(
+      and(
+        eq(branchTrees.id, input.treeId),
+        eq(branchTrees.userId, input.userId)
+      )
+    )
+  return owned ?? null
+}
+
 /** GET 精确 URL 的迁移入口：普通 owner 读取，或原子认领一棵历史无主树。 */
 export async function loadOwnedOrClaimLegacyTree(input: {
   userId: string

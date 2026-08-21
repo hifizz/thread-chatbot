@@ -1,7 +1,9 @@
 import { config } from "dotenv"
 
 config({ path: ".env.local" })
-process.env.CONVERSATION_COMMAND_API_AUTHORITY = "isolated-test"
+process.env.CONVERSATION_AUTHORITY = "canonical"
+process.env.CONVERSATION_CUTOVER_EPOCH = "browser-fixture"
+process.env.CONVERSATION_ISOLATED_TEST = "true"
 
 const { eq } = await import("drizzle-orm")
 const { db } = await import("../lib/db/index.ts")

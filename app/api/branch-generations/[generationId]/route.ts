@@ -2,6 +2,7 @@ import { getCurrentUserId } from "@/lib/auth/server"
 import { isValidTreeId } from "@/lib/chat/tree-id"
 import { failStaleGenerationForOwner } from "@/lib/thread-chat-generation/stale-generation-repository"
 import { toGenerationSummary } from "@/lib/thread-chat-generation/query-repository"
+import { legacyProtocolGate } from "@/lib/thread-chat/cutover/conversation-authority"
 
 type RouteContext = { params: Promise<{ generationId: string }> }
 
@@ -19,6 +20,11 @@ export async function GET(_req: Request, { params }: RouteContext) {
       { error: { code: "invalid_id", message: "generationId 必须是 UUID" } },
       { status: 400 }
     )
+  const gate = legacyProtocolGate({
+    mutation: false,
+    protocol: "branch-generation-read",
+  })
+  if (gate) return gate
 
   const generation = await failStaleGenerationForOwner(userId, generationId)
   if (!generation)

@@ -63,7 +63,15 @@ const textOf = (message: ConversationMessage) =>
     .map((part) => part.text)
     .join("")
 
-export function CanonicalThreadChat({ id }: { id: string }) {
+export function CanonicalThreadChat({
+  id,
+  expectedSchemaVersion,
+  expectedEpoch,
+}: {
+  id: string
+  expectedSchemaVersion: number
+  expectedEpoch: string
+}) {
   const router = useRouter()
   const targetId = conversationId(id)
   const store = useMemo(() => createNormalizedConversationStore(), [])
@@ -119,12 +127,19 @@ export function CanonicalThreadChat({ id }: { id: string }) {
       clearTimeout(coordinatorDisposeTimer.current)
       coordinatorDisposeTimer.current = null
     }
-    gateway.loadConversation(targetId).then(
-      () => setLoaded(true),
-      (cause) =>
-        setError(cause instanceof Error ? cause.message : String(cause))
-    )
-  }, [gateway, targetId])
+    gateway
+      .verifyAuthority({
+        authority: "canonical",
+        schemaVersion: expectedSchemaVersion,
+        epoch: expectedEpoch,
+      })
+      .then(() => gateway.loadConversation(targetId))
+      .then(
+        () => setLoaded(true),
+        (cause) =>
+          setError(cause instanceof Error ? cause.message : String(cause))
+      )
+  }, [expectedEpoch, expectedSchemaVersion, gateway, targetId])
   useEffect(() => {
     if (!loaded) return
     void gateway.listMessageFeedback(targetId).then(

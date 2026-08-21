@@ -5,6 +5,7 @@ import { and, asc, eq, inArray, max, sql } from "drizzle-orm"
 import { CONVERSATION_COMMAND_SCHEMA_VERSION } from "../../../constants/conversation-command"
 import { db } from "../../db"
 import {
+  conversationArtifacts,
   conversationCommandRecords,
   conversationGenerations,
   conversationMessages,
@@ -52,6 +53,7 @@ import {
   turnId,
   workspaceId,
   type Conversation,
+  type ConversationArtifactProvenance,
   type ConversationGeneration,
   type ConversationMessage,
   type ConversationSnapshot,
@@ -160,6 +162,18 @@ function mapFork(row: typeof threadForks.$inferSelect): ThreadFork {
     ...(row.anchor ? { anchor: row.anchor as ThreadFork["anchor"] } : {}),
     createdBy: row.createdBy,
     createdAt: row.createdAt.toISOString(),
+  }
+}
+
+function mapArtifact(
+  row: typeof conversationArtifacts.$inferSelect
+): ConversationArtifactProvenance {
+  return {
+    id: row.id as ConversationArtifactProvenance["id"],
+    sourceThreadId: threadId(row.sourceThreadId),
+    sourceMessageId: messageId(row.sourceMessageId),
+    title: row.title,
+    kind: row.kind,
   }
 }
 
@@ -391,63 +405,76 @@ export class DrizzleConversationCommandStore
       input.conversationId
     )
     if (!access) return null
-    const [threadRows, turnRows, messageRows, forkRows, generationRows] =
-      await Promise.all([
-        db
-          .select()
-          .from(conversationThreads)
-          .where(eq(conversationThreads.conversationId, input.conversationId))
-          .orderBy(
-            asc(conversationThreads.createdAt),
-            asc(conversationThreads.id)
-          ),
-        db
-          .select({ turn: conversationTurns })
-          .from(conversationTurns)
-          .innerJoin(
-            conversationThreads,
-            eq(conversationThreads.id, conversationTurns.threadId)
-          )
-          .where(eq(conversationThreads.conversationId, input.conversationId))
-          .orderBy(
-            asc(conversationTurns.threadId),
-            asc(conversationTurns.position),
-            asc(conversationTurns.id)
-          ),
-        db
-          .select({ message: conversationMessages })
-          .from(conversationMessages)
-          .innerJoin(
-            conversationThreads,
-            eq(conversationThreads.id, conversationMessages.threadId)
-          )
-          .where(eq(conversationThreads.conversationId, input.conversationId))
-          .orderBy(
-            asc(conversationMessages.threadId),
-            asc(conversationMessages.createdAt),
-            asc(conversationMessages.id)
-          ),
-        db
-          .select()
-          .from(threadForks)
-          .where(eq(threadForks.conversationId, input.conversationId))
-          .orderBy(asc(threadForks.createdAt), asc(threadForks.id)),
-        db
-          .select()
-          .from(conversationGenerations)
-          .where(
-            eq(conversationGenerations.conversationId, input.conversationId)
-          )
-          .orderBy(
-            asc(conversationGenerations.createdAt),
-            asc(conversationGenerations.id)
-          ),
-      ])
+    const [
+      threadRows,
+      turnRows,
+      messageRows,
+      forkRows,
+      generationRows,
+      artifactRows,
+    ] = await Promise.all([
+      db
+        .select()
+        .from(conversationThreads)
+        .where(eq(conversationThreads.conversationId, input.conversationId))
+        .orderBy(
+          asc(conversationThreads.createdAt),
+          asc(conversationThreads.id)
+        ),
+      db
+        .select({ turn: conversationTurns })
+        .from(conversationTurns)
+        .innerJoin(
+          conversationThreads,
+          eq(conversationThreads.id, conversationTurns.threadId)
+        )
+        .where(eq(conversationThreads.conversationId, input.conversationId))
+        .orderBy(
+          asc(conversationTurns.threadId),
+          asc(conversationTurns.position),
+          asc(conversationTurns.id)
+        ),
+      db
+        .select({ message: conversationMessages })
+        .from(conversationMessages)
+        .innerJoin(
+          conversationThreads,
+          eq(conversationThreads.id, conversationMessages.threadId)
+        )
+        .where(eq(conversationThreads.conversationId, input.conversationId))
+        .orderBy(
+          asc(conversationMessages.threadId),
+          asc(conversationMessages.createdAt),
+          asc(conversationMessages.id)
+        ),
+      db
+        .select()
+        .from(threadForks)
+        .where(eq(threadForks.conversationId, input.conversationId))
+        .orderBy(asc(threadForks.createdAt), asc(threadForks.id)),
+      db
+        .select()
+        .from(conversationGenerations)
+        .where(eq(conversationGenerations.conversationId, input.conversationId))
+        .orderBy(
+          asc(conversationGenerations.createdAt),
+          asc(conversationGenerations.id)
+        ),
+      db
+        .select()
+        .from(conversationArtifacts)
+        .where(eq(conversationArtifacts.conversationId, input.conversationId))
+        .orderBy(
+          asc(conversationArtifacts.createdAt),
+          asc(conversationArtifacts.id)
+        ),
+    ])
     const mappedThreads = threadRows.map(mapThread)
     const mappedTurns = turnRows.map(({ turn }) => mapTurn(turn))
     const mappedMessages = messageRows.map(({ message }) => mapMessage(message))
     const mappedForks = forkRows.map(mapFork)
     const mappedGenerations = generationRows.map(mapGenerationSummary)
+    const mappedArtifacts = artifactRows.map(mapArtifact)
     const snapshot: ConversationSnapshot = {
       schemaVersion: 1,
       project: {
@@ -463,7 +490,7 @@ export class DrizzleConversationCommandStore
       turns: registry(mappedTurns),
       messages: registry(mappedMessages),
       generations: registry(mappedGenerations),
-      artifactProvenance: {},
+      artifactProvenance: registry(mappedArtifacts),
     }
     return {
       snapshot,

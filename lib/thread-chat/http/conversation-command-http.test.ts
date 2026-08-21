@@ -1,6 +1,10 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 
+process.env.CONVERSATION_AUTHORITY = "canonical"
+process.env.CONVERSATION_CUTOVER_EPOCH = "command-http-test"
+process.env.CONVERSATION_ISOLATED_TEST = "true"
+
 import {
   commandSuccessTransportSchema,
   conversationErrorTransportSchema,

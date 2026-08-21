@@ -13,6 +13,8 @@ import { DrizzleConversationCommandStore } from "../persistence/drizzle-conversa
 import { DrizzleConversationGenerationRepository } from "../persistence/drizzle-conversation-generation-repository"
 import { DrizzleConversationOutboxDispatcher } from "../persistence/drizzle-conversation-outbox-dispatcher"
 import { resolveConversationCommandApiPolicy } from "../persistence/conversation-command-policy"
+import { resolveCanonicalGenerationPolicy } from "../persistence/canonical-generation-policy"
+import { resolveConversationAuthority } from "../cutover/conversation-authority"
 
 declare global {
   var __conversationCommandComposition:
@@ -29,9 +31,7 @@ function createComposition() {
   const policy = resolveConversationCommandApiPolicy()
   const store = new DrizzleConversationCommandStore(policy)
   const generations = new DrizzleConversationGenerationRepository({
-    authority: policy.authority,
-    legacyAuthorityEnabled:
-      process.env.BRANCH_GENERATION_AUTHORITY_ENABLED !== "false",
+    ...resolveCanonicalGenerationPolicy(),
   })
   const abortRegistry = new InMemoryGenerationAbortRegistry()
   const execution = new CanonicalGenerationApplicationService(
@@ -97,7 +97,7 @@ export function setConversationOutboxConsumerForIsolatedTest(
   consumer: OutboxEventConsumer | null
 ): void {
   if (
-    process.env.CONVERSATION_COMMAND_API_AUTHORITY !== "isolated-test" ||
+    !resolveConversationAuthority().isolatedTest ||
     process.env.NODE_ENV === "production"
   )
     throw new Error("只能在 isolated-test authority 下替换 outbox consumer")

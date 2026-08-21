@@ -15,6 +15,7 @@ import {
 } from "../application/conversation-command-contracts"
 import { CanonicalGenerationServiceError } from "../application/conversation-generation-service"
 import { InvalidEntityIdError } from "../domain/conversation-model"
+import { resolveConversationAuthority } from "../cutover/conversation-authority"
 
 const ERROR_STATUS: Record<string, number> = {
   invalid_request: 400,
@@ -28,6 +29,7 @@ const ERROR_STATUS: Record<string, number> = {
   fork_required: 422,
   semantic_validation: 422,
   rate_limited: 429,
+  maintenance: 503,
   internal: 500,
 }
 
@@ -62,6 +64,15 @@ export async function parseJson<TSchema extends z.ZodType>(
   return parsed.data
 }
 
+export function assertCanonicalMutationAllowed(): void {
+  if (resolveConversationAuthority().maintenanceMode === "read-only")
+    throw new ConversationCommandError(
+      "maintenance",
+      "Conversation 正处于受控维护窗口，请稍后重试",
+      { retryable: true }
+    )
+}
+
 export function commandEnvelope<TPayload>(input: {
   readonly request: Request
   readonly actor: { readonly kind: "user"; readonly userId: string }
@@ -69,6 +80,7 @@ export function commandEnvelope<TPayload>(input: {
   readonly payload: TPayload
   readonly expectedRevisionRequired?: boolean
 }): CommandEnvelope<TPayload> {
+  assertCanonicalMutationAllowed()
   const idempotencyKey = input.request.headers.get("Idempotency-Key")?.trim()
   if (
     !idempotencyKey ||

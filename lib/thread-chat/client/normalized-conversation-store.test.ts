@@ -601,6 +601,45 @@ test("client gateway 使用最小 revision，并以同一幂等键确认网络�
   assert.equal(store.getCommandState().pendingByCommandId[commandId], undefined)
 })
 
+test("client gateway 在加载实体前校验 authority、schema 与 cutover epoch", async () => {
+  const store = createNormalizedConversationStore()
+  const responses = [
+    Response.json({
+      authority: "canonical",
+      schemaVersion: 1,
+      epoch: "epoch-a",
+      maintenanceMode: "off",
+    }),
+    Response.json({
+      authority: "canonical",
+      schemaVersion: 1,
+      epoch: "epoch-b",
+      maintenanceMode: "off",
+    }),
+  ]
+  const gateway = createConversationClientGateway({
+    store,
+    fetch: async () => responses.shift() ?? Response.error(),
+  })
+
+  await gateway.verifyAuthority({
+    authority: "canonical",
+    schemaVersion: 1,
+    epoch: "epoch-a",
+  })
+  await assert.rejects(
+    gateway.verifyAuthority({
+      authority: "canonical",
+      schemaVersion: 1,
+      epoch: "epoch-a",
+    }),
+    (error) =>
+      error instanceof ConversationClientError &&
+      error.code === "authority_mismatch" &&
+      error.details?.actual !== undefined
+  )
+})
+
 test("client gateway 遇到 409 后重取快照并保留失败 overlay", async () => {
   const store = createNormalizedConversationStore()
   store.installSnapshot(fixture())

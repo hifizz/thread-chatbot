@@ -23,8 +23,11 @@ export type LegacyConversationAuditCode =
   | "generation_thread_missing"
   | "generation_user_message_missing"
   | "generation_assistant_message_missing"
+  | "generation_owner_mismatch"
+  | "generation_intent_missing"
   | "feedback_thread_missing"
   | "feedback_message_missing"
+  | "feedback_owner_mismatch"
   | "canonical_projection_failed"
 
 export interface LegacyConversationAuditIssue {
@@ -35,12 +38,15 @@ export interface LegacyConversationAuditIssue {
 
 export interface LegacyGenerationReference {
   readonly id: string
+  readonly ownerUserId?: string
+  readonly intentPresent?: boolean
   readonly threadId: string
   readonly userMessageId: string
   readonly assistantMessageId: string
 }
 
 export interface LegacyFeedbackReference {
+  readonly ownerUserId?: string
   readonly threadId: string
   readonly messageId: string
 }
@@ -310,6 +316,23 @@ export function auditLegacyConversation(
   }
 
   for (const generation of input.generations) {
+    if (
+      generation.ownerUserId !== undefined &&
+      generation.ownerUserId !== input.ownerUserId
+    )
+      issue(
+        issues,
+        "generation_owner_mismatch",
+        `generations.${generation.id}.userId`,
+        generation.id
+      )
+    if (generation.intentPresent === false)
+      issue(
+        issues,
+        "generation_intent_missing",
+        `generations.${generation.id}.turnSnapshot.intent`,
+        generation.id
+      )
     const threadMessages = messagesByThread.get(generation.threadId)
     if (!threadMessages)
       issue(
@@ -337,6 +360,16 @@ export function auditLegacyConversation(
   }
 
   for (const [feedbackIndex, feedback] of input.feedback.entries()) {
+    if (
+      feedback.ownerUserId !== undefined &&
+      feedback.ownerUserId !== input.ownerUserId
+    )
+      issue(
+        issues,
+        "feedback_owner_mismatch",
+        `feedback.${feedbackIndex}.userId`,
+        feedback.messageId
+      )
     const threadMessages = messagesByThread.get(feedback.threadId)
     if (!threadMessages)
       issue(
@@ -401,6 +434,7 @@ export function auditLegacyConversation(
       entry.code !== "owner_missing" &&
       entry.code !== "generation_user_message_missing" &&
       entry.code !== "generation_assistant_message_missing" &&
+      entry.code !== "generation_intent_missing" &&
       entry.code !== "feedback_message_missing"
   )
 

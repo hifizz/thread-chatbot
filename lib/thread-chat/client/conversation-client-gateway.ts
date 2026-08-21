@@ -25,6 +25,7 @@ import type {
 import {
   conversationErrorEnvelopeSchema,
   conversationListQueryDataSchema,
+  conversationAuthorityStateSchema,
   generationQueryDataSchema,
   parseCommandSuccess,
   parseConversationQuery,
@@ -83,6 +84,11 @@ export interface CommandOptions {
 }
 
 export interface ConversationClientGateway {
+  readonly verifyAuthority: (expected: {
+    readonly authority: "canonical"
+    readonly schemaVersion: number
+    readonly epoch: string
+  }) => Promise<void>
   readonly listConversations: (
     projectId: ProjectId,
     includeArchived?: boolean
@@ -330,6 +336,25 @@ export function createConversationClientGateway(input: {
   }
 
   return {
+    async verifyAuthority(expected) {
+      const response = await fetcher("/api/conversation-authority", {
+        cache: "no-store",
+      })
+      const value = await responseJson(response)
+      if (!response.ok) throw responseError(value, response)
+      const actual = conversationAuthorityStateSchema.parse(value)
+      if (
+        actual.authority !== expected.authority ||
+        actual.schemaVersion !== expected.schemaVersion ||
+        actual.epoch !== expected.epoch
+      )
+        throw new ConversationClientError({
+          code: "authority_mismatch",
+          message: "客户端与服务端的 Conversation 权威版本不一致，请刷新页面",
+          status: 409,
+          details: { expected, actual },
+        })
+    },
     async listConversations(targetProjectId, includeArchived = false) {
       const response = await fetcher(
         `/api/projects/${targetProjectId}/conversations?includeArchived=${includeArchived}`

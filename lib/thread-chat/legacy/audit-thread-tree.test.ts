@@ -136,12 +136,20 @@ test("污染引用使用稳定错误码报告", () => {
     generations: [
       {
         id: "generation-invalid",
+        ownerUserId: "other-owner",
+        intentPresent: false,
         threadId: "missing-thread",
         userMessageId: "missing-user",
         assistantMessageId: "missing-assistant",
       },
     ],
-    feedback: [{ threadId: "main", messageId: "missing-feedback-message" }],
+    feedback: [
+      {
+        ownerUserId: "other-owner",
+        threadId: "main",
+        messageId: "missing-feedback-message",
+      },
+    ],
   })
   const codes = new Set(report.issues.map((entry) => entry.code))
 
@@ -154,7 +162,10 @@ test("污染引用使用稳定错误码报告", () => {
     "fork_source_missing",
     "artifact_source_thread_missing",
     "generation_thread_missing",
+    "generation_owner_mismatch",
+    "generation_intent_missing",
     "feedback_message_missing",
+    "feedback_owner_mismatch",
     "canonical_projection_failed",
   ] as const)
     assert.ok(codes.has(code), `缺少稳定错误码 ${code}`)

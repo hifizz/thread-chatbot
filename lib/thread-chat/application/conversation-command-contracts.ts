@@ -55,6 +55,7 @@ export type ConversationCommandErrorCode =
   | "fork_required"
   | "conversation_action_required"
   | "rate_limited"
+  | "maintenance"
   | "internal"
 
 export interface ConversationCommandErrorDetails {

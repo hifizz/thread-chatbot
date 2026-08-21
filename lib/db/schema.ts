@@ -263,6 +263,45 @@ export const conversationMessages = dbSchema.table(
   ]
 )
 
+/** 规范 Message 所引用的 Artifact；来源使用稳定 Conversation/Thread/Message ID。 */
+export const conversationArtifacts = dbSchema.table(
+  "conversation_artifacts",
+  {
+    id: text("id").primaryKey(),
+    conversationId: text("conversation_id")
+      .notNull()
+      .references(() => conversations.id, { onDelete: "cascade" }),
+    sourceThreadId: text("source_thread_id").notNull(),
+    sourceMessageId: text("source_message_id").notNull(),
+    title: text("title").notNull(),
+    kind: text("kind").notNull(),
+    lang: text("lang"),
+    content: text("content").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("conversation_artifacts_conversation_idx").on(
+      table.conversationId,
+      table.createdAt
+    ),
+    foreignKey({
+      name: "conversation_artifacts_thread_fk",
+      columns: [table.sourceThreadId, table.conversationId],
+      foreignColumns: [
+        conversationThreads.id,
+        conversationThreads.conversationId,
+      ],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "conversation_artifacts_message_fk",
+      columns: [table.sourceMessageId, table.sourceThreadId],
+      foreignColumns: [conversationMessages.id, conversationMessages.threadId],
+    }).onDelete("cascade"),
+  ]
+)
+
 export const conversationMessageFeedback = dbSchema.table(
   "conversation_message_feedback",
   {
@@ -483,6 +522,35 @@ export const conversationOutboxEvents = dbSchema.table(
       table.aggregateType,
       table.aggregateId,
       table.aggregateRevision
+    ),
+  ]
+)
+
+/**
+ * 一次性 ThreadTree → Conversation 导入的稳定身份账本。
+ * 映射本身是迁移审计事实；运行时业务代码不得用它做 legacy 读取回退。
+ */
+export const legacyConversationEntityMappings = dbSchema.table(
+  "legacy_conversation_entity_mappings",
+  {
+    legacyTreeId: text("legacy_tree_id").notNull(),
+    entityType: text("entity_type").notNull(),
+    localId: text("local_id").notNull(),
+    canonicalId: text("canonical_id").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    primaryKey({
+      name: "legacy_conversation_entity_mappings_pk",
+      columns: [table.legacyTreeId, table.entityType, table.localId],
+    }),
+    uniqueIndex("legacy_conversation_entity_mappings_canonical_uq").on(
+      table.canonicalId
+    ),
+    index("legacy_conversation_entity_mappings_tree_idx").on(
+      table.legacyTreeId
     ),
   ]
 )

@@ -10,6 +10,7 @@ import {
 } from "@/lib/thread-chat/domain/conversation-model"
 import {
   authenticatedActor,
+  assertCanonicalMutationAllowed,
   parseJson,
   withConversationRoute,
 } from "@/lib/thread-chat/http/conversation-command-http"
@@ -21,6 +22,7 @@ type Context = {
 export async function PUT(request: Request, { params }: Context) {
   return withConversationRoute(async () => {
     const actor = await authenticatedActor()
+    assertCanonicalMutationAllowed()
     const ids = await params
     const body = await parseJson(
       request,
