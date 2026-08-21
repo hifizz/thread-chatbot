@@ -17,7 +17,7 @@
 - [x] 3.1 实现 `(legacyTreeId, entityType, localId) → canonicalId` 的持久映射与幂等 dry-run/report。
 - [x] 3.2 实现按 Conversation 事务导入 Project/Conversation/Thread/ThreadFork/Turn/Message 和当前有效变体。
 - [x] 3.3 迁移 Generation、标题、Message feedback、Artifact、usage/billing 和其他审计确认的 sidecar 外键。
-- [ ] 3.4 实现受批准重置路径，仅接受 ADR scope 并在执行前验证目标环境与备份标识。
+- [x] 3.4 实现受批准重置路径，仅接受 ADR scope 并在执行前验证目标环境与备份标识。
 - [x] 3.5 增加 A → B → C、Message 变体、partial Generation、辅助引用、重复运行和故障回滚测试。
 - [x] 3.6 实现源/目标计数、映射、约束、悬空引用和摘要的全量 post-import verifier。
 
@@ -27,7 +27,7 @@
 - dry-run 生成 19 个 Conversation、187 个实体和逐树稳定摘要；发现 5 条 `generation_intent_missing`，显式列为需要审批的 `missing-generation-intent-as-send`，不静默推断。
 - 导入按 Conversation 事务写入 Project → Conversation → Thread、Turn/Message 变体、ThreadFork、Generation/checkpoint/usage/billing、标题、Artifact 和反馈；legacy Message 级 `isCurrent` 只在 active assistant 上映射为 canonical Turn 级 current Generation。
 - 本地 `--test-rollback` 对全部 19 棵树完成写入、数据库约束、源/目标计数、映射 SHA-256 与重复导入幂等校验，随后强制回滚；回滚后 mapping 和 `legacy:%` Conversation 计数均为 0。
-- 3.4 保持未完成：仓库尚无任何目标环境获批的“丢弃数据” ADR，因此只实现并验证导入路径，不伪造重置授权。
+- 受批准重置工具要求 `legacy + read-only`、drain 清零、独立 reset 开关、环境/数据库/approval ID/backup ID 精确匹配、恢复演练证明和审批前计数完全一致。它只删除 scope 内 legacy Tree 与映射可证明来源的 canonical Conversation；保留 `usage_records` 财务账本，不允许把会话重置偷换成账单抹除。仓库只验证 fail-closed 合同与事务回滚能力；没有伪造或执行任何目标环境“丢弃数据” ADR。
 
 ## 4. Authority、维护与旧协议拒绝
 
@@ -51,6 +51,7 @@
 
 - `pnpm rehearse:conversation-cutover-local -- --approve-local-ephemeral-databases` 在两个受限命名的 loopback 临时库中完成 legacy 备份恢复、`legacy + read-only` drain/审计、获批确定性导入两次、canonical 备份和再次恢复。
 - 两次恢复均以 13 张 cutover 表的逐表 JSONB SHA-256 合并指纹证明与各自源库一致；导入后为 20 个 Conversation（含源库已有 1 个隔离夹具）和 186 条映射，总耗时约 8.4 秒。
+- 同一演练在 canonical 恢复副本上执行受批准 reset 的完整 SQL 并强制事务回滚；回滚前后 13 表指纹一致，5 条相关 `usage_records` 保持不变。首次演练还实际发现并修正了非级联 Generation 复合外键所要求的删除顺序。
 - 演练结束自动删除临时库、dump 和审批文件；源开发库只读。由于尚未覆盖目标基础设施、真实保留备份、负责人/观察窗口和流量切换，1.4 与 5.1 仍保持未完成。
 
 ## 5. Cutover 演练与正式执行

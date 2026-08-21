@@ -27,6 +27,14 @@ const canonicalRestoreName = `${databasePrefix}_canonical`
 const legacyDump = join(tmpdir(), `${databasePrefix}_legacy.dump`)
 const canonicalDump = join(tmpdir(), `${databasePrefix}_canonical.dump`)
 const approvalPath = join(tmpdir(), `${databasePrefix}_approval.json`)
+const resetApprovalPath = join(
+  tmpdir(),
+  `${databasePrefix}_reset-approval.json`
+)
+const backupVerificationPath = join(
+  tmpdir(),
+  `${databasePrefix}_backup-verification.json`
+)
 const startedAt = Date.now()
 
 const CUTOVER_TABLES = [
@@ -115,7 +123,7 @@ async function fingerprint(url) {
   }
 }
 
-function cutoverEnv(url, approvalId) {
+function cutoverEnv(url, approvalId, extra = {}) {
   return {
     ...process.env,
     DATABASE_URL: url,
@@ -124,6 +132,44 @@ function cutoverEnv(url, approvalId) {
     CONVERSATION_MAINTENANCE_MODE: "read-only",
     CONVERSATION_ISOLATED_TEST: "true",
     CONVERSATION_CUTOVER_APPROVAL_ID: approvalId,
+    ...extra,
+  }
+}
+
+async function resetCounts(url) {
+  const sql = postgres(url, { max: 1, prepare: false })
+  try {
+    const [row] = await sql`SELECT
+      (SELECT count(*)::int FROM thread_chat.branch_trees) AS "legacyTrees",
+      (SELECT count(*)::int FROM thread_chat.branch_generations) AS "legacyGenerations",
+      (SELECT count(*)::int FROM thread_chat.branch_message_feedback) AS "legacyFeedback",
+      (SELECT count(*)::int FROM thread_chat.legacy_conversation_entity_mappings) AS mappings,
+      (SELECT count(*)::int FROM thread_chat.conversations c WHERE c.id IN (
+        SELECT canonical_id FROM thread_chat.legacy_conversation_entity_mappings WHERE entity_type = 'conversation'
+      )) AS "canonicalConversations",
+      (SELECT count(*)::int FROM thread_chat.conversation_generations g WHERE g.conversation_id IN (
+        SELECT canonical_id FROM thread_chat.legacy_conversation_entity_mappings WHERE entity_type = 'conversation'
+      )) AS "canonicalGenerations",
+      (SELECT count(*)::int FROM thread_chat.conversation_message_feedback f WHERE f.conversation_id IN (
+        SELECT canonical_id FROM thread_chat.legacy_conversation_entity_mappings WHERE entity_type = 'conversation'
+      )) AS "canonicalFeedback",
+      (SELECT count(*)::int FROM thread_chat.conversation_artifacts a WHERE a.conversation_id IN (
+        SELECT canonical_id FROM thread_chat.legacy_conversation_entity_mappings WHERE entity_type = 'conversation'
+      )) AS "canonicalArtifacts",
+      (SELECT count(*)::int FROM thread_chat.conversation_command_records r WHERE r.scope_id IN (
+        SELECT canonical_id FROM thread_chat.legacy_conversation_entity_mappings
+      )) AS "commandRecords",
+      (SELECT count(*)::int FROM thread_chat.conversation_outbox_events e WHERE e.aggregate_id IN (
+        SELECT canonical_id FROM thread_chat.legacy_conversation_entity_mappings
+      )) AS "outboxEvents",
+      (SELECT count(*)::int FROM thread_chat.usage_records u WHERE u.app_generation_id IN (
+        SELECT canonical_id FROM thread_chat.legacy_conversation_entity_mappings WHERE entity_type = 'generation'
+        UNION
+        SELECT local_id FROM thread_chat.legacy_conversation_entity_mappings WHERE entity_type = 'generation'
+      )) AS "preservedUsageRecords"`
+    return row
+  } finally {
+    await sql.end()
   }
 }
 
@@ -177,12 +223,12 @@ try {
   await writeFile(approvalPath, `${JSON.stringify(approval, null, 2)}\n`)
   const env = cutoverEnv(databaseUrl(legacyRestoreName), approvalId)
 
-  run("pnpm", ["exec", "tsx", "scripts/check-conversation-cutover-drain.ts"], env)
   run(
     "pnpm",
-    ["exec", "tsx", "scripts/audit-legacy-conversations.ts"],
+    ["exec", "tsx", "scripts/check-conversation-cutover-drain.ts"],
     env
   )
+  run("pnpm", ["exec", "tsx", "scripts/audit-legacy-conversations.ts"], env)
   run(
     "pnpm",
     [
@@ -233,6 +279,68 @@ try {
   if (restoredCanonicalFingerprint.hash !== importedFingerprint.hash)
     throw new Error("canonical 备份恢复后的 cutover 表指纹与导入库不一致")
 
+  // 在已恢复的 canonical 备份副本上走完整 reset SQL，但强制事务回滚。
+  const resetApprovalId = `local-reset-rehearsal-${runId}`
+  const resetBackupId = `sha256:${canonicalDumpHash}`
+  const resetApproval = {
+    schemaVersion: 1,
+    action: "approved-conversation-reset",
+    environment: "local-ephemeral-cutover-rehearsal",
+    database: {
+      host: sourceUrl.hostname,
+      name: canonicalRestoreName,
+    },
+    scope: { legacyTreeIds: "all" },
+    expected: await resetCounts(databaseUrl(canonicalRestoreName)),
+    backupId: resetBackupId,
+    approvalId: resetApprovalId,
+    approvedBy: "local-cutover-rehearsal",
+    approvedAt: new Date().toISOString(),
+    reason: "本地临时恢复库的事务回滚演练",
+  }
+  const backupVerification = {
+    schemaVersion: 1,
+    action: "conversation-backup-verification",
+    environment: resetApproval.environment,
+    database: resetApproval.database,
+    backupId: resetBackupId,
+    backupSha256: canonicalDumpHash,
+    restoreTestId: `local-restore-${runId}`,
+    verifiedAt: new Date().toISOString(),
+    verifiedBy: "local-cutover-rehearsal",
+  }
+  await writeFile(
+    resetApprovalPath,
+    `${JSON.stringify(resetApproval, null, 2)}\n`
+  )
+  await writeFile(
+    backupVerificationPath,
+    `${JSON.stringify(backupVerification, null, 2)}\n`
+  )
+  run(
+    "pnpm",
+    [
+      "exec",
+      "tsx",
+      "scripts/reset-approved-conversations.ts",
+      "--test-rollback",
+      "--approval-file",
+      resetApprovalPath,
+      "--backup-verification-file",
+      backupVerificationPath,
+    ],
+    cutoverEnv(databaseUrl(canonicalRestoreName), resetApprovalId, {
+      CONVERSATION_CUTOVER_ENVIRONMENT: resetApproval.environment,
+      CONVERSATION_CUTOVER_BACKUP_ID: resetBackupId,
+      CONVERSATION_APPROVED_RESET_ENABLED: "true",
+    })
+  )
+  const postResetRollbackFingerprint = await fingerprint(
+    databaseUrl(canonicalRestoreName)
+  )
+  if (postResetRollbackFingerprint.hash !== restoredCanonicalFingerprint.hash)
+    throw new Error("受批准 reset 回滚演练改变了恢复库指纹")
+
   console.log(
     JSON.stringify(
       {
@@ -253,11 +361,20 @@ try {
             restoredCanonicalFingerprint.hash === importedFingerprint.hash,
         },
         imported: {
-          conversations:
-            importedFingerprint.tables.conversations?.count ?? 0,
+          conversations: importedFingerprint.tables.conversations?.count ?? 0,
           mappings:
             importedFingerprint.tables.legacy_conversation_entity_mappings
               ?.count ?? 0,
+        },
+        approvedReset: {
+          mode: "test-rollback",
+          scope: "all-legacy-mapped-conversations",
+          sourceFingerprint: restoredCanonicalFingerprint.hash,
+          rollbackFingerprint: postResetRollbackFingerprint.hash,
+          matches:
+            postResetRollbackFingerprint.hash ===
+            restoredCanonicalFingerprint.hash,
+          preservedUsageRecords: resetApproval.expected.preservedUsageRecords,
         },
         elapsedMs: Date.now() - startedAt,
       },
@@ -273,5 +390,7 @@ try {
     rm(legacyDump, { force: true }),
     rm(canonicalDump, { force: true }),
     rm(approvalPath, { force: true }),
+    rm(resetApprovalPath, { force: true }),
+    rm(backupVerificationPath, { force: true }),
   ])
 }

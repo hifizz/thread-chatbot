@@ -23,18 +23,18 @@ define-conversation-domain-model
 
 ## Release 行为矩阵
 
-| 行为边界 | 自动证据 | Ego Browser / API smoke | Cutover 门禁 |
-| --- | --- | --- | --- |
-| owner/workspace/project 隔离 | persistence、command API DB tests | 已登录测试账号读取规范 Conversation | 越权统一不可见；无跨 owner 引用 |
-| Conversation 列表/创建/标题/归档/恢复/删除 | command contract/API、client tests | 列表、重命名、归档/恢复已验证 | revision 与幂等键稳定 |
-| Thread 标题/归档/恢复 | command API、client tests | 三列 A→B→C、最深 Thread 归档/恢复 | 根 Thread 不可被错误归档或重挂 |
-| Fork/selection/A→B→C | domain、persistence、client tests | 列/树列表/画布均显示 3 节点 2 边 | 来源 Message 精确且图无环 |
-| send/edit/regenerate/select variant | generation、command、client tests | GLM 5.3 流式、刷新、变体选择已验证 | current Generation 每 Turn 唯一 |
-| Markdown/研究/Artifact | generation checkpoint、client tests | Markdown/结构化研究与 Artifact 定位 | Artifact 来源是稳定 Thread/Message ID |
-| copy/feedback/actions | client 与 feedback DB tests | 复制状态、赞/踩刷新保持 | feedback 使用稳定 Message ID |
-| disconnect/Stop/stale/refresh | generation unit/DB、coordinator tests | partial Stop 与刷新恢复已验证 | 非终态与 pending billing 必须清零 |
-| usage/exactly-once billing | generation DB tests | 不依赖浏览器连接 | pending billing=0；usage 终态明确 |
-| authority 与旧协议 | authority/client tests | authority 三元组匹配；旧 route 返回 410 | 不存在分裂开关或 fallback |
+| 行为边界                                   | 自动证据                              | Ego Browser / API smoke                 | Cutover 门禁                          |
+| ------------------------------------------ | ------------------------------------- | --------------------------------------- | ------------------------------------- |
+| owner/workspace/project 隔离               | persistence、command API DB tests     | 已登录测试账号读取规范 Conversation     | 越权统一不可见；无跨 owner 引用       |
+| Conversation 列表/创建/标题/归档/恢复/删除 | command contract/API、client tests    | 列表、重命名、归档/恢复已验证           | revision 与幂等键稳定                 |
+| Thread 标题/归档/恢复                      | command API、client tests             | 三列 A→B→C、最深 Thread 归档/恢复       | 根 Thread 不可被错误归档或重挂        |
+| Fork/selection/A→B→C                       | domain、persistence、client tests     | 列/树列表/画布均显示 3 节点 2 边        | 来源 Message 精确且图无环             |
+| send/edit/regenerate/select variant        | generation、command、client tests     | GLM 5.3 流式、刷新、变体选择已验证      | current Generation 每 Turn 唯一       |
+| Markdown/研究/Artifact                     | generation checkpoint、client tests   | Markdown/结构化研究与 Artifact 定位     | Artifact 来源是稳定 Thread/Message ID |
+| copy/feedback/actions                      | client 与 feedback DB tests           | 复制状态、赞/踩刷新保持                 | feedback 使用稳定 Message ID          |
+| disconnect/Stop/stale/refresh              | generation unit/DB、coordinator tests | partial Stop 与刷新恢复已验证           | 非终态与 pending billing 必须清零     |
+| usage/exactly-once billing                 | generation DB tests                   | 不依赖浏览器连接                        | pending billing=0；usage 终态明确     |
+| authority 与旧协议                         | authority/client tests                | authority 三元组匹配；旧 route 返回 410 | 不存在分裂开关或 fallback             |
 
 ## 本地 cutover 演练结果（2026-08-22）
 
@@ -55,6 +55,11 @@ define-conversation-domain-model
 - [ ] 创建 legacy 与 canonical 备份，执行真实恢复验证并填写备份 ID。
 - [ ] 进入 `legacy + read-only`，运行 drain checker 直至 `ready=true`。
 - [ ] 用目标审批文件执行 import/reset，保存 verifier 结果。
+
+受批准 reset 必须同时提供 ADR 审批文件与独立的备份恢复验证文件，并设置与二者精确匹配的 `CONVERSATION_CUTOVER_ENVIRONMENT`、`CONVERSATION_CUTOVER_APPROVAL_ID`、`CONVERSATION_CUTOVER_BACKUP_ID`。只有在 `legacy + read-only`、drain 清零且 `CONVERSATION_APPROVED_RESET_ENABLED=true` 时，才可运行 `pnpm reset:approved-conversations -- --execute --approval-file <adr.json> --backup-verification-file <backup.json>`。先用 `--test-rollback` 完成同一事务路径的强制回滚验证。工具保留 `usage_records`，任何财务账本处置必须走独立 ADR。
+
+本地临时库演练已覆盖完整 reset SQL：在 canonical 备份恢复副本中删除审批 scope 内实体后强制回滚，13 张 cutover 表的合并指纹在前后完全一致，并验证关联的 5 条 `usage_records` 未被删除。该证据只证明工具路径，不构成目标环境的数据丢弃批准。
+
 - [ ] 原子切换 canonical server/client epoch，运行行为矩阵关键 smoke。
 - [ ] 确认首个 canonical 生产写入时间；此后禁止恢复落后的 legacy 权威。
 - [ ] 观察期内 legacy route/query 为 0，完整性与计费对账连续通过。
