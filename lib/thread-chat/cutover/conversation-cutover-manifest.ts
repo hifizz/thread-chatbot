@@ -198,3 +198,33 @@ export function assertConversationCutoverManifestReady(input: {
   )
     throw new Error("备份恢复验证必须在维护窗口开始前完成")
 }
+
+export function assertConversationCutoverManifestDisposition(input: {
+  readonly manifest: ConversationCutoverManifest
+  readonly mode: "deterministic-import" | "approved-reset"
+  readonly approvalId: string
+  readonly backupId: string
+  readonly legacyTreeIds: "all" | readonly string[]
+}): void {
+  const { disposition } = input.manifest
+  if (disposition.mode !== input.mode)
+    throw new Error(`cutover manifest 未批准 ${input.mode}`)
+  if (disposition.approvalId !== input.approvalId)
+    throw new Error("cutover manifest approval ID 与执行审批不匹配")
+  const expectedBackup =
+    input.mode === "deterministic-import"
+      ? input.manifest.backups.legacy.id
+      : input.manifest.backups.canonical.id
+  if (expectedBackup !== input.backupId)
+    throw new Error("cutover manifest backup ID 与执行审批不匹配")
+  const manifestScope = disposition.legacyTreeIds
+  if (
+    JSON.stringify(
+      manifestScope === "all" ? "all" : [...manifestScope].sort()
+    ) !==
+    JSON.stringify(
+      input.legacyTreeIds === "all" ? "all" : [...input.legacyTreeIds].sort()
+    )
+  )
+    throw new Error("cutover manifest scope 与执行审批不匹配")
+}

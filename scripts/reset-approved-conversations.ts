@@ -11,6 +11,11 @@ import {
 } from "../lib/thread-chat/cutover/approved-conversation-reset.ts"
 import { resolveConversationAuthority } from "../lib/thread-chat/cutover/conversation-authority.ts"
 import { evaluateConversationCutoverDrain } from "../lib/thread-chat/cutover/conversation-drain.ts"
+import {
+  assertConversationCutoverManifestDisposition,
+  assertConversationCutoverManifestReady,
+  conversationCutoverManifestSchema,
+} from "../lib/thread-chat/cutover/conversation-cutover-manifest.ts"
 
 config({ path: ".env.local" })
 
@@ -28,6 +33,7 @@ function flagValue(name: string): string {
 
 const approvalPath = flagValue("--approval-file")
 const backupVerificationPath = flagValue("--backup-verification-file")
+const manifestPath = flagValue("--manifest-file")
 const rawUrl = process.env.DIRECT_URL || process.env.DATABASE_URL
 if (!rawUrl) throw new Error("未配置 DIRECT_URL 或 DATABASE_URL")
 const databaseUrl = rawUrl.trim().replace(/^(['"])(.*)\1$/u, "$2")
@@ -201,12 +207,28 @@ async function deleteApprovedScope(
 
 try {
   const { approval, backup } = await readApprovalFiles()
+  const manifest = conversationCutoverManifestSchema.parse(
+    JSON.parse(await readFile(manifestPath, "utf8"))
+  )
   const authority = resolveConversationAuthority()
   if (
     authority.authority !== "legacy" ||
     authority.maintenanceMode !== "read-only"
   )
     throw new Error("受批准重置只允许在 legacy + read-only 维护窗口执行")
+  assertConversationCutoverManifestReady({
+    manifest,
+    environment: process.env.CONVERSATION_CUTOVER_ENVIRONMENT ?? "",
+    databaseHost: parsedDatabaseUrl.hostname,
+    databaseName: parsedDatabaseUrl.pathname.slice(1),
+  })
+  assertConversationCutoverManifestDisposition({
+    manifest,
+    mode: "approved-reset",
+    approvalId: approval.approvalId,
+    backupId: approval.backupId,
+    legacyTreeIds: approval.scope.legacyTreeIds,
+  })
 
   class RollbackProbe extends Error {}
   let output: unknown

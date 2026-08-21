@@ -27,6 +27,10 @@ const canonicalRestoreName = `${databasePrefix}_canonical`
 const legacyDump = join(tmpdir(), `${databasePrefix}_legacy.dump`)
 const canonicalDump = join(tmpdir(), `${databasePrefix}_canonical.dump`)
 const approvalPath = join(tmpdir(), `${databasePrefix}_approval.json`)
+const importManifestPath = join(
+  tmpdir(),
+  `${databasePrefix}_import-manifest.json`
+)
 const resetApprovalPath = join(
   tmpdir(),
   `${databasePrefix}_reset-approval.json`
@@ -34,6 +38,10 @@ const resetApprovalPath = join(
 const backupVerificationPath = join(
   tmpdir(),
   `${databasePrefix}_backup-verification.json`
+)
+const resetManifestPath = join(
+  tmpdir(),
+  `${databasePrefix}_reset-manifest.json`
 )
 const startedAt = Date.now()
 
@@ -132,7 +140,90 @@ function cutoverEnv(url, approvalId, extra = {}) {
     CONVERSATION_MAINTENANCE_MODE: "read-only",
     CONVERSATION_ISOLATED_TEST: "true",
     CONVERSATION_CUTOVER_APPROVAL_ID: approvalId,
+    CONVERSATION_CUTOVER_ENVIRONMENT: "local-ephemeral-cutover-rehearsal",
     ...extra,
+  }
+}
+
+function releaseManifest(input) {
+  const now = Date.now()
+  const backup = (id, sha256, suffix) => ({
+    id,
+    sha256,
+    restoreTestId: `local-${suffix}-${runId}`,
+    verifiedAt: new Date(now).toISOString(),
+    verifiedBy: "local-cutover-rehearsal",
+  })
+  return {
+    schemaVersion: 1,
+    action: "conversation-cutover-release",
+    environment: "local-ephemeral-cutover-rehearsal",
+    database: { host: sourceUrl.hostname, name: input.databaseName },
+    authority: { from: "legacy", to: "canonical", epoch: `local-${runId}` },
+    owners: {
+      release: "local-release-rehearsal",
+      data: "local-data-rehearsal",
+      billing: "local-data-rehearsal",
+      incident: "local-release-rehearsal",
+    },
+    windows: {
+      maintenanceStartsAt: new Date(now + 60_000).toISOString(),
+      maintenanceEndsAt: new Date(now + 3_600_000).toISOString(),
+      observationEndsAt: new Date(now + 86_400_000).toISOString(),
+    },
+    baseline: {
+      capturedAt: new Date(now).toISOString(),
+      legacyTrees: 19,
+      legacyGenerations: 37,
+      canonicalConversations: 1,
+      requestsPerMinute: 0,
+      commandErrorRate: 0,
+      revisionConflictRate: 0,
+      usageUnavailableRate: 0,
+    },
+    thresholds: {
+      maxMaintenanceSeconds: 3600,
+      maxImportSeconds: 600,
+      maxCommandErrorRate: 0,
+      maxRevisionConflictRate: 0,
+      maxGenerationHeartbeatAgeSeconds: 120,
+      maxPendingBilling: 0,
+      maxPendingOutbox: 0,
+      maxUsageUnavailableRate: 0,
+      maxLegacyRouteCalls: 0,
+      maxLegacySqlCalls: 0,
+    },
+    disposition: {
+      mode: input.mode,
+      retentionRequired: input.mode === "deterministic-import",
+      legacyTreeIds: "all",
+      adrId: `local-adr-${runId}`,
+      approvalId: input.approvalId,
+      approvedBy: "local-data-rehearsal",
+      approvedAt: new Date(now).toISOString(),
+      reason: "本地临时数据库 cutover 演练",
+      exclusions: [],
+    },
+    backups: {
+      legacy: backup(input.legacyBackupId, input.legacyBackupSha, "legacy"),
+      canonical: backup(
+        input.canonicalBackupId,
+        input.canonicalBackupSha,
+        "canonical"
+      ),
+    },
+    goNoGo: {
+      strictSpecsPassed: true,
+      behaviorMatrixPassed: true,
+      securityReviewPassed: true,
+      dataAuditResolved: true,
+      drainReady: true,
+      backupRestorePassed: true,
+      rollbackRehearsalPassed: true,
+      canaryActorsReady: true,
+      dashboardsReady: true,
+      finalApprovalGranted: true,
+    },
   }
 }
 
@@ -221,6 +312,19 @@ try {
     approvedRepairs: ["missing-generation-intent-as-send"],
   }
   await writeFile(approvalPath, `${JSON.stringify(approval, null, 2)}\n`)
+  const importManifest = releaseManifest({
+    databaseName: legacyRestoreName,
+    mode: "deterministic-import",
+    approvalId,
+    legacyBackupId: approval.backupId,
+    legacyBackupSha: legacyDumpHash,
+    canonicalBackupId: approval.backupId,
+    canonicalBackupSha: legacyDumpHash,
+  })
+  await writeFile(
+    importManifestPath,
+    `${JSON.stringify(importManifest, null, 2)}\n`
+  )
   const env = cutoverEnv(databaseUrl(legacyRestoreName), approvalId)
 
   run(
@@ -238,6 +342,8 @@ try {
       "--execute",
       "--approval-file",
       approvalPath,
+      "--manifest-file",
+      importManifestPath,
     ],
     env
   )
@@ -251,6 +357,8 @@ try {
       "--execute",
       "--approval-file",
       approvalPath,
+      "--manifest-file",
+      importManifestPath,
     ],
     env
   )
@@ -313,6 +421,19 @@ try {
     resetApprovalPath,
     `${JSON.stringify(resetApproval, null, 2)}\n`
   )
+  const resetManifest = releaseManifest({
+    databaseName: canonicalRestoreName,
+    mode: "approved-reset",
+    approvalId: resetApprovalId,
+    legacyBackupId: `sha256:${legacyDumpHash}`,
+    legacyBackupSha: legacyDumpHash,
+    canonicalBackupId: resetBackupId,
+    canonicalBackupSha: canonicalDumpHash,
+  })
+  await writeFile(
+    resetManifestPath,
+    `${JSON.stringify(resetManifest, null, 2)}\n`
+  )
   await writeFile(
     backupVerificationPath,
     `${JSON.stringify(backupVerification, null, 2)}\n`
@@ -328,6 +449,8 @@ try {
       resetApprovalPath,
       "--backup-verification-file",
       backupVerificationPath,
+      "--manifest-file",
+      resetManifestPath,
     ],
     cutoverEnv(databaseUrl(canonicalRestoreName), resetApprovalId, {
       CONVERSATION_CUTOVER_ENVIRONMENT: resetApproval.environment,
@@ -390,7 +513,9 @@ try {
     rm(legacyDump, { force: true }),
     rm(canonicalDump, { force: true }),
     rm(approvalPath, { force: true }),
+    rm(importManifestPath, { force: true }),
     rm(resetApprovalPath, { force: true }),
     rm(backupVerificationPath, { force: true }),
+    rm(resetManifestPath, { force: true }),
   ])
 }

@@ -2,6 +2,7 @@ import assert from "node:assert/strict"
 import test from "node:test"
 
 import {
+  assertConversationCutoverManifestDisposition,
   assertConversationCutoverManifestReady,
   conversationCutoverManifestSchema,
   hashConversationCutoverManifest,
@@ -165,4 +166,33 @@ test("执行校验拒绝环境漂移、未通过门禁和过期窗口", () => {
       }),
     /维护窗口已经结束/u
   )
+})
+
+test("执行动作必须与 manifest 的 ADR 模式、审批、备份和 scope 一致", () => {
+  const manifest = conversationCutoverManifestSchema.parse(manifestInput)
+  assert.doesNotThrow(() =>
+    assertConversationCutoverManifestDisposition({
+      manifest,
+      mode: "deterministic-import",
+      approvalId: "approval-34",
+      backupId: "legacy-backup",
+      legacyTreeIds: "all",
+    })
+  )
+  for (const override of [
+    { mode: "approved-reset" as const },
+    { approvalId: "other" },
+    { backupId: "other" },
+    { legacyTreeIds: ["tree-1"] },
+  ])
+    assert.throws(() =>
+      assertConversationCutoverManifestDisposition({
+        manifest,
+        mode: "deterministic-import",
+        approvalId: "approval-34",
+        backupId: "legacy-backup",
+        legacyTreeIds: "all",
+        ...override,
+      })
+    )
 })

@@ -16,6 +16,7 @@
 
 - 新增严格 cutover manifest schema 与执行校验 CLI，覆盖环境/数据库、四类负责人、维护/观察窗口、容量/错误/计费基线、十项阈值、import/reset ADR、双备份恢复证明、epoch 和十项 go/no-go 门禁。
 - 有保留义务时 schema 强制确定性导入；执行时环境、数据库、时间窗口与所有门禁必须精确匹配，并输出 manifest SHA-256，禁止从代码或环境隐式猜测数据处置。
+- 正式 import/reset 写工具已强制接收 manifest，并二次核对 ADR mode、approval ID、对应备份 ID 与 scope；本地临时数据库演练覆盖两次幂等 import 和 reset 强制回滚，证明无法绕过 manifest 单独执行审批文件。
 - 1.3 与 2.4 保持未完成：尚未填入真实目标环境基线、负责人、阈值、窗口和已批准 ADR，也未把真实 manifest 纳入发布证据。
 
 ## 3. 确定性导入或重置工具

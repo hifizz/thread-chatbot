@@ -15,6 +15,11 @@ import {
   type LegacyConversationImportPlan,
 } from "../lib/thread-chat/cutover/legacy-conversation-import.ts"
 import { evaluateConversationCutoverDrain } from "../lib/thread-chat/cutover/conversation-drain.ts"
+import {
+  assertConversationCutoverManifestDisposition,
+  assertConversationCutoverManifestReady,
+  conversationCutoverManifestSchema,
+} from "../lib/thread-chat/cutover/conversation-cutover-manifest.ts"
 
 config({ path: ".env.local" })
 
@@ -48,6 +53,9 @@ const rollback = args.has("--test-rollback")
 const approvalFlag = process.argv.indexOf("--approval-file")
 const approvalPath =
   approvalFlag >= 0 ? process.argv[approvalFlag + 1] : undefined
+const manifestFlag = process.argv.indexOf("--manifest-file")
+const manifestPath =
+  manifestFlag >= 0 ? process.argv[manifestFlag + 1] : undefined
 
 const rawUrl = process.env.DIRECT_URL || process.env.DATABASE_URL
 if (!rawUrl) throw new Error("未配置 DIRECT_URL 或 DATABASE_URL")
@@ -312,8 +320,12 @@ try {
   let approval: z.infer<typeof approvalSchema> | null = null
   if (execute || rollback) {
     if (!approvalPath) throw new Error("执行写入必须提供 --approval-file")
+    if (!manifestPath) throw new Error("执行写入必须提供 --manifest-file")
     approval = approvalSchema.parse(
       JSON.parse(await readFile(approvalPath, "utf8"))
+    )
+    const manifest = conversationCutoverManifestSchema.parse(
+      JSON.parse(await readFile(manifestPath, "utf8"))
     )
     const authority = resolveConversationAuthority()
     if (
@@ -328,6 +340,19 @@ try {
       parsedDatabaseUrl.pathname.slice(1) !== approval.database.name
     )
       throw new Error("当前数据库与审批文件目标不匹配")
+    assertConversationCutoverManifestReady({
+      manifest,
+      environment: process.env.CONVERSATION_CUTOVER_ENVIRONMENT ?? "",
+      databaseHost: parsedDatabaseUrl.hostname,
+      databaseName: parsedDatabaseUrl.pathname.slice(1),
+    })
+    assertConversationCutoverManifestDisposition({
+      manifest,
+      mode: "deterministic-import",
+      approvalId: approval.approvalId,
+      backupId: approval.backupId,
+      legacyTreeIds: approval.scope.legacyTreeIds,
+    })
     const [drainCounts] = await sql<
       readonly {
         legacy_active: number

@@ -42,6 +42,8 @@ define-conversation-domain-model
 
 schema-only 校验不代表可执行；`--for-execution` 会在任一门禁为 false、环境/数据库漂移、窗口过期、备份验证晚于维护开始，或“有保留义务却选择 reset”时 fail closed。仓库不提供带伪造生产值的默认 manifest。
 
+正式 `import:legacy-conversations` 与 `reset:approved-conversations` 写执行均强制要求 `--manifest-file`，并再次核对 ADR mode、approval ID、对应 legacy/canonical backup ID 与 legacy Tree scope；单独运行 validator 不能绕过写工具内的二次校验。
+
 ## 本地 cutover 演练结果（2026-08-22）
 
 - 数据：19 棵 legacy 树；22 Thread、34 Turn、71 Message、3 Fork、37 Generation、1 feedback。
@@ -62,7 +64,7 @@ schema-only 校验不代表可执行；`--for-execution` 会在任一门禁为 f
 - [ ] 进入 `legacy + read-only`，运行 drain checker 直至 `ready=true`。
 - [ ] 用目标审批文件执行 import/reset，保存 verifier 结果。
 
-受批准 reset 必须同时提供 ADR 审批文件与独立的备份恢复验证文件，并设置与二者精确匹配的 `CONVERSATION_CUTOVER_ENVIRONMENT`、`CONVERSATION_CUTOVER_APPROVAL_ID`、`CONVERSATION_CUTOVER_BACKUP_ID`。只有在 `legacy + read-only`、drain 清零且 `CONVERSATION_APPROVED_RESET_ENABLED=true` 时，才可运行 `pnpm reset:approved-conversations -- --execute --approval-file <adr.json> --backup-verification-file <backup.json>`。先用 `--test-rollback` 完成同一事务路径的强制回滚验证。工具保留 `usage_records`，任何财务账本处置必须走独立 ADR。
+受批准 reset 必须同时提供 release manifest、ADR 审批文件与独立的备份恢复验证文件，并设置与三者精确匹配的 `CONVERSATION_CUTOVER_ENVIRONMENT`、`CONVERSATION_CUTOVER_APPROVAL_ID`、`CONVERSATION_CUTOVER_BACKUP_ID`。只有在 `legacy + read-only`、drain 清零且 `CONVERSATION_APPROVED_RESET_ENABLED=true` 时，才可运行 `pnpm reset:approved-conversations -- --execute --manifest-file <manifest.json> --approval-file <adr.json> --backup-verification-file <backup.json>`。先用 `--test-rollback` 完成同一事务路径的强制回滚验证。工具保留 `usage_records`，任何财务账本处置必须走独立 ADR。
 
 本地临时库演练已覆盖完整 reset SQL：在 canonical 备份恢复副本中删除审批 scope 内实体后强制回滚，13 张 cutover 表的合并指纹在前后完全一致，并验证关联的 5 条 `usage_records` 未被删除。该证据只证明工具路径，不构成目标环境的数据丢弃批准。
 
