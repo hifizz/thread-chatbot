@@ -167,7 +167,7 @@ await context.route("**/api/**", async (route) => {
     return
   }
 
-  if (url.pathname === "/api/branch-title") {
+  if (url.pathname === "/api/title") {
     await route.fulfill({
       contentType: "application/json",
       body: JSON.stringify({ title: "Markdown 分支" }),

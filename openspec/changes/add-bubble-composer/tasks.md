@@ -19,8 +19,8 @@
 
 ## 3.5 异步分支标题（D7）
 
-- [x] 3.5.1 新路由 `app/api/branch-title/route.ts`：POST {anchorText, question, answer 摘录} → minimaxModel generateText 4–8 字标题（超长截断、空回退默认），照主聊天 generateTitle 先例
-- [x] 3.5.2 `core/store.ts` 新 mutator `setThreadTitle(threadId, title)`（原子 + notify）；客户端触发：分支首答 finish 后一次（Set ref 防重、失败 console.warn 静默），标题变更随整树防抖存盘持久化
+- [x] 3.5.1 统一路由 `app/api/title/route.ts`：POST `{ kind: "branch", anchorText, question, answer }`，使用标题专用模型生成完整语义标题，空结果回退默认标题
+- [x] 3.5.2 `core/store.ts` 使用 `setGeneratedThreadTitle(threadId, title)` 原子写入；统一标题 hook 在分支首答 finish 后触发一次（sessionStorage + 持久化标记防重、失败 console.warn 静默），标题变更随整树防抖存盘持久化
 
 ## 4. 验收（真实执行，全绿才算完）
 

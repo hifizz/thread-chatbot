@@ -1,406 +1,246 @@
 import {
   convertToModelMessages,
+  consumeStream,
   createUIMessageStream,
   createUIMessageStreamResponse,
   isStepCount,
   streamText,
-  tool,
-  type ToolSet,
-  type UIMessage,
 } from "ai"
 import { after } from "next/server"
 import { frontendTools } from "@assistant-ui/react-ai-sdk"
-import type { ToolJSONSchema } from "assistant-stream"
-import { z } from "zod"
 import { resolveAttachmentParts } from "@/lib/chat/resolve-attachments"
-import {
-  readUrlTool,
-  webSearchTool,
-} from "@/lib/chat/research-tools"
 import { isSearchConfigured } from "@/lib/ai/search"
+import { RESEARCH_MAX_STEPS } from "@/constants/research"
+import { MAX_OUTPUT_TOKENS } from "@/constants/model"
+import { MODEL_CALL_PURPOSE } from "@/constants/model-call"
+import { resolveChatModel } from "@/lib/ai/provider"
 import {
-  DIRECT_FETCH_SYSTEM_PROMPT,
-  RESEARCH_MAX_STEPS,
-  RESEARCH_ROUTER_CONTEXT_MESSAGES,
-  RESEARCH_SYSTEM_PROMPT,
-  WEB_ACCESS_SYSTEM_PROMPT,
-} from "@/constants/research"
-import { buildThreadChatSystem } from "@/lib/chat/thread-chat-prompt"
-import { getCurrentUserId } from "@/lib/auth/server"
-import {
-  DEFAULT_MODEL_ID,
-  getChatModel,
-  isUnbilledPreviewModel,
-  MAX_OUTPUT_TOKENS,
-} from "@/constants/model"
-import { resolveChatModel, isModelConfigured } from "@/lib/ai/provider"
-import { openRouterCostUsdFromSteps } from "@/lib/ai/openrouter"
-import { hasPositiveBalance, chargeUsage } from "@/lib/billing/credits"
+  withModelCallLogging,
+  type ModelCallTrace,
+} from "@/lib/ai/model-call-logger"
 import { buildUsageMetadata } from "@/lib/billing/usage-meta"
+import { isExplicitMarkdownArtifactRequest } from "@/lib/chat/markdown-artifact"
+import { reasoningForResearchRoute } from "@/lib/chat/research-router"
+import { unregisterGenerationController } from "@/lib/thread-chat-generation/execution"
+import { createToolStepPolicy } from "@/app/api/chat/tool-step-policy"
+import { buildChatSystemPrompt } from "@/app/api/chat/system-prompt"
+import { resolveResearchContext } from "@/app/api/chat/research-context"
+import { buildChatToolSet } from "@/app/api/chat/tool-set"
+import { createStreamLifecycle } from "@/app/api/chat/stream-lifecycle"
 import {
-  isExplicitMarkdownArtifactRequest,
-  MARKDOWN_ARTIFACT_TOOL_DESCRIPTION,
-  MARKDOWN_ARTIFACT_TOOL_NAME,
-  markdownArtifactInputSchema,
-  type MarkdownArtifactToolResult,
-} from "@/lib/chat/markdown-artifact"
-import {
-  createResearchPlan,
-  reasoningForResearchRoute,
-  researchPlanExecutionPrompt,
-  resolveResearchRoute,
-  type ResearchPlan,
-  type ResearchRoute,
-} from "@/lib/chat/research-router"
+  createGenerationSettlementHandler,
+  settleGenerationInitializationFailure,
+} from "@/app/api/chat/generation-settlement"
+import { prepareThreadGenerationContext } from "@/app/api/chat/thread-generation-context"
+import { prepareChatRequestContext } from "@/app/api/chat/request-context"
 
 // AnySearch 搜索与网页深读可能形成多步循环，放宽单次请求时长上限。
 export const maxDuration = 300
 
-const getWeather = tool({
-  description: "Get the current weather for a city.",
-  inputSchema: z.object({
-    location: z.string().describe("City name, e.g. 'San Francisco'"),
-  }),
-  execute: async ({ location }) => {
-    // Deterministic mock reading (hashed from the city name) - no real weather API/key involved.
-    const conditions = [
-      "Sunny",
-      "Partly Cloudy",
-      "Cloudy",
-      "Light Rain",
-      "Clear",
-    ]
-    const seed = [...location].reduce((acc, c) => acc + c.charCodeAt(0), 0)
-    return {
-      location,
-      temperatureF: 55 + (seed % 35),
-      condition: conditions[seed % conditions.length],
-      humidity: 30 + (seed % 50),
-      asOf: new Date().toISOString(),
-    }
-  },
-})
-
-const compareTable = tool({
-  description:
-    "Render a comparison table for two or more items across one or more numeric metrics. Use whenever the user asks to compare things 'in a table' with real numeric data.",
-  inputSchema: z.object({
-    title: z.string(),
-    unit: z.string().optional(),
-    columns: z
-      .array(z.string())
-      .describe("Category labels, e.g. country names"),
-    series: z.array(
-      z.object({
-        name: z.string(),
-        values: z
-          .array(z.number())
-          .describe("One value per column, same order as columns"),
-      })
-    ),
-  }),
-  execute: async (input) => input,
-})
-
-const createMarkdownArtifact = tool({
-  description: MARKDOWN_ARTIFACT_TOOL_DESCRIPTION,
-  inputSchema: markdownArtifactInputSchema,
-  execute: async (): Promise<MarkdownArtifactToolResult> => ({ created: true }),
-})
-
-/** 只看最后一条 user 消息的文本 part，供高置信首步强制路由。 */
-function latestUserText(messages: UIMessage[]): string {
-  for (let i = messages.length - 1; i >= 0; i--) {
-    const message = messages[i]
-    if (message.role !== "user") continue
-    return message.parts
-      .flatMap((part) => (part.type === "text" ? [part.text] : []))
-      .join("\n")
-  }
-  return ""
-}
-
-/** Router 只取最近少量纯文本上下文，用于理解“这个/它”等指代。 */
-function recentConversationText(messages: UIMessage[]): string {
-  return messages
-    .slice(-RESEARCH_ROUTER_CONTEXT_MESSAGES)
-    .map((message) => {
-      const text = message.parts
-        .flatMap((part) => (part.type === "text" ? [part.text] : []))
-        .join("\n")
-      return `${message.role}: ${text}`
-    })
-    .join("\n")
-}
-
 export async function POST(req: Request) {
-  // 1) 鉴权：未登录直接拒绝
-  const userId = await getCurrentUserId()
-  if (!userId) {
-    return Response.json(
-      { error: "请先登录后再使用对话功能。" },
-      { status: 401 }
-    )
-  }
-
+  const requestContext = await prepareChatRequestContext(req)
+  if (requestContext.kind === "response") return requestContext.response
   const {
+    userId,
     messages,
     tools,
     deepResearch,
     threadChat,
-    modelId: rawModelId,
-    id: threadId,
-  }: {
-    messages: UIMessage[]
-    tools?: Record<string, ToolJSONSchema>
-    deepResearch?: boolean
-    /** thread-chat 分支对话页的模式标记：system 由服务端按锚点原文构造 */
-    threadChat?: { anchorText?: string | null }
-    modelId?: unknown
-    id?: string
-  } = await req.json()
+    linearThreadId,
+    modelId,
+    model,
+    isUnbilledPreview,
+  } = requestContext
 
-  // 2) 解析并校验所选模型
-  if (
-    rawModelId !== undefined &&
-    (typeof rawModelId !== "string" || !getChatModel(rawModelId))
-  ) {
-    return Response.json({ error: "未知或无效的模型。" }, { status: 400 })
-  }
-  const modelId = typeof rawModelId === "string" ? rawModelId : DEFAULT_MODEL_ID
-  const model = getChatModel(modelId)!
-  if (!isModelConfigured(model)) {
-    return Response.json(
-      {
-        error: `模型「${model.name}」未配置，请联系管理员在服务端配置对应 API Key 或可用网关。`,
-      },
-      { status: 400 }
-    )
-  }
+  const prepared = await prepareThreadGenerationContext({
+    userId,
+    modelId,
+    messages,
+    threadChat,
+    unbilledPreview: isUnbilledPreview,
+  })
+  if (prepared.kind === "response") return prepared.response
+  const {
+    persistence,
+    authoritativeMessages,
+    authoritativeAnchorText,
+    preparedRevision,
+    generationController,
+    generationObserver,
+  } = prepared
 
-  const isUnbilledPreview = isUnbilledPreviewModel(model)
-
-  // 3) 计费拦截：未计费预览模型不依赖用户余额。
-  if (!isUnbilledPreview && !(await hasPositiveBalance(userId))) {
-    return Response.json({ error: "额度不足，请充值后再试。" }, { status: 402 })
-  }
-
-  // AnySearch 是当前统一联网层：所有模型都获得相同的搜索与网页深读工具。
-  // deepResearch 只控制研究提示强度，不再决定工具是否存在。
-  const research = deepResearch === true
-  const searchReady = isSearchConfigured()
-  const isThreadChat = threadChat != null
-  const latestText = latestUserText(messages)
-  const chatModel = resolveChatModel(modelId)
-  const researchRoute: ResearchRoute = research
-    ? searchReady
-      ? {
-          mode: "research",
-          reasonCode: "multi_source_research",
-          urls: [],
-          suggestedQueries: [],
-        }
-      : {
-          mode: "answer",
-          reasonCode: "search_unavailable",
-          urls: [],
-          suggestedQueries: [],
-        }
-    : await resolveResearchRoute({
-        model: chatModel,
-        latestUserText: latestText,
-        recentConversation: recentConversationText(messages),
-        searchReady,
-      })
-  const researchPlan: ResearchPlan | null =
-    researchRoute.mode === "research"
-      ? await createResearchPlan({
-          model: chatModel,
-          userRequest: latestText,
-          route: researchRoute,
-        })
-      : null
-  const webToolsEnabled =
-    searchReady && researchRoute.mode !== "answer"
-  const markdownArtifactRequested =
-    isThreadChat &&
-    isExplicitMarkdownArtifactRequest(latestText)
-
-  const routedWebTools: ToolSet =
-    researchRoute.mode === "fetch"
-      ? { readUrl: readUrlTool }
-      : researchRoute.mode === "search" || researchRoute.mode === "research"
-        ? { webSearch: webSearchTool, readUrl: readUrlTool }
-        : {}
-
-  const allTools: ToolSet = {
-    // 普通 ThreadChat 请求完全不暴露 Markdown 工具，避免模型把长回答误判成产物。
-    // 只有明确要求独立文章/文档/文件/Markdown 时才挂载并强制使用。
-    ...(isThreadChat
-      ? markdownArtifactRequested
-        ? { [MARKDOWN_ARTIFACT_TOOL_NAME]: createMarkdownArtifact }
-        : {}
-      : { getWeather, compareTable }),
-    ...(webToolsEnabled ? routedWebTools : {}),
-    ...frontendTools(tools ?? {}),
-  }
-
-  // MiniMax 不接受 file part：先把附件（PDF→提取文本，其余→占位说明）转换为 text part
-  const resolvedMessages = await resolveAttachmentParts(messages)
-
-  const system = [
-    isThreadChat
-      ? buildThreadChatSystem(threadChat.anchorText, {
-          enableMarkdownArtifact: markdownArtifactRequested,
-        })
-      : null,
-    researchRoute.mode === "fetch" ? DIRECT_FETCH_SYSTEM_PROMPT : null,
-    researchRoute.mode === "search" || researchRoute.mode === "research"
-      ? WEB_ACCESS_SYSTEM_PROMPT
-      : null,
-    researchRoute.mode === "research" ? RESEARCH_SYSTEM_PROMPT : null,
-    researchPlan ? researchPlanExecutionPrompt(researchPlan) : null,
-    research && !searchReady
-      ? "用户开启了深度研究，但服务端未启用搜索服务，请如实告知该功能暂不可用，并基于已有知识尽力回答。"
-      : null,
-  ]
-    .filter((part): part is string => part !== null)
-    .join("\n\n")
-
-  const result = streamText({
-    model: chatModel,
-    reasoning: reasoningForResearchRoute(researchRoute.mode),
-    system,
-    messages: await convertToModelMessages(resolvedMessages, {
-      tools: allTools,
-    }),
-    tools: allTools,
-    // 明确 Markdown 交付请求只强制第 0 步启动工具调用；后续步骤仍保留工具，
-    // 让模型在用户要求多份独立文档时，为每份文档分别创建一个 Artifact。
-    prepareStep:
-      isThreadChat || webToolsEnabled
-        ? ({ stepNumber }) => {
-            const activeWebTools =
-              researchRoute.mode === "fetch"
-                ? ["readUrl"]
-                : researchRoute.mode === "search" ||
-                    researchRoute.mode === "research"
-                  ? ["webSearch", "readUrl"]
-                  : []
-            const activeTools = isThreadChat
-              ? [
-                  ...(markdownArtifactRequested
-                    ? [MARKDOWN_ARTIFACT_TOOL_NAME]
-                    : []),
-                  ...activeWebTools,
-                ]
-              : activeWebTools
-
-            if (stepNumber === 0 && researchRoute.mode === "fetch") {
-              return {
-                activeTools,
-                toolChoice: { type: "tool" as const, toolName: "readUrl" },
-              }
-            }
-            if (
-              stepNumber === 0 &&
-              (researchRoute.mode === "search" ||
-                researchRoute.mode === "research")
-            ) {
-              return {
-                activeTools,
-                toolChoice: { type: "tool" as const, toolName: "webSearch" },
-              }
-            }
-            if (stepNumber === 0 && markdownArtifactRequested) {
-              return {
-                activeTools,
-                toolChoice: {
-                  type: "tool" as const,
-                  toolName: MARKDOWN_ARTIFACT_TOOL_NAME,
-                },
-              }
-            }
-            return activeTools.length > 0 ? { activeTools } : undefined
+  try {
+    // AnySearch 是当前统一联网层：所有模型都获得相同的搜索与网页深读工具。
+    // deepResearch 只控制研究提示强度，不再决定工具是否存在。
+    const research = deepResearch === true
+    const searchReady = isSearchConfigured()
+    const isThreadChat = persistence != null
+    const chatModel = resolveChatModel(modelId)
+    const modelCallTrace: ModelCallTrace = {
+      requestId: crypto.randomUUID(),
+      ...(persistence
+        ? {
+            treeId: persistence.treeId,
+            threadId: persistence.threadId,
+            generationId: persistence.generationId,
+            assistantMessageId: persistence.assistantMessageId,
           }
-        : undefined,
-    // 单请求输出封顶：收敛并发竞态下的最大超支敞口，并防异常长输出打爆供应商账单
-    maxOutputTokens: MAX_OUTPUT_TOKENS,
-    // 联网模式允许模型反复搜索、深读并综合；20 步只作为异常循环熔断。
-    stopWhen: isStepCount(webToolsEnabled ? RESEARCH_MAX_STEPS : 5),
-    // 4) 已计费模型在生成结束后按 token 用量即时扣费并写入流水。
-    //    UMAPIS 预览尚未有经确认的价格，不扣余额也不写流水。
-    onEnd: async ({ usage, providerMetadata, steps }) => {
-      if (isUnbilledPreview) return
-      const generationId =
-        typeof providerMetadata?.gateway?.generationId === "string"
-          ? providerMetadata.gateway.generationId
-          : null
-      const openRouterCostUsd =
-        model.provider === "openrouter"
-          ? openRouterCostUsdFromSteps(steps)
-          : null
-      if (model.provider === "openrouter" && openRouterCostUsd == null) {
-        console.warn(
-          `[chat] OpenRouter 成本元数据不完整，使用静态估值：${model.id}`
-        )
-      }
-      await chargeUsage({
-        userId,
-        model: modelId,
-        inputTokens: usage.inputTokens ?? 0,
-        outputTokens: usage.outputTokens ?? 0,
-        threadId: threadId ?? null,
-        costEvidence:
-          openRouterCostUsd != null
-            ? { source: "openrouter", costUsd: openRouterCostUsd }
-            : generationId
-              ? { source: "vercel-gateway", generationId }
-              : { source: "estimate" },
-      })
-    },
-  })
-
-  // 即使客户端中途断连，也在服务端把整条流消费完，保证 onEnd（计费）必然触发，
-  // 避免「已产生供应商成本却漏计费」。after 让 Serverless 保活到消费结束。
-  after(async () => {
-    try {
-      await result.consumeStream()
-    } catch {
-      // 生成出错时不计费（onEnd 不触发），忽略消费错误即可
+        : linearThreadId
+          ? { threadId: linearThreadId }
+          : {}),
     }
-  })
-
-  const uiStream = createUIMessageStream({
-    execute: ({ writer }) => {
-      writer.write({
-        type: "data-research-route",
-        id: "research-route",
-        data: researchRoute,
+    const { latestText, researchRoute, researchPlan } =
+      await resolveResearchContext({
+        model: chatModel,
+        messages: authoritativeMessages,
+        deepResearchRequested: research,
+        searchReady,
+        modelCallTrace,
       })
-      if (researchPlan) {
-        writer.write({
-          type: "data-research-plan",
-          id: "research-plan",
-          data: researchPlan,
-        })
-      }
-      writer.merge(
-        result.toUIMessageStream({
-          // 流内错误在服务端留日志；返回客户端的仍是统一掩码文案。
-          onError: (error) => {
-            console.error("[chat] 流内错误:", error)
-            return "An error occurred."
-          },
-          // 把本次用量与费用附到 assistant 消息 metadata，随消息持久化。
-          messageMetadata: ({ part }) =>
-            part.type === "finish"
-              ? buildUsageMetadata(modelId, part.totalUsage)
-              : undefined,
-        })
-      )
-    },
-  })
+    const markdownArtifactRequested =
+      isThreadChat && isExplicitMarkdownArtifactRequest(latestText)
+    const { tools: allTools, webToolsEnabled } = buildChatToolSet({
+      researchMode: researchRoute.mode,
+      searchReady,
+      threadChat: isThreadChat,
+      markdownArtifactRequested,
+      frontendToolSet: frontendTools(tools ?? {}),
+    })
 
-  return createUIMessageStreamResponse({ stream: uiStream })
+    // MiniMax 不接受 file part：先把附件（PDF→提取文本，其余→占位说明）转换为 text part
+    const resolvedMessages = await resolveAttachmentParts(authoritativeMessages)
+
+    const system = buildChatSystemPrompt({
+      threadChat: isThreadChat,
+      anchorText: authoritativeAnchorText,
+      markdownArtifactRequested,
+      researchMode: researchRoute.mode,
+      researchPlan,
+      deepResearchRequested: research,
+      searchReady,
+    })
+
+    const streamLifecycle = createStreamLifecycle({
+      userId,
+      modelId,
+      model,
+      persistentGeneration: isThreadChat,
+      unbilledPreview: isUnbilledPreview,
+      linearThreadId,
+    })
+
+    const result = streamText({
+      model: withModelCallLogging(
+        chatModel,
+        MODEL_CALL_PURPOSE.chatAnswer,
+        modelCallTrace
+      ),
+      ...(generationController
+        ? { abortSignal: generationController.signal }
+        : {}),
+      reasoning: reasoningForResearchRoute(researchRoute.mode, model),
+      system,
+      messages: await convertToModelMessages(resolvedMessages, {
+        tools: allTools,
+      }),
+      tools: allTools,
+      // 明确 Markdown 交付请求只强制第 0 步启动工具调用；后续步骤仍保留工具，
+      // 让模型在用户要求多份独立文档时，为每份文档分别创建一个 Artifact。
+      prepareStep: createToolStepPolicy({
+        isThreadChat,
+        markdownArtifactRequested,
+        researchMode: researchRoute.mode,
+      }),
+      maxOutputTokens: MAX_OUTPUT_TOKENS,
+      stopWhen: isStepCount(webToolsEnabled ? RESEARCH_MAX_STEPS : 5),
+      onError: streamLifecycle.onError,
+      onAbort: streamLifecycle.onAbort,
+      onEnd: streamLifecycle.onEnd,
+    })
+
+    const uiStream = createUIMessageStream({
+      ...(persistence
+        ? {
+            originalMessages: resolvedMessages,
+            generateId: () => persistence.assistantMessageId,
+          }
+        : {}),
+      execute: ({ writer }) => {
+        writer.write({
+          type: "data-research-route",
+          id: "research-route",
+          data: researchRoute,
+        })
+        if (researchPlan) {
+          writer.write({
+            type: "data-research-plan",
+            id: "research-plan",
+            data: researchPlan,
+          })
+        }
+        writer.merge(
+          result.toUIMessageStream({
+            onError: (error) => {
+              console.error("[chat] 流内错误:", error)
+              return "An error occurred."
+            },
+            messageMetadata: ({ part }) =>
+              part.type === "finish"
+                ? buildUsageMetadata(modelId, part.totalUsage)
+                : undefined,
+          })
+        )
+      },
+      onEnd: persistence
+        ? createGenerationSettlementHandler({
+            persistence,
+            researchRoute,
+            researchPlan,
+            unbilledPreview: isUnbilledPreview,
+            streamLifecycle,
+          })
+        : undefined,
+    })
+
+    const response = createUIMessageStreamResponse({
+      stream: uiStream,
+      consumeSseStream: ({ stream }) => {
+        after(async () => {
+          await consumeStream({
+            stream,
+            onError: (error) => {
+              console.error("[chat] 服务端 UI stream 消费失败", error)
+            },
+          })
+          generationObserver?.stop()
+          if (generationObserver) await generationObserver.done
+          if (persistence && generationController) {
+            unregisterGenerationController(
+              persistence.generationId,
+              generationController
+            )
+          }
+        })
+      },
+    })
+    if (preparedRevision !== null)
+      response.headers.set("x-thread-tree-revision", String(preparedRevision))
+    return response
+  } catch (error) {
+    generationController?.abort(error)
+    generationObserver?.stop()
+    if (persistence && generationController) {
+      unregisterGenerationController(
+        persistence.generationId,
+        generationController
+      )
+      await settleGenerationInitializationFailure({
+        persistence,
+        error,
+        usageUnavailable: !isUnbilledPreview,
+      })
+    }
+    console.error("[chat] 请求初始化失败", error)
+    return Response.json({ error: "生成初始化失败，请重试。" }, { status: 500 })
+  }
 }

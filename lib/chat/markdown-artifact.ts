@@ -61,7 +61,7 @@ export function isExplicitMarkdownArtifactRequest(text: string): boolean {
   if (conceptQuestion || instructionQuestion) return false
 
   const chineseArtifact =
-    /(?:(?:帮我|请|为我).{0,8})?(?:创建|生成|输出|整理成|制作|写成|写为|改写成|转换成|转成|导出|保存为|交付).{0,30}(?:markdown|\.md|md[\t ]*(?:文件|文档|格式)|文件|文档|产物|附件)|(?:给我|提供)(?:[\s：:，,]*(?:一份|一个|一篇|该|这份|这个))?[\s：:，,]*(?:markdown|\.md|md[\t ]*(?:文件|文档|格式)|文件|文档|产物|附件)|(?:markdown|\.md|md[\t ]*(?:文件|文档|格式)|文件|文档|产物|附件).{0,30}(?:创建|生成|输出|整理|制作|写成|写为|改写|转换|转成|导出|保存|交付)/i.test(
+    /(?:(?:帮我|请|为我).{0,8})?(?:创建|生成|输出|整理成|总结成|汇总成|制作|写成|写为|改写成|转换成|转成|导出|保存为|交付).{0,30}(?:markdown|\.md|md[\t ]*(?:文件|文档|格式)|文件|文档|产物|附件)|(?:给我|提供)(?:[\s：:，,]*(?:一份|一个|一篇|该|这份|这个))?[\s：:，,]*(?:markdown|\.md|md[\t ]*(?:文件|文档|格式)|文件|文档|产物|附件)|(?:markdown|\.md|md[\t ]*(?:文件|文档|格式)|文件|文档|产物|附件).{0,30}(?:创建|生成|输出|整理|总结|汇总|制作|写成|写为|改写|转换|转成|导出|保存|交付)/i.test(
       normalized
     )
   const chineseLongForm =
@@ -69,7 +69,7 @@ export function isExplicitMarkdownArtifactRequest(text: string): boolean {
       normalized
     )
   const englishArtifact =
-    /\b(?:create|generate|output|convert|export|produce|deliver|provide|return|save)\b.{0,60}\b(?:markdown|md\s+(?:file|document)|file|document|artifact|deliverable)\b|\b(?:markdown|md\s+(?:file|document)|file|document|artifact|deliverable)\b.{0,60}\b(?:create|generate|output|convert|export|produce|deliver|provide|return|save)\b|\b(?:create|generate|write|draft|produce)\b.{0,60}\b(?:article|report|manuscript|blog\s+post|tutorial)\b/i.test(
+    /\b(?:create|generate|output|convert|export|produce|deliver|provide|return|save|summari[sz]e)\b.{0,60}\b(?:markdown|md\s+(?:file|document)|file|document|artifact|deliverable)\b|\b(?:markdown|md\s+(?:file|document)|file|document|artifact|deliverable)\b.{0,60}\b(?:create|generate|output|convert|export|produce|deliver|provide|return|save|summari[sz]e)\b|\b(?:create|generate|write|draft|produce)\b.{0,60}\b(?:article|report|manuscript|blog\s+post|tutorial)\b/i.test(
       normalized
     )
 

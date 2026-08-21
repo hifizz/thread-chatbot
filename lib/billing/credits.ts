@@ -58,6 +58,103 @@ export type ChargeResult = {
   priceMicros: number
   balanceMicros: number
   costSource: UsageCostSource
+  charged?: boolean
+}
+
+export type BillingTransaction = Parameters<
+  Parameters<typeof db.transaction>[0]
+>[0]
+
+type UsageCharge = {
+  costMicros: number
+  priceMicros: number
+  generationId: string | null
+  costSource: UsageCostSource
+}
+
+function calculateUsageCharge(input: UsageInput): UsageCharge {
+  const evidence = input.costEvidence ?? { source: "estimate" }
+  const costMicrosValue =
+    evidence.source === "openrouter"
+      ? usdToMicros(evidence.costUsd)
+      : costMicros(input.model, input.inputTokens, input.outputTokens)
+  return {
+    costMicros: costMicrosValue,
+    priceMicros:
+      evidence.source === "openrouter"
+        ? priceFromCost(costMicrosValue)
+        : priceMicros(input.model, input.inputTokens, input.outputTokens),
+    generationId:
+      evidence.source === "vercel-gateway" ? evidence.generationId : null,
+    costSource:
+      evidence.source === "openrouter" ? "openrouter" : "estimate",
+  }
+}
+
+async function ensureUserCreditsInTransaction(
+  tx: BillingTransaction,
+  userId: string
+) {
+  await tx
+    .insert(userCredits)
+    .values({ userId, balanceMicros: INITIAL_CREDIT_MICROS })
+    .onConflictDoNothing({ target: userCredits.userId })
+}
+
+async function chargeUsageInTransaction(
+  tx: BillingTransaction,
+  input: UsageInput,
+  appGenerationId: string | null
+): Promise<ChargeResult> {
+  const charge = calculateUsageCharge(input)
+  await ensureUserCreditsInTransaction(tx, input.userId)
+
+  const insert = tx.insert(usageRecords).values({
+    id: randomUUID(),
+    userId: input.userId,
+    threadId: input.threadId ?? null,
+    messageId: input.messageId ?? null,
+    appGenerationId,
+    model: input.model,
+    inputTokens: input.inputTokens,
+    outputTokens: input.outputTokens,
+    costMicros: charge.costMicros,
+    priceMicros: charge.priceMicros,
+    generationId: charge.generationId,
+    costSource: charge.costSource,
+  })
+  const [inserted] = appGenerationId
+    ? await insert
+        .onConflictDoNothing({ target: usageRecords.appGenerationId })
+        .returning({ id: usageRecords.id })
+    : await insert.returning({ id: usageRecords.id })
+
+  if (!inserted) {
+    const [balance] = await tx
+      .select({ value: userCredits.balanceMicros })
+      .from(userCredits)
+      .where(eq(userCredits.userId, input.userId))
+    return {
+      ...charge,
+      balanceMicros: balance?.value ?? 0,
+      charged: false,
+    }
+  }
+
+  const [row] = await tx
+    .update(userCredits)
+    .set({
+      balanceMicros: sql`${userCredits.balanceMicros} - ${charge.priceMicros}`,
+      updatedAt: new Date(),
+    })
+    .where(eq(userCredits.userId, input.userId))
+    .returning({ balance: userCredits.balanceMicros })
+
+  return {
+    ...charge,
+    balanceMicros: row?.balance ?? 0,
+    charged: true,
+  }
 }
 
 /**
@@ -65,51 +162,19 @@ export type ChargeResult = {
  * 发送前的 hasPositiveBalance 拦截；这里允许扣至负数以覆盖最后一条消息的成本）。
  */
 export async function chargeUsage(input: UsageInput): Promise<ChargeResult> {
-  const evidence = input.costEvidence ?? { source: "estimate" }
-  const cost =
-    evidence.source === "openrouter"
-      ? usdToMicros(evidence.costUsd)
-      : costMicros(input.model, input.inputTokens, input.outputTokens)
-  const price =
-    evidence.source === "openrouter"
-      ? priceFromCost(cost)
-      : priceMicros(input.model, input.inputTokens, input.outputTokens)
-  const generationId =
-    evidence.source === "vercel-gateway" ? evidence.generationId : null
-  const costSource: UsageCostSource =
-    evidence.source === "openrouter" ? "openrouter" : "estimate"
+  return db.transaction((tx) => chargeUsageInTransaction(tx, input, null))
+}
 
-  await ensureUserCredits(input.userId)
-
-  // 扣余额 + 写流水放进同一事务：避免「扣了钱没记账」或「记了账没扣钱」。
-  const balanceMicros = await db.transaction(async (tx) => {
-    const [row] = await tx
-      .update(userCredits)
-      .set({
-        balanceMicros: sql`${userCredits.balanceMicros} - ${price}`,
-        updatedAt: new Date(),
-      })
-      .where(eq(userCredits.userId, input.userId))
-      .returning({ balance: userCredits.balanceMicros })
-
-    await tx.insert(usageRecords).values({
-      id: randomUUID(),
-      userId: input.userId,
-      threadId: input.threadId ?? null,
-      messageId: input.messageId ?? null,
-      model: input.model,
-      inputTokens: input.inputTokens,
-      outputTokens: input.outputTokens,
-      costMicros: cost,
-      priceMicros: price,
-      generationId,
-      costSource,
-    })
-
-    return row?.balance ?? 0
-  })
-
-  return { costMicros: cost, priceMicros: price, balanceMicros, costSource }
+/**
+ * thread-chat generation 的事务内幂等扣费。相同 appGenerationId 重入只读取余额，
+ * 不再插入 usage 或扣减第二次；调用方可把它与 generation 终态更新放在同一事务。
+ */
+export async function chargeUsageOnce(
+  tx: BillingTransaction,
+  appGenerationId: string,
+  input: UsageInput
+): Promise<ChargeResult> {
+  return chargeUsageInTransaction(tx, input, appGenerationId)
 }
 
 /** 给用户增加额度（充值到账）。确保额度行存在后原子累加，返回新余额。 */

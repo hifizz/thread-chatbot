@@ -1,16 +1,18 @@
 /**
  * Thread 模型归属的纯状态用例：
- *   node --experimental-strip-types e2e/thread-chat/model-selection.test.mjs
+ *   node --import tsx e2e/thread-chat/model-selection.test.mjs
  */
 import assert from "node:assert/strict"
 import {
   CHAT_MODELS,
   DEFAULT_THREAD_CHAT_MODEL_ID,
+  isThreadChatModelId,
+  isLinearChatModelId,
   THREAD_CHAT_MODELS,
 } from "../../constants/model.ts"
 import { MODEL_COST, costMicros } from "../../constants/pricing.ts"
 import { createThreadStore } from "../../app/thread-chat/core/store.ts"
-import { sanitizeLoadedState } from "../../app/thread-chat/net/sanitize-loaded-state.ts"
+import { sanitizeLoadedState } from "../../app/thread-chat/net/persistence/sanitize-loaded-state.ts"
 
 const DEFAULT_MODEL_ID = DEFAULT_THREAD_CHAT_MODEL_ID
 const validIds = new Set(THREAD_CHAT_MODELS.map((model) => model.id))
@@ -20,6 +22,7 @@ const resolveModelId = (modelId) =>
 
 function seed(modelId = DEFAULT_MODEL_ID) {
   return {
+    schemaVersion: 2,
     threads: {
       main: {
         id: "main",
@@ -34,12 +37,14 @@ function seed(modelId = DEFAULT_MODEL_ID) {
         messages: [
           {
             id: "m1",
+            parentMessageId: null,
             role: "assistant",
             text: "可分叉的回答",
             forks: [],
             status: "done",
           },
         ],
+        activeLeafMessageId: "m1",
         lastActive: 1,
       },
     },
@@ -84,9 +89,19 @@ function seed(modelId = DEFAULT_MODEL_ID) {
     id: "branch",
     modelId: "removed-model",
     parentId: "main",
+    depth: 1,
+    anchorText: "可分叉",
+    forkFromMsgId: "m1",
+    footnote: 1,
+    children: [],
     messages: [],
+    activeLeafMessageId: null,
   }
   legacy.threads.main.children = ["branch"]
+  legacy.threads.main.messages[0].forks = [
+    { text: "可分叉", num: 1, threadId: "branch", depth: 1 },
+  ]
+  legacy.footnoteCounter = 1
 
   const clean = sanitizeLoadedState(legacy, resolveModelId)
   assert.equal(clean.threads.main.modelId, DEFAULT_MODEL_ID)
@@ -109,5 +124,10 @@ function seed(modelId = DEFAULT_MODEL_ID) {
   const visibleIds = new Set(THREAD_CHAT_MODELS.map((model) => model.id))
   assert.ok(!visibleIds.has("minimax-m2"))
   assert.ok(!visibleIds.has("minimax-m2.7"))
+  assert.equal(isThreadChatModelId("minimax-m2"), false)
+  assert.equal(isThreadChatModelId("minimax-m2.7"), false)
+  assert.equal(isThreadChatModelId("glm-5.3"), true)
+  assert.equal(isLinearChatModelId("minimax-m2"), true)
+  assert.equal(isLinearChatModelId("umapis-claude-opus-4-6"), false)
   console.log("PASS  Thread Chat selector 不展示 M2 与 M2.7")
 }

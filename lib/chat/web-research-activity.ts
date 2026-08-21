@@ -32,12 +32,17 @@ function textField(value: unknown, field: string): string | undefined {
   return typeof text === "string" && text.trim() ? text.trim() : undefined
 }
 
-function sourcesFromOutput(output: unknown): WebResearchSource[] {
+/** webSearch provider output 到产品来源列表的唯一规范化边界。 */
+export function webResearchSourcesFromOutput(
+  output: unknown
+): WebResearchSource[] {
   if (!isRecord(output) || !Array.isArray(output.results)) return []
+  const seen = new Set<string>()
   return output.results.flatMap((result) => {
     if (!isRecord(result) || typeof result.url !== "string") return []
     const url = result.url.trim()
-    if (!url) return []
+    if (!url || seen.has(url)) return []
+    seen.add(url)
     const title =
       typeof result.title === "string" && result.title.trim()
         ? result.title.trim()
@@ -100,7 +105,10 @@ export function createWebResearchActivityDispatcher(
           call.toolName === "readUrl"
             ? (textField(output, "url") ?? textField(call.input, "url"))
             : undefined,
-        sources: call.toolName === "webSearch" ? sourcesFromOutput(output) : [],
+        sources:
+          call.toolName === "webSearch"
+            ? webResearchSourcesFromOutput(output)
+            : [],
       })
       return true
     }

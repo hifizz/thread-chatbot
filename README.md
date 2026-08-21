@@ -108,11 +108,11 @@ Do not commit `.env.local` or credentials.
 
 ## OpenRouter models
 
-Thread Chat offers thirteen fixed OpenRouter-backed internal model IDs: `openrouter-gpt-5.6-luna`, `openrouter-gpt-5.6-luna-pro`, `openrouter-gpt-5.6-terra`, `openrouter-gpt-5.6-terra-pro`, `openrouter-gpt-5.6-sol`, `openrouter-gpt-5.6-sol-pro`, `openrouter-gpt-5.5`, `openrouter-gpt-5.5-pro`, `openrouter-kimi-k3`, `openrouter-deepseek-v4-flash-0731`, `openrouter-qwen3.8-max`, `openrouter-grok-4.5`, and `openrouter-grok-4.6`. Configure `OPENROUTER_API_KEY`; `OPENROUTER_HTTP_REFERER` and `OPENROUTER_APP_TITLE` are optional attribution values. These IDs always use the dedicated OpenRouter provider—arbitrary external slugs are rejected. GLM 5.3 is not included because OpenRouter does not currently list it. Completed requests use OpenRouter's real per-step USD cost when complete, with conservative static pricing as fallback. Attachments remain on the existing text-extraction path.
+Thread Chat offers fourteen fixed OpenRouter-backed internal model IDs: `openrouter-gpt-5.6-luna`, `openrouter-gpt-5.6-luna-pro`, `openrouter-gpt-5.6-terra`, `openrouter-gpt-5.6-terra-pro`, `openrouter-gpt-5.6-sol`, `openrouter-gpt-5.6-sol-pro`, `openrouter-gpt-5.5`, `openrouter-gpt-5.5-pro`, `openrouter-kimi-k3`, `openrouter-deepseek-v4-flash-0731`, `openrouter-qwen3.8-max`, `openrouter-grok-4.5`, `openrouter-grok-4.6`, and `openrouter-ox-alpha`. Configure `OPENROUTER_API_KEY`; `OPENROUTER_HTTP_REFERER` and `OPENROUTER_APP_TITLE` are optional attribution values. These IDs always use the dedicated OpenRouter provider—arbitrary external slugs are rejected. Ox Alpha uses upstream ID `stealth/ox-alpha` and is offered as a free, unbilled preview; completed requests for the other models use OpenRouter's real per-step USD cost when complete, with conservative static pricing as fallback. Attachments remain on the existing text-extraction path.
 
 ## UMAPIS preview models
 
-The Thread Chat Prompt input model selector includes `umapis-claude-opus-4-6`, `umapis-claude-sonnet-5`, `umapis-gpt-5.6-sol`, and `umapis-gpt-5.6-terra`. Set `UMAPIS_API_KEY_CLAUDE` for the Claude models and `UMAPIS_API_KEY_GPT` for the GPT models; `UMAPIS_BASE_URL` is optional and accepts either the site root or the `/v1` API root. Requests use the upstream default behavior and do not send an Effort parameter. These models are unbilled previews: they do not require a positive user balance, do not debit credits, and do not display an unverified price. Effort configuration and UMAPIS billing belong to a later spec.
+The Thread Chat Prompt input model selector includes the UMAPIS Claude and GPT preview models registered in `constants/model.ts`. Set `UMAPIS_API_KEY_CLAUDE` for the Claude models and `UMAPIS_API_KEY_GPT` for the GPT models; `UMAPIS_BASE_URL` is optional and accepts either the site root or the `/v1` API root. Requests use the upstream default behavior and do not send an Effort parameter. These models are unbilled previews: they do not require a positive user balance, do not debit credits, and do not display an unverified price. Effort configuration and UMAPIS billing belong to a later spec.
 
 ## Architecture
 
@@ -121,9 +121,10 @@ The project is a Next.js 16 App Router application using React, TypeScript, Tail
 | Boundary      | Location                                                             | Responsibility                                                                                    |
 | ------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
 | Core          | [`app/thread-chat/core/`](./app/thread-chat/core/)                   | Tree state, selectors, and the branch-conversation store                                          |
-| Branching     | [`app/thread-chat/branching/`](./app/thread-chat/branching/)         | Text selection, anchors, contextual branches, and branch-aware chat rendering                     |
-| Orchestration | [`app/thread-chat/orchestration/`](./app/thread-chat/orchestration/) | Column workspace, tree canvas, switching, artifacts, and workbench controls                       |
-| Network       | [`app/thread-chat/net/`](./app/thread-chat/net/)                     | Tree loading, sanitization, debounced persistence, prompts, and streaming UI events               |
+| Branching     | [`app/thread-chat/branching/`](./app/thread-chat/branching/)         | `selection/` owns text anchors and selection UI; `assistant/` owns branch-aware assistant rendering |
+| Chat          | [`app/thread-chat/chat/`](./app/thread-chat/chat/)                   | `message/`, `composer/`, and `actions/` group the three conversation feature sets                 |
+| Orchestration | [`app/thread-chat/orchestration/`](./app/thread-chat/orchestration/) | `canvas/`, `columns/`, `navigation/`, `artifacts/`, `overlays/`, and `workspace/` compose the workbench |
+| Network       | [`app/thread-chat/net/`](./app/thread-chat/net/)                     | `boot/`, `commands/`, `persistence/`, `prompt/`, `stream/`, and `titles/` isolate client-side I/O |
 | Server        | [`app/api/`](./app/api/) and [`lib/chat/`](./lib/chat/)              | Authentication, model streaming, tool handling, branch-tree APIs, attachments, and research tools |
 
 Detailed design material is available in the repository:

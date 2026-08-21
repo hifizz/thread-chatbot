@@ -5,7 +5,7 @@
  *   CHROMIUM_PATH=... BASE_URL=http://localhost:4040 \
  *     node --experimental-strip-types e2e/thread-chat/verify-bubble-composer.mjs
  * （--experimental-strip-types：直接 import 产品代码的 kickoffQuestion /
- *   defaultBranchTitle / BRANCH_TITLE_GEN_MAX_LEN 生成断言期望值。）
+ *   defaultBranchTitle 生成断言期望值。）
  *
  * 断言面（参考 playground verify6 + 本仓 IME/标题/预算关注点）：
  * · 气泡结构：输入框存在 / placeholder 提示可留空 / 弹出即聚焦；
@@ -18,8 +18,8 @@
  *   payload 契约（threadChat.anchorText / user 原文入 messages）；
  * · 留空 Enter：空分支 + composer 预填 kickoffQuestion() + 2 秒内无 /api/chat POST；
  * · ⌘Enter keepSource：来源列保留、新列开在紧邻右侧、首条为 user 问题；
- * · 异步分支标题：首答完成后标题变为 ≤8 字语义标题（非锚点截断）、刷新后仍在、
- *   全程 /api/branch-title 恰好请求一次；
+ * · 异步分支标题：首答完成后标题变为完整语义标题（非锚点截断）、刷新后仍在、
+ *   全程 /api/title 恰好请求一次；
  * · 深树继承段预算的纯函数用例在 prompt-budget.test.mjs（无需 dev server，见 README）。
  * 走真实模型，回复内容非确定，断言只卡结构与契约；测试树跑完自动清理。
  */
@@ -28,8 +28,7 @@ import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { chromium } from "playwright-core"
 import { defaultBranchTitle } from "../../app/thread-chat/core/store.ts"
-import { kickoffQuestion } from "../../app/thread-chat/net/prompt-pure.ts"
-import { BRANCH_TITLE_GEN_MAX_LEN } from "../../constants/thread-chat.ts"
+import { kickoffQuestion } from "../../lib/thread-chat/application/prompt-policy.ts"
 
 const here = dirname(fileURLToPath(import.meta.url))
 const shotsDir = join(here, "shots")
@@ -64,7 +63,16 @@ const page = await browser.newPage({ viewport: { width: 1920, height: 950 } })
 
 const chatPosts = [] // /api/chat POST payload（契约断言）
 const treePuts = [] // /api/branch-trees PUT（防抖存盘观测）
-let titlePosts = 0 // /api/branch-title POST（「至多一次」断言）
+function isBranchTitleRequest(req) {
+  if (!req.url().includes("/api/title") || req.method() !== "POST") return false
+  try {
+    return req.postDataJSON()?.kind === "branch"
+  } catch {
+    return false
+  }
+}
+
+let titlePosts = 0 // /api/title 的 kind=branch POST（「至多一次」断言）
 page.on("request", (req) => {
   const url = req.url()
   if (url.includes("/api/chat") && req.method() === "POST") {
@@ -76,11 +84,11 @@ page.on("request", (req) => {
   }
   if (url.includes("/api/branch-trees/") && req.method() === "PUT")
     treePuts.push(url)
-  if (url.includes("/api/branch-title") && req.method() === "POST") titlePosts++
+  if (isBranchTitleRequest(req)) titlePosts++
 })
 let titleResponses = 0 // 收尾时等标题请求收口，避免删树后被迟到的 PUT 复活
 page.on("response", (res) => {
-  if (res.url().includes("/api/branch-title")) titleResponses++
+  if (isBranchTitleRequest(res.request())) titleResponses++
 })
 const pageErrors = []
 page.on("pageerror", (e) => pageErrors.push(String(e)))
@@ -388,9 +396,7 @@ ok("带问 Enter：分支列打开", true)
   )
   await page.evaluate(() => {
     const cols = document.querySelectorAll(".tc .cols > .column")
-    cols[1]
-      ?.querySelector(".msg-list")
-      ?.dispatchEvent(new Event("scroll"))
+    cols[1]?.querySelector(".msg-list")?.dispatchEvent(new Event("scroll"))
   })
   await page.waitForTimeout(200)
   ok(
@@ -399,9 +405,7 @@ ok("带问 Enter：分支列打开", true)
   )
   await page.evaluate(() => {
     const cols = document.querySelectorAll(".tc .cols > .column")
-    cols[0]
-      ?.querySelector(".msg-list")
-      ?.dispatchEvent(new Event("scroll"))
+    cols[0]?.querySelector(".msg-list")?.dispatchEvent(new Event("scroll"))
   })
   await page.waitForTimeout(200)
   ok(
@@ -459,12 +463,7 @@ ok(
   `分支标题异步变为语义标题（非锚点截断）：「${genTitle}」`,
   titleChanged && genTitle !== DEFAULT_TITLE_A && !genTitle.endsWith("…")
 )
-ok(
-  `语义标题长度 ≤ ${BRANCH_TITLE_GEN_MAX_LEN} 字`,
-  titleChanged &&
-    genTitle.length >= 2 &&
-    genTitle.length <= BRANCH_TITLE_GEN_MAX_LEN
-)
+ok("语义标题至少包含 2 个字符", titleChanged && genTitle.length >= 2)
 // 标题变更随整树防抖存盘（1.5s）：必须等「标题变更之后」的那次 PUT——
 // 首答完成本身也会触发一次 PUT（标题请求彼时还在飞），拿它当依据会在
 // 带标题的 PUT 落库前刷新，DB 里还是默认标题（本脚本首版踩过的竞态）
@@ -487,7 +486,7 @@ await page.locator(".tc .cols > .column").nth(1).waitFor({ timeout: 10000 })
 }
 await sleep(2500) // 「至多一次」：重载后不应因既有语义标题再次请求
 ok(
-  "全程 /api/branch-title 恰好请求一次",
+  "全程 /api/title 的 kind=branch 恰好请求一次",
   titlePosts === 1,
   `实际 ${titlePosts}`
 )

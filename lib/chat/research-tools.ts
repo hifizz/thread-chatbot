@@ -12,8 +12,12 @@ export const webSearchTool = tool({
   inputSchema: z.object({
     query: z.string().describe("检索关键词或问题，尽量具体"),
   }),
-  execute: async ({ query }) => {
-    const { results } = await webSearch(query, SEARCH_MAX_RESULTS)
+  execute: async ({ query }, { abortSignal }) => {
+    const { results } = await webSearch(
+      query,
+      SEARCH_MAX_RESULTS,
+      abortSignal
+    )
     // 返回给模型的结构：带 url 的结果列表，供其继续深读或引用
     return {
       query,
@@ -32,8 +36,8 @@ export const readUrlTool = tool({
   inputSchema: z.object({
     url: z.string().describe("要深读的网页 URL（来自搜索结果）"),
   }),
-  execute: async ({ url }) => {
-    const content = await extractUrl(url)
+  execute: async ({ url }, { abortSignal }) => {
+    const content = await extractUrl(url, abortSignal)
     return { url, content: content.slice(0, EXTRACT_CHAR_LIMIT) }
   },
 })

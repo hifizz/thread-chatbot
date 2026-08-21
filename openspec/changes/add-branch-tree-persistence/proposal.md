@@ -28,6 +28,6 @@
 
 - **DB**：`lib/db/schema.ts` 新增 `branchTrees` 表 + drizzle 迁移一枚（注：schema 改动与 `drizzle/0004_dear_wolfsbane.sql` 迁移文件已在工作树就位、未应用未提交——上次被打断的实现残留，与本设计一致，实现阶段直接复用并应用）。
 - **API**：新增 `app/api/branch-trees/[treeId]/route.ts`（Next 16 App Router route handler）。
-- **前端**：`app/thread-chat/thread-chat-demo.tsx`（拆 loader/inner、接防抖存盘）、新增 `app/thread-chat/net/persist.ts`（加载/存盘/sanitize/treeId 管理）、`constants/thread-chat.ts`（localStorage key、防抖毫秒等常量归位）。
+- **前端**：`app/thread-chat/thread-chat-demo.tsx`（拆 loader/inner、接防抖存盘）、新增 `app/thread-chat/net/persistence/persist.ts`（加载/存盘/sanitize/treeId 管理）、`constants/thread-chat.ts`（localStorage key、防抖毫秒等常量归位）。
 - **不改**：`core/store.ts` 零改动（`createThreadStore(seed)` 天然支持以已存状态为种子）；`/api/chat`、锚点/分支/markdown/滚动/平滑逻辑一律不动。
 - **运行前提**：本地 Docker Postgres（`DATABASE_URL` 指向 `thread-chat` 库）。页面在 DB 不可用时的行为见 design.md 的降级策略。

@@ -6,44 +6,139 @@
  *        供主线列头副标题优先展示）；未命中返回 200 + { state: null, customTitle: null }——
  *        首次访问是正常路径不是错误，客户端一个分支判断即可，无需在 fetch 层区分
  *        「404 = 正常」与「404 = 路由不存在」。
- * · PUT  { state, title? } 整树 upsert。服务端不理解 ThreadTreeState 语义，只做
- *        「state 存在且为对象」的浅校验（深校验属于过度设计），体积治理交给 Next 默认 body 限制。
- *        只写 state / 派生 title / updatedAt，不触碰 custom_title（双轨标题，design D1）。
+ * · PUT  { state, title?, baseRevision } 严格校验 schema-v2 消息图，并按 owner/revision
+ *        做 CAS upsert。只写 state / 派生 title / updatedAt，不触碰 custom_title（双轨标题）。
  * · PATCH { title } 重命名：trim 后非空且 ≤ CUSTOM_TITLE_MAX_LEN，只写 custom_title 列；
  *        树不存在 404——与 PUT 的派生轨互不踩踏。
  * · DELETE 删除该行，幂等（不存在也返回 { ok: true }）。
  * treeId 做 UUID 形状校验（安全阀），不合法一律 400。
  */
 
-import { eq } from "drizzle-orm"
-import { db } from "@/lib/db"
-import { branchTrees } from "@/lib/db/schema"
 import { isValidTreeId } from "@/lib/chat/tree-id"
-import { CUSTOM_TITLE_MAX_LEN } from "@/constants/thread-chat"
+import {
+  CUSTOM_TITLE_MAX_LEN,
+  THREAD_TREE_SCHEMA_VERSION,
+} from "@/constants/thread-chat"
+import { getCurrentUserId } from "@/lib/auth/server"
+import type { ThreadTreeState } from "@/lib/thread-chat/domain/types"
+import { parseThreadTreeState } from "@/lib/thread-chat/domain/message-graph"
+import {
+  assertCompletedMessageGenerationLinks,
+  reconcileThreadChatTurns,
+} from "@/lib/thread-chat/application/reconcile-turns"
+import { failStaleGenerationsForTree } from "@/lib/thread-chat-generation/stale-generation-repository"
+import {
+  listCurrentGenerationsForTree,
+  toGenerationSummary,
+} from "@/lib/thread-chat-generation/query-repository"
+import { listMessageFeedbackForTree } from "@/lib/thread-chat-generation/message-feedback-repository"
+import {
+  deleteOwnedTreeIfIdle,
+  loadOwnedOrClaimLegacyTree,
+  renameOwnedTree,
+  saveOwnedTree,
+} from "@/lib/thread-chat-generation/tree-repository"
+import {
+  SAVE_TREE_ERROR_STATUS,
+  SAVE_TREE_REVISION_ERRORS,
+  saveTreeErrorResponseSchema,
+  saveTreeRequestSchema,
+  saveTreeSuccessResponseSchema,
+  type SaveTreeErrorCode,
+} from "@/lib/thread-chat/contracts/save-tree"
 
 type RouteContext = { params: Promise<{ treeId: string }> }
 
+function unauthorized() {
+  return Response.json(
+    { error: { code: "unauthorized", message: "请先登录" } },
+    { status: 401 }
+  )
+}
+
+function notFound() {
+  return Response.json(
+    { error: { code: "not_found", message: "分支树不存在" } },
+    { status: 404 }
+  )
+}
+
+function saveTreeErrorResponse(
+  code: SaveTreeErrorCode,
+  message: string,
+  currentRevision?: number
+) {
+  return Response.json(
+    saveTreeErrorResponseSchema.parse({
+      error: {
+        code,
+        message,
+        ...(currentRevision !== undefined ? { currentRevision } : {}),
+      },
+    }),
+    { status: SAVE_TREE_ERROR_STATUS[code] }
+  )
+}
+
 export async function GET(_req: Request, { params }: RouteContext) {
+  const userId = await getCurrentUserId()
+  if (!userId) return unauthorized()
   const { treeId } = await params
   if (!isValidTreeId(treeId))
     return new Response("treeId 必须是 UUID", { status: 400 })
 
-  const [row] = await db
-    .select({ state: branchTrees.state, customTitle: branchTrees.customTitle })
-    .from(branchTrees)
-    .where(eq(branchTrees.id, treeId))
+  const row = await loadOwnedOrClaimLegacyTree({ userId, treeId })
+  if (!row) return notFound()
+
+  await failStaleGenerationsForTree(userId, treeId)
+  const [generations, messageFeedbacks] = await Promise.all([
+    listCurrentGenerationsForTree(userId, treeId),
+    listMessageFeedbackForTree(userId, treeId),
+  ])
+  const generationSummaries = generations.map(toGenerationSummary)
+  let reconciled
+  try {
+    reconciled = reconcileThreadChatTurns({
+      state: row.state as ThreadTreeState,
+      generations: generations.map((generation) => ({
+        ...toGenerationSummary(generation),
+        turnSnapshot: generation.turnSnapshot,
+      })),
+    })
+    assertCompletedMessageGenerationLinks(
+      reconciled.state,
+      generationSummaries
+    )
+  } catch (error) {
+    console.error("[thread-chat] 消息图读取协调失败", { treeId, error })
+    return Response.json(
+      {
+        error: {
+          code: "invalid_tree_state",
+          message: "分支树消息结构或生成关联无效",
+        },
+      },
+      { status: 500 }
+    )
+  }
   return Response.json({
-    state: row?.state ?? null,
-    customTitle: row?.customTitle ?? null,
+    state: reconciled.state,
+    revision: row.revision,
+    customTitle: row.customTitle,
+    generations: generationSummaries,
+    messageFeedbacks,
+    recoverableTurns: reconciled.recoverableTurns,
   })
 }
 
 export async function PUT(req: Request, { params }: RouteContext) {
+  const userId = await getCurrentUserId()
+  if (!userId) return unauthorized()
   const { treeId } = await params
   if (!isValidTreeId(treeId))
     return new Response("treeId 必须是 UUID", { status: 400 })
 
-  let body: { state?: unknown; title?: unknown }
+  let body: { state?: unknown; title?: unknown; baseRevision?: unknown }
   try {
     body = await req.json()
   } catch {
@@ -59,18 +154,50 @@ export async function PUT(req: Request, { params }: RouteContext) {
     return new Response("state.threads 必须是对象", { status: 400 })
 
   const title = typeof body.title === "string" ? body.title : null
-  const now = new Date()
-  await db
-    .insert(branchTrees)
-    .values({ id: treeId, state, title, updatedAt: now })
-    .onConflictDoUpdate({
-      target: branchTrees.id,
-      set: { state, title, updatedAt: now },
+  const incomingSchemaVersion = (state as Record<string, unknown>).schemaVersion
+  if (incomingSchemaVersion !== THREAD_TREE_SCHEMA_VERSION)
+    return saveTreeErrorResponse(
+      "invalid_tree_state",
+      `只接受 schemaVersion=${THREAD_TREE_SCHEMA_VERSION} 的消息图`
+    )
+  const command = saveTreeRequestSchema.safeParse(body)
+  if (!command.success) {
+    const error = SAVE_TREE_REVISION_ERRORS.revision_required
+    return saveTreeErrorResponse(error.code, error.message)
+  }
+
+  let validatedState: ThreadTreeState
+  try {
+    validatedState = parseThreadTreeState(state)
+  } catch {
+    return saveTreeErrorResponse(
+      "invalid_tree_state",
+      "消息图包含无效的 parent、active leaf 或 Artifact source"
+    )
+  }
+  const saved = await saveOwnedTree({
+    userId,
+    treeId,
+    state: validatedState,
+    title,
+    baseRevision: command.data.baseRevision,
+  })
+  if (saved.kind === "not_found") return notFound()
+  if (saved.kind === "conflict") {
+    const error = SAVE_TREE_REVISION_ERRORS.tree_revision_conflict
+    return saveTreeErrorResponse(error.code, error.message, saved.revision)
+  }
+  return Response.json(
+    saveTreeSuccessResponseSchema.parse({
+      ok: true,
+      revision: saved.revision,
     })
-  return Response.json({ ok: true })
+  )
 }
 
 export async function PATCH(req: Request, { params }: RouteContext) {
+  const userId = await getCurrentUserId()
+  if (!userId) return unauthorized()
   const { treeId } = await params
   if (!isValidTreeId(treeId))
     return new Response("treeId 必须是 UUID", { status: 400 })
@@ -89,21 +216,33 @@ export async function PATCH(req: Request, { params }: RouteContext) {
     )
 
   // 只写 custom_title（用户意志轨）——防抖 PUT 的派生 title 与之互不踩踏（design D1）
-  const updated = await db
-    .update(branchTrees)
-    .set({ customTitle: title })
-    .where(eq(branchTrees.id, treeId))
-    .returning({ id: branchTrees.id })
-  if (updated.length === 0) return new Response("树不存在", { status: 404 })
+  const renamed = await renameOwnedTree({
+    userId,
+    treeId,
+    customTitle: title,
+  })
+  if (!renamed) return new Response("树不存在", { status: 404 })
   return Response.json({ ok: true })
 }
 
 export async function DELETE(_req: Request, { params }: RouteContext) {
+  const userId = await getCurrentUserId()
+  if (!userId) return unauthorized()
   const { treeId } = await params
   if (!isValidTreeId(treeId))
     return new Response("treeId 必须是 UUID", { status: 400 })
 
-  // 幂等：不存在也返回 ok——重复删除 / 悬空条目再删都不是错误
-  await db.delete(branchTrees).where(eq(branchTrees.id, treeId))
+  const outcome = await deleteOwnedTreeIfIdle({ userId, treeId })
+  if (outcome === "generation_running") {
+    return Response.json(
+      {
+        error: {
+          code: "generation_running",
+          message: "请先停止正在运行的生成，再删除这棵对话树",
+        },
+      },
+      { status: 409 }
+    )
+  }
   return Response.json({ ok: true })
 }

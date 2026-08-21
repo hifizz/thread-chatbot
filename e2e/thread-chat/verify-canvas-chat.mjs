@@ -27,7 +27,7 @@ import { mkdirSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { chromium } from "playwright-core"
-import { kickoffQuestion } from "../../app/thread-chat/net/prompt-pure.ts"
+import { kickoffQuestion } from "../../lib/thread-chat/application/prompt-policy.ts"
 
 const here = dirname(fileURLToPath(import.meta.url))
 const shotsDir = join(here, "shots")
@@ -58,14 +58,22 @@ const browser = await chromium.launch({
 })
 const page = await browser.newPage({ viewport: { width: 1600, height: 1000 } })
 
+function isBranchTitleRequest(req) {
+  if (!req.url().includes("/api/title") || req.method() !== "POST") return false
+  try {
+    return req.postDataJSON()?.kind === "branch"
+  } catch {
+    return false
+  }
+}
+
 let titlePosts = 0
 let titleResponses = 0
 page.on("request", (req) => {
-  if (req.url().includes("/api/branch-title") && req.method() === "POST")
-    titlePosts++
+  if (isBranchTitleRequest(req)) titlePosts++
 })
 page.on("response", (res) => {
-  if (res.url().includes("/api/branch-title")) titleResponses++
+  if (isBranchTitleRequest(res.request())) titleResponses++
 })
 const pageErrors = []
 page.on("pageerror", (e) => pageErrors.push(String(e)))

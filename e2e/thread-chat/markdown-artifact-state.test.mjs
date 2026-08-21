@@ -1,9 +1,10 @@
 import assert from "node:assert/strict"
 import { createThreadStore } from "../../app/thread-chat/core/store.ts"
-import { hasAssistantOutput } from "../../app/thread-chat/net/assistant-output.ts"
-import { serializeMessageForModel } from "../../app/thread-chat/net/message-serialization.ts"
-import { sanitizeLoadedState } from "../../app/thread-chat/net/sanitize-loaded-state.ts"
-import { withoutTransientGenerationState } from "../../app/thread-chat/net/transient-state.ts"
+import { prepareRegenerationPatch } from "../../app/thread-chat/core/regeneration.ts"
+import { hasAssistantOutput } from "../../app/thread-chat/net/stream/assistant-output.ts"
+import { serializeMessageForModel } from "../../app/thread-chat/net/prompt/message-serialization.ts"
+import { sanitizeLoadedState } from "../../app/thread-chat/net/persistence/sanitize-loaded-state.ts"
+import { withoutTransientGenerationState } from "../../app/thread-chat/net/persistence/transient-state.ts"
 import {
   createMarkdownArtifactEventDispatcher,
   createMarkdownArtifactProgressDispatcher,
@@ -19,6 +20,7 @@ function test(name, fn) {
 
 function seed() {
   return {
+    schemaVersion: 2,
     threads: {
       main: {
         id: "main",
@@ -31,6 +33,7 @@ function seed() {
         footnote: null,
         children: [],
         messages: [],
+        activeLeafMessageId: null,
         lastActive: 0,
       },
     },
@@ -150,8 +153,9 @@ await test("流分派依次发出 start、局部真实进度和完整 Artifact",
   assert.equal(artifacts.length, 1)
 })
 
-await test("retry 清除旧 Markdown registry、order 与消息关联", () => {
+await test("regenerate 追加 sibling 并保留旧 Markdown provenance", () => {
   const store = createThreadStore(seed())
+  const userMessageId = store.appendUserMessage("main", "生成文档")
   const messageId = store.beginAssistantMessage("main")
   const artifactId = store.attachArtifactToMessage("main", messageId, {
     kind: "markdown",
@@ -159,12 +163,28 @@ await test("retry 清除旧 Markdown registry、order 与消息关联", () => {
     content: "old",
   })
   assert.ok(messageId && artifactId)
-  store.resetAssistantMessage("main", messageId)
+  store.finishAssistantMessage("main", messageId)
+  const patch = prepareRegenerationPatch(store.getState(), {
+    threadId: "main",
+    userMessageId,
+    assistantMessageId: "a-new",
+    generationId: "g-new",
+    intent: {
+      kind: "regenerate-assistant",
+      sourceAssistantMessageId: messageId,
+    },
+  })
+  assert.ok(patch)
+  assert.equal(store.applyPreparedTurn(patch), true)
   const state = store.getState()
-  assert.equal(state.artifacts[artifactId], undefined)
-  assert.deepEqual(state.artifactOrder, [])
-  assert.equal(state.threads.main.messages[0].artifactIds, undefined)
-  assert.equal(state.threads.main.messages[0].status, "pending")
+  assert.equal(state.artifacts[artifactId].sourceMessageId, messageId)
+  assert.deepEqual(state.artifactOrder, [artifactId])
+  assert.deepEqual(
+    state.threads.main.messages.find((message) => message.id === messageId)
+      .artifactIds,
+    [artifactId]
+  )
+  assert.equal(state.threads.main.activeLeafMessageId, "a-new")
 })
 
 await test("Artifact-only 计为有效终态输出", () => {
@@ -217,7 +237,7 @@ await test("UI stream 分派支持同一回复多份 Markdown，并按 call id �
   assert.equal(artifacts[1].toolCallId, "call-2")
 })
 
-await test("sanitize 恢复 Artifact-only 中断消息并清理坏引用和孤儿", () => {
+await test("sanitize 保留 Artifact-only 中断内容但不会猜成完成回复", () => {
   const state = seed()
   state.artifacts = {
     keep: {
@@ -226,47 +246,46 @@ await test("sanitize 恢复 Artifact-only 中断消息并清理坏引用和孤�
       title: "保留",
       content: "# 保留",
       sourceThreadId: "main",
-    },
-    orphan: {
-      id: "orphan",
-      kind: "markdown",
-      title: "孤儿",
-      content: "# 孤儿",
-      sourceThreadId: "main",
+      sourceMessageId: "m1",
     },
   }
-  state.artifactOrder = ["orphan", "missing"]
+  state.artifactOrder = ["keep"]
   state.threads.main.messages = [
     {
       id: "m1",
+      parentMessageId: null,
       role: "assistant",
       text: "",
       forks: [],
-      artifactIds: ["keep", "missing", "keep"],
+      artifactIds: ["keep"],
       status: "streaming",
     },
     {
       id: "m2",
+      parentMessageId: "m1",
       role: "assistant",
       text: "",
       forks: [],
       status: "pending",
     },
   ]
+  state.threads.main.activeLeafMessageId = "m2"
 
   const clean = sanitizeLoadedState(state, resolveModelIdForTest)
-  assert.equal(clean.threads.main.messages.length, 1)
-  assert.equal(clean.threads.main.messages[0].status, "done")
+  assert.equal(clean.threads.main.messages.length, 2)
+  assert.equal(clean.threads.main.messages[0].status, "error")
+  assert.equal(clean.threads.main.messages[1].status, "error")
   assert.deepEqual(clean.threads.main.messages[0].artifactIds, ["keep"])
   assert.deepEqual(Object.keys(clean.artifacts), ["keep"])
   assert.deepEqual(clean.artifactOrder, ["keep"])
 })
 
-await test("sanitize 防御性清理旧快照中的 Markdown 临时进度", () => {
+await test("sanitize 清理临时进度并把无 active generation 的部分回复转为 error", () => {
   const state = seed()
   state.threads.main.messages = [
     {
       id: "m-progress",
+      parentMessageId: null,
       role: "assistant",
       text: "已有正文",
       forks: [],
@@ -280,8 +299,9 @@ await test("sanitize 防御性清理旧快照中的 Markdown 临时进度", () =
       },
     },
   ]
+  state.threads.main.activeLeafMessageId = "m-progress"
   const clean = sanitizeLoadedState(state, resolveModelIdForTest)
-  assert.equal(clean.threads.main.messages[0].status, "done")
+  assert.equal(clean.threads.main.messages[0].status, "error")
   assert.equal(clean.threads.main.messages[0].markdownGeneration, undefined)
 })
 
@@ -293,9 +313,11 @@ await test("Artifact-only 上下文回放标题与原始 Markdown", () => {
     title: "项目总结",
     content: "# 项目总结\n\n- 完成 A",
     sourceThreadId: "main",
+    sourceMessageId: "m1",
   }
   const message = {
     id: "m1",
+    parentMessageId: null,
     role: "assistant",
     text: "",
     forks: [],

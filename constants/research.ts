@@ -12,6 +12,8 @@ export const ANYSEARCH_CLIENT_HEADER = "thread-chat/1.0"
 export const ANYSEARCH_SEARCH_RESULT_LIMIT = 20
 /** 每条搜索摘要注入模型的字符上限，正文按需交给 readUrl。 */
 export const ANYSEARCH_SEARCH_RESULT_CHAR_LIMIT = 2000
+/** 单次 AnySearch Search/Extract 的服务端 deadline，独立于整轮模型时限。 */
+export const ANYSEARCH_REQUEST_TIMEOUT_MS = 20_000
 
 /** 多步工具循环的最大步数（含工具调用与最终综合）。Demo 阶段放宽，仍保留防死循环熔断。 */
 export const RESEARCH_MAX_STEPS = 20

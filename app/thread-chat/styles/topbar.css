@@ -58,6 +58,11 @@
   color: var(--d1);
   font-weight: 700;
 }
+.tc .seg button.mode {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
 
 .tc .tbtn {
   font-family: var(--font-mono);
@@ -75,6 +80,14 @@
 .tc .tbtn:hover {
   border-color: var(--d1);
   color: var(--d1);
+}
+.tc .tbtn.help {
+  padding: 5px 7px;
+  line-height: 0;
+  color: var(--ink-soft);
+}
+.tc .tbtn.help:hover {
+  color: var(--ink);
 }
 .tc .tbtn[disabled] {
   opacity: 0.4;

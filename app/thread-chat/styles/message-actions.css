@@ -1,0 +1,164 @@
+/* ── 消息操作：仅在 .tc 内生效，列与画布共用 ── */
+
+.tc .message-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  margin-top: 5px;
+  color: var(--ink-faint);
+  transition: opacity 0.16s ease;
+}
+.tc .message-toolbar.end {
+  justify-content: flex-end;
+}
+.tc .assistant-actions-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+}
+.tc .message.user > .message-toolbar {
+  opacity: 0;
+}
+.tc .message.user:hover > .message-toolbar,
+.tc .message.user:focus-within > .message-toolbar {
+  opacity: 1;
+}
+.tc .message-action-trigger {
+  display: inline-flex;
+}
+.tc .message-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 6px;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.tc .message-action:hover,
+.tc .message-action:focus-visible,
+.tc .message-action[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+  color: var(--ink-soft);
+  outline: none;
+}
+.tc .message-action[aria-pressed="true"] {
+  color: var(--ink);
+}
+.tc .message-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+}
+.tc .user-message-body.editing {
+  width: min(84%, 560px);
+  max-width: 84%;
+}
+.tc .user-message-body textarea {
+  display: block;
+  width: 100%;
+  min-height: 84px;
+  border: 1px solid var(--rule-strong);
+  border-radius: 8px;
+  background: var(--paper);
+  color: var(--ink);
+  padding: 8px 9px;
+  resize: vertical;
+  font: inherit;
+  line-height: inherit;
+}
+.tc .user-edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 7px;
+  margin-top: 8px;
+}
+.tc .user-edit-actions button,
+.tc .recoverable-turn button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--rule-strong);
+  border-radius: 6px;
+  background: var(--paper);
+  color: var(--ink-soft);
+  padding: 4px 8px;
+  font-size: 11px;
+  cursor: pointer;
+}
+.tc .user-edit-actions button.primary {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--paper);
+}
+.tc .user-edit-actions button:disabled,
+.tc .recoverable-turn button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+.tc .recoverable-turn {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  max-width: 84%;
+  margin-top: 7px;
+  color: #a8443a;
+  font-size: 11.5px;
+}
+.tc .message-action-error {
+  margin-top: 5px;
+  color: #a8443a;
+  font-size: 11.5px;
+}
+.tc .turn-variant-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 4px;
+  color: var(--ink-faint);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+}
+.tc .turn-variant-picker button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.tc .turn-variant-picker button:hover:not(:disabled),
+.tc .turn-variant-picker button:focus-visible {
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+  color: var(--ink);
+  outline: none;
+}
+.tc .turn-variant-picker button:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+.tc .variant-derived {
+  margin-left: 4px;
+  font-family: var(--font-ui);
+}
+@media (hover: none), (pointer: coarse) {
+  .tc .message.user > .message-toolbar {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tc .message-toolbar {
+    transition: none;
+  }
+}

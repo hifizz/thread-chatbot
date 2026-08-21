@@ -12,7 +12,7 @@
 node --experimental-strip-types e2e/thread-chat/text-anchor.test.mjs
 ```
 
-覆盖 `app/thread-chat/branching/text-anchor.ts` 纯字符串层的三层降级定位
+覆盖 `app/thread-chat/branching/selection/text-anchor.ts` 纯字符串层的三层降级定位
 （position → exact → fuzzy）：position 直接命中、exact 多处命中经 prefix/suffix
 上下文消歧、**fuzzy 原文被改几个字后仍以 score≥阈值 命中正确区间**、
 阈值抬高 / 彻底无关锚点判定丢失（返回 null）、fuzzySubstring 单字错漏容忍。
@@ -23,7 +23,7 @@ node --experimental-strip-types e2e/thread-chat/text-anchor.test.mjs
 node --experimental-strip-types e2e/thread-chat/prompt-budget.test.mjs
 ```
 
-覆盖 `app/thread-chat/net/prompt-pure.ts` 的继承段预算截断（openspec:
+覆盖 `app/thread-chat/net/prompt/prompt-pure.ts` 的继承段预算截断（openspec:
 add-bubble-composer D8）：预算内不截断、超预算从最旧整条丢弃（顺序保持）、
 恰好等于预算的边界、**最新 1 条独超预算仍保留（保底 1 条）**、省略说明与
 kickoff 文案形状。
@@ -39,6 +39,68 @@ node --experimental-strip-types e2e/thread-chat/markdown-artifact-state.test.mjs
 `toolCallId` 去重、`tool-input-start/delta` 局部 JSON 进度、真实字符/行数/最近章节、
 store 临时进度与完整 Artifact 原子替换、存盘剥离、Artifact-only 终态、retry 清理、
 加载 sanitize 及后续模型上下文序列化。
+
+## Generation 刷新持久化测试（P0）
+
+结构化投影与整树合并是无数据库纯测试：
+
+```bash
+node --import tsx e2e/thread-chat/generation-persistence.test.mjs
+```
+
+覆盖正文、Markdown Artifact、联网来源/研究上下文、partial error、空回复、确定性
+Artifact id、重复投影/合并幂等、fork 保留、旧 attempt CAS、缺消息读修复，以及只有
+服务端 active generation 能保留 pending 的加载 sanitize。
+
+repository/finalize 是开发数据库测试；读取 `.env.local` 后运行，脚本创建随机测试用户
+与树，并在 `finally` 中级联清理：
+
+```bash
+node --env-file=.env.local --import tsx e2e/thread-chat/generation-db.test.mjs
+```
+
+覆盖并发重复 start、单 current attempt、supersede、Stop-vs-complete、stale heartbeat、
+跨用户 404 语义，以及 superseded attempt 的结果审计与 finalize 重入只扣费一次。
+
+浏览器手工验收必须使用当前 checkout 的 dev server：发送可控慢回复后刷新，页面应显示
+“正在后台生成，完成后显示”，服务端继续生成且只计费一次，轮询后原子显示完整结构化
+结果。明确 Stop 才会中止；普通刷新不得产生 stopped。P0 不恢复错过的逐 token 动画，只
+恢复后台状态和最终答案。
+
+## 消息操作与轻量消息 DAG
+
+无需浏览器的纯行为测试：
+
+```bash
+node --import tsx e2e/thread-chat/message-graph.test.mjs
+node --import tsx e2e/thread-chat/reconcile-turns.test.mjs
+node --import tsx e2e/thread-chat/regeneration-patch.test.mjs
+node --import tsx e2e/thread-chat/message-actions-controller.test.mjs
+node --import tsx e2e/thread-chat/message-action-availability.test.mjs
+```
+
+覆盖 strict schema-v2 拒绝旧线性树、active/exact-source path、回复版本、Artifact 来源、恢复状态、
+不可变 edit/regenerate patch，以及 controller 接受/拒绝/冲突/反馈命令。
+
+以下脚本连接 `.env.local` 的开发数据库并在 `finally` 中清理随机测试用户：
+
+```bash
+node --env-file=.env.local --import tsx e2e/thread-chat/generation-actions-db.test.mjs
+node --env-file=.env.local --import tsx e2e/thread-chat/tree-revision-db.test.mjs
+node --env-file=.env.local --import tsx e2e/thread-chat/tree-deletion-db.test.mjs
+node --env-file=.env.local --import tsx e2e/thread-chat/tree-ownership-db.test.mjs
+node --env-file=.env.local --import tsx e2e/thread-chat/tree-save-db.test.mjs
+node --env-file=.env.local --import tsx e2e/thread-chat/tree-rename-db.test.mjs
+node --env-file=.env.local --import tsx e2e/thread-chat/message-feedback-db.test.mjs
+```
+
+覆盖 generation intent 的原子落库、幂等 replay、running attempt supersede、terminal
+source/Artifact 保留、active-leaf CAS、跨用户拒绝、generation-vs-switch revision
+竞态、删除与 generation start 的行锁串行化及幂等删除、历史无主树的单次原子认领、
+整树保存的 owner/revision CAS，以及 message feedback 的 set/repeat/switch/clear、
+用户命名与派生标题隔离、完成态约束和 owner isolation。
+真实 UI 验收按仓库规则使用 `ego-browser nodejs` 访问 `localhost:4040`，不得用
+本目录旧的 Playwright 脚本替代本 change 的浏览器验收。
 
 ## Markdown Artifact 浏览器验收（mock API）
 
@@ -131,8 +193,8 @@ CHROMIUM_PATH=... BASE_URL=http://localhost:4040 node e2e/thread-chat/verify-per
   仍在 → DB 行断言（state.threads 含 main+分支、派生标题非空、空树不写库）。
   截图 `shots/persist-restored.png`。
 - **sanitize（4 断言）**：node 直接往 `branch_trees` 写含 `streaming` 半截正文 +
-  `pending` 空占位的脏快照 → 加载后半截消息以正文显示为 done、空占位被删、无转圈、
-  composer 非忙碌（测试行随后清理）。
+  `pending` 空占位的脏快照 → 加载后半截消息以正文显示为 done、空占位转成可重试
+  error、无转圈、composer 非忙碌（测试行随后清理）。
 - **降级（5 断言）**：playwright 拦截 `/api/branch-trees/**` 返回 500 → 页面仍以
   空树打开、console.warn 留痕、真实聊天照常、PUT 失败仅警告不打断。
 
@@ -156,8 +218,8 @@ CHROMIUM_PATH=... BASE_URL=http://localhost:4040 \
 assistant 流式首答、composer 无预填、payload 契约（threadChat.anchorText /
 user 原文入 messages）→ 留空 Enter：composer 预填 `kickoffQuestion()` 期望值、
 消息区为空、2 秒内无 /api/chat POST → ⌘Enter keepSource：来源列保留、新列开在
-紧邻右侧 → **分支首答完成后标题异步变为 ≤8 字语义标题（非锚点截断）、刷新后
-仍在（随树持久化）、全程 /api/branch-title 恰好一次**。深树继承段预算的纯函数
+紧邻右侧 → **分支首答完成后标题异步变为完整语义标题（非锚点截断）、刷新后
+仍在（随树持久化）、全程 /api/title 恰好一次**。深树继承段预算的纯函数
 用例见上方 prompt-budget.test.mjs。截图 `shots/bc-*.png`。
 
 ## 画布节点内对话验收（openspec: add-canvas-conversations）

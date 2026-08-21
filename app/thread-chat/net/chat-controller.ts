@@ -18,26 +18,53 @@
  *    text-delta / Markdown Artifact 继续到达并正常 finish。因此 onError 不立即判死：只记录 lastError
  *    （后到覆盖先到）并继续收流；终态统一裁决——收到过任何正文即按成功 finish
  *    （瞬时 error 忽略并 console.warn 留痕），正文/Artifact 都没有且有 error 用 lastError
- *    fail，两者都没有且无 error 也 fail。中止同理：已有可渲染输出就保留并 finish。
+ *    fail，两者都没有且无 error 也 fail。中止时即使已有部分输出也落为 error，
+ *    避免未完成消息暴露复制和评价操作；用户可通过错误态的重试入口重新生成。
  */
 
 import type { ThreadStore } from "../core/store"
-import { buildRequestBody } from "./prompt"
-import { consumeUIMessageStream, type UIStreamHandlers } from "./ui-stream"
-import { handleUnauthorized } from "@/lib/auth/session-recovery"
-import type { ArtifactSeed } from "../core/types"
-import { hasAssistantOutput } from "./assistant-output"
+import { buildRequestBody } from "./prompt/prompt"
+import { consumeUIMessageStream } from "./stream/ui-stream"
+import type { MessageFeedback, MessageFeedbackSummary } from "../core/types"
+import { GENERATION_ERRORS } from "@/constants/generation"
+import {
+  getKnownTreeRevision,
+  setKnownTreeRevision,
+} from "./persistence/persist"
+import { activeLeafTurn } from "../core/message-graph"
+import { submitMessageFeedback } from "./commands/message-feedback-command"
+import { switchActiveLeaf } from "./commands/switch-active-leaf-command"
+import { requestGenerationStop } from "./commands/stop-generation-command"
+import { requestChatGeneration } from "./commands/chat-generation-command"
+import {
+  ABORTED_ERROR,
+  createAssistantStreamRuntime,
+} from "./stream/assistant-stream-runtime"
+import {
+  prepareAssistantRetry,
+  prepareUserEdit,
+  prepareUserTurnRetry,
+  type PreparedRegenerationAction,
+  type PreparedRegenerationStart,
+} from "./commands/regeneration-command"
+import { createLocalGenerationExecutions } from "./stream/local-generation-executions"
+import type {
+  GenerationActionResult,
+  ThreadMessageActionCommands,
+  VariantSwitchResult,
+} from "../chat/actions/message-action-commands"
 
-/** 页面不可见 / 无 requestAnimationFrame 时的降级刷新间隔（毫秒） */
-const FALLBACK_FLUSH_MS = 50
+export type {
+  GenerationActionResult,
+  MessageActionFailureCode,
+  VariantSwitchResult,
+} from "../chat/actions/message-action-commands"
+
 /** 网络异常（非中止）的兜底错误文案 */
 const NETWORK_ERROR = "网络请求失败，请重试"
-/** 流正常结束但一个正文字符都没收到时的错误文案（空回复转正为可重试错误） */
-const EMPTY_REPLY_ERROR = "未收到任何回复，请重试"
-/** 零正文时被中止（停止按钮 / 卸载）的错误文案 */
-const ABORTED_ERROR = "已停止生成"
 
-export type ChatController = ReturnType<typeof createChatController>
+export type ChatController = ReturnType<typeof createChatController> &
+  ThreadMessageActionCommands
 
 /** 判断是否为「中止」类异常 */
 function isAbortError(err: unknown): boolean {
@@ -48,262 +75,328 @@ function isAbortError(err: unknown): boolean {
   )
 }
 
-export function createChatController(store: ThreadStore) {
-  /** 每个会话同一时间只允许一路在飞的流式请求 */
-  const inflight = new Map<string, AbortController>()
+export interface ChatControllerOptions {
+  treeId: string
+  /** 严格整树存盘：失败必须 reject，确保不会调用付费模型。 */
+  persistNow(): Promise<void>
+  onError?(message: string): void
+}
+
+export function createChatController(
+  store: ThreadStore,
+  options: ChatControllerOptions
+) {
+  /** 每个会话同一时间只允许一路在飞，并供后台协调排除本页已有的 SSE。 */
+  const localExecutions = createLocalGenerationExecutions()
 
   /**
    * 对某会话的某条 assistant 消息发起真实流式请求。
-   * 调用前必须已通过 beginAssistantMessage / resetAssistantMessage 备好目标消息。
+   * 普通发送已由 beginAssistantMessage 备好目标；变体操作在服务端接受后原子应用 patch。
    */
-  function startAssistant(threadId: string, msgId: string): void {
-    const controller = new AbortController()
-    inflight.set(threadId, controller)
+  function startAssistant(
+    threadId: string,
+    msgId: string,
+    userMessageId: string,
+    generationId: string,
+    action?: PreparedRegenerationAction
+  ): Promise<GenerationActionResult> {
+    const execution = localExecutions.begin(threadId, generationId)
+    const { controller, isOwner } = execution
     const { signal } = controller
 
-    /** 本次流是否仍是该会话的当前在飞流（retry 会用新 controller 顶替旧的） */
-    const isOwner = () => inflight.get(threadId) === controller
+    const streamRuntime = createAssistantStreamRuntime({
+      store,
+      threadId,
+      messageId: msgId,
+      isOwner,
+    })
 
-    // ---- 合帧缓冲 ----
-    let pending = ""
-    let pendingMarkdownProgress:
-      Parameters<ThreadStore["setMarkdownGenerationProgress"]>[2] | null = null
-    let frame: number | null = null
-    let usingRAF = false
-
-    const doFlush = () => {
-      if (!pending && !pendingMarkdownProgress) return
-      if (!isOwner()) {
-        pending = "" // 已被新流顶替：丢弃残余，不写旧消息
-        pendingMarkdownProgress = null
-        return
-      }
-      if (pending) {
-        const delta = pending
-        pending = ""
-        store.appendAssistantDelta(threadId, msgId, delta)
-      }
-      if (pendingMarkdownProgress) {
-        const progress = pendingMarkdownProgress
-        pendingMarkdownProgress = null
-        store.setMarkdownGenerationProgress(threadId, msgId, progress)
-      }
-    }
-    const onFrame = () => {
-      frame = null
-      doFlush()
-    }
-    const canUseRAF = () =>
-      typeof requestAnimationFrame !== "undefined" &&
-      !(typeof document !== "undefined" && document.hidden)
-    const schedule = () => {
-      if (frame !== null) return
-      if (canUseRAF()) {
-        usingRAF = true
-        frame = requestAnimationFrame(onFrame)
-      } else {
-        usingRAF = false
-        frame = setTimeout(onFrame, FALLBACK_FLUSH_MS) as unknown as number
-      }
-    }
-    const cancelFrame = () => {
-      if (frame === null) return
-      if (usingRAF) cancelAnimationFrame(frame)
-      else clearTimeout(frame)
-      frame = null
-    }
-
-    // ---- 终态收敛（只结算一次；非归属者只清理不写消息）----
-    let settled = false
-    const settle = (apply: () => void) => {
-      if (settled) return
-      settled = true
-      cancelFrame()
-      if (!isOwner()) return // 已被 retry 顶替：不触碰新流的消息
-      doFlush() // 先 flush 残余文本，再落终态
-      apply()
-    }
-
-    // ---- error chunk 容错：只记录不判死，终态统一裁决（见文件头说明）----
-    let lastError: string | null = null
-    /** 本次流累计收到的正文字符数（含尚在 pending 缓冲里的） */
-    let receivedChars = 0
-    /** 已成功原子绑定到目标消息的 Artifact 数 */
-    let attachedArtifactCount = 0
-    const hasOutput = () =>
-      hasAssistantOutput({
-        receivedTextChars: receivedChars,
-        attachedArtifactCount,
-      })
-
-    /** 流「正常走完」时的终态裁决：有正文即成功；零正文一律 fail（可重试） */
-    const settleByOutcome = () => {
-      settle(() => {
-        if (hasOutput()) {
-          if (lastError !== null)
-            console.warn(
-              "[thread-chat] 流中出现瞬时 error chunk（已忽略）:",
-              lastError
-            )
-          store.finishAssistantMessage(threadId, msgId)
-        } else if (lastError !== null) {
-          store.failAssistantMessage(threadId, msgId, lastError)
-        } else {
-          // 空回复转正为错误：可点「重试」，而不是留一个静默完成的空气泡
-          store.failAssistantMessage(threadId, msgId, EMPTY_REPLY_ERROR)
-        }
-      })
-    }
-
-    /** 中止时的终态裁决：已有正文保留文本 finish；零正文 fail（可重试） */
-    const settleByAbort = () => {
-      settle(() => {
-        if (hasOutput()) store.finishAssistantMessage(threadId, msgId)
-        else store.failAssistantMessage(threadId, msgId, ABORTED_ERROR)
-      })
-    }
-
-    const handlers: UIStreamHandlers = {
-      onTextDelta(delta) {
-        if (settled) return
-        receivedChars += delta.replace(/\s/g, "").length
-        pending += delta
-        schedule()
-      },
-      onMarkdownArtifactProgress(event) {
-        if (settled || !isOwner()) return
-        if (event.phase === "starting") {
-          pendingMarkdownProgress = null
-          store.setMarkdownGenerationProgress(threadId, msgId, event)
-          return
-        }
-        pendingMarkdownProgress = event
-        schedule()
-      },
-      onMarkdownArtifact(event) {
-        if (settled || !isOwner()) return
-        pendingMarkdownProgress = null
-        const seed: ArtifactSeed = {
-          kind: "markdown",
-          title: event.input.title,
-          content: event.input.content,
-        }
-        if (store.attachArtifactToMessage(threadId, msgId, seed) !== null)
-          attachedArtifactCount++
-      },
-      onWebResearchActivity(activity) {
-        if (settled || !isOwner()) return
-        // UI 必须把聚合面板插在 tool-input-start 的真实位置。先把此前按帧
-        // 缓冲的 text-delta 落进消息，store 才能记录准确的正文字符偏移。
-        doFlush()
-        store.setWebResearchActivity(threadId, msgId, activity)
-      },
-      onResearchRoute(route) {
-        if (settled || !isOwner()) return
-        store.setResearchRoute(threadId, msgId, route)
-      },
-      onResearchPlan(plan) {
-        if (settled || !isOwner()) return
-        store.setResearchPlan(threadId, msgId, plan)
-      },
-      onError(message) {
-        if (settled) return
-        lastError = message // 不立即 settle：可能是瞬时噪声，正文还会继续到达（后到覆盖先到）
-      },
-      onFinish() {
-        settleByOutcome()
-      },
-    }
-
-    void (async () => {
+    let streamHandedOff = false
+    return (async () => {
       try {
+        if (!action) {
+          try {
+            await options.persistNow()
+          } catch (error) {
+            console.error("[thread-chat] 发送前持久化屏障失败", error)
+            streamRuntime.fail(GENERATION_ERRORS.persistenceBarrier)
+            return {
+              ok: false,
+              code: "persistence_failed",
+              message: GENERATION_ERRORS.persistenceBarrier,
+            }
+          }
+        }
+        if (signal.aborted)
+          return { ok: false, code: "network_error", message: ABORTED_ERROR }
+
         const state = store.getState()
         const thread = state.threads[threadId]
         if (!thread) {
-          settle(() =>
-            store.failAssistantMessage(threadId, msgId, "会话不存在")
-          )
-          return
+          streamRuntime.fail("会话不存在")
+          return { ok: false, code: "not_found", message: "会话不存在" }
         }
 
-        const body = buildRequestBody(state, thread, msgId)
-        const res = await fetch("/api/chat", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify(body),
-          signal,
+        const body = buildRequestBody(state, thread, msgId, {
+          treeId: options.treeId,
+          userMessageId,
+          generationId,
+          intent: action?.intent ?? { kind: "persisted-turn" },
         })
-
-        if (!res.ok || !res.body) {
-          // 401：会话已失效——触发自救（登出 + 跳登录），并给出明确文案而非死胡同错误
-          if (res.status === 401) void handleUnauthorized()
-          settle(() =>
-            store.failAssistantMessage(
-              threadId,
-              msgId,
-              res.status === 401
-                ? "登录已失效，正在跳转登录…"
-                : `请求失败（HTTP ${res.status}）`
-            )
-          )
-          return
+        const command = await requestChatGeneration({ body, signal })
+        if (command.kind === "replayed") {
+          // 同 generation 请求重放：服务端已在执行或已终态，不启动第二次模型；
+          // 保留 pending，由 generation 轮询取得权威状态。
+          if (action) store.applyPreparedTurn(action.patch)
+          return {
+            ok: true,
+            generationId,
+            userMessageId,
+            assistantMessageId: msgId,
+            ...(action?.sourceUserMessageId
+              ? { sourceUserMessageId: action.sourceUserMessageId }
+              : {}),
+            ...(action?.sourceAssistantMessageId
+              ? { sourceAssistantMessageId: action.sourceAssistantMessageId }
+              : {}),
+          }
+        }
+        if (command.kind === "rejected") {
+          if (!action) streamRuntime.fail(command.failure.message)
+          return command.failure
+        }
+        const res = command.response
+        if (command.revision !== null)
+          setKnownTreeRevision(options.treeId, command.revision)
+        if (action && !store.applyPreparedTurn(action.patch)) {
+          return {
+            ok: false,
+            code: "generation_conflict",
+            message: "服务端已接受生成，但本地消息图需要刷新",
+          }
         }
 
-        await consumeUIMessageStream(res, handlers, signal)
+        const accepted: GenerationActionResult = {
+          ok: true,
+          generationId,
+          userMessageId,
+          assistantMessageId: msgId,
+          ...(action?.sourceUserMessageId
+            ? { sourceUserMessageId: action.sourceUserMessageId }
+            : {}),
+          ...(action?.sourceAssistantMessageId
+            ? { sourceAssistantMessageId: action.sourceAssistantMessageId }
+            : {}),
+        }
+
+        if (action) {
+          streamHandedOff = true
+          void (async () => {
+            try {
+              await consumeUIMessageStream(res, streamRuntime.handlers, signal)
+              if (signal.aborted) streamRuntime.settleByAbort()
+              else streamRuntime.settleByOutcome()
+            } catch (error) {
+              if (signal.aborted || isAbortError(error))
+                streamRuntime.settleByAbort()
+              else streamRuntime.fail(NETWORK_ERROR)
+            } finally {
+              streamRuntime.cancel()
+              localExecutions.clearIfOwner(threadId, controller)
+            }
+          })()
+          return accepted
+        }
+
+        await consumeUIMessageStream(res, streamRuntime.handlers, signal)
         if (signal.aborted) {
           // 被 abort：consume 静默返回、onFinish 不触发——有正文保留 finish，零正文标可重试错误
-          settleByAbort()
+          streamRuntime.settleByAbort()
         } else {
           // 正常结束时 handlers.onFinish 已 settle（幂等）；这里兜底走同一套终态裁决
-          settleByOutcome()
+          streamRuntime.settleByOutcome()
         }
+        return accepted
       } catch (err) {
         if (signal.aborted || isAbortError(err)) {
-          settleByAbort() // 中止：有正文保留 finish，零正文标可重试错误
+          streamRuntime.settleByAbort() // 中止：有正文保留 finish，零正文标可重试错误
         } else {
-          settle(() =>
-            store.failAssistantMessage(threadId, msgId, NETWORK_ERROR)
-          ) // fetch reject 等
+          if (!action) streamRuntime.fail(NETWORK_ERROR) // fetch reject 等
+        }
+        return {
+          ok: false,
+          code: "network_error",
+          message: isAbortError(err) ? ABORTED_ERROR : NETWORK_ERROR,
         }
       } finally {
-        cancelFrame()
-        // 仅当 inflight 仍指向本次 controller 时才清除，避免 retry 竞态误删新流的条目
-        if (inflight.get(threadId) === controller) inflight.delete(threadId)
+        if (!streamHandedOff) {
+          streamRuntime.cancel()
+          // 仅当 inflight 仍指向本次 controller 时才清除，避免 retry 竞态误删新流的条目
+          localExecutions.clearIfOwner(threadId, controller)
+        }
       }
     })()
   }
 
-  /** 中止某会话在飞的流式请求（不从 inflight 删除：交由该流的 finally 收尾；
-      有正文保留 finish，零正文标「已停止生成」可重试） */
-  function abortThread(threadId: string): void {
-    inflight.get(threadId)?.abort()
+  /** 只断开本地 fetch 消费者；不会向服务端表达 Stop。 */
+  function detachThread(threadId: string): void {
+    localExecutions.detach(threadId)
+  }
+
+  function startPreparedRegeneration(start: PreparedRegenerationStart) {
+    detachThread(start.threadId)
+    return startAssistant(
+      start.threadId,
+      start.messageId,
+      start.userMessageId,
+      start.generationId,
+      start.action
+    )
+  }
+
+  function activeAssistant(threadId: string) {
+    const thread = store.getState().threads[threadId]
+    if (!thread) return null
+    const turn = activeLeafTurn(thread)
+    const message = turn?.assistantMessage
+    if (
+      !message ||
+      (message.status !== "pending" && message.status !== "streaming")
+    )
+      return null
+    return { message, index: thread.messages.indexOf(message) }
+  }
+
+  async function requestStop(threadId: string): Promise<boolean> {
+    const active = activeAssistant(threadId)
+    const generationId = active?.message.generationId
+    if (!generationId) return false
+    const result = await requestGenerationStop(generationId)
+    if (!result.ok) {
+      options.onError?.(result.message)
+      return false
+    }
+    detachThread(threadId)
+    return true
   }
 
   return {
     /** 在会话里发一条用户消息并触发流式回复；同会话已有在飞请求时直接忽略 */
     send(threadId: string, text: string, quote?: { text: string }): void {
-      if (inflight.has(threadId)) return
-      if (!store.appendUserMessage(threadId, text, quote)) return
-      const msgId = store.beginAssistantMessage(threadId)
+      if (localExecutions.hasThread(threadId) || activeAssistant(threadId))
+        return
+      const userMessageId = store.appendUserMessage(threadId, text, quote)
+      if (!userMessageId) return
+      const generationId = crypto.randomUUID()
+      const msgId = store.beginAssistantMessage(threadId, generationId)
       if (!msgId) return
-      startAssistant(threadId, msgId)
+      void startAssistant(threadId, msgId, userMessageId, generationId)
     },
 
-    /** 重试：先中止在飞的旧流，复位同一条消息（清空正文/错误、回到 pending），再起新流复用该 msgId */
+    /** 兼容旧宿主的 retry 入口；新语义为追加 sibling assistant。 */
     retry(threadId: string, msgId: string): void {
-      abortThread(threadId)
-      store.resetAssistantMessage(threadId, msgId)
-      startAssistant(threadId, msgId)
+      const prepared = prepareAssistantRetry(store.getState(), {
+        threadId,
+        sourceAssistantMessageId: msgId,
+        assistantMessageId: crypto.randomUUID(),
+        generationId: crypto.randomUUID(),
+      })
+      if (!prepared.ok) return
+      void startPreparedRegeneration(prepared.start)
     },
 
-    /** 中止某会话在飞的流式请求（有正文保留 finish；零正文标「已停止生成」可重试） */
-    abort(threadId: string): void {
-      abortThread(threadId)
+    async retryAssistant(
+      threadId: string,
+      assistantMessageId: string
+    ): Promise<GenerationActionResult> {
+      const prepared = prepareAssistantRetry(store.getState(), {
+        threadId,
+        sourceAssistantMessageId: assistantMessageId,
+        assistantMessageId: crypto.randomUUID(),
+        generationId: crypto.randomUUID(),
+      })
+      if (!prepared.ok) return prepared
+      return startPreparedRegeneration(prepared.start)
     },
 
-    /** 中止所有会话在飞的流式请求（壳层卸载时调用） */
-    abortAll(): void {
-      inflight.forEach((c) => c.abort())
+    async retryUserTurn(
+      threadId: string,
+      userMessageId: string
+    ): Promise<GenerationActionResult> {
+      const prepared = prepareUserTurnRetry(store.getState(), {
+        threadId,
+        userMessageId,
+        assistantMessageId: crypto.randomUUID(),
+        generationId: crypto.randomUUID(),
+      })
+      if (!prepared.ok) return prepared
+      return startPreparedRegeneration(prepared.start)
+    },
+
+    async editAndRegenerate(
+      threadId: string,
+      userMessageId: string,
+      text: string
+    ): Promise<GenerationActionResult> {
+      const prepared = prepareUserEdit(store.getState(), {
+        threadId,
+        sourceUserMessageId: userMessageId,
+        text,
+        userMessageId: crypto.randomUUID(),
+        assistantMessageId: crypto.randomUUID(),
+        generationId: crypto.randomUUID(),
+      })
+      if (!prepared.ok) return prepared
+      return startPreparedRegeneration(prepared.start)
+    },
+
+    async switchTurnVariant(
+      threadId: string,
+      assistantMessageId: string
+    ): Promise<VariantSwitchResult> {
+      const result = await switchActiveLeaf({
+        treeId: options.treeId,
+        threadId,
+        assistantMessageId,
+        baseRevision: getKnownTreeRevision(options.treeId),
+      })
+      if (!result.ok) return result
+      setKnownTreeRevision(options.treeId, result.revision)
+      if (!store.setActiveLeaf(threadId, assistantMessageId))
+        return {
+          ok: false,
+          code: "generation_conflict",
+          message: "本地消息图需要刷新",
+        }
+      return result
+    },
+
+    async submitFeedback(
+      threadId: string,
+      messageId: string,
+      feedback: MessageFeedback | null
+    ): Promise<MessageFeedbackSummary | null> {
+      return submitMessageFeedback({
+        treeId: options.treeId,
+        threadId,
+        messageId,
+        feedback,
+      })
+    },
+
+    /** 只有该显式操作才请求服务端停止模型；服务端确认后再断开本地流。 */
+    stop(threadId: string): void {
+      void requestStop(threadId)
+    },
+
+    /** 页面卸载只 detach 本地消费者，服务端 generation 继续执行与计费。 */
+    detachAll(): void {
+      localExecutions.detachAll()
+    },
+
+    /** reconciliation 用：本页已有 SSE 消费者时不再为同一 generation 发轮询 GET。 */
+    isGenerationStreamingLocally(generationId: string): boolean {
+      return localExecutions.isGenerationActive(generationId)
     },
   }
 }

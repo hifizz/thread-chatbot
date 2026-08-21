@@ -4,66 +4,41 @@ import {
   Output,
   type LanguageModel,
 } from "ai"
-import { z } from "zod"
 import {
   RESEARCH_PLANNER_MAX_OUTPUT_TOKENS,
   RESEARCH_PLANNER_SYSTEM_PROMPT,
   RESEARCH_ROUTER_MAX_OUTPUT_TOKENS,
   RESEARCH_ROUTER_SYSTEM_PROMPT,
 } from "@/constants/research"
+import type { ChatModel } from "@/constants/model"
+import { MODEL_CALL_PURPOSE } from "@/constants/model-call"
+import {
+  withModelCallLogging,
+  type ModelCallTrace,
+} from "@/lib/ai/model-call-logger"
+import {
+  researchPlanSchema,
+  researchRouteSchema,
+  type ResearchPlan,
+  type ResearchRoute,
+  type ResearchRouteMode,
+} from "@/lib/chat/research-contract"
 
-export const researchRouteModeSchema = z.enum([
-  "answer",
-  "fetch",
-  "search",
-  "research",
-])
-export type ResearchRouteMode = z.infer<typeof researchRouteModeSchema>
-
-export const researchRouteSchema = z.object({
-  mode: researchRouteModeSchema,
-  reasonCode: z.enum([
-    "no_web_needed",
-    "explicit_url",
-    "explicit_search",
-    "freshness_required",
-    "multi_source_research",
-    "search_unavailable",
-  ]),
-  urls: z.array(z.string()).max(4),
-  suggestedQueries: z.array(z.string().trim().min(1)).max(4),
-})
-export type ResearchRoute = z.infer<typeof researchRouteSchema>
-
-export const researchPlanSchema = z.object({
-  goal: z.string().trim().min(1).max(300),
-  subquestions: z
-    .array(
-      z.object({
-        id: z.string().trim().min(1).max(40),
-        question: z.string().trim().min(1).max(300),
-        queries: z.array(z.string().trim().min(1).max(200)).min(1).max(4),
-        preferredSourceTypes: z
-          .array(z.string().trim().min(1).max(80))
-          .max(4),
-        requiresPageFetch: z.boolean(),
-      })
-    )
-    .min(1)
-    .max(8),
-  exitCriteria: z.object({
-    minimumIndependentSources: z.number().int().min(1).max(12),
-    requirePrimarySources: z.boolean(),
-    freshnessRequired: z.boolean(),
-  }),
-})
-export type ResearchPlan = z.infer<typeof researchPlanSchema>
+export {
+  researchPlanSchema,
+  researchRouteModeSchema,
+  researchRouteSchema,
+  type ResearchPlan,
+  type ResearchRoute,
+  type ResearchRouteMode,
+} from "@/lib/chat/research-contract"
 
 export interface ResolveResearchRouteInput {
   model: LanguageModel
   latestUserText: string
   recentConversation: string
   searchReady: boolean
+  modelCallTrace?: ModelCallTrace
 }
 
 function errorSummary(error: unknown): string {
@@ -171,6 +146,28 @@ export function extractHttpUrls(text: string): string[] {
   return [...new Set((text.match(URL_PATTERN) ?? []).map(trimUrlPunctuation))]
 }
 
+function explicitlyDisablesWeb(text: string): boolean {
+  return /(?:不要|无需|不用|禁止).{0,8}(?:联网|搜索|检索|访问网络)|\b(?:do\s+not|don'?t|without)\s+(?:browse|search|use\s+the\s+web)\b/i.test(
+    text
+  )
+}
+
+/** “总结这个链接”等跟进从最近对话恢复 URL；普通总结仍保持本地回答。 */
+export function contextualUrlFollowUpRoute(
+  latestUserText: string,
+  recentConversation: string
+): ResearchRoute | null {
+  if (explicitlyDisablesWeb(latestUserText)) return null
+  if (extractHttpUrls(latestUserText).length > 0) return null
+  const refersToPage =
+    /(?:总结|翻译|分析|解读|概括|改写).{0,16}(?:(?:这个|这篇|该|上面|之前)(?:链接|网页|页面|网址)|(?:链接|网页|页面|网址)(?:内容)?)|\b(?:summari[sz]e|translate|analy[sz]e|explain)\b.{0,24}\b(?:(?:this|that|the|previous)\s+)?(?:link|url|page)\b/i.test(
+      latestUserText
+    )
+  if (!refersToPage) return null
+  const urls = extractHttpUrls(recentConversation).slice(-4)
+  return urls.length > 0 ? route("fetch", "explicit_url", { urls }) : null
+}
+
 function route(
   mode: ResearchRouteMode,
   reasonCode: ResearchRoute["reasonCode"],
@@ -191,11 +188,7 @@ export function deterministicResearchRoute(
   const normalized = text.trim()
   if (!normalized) return route("answer", "no_web_needed")
 
-  if (
-    /(?:不要|无需|不用|禁止).{0,8}(?:联网|搜索|检索|访问网络)|\b(?:do\s+not|don'?t|without)\s+(?:browse|search|use\s+the\s+web)\b/i.test(
-      normalized
-    )
-  )
+  if (explicitlyDisablesWeb(normalized))
     return route("answer", "no_web_needed")
 
   const urls = extractHttpUrls(normalized)
@@ -248,7 +241,14 @@ export async function resolveResearchRoute({
   latestUserText,
   recentConversation,
   searchReady,
+  modelCallTrace,
 }: ResolveResearchRouteInput): Promise<ResearchRoute> {
+  const contextualFollowUp = contextualUrlFollowUpRoute(
+    latestUserText,
+    recentConversation
+  )
+  if (contextualFollowUp)
+    return normalizeModelRoute(contextualFollowUp, searchReady)
   const deterministic = deterministicResearchRoute(latestUserText)
   if (deterministic)
     return normalizeModelRoute(deterministic, searchReady)
@@ -256,7 +256,11 @@ export async function resolveResearchRoute({
 
   try {
     const result = await generateText({
-      model,
+      model: withModelCallLogging(
+        model,
+        MODEL_CALL_PURPOSE.researchRoute,
+        modelCallTrace
+      ),
       reasoning: "low",
       system: RESEARCH_ROUTER_SYSTEM_PROMPT,
       prompt: [
@@ -290,14 +294,20 @@ export async function createResearchPlan({
   model,
   userRequest,
   route: resolvedRoute,
+  modelCallTrace,
 }: {
   model: LanguageModel
   userRequest: string
   route: ResearchRoute
+  modelCallTrace?: ModelCallTrace
 }): Promise<ResearchPlan> {
   try {
     const result = await generateText({
-      model,
+      model: withModelCallLogging(
+        model,
+        MODEL_CALL_PURPOSE.researchPlan,
+        modelCallTrace
+      ),
       reasoning: "high",
       system: RESEARCH_PLANNER_SYSTEM_PROMPT,
       prompt: [
@@ -349,8 +359,17 @@ export async function createResearchPlan({
 }
 
 export function reasoningForResearchRoute(
-  mode: ResearchRouteMode
-): "provider-default" | "medium" | "high" {
+  mode: ResearchRouteMode,
+  model?: Pick<ChatModel, "provider" | "umapisCredentialGroup">
+): "provider-default" | "none" | "medium" | "high" {
+  // UMAPIS 的 Anthropic 兼容端点可能不返回可供下一工具步骤回放的 signed
+  // reasoning metadata；多步联网时显式关闭，避免丢弃历史 reasoning 并逐步告警。
+  if (
+    model?.provider === "umapis" &&
+    model.umapisCredentialGroup === "claude" &&
+    mode !== "answer"
+  )
+    return "none"
   if (mode === "research") return "high"
   if (mode === "search" || mode === "fetch") return "medium"
   return "provider-default"
