@@ -36,6 +36,12 @@ define-conversation-domain-model
 | usage/exactly-once billing                 | generation DB tests                   | 不依赖浏览器连接                        | pending billing=0；usage 终态明确     |
 | authority 与旧协议                         | authority/client tests                | authority 三元组匹配；旧 route 返回 410 | 不存在分裂开关或 fallback             |
 
+## 版本化 release manifest
+
+正式演练和 cutover 必须先生成受版本控制的 JSON manifest，并用 `pnpm validate:conversation-cutover-manifest -- --manifest-file <manifest.json> --for-execution --environment <env> --database-host <host> --database-name <name>` 校验。manifest 固化负责人、维护/观察窗口、实测基线、阈值、import/reset ADR、legacy/canonical 备份恢复证明、epoch 和十项 go/no-go 结果，并输出稳定 SHA-256 供审批与执行日志引用。
+
+schema-only 校验不代表可执行；`--for-execution` 会在任一门禁为 false、环境/数据库漂移、窗口过期、备份验证晚于维护开始，或“有保留义务却选择 reset”时 fail closed。仓库不提供带伪造生产值的默认 manifest。
+
 ## 本地 cutover 演练结果（2026-08-22）
 
 - 数据：19 棵 legacy 树；22 Thread、34 Turn、71 Message、3 Fork、37 Generation、1 feedback。
