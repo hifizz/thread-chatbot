@@ -22,10 +22,18 @@ import type {
 import type { MessageFeedback } from "@/lib/thread-chat/domain/types"
 import type {
   LifecycleStatus,
+  GenerationIntent,
+  GenerationStatus as CanonicalGenerationStatus,
+  GenerationBillingStatus as CanonicalGenerationBillingStatus,
   MessageContent,
   MessageContentState,
   MessageRole,
 } from "@/lib/thread-chat/domain/conversation-model"
+import type {
+  ConversationGenerationCheckpoint,
+  KnownGenerationUsage,
+  UsageCompleteness,
+} from "@/lib/thread-chat/domain/conversation-generation"
 
 // 认证与计费表在独立文件中定义，这里统一 re-export，使 drizzle 客户端与迁移能感知它们。
 export * from "./auth-schema"
@@ -280,6 +288,85 @@ export const threadForks = dbSchema.table(
     index("thread_forks_conversation_created_idx").on(
       table.conversationId,
       table.createdAt
+    ),
+  ]
+)
+
+export const conversationGenerations = dbSchema.table(
+  "conversation_generations",
+  {
+    id: text("id").primaryKey(),
+    ownerId: text("owner_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    workspaceId: text("workspace_id").notNull(),
+    projectId: text("project_id").notNull(),
+    conversationId: text("conversation_id").notNull(),
+    threadId: text("thread_id").notNull(),
+    turnId: text("turn_id").notNull(),
+    inputMessageId: text("input_message_id").notNull(),
+    outputMessageId: text("output_message_id").notNull(),
+    intent: jsonb("intent").$type<GenerationIntent>().notNull(),
+    requestHash: text("request_hash").notNull(),
+    idempotencyKey: text("idempotency_key").notNull(),
+    modelId: text("model_id").notNull(),
+    attempt: integer("attempt").notNull(),
+    isCurrent: boolean("is_current").notNull().default(true),
+    status: text("status").$type<CanonicalGenerationStatus>().notNull(),
+    contentState: text("content_state").$type<MessageContentState>().notNull(),
+    checkpointVersion: integer("checkpoint_version").notNull().default(0),
+    checkpoint: jsonb("checkpoint")
+      .$type<ConversationGenerationCheckpoint>()
+      .notNull(),
+    knownUsage: jsonb("known_usage").$type<KnownGenerationUsage>(),
+    usageCompleteness: text("usage_completeness")
+      .$type<UsageCompleteness>()
+      .notNull(),
+    billingStatus: text("billing_status")
+      .$type<CanonicalGenerationBillingStatus>()
+      .notNull(),
+    paidCallStarted: boolean("paid_call_started").notNull().default(false),
+    leaseOwner: text("lease_owner"),
+    leaseVersion: integer("lease_version").notNull().default(0),
+    heartbeatAt: timestamp("heartbeat_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    stopRequestedAt: timestamp("stop_requested_at", { withTimezone: true }),
+    startedAt: timestamp("started_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+    errorCode: text("error_code"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("conversation_generations_owner_idempotency_uq").on(
+      table.ownerId,
+      table.idempotencyKey
+    ),
+    uniqueIndex("conversation_generations_output_attempt_uq").on(
+      table.outputMessageId,
+      table.attempt
+    ),
+    uniqueIndex("conversation_generations_current_turn_uq")
+      .on(table.turnId)
+      .where(sql`${table.isCurrent} = true`),
+    index("conversation_generations_owner_status_idx").on(
+      table.ownerId,
+      table.status
+    ),
+    index("conversation_generations_conversation_updated_idx").on(
+      table.conversationId,
+      table.updatedAt
+    ),
+    index("conversation_generations_lease_idx").on(
+      table.status,
+      table.heartbeatAt
     ),
   ]
 )

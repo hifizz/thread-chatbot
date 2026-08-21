@@ -14,6 +14,8 @@
     "format": "prettier --write \"**/*.{ts,tsx}\"",
     "typecheck": "tsc --noEmit",
     "test:conversation-domain": "node --experimental-strip-types --test lib/thread-chat/domain/conversation-model.test.ts",
+    "test:conversation-generation-unit": "tsx --test lib/thread-chat/domain/conversation-generation.test.ts lib/thread-chat/generation/canonical-generation-execution.test.ts",
+    "test:conversation-generation": "tsx scripts/test-conversation-generation.ts",
     "test:conversation-persistence": "tsx scripts/test-conversation-persistence.ts",
     "test:legacy-conversation-audit": "node --experimental-strip-types --test lib/thread-chat/legacy/audit-thread-tree.test.ts",
     "audit:conversation-domain": "node scripts/audit-thread-tree-boundary.mjs",

@@ -57,6 +57,13 @@
       "when": 1787334734551,
       "tag": "0007_protect-root-thread-identity",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1787335260786,
+      "tag": "0008_noisy_random",
+      "breakpoints": true
     }
   ]
 }
