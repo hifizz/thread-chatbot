@@ -15,6 +15,18 @@ const MIGRATIONS_FOLDER = "./drizzle"
 const MIGRATIONS_SCHEMA = "drizzle"
 const MIGRATIONS_TABLE = "__drizzle_migrations"
 
+// Preview 默认共享项目数据库；在 build 阶段自动跑 DDL 会让多个分支争用同一迁移日志。
+// 只有为该 Preview 配置了隔离数据库并显式确认时才允许迁移。
+if (
+  process.env.VERCEL_ENV === "preview" &&
+  process.env.VERCEL_PREVIEW_DATABASE_MIGRATIONS !== "true"
+) {
+  console.log(
+    "[vercel-build] Preview 默认不执行数据库迁移；构建继续。若使用隔离预览库，请显式设置 VERCEL_PREVIEW_DATABASE_MIGRATIONS=true。"
+  )
+  process.exit(0)
+}
+
 const rawUrl = process.env.DIRECT_URL || process.env.DATABASE_URL
 
 if (!rawUrl) {

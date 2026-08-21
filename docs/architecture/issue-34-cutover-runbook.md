@@ -14,6 +14,13 @@ define-conversation-domain-model
 
 `pnpm openspec:validate` 当前为 31/31。正式环境仍须填写负责人、观察窗口、性能/错误/计费基线和真实备份 ID；本文件中的本地结果不能替代生产批准。
 
+## 部署迁移边界
+
+- Vercel Preview 默认只构建，不在共享数据库执行迁移。多个功能分支不能争用同一份 Drizzle 迁移日志。
+- 只有 Preview 使用独立、可丢弃的数据库时，才可显式设置 `VERCEL_PREVIEW_DATABASE_MIGRATIONS=true`。
+- Production 迁移继续失败即阻断，并在执行 DDL 前校验本地迁移的时间戳与哈希。出现旧谱系、缺失迁移或哈希分叉时必须人工核对，禁止自动覆盖迁移日志。
+- Issue #34 正式切换前，必须把目标库的旧迁移谱系核对和基线处置记录到环境 ADR；Preview 构建通过不代表该门禁已完成。
+
 ## Release 行为矩阵
 
 | 行为边界 | 自动证据 | Ego Browser / API smoke | Cutover 门禁 |
