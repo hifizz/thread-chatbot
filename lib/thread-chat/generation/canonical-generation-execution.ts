@@ -174,6 +174,16 @@ export class CanonicalGenerationApplicationService {
     return { generation: started.generation, execution }
   }
 
+  /** Outbox 消费者在命令事务提交后接管已持久化的 Generation。 */
+  executeExisting(
+    generation: CanonicalGenerationRecord,
+    leaseOwner: string
+  ): Promise<CanonicalGenerationRecord | null> {
+    if (generation.status !== "running" || generation.leaseOwner !== leaseOwner)
+      return Promise.resolve(generation)
+    return this.run(generation, leaseOwner)
+  }
+
   async query(input: {
     readonly ownerId: string
     readonly generationId: GenerationId

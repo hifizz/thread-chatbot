@@ -28,6 +28,7 @@ import type {
   MessageContent,
   MessageContentState,
   MessageRole,
+  JsonValue,
 } from "@/lib/thread-chat/domain/conversation-model"
 import type {
   ConversationGenerationCheckpoint,
@@ -367,6 +368,76 @@ export const conversationGenerations = dbSchema.table(
     index("conversation_generations_lease_idx").on(
       table.status,
       table.heartbeatAt
+    ),
+  ]
+)
+
+export const conversationCommandRecords = dbSchema.table(
+  "conversation_command_records",
+  {
+    id: text("id").primaryKey(),
+    actorId: text("actor_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    scopeType: text("scope_type").notNull(),
+    scopeId: text("scope_id").notNull(),
+    commandType: text("command_type").notNull(),
+    idempotencyKey: text("idempotency_key").notNull(),
+    payloadHash: text("payload_hash").notNull(),
+    result: jsonb("result").$type<JsonValue>().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("conversation_command_records_scope_key_uq").on(
+      table.actorId,
+      table.scopeType,
+      table.scopeId,
+      table.idempotencyKey
+    ),
+    index("conversation_command_records_actor_created_idx").on(
+      table.actorId,
+      table.createdAt
+    ),
+  ]
+)
+
+export const conversationOutboxEvents = dbSchema.table(
+  "conversation_outbox_events",
+  {
+    id: text("id").primaryKey(),
+    aggregateType: text("aggregate_type").notNull(),
+    aggregateId: text("aggregate_id").notNull(),
+    aggregateRevision: integer("aggregate_revision").notNull(),
+    type: text("type").notNull(),
+    schemaVersion: integer("schema_version").notNull().default(1),
+    actorId: text("actor_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    payload: jsonb("payload").$type<JsonValue>().notNull(),
+    status: text("status").notNull().default("pending"),
+    attempts: integer("attempts").notNull().default(0),
+    availableAt: timestamp("available_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    claimedBy: text("claimed_by"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    dispatchedAt: timestamp("dispatched_at", { withTimezone: true }),
+    lastError: text("last_error"),
+  },
+  (table) => [
+    index("conversation_outbox_events_pending_idx").on(
+      table.status,
+      table.availableAt,
+      table.createdAt
+    ),
+    index("conversation_outbox_events_aggregate_idx").on(
+      table.aggregateType,
+      table.aggregateId,
+      table.aggregateRevision
     ),
   ]
 )
