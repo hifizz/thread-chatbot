@@ -44,6 +44,7 @@ define-conversation-domain-model
 - 导入：19 个 Conversation、187 个实体；同事务逐 Conversation 写入、post-import verifier、重复导入幂等检查全部通过，随后强制回滚。
 - 回滚证明：`legacy_conversation_entity_mappings=0`，`conversations.id LIKE 'legacy:%'=0`。
 - 客户端：`canonical / schema 1 / local-issue34-20260822` 匹配后正常加载；旧 tree 与 generation routes 返回 410。
+- 备份恢复：通过受限临时数据库完成 legacy dump→恢复→drain/审计→正式导入两次→canonical dump→再次恢复；两次恢复的 13 张 cutover 表指纹均与备份源一致，耗时约 8.4 秒，临时数据库与文件均已删除。
 
 ## 正式 go / no-go checklist
 

@@ -47,6 +47,12 @@
 - 自动验证：typecheck；domain 8/8；Generation unit 7/7；authority/drain/import 6/6；client 14/14；command contract 5/5；数据库 persistence/Generation/command API 分别 26/52/69 assertions；真实 HTTP + 本地 PostgreSQL + 邮箱认证 + `glm-5.3` 31 assertions；OpenSpec strict 31/31；canonical production build 成功。Ego Browser 实测健康三元组为 `canonical / 1 / local-issue34-20260822`，匹配后 3 列页面与 composer 加载成功；旧整树与旧 Generation 查询均返回 410。
 - 本记录只证明第 4 阶段的实现和本地隔离验收，不代表第 5 阶段的生产维护、备份、正式切换或批准已经发生。
 
+### 本地临时数据库恢复演练（不等同于第 5 阶段）
+
+- `pnpm rehearse:conversation-cutover-local -- --approve-local-ephemeral-databases` 在两个受限命名的 loopback 临时库中完成 legacy 备份恢复、`legacy + read-only` drain/审计、获批确定性导入两次、canonical 备份和再次恢复。
+- 两次恢复均以 13 张 cutover 表的逐表 JSONB SHA-256 合并指纹证明与各自源库一致；导入后为 20 个 Conversation（含源库已有 1 个隔离夹具）和 186 条映射，总耗时约 8.4 秒。
+- 演练结束自动删除临时库、dump 和审批文件；源开发库只读。由于尚未覆盖目标基础设施、真实保留备份、负责人/观察窗口和流量切换，1.4 与 5.1 仍保持未完成。
+
 ## 5. Cutover 演练与正式执行
 
 - [ ] 5.1 在与生产等价的隔离环境完整演练冻结、drain、备份、import/reset、验证、authority/client 切换和 smoke，并记录耗时。
