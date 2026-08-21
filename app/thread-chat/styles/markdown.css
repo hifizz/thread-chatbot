@@ -26,14 +26,13 @@
 .tc .md-body h4 {
   font-family: var(--font-ui);
   color: var(--ink);
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.35;
   margin: 20px 0 9px;
 }
 .tc .md-body h1 {
-  font-size: 20px;
-  padding-bottom: 5px;
-  border-bottom: 1px solid var(--rule);
+  font-size: 22px;
+  font-weight: 800;
 }
 .tc .md-body h2 {
   font-size: 17px;
@@ -92,6 +91,7 @@
 .tc .md-body .md-inline-code {
   font-family: var(--font-mono);
   font-size: 0.85em;
+  color: color-mix(in srgb, #8e2626 calc(1 * 100%), transparent);
   background: var(--paper-2);
   border: 1px solid var(--rule);
   border-radius: 4px;
@@ -123,15 +123,15 @@
   border: 1px solid var(--rule);
   border-radius: 8px;
   overflow: hidden;
-  background: #fff;
+  background: rgba(252,252,252, 1);
 }
 .tc .md-body .md-code-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 5px 10px;
-  background: var(--paper-2);
-  border-bottom: 1px solid var(--rule);
+  /*background: var(--paper-2);*/
+  /*border-bottom: 1px solid var(--rule);*/
   font-family: var(--font-mono);
 }
 .tc .md-body .md-code-head .lang {
@@ -147,7 +147,7 @@
   border: none;
   color: var(--ink-soft);
   cursor: pointer;
-  padding: 2px;
+  padding: 4px;
   border-radius: 4px;
 }
 .tc .md-body .md-code-head .copy:hover {

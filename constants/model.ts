@@ -336,7 +336,7 @@ export const THREAD_CHAT_MODELS: readonly ChatModel[] = CHAT_MODELS.filter(
 )
 
 /** Thread Chat 新建树及旧树模型回退使用的默认模型。 */
-export const DEFAULT_THREAD_CHAT_MODEL_ID = "glm-5.3"
+export const DEFAULT_THREAD_CHAT_MODEL_ID = "umapis-claude-opus-4-6"
 
 /**
  * 单次生成的输出 token 上限（安全阀）。

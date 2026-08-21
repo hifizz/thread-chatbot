@@ -6,6 +6,7 @@
 import {
   THREAD_CHAT_BRANCH_PREFIX,
   THREAD_CHAT_BRANCH_SUFFIX,
+  THREAD_CHAT_MARKDOWN_ARTIFACT_SYSTEM,
   THREAD_CHAT_SYSTEM,
 } from "@/constants/thread-chat"
 
@@ -13,8 +14,20 @@ import {
  * 构造 thread-chat 模式的 system 提示：
  * 通用结构化风格段 +（anchorText 非空时）分支焦点段（锚点原文作为数据嵌入「」内）。
  */
-export function buildThreadChatSystem(anchorText?: string | null): string {
+export function buildThreadChatSystem(
+  anchorText?: string | null,
+  options?: { enableMarkdownArtifact?: boolean }
+): string {
   const anchor = anchorText?.trim()
-  if (!anchor) return THREAD_CHAT_SYSTEM
-  return `${THREAD_CHAT_SYSTEM}\n\n${THREAD_CHAT_BRANCH_PREFIX}「${anchor}」。${THREAD_CHAT_BRANCH_SUFFIX}`
+  return [
+    THREAD_CHAT_SYSTEM,
+    options?.enableMarkdownArtifact
+      ? THREAD_CHAT_MARKDOWN_ARTIFACT_SYSTEM
+      : null,
+    anchor
+      ? `${THREAD_CHAT_BRANCH_PREFIX}「${anchor}」。${THREAD_CHAT_BRANCH_SUFFIX}`
+      : null,
+  ]
+    .filter((part): part is string => part !== null)
+    .join("\n\n")
 }

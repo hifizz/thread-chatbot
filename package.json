@@ -21,6 +21,7 @@
     "openspec:validate": "openspec validate --all --strict"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^4.0.39",
     "@ai-sdk/openai-compatible": "^3.0.5",
     "@ai-sdk/react": "^4.0.15",
     "@assistant-ui/core": "^0.2.20",

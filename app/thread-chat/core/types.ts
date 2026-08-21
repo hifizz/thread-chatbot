@@ -6,6 +6,8 @@
  */
 
 import type { TextAnchor } from "../branching/text-anchor"
+import type { WebResearchActivity } from "@/lib/chat/web-research-activity"
+import type { ResearchPlan, ResearchRoute } from "@/lib/chat/research-router"
 
 export type Role = "user" | "assistant"
 export type ArtifactKind = "code" | "note" | "markdown"
@@ -71,6 +73,14 @@ export interface Message {
   error?: string
   /** 当前页临时态；存盘前必须剥离，加载时也会防御性清理。 */
   markdownGeneration?: MarkdownGenerationProgress
+  /** 联网搜索/深读活动；完成结果随消息持久化，刷新后仍可核验来源。 */
+  webResearch?: WebResearchActivity[]
+  /** 第一次联网工具事件到达时，已接收正文的 UTF-16 字符偏移；用于原位插入聚合面板。 */
+  webResearchTextOffset?: number
+  /** 本轮联网路由决策；不含原始 CoT。 */
+  researchRoute?: ResearchRoute
+  /** 复杂研究的结构化计划；随消息持久化，供 UI 和调试核验。 */
+  researchPlan?: ResearchPlan
 }
 
 export interface Thread {

@@ -3,7 +3,7 @@
  * chat/chat-view —— 单会话视图：消息列表 + composer + who 标签。
  *
  * 这一层不知道「树 / 列 / 分支」的存在：锚点高亮、脚注、artifact 卡片等
- * 分支能力全部通过 renderAssistantBody / renderAfterMessage 两个渲染插槽注入，
+ * 分支能力全部通过 assistant 正文 / 后置区两个渲染插槽注入，
  * 列头 / focus banner / 继承上文则作为 header / banner ReactNode 传入。
  *
  * .lane 是纯展示的阅读通道包装（max --lane-max、列内居中）：消息流与 composer
@@ -119,12 +119,15 @@ export function ChatView({
 
   const renderMessage = (msg: Message) => {
     const hasVisibleText = msg.text.trim().length > 0
+    const hasWebResearch = Boolean(msg.webResearch?.length)
+    const hasVisibleAssistantContent = hasVisibleText || hasWebResearch
     const isWaitingForVisibleOutput =
       msg.role === "assistant" &&
       (msg.status === "pending" || msg.status === "streaming") &&
-      !hasVisibleText &&
+      !hasVisibleAssistantContent &&
       !msg.artifactIds?.length &&
-      !msg.markdownGeneration
+      !msg.markdownGeneration &&
+      !msg.webResearch?.length
 
     return (
       <div key={msg.id} className={`message ${msg.role}`} data-msg-id={msg.id}>
@@ -136,7 +139,7 @@ export function ChatView({
           </div>
         ) : (
           <>
-            {(hasVisibleText || isWaitingForVisibleOutput) && (
+            {(hasVisibleAssistantContent || isWaitingForVisibleOutput) && (
               <div className="bubble" data-role="assistant">
                 {isWaitingForVisibleOutput ? (
                   <span
@@ -195,7 +198,7 @@ export function ChatView({
             </MessageScroller.Content>
           </MessageScroller.Viewport>
           <MessageScroller.Button direction="end" className="scroll-end-btn">
-            ↓
+            <span className="scroll-end-icon">↓</span>
           </MessageScroller.Button>
         </MessageScroller.Root>
       </MessageScroller.Provider>

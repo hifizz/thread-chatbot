@@ -191,6 +191,21 @@ export function createChatController(store: ThreadStore) {
         if (store.attachArtifactToMessage(threadId, msgId, seed) !== null)
           attachedArtifactCount++
       },
+      onWebResearchActivity(activity) {
+        if (settled || !isOwner()) return
+        // UI 必须把聚合面板插在 tool-input-start 的真实位置。先把此前按帧
+        // 缓冲的 text-delta 落进消息，store 才能记录准确的正文字符偏移。
+        doFlush()
+        store.setWebResearchActivity(threadId, msgId, activity)
+      },
+      onResearchRoute(route) {
+        if (settled || !isOwner()) return
+        store.setResearchRoute(threadId, msgId, route)
+      },
+      onResearchPlan(plan) {
+        if (settled || !isOwner()) return
+        store.setResearchPlan(threadId, msgId, plan)
+      },
       onError(message) {
         if (settled) return
         lastError = message // 不立即 settle：可能是瞬时噪声，正文还会继续到达（后到覆盖先到）
