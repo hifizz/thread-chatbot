@@ -24,6 +24,7 @@ const MODEL_FAMILY_ORDER = [
   "moonshotai",
   "deepseek",
   "x-ai",
+  "stealth",
   "minimax",
   "doubao",
 ] as const
