@@ -496,6 +496,7 @@ export class DrizzleConversationCommandStore
         turns: mappedTurns,
         messages: mappedMessages,
         forks: mappedForks,
+        generations: mappedGenerations,
       }),
     }
   }
@@ -700,7 +701,10 @@ export class DrizzleConversationCommandStore
         .where(eq(conversations.id, access.conversation.id))
       return {
         data: asJson({ conversationId: access.conversation.id, deleted: true }),
-        revisions: {},
+        // 删除响应仍携带 tombstone revision，客户端才能拒绝迟到的旧实体 delta。
+        revisions: {
+          [access.conversation.id]: access.conversation.revision + 1,
+        },
         delta: {
           upsert: {},
           remove: { conversations: [conversationId(access.conversation.id)] },
@@ -1780,6 +1784,7 @@ function deriveContextMessageIds(input: {
   readonly turns: readonly ConversationTurn[]
   readonly messages: readonly ConversationMessage[]
   readonly forks: readonly ThreadFork[]
+  readonly generations: readonly ConversationGeneration[]
 }): Readonly<Record<string, readonly MessageId[]>> {
   const forkByChild = new Map(
     input.forks.map((fork) => [fork.childThreadId, fork])
@@ -1800,10 +1805,43 @@ function deriveContextMessageIds(input: {
       turn.activeUserMessageId,
       turn.activeAssistantMessageId,
     ])
-  const memo = new Map<string, MessageId[]>()
+  const messagesById = new Map(
+    input.messages.map((message) => [message.id, message])
+  )
+  const turnsById = new Map(input.turns.map((turn) => [turn.id, turn]))
+  const generationByOutput = new Map(
+    input.generations.map((generation) => [
+      generation.outputMessageId,
+      generation,
+    ])
+  )
+  const localThroughSource = (
+    targetThreadId: ThreadId,
+    sourceMessageId: MessageId
+  ): MessageId[] => {
+    const source = messagesById.get(sourceMessageId)
+    const sourceTurn = source ? turnsById.get(source.turnId) : undefined
+    if (!source || !sourceTurn || source.threadId !== targetThreadId)
+      throw new ConversationCommandError(
+        "internal",
+        "ThreadFork 来源 Message 无法解析"
+      )
+    const before = (turnsByThread.get(targetThreadId) ?? [])
+      .filter((turn) => turn.position < sourceTurn.position)
+      .flatMap((turn) => [
+        turn.activeUserMessageId,
+        turn.activeAssistantMessageId,
+      ])
+    if (source.role === "user") return [...before, source.id]
+    const inputMessageId =
+      generationByOutput.get(source.id)?.inputMessageId ??
+      sourceTurn.activeUserMessageId
+    return [...before, inputMessageId, source.id]
+  }
+  const inheritedMemo = new Map<string, MessageId[]>()
   const visiting = new Set<string>()
-  const derive = (targetThreadId: ThreadId): MessageId[] => {
-    const cached = memo.get(targetThreadId)
+  const inherited = (targetThreadId: ThreadId): MessageId[] => {
+    const cached = inheritedMemo.get(targetThreadId)
     if (cached) return cached
     if (visiting.has(targetThreadId))
       throw new ConversationCommandError(
@@ -1812,23 +1850,20 @@ function deriveContextMessageIds(input: {
       )
     visiting.add(targetThreadId)
     const fork = forkByChild.get(targetThreadId)
-    let inherited: MessageId[] = []
-    if (fork) {
-      const parent = derive(fork.parentThreadId)
-      const sourceIndex = parent.indexOf(fork.sourceMessageId)
-      if (sourceIndex < 0)
-        throw new ConversationCommandError(
-          "internal",
-          "ThreadFork 来源不在父 Thread 当前上下文投影"
-        )
-      inherited = parent.slice(0, sourceIndex + 1)
-    }
-    const value = [...inherited, ...local(targetThreadId)]
+    const value = fork
+      ? [
+          ...inherited(fork.parentThreadId),
+          ...localThroughSource(fork.parentThreadId, fork.sourceMessageId),
+        ]
+      : []
     visiting.delete(targetThreadId)
-    memo.set(targetThreadId, value)
+    inheritedMemo.set(targetThreadId, value)
     return value
   }
   return Object.fromEntries(
-    input.threads.map((thread) => [thread.id, derive(thread.id)])
+    input.threads.map((thread) => [
+      thread.id,
+      [...inherited(thread.id), ...local(thread.id)],
+    ])
   )
 }

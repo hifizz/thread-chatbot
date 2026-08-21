@@ -520,7 +520,26 @@ try {
     generationId: stopInput.id,
   })
   assert.equal(repeatedStop?.status, "stopped")
-  assertions += 7
+  const [persistedStoppedMessage] = await db
+    .select({
+      content: conversationMessages.content,
+      contentState: conversationMessages.contentState,
+    })
+    .from(conversationMessages)
+    .where(eq(conversationMessages.id, stopInput.outputMessage.id))
+  assert.equal(persistedStoppedMessage?.contentState, "incomplete")
+  assert.ok(
+    persistedStoppedMessage?.content.parts.some(
+      (part) => part.type === "text" && part.text === "停止前已知内容"
+    )
+  )
+  assert.ok(
+    persistedStoppedMessage?.content.parts.some(
+      (part) =>
+        part.type === "structured" && part.kind === "research-activities"
+    )
+  )
+  assertions += 10
 
   // 无输出失败。
   const failureService = new CanonicalGenerationApplicationService(

@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation"
 import { isValidTreeId } from "@/lib/chat/tree-id"
 import { ThreadChatDemo } from "../thread-chat-demo"
+import { CanonicalThreadChat } from "../canonical/canonical-thread-chat"
 import { threadChatMetadata } from "../page-metadata"
 
 export const metadata = threadChatMetadata
@@ -17,5 +18,9 @@ export default async function ThreadChatTreePage({
 }) {
   const { treeId } = await params
   if (!isValidTreeId(treeId)) notFound()
-  return <ThreadChatDemo key={treeId} treeId={treeId} />
+  return process.env.CONVERSATION_CLIENT_AUTHORITY === "canonical" ? (
+    <CanonicalThreadChat key={treeId} id={treeId} />
+  ) : (
+    <ThreadChatDemo key={treeId} treeId={treeId} />
+  )
 }

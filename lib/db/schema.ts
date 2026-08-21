@@ -8,6 +8,7 @@ import {
   boolean,
   vector,
   primaryKey,
+  foreignKey,
 } from "drizzle-orm/pg-core"
 import { sql } from "drizzle-orm"
 import { dbSchema } from "./pg-schema"
@@ -259,6 +260,50 @@ export const conversationMessages = dbSchema.table(
     index("conversation_messages_variant_source_idx").on(
       table.variantOfMessageId
     ),
+  ]
+)
+
+export const conversationMessageFeedback = dbSchema.table(
+  "conversation_message_feedback",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    conversationId: text("conversation_id")
+      .notNull()
+      .references(() => conversations.id, { onDelete: "cascade" }),
+    threadId: text("thread_id").notNull(),
+    messageId: text("message_id").notNull(),
+    feedback: text("feedback").$type<MessageFeedback>().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    primaryKey({
+      name: "conversation_message_feedback_pk",
+      columns: [table.userId, table.conversationId, table.messageId],
+    }),
+    index("conversation_message_feedback_conversation_idx").on(
+      table.userId,
+      table.conversationId
+    ),
+    foreignKey({
+      name: "conversation_message_feedback_thread_fk",
+      columns: [table.threadId, table.conversationId],
+      foreignColumns: [
+        conversationThreads.id,
+        conversationThreads.conversationId,
+      ],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "conversation_message_feedback_message_fk",
+      columns: [table.messageId, table.threadId],
+      foreignColumns: [conversationMessages.id, conversationMessages.threadId],
+    }).onDelete("cascade"),
   ]
 )
 

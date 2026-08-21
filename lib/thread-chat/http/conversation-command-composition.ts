@@ -7,6 +7,8 @@ import type {
 import { ConversationCommandApplicationService } from "../application/conversation-command-service"
 import { generationId, type GenerationId } from "../domain/conversation-model"
 import { InMemoryGenerationAbortRegistry } from "../generation/canonical-generation-execution"
+import { CanonicalGenerationApplicationService } from "../generation/canonical-generation-execution"
+import { CanonicalAiGenerationExecutor } from "../generation/canonical-ai-generation-executor"
 import { DrizzleConversationCommandStore } from "../persistence/drizzle-conversation-command-store"
 import { DrizzleConversationGenerationRepository } from "../persistence/drizzle-conversation-generation-repository"
 import { DrizzleConversationOutboxDispatcher } from "../persistence/drizzle-conversation-outbox-dispatcher"
@@ -23,16 +25,6 @@ declare global {
   var __conversationOutboxConsumerOverride: OutboxEventConsumer | undefined
 }
 
-const defaultConsumer: OutboxEventConsumer = {
-  async consume(event) {
-    if (event.type === "GenerationRequested")
-      throw new Error(
-        "规范 Generation executor 尚未接入公开组合根；事件保留待重试"
-      )
-    // 审计/投影事件在没有外部消费者时可视为已处理；实体事务不依赖它。
-  },
-}
-
 function createComposition() {
   const policy = resolveConversationCommandApiPolicy()
   const store = new DrizzleConversationCommandStore(policy)
@@ -42,6 +34,34 @@ function createComposition() {
       process.env.BRANCH_GENERATION_AUTHORITY_ENABLED !== "false",
   })
   const abortRegistry = new InMemoryGenerationAbortRegistry()
+  const execution = new CanonicalGenerationApplicationService(
+    generations,
+    new CanonicalAiGenerationExecutor(store),
+    abortRegistry
+  )
+  const defaultConsumer: OutboxEventConsumer = {
+    async consume(event) {
+      if (event.type !== "GenerationRequested") return
+      const payload = event.payload as {
+        generationId?: unknown
+        ownerId?: unknown
+        leaseOwner?: unknown
+      }
+      if (
+        typeof payload.generationId !== "string" ||
+        typeof payload.ownerId !== "string" ||
+        typeof payload.leaseOwner !== "string"
+      )
+        throw new Error("GenerationRequested payload 无效")
+      const generation = await generations.getGeneration({
+        ownerId: payload.ownerId,
+        generationId: generationId(payload.generationId),
+      })
+      if (!generation)
+        throw new Error("GenerationRequested 指向不存在的 Generation")
+      await execution.executeExisting(generation, payload.leaseOwner)
+    },
+  }
   const dispatcher = new DrizzleConversationOutboxDispatcher(
     globalThis.__conversationOutboxConsumerOverride ?? defaultConsumer,
     `http:${randomUUID()}`

@@ -11,6 +11,7 @@ const { db } = await import("../lib/db/index.ts")
 const {
   conversationCommandRecords,
   conversationGenerations,
+  conversationMessageFeedback,
   conversationOutboxEvents,
   conversationThreads,
   user,
@@ -47,6 +48,8 @@ const { DrizzleConversationRepository } =
   await import("../lib/thread-chat/persistence/drizzle-conversation-repository.ts")
 const { assertConversationCommandApiEnabled } =
   await import("../lib/thread-chat/persistence/conversation-command-policy.ts")
+const { listCanonicalMessageFeedback, setCanonicalMessageFeedback } =
+  await import("../lib/thread-chat/persistence/canonical-message-feedback-repository.ts")
 
 const runId = randomUUID()
 const prefix = `command-api-test:${runId}`
@@ -803,6 +806,86 @@ try {
   )
   assertions += 6
 
+  assert.deepEqual(
+    await listCanonicalMessageFeedback({
+      userId: outsiderId,
+      conversationId: conversation,
+    }),
+    []
+  )
+  assert.deepEqual(
+    await setCanonicalMessageFeedback({
+      userId: outsiderId,
+      conversationId: conversation,
+      threadId: threadA,
+      messageId: sendA.assistantMessageId,
+      feedback: "positive",
+    }),
+    { ok: false, reason: "not_found" }
+  )
+  assert.deepEqual(
+    await setCanonicalMessageFeedback({
+      userId: ownerId,
+      conversationId: conversation,
+      threadId: root,
+      messageId: rootSend.assistantMessageId,
+      feedback: "positive",
+    }),
+    { ok: false, reason: "not_completed" }
+  )
+  const positive = await setCanonicalMessageFeedback({
+    userId: ownerId,
+    conversationId: conversation,
+    threadId: threadA,
+    messageId: sendA.assistantMessageId,
+    feedback: "positive",
+  })
+  assert.equal(positive.ok && positive.feedback?.feedback, "positive")
+  const negative = await setCanonicalMessageFeedback({
+    userId: ownerId,
+    conversationId: conversation,
+    threadId: threadA,
+    messageId: sendA.assistantMessageId,
+    feedback: "negative",
+  })
+  assert.equal(negative.ok && negative.feedback?.feedback, "negative")
+  const [feedbackCount] = await db
+    .select({ value: count(conversationMessageFeedback.messageId) })
+    .from(conversationMessageFeedback)
+    .where(eq(conversationMessageFeedback.conversationId, conversation))
+  assert.equal(feedbackCount?.value, 1)
+  assert.deepEqual(
+    await setCanonicalMessageFeedback({
+      userId: ownerId,
+      conversationId: conversation,
+      threadId: threadA,
+      messageId: sendA.assistantMessageId,
+      feedback: null,
+    }),
+    { ok: true, feedback: null }
+  )
+  assert.deepEqual(
+    await listCanonicalMessageFeedback({
+      userId: ownerId,
+      conversationId: conversation,
+    }),
+    []
+  )
+  await db
+    .delete(conversationGenerations)
+    .where(eq(conversationGenerations.id, sendA.generationId))
+  assert.deepEqual(
+    await setCanonicalMessageFeedback({
+      userId: ownerId,
+      conversationId: conversation,
+      threadId: threadA,
+      messageId: sendA.assistantMessageId,
+      feedback: "positive",
+    }),
+    { ok: false, reason: "missing_generation" }
+  )
+  assertions += 9
+
   const [commandCount] = await db
     .select({ value: count(conversationCommandRecords.id) })
     .from(conversationCommandRecords)
@@ -842,6 +925,7 @@ try {
     })
   )
   assert.deepEqual(deleted.delta.remove.conversations, [conversation])
+  assert.equal(deleted.revisions[conversation], 7)
   assert.equal(
     await service.getConversationSnapshot({
       actorUserId: ownerId,
@@ -849,7 +933,7 @@ try {
     }),
     null
   )
-  assertions += 5
+  assertions += 6
 
   console.log(
     JSON.stringify({
