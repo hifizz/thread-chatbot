@@ -20,7 +20,6 @@ import {
 } from "@/lib/thread-chat/client/conversation-client-gateway"
 import {
   createGenerationCoordinator,
-  type GenerationCoordinator,
 } from "@/lib/thread-chat/client/generation-coordinator"
 import {
   createNormalizedConversationStore,
@@ -40,6 +39,7 @@ import {
 } from "@/lib/thread-chat/client/ui-workspace"
 import {
   conversationId,
+  type ArtifactId,
   generationId,
   messageId,
   threadForkId,
@@ -92,6 +92,8 @@ export function CanonicalThreadChat({
   const [conversationTitleDraft, setConversationTitleDraft] = useState<
     string | null
   >(null)
+  const [selectedArtifactId, setSelectedArtifactId] =
+    useState<ArtifactId | null>(null)
   const [conversationList, setConversationList] = useState<
     Awaited<ReturnType<typeof gateway.listConversations>>
   >([])
@@ -222,6 +224,29 @@ export function CanonicalThreadChat({
     )
   const indexes = deriveConversationClientIndexes(state)
   const allThreads = indexes.threadIdsByConversation[targetId] ?? []
+  const watchGeneration = (
+    targetGenerationId: ReturnType<typeof generationId>
+  ) => {
+    let release = () => {}
+    release = coordinator.subscribe(targetGenerationId, () => {
+      const generation = canonicalGenerationRecord(
+        store.getState().generationsById[targetGenerationId]
+      )
+      if (
+        !generation ||
+        !["completed", "stopped", "failed", "superseded"].includes(
+          generation.status
+        )
+      )
+        return
+      release()
+      void gateway
+        .loadConversation(targetId)
+        .catch((cause) =>
+          setActionError(cause instanceof Error ? cause.message : String(cause))
+        )
+    })
+  }
   const send = async (targetThreadId: ThreadId, text: string) => {
     const ids = {
       turn: turnId(crypto.randomUUID()),
@@ -252,7 +277,7 @@ export function CanonicalThreadChat({
         }
       )
       workspaceStore.setDraft(targetThreadId, "")
-      coordinator.subscribe(ids.generation, () => {})
+      watchGeneration(ids.generation)
     } catch (cause) {
       setActionError(cause instanceof Error ? cause.message : String(cause))
     }
@@ -473,7 +498,7 @@ export function CanonicalThreadChat({
                 void gateway.stopGeneration(targetGenerationId)
               }
               gateway={gateway}
-              coordinator={coordinator}
+              watchGeneration={watchGeneration}
               feedbackByMessageId={feedbackByMessageId}
               onFeedback={async (message, feedback) => {
                 const saved = await gateway.setMessageFeedback({
@@ -495,10 +520,33 @@ export function CanonicalThreadChat({
                   cause instanceof Error ? cause.message : String(cause)
                 )
               }
+              onOpenArtifact={setSelectedArtifactId}
             />
           ))}
         </div>
       )}
+      {selectedArtifactId &&
+        state.artifactProvenanceById[selectedArtifactId] && (
+          <aside
+            className="canonical-artifact-drawer"
+            role="dialog"
+            aria-label="Markdown Artifact"
+          >
+            <header>
+              <strong>
+                {state.artifactProvenanceById[selectedArtifactId]!.title}
+              </strong>
+              <button onClick={() => setSelectedArtifactId(null)}>关闭</button>
+            </header>
+            <div className="canonical-artifact-body">
+              <MarkdownBody
+                source={
+                  state.artifactProvenanceById[selectedArtifactId]!.content
+                }
+              />
+            </div>
+          </aside>
+        )}
     </div>
   )
 }
@@ -512,11 +560,12 @@ function CanonicalColumn({
   onFork,
   onStop,
   gateway,
-  coordinator,
+  watchGeneration,
   feedbackByMessageId,
   onFeedback,
   runAction,
   onActionError,
+  onOpenArtifact,
 }: {
   threadId: ThreadId
   state: ReturnType<
@@ -528,7 +577,7 @@ function CanonicalColumn({
   onFork: (message: ConversationMessage, quote?: string) => void
   onStop: (id: ReturnType<typeof generationId>) => void
   gateway: ConversationClientGateway
-  coordinator: GenerationCoordinator
+  watchGeneration: (id: ReturnType<typeof generationId>) => void
   feedbackByMessageId: Readonly<Record<string, MessageFeedback>>
   onFeedback: (
     message: ConversationMessage,
@@ -536,6 +585,7 @@ function CanonicalColumn({
   ) => Promise<void>
   runAction: (action: Promise<unknown>) => void
   onActionError: (cause: unknown) => void
+  onOpenArtifact: (id: ArtifactId) => void
 }) {
   const [threadTitleDraft, setThreadTitleDraft] = useState<string | null>(null)
   const thread = state.threadsById[targetThreadId]!
@@ -623,7 +673,6 @@ function CanonicalColumn({
             message={message}
             onFork={onFork}
             state={state}
-            onOpen={onOpen}
             onEdit={async (source, text) => {
               const nextGenerationId = generationId(crypto.randomUUID())
               await gateway.editTurnInput(source.turnId, {
@@ -635,7 +684,7 @@ function CanonicalColumn({
                 content: { schemaVersion: 1, parts: [{ type: "text", text }] },
                 modelId: thread.modelId,
               })
-              coordinator.subscribe(nextGenerationId, () => {})
+              watchGeneration(nextGenerationId)
             }}
             onRegenerate={async (source) => {
               const nextGenerationId = generationId(crypto.randomUUID())
@@ -646,7 +695,7 @@ function CanonicalColumn({
                 sourceAssistantMessageId: source.id,
                 modelId: thread.modelId,
               })
-              coordinator.subscribe(nextGenerationId, () => {})
+              watchGeneration(nextGenerationId)
             }}
             onSelect={(source) =>
               runAction(
@@ -660,6 +709,7 @@ function CanonicalColumn({
             feedback={feedbackByMessageId[message.id] ?? null}
             onFeedback={(feedback) => runAction(onFeedback(message, feedback))}
             onActionError={onActionError}
+            onOpenArtifact={onOpenArtifact}
           />
         ))}
       </div>
@@ -682,26 +732,26 @@ function CanonicalMessage({
   message,
   onFork,
   state,
-  onOpen,
   onEdit,
   onRegenerate,
   onSelect,
   feedback,
   onFeedback,
   onActionError,
+  onOpenArtifact,
 }: {
   message: ConversationMessage
   onFork: (message: ConversationMessage, quote?: string) => void
   state: ReturnType<
     ReturnType<typeof createNormalizedConversationStore>["getState"]
   >
-  onOpen: (id: ThreadId) => void
   onEdit: (message: ConversationMessage, text: string) => Promise<void>
   onRegenerate: (message: ConversationMessage) => Promise<void>
   onSelect: (message: ConversationMessage) => void
   feedback: MessageFeedback | null
   onFeedback: (feedback: MessageFeedback | null) => void
   onActionError: (cause: unknown) => void
+  onOpenArtifact: (id: ArtifactId) => void
 }) {
   const [selection, setSelection] = useState("")
   const [copied, setCopied] = useState(false)
@@ -762,10 +812,7 @@ function CanonicalMessage({
             <button
               className="canonical-artifact"
               key={part.artifactId}
-              onClick={() => {
-                const provenance = state.artifactProvenanceById[part.artifactId]
-                onOpen(provenance?.sourceThreadId ?? message.threadId)
-              }}
+              onClick={() => onOpenArtifact(part.artifactId)}
             >
               Artifact ·{" "}
               {state.artifactProvenanceById[part.artifactId]?.title ??

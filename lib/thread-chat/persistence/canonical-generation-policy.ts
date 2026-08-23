@@ -14,13 +14,8 @@ export function resolveCanonicalGenerationPolicy(
 ): CanonicalGenerationPolicy {
   const deployment = resolveConversationAuthority(environment)
   return {
-    authority:
-      deployment.authority === "canonical"
-        ? deployment.isolatedTest
-          ? "isolated-test"
-          : "canonical"
-        : "disabled",
-    legacyAuthorityEnabled: deployment.authority === "legacy",
+    authority: deployment.isolatedTest ? "isolated-test" : "canonical",
+    legacyAuthorityEnabled: false,
   }
 }
 
@@ -43,6 +38,6 @@ export function assertCanonicalGenerationEnabled(
   if (policy.authority === "canonical" && policy.legacyAuthorityEnabled)
     throw new CanonicalGenerationServiceError(
       "forbidden",
-      "同一次执行不能同时启用规范与 branch_generations 权威"
+      "同一次执行不能同时启用规范与已退役 Generation 权威"
     )
 }

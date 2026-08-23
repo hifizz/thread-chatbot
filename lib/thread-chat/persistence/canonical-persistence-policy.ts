@@ -14,13 +14,8 @@ export function resolveCanonicalPersistencePolicy(
 ): CanonicalPersistencePolicy {
   const deployment = resolveConversationAuthority(environment)
   return {
-    writeMode:
-      deployment.authority === "canonical"
-        ? deployment.isolatedTest
-          ? "isolated-test"
-          : "canonical"
-        : "disabled",
-    legacyWritesEnabled: deployment.authority === "legacy",
+    writeMode: deployment.isolatedTest ? "isolated-test" : "canonical",
+    legacyWritesEnabled: false,
   }
 }
 

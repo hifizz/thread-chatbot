@@ -14,13 +14,8 @@ export function resolveConversationCommandApiPolicy(
 ): ConversationCommandApiPolicy {
   const deployment = resolveConversationAuthority(environment)
   return {
-    authority:
-      deployment.authority === "canonical"
-        ? deployment.isolatedTest
-          ? "isolated-test"
-          : "canonical"
-        : "disabled",
-    legacyAuthorityEnabled: deployment.authority === "legacy",
+    authority: deployment.isolatedTest ? "isolated-test" : "canonical",
+    legacyAuthorityEnabled: false,
   }
 }
 

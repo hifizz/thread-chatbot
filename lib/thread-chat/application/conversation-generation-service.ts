@@ -5,6 +5,7 @@ import type {
 } from "../domain/conversation-generation"
 import type {
   ConversationGeneration,
+  ArtifactId,
   ConversationId,
   ConversationMessage,
   GenerationBillingStatus,
@@ -41,6 +42,15 @@ export interface CanonicalGenerationRecord extends ConversationGeneration {
   readonly startedAt: string
   readonly finishedAt: string | null
   readonly errorCode: string | null
+}
+
+export interface CanonicalArtifactWriter {
+  persistMarkdownArtifact(input: {
+    readonly generation: CanonicalGenerationRecord
+    readonly artifactId: ArtifactId
+    readonly title: string
+    readonly content: string
+  }): Promise<void>
 }
 
 export interface StartCanonicalGenerationInput {

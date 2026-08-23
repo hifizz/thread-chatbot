@@ -201,6 +201,8 @@ export interface ConversationArtifactProvenance {
   readonly sourceMessageId: MessageId
   readonly title: string
   readonly kind: string
+  readonly lang: string | null
+  readonly content: string
 }
 
 export interface ProjectInstructionVersion {

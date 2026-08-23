@@ -5,6 +5,7 @@ import { chargeUsageOnce } from "../../billing/credits"
 import { db } from "../../db"
 import {
   conversationGenerations,
+  conversationArtifacts,
   conversationMessages,
   conversationThreads,
   conversationTurns,
@@ -14,6 +15,7 @@ import {
 } from "../../db/schema"
 import type {
   CanonicalGenerationRecord,
+  CanonicalArtifactWriter,
   CanonicalGenerationRepository,
   FinalizeCanonicalGenerationInput,
   StartCanonicalGenerationInput,
@@ -169,13 +171,77 @@ async function lockGeneration(
   return row ?? null
 }
 
-export class DrizzleConversationGenerationRepository implements CanonicalGenerationRepository {
+export class DrizzleConversationGenerationRepository
+  implements CanonicalGenerationRepository, CanonicalArtifactWriter
+{
   readonly policy: CanonicalGenerationPolicy
 
   constructor(
     policy: CanonicalGenerationPolicy = resolveCanonicalGenerationPolicy()
   ) {
     this.policy = policy
+  }
+
+  async persistMarkdownArtifact(
+    input: Parameters<CanonicalArtifactWriter["persistMarkdownArtifact"]>[0]
+  ): Promise<void> {
+    assertCanonicalGenerationEnabled(this.policy)
+    await db.transaction(async (transaction) => {
+      const [generation] = await transaction
+        .select({
+          id: conversationGenerations.id,
+          conversationId: conversationGenerations.conversationId,
+          threadId: conversationGenerations.threadId,
+          outputMessageId: conversationGenerations.outputMessageId,
+          ownerId: conversationGenerations.ownerId,
+        })
+        .from(conversationGenerations)
+        .where(eq(conversationGenerations.id, input.generation.id))
+        .limit(1)
+      if (
+        !generation ||
+        generation.ownerId !== input.generation.ownerId ||
+        generation.conversationId !== input.generation.conversationId ||
+        generation.threadId !== input.generation.threadId ||
+        generation.outputMessageId !== input.generation.outputMessageId
+      )
+        throw new CanonicalGenerationServiceError(
+          "invalid_identity",
+          "Artifact 来源必须匹配同一 Generation 的输出 Message"
+        )
+
+      await transaction
+        .insert(conversationArtifacts)
+        .values({
+          id: input.artifactId,
+          conversationId: input.generation.conversationId,
+          sourceThreadId: input.generation.threadId,
+          sourceMessageId: input.generation.outputMessageId,
+          title: input.title,
+          kind: "markdown",
+          lang: "markdown",
+          content: input.content,
+        })
+        .onConflictDoNothing()
+      const [persisted] = await transaction
+        .select()
+        .from(conversationArtifacts)
+        .where(eq(conversationArtifacts.id, input.artifactId))
+        .limit(1)
+      if (
+        !persisted ||
+        persisted.conversationId !== input.generation.conversationId ||
+        persisted.sourceThreadId !== input.generation.threadId ||
+        persisted.sourceMessageId !== input.generation.outputMessageId ||
+        persisted.title !== input.title ||
+        persisted.kind !== "markdown" ||
+        persisted.content !== input.content
+      )
+        throw new CanonicalGenerationServiceError(
+          "idempotency_conflict",
+          "Artifact ID 已绑定不同内容或来源"
+        )
+    })
   }
 
   async startGeneration(

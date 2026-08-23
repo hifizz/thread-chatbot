@@ -182,6 +182,8 @@ function fixture() {
         sourceMessageId: messageId("message-1-assistant"),
         title: "规范 Artifact",
         kind: "markdown",
+        lang: "markdown",
+        content: "# 规范 Artifact\n\n规范内容",
       },
     },
   }

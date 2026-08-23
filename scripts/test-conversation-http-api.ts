@@ -22,8 +22,11 @@ if (!password)
 
 const { db } = await import("../lib/db/index.ts")
 const {
+  conversationArtifacts,
   conversationCommandRecords,
+  conversationGenerations,
   conversationOutboxEvents,
+  conversations,
   projects,
   usageRecords,
   user,
@@ -41,12 +44,18 @@ const turnId = `${prefix}:turn:1`
 const userMessageId = `${prefix}:message:user`
 const assistantMessageId = `${prefix}:message:assistant`
 const generationId = `${prefix}:generation`
+const artifactTurnId = `${prefix}:turn:artifact`
+const artifactUserMessageId = `${prefix}:message:artifact:user`
+const artifactAssistantMessageId = `${prefix}:message:artifact:assistant`
+const artifactGenerationId = `${prefix}:generation:artifact`
 const commandIds: string[] = []
 const aggregateIds = [
   conversationId,
   rootThreadId,
   turnId,
   generationId,
+  artifactTurnId,
+  artifactGenerationId,
 ]
 let cookie = ""
 let assertions = 0
@@ -105,7 +114,8 @@ function commandHeaders(
 function errorCode(body: unknown): string | undefined {
   if (!body || typeof body !== "object" || !("error" in body)) return undefined
   const error = body.error
-  if (!error || typeof error !== "object" || !("code" in error)) return undefined
+  if (!error || typeof error !== "object" || !("code" in error))
+    return undefined
   return typeof error.code === "string" ? error.code : undefined
 }
 
@@ -117,10 +127,12 @@ function responseData(body: unknown): Record<string, unknown> | undefined {
     : undefined
 }
 
-async function waitForGeneration(): Promise<Record<string, unknown>> {
+async function waitForGeneration(
+  targetGenerationId = generationId
+): Promise<Record<string, unknown>> {
   const deadline = Date.now() + 120_000
   while (Date.now() < deadline) {
-    const result = await api(`/api/generations/${generationId}`)
+    const result = await api(`/api/generations/${targetGenerationId}`)
     assert.equal(result.response.status, 200)
     const generation = responseData(result.body)?.generation
     assert.ok(generation && typeof generation === "object")
@@ -186,9 +198,12 @@ try {
     lifecycle: "active",
   })
 
-  const unauthenticated = await api(`/api/projects/${projectId}/conversations`, {
-    authenticated: false,
-  })
+  const unauthenticated = await api(
+    `/api/projects/${projectId}/conversations`,
+    {
+      authenticated: false,
+    }
+  )
   assert.equal(unauthenticated.response.status, 401)
   assert.equal(errorCode(unauthenticated.body), "unauthenticated")
   assertions += 2
@@ -210,6 +225,25 @@ try {
   assert.equal(responseData(created.body)?.replayed, undefined)
   assert.equal((created.body as { replayed?: unknown }).replayed, false)
   assertions += 4
+
+  const bootstrapped = await api("/api/conversations/bootstrap", {
+    method: "POST",
+    headers: commandHeaders("bootstrap"),
+  })
+  assert.equal(
+    bootstrapped.response.status,
+    200,
+    JSON.stringify(bootstrapped.body)
+  )
+  const bootstrappedConversationId = responseData(
+    bootstrapped.body
+  )?.conversationId
+  assert.equal(typeof bootstrappedConversationId, "string")
+  const bootstrappedSnapshot = await api(
+    `/api/conversations/${bootstrappedConversationId}`
+  )
+  assert.equal(bootstrappedSnapshot.response.status, 200)
+  assertions += 3
 
   const replayed = await api(`/api/projects/${projectId}/conversations`, {
     method: "POST",
@@ -309,6 +343,57 @@ try {
       assistantMessageId
     )
     assertions += 3
+
+    const artifactSent = await api(`/api/threads/${rootThreadId}/turns`, {
+      method: "POST",
+      headers: commandHeaders("send-artifact", 1),
+      body: {
+        conversationId,
+        turnId: artifactTurnId,
+        userMessageId: artifactUserMessageId,
+        assistantMessageId: artifactAssistantMessageId,
+        generationId: artifactGenerationId,
+        content: {
+          schemaVersion: 1,
+          parts: [
+            {
+              type: "text",
+              text: "请创建一个 Markdown 文档，只包含标题：# Canonical Artifact 验收",
+            },
+          ],
+        },
+        modelId: "glm-5.3",
+      },
+    })
+    assert.equal(
+      artifactSent.response.status,
+      200,
+      JSON.stringify(artifactSent.body)
+    )
+    const artifactGeneration = await waitForGeneration(artifactGenerationId)
+    assert.equal(
+      artifactGeneration.status,
+      "completed",
+      JSON.stringify(artifactGeneration)
+    )
+    const artifactCheckpoint = artifactGeneration.checkpoint as
+      { artifactIds?: unknown } | undefined
+    assert.ok(
+      Array.isArray(artifactCheckpoint?.artifactIds) &&
+        artifactCheckpoint.artifactIds.length === 1,
+      JSON.stringify(artifactGeneration)
+    )
+    const artifactSnapshot = await api(`/api/conversations/${conversationId}`)
+    const artifactProvenance = (
+      responseData(artifactSnapshot.body)?.snapshot as
+        | { artifactProvenance?: Record<string, { content?: unknown }> }
+        | undefined
+    )?.artifactProvenance
+    assert.match(
+      String(Object.values(artifactProvenance ?? {})[0]?.content ?? ""),
+      /Canonical Artifact 验收/
+    )
+    assertions += 4
   }
 
   const deleted = await api(`/api/conversations/${conversationId}`, {
@@ -343,7 +428,19 @@ try {
       .where(inArray(conversationCommandRecords.id, commandIds))
   await db
     .delete(usageRecords)
-    .where(eq(usageRecords.appGenerationId, generationId))
+    .where(
+      inArray(usageRecords.appGenerationId, [
+        generationId,
+        artifactGenerationId,
+      ])
+    )
+  await db
+    .delete(conversationArtifacts)
+    .where(eq(conversationArtifacts.conversationId, conversationId))
+  await db
+    .delete(conversationGenerations)
+    .where(eq(conversationGenerations.conversationId, conversationId))
+  await db.delete(conversations).where(eq(conversations.id, conversationId))
   await db.delete(workspaces).where(eq(workspaces.id, workspaceId))
   await globalThis.__dbClient?.end({ timeout: 5 })
 }

@@ -174,6 +174,8 @@ function mapArtifact(
     sourceMessageId: messageId(row.sourceMessageId),
     title: row.title,
     kind: row.kind,
+    lang: row.lang,
+    content: row.content,
   }
 }
 

@@ -228,6 +228,8 @@ const artifactSchema = z
     sourceMessageId: id,
     title: z.string(),
     kind: z.string(),
+    lang: z.string().nullable(),
+    content: z.string(),
   })
   .strict()
 

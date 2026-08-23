@@ -13,18 +13,12 @@ const sql = postgres(databaseUrl, { max: 1, prepare: false })
 try {
   const [row] = await sql<
     readonly {
-      legacy_active_generations: number
-      legacy_pending_billing: number
       canonical_active_generations: number
       canonical_pending_billing: number
       canonical_pending_outbox: number
     }[]
   >`
     SELECT
-      (SELECT count(*)::int FROM thread_chat.branch_generations
-        WHERE status IN ('running', 'stop_requested')) AS legacy_active_generations,
-      (SELECT count(*)::int FROM thread_chat.branch_generations
-        WHERE billing_status = 'pending') AS legacy_pending_billing,
       (SELECT count(*)::int FROM thread_chat.conversation_generations
         WHERE status IN ('running', 'stop_requested')) AS canonical_active_generations,
       (SELECT count(*)::int FROM thread_chat.conversation_generations
@@ -34,8 +28,8 @@ try {
   `
   if (!row) throw new Error("无法读取 Conversation drain 状态")
   const report = evaluateConversationCutoverDrain({
-    legacyActiveGenerations: row.legacy_active_generations,
-    legacyPendingBilling: row.legacy_pending_billing,
+    legacyActiveGenerations: 0,
+    legacyPendingBilling: 0,
     canonicalActiveGenerations: row.canonical_active_generations,
     canonicalPendingBilling: row.canonical_pending_billing,
     canonicalPendingOutbox: row.canonical_pending_outbox,

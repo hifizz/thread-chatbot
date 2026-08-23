@@ -1,7 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 
-import { THREAD_TREE_SCHEMA_VERSION } from "../../../constants/thread-chat.ts"
 import {
   conversationId,
   generationId,
@@ -22,150 +21,147 @@ import {
   assertValidConversationSnapshot,
   validateConversationSnapshot,
 } from "./conversation-validation.ts"
-import type { ThreadTreeState } from "./types.ts"
-import { projectLegacyThreadTree } from "../legacy/project-thread-tree.ts"
 
 const WORKSPACE_ID = workspaceId("workspace-fixture")
 const PROJECT_ID = projectId("project-fixture")
 const CONVERSATION_ID = conversationId("conversation-fixture")
 
-function legacyFixture(): ThreadTreeState {
+function canonicalFixture(): ConversationSnapshot {
+  const root = threadId("canonical:thread:root")
+  const branchA = threadId("canonical:thread:A")
+  const branchB = threadId("canonical:thread:B")
+  const rootTurn = turnId("canonical:turn:root")
+  const aTurn = turnId("canonical:turn:A")
+  const bTurn = turnId("canonical:turn:B")
+  const rootUser = messageId("canonical:message:root:user")
+  const rootAssistant = messageId("canonical:message:root:assistant")
+  const aUser = messageId("canonical:message:A:user")
+  const aAssistant = messageId("canonical:message:A:assistant")
+  const bUser = messageId("canonical:message:B:user")
+  const bAssistant1 = messageId("canonical:message:B:assistant:1")
+  const bAssistant2 = messageId("canonical:message:B:assistant:2")
+  const content = (text: string) => ({
+    schemaVersion: 1 as const,
+    parts: [{ type: "text" as const, text }],
+  })
+  const createdAt = "1970-01-01T00:00:00.000Z"
   return {
-    schemaVersion: THREAD_TREE_SCHEMA_VERSION,
-    threads: {
-      main: {
-        id: "main",
-        modelId: "ark-glm-5.3",
-        parentId: null,
-        depth: 0,
-        title: "遗留根标题",
-        anchorText: null,
-        forkFromMsgId: null,
-        footnote: null,
-        children: ["A"],
-        messages: [
-          {
-            id: "root-user",
-            parentMessageId: null,
-            role: "user",
-            text: "根问题",
-            forks: [],
-          },
-          {
-            id: "root-assistant",
-            parentMessageId: "root-user",
-            role: "assistant",
-            text: "根回答",
-            forks: [
-              {
-                text: "根回答",
-                num: 1,
-                threadId: "A",
-                depth: 1,
-              },
-            ],
-          },
-        ],
-        activeLeafMessageId: "root-assistant",
-        lastActive: 1,
+    schemaVersion: 1,
+    project: {
+      id: PROJECT_ID,
+      workspaceId: WORKSPACE_ID,
+      title: "测试 Project",
+      revision: 0,
+      lifecycle: "active",
+    },
+    conversation: {
+      id: CONVERSATION_ID,
+      projectId: PROJECT_ID,
+      rootThreadId: root,
+      autoTitle: "自动标题",
+      customTitle: null,
+      revision: 0,
+      lifecycle: "active",
+    },
+    threads: Object.fromEntries(
+      [
+        [root, null],
+        [branchA, "分支 A"],
+        [branchB, "分支 B"],
+      ].map(([id, localTitle]) => [
+        id,
+        {
+          id,
+          conversationId: CONVERSATION_ID,
+          modelId: "glm-5.3",
+          localTitle,
+          revision: 0,
+          lifecycle: "active" as const,
+        },
+      ])
+    ),
+    threadForks: {
+      "canonical:fork:A": {
+        id: threadForkId("canonical:fork:A"),
+        conversationId: CONVERSATION_ID,
+        parentThreadId: root,
+        sourceMessageId: rootAssistant,
+        childThreadId: branchA,
+        createdBy: "fixture-user",
+        createdAt,
       },
-      A: {
-        id: "A",
-        modelId: "ark-glm-5.3",
-        parentId: "main",
-        depth: 1,
-        title: "分支 A",
-        anchorText: "根回答",
-        forkFromMsgId: "root-assistant",
-        footnote: 1,
-        children: ["B"],
-        messages: [
-          {
-            id: "a-user",
-            parentMessageId: null,
-            role: "user",
-            text: "A 问题",
-            forks: [],
-          },
-          {
-            id: "a-assistant",
-            parentMessageId: "a-user",
-            role: "assistant",
-            text: "A 回答",
-            forks: [
-              {
-                text: "A 回答",
-                num: 2,
-                threadId: "B",
-                depth: 2,
-              },
-            ],
-          },
-        ],
-        activeLeafMessageId: "a-assistant",
-        lastActive: 2,
-      },
-      B: {
-        id: "B",
-        modelId: "ark-glm-5.3",
-        parentId: "A",
-        depth: 2,
-        title: "分支 B",
-        anchorText: "A 回答",
-        forkFromMsgId: "a-assistant",
-        footnote: 2,
-        children: [],
-        messages: [
-          {
-            id: "b-user",
-            parentMessageId: null,
-            role: "user",
-            text: "B 问题",
-            forks: [],
-          },
-          {
-            id: "b-assistant-1",
-            parentMessageId: "b-user",
-            role: "assistant",
-            text: "B 初始回答",
-            forks: [],
-          },
-          {
-            id: "b-assistant-2",
-            parentMessageId: "b-user",
-            role: "assistant",
-            text: "B 重新生成回答",
-            forks: [],
-          },
-        ],
-        activeLeafMessageId: "b-assistant-2",
-        lastActive: 3,
+      "canonical:fork:B": {
+        id: threadForkId("canonical:fork:B"),
+        conversationId: CONVERSATION_ID,
+        parentThreadId: branchA,
+        sourceMessageId: aAssistant,
+        childThreadId: branchB,
+        createdBy: "fixture-user",
+        createdAt,
       },
     },
-    artifacts: {},
-    artifactOrder: [],
-    recents: ["B", "A"],
-    footnoteCounter: 2,
-    seq: 20,
-    tick: 3,
+    turns: {
+      [rootTurn]: {
+        id: rootTurn,
+        threadId: root,
+        position: 0,
+        activeUserMessageId: rootUser,
+        activeAssistantMessageId: rootAssistant,
+        revision: 0,
+      },
+      [aTurn]: {
+        id: aTurn,
+        threadId: branchA,
+        position: 0,
+        activeUserMessageId: aUser,
+        activeAssistantMessageId: aAssistant,
+        revision: 0,
+      },
+      [bTurn]: {
+        id: bTurn,
+        threadId: branchB,
+        position: 0,
+        activeUserMessageId: bUser,
+        activeAssistantMessageId: bAssistant2,
+        revision: 1,
+      },
+    },
+    messages: Object.fromEntries(
+      [
+        [rootUser, root, rootTurn, "user", "根问题", undefined],
+        [rootAssistant, root, rootTurn, "assistant", "根回答", undefined],
+        [aUser, branchA, aTurn, "user", "A 问题", undefined],
+        [aAssistant, branchA, aTurn, "assistant", "A 回答", undefined],
+        [bUser, branchB, bTurn, "user", "B 问题", undefined],
+        [bAssistant1, branchB, bTurn, "assistant", "B 初始回答", undefined],
+        [
+          bAssistant2,
+          branchB,
+          bTurn,
+          "assistant",
+          "B 重新生成回答",
+          bAssistant1,
+        ],
+      ].map(([id, targetThread, targetTurn, role, text, variant]) => [
+        id,
+        {
+          id,
+          threadId: targetThread,
+          turnId: targetTurn,
+          role,
+          content: content(text as string),
+          contentState: "complete" as const,
+          ...(variant ? { variantOfMessageId: variant } : {}),
+          createdAt,
+        },
+      ])
+    ) as ConversationSnapshot["messages"],
+    generations: {},
+    artifactProvenance: {},
   }
 }
 
-function canonicalFixture(): ConversationSnapshot {
-  return projectLegacyThreadTree({
-    legacyTreeId: "legacy-fixture",
-    workspaceId: WORKSPACE_ID,
-    projectId: PROJECT_ID,
-    conversationId: CONVERSATION_ID,
-    projectTitle: "测试 Project",
-    conversationAutoTitle: "自动标题",
-    conversationCustomTitle: null,
-    actorId: "fixture-user",
-    state: legacyFixture(),
-  })
-}
-
-test("单向投影产生合法的 Project → Conversation → Thread 快照", () => {
+test("A → B → C 规范实体产生合法的 Project → Conversation → Thread 快照", () => {
   const snapshot = canonicalFixture()
   assert.doesNotThrow(() => assertValidConversationSnapshot(snapshot))
   assert.equal(Object.keys(snapshot.threads).length, 3)

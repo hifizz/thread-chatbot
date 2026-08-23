@@ -5,7 +5,7 @@
 export const ROUTES = {
   landing: "/",
   startChat: "/start-chat",
-  flagship: "/thread-chat", // 旗舰跳板（裸路径 → /thread-chat/{uuid}）
+  flagship: "/thread-chat", // 旗舰跳板（canonical bootstrap → Conversation URL）
   signIn: "/sign-in",
   account: "/account",
 } as const
@@ -18,9 +18,4 @@ export const DEFAULT_AUTHED_REDIRECT: string = ROUTES.flagship
 /** 构造带回跳的登录地址（redirect 目标做 URL 编码）。 */
 export function signInWithRedirect(target: string): string {
   return `${ROUTES.signIn}?redirect=${encodeURIComponent(target)}`
-}
-
-/** 构造指定分支树的工作台路由；UUID 合法性由目标页面统一校验。 */
-export function threadTreeRoute(treeId: string): `/thread-chat/${string}` {
-  return `/thread-chat/${treeId}`
 }

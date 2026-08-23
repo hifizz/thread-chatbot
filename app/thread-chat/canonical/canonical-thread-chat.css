@@ -125,3 +125,34 @@
   min-height: 0;
   width: 100%;
 }
+.canonical-artifact-drawer {
+  position: fixed;
+  inset: 64px 24px 24px auto;
+  z-index: 40;
+  display: flex;
+  width: min(680px, calc(100vw - 48px));
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--paper);
+  border: 1px solid var(--rule-strong);
+  border-radius: 10px;
+  box-shadow: 0 20px 60px #0003;
+}
+.canonical-artifact-drawer > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--rule);
+}
+.canonical-artifact-drawer > header button {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.canonical-artifact-body {
+  min-height: 0;
+  overflow: auto;
+  padding: 20px;
+}

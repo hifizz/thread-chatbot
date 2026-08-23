@@ -36,7 +36,7 @@ function createComposition() {
   const abortRegistry = new InMemoryGenerationAbortRegistry()
   const execution = new CanonicalGenerationApplicationService(
     generations,
-    new CanonicalAiGenerationExecutor(store),
+    new CanonicalAiGenerationExecutor(store, generations),
     abortRegistry
   )
   const defaultConsumer: OutboxEventConsumer = {

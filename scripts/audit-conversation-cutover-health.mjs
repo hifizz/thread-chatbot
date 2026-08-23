@@ -30,6 +30,29 @@ function legacyRuntimeReferenceCount() {
   return result.stdout.split("\n").filter(Boolean).length
 }
 
+async function legacyTableState() {
+  const tableNames = [
+    "branch_trees",
+    "branch_generations",
+    "branch_message_feedback",
+    "legacy_conversation_entity_mappings",
+  ]
+  const rows = {}
+  for (const table of tableNames) {
+    const [relation] = await sql`
+      SELECT to_regclass(${`thread_chat.${table}`})::text AS name`
+    if (!relation?.name) {
+      rows[table] = { present: false, count: 0 }
+      continue
+    }
+    const [count] = await sql.unsafe(
+      `SELECT count(*)::int AS value FROM thread_chat."${table}"`
+    )
+    rows[table] = { present: true, count: count.value }
+  }
+  return rows
+}
+
 try {
   const generationStatus = await sql`
     SELECT status, billing_status, usage_completeness,
@@ -43,8 +66,9 @@ try {
       count(*) FILTER (WHERE status IN ('running', 'stop_requested'))::int AS active,
       count(*) FILTER (WHERE billing_status = 'pending')::int AS pending_billing,
       count(*) FILTER (WHERE status IN ('completed', 'stopped') AND checkpoint_version = 0)::int AS terminal_without_checkpoint,
-      count(*) FILTER (WHERE status IN ('completed', 'stopped') AND content_state <> 'complete')::int AS completed_or_stopped_with_incomplete_content,
-      count(*) FILTER (WHERE status IN ('failed', 'superseded') AND finished_at IS NULL)::int AS terminal_without_finished_at
+      count(*) FILTER (WHERE status = 'completed' AND content_state <> 'complete')::int AS completed_with_incomplete_content,
+      count(*) FILTER (WHERE status = 'stopped' AND content_state NOT IN ('incomplete', 'failed'))::int AS stopped_with_invalid_content_state,
+      count(*) FILTER (WHERE status IN ('completed', 'stopped', 'failed', 'superseded') AND finished_at IS NULL)::int AS terminal_without_finished_at
     FROM thread_chat.conversation_generations`
   const outbox = await sql`
     SELECT status, count(*)::int AS count,
@@ -66,11 +90,7 @@ try {
     FROM thread_chat.usage_records u
     FULL JOIN thread_chat.conversation_generations g
       ON g.id = u.app_generation_id`
-  const [legacy] = await sql`
-    SELECT
-      (SELECT count(*)::int FROM thread_chat.branch_trees) AS trees,
-      (SELECT count(*)::int FROM thread_chat.branch_generations) AS generations,
-      (SELECT count(*)::int FROM thread_chat.branch_message_feedback) AS feedback`
+  const legacy = await legacyTableState()
   const [statExtension] = await sql`
     SELECT EXISTS (
       SELECT 1 FROM pg_extension WHERE extname = 'pg_stat_statements'
