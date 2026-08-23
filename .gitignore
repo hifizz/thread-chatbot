@@ -37,6 +37,10 @@ pnpm-debug.log*
 next-env.d.ts
 .gstack/
 
+# local cutover evidence and database dumps (never commit)
+/.local-backups/
+/.local-cutover/
+
 # thread-chat e2e 验收脚本的截图输出
 e2e/thread-chat/shots/
 .vercel

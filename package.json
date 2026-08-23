@@ -23,6 +23,7 @@
     "test:conversation-authority": "tsx --test lib/thread-chat/cutover/conversation-authority.test.ts lib/thread-chat/cutover/conversation-drain.test.ts lib/thread-chat/cutover/legacy-conversation-import.test.ts lib/thread-chat/cutover/approved-conversation-reset.test.ts lib/thread-chat/cutover/conversation-forward-recovery.test.ts lib/thread-chat/cutover/conversation-cutover-manifest.test.ts",
     "check:conversation-cutover-drain": "tsx scripts/check-conversation-cutover-drain.ts",
     "rehearse:conversation-cutover-local": "node scripts/rehearse-conversation-cutover-local.mjs",
+    "backup:conversation-cutover-local": "node scripts/backup-conversation-cutover-local.mjs",
     "seed:conversation-browser": "tsx scripts/seed-canonical-browser-fixture.ts",
     "test:conversation-persistence": "tsx scripts/test-conversation-persistence.ts",
     "test:legacy-conversation-audit": "node --experimental-strip-types --test lib/thread-chat/legacy/audit-thread-tree.test.ts",
