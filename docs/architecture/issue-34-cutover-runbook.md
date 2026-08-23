@@ -54,15 +54,15 @@ schema-only 校验不代表可执行；`--for-execution` 会在任一门禁为 f
 - 客户端：`canonical / schema 1 / local-issue34-20260822` 匹配后正常加载；旧 tree 与 generation routes 返回 410。
 - 备份恢复：通过受限临时数据库完成 legacy dump→恢复→drain/审计→正式导入两次→canonical dump→再次恢复；两次恢复的 13 张 cutover 表指纹均与备份源一致，耗时约 8.4 秒，临时数据库与文件均已删除。
 
-## 正式 go / no-go checklist
+## 本地目标 go / no-go checklist
 
-- [ ] 目标环境重新执行只读审计，保存完整报告与 plan hash。
-- [ ] 确认所有 repair/排除项均在目标环境 ADR 中获批。
-- [ ] 记录负责人、值班人、维护窗口、观察窗口和回滚决策人。
-- [ ] 记录容量、P95/P99、命令错误率、Generation age、Stop latency、计费差异基线和阈值。
-- [ ] 创建 legacy 与 canonical 备份，执行真实恢复验证并填写备份 ID。
-- [ ] 进入 `legacy + read-only`，运行 drain checker 直至 `ready=true`。
-- [ ] 用目标审批文件执行 import/reset，保存 verifier 结果。
+- [x] 目标环境重新执行只读审计，保存完整报告与 plan hash。
+- [x] 确认所有 repair/排除项均在目标环境 ADR 中获批。
+- [x] 记录负责人、维护窗口、观察窗口和回滚决策人。
+- [x] 记录本地零流量基线、Generation/计费/旧调用阈值；明确数据库不可观测 HTTP 指标。
+- [x] 创建 legacy/canonical 完整备份，执行真实恢复验证并填写备份 ID。
+- [x] 进入 `legacy + read-only`，运行 drain checker直至 `ready=true`。
+- [x] 用目标审批文件执行 approved reset，保存 rollback 与 committed verifier 结果；19 Tree 不导入。
 
 受批准 reset 必须同时提供 release manifest、ADR 审批文件与独立的备份恢复验证文件，并设置与三者精确匹配的 `CONVERSATION_CUTOVER_ENVIRONMENT`、`CONVERSATION_CUTOVER_APPROVAL_ID`、`CONVERSATION_CUTOVER_BACKUP_ID`。只有在 `legacy + read-only`、drain 清零且 `CONVERSATION_APPROVED_RESET_ENABLED=true` 时，才可运行 `pnpm reset:approved-conversations -- --execute --manifest-file <manifest.json> --approval-file <adr.json> --backup-verification-file <backup.json>`。先用 `--test-rollback` 完成同一事务路径的强制回滚验证。工具保留 `usage_records`，任何财务账本处置必须走独立 ADR。
 
@@ -74,6 +74,8 @@ schema-only 校验不代表可执行；`--for-execution` 会在任一门禁为 f
 
 该规划器不直接修改部署或数据库；目标环境仍需把 incident、批准、首写时间、备份恢复证明、执行日志和 smoke 结果放入证据包。
 
-- [ ] 原子切换 canonical server/client epoch，运行行为矩阵关键 smoke。
-- [ ] 确认首个 canonical 生产写入时间；此后禁止恢复落后的 legacy 权威。
-- [ ] 观察期内 legacy route/query 为 0，完整性与计费对账连续通过。
+- [x] 原子切换 canonical server/client epoch，运行 HTTP、GLM 5.3 与 Ego Browser 行为矩阵 smoke。
+- [x] 确认首个 canonical 本地写入时间为 `2026-08-21T19:33:42.757Z`；前滚规划器证明此后禁止恢复落后的 legacy 权威。
+- [x] 本地零外部流量观察中，以旧路由删除、运行时零引用、drain 与最终完整性/计费审计证明 legacy 调用路径已收口。
+
+最终证据：`docs/architecture/issue-34-local-cutover-final-verification-2026-08-24.md`。这些勾选只适用于 manifest 锁定的 `localhost/thread-chat`，不能代表共享或 Production cutover。

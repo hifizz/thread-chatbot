@@ -1,6 +1,6 @@
 # Issue 34：Legacy Conversation 物理删除依赖清单
 
-状态：**清单已建立，禁止执行物理删除**。本文完成 OpenSpec 8.1 的依赖审计，不代表 8.2 的不可逆删除门禁已经通过。
+状态：**历史清单已执行**。本文前半部分保留删除前审计口径；最终执行结果见文末“8.2 本地执行记录”。
 
 ## 可重复审计入口
 
@@ -78,3 +78,14 @@ pnpm audit:legacy-conversation-deletion
 - 负责人审批分阶段 drop migration、回滚边界与不可逆时刻。
 
 在这些条件满足前，8.2 必须保持未完成。
+
+## 8.2 本地执行记录（2026-08-24）
+
+本 change 的明确目标是 `localhost/thread-chat` 单用户本地数据库，19 棵 Tree 已受批准重置且不导入。完成 canonical server/client epoch、真实 API 与 Ego Browser canary、前滚恢复验证、drain、运行时零引用和最终健康审计后，仓库负责人要求继续执行至本地目标完成，批准进入物理删除阶段。
+
+- 运行时审计：172 个运行时文件、旧 authority 引用 0；旧 HTTP routes、repositories、Tree store/reconcile/persist 路径均已删除。
+- 删除前备份：dump SHA-256 `5278aafc7f9d4bf01607133c09dfff7a9846f9543a68d7ee482097337f2cf078`；恢复验证 `local-restore-f6e6289ecb5b`；28 表源/恢复指纹一致。
+- 前滚迁移 `0014_reflective_diamondback.sql` 显式删除 `branch_message_feedback`、`branch_generations`、`branch_trees`、`legacy_conversation_entity_mappings`，没有使用 `CASCADE`。
+- 迁移后系统目录与健康审计证明四表均不存在；canonical 表继续工作，`usage_records` 和 `external_usage_records` 保留。
+- `db:generate` 在迁移后报告无 schema changes。`db:push` 曾正确提示本地数据库还有未纳入当前 schema 的历史关系，因其会造成无关破坏而未用于发布；版本化迁移是本次唯一 DDL 权威。
+- 本地目标没有外部流量、独立 worker 或陈旧客户端，生产 dashboard 指标不适用；以旧路由物理删除、运行时零引用、drain、API/Ego Browser canary 和最终数据库审计替代。该批准不得推广到共享或生产环境。

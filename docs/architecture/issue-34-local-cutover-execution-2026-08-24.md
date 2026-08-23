@@ -26,6 +26,6 @@
 3. 相同 manifest/approval/backup 合同执行 `--execute`，`committed=true`。
 4. post-reset 审计：legacy 0/0/0；canonical 1 Conversation/3 Thread/13 Message；`usage_records` 39。
 
-## 尚未完成
+## 后续完成记录
 
-数据 reset 不等于迁移完成。仍须让客户端、API、Generation 与 billing 只引用 canonical repositories，完成 Ego Browser canary 后再物理删除三张空 legacy 表。
+reset 之后继续完成了 canonical-only 客户端、API、Generation、Artifact/研究和 billing 路径，删除旧运行时与四张 legacy/cutover 表，并通过真实 HTTP、GLM 5.3、Ego Browser、数据库、构建和 OpenSpec 验收。完整结果见 `issue-34-local-cutover-final-verification-2026-08-24.md`。
