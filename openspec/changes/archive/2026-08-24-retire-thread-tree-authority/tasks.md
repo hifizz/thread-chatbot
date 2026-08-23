@@ -108,8 +108,8 @@
 - [x] 8.1 审计 `branch_trees`、`branch_generations` 及名称相似表的全部 FK、job、查询和备份依赖，形成精确删除清单。
 - [x] 8.2 在备份保留/恢复验证和零依赖门禁通过后，执行分阶段不可逆迁移删除确认遗留表、列、索引和约束。
 - [x] 8.3 建立旧 OpenSpec supersession map；保留已完成历史，明确记录 `persist-thread-chat-generations` 未完成项被新 lifecycle/cutover 替代，不补勾任务。
-- [ ] 8.4 按依赖顺序归档新 changes，验证最终 specs 以 Project → Conversation → Thread 模型和 canonical capabilities 为权威。
-- [ ] 8.5 运行最终 `pnpm openspec:validate`、schema 漂移检查、生产 smoke 和数据完整性/计费审计并记录结果。
+- [x] 8.4 按依赖顺序归档新 changes，验证最终 specs 以 Project → Conversation → Thread 模型和 canonical capabilities 为权威。
+- [x] 8.5 运行最终 `pnpm openspec:validate`、schema 漂移检查、生产 smoke 和数据完整性/计费审计并记录结果。
 
 ### 第 8.1 阶段删除依赖审计（2026-08-22，本地）
 
@@ -123,3 +123,10 @@
 - `supersession-map.md` 明确了旧 branch-tree persistence、tree list 数据源、Generation sidecar、Message DAG identity、canvas 与 Artifact provenance 到六个 canonical changes 的替代关系，同时保留 composer/Markdown/actions/help 等仍正确的产品能力。
 - `persist-thread-chat-generations` 的 4.5、7.4、10.3、10.4、10.6、10.8 逐项映射到新 lifecycle/persistence/API/client/cutover 证据，原任务保持 `[ ]`，没有篡改历史完成状态。
 - 文档记录新 change 的依赖归档顺序；由于目标环境 cutover、观察和物理删除尚未完成，8.4 仍保持未完成。
+
+### 第 8.4/8.5 阶段最终收口（2026-08-24，本地）
+
+- 六份 delta specs 已同步到 `domain`、`conversation-persistence`、`conversation-generation-lifecycle`、`conversation-command-api`、`conversation-client-state`、`conversation-cutover` 主规格；`domain` 已移除旧“线程树层级不变量”，规范术语以 Project → Conversation → Thread 与 ThreadFork 为权威。
+- 前五个 changes 已按依赖顺序归档并各自独立提交；当前 change 的 artifacts 完成、任务 37/37，完成本节后作为链尾归档。
+- 最终 schema 漂移检查为 23 张当前表、`No schema changes`；Webpack production build、真实 HTTP/GLM 5.3、Ego Browser Artifact/研究/刷新、数据库完整性/计费健康审计均通过。
+- 最终 OpenSpec strict 在链尾归档前后均通过；完整证据见 `docs/architecture/issue-34-local-cutover-final-verification-2026-08-24.md`。

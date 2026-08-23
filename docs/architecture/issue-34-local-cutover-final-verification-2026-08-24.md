@@ -43,7 +43,7 @@
 - command HTTP contract：5/5。
 - canonical E2E：30/30。
 - 数据库 persistence / Generation / command API：26 / 52 / 69 项断言。
-- OpenSpec strict：31/31（归档后重新验证）。
+- OpenSpec strict：30/30（六个 change 归档后重新验证）。
 - `audit:conversation-domain`：172 文件、0 旧引用。
 - `audit:conversation-cutover-health`：0 active、0 pending billing、0 pending outbox、0 token mismatch、0 runtime legacy reference。
 - Next.js Webpack production build：通过。
