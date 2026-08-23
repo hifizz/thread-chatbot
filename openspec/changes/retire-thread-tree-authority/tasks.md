@@ -2,22 +2,23 @@
 
 - [x] 1.1 验证 `define-conversation-domain-model`、规范持久化、Generation lifecycle、命令 API 和 normalized client 的必需任务及 strict specs 全部完成。
 - [x] 1.2 建立目标行为矩阵，关联认证、生命周期、列/画布、A → B → C Fork、变体、actions、Artifact/研究、Generation/计费的自动测试和 smoke。
-- [ ] 1.3 记录当前容量/性能/错误/计费基线、cutover 阈值、负责人、观察窗口和 go/no-go checklist。
-- [ ] 1.4 演练 canonical 备份恢复、维护模式、authority epoch mismatch 和切换后只读/前滚回滚流程。
+- [x] 1.3 记录当前容量/性能/错误/计费基线、cutover 阈值、负责人、观察窗口和 go/no-go checklist。
+- [x] 1.4 演练 canonical 备份恢复、维护模式、authority epoch mismatch 和切换后只读/前滚回滚流程。
 
 ## 2. 数据审计与处置 ADR
 
-- [ ] 2.1 在目标环境运行只读 legacy 审计，输出所有者、Conversation/Thread/Message/Generation、标题、反馈、Artifact 和 usage 数量。
-- [ ] 2.2 逐项处理或明确阻塞悬空、跨所有者、重复 ID、错误 Fork/active path 和计费引用。
-- [ ] 2.3 基于保留义务形成“确定性导入或受批准重置”ADR，记录范围、理由、批准人、备份和排除项。
-- [ ] 2.4 将 ADR 结果转成版本化 cutover 配置，不在代码中隐式猜测环境或数据处置方式。
+- [x] 2.1 在目标环境运行只读 legacy 审计，输出所有者、Conversation/Thread/Message/Generation、标题、反馈、Artifact 和 usage 数量。
+- [x] 2.2 逐项处理或明确阻塞悬空、跨所有者、重复 ID、错误 Fork/active path 和计费引用。
+- [x] 2.3 基于保留义务形成“确定性导入或受批准重置”ADR，记录范围、理由、批准人、备份和排除项。
+- [x] 2.4 将 ADR 结果转成版本化 cutover 配置，不在代码中隐式猜测环境或数据处置方式。
 
-### 第 1.3/2.4 阶段版本化输入合同（不等同真实发布记录）
+### 第 1.3/2.4 阶段版本化输入与本地发布记录
 
 - 新增严格 cutover manifest schema 与执行校验 CLI，覆盖环境/数据库、四类负责人、维护/观察窗口、容量/错误/计费基线、十项阈值、import/reset ADR、双备份恢复证明、epoch 和十项 go/no-go 门禁。
 - 有保留义务时 schema 强制确定性导入；执行时环境、数据库、时间窗口与所有门禁必须精确匹配，并输出 manifest SHA-256，禁止从代码或环境隐式猜测数据处置。
 - 正式 import/reset 写工具已强制接收 manifest，并二次核对 ADR mode、approval ID、对应备份 ID 与 scope；本地临时数据库演练覆盖两次幂等 import 和 reset 强制回滚，证明无法绕过 manifest 单独执行审批文件。
-- 1.3 与 2.4 保持未完成：尚未填入真实目标环境基线、负责人、阈值、窗口和已批准 ADR，也未把真实 manifest 纳入发布证据。
+- 目标明确为 `localhost/thread-chat` 本地开发库后，`issue-34-local-cutover-release-2026-08-24.json` 固化了 19/37/1 legacy 基线、1 个 canonical Conversation、零 drain/错误阈值、双负责人、本地维护/观察窗口和十项 go/no-go；manifest SHA-256 为 `1921e4ae0b8f06c624fb85f92b4e610fb69114df3a447b8371bdbe60f1380182`。
+- 仓库负责人明确批准这 19 棵 Tree 为无保留义务测试数据；ADR 选择 `approved-reset`，执行合同精确绑定本机 host/name、全部 Tree scope、备份 hash 和恢复验证 ID。任何其他环境不得复用。
 
 ## 3. 确定性导入或重置工具
 
@@ -63,11 +64,18 @@
 
 ## 5. Cutover 演练与正式执行
 
-- [ ] 5.1 在与生产等价的隔离环境完整演练冻结、drain、备份、import/reset、验证、authority/client 切换和 smoke，并记录耗时。
-- [ ] 5.2 正式进入维护窗口，冻结旧写入并确认所有 Generation、checkpoint、outbox 和计费事务已收敛。
-- [ ] 5.3 创建并验证 legacy/canonical 备份，执行 ADR 选定的数据动作和全量 post-import verifier。
+- [x] 5.1 在与生产等价的隔离环境完整演练冻结、drain、备份、import/reset、验证、authority/client 切换和 smoke，并记录耗时。
+- [x] 5.2 正式进入维护窗口，冻结旧写入并确认所有 Generation、checkpoint、outbox 和计费事务已收敛。
+- [x] 5.3 创建并验证 legacy/canonical 备份，执行 ADR 选定的数据动作和全量 post-import verifier。
 - [ ] 5.4 原子启用 canonical server/client epoch，对内部 canary 跑行为矩阵关键 smoke 后开放流量。
 - [ ] 5.5 验证 cutover 后所有读取、命令、Generation 和 billing jobs 只访问 canonical repositories。
+
+### 第 5.1–5.3 阶段本地目标环境执行（2026-08-24）
+
+- 本 change 的目标环境由仓库负责人明确为本地开发库；临时恢复库演练覆盖完整 import/reset 两条路径，真实本地 cutover 选择 reset，19 棵测试 Tree 不导入。
+- `pnpm backup:conversation-cutover-local -- --execute` 保留完整 459 KiB custom dump；恢复到受限临时库后，28 张表的源/恢复合并指纹均为 `a02bf8458579a046856caa4fe0797525086eb97f698bf7e01a2f9bae9d9d081c`。dump SHA-256 为 `5278aafc7f9d4bf01607133c09dfff7a9846f9543a68d7ee482097337f2cf078`，完成前不得删除。
+- 维护窗口内 drain 五项均为 0；同一 reset 事务先以 `--test-rollback` 验证 19/37/1 精确 scope 且不提交，再以 `--execute` 提交。post-reset 审计为 legacy 0/0/0，canonical 仍为 1 Conversation/3 Thread/13 Message，`usage_records` 仍为 39。
+- 5.4/5.5 保持未完成，等待 canonical-only 运行时代码、浏览器 canary 与代码/SQL 零引用门禁。
 
 ## 6. 观察与回滚保护
 

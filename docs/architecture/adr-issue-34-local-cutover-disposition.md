@@ -1,14 +1,16 @@
 # ADR：Issue #34 本地切换数据处置
 
-- 状态：本地演练已接受；生产决策待定
-- 日期：2026-08-22
+- 状态：本地开发库 reset 已批准，等待执行
+- 日期：2026-08-24
 - 范围：`localhost/thread-chat` 的 `thread_chat` schema
 
 ## 决策
 
-本地演练采用**确定性导入**，不采用数据重置。原因是只读审计的 19 棵树中没有拒绝级结构、所有权或引用污染；5 条异常都只是早期终态 Generation 缺少来源 intent。
+本地临时恢复演练仍采用**确定性导入**，用于证明导入器可用；当前本地开发库的正式 cutover 改为采用**受批准重置**，不导入 19 棵 legacy Tree。
 
-缺失 intent 的 5 条记录允许在本地演练中使用 `missing-generation-intent-as-send` 修复：它只把历史执行来源归为最弱的 `send`，不改变 Message 内容、计费终态或 active variant，也不会重新执行模型。正式环境若出现同类记录，仍需在自己的审批文件中逐项批准。
+理由是这 19 棵树均为测试数据，没有数据保留义务。仓库负责人在 2026-08-24 明确批准：完整备份并实际恢复验证后，可以不导入这批数据。重置只覆盖全部 legacy Tree 及由持久映射可证明来源于它们的 canonical 实体；现有独立 canonical 浏览器夹具和 `usage_records` 财务流水不在删除范围内。
+
+缺失 intent 的 5 条记录只影响导入路径；本次选择 reset，因此不推断、不修复也不导入这些测试记录。完整 dump 是它们的唯一保留副本。
 
 ## 数据与回滚边界
 
@@ -22,15 +24,26 @@ flowchart LR
   F --> G[切换 canonical epoch]
 ```
 
-本地自动演练使用 `--test-rollback`：在同一事务中导入 19 个 Conversation、执行 post-import verifier、重复导入验证幂等，再强制回滚。该模式的 `backupId=rollback-test-does-not-commit` 不是生产备份凭证。正式 `--execute` 必须同时满足：
+本地自动演练使用 `--test-rollback` 验证导入与 reset 事务。当前本地开发库的 `--execute` 必须同时满足：
 
 1. `legacy + read-only` authority；
 2. 审批文件的数据库 host/name 与当前连接一致；
 3. 环境中的 approval ID 与审批文件一致；
-4. 真实备份 ID、批准人、时间、scope 和允许 repair 均非空；
+4. 真实备份 ID、批准人、时间和 scope 均非空；
 5. drain 门禁为 0。
 
-生产环境不能复用本 ADR 的批准身份或测试备份标识，必须在真实审计后另建 ADR。
+本 ADR 只批准 `localhost/thread-chat`。任何共享、预发布或生产数据库都不能复用其批准身份、manifest 或备份标识，必须在对应环境重新审计并另建 ADR。
+
+## 本地开发库执行输入
+
+- 处置：`approved-reset`
+- scope：全部 19 棵 legacy Tree
+- 保留义务：无（测试数据）
+- 备份：`sha256:5278aafc7f9d4bf01607133c09dfff7a9846f9543a68d7ee482097337f2cf078`
+- 恢复验证：源库与恢复库 28 张表的合并指纹均为 `a02bf8458579a046856caa4fe0797525086eb97f698bf7e01a2f9bae9d9d081c`
+- 版本化 manifest：`issue-34-local-cutover-release-2026-08-24.json`
+- 审批合同：`issue-34-local-reset-approval-2026-08-24.json`
+- 备份合同：`issue-34-local-backup-verification-2026-08-24.json`
 
 ## 临时数据库备份恢复演练（2026-08-22）
 
