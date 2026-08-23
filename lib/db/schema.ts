@@ -14,13 +14,7 @@ import { sql } from "drizzle-orm"
 import { dbSchema } from "./pg-schema"
 import { EMBEDDING_DIMENSIONS } from "@/constants/rag"
 import { user } from "./auth-schema"
-import type {
-  GenerationBillingStatus,
-  GenerationResultV1,
-  GenerationStatus,
-  GenerationTurnSnapshot,
-} from "@/lib/thread-chat/domain/generation"
-import type { MessageFeedback } from "@/lib/thread-chat/domain/types"
+import type { MessageFeedback } from "@/lib/thread-chat/contracts/message-feedback"
 import type {
   LifecycleStatus,
   GenerationIntent,
@@ -64,9 +58,8 @@ export const attachments = dbSchema.table("attachments", {
     .defaultNow(),
 })
 
-// Issue #34 的规范 Conversation 写模型。迁移期间这些表默认不承载生产写入；旧的
-// branch_trees 仍保留到 retire-thread-tree-authority 完成。关系型约束的可延迟部分
-// 位于对应 Drizzle SQL migration 中。
+// Issue #34 的规范 Conversation 写模型。Project → Conversation → Thread 是唯一
+// 运行时权威；关系型约束的可延迟部分位于对应 Drizzle SQL migration 中。
 export const workspaces = dbSchema.table(
   "workspaces",
   {
@@ -523,158 +516,6 @@ export const conversationOutboxEvents = dbSchema.table(
       table.aggregateId,
       table.aggregateRevision
     ),
-  ]
-)
-
-/**
- * 一次性 ThreadTree → Conversation 导入的稳定身份账本。
- * 映射本身是迁移审计事实；运行时业务代码不得用它做 legacy 读取回退。
- */
-export const legacyConversationEntityMappings = dbSchema.table(
-  "legacy_conversation_entity_mappings",
-  {
-    legacyTreeId: text("legacy_tree_id").notNull(),
-    entityType: text("entity_type").notNull(),
-    localId: text("local_id").notNull(),
-    canonicalId: text("canonical_id").notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
-  },
-  (table) => [
-    primaryKey({
-      name: "legacy_conversation_entity_mappings_pk",
-      columns: [table.legacyTreeId, table.entityType, table.localId],
-    }),
-    uniqueIndex("legacy_conversation_entity_mappings_canonical_uq").on(
-      table.canonicalId
-    ),
-    index("legacy_conversation_entity_mappings_tree_idx").on(
-      table.legacyTreeId
-    ),
-  ]
-)
-
-// 分支对话树（app/thread-chat）的整棵树持久化：一棵树一行，state 存完整
-// ThreadTreeState（JSON）。与上面 assistant-ui 线性模型的 threads/messages 表分开，
-// 互不复用——那两张表是线性会话，这张是树形分支态。treeId 由客户端生成
-// （crypto.randomUUID()），URL 路径段承载（/thread-chat/{treeId}），URL 即树身份。
-export const branchTrees = dbSchema.table(
-  "branch_trees",
-  {
-    id: text("id").primaryKey(), // 客户端生成的 treeId（UUID，URL 路径段承载）
-    // 迁移期允许历史树无主；新写入必须由 API 绑定当前 session user。
-    userId: text("user_id").references(() => user.id, {
-      onDelete: "cascade",
-    }),
-    title: text("title"), // 可空：取 main 首条 user 文本前若干字，纯展示（机器派生轨）
-    // 双轨标题（design D1）：用户重命名只写这列（PATCH），防抖整树 PUT 只写上面的派生
-    // title——两条写路径互不踩踏；对外展示一律 coalesce(custom_title, title)。
-    customTitle: text("custom_title"),
-    state: jsonb("state").notNull(), // 完整 ThreadTreeState
-    revision: integer("revision").notNull().default(0),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
-    updatedAt: timestamp("updated_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
-  },
-  (table) => [index("branch_trees_user_id_idx").on(table.userId)]
-)
-
-/**
- * 每次 thread-chat assistant attempt 的服务端权威 sidecar。终态不直接改整树 JSON，
- * 读取时再把 current generation result 合并进去，避免旧浏览器快照覆盖最终答案。
- */
-export const branchGenerations = dbSchema.table(
-  "branch_generations",
-  {
-    id: text("id").primaryKey(),
-    userId: text("user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
-    treeId: text("tree_id")
-      .notNull()
-      .references(() => branchTrees.id, { onDelete: "cascade" }),
-    threadId: text("thread_id").notNull(),
-    userMessageId: text("user_message_id").notNull(),
-    assistantMessageId: text("assistant_message_id").notNull(),
-    attempt: integer("attempt").notNull(),
-    isCurrent: boolean("is_current").notNull().default(true),
-    status: text("status").$type<GenerationStatus>().notNull(),
-    modelId: text("model_id").notNull(),
-    assistantMessageIndex: integer("assistant_message_index").notNull(),
-    turnSnapshot: jsonb("turn_snapshot")
-      .$type<GenerationTurnSnapshot>()
-      .notNull(),
-    result: jsonb("result").$type<GenerationResultV1>(),
-    error: text("error"),
-    billingStatus: text("billing_status")
-      .$type<GenerationBillingStatus>()
-      .notNull()
-      .default("pending"),
-    heartbeatAt: timestamp("heartbeat_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
-    stopRequestedAt: timestamp("stop_requested_at", { withTimezone: true }),
-    finishedAt: timestamp("finished_at", { withTimezone: true }),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
-    updatedAt: timestamp("updated_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
-  },
-  (table) => [
-    uniqueIndex("branch_generations_current_assistant_uq")
-      .on(table.treeId, table.threadId, table.assistantMessageId)
-      .where(sql`${table.isCurrent} = true`),
-    uniqueIndex("branch_generations_assistant_attempt_uq").on(
-      table.treeId,
-      table.threadId,
-      table.assistantMessageId,
-      table.attempt
-    ),
-    index("branch_generations_user_id_idx").on(table.userId),
-    index("branch_generations_tree_current_idx").on(
-      table.treeId,
-      table.isCurrent
-    ),
-    index("branch_generations_user_status_idx").on(table.userId, table.status),
-    index("branch_generations_heartbeat_idx").on(
-      table.status,
-      table.heartbeatAt
-    ),
-  ]
-)
-
-/** 产品层 assistant message 的当前互斥反馈；不与 generation 执行身份耦合。 */
-export const branchMessageFeedback = dbSchema.table(
-  "branch_message_feedback",
-  {
-    userId: text("user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
-    treeId: text("tree_id")
-      .notNull()
-      .references(() => branchTrees.id, { onDelete: "cascade" }),
-    threadId: text("thread_id").notNull(),
-    messageId: text("message_id").notNull(),
-    feedback: text("feedback").$type<MessageFeedback>().notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
-    updatedAt: timestamp("updated_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
-  },
-  (table) => [
-    primaryKey({
-      name: "branch_message_feedback_pk",
-      columns: [table.userId, table.treeId, table.threadId, table.messageId],
-    }),
-    index("branch_message_feedback_tree_idx").on(table.userId, table.treeId),
   ]
 )
 
