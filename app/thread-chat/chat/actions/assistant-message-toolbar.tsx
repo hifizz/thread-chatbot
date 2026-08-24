@@ -1,22 +1,42 @@
 "use client"
 
 import { useState } from "react"
-import { Check, Copy, RotateCcw, ThumbsDown, ThumbsUp } from "lucide-react"
+import {
+  Check,
+  Copy,
+  GitFork,
+  RotateCcw,
+  ThumbsDown,
+  ThumbsUp,
+} from "lucide-react"
 import {
   MESSAGE_ACTION_ERRORS,
   MESSAGE_ACTION_LABELS,
-  type AssistantMessageToolbarProps,
+  messageActionError,
+  type MessageActionFeedback,
 } from "./message-action-types"
 import { MessageToolbar } from "./message-toolbar"
 import { useCopyMarkdown } from "./use-copy-markdown"
 
 export function AssistantMessageToolbar({
-  threadId,
-  message,
+  markdown,
   regeneratable,
+  feedbackEnabled,
   feedback,
-  commands,
-}: AssistantMessageToolbarProps) {
+  forkLabel,
+  onFork,
+  onRegenerate,
+  onFeedback,
+}: {
+  markdown: string
+  regeneratable: boolean
+  feedbackEnabled: boolean
+  feedback: MessageActionFeedback
+  forkLabel: string
+  onFork: () => void
+  onRegenerate: () => Promise<void>
+  onFeedback: (feedback: MessageActionFeedback) => Promise<void>
+}) {
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const { copied, copy } = useCopyMarkdown(setError)
@@ -24,18 +44,22 @@ export function AssistantMessageToolbar({
   const regenerate = async () => {
     setBusy("regenerate")
     setError(null)
-    const result = await commands.retryAssistant(threadId, message.id)
-    setBusy(null)
-    if (!result.ok) setError(result.message)
+    try {
+      await onRegenerate()
+    } catch (cause) {
+      setError(messageActionError(cause))
+    } finally {
+      setBusy(null)
+    }
   }
 
-  const submitFeedback = async (next: typeof feedback) => {
+  const submitFeedback = async (next: MessageActionFeedback) => {
     setBusy(next ?? feedback ?? "clear")
     setError(null)
     try {
-      await commands.submitFeedback(threadId, message.id, next ?? null)
-    } catch {
-      setError(MESSAGE_ACTION_ERRORS.feedbackSave)
+      await onFeedback(next)
+    } catch (cause) {
+      setError(messageActionError(cause) || MESSAGE_ACTION_ERRORS.feedbackSave)
     } finally {
       setBusy(null)
     }
@@ -52,9 +76,15 @@ export function AssistantMessageToolbar({
               ? MESSAGE_ACTION_LABELS.copied
               : MESSAGE_ACTION_LABELS.copy,
             icon: copied ? Check : Copy,
-            onSelect: () => void copy(message.text),
-            disabled: message.text.trim() === "",
+            onSelect: () => void copy(markdown),
+            disabled: markdown.trim() === "",
             disabledReason: MESSAGE_ACTION_ERRORS.noMarkdown,
+          },
+          {
+            key: "fork",
+            label: forkLabel,
+            icon: GitFork,
+            onSelect: onFork,
           },
           {
             key: "regenerate",
@@ -70,22 +100,22 @@ export function AssistantMessageToolbar({
             label: MESSAGE_ACTION_LABELS.positive,
             icon: ThumbsUp,
             onSelect: () =>
-              void submitFeedback(
-                feedback === "positive" ? undefined : "positive"
-              ),
+              void submitFeedback(feedback === "positive" ? null : "positive"),
             pressed: feedback === "positive",
             busy: busy === "positive",
+            disabled: !feedbackEnabled,
+            disabledReason: MESSAGE_ACTION_ERRORS.incompleteFeedback,
           },
           {
             key: "negative",
             label: MESSAGE_ACTION_LABELS.negative,
             icon: ThumbsDown,
             onSelect: () =>
-              void submitFeedback(
-                feedback === "negative" ? undefined : "negative"
-              ),
+              void submitFeedback(feedback === "negative" ? null : "negative"),
             pressed: feedback === "negative",
             busy: busy === "negative",
+            disabled: !feedbackEnabled,
+            disabledReason: MESSAGE_ACTION_ERRORS.incompleteFeedback,
           },
         ]}
       />

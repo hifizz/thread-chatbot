@@ -1,80 +1,32 @@
 import type { ProviderMetadata } from "ai"
+
 import type { ChatModel } from "@/constants/model"
-import { GENERATION_ERRORS } from "@/constants/generation"
 import { chargeUsage } from "@/lib/billing/credits"
 import { usageCostEvidence } from "@/lib/billing/usage-cost-evidence"
 import type { OpenRouterStepLike } from "@/lib/ai/openrouter"
-import type { FinalizeGenerationUsage } from "@/lib/thread-chat-generation/finalize"
 
 type UsageStep = OpenRouterStepLike & {
-  usage: {
-    inputTokens?: number
-    outputTokens?: number
-  }
+  usage: { inputTokens?: number; outputTokens?: number }
 }
 
-type StreamLifecycleInput = {
-  userId: string
-  modelId: string
-  model: Pick<ChatModel, "id" | "provider">
-  persistentGeneration: boolean
-  unbilledPreview: boolean
-  linearThreadId?: string
-}
+type StreamLifecycleDependencies = { charge: typeof chargeUsage }
 
-type StreamLifecycleDependencies = {
-  charge: typeof chargeUsage
-}
+const defaultDependencies: StreamLifecycleDependencies = { charge: chargeUsage }
 
-const defaultDependencies: StreamLifecycleDependencies = {
-  charge: chargeUsage,
-}
-
-/** 请求级 stream usage/error 状态；handler 写入，持久化终态只读取 snapshot。 */
-export function createStreamLifecycle(
-  {
-    userId,
-    modelId,
-    model,
-    persistentGeneration,
-    unbilledPreview,
-    linearThreadId,
-  }: StreamLifecycleInput,
+/** 线性聊天的模型流错误记录与 exactly-once 请求结算。 */
+export function createLinearStreamLifecycle(
+  input: {
+    userId: string
+    modelId: string
+    model: Pick<ChatModel, "id" | "provider">
+    unbilledPreview: boolean
+    linearThreadId?: string
+  },
   dependencies: StreamLifecycleDependencies = defaultDependencies
 ) {
-  let capturedUsage: FinalizeGenerationUsage | undefined
-  let modelStreamError: string | undefined
-  let abortedUsageUnavailable = false
-
   return {
     onError({ error }: { error: unknown }) {
-      modelStreamError = GENERATION_ERRORS.streamFailed
       console.error("[chat] 模型流错误:", error)
-    },
-
-    onAbort({ steps }: { steps: readonly UsageStep[] }) {
-      if (!persistentGeneration) return
-      const inputTokens = steps.reduce(
-        (total, step) => total + (step.usage.inputTokens ?? 0),
-        0
-      )
-      const outputTokens = steps.reduce(
-        (total, step) => total + (step.usage.outputTokens ?? 0),
-        0
-      )
-      const providerMetadata = steps.at(-1)?.providerMetadata
-      if (steps.length > 0) {
-        capturedUsage = {
-          inputTokens,
-          outputTokens,
-          costEvidence: usageCostEvidence({
-            provider: model.provider,
-            steps,
-            providerMetadata,
-          }),
-        }
-      }
-      abortedUsageUnavailable = true
     },
 
     async onEnd({
@@ -86,46 +38,27 @@ export function createStreamLifecycle(
       providerMetadata?: ProviderMetadata
       steps: readonly UsageStep[]
     }) {
-      if (unbilledPreview) return
+      if (input.unbilledPreview) return
       const costEvidence = usageCostEvidence({
-        provider: model.provider,
+        provider: input.model.provider,
         steps,
         providerMetadata,
       })
       if (
-        model.provider === "openrouter" &&
+        input.model.provider === "openrouter" &&
         costEvidence.source !== "openrouter"
-      ) {
+      )
         console.warn(
-          `[chat] OpenRouter 成本元数据不完整，使用静态估值：${model.id}`
+          `[chat] OpenRouter 成本元数据不完整，使用静态估值：${input.model.id}`
         )
-      }
-      if (persistentGeneration) {
-        capturedUsage = {
-          inputTokens: usage.inputTokens ?? 0,
-          outputTokens: usage.outputTokens ?? 0,
-          costEvidence,
-        }
-        return
-      }
       await dependencies.charge({
-        userId,
-        model: modelId,
+        userId: input.userId,
+        model: input.modelId,
         inputTokens: usage.inputTokens ?? 0,
         outputTokens: usage.outputTokens ?? 0,
-        threadId: linearThreadId ?? null,
+        threadId: input.linearThreadId ?? null,
         costEvidence,
       })
     },
-
-    snapshot() {
-      return {
-        capturedUsage,
-        modelStreamError,
-        abortedUsageUnavailable,
-      }
-    },
   }
 }
-
-export type StreamLifecycle = ReturnType<typeof createStreamLifecycle>

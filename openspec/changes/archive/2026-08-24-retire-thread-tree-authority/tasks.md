@@ -1,0 +1,132 @@
+## 1. 前置实现与发布门禁
+
+- [x] 1.1 验证 `define-conversation-domain-model`、规范持久化、Generation lifecycle、命令 API 和 normalized client 的必需任务及 strict specs 全部完成。
+- [x] 1.2 建立目标行为矩阵，关联认证、生命周期、列/画布、A → B → C Fork、变体、actions、Artifact/研究、Generation/计费的自动测试和 smoke。
+- [x] 1.3 记录当前容量/性能/错误/计费基线、cutover 阈值、负责人、观察窗口和 go/no-go checklist。
+- [x] 1.4 演练 canonical 备份恢复、维护模式、authority epoch mismatch 和切换后只读/前滚回滚流程。
+
+## 2. 数据审计与处置 ADR
+
+- [x] 2.1 在目标环境运行只读 legacy 审计，输出所有者、Conversation/Thread/Message/Generation、标题、反馈、Artifact 和 usage 数量。
+- [x] 2.2 逐项处理或明确阻塞悬空、跨所有者、重复 ID、错误 Fork/active path 和计费引用。
+- [x] 2.3 基于保留义务形成“确定性导入或受批准重置”ADR，记录范围、理由、批准人、备份和排除项。
+- [x] 2.4 将 ADR 结果转成版本化 cutover 配置，不在代码中隐式猜测环境或数据处置方式。
+
+### 第 1.3/2.4 阶段版本化输入与本地发布记录
+
+- 新增严格 cutover manifest schema 与执行校验 CLI，覆盖环境/数据库、四类负责人、维护/观察窗口、容量/错误/计费基线、十项阈值、import/reset ADR、双备份恢复证明、epoch 和十项 go/no-go 门禁。
+- 有保留义务时 schema 强制确定性导入；执行时环境、数据库、时间窗口与所有门禁必须精确匹配，并输出 manifest SHA-256，禁止从代码或环境隐式猜测数据处置。
+- 正式 import/reset 写工具已强制接收 manifest，并二次核对 ADR mode、approval ID、对应备份 ID 与 scope；本地临时数据库演练覆盖两次幂等 import 和 reset 强制回滚，证明无法绕过 manifest 单独执行审批文件。
+- 目标明确为 `localhost/thread-chat` 本地开发库后，`issue-34-local-cutover-release-2026-08-24.json` 固化了 19/37/1 legacy 基线、1 个 canonical Conversation、零 drain/错误阈值、双负责人、本地维护/观察窗口和十项 go/no-go；manifest SHA-256 为 `1921e4ae0b8f06c624fb85f92b4e610fb69114df3a447b8371bdbe60f1380182`。
+- 仓库负责人明确批准这 19 棵 Tree 为无保留义务测试数据；ADR 选择 `approved-reset`，执行合同精确绑定本机 host/name、全部 Tree scope、备份 hash 和恢复验证 ID。任何其他环境不得复用。
+
+## 3. 确定性导入或重置工具
+
+- [x] 3.1 实现 `(legacyTreeId, entityType, localId) → canonicalId` 的持久映射与幂等 dry-run/report。
+- [x] 3.2 实现按 Conversation 事务导入 Project/Conversation/Thread/ThreadFork/Turn/Message 和当前有效变体。
+- [x] 3.3 迁移 Generation、标题、Message feedback、Artifact、usage/billing 和其他审计确认的 sidecar 外键。
+- [x] 3.4 实现受批准重置路径，仅接受 ADR scope 并在执行前验证目标环境与备份标识。
+- [x] 3.5 增加 A → B → C、Message 变体、partial Generation、辅助引用、重复运行和故障回滚测试。
+- [x] 3.6 实现源/目标计数、映射、约束、悬空引用和摘要的全量 post-import verifier。
+
+### 第 3 阶段本地验收记录（2026-08-22）
+
+- 新增持久映射账本和规范 `conversation_artifacts` 表；canonical 快照从关系表恢复 Artifact provenance，不回读 legacy JSON。
+- dry-run 生成 19 个 Conversation、187 个实体和逐树稳定摘要；发现 5 条 `generation_intent_missing`，显式列为需要审批的 `missing-generation-intent-as-send`，不静默推断。
+- 导入按 Conversation 事务写入 Project → Conversation → Thread、Turn/Message 变体、ThreadFork、Generation/checkpoint/usage/billing、标题、Artifact 和反馈；legacy Message 级 `isCurrent` 只在 active assistant 上映射为 canonical Turn 级 current Generation。
+- 本地 `--test-rollback` 对全部 19 棵树完成写入、数据库约束、源/目标计数、映射 SHA-256 与重复导入幂等校验，随后强制回滚；回滚后 mapping 和 `legacy:%` Conversation 计数均为 0。
+- 受批准重置工具要求 `legacy + read-only`、drain 清零、独立 reset 开关、环境/数据库/approval ID/backup ID 精确匹配、恢复演练证明和审批前计数完全一致。它只删除 scope 内 legacy Tree 与映射可证明来源的 canonical Conversation；保留 `usage_records` 财务账本，不允许把会话重置偷换成账单抹除。仓库只验证 fail-closed 合同与事务回滚能力；没有伪造或执行任何目标环境“丢弃数据” ADR。
+
+## 4. Authority、维护与旧协议拒绝
+
+- [x] 4.1 实现单值 `legacy | canonical` authority 组合根、schemaVersion/cutover epoch 健康信息和非法双 authority 启动失败。
+- [x] 4.2 实现维护模式，拒绝新 legacy mutations/Generation，同时保留必要只读和安全认证语义。
+- [x] 4.3 实现非终态 Generation drain/Stop/stale 收敛与 usage/计费完成检查，未清零时阻止 cutover。
+- [x] 4.4 为旧整树、active-leaf、Generation sidecar 和 reconcile routes 实现安全 `legacy_protocol_retired` 拒绝与遥测。
+- [x] 4.5 让 canonical 客户端 boot 校验服务端 authority/schema/epoch，不匹配时不得发送写命令。
+
+### 第 4 阶段验收记录（2026-08-22，本地隔离环境）
+
+- `CONVERSATION_AUTHORITY` 是唯一组合根；发现任何已退役的 client/API/Generation 分裂开关时启动失败。canonical 必须携带不可为空的 `CONVERSATION_CUTOVER_EPOCH`，生产环境禁止 `CONVERSATION_ISOLATED_TEST=true`。
+- `/api/conversation-authority` 发布 authority、schemaVersion、epoch 和维护状态。canonical 客户端先核对三元组，成功后才加载快照；不匹配返回 `authority_mismatch`，不会进入实体加载或写命令路径。
+- `read-only` 维护模式拒绝会产生新事实的 legacy/canonical 写入；legacy GET 改为纯 owner 读取，不再认领无主树，也不借读取执行 stale 修复。Generation Stop 保留用于排空。
+- 旧整树、active-leaf、Message feedback、legacy chat Generation 和 Generation sidecar 在 canonical authority 下统一返回 `410 legacy_protocol_retired`，并输出不含正文的协议名与 epoch 遥测。
+- `pnpm check:conversation-cutover-drain` 只读检查 legacy/canonical 非终态 Generation、待结算计费与 canonical outbox；任一非零以退出码 2 阻止 cutover。本地实测五项均为 0、`ready=true`。
+- 自动验证：typecheck；domain 8/8；Generation unit 7/7；authority/drain/import 6/6；client 14/14；command contract 5/5；数据库 persistence/Generation/command API 分别 26/52/69 assertions；真实 HTTP + 本地 PostgreSQL + 邮箱认证 + `glm-5.3` 31 assertions；OpenSpec strict 31/31；canonical production build 成功。Ego Browser 实测健康三元组为 `canonical / 1 / local-issue34-20260822`，匹配后 3 列页面与 composer 加载成功；旧整树与旧 Generation 查询均返回 410。
+- 本记录只证明第 4 阶段的实现和本地隔离验收，不代表第 5 阶段的生产维护、备份、正式切换或批准已经发生。
+
+### 本地临时数据库恢复演练（不等同于第 5 阶段）
+
+- `pnpm rehearse:conversation-cutover-local -- --approve-local-ephemeral-databases` 在两个受限命名的 loopback 临时库中完成 legacy 备份恢复、`legacy + read-only` drain/审计、获批确定性导入两次、canonical 备份和再次恢复。
+- 两次恢复均以 13 张 cutover 表的逐表 JSONB SHA-256 合并指纹证明与各自源库一致；导入后为 20 个 Conversation（含源库已有 1 个隔离夹具）和 186 条映射，总耗时约 8.4 秒。
+- 同一演练在 canonical 恢复副本上执行受批准 reset 的完整 SQL 并强制事务回滚；回滚前后 13 表指纹一致，5 条相关 `usage_records` 保持不变。首次演练还实际发现并修正了非级联 Generation 复合外键所要求的删除顺序。
+- 演练结束自动删除临时库、dump 和审批文件；源开发库只读。由于尚未覆盖目标基础设施、真实保留备份、负责人/观察窗口和流量切换，1.4 与 5.1 仍保持未完成。
+
+## 5. Cutover 演练与正式执行
+
+- [x] 5.1 在与生产等价的隔离环境完整演练冻结、drain、备份、import/reset、验证、authority/client 切换和 smoke，并记录耗时。
+- [x] 5.2 正式进入维护窗口，冻结旧写入并确认所有 Generation、checkpoint、outbox 和计费事务已收敛。
+- [x] 5.3 创建并验证 legacy/canonical 备份，执行 ADR 选定的数据动作和全量 post-import verifier。
+- [x] 5.4 原子启用 canonical server/client epoch，对内部 canary 跑行为矩阵关键 smoke 后开放流量。
+- [x] 5.5 验证 cutover 后所有读取、命令、Generation 和 billing jobs 只访问 canonical repositories。
+
+### 第 5.1–5.3 阶段本地目标环境执行（2026-08-24）
+
+- 本 change 的目标环境由仓库负责人明确为本地开发库；临时恢复库演练覆盖完整 import/reset 两条路径，真实本地 cutover 选择 reset，19 棵测试 Tree 不导入。
+- `pnpm backup:conversation-cutover-local -- --execute` 保留完整 459 KiB custom dump；恢复到受限临时库后，28 张表的源/恢复合并指纹均为 `a02bf8458579a046856caa4fe0797525086eb97f698bf7e01a2f9bae9d9d081c`。dump SHA-256 为 `5278aafc7f9d4bf01607133c09dfff7a9846f9543a68d7ee482097337f2cf078`，完成前不得删除。
+- 维护窗口内 drain 五项均为 0；同一 reset 事务先以 `--test-rollback` 验证 19/37/1 精确 scope 且不提交，再以 `--execute` 提交。post-reset 审计为 legacy 0/0/0，canonical 仍为 1 Conversation/3 Thread/13 Message，`usage_records` 仍为 39。
+- 后续以 `canonical / 1 / local-issue34-20260824` 启动唯一组合根；真实 HTTP 38 项断言、GLM 5.3、Ego Browser A → B → C、Artifact/研究与刷新恢复均通过。产品运行时扫描 172 个文件、旧 authority 引用 0，5.4/5.5 完成。
+
+## 6. 观察与回滚保护
+
+- [x] 6.1 建立 authority mismatch、命令错误、revision/idempotency 冲突、Generation age/checkpoint、Stop/stale 和 usage 对账 dashboard/告警。
+- [x] 6.2 监控旧 route 调用、数据库查询和代码路径，记录陈旧客户端/任务调用方并完成迁移。
+- [x] 6.3 验证切换后回滚工具不会执行 canonical → ThreadTree 反向同步，也不会把落后 legacy 数据恢复为权威。
+- [x] 6.4 在声明观察窗口内完成逐日完整性/计费审计，并由负责人批准进入遗留删除阶段。
+
+### 第 6.1/6.2 阶段本地审计基础（不等同生产 dashboard）
+
+- `pnpm audit:conversation-cutover-health` 只读输出 canonical Generation 状态/年龄/checkpoint、billing、outbox、command、usage 对账，以及 legacy 行数、运行时代码引用和可用时的 `pg_stat_statements` 聚合；不输出 Message/SQL 正文或凭据。
+- authority mismatch、HTTP command error、revision/idempotency conflict 和 legacy route 请求率无法由数据库证明，工具显式报告 unavailable；生产必须接入日志/指标平台，不能把“不可见”写成“零”。
+- dashboard 指标、维度和放行原则记录在 `docs/architecture/issue-34-observability-runbook.md`。本目标是 manifest 锁定的单用户本地库，零外部流量且没有独立客户端/worker；数据库不可证明的 HTTP 指标保持 `unavailable`，没有伪装为零。运行时零引用、旧 route 物理删除、drain、真实 API/Ego canary 与最终健康审计构成本地等价门禁。仓库负责人要求继续至本地目标完成，批准进入遗留删除；该结论不得复用于共享或生产环境。
+
+### 第 6.3 阶段本地保护（不等同目标环境验证）
+
+- 新增只读前滚恢复规划器：首个 canonical 写入前只允许“零 canonical 写入”的 legacy abort；首写之后强制保持 canonical authority，只允许 canonical 备份恢复或前滚修复。
+- schema 与运行时规则共同拒绝 `canonical → legacy`、legacy 备份恢复为权威、重新启用 branch-tree 写入和复用故障 epoch；自动测试覆盖合法/非法路径。
+- 使用真实首写时间 `2026-08-21T19:33:42.757Z`、备份 SHA 与恢复验证 ID 运行 `issue-34-local-forward-recovery-request-2026-08-24.json`；只读规划器输出 `post-write-forward-recovery / canonical-to-canonical`，6.3 完成。
+
+## 7. 删除遗留运行时代码
+
+- [x] 7.1 删除 canonical build 中的 `ThreadTreeState`、魔法 `main`、parent/children/Message forks/depth/activeLeaf 等重复领域事实和 selector。
+- [x] 7.2 删除 Tree Store mutation、`persistNow`、save debounce、卸载 flush、startup reconcile 和 Generation merge 协调代码。
+- [x] 7.3 删除旧 branch-tree/Generation 写路由、仓储和新代码对 legacy types 的导入，保留历史迁移文件不重写。
+- [x] 7.4 运行 `rg`/依赖检查证明运行时代码无旧 authority 读写，并通过完整行为矩阵、typecheck、build 和测试。
+
+## 8. 物理清理与 OpenSpec 收口
+
+- [x] 8.1 审计 `branch_trees`、`branch_generations` 及名称相似表的全部 FK、job、查询和备份依赖，形成精确删除清单。
+- [x] 8.2 在备份保留/恢复验证和零依赖门禁通过后，执行分阶段不可逆迁移删除确认遗留表、列、索引和约束。
+- [x] 8.3 建立旧 OpenSpec supersession map；保留已完成历史，明确记录 `persist-thread-chat-generations` 未完成项被新 lifecycle/cutover 替代，不补勾任务。
+- [x] 8.4 按依赖顺序归档新 changes，验证最终 specs 以 Project → Conversation → Thread 模型和 canonical capabilities 为权威。
+- [x] 8.5 运行最终 `pnpm openspec:validate`、schema 漂移检查、生产 smoke 和数据完整性/计费审计并记录结果。
+
+### 第 8.1 阶段删除依赖审计（2026-08-22，本地）
+
+- `pnpm audit:legacy-conversation-deletion` 可重复输出数据库精确行数/大小、5 条 FK、11 个索引、trigger/view/function、名称相似 relation、数据库定时任务、账单引用和 140 个分类后的仓库引用；本地未发现业务 view、显式 trigger、存储函数或 `pg_cron` 依赖。
+- 本地三张 legacy 表分别为 19 个 Tree、37 个 Generation、1 条 feedback；5 条 `usage_records` 通过无 FK 的 `app_generation_id` 引用 legacy Generation，物理删除时必须保留账单流水。
+- 精确删除清单记录在 `docs/architecture/issue-34-legacy-deletion-inventory.md`。产品运行时、cutover 运维工具、历史迁移/快照和备份指纹采用不同处置；禁止 `DROP ... CASCADE` 或改写历史迁移。
+- 后续完成全部本地门禁，以前滚迁移 `0014_reflective_diamondback.sql` 显式删除四张空 legacy/cutover 表；没有 `CASCADE`，保留账单流水和历史迁移。迁移后健康审计证明表不存在、运行时引用 0、canonical 数据与计费无风险。
+
+### 第 8.3 阶段规范替代映射
+
+- `supersession-map.md` 明确了旧 branch-tree persistence、tree list 数据源、Generation sidecar、Message DAG identity、canvas 与 Artifact provenance 到六个 canonical changes 的替代关系，同时保留 composer/Markdown/actions/help 等仍正确的产品能力。
+- `persist-thread-chat-generations` 的 4.5、7.4、10.3、10.4、10.6、10.8 逐项映射到新 lifecycle/persistence/API/client/cutover 证据，原任务保持 `[ ]`，没有篡改历史完成状态。
+- 文档记录新 change 的依赖归档顺序；由于目标环境 cutover、观察和物理删除尚未完成，8.4 仍保持未完成。
+
+### 第 8.4/8.5 阶段最终收口（2026-08-24，本地）
+
+- 六份 delta specs 已同步到 `domain`、`conversation-persistence`、`conversation-generation-lifecycle`、`conversation-command-api`、`conversation-client-state`、`conversation-cutover` 主规格；`domain` 已移除旧“线程树层级不变量”，规范术语以 Project → Conversation → Thread 与 ThreadFork 为权威。
+- 前五个 changes 已按依赖顺序归档并各自独立提交；当前 change 的 artifacts 完成、任务 37/37，完成本节后作为链尾归档。
+- 最终 schema 漂移检查为 23 张当前表、`No schema changes`；Webpack production build、真实 HTTP/GLM 5.3、Ego Browser Artifact/研究/刷新、数据库完整性/计费健康审计均通过。
+- 最终 OpenSpec strict 在链尾归档前后均通过；完整证据见 `docs/architecture/issue-34-local-cutover-final-verification-2026-08-24.md`。

@@ -6,22 +6,16 @@ import {
   DEFAULT_MODEL_ID,
   getChatModel,
   isLinearChatModelId,
-  isThreadChatModelId,
   isUnbilledPreviewModel,
 } from "@/constants/model"
 import { isModelConfigured } from "@/lib/ai/provider"
 import { hasPositiveBalance } from "@/lib/billing/credits"
-import {
-  threadChatGenerationIdentitySchema,
-  type ThreadChatGenerationIdentity,
-} from "@/lib/thread-chat/contracts/generation-identity"
-import type { MessageActionFailureResponse } from "@/lib/thread-chat/contracts/message-action-failure"
 
 type ChatRequestBody = {
   messages: UIMessage[]
   tools?: Record<string, ToolJSONSchema>
   deepResearch?: boolean
-  /** thread-chat 分支对话页的持久化 generation identity。 */
+  /** 仅用于明确拒绝已退役客户端，不再解析其内部结构。 */
   threadChat?: unknown
   modelId?: unknown
   id?: string
@@ -47,7 +41,6 @@ type ChatRequestContextDependencies = {
   currentUserId: typeof getCurrentUserId
   getModel: typeof getChatModel
   linearModelAllowed: typeof isLinearChatModelId
-  threadModelAllowed: typeof isThreadChatModelId
   modelConfigured: typeof isModelConfigured
   unbilledPreview: typeof isUnbilledPreviewModel
   positiveBalance: typeof hasPositiveBalance
@@ -57,7 +50,6 @@ const defaultDependencies: ChatRequestContextDependencies = {
   currentUserId: getCurrentUserId,
   getModel: getChatModel,
   linearModelAllowed: isLinearChatModelId,
-  threadModelAllowed: isThreadChatModelId,
   modelConfigured: isModelConfigured,
   unbilledPreview: isUnbilledPreviewModel,
   positiveBalance: hasPositiveBalance,
@@ -104,6 +96,19 @@ export async function prepareChatRequestContext(
     messages: validatedMessages.data,
     tools: envelope.data.tools as Record<string, ToolJSONSchema> | undefined,
   }
+  if (body.threadChat != null)
+    return {
+      kind: "response" as const,
+      response: Response.json(
+        {
+          error: {
+            code: "legacy_protocol_retired",
+            message: "旧分叉聊天协议已退役",
+          },
+        },
+        { status: 410 }
+      ),
+    }
   const rawModelId = body.modelId
   if (
     rawModelId !== undefined &&
@@ -117,39 +122,7 @@ export async function prepareChatRequestContext(
 
   const modelId = typeof rawModelId === "string" ? rawModelId : DEFAULT_MODEL_ID
   const model = dependencies.getModel(modelId)!
-  let threadChat: ThreadChatGenerationIdentity | undefined
-  if (body.threadChat != null) {
-    const parsedIdentity = threadChatGenerationIdentitySchema.safeParse(
-      body.threadChat
-    )
-    if (!parsedIdentity.success)
-      return {
-        kind: "response" as const,
-        response: Response.json(
-          {
-            error: {
-              code: "invalid_generation_identity",
-              message: "thread-chat 请求缺少有效的持久化身份，请刷新页面后重试",
-            },
-          } satisfies MessageActionFailureResponse,
-          { status: 400 }
-        ),
-      }
-    if (!dependencies.threadModelAllowed(modelId))
-      return {
-        kind: "response" as const,
-        response: Response.json(
-          {
-            error: {
-              code: "invalid_thread_model",
-              message: "Thread Chat 不允许使用该模型，请刷新页面后重试",
-            },
-          } satisfies MessageActionFailureResponse,
-          { status: 400 }
-        ),
-      }
-    threadChat = parsedIdentity.data
-  } else if (!dependencies.linearModelAllowed(modelId)) {
+  if (!dependencies.linearModelAllowed(modelId)) {
     return {
       kind: "response" as const,
       response: Response.json(
@@ -187,7 +160,6 @@ export async function prepareChatRequestContext(
     messages: body.messages,
     tools: body.tools,
     deepResearch: body.deepResearch,
-    threadChat,
     linearThreadId: body.id,
     modelId,
     model,

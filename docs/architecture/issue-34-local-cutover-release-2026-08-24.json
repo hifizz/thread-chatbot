@@ -1,0 +1,83 @@
+{
+  "schemaVersion": 1,
+  "action": "conversation-cutover-release",
+  "environment": "local-development-cutover",
+  "database": { "host": "localhost", "name": "thread-chat" },
+  "authority": {
+    "from": "legacy",
+    "to": "canonical",
+    "epoch": "local-issue34-20260824"
+  },
+  "owners": {
+    "release": "codex-executor",
+    "data": "repository-owner",
+    "billing": "repository-owner",
+    "incident": "codex-executor"
+  },
+  "windows": {
+    "maintenanceStartsAt": "2026-08-23T16:17:00.000Z",
+    "maintenanceEndsAt": "2026-08-23T17:17:00.000Z",
+    "observationEndsAt": "2026-08-24T17:17:00.000Z"
+  },
+  "baseline": {
+    "capturedAt": "2026-08-23T16:14:28.136Z",
+    "legacyTrees": 19,
+    "legacyGenerations": 37,
+    "canonicalConversations": 1,
+    "requestsPerMinute": 0,
+    "commandErrorRate": 0,
+    "revisionConflictRate": 0,
+    "usageUnavailableRate": 0
+  },
+  "thresholds": {
+    "maxMaintenanceSeconds": 3600,
+    "maxImportSeconds": 600,
+    "maxCommandErrorRate": 0,
+    "maxRevisionConflictRate": 0,
+    "maxGenerationHeartbeatAgeSeconds": 120,
+    "maxPendingBilling": 0,
+    "maxPendingOutbox": 0,
+    "maxUsageUnavailableRate": 0,
+    "maxLegacyRouteCalls": 0,
+    "maxLegacySqlCalls": 0
+  },
+  "disposition": {
+    "mode": "approved-reset",
+    "retentionRequired": false,
+    "legacyTreeIds": "all",
+    "adrId": "adr-issue-34-local-cutover-disposition",
+    "approvalId": "issue-34-local-reset-2026-08-24",
+    "approvedBy": "repository-owner",
+    "approvedAt": "2026-08-23T16:16:00.000Z",
+    "reason": "19 棵 legacy Tree 均为本地测试数据，完整备份并恢复验证后无需导入",
+    "exclusions": ["usage_records 财务流水不随会话测试数据重置"]
+  },
+  "backups": {
+    "legacy": {
+      "id": "sha256:5278aafc7f9d4bf01607133c09dfff7a9846f9543a68d7ee482097337f2cf078",
+      "sha256": "5278aafc7f9d4bf01607133c09dfff7a9846f9543a68d7ee482097337f2cf078",
+      "restoreTestId": "local-restore-f6e6289ecb5b",
+      "verifiedAt": "2026-08-23T16:15:32.639Z",
+      "verifiedBy": "issue-34-local-cutover"
+    },
+    "canonical": {
+      "id": "sha256:5278aafc7f9d4bf01607133c09dfff7a9846f9543a68d7ee482097337f2cf078",
+      "sha256": "5278aafc7f9d4bf01607133c09dfff7a9846f9543a68d7ee482097337f2cf078",
+      "restoreTestId": "local-restore-f6e6289ecb5b",
+      "verifiedAt": "2026-08-23T16:15:32.639Z",
+      "verifiedBy": "issue-34-local-cutover"
+    }
+  },
+  "goNoGo": {
+    "strictSpecsPassed": true,
+    "behaviorMatrixPassed": true,
+    "securityReviewPassed": true,
+    "dataAuditResolved": true,
+    "drainReady": true,
+    "backupRestorePassed": true,
+    "rollbackRehearsalPassed": true,
+    "canaryActorsReady": true,
+    "dashboardsReady": true,
+    "finalApprovalGranted": true
+  }
+}

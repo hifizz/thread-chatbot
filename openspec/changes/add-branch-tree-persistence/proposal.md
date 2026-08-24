@@ -1,5 +1,9 @@
 # 分支对话树 DB 持久化（刷新不丢）
 
+## 架构状态
+
+本变更记录已经落地的迁移前持久化事实，不再代表最终架构。刷新不丢、所有者隔离和 URL 可定位行为继续有效；`ThreadTreeState` 整包 JSON、`threads.main`、整树 PUT 与防抖写入将由 Issue #34 的 `define-conversation-domain-model`、`normalize-conversation-persistence` 和 `retire-thread-tree-authority` 依次取代。
+
 ## Why
 
 分支对话页（`app/thread-chat/`）目前纯内存：整棵分支树（主线消息、划选锚点、分支列、Artifact 登记）在刷新或重进页面后全部丢失。这是当前体验里最痛的一条——富文本、鲁棒锚点、流式平滑都已就位，唯独对话本身留不住。数据模型（`ThreadTreeState`）从一开始就是纯 JSON、可整体序列化，为持久化留好了路（设计原则 P10），现在把这条路走通。

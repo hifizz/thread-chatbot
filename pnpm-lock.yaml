@@ -12,6 +12,9 @@ patchedDependencies:
   '@assistant-ui/react-markdown@0.14.5':
     hash: 546da2bef2b8a0f05d7e44b760cc91f31a597464de81f020df6ecb03006a1cfb
     path: patches/@assistant-ui__react-markdown@0.14.5.patch
+  next-themes@0.4.6:
+    hash: 9ab742790bc3284034400fc2d6422e596a9b3439e3dacdb030316992ec0bec6e
+    path: patches/next-themes@0.4.6.patch
 
 importers:
 
@@ -124,7 +127,7 @@ importers:
         version: 16.3.1(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(@types/node@20.19.43)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       next-themes:
         specifier: ^0.4.6
-        version: 0.4.6(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+        version: 0.4.6(patch_hash=9ab742790bc3284034400fc2d6422e596a9b3439e3dacdb030316992ec0bec6e)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       parse-diff:
         specifier: ^0.12.0
         version: 0.12.0
@@ -11139,7 +11142,7 @@ snapshots:
 
   negotiator@1.0.0: {}
 
-  next-themes@0.4.6(react-dom@19.2.8(react@19.2.8))(react@19.2.8):
+  next-themes@0.4.6(patch_hash=9ab742790bc3284034400fc2d6422e596a9b3439e3dacdb030316992ec0bec6e)(react-dom@19.2.8(react@19.2.8))(react@19.2.8):
     dependencies:
       react: 19.2.8
       react-dom: 19.2.8(react@19.2.8)

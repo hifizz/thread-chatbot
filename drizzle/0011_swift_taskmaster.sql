@@ -1,0 +1,2 @@
+ALTER TABLE "thread_chat"."conversation_message_feedback" ADD CONSTRAINT "conversation_message_feedback_thread_fk" FOREIGN KEY ("thread_id","conversation_id") REFERENCES "thread_chat"."conversation_threads"("id","conversation_id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "thread_chat"."conversation_message_feedback" ADD CONSTRAINT "conversation_message_feedback_message_fk" FOREIGN KEY ("message_id","thread_id") REFERENCES "thread_chat"."conversation_messages"("id","thread_id") ON DELETE cascade ON UPDATE no action;

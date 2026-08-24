@@ -1,33 +1,39 @@
 "use client"
 
 import { ChevronLeft, ChevronRight } from "lucide-react"
-import type { TurnVariantPickerProps } from "./message-action-types"
+
+export interface MessageVariantOption {
+  id: string
+  derivedThreadCount?: number
+}
 
 export function TurnVariantPicker({
-  threadId,
-  activeAssistantMessageId,
+  activeMessageId,
   alternatives,
   onSwitch,
-}: TurnVariantPickerProps) {
+  label = "回复版本切换",
+}: {
+  activeMessageId: string
+  alternatives: readonly MessageVariantOption[]
+  onSwitch: (messageId: string) => void
+  label?: string
+}) {
   if (alternatives.length < 2) return null
   const activeIndex = Math.max(
     0,
-    alternatives.findIndex(
-      (alternative) =>
-        alternative.assistantMessageId === activeAssistantMessageId
-    )
+    alternatives.findIndex((alternative) => alternative.id === activeMessageId)
   )
   const switchTo = (index: number) => {
     const target = alternatives[index]
-    if (target) void onSwitch(threadId, target.assistantMessageId)
+    if (target) onSwitch(target.id)
   }
   const active = alternatives[activeIndex]
 
   return (
-    <div className="turn-variant-picker" role="group" aria-label="回复版本切换">
+    <div className="turn-variant-picker" role="group" aria-label={label}>
       <button
         type="button"
-        aria-label="上一个回复版本"
+        aria-label="上一个版本"
         disabled={activeIndex === 0}
         onClick={() => switchTo(activeIndex - 1)}
       >
@@ -38,7 +44,7 @@ export function TurnVariantPicker({
       </span>
       <button
         type="button"
-        aria-label="下一个回复版本"
+        aria-label="下一个版本"
         disabled={activeIndex === alternatives.length - 1}
         onClick={() => switchTo(activeIndex + 1)}
       >

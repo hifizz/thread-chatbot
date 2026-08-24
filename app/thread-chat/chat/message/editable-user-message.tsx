@@ -1,26 +1,29 @@
 "use client"
 
-import { useState } from "react"
-import { Check, Copy, Pencil, RotateCcw, X } from "lucide-react"
+import { useState, type ReactNode } from "react"
+import { Check, Copy, Pencil, X } from "lucide-react"
 import {
   MESSAGE_ACTION_ERRORS,
   MESSAGE_ACTION_LABELS,
-  type EditableUserMessageProps,
+  messageActionError,
 } from "../actions/message-action-types"
 import { MessageToolbar } from "../actions/message-toolbar"
 import { useCopyMarkdown } from "../actions/use-copy-markdown"
 
 export function EditableUserMessage({
-  threadId,
-  message,
+  markdown,
   editable,
-  recovery,
-  commands,
-}: EditableUserMessageProps) {
+  variantPicker,
+  onEdit,
+}: {
+  markdown: string
+  editable: boolean
+  variantPicker?: ReactNode
+  onEdit: (markdown: string) => Promise<void>
+}) {
   const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState(message.text)
+  const [draft, setDraft] = useState(markdown)
   const [submitting, setSubmitting] = useState(false)
-  const [retrying, setRetrying] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const { copied, copy } = useCopyMarkdown(setError)
 
@@ -29,19 +32,14 @@ export function EditableUserMessage({
     if (!text || submitting) return
     setSubmitting(true)
     setError(null)
-    const result = await commands.editAndRegenerate(threadId, message.id, text)
-    setSubmitting(false)
-    if (result.ok) setEditing(false)
-    else setError(result.message)
-  }
-
-  const retry = async () => {
-    if (retrying) return
-    setRetrying(true)
-    setError(null)
-    const result = await commands.retryUserTurn(threadId, message.id)
-    setRetrying(false)
-    if (!result.ok) setError(result.message)
+    try {
+      await onEdit(text)
+      setEditing(false)
+    } catch (cause) {
+      setError(messageActionError(cause))
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -50,7 +48,6 @@ export function EditableUserMessage({
         className={`bubble user-message-body${editing ? "editing" : ""}`}
         data-role="user"
       >
-        {message.quote && <div className="msg-quote">{message.quote.text}</div>}
         {editing ? (
           <>
             <textarea
@@ -70,7 +67,7 @@ export function EditableUserMessage({
                 type="button"
                 onClick={() => {
                   setEditing(false)
-                  setDraft(message.text)
+                  setDraft(markdown)
                   setError(null)
                 }}
                 disabled={submitting}
@@ -89,7 +86,7 @@ export function EditableUserMessage({
             </div>
           </>
         ) : (
-          message.text
+          markdown
         )}
       </div>
       {!editing && (
@@ -102,38 +99,23 @@ export function EditableUserMessage({
                 ? MESSAGE_ACTION_LABELS.copied
                 : MESSAGE_ACTION_LABELS.copy,
               icon: copied ? Check : Copy,
-              onSelect: () => void copy(message.text),
+              onSelect: () => void copy(markdown),
             },
             {
               key: "edit",
               label: MESSAGE_ACTION_LABELS.edit,
               icon: Pencil,
               onSelect: () => {
-                setDraft(message.text)
+                setDraft(markdown)
                 setEditing(true)
               },
               disabled: !editable,
               disabledReason: MESSAGE_ACTION_ERRORS.latestUserOnly,
             },
           ]}
-        />
-      )}
-      {recovery && (
-        <div className="recoverable-turn" role="status">
-          <span>这条消息没有可恢复的 AI 回复。</span>
-          <button
-            type="button"
-            disabled={retrying}
-            onClick={() => void retry()}
-          >
-            <RotateCcw size={13} />
-            {retrying ? "重试中…" : "重试"}
-          </button>
-          <button type="button" onClick={() => setEditing(true)}>
-            <Pencil size={13} />
-            编辑后重试
-          </button>
-        </div>
+        >
+          {variantPicker}
+        </MessageToolbar>
       )}
       {error && (
         <div className="message-action-error" role="alert">

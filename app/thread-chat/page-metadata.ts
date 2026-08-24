@@ -1,6 +1,6 @@
 import type { Metadata } from "next"
 
-/** /thread-chat 与 /thread-chat/[treeId] 共用的页面 metadata（两个路由是同一页面的跳板与本体） */
+/** /thread-chat 与 Conversation 详情路由共用的页面 metadata。 */
 export const threadChatMetadata: Metadata = {
   title: "Thread Chat · 分支对话",
   description:

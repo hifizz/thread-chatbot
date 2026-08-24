@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "action": "conversation-recovery-plan",
+  "environment": "local-development-cutover",
+  "database": { "host": "localhost", "name": "thread-chat" },
+  "cutoverEpoch": "local-issue34-20260824",
+  "currentAuthority": "canonical",
+  "firstCanonicalWriteAt": "2026-08-21T19:33:42.757Z",
+  "requestedAction": "restore-canonical-backup",
+  "targetAuthority": "canonical",
+  "dataFlow": "canonical-to-canonical",
+  "backup": {
+    "kind": "canonical",
+    "id": "sha256:5278aafc7f9d4bf01607133c09dfff7a9846f9543a68d7ee482097337f2cf078",
+    "restoreTestId": "local-restore-f6e6289ecb5b"
+  },
+  "incidentId": "issue-34-local-forward-recovery-verification-2026-08-24",
+  "approvedBy": "repository-owner",
+  "approvedAt": "2026-08-23T17:21:00.000Z"
+}

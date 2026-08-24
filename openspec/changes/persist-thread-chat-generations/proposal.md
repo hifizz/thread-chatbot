@@ -32,3 +32,6 @@
 - 客户端：调整发送前持久化、刷新加载 reconcile、后台终态轮询、Stop/Retry 语义和整树防抖写入规则。
 - 计费：保留断连后完整计费，并以应用 generation id 保证一次 attempt 至多扣费一次。
 - 不新增 Redis 或其他外部服务；SSE 字节重放、刷新后的实时续流和进程崩溃后的执行恢复留给 P1/P2。
+# 架构状态
+
+本变更定义的刷新恢复、服务端 Generation 生命周期和计费行为继续有效，但其 `branch_trees.state` 整树协调与 JSON 内部 Thread/Message 身份只属于 Issue #34 迁移前实现。目标 Generation 身份、外键和终态由 `define-conversation-domain-model` → `normalize-conversation-persistence` → `migrate-generation-lifecycle` 迁移链取代；不得据此继续声明整树 JSON 是最终权威模型。

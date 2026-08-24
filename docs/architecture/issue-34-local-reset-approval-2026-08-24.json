@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "action": "approved-conversation-reset",
+  "environment": "local-development-cutover",
+  "database": { "host": "localhost", "name": "thread-chat" },
+  "scope": { "legacyTreeIds": "all" },
+  "expected": {
+    "legacyTrees": 19,
+    "legacyGenerations": 37,
+    "legacyFeedback": 1,
+    "mappings": 0,
+    "canonicalConversations": 0,
+    "canonicalGenerations": 0,
+    "canonicalFeedback": 0,
+    "canonicalArtifacts": 0,
+    "commandRecords": 0,
+    "outboxEvents": 0,
+    "preservedUsageRecords": 0
+  },
+  "backupId": "sha256:5278aafc7f9d4bf01607133c09dfff7a9846f9543a68d7ee482097337f2cf078",
+  "approvalId": "issue-34-local-reset-2026-08-24",
+  "approvedBy": "repository-owner",
+  "approvedAt": "2026-08-23T16:16:00.000Z",
+  "reason": "19 棵 legacy Tree 均为无保留义务的本地测试数据；完整备份恢复验证后批准不导入并重置"
+}

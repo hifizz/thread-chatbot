@@ -1,0 +1,973 @@
+"use client"
+
+import dynamic from "next/dynamic"
+import { useRouter } from "next/navigation"
+import { MessageScroller } from "@shadcn/react/message-scroller"
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react"
+
+import { AssistantMessageToolbar } from "../chat/actions/assistant-message-toolbar"
+import { MESSAGE_ACTION_LABELS } from "../chat/actions/message-action-types"
+import {
+  TurnVariantPicker,
+  type MessageVariantOption,
+} from "../chat/actions/turn-variant-picker"
+import { ConversationComposer } from "../chat/composer/conversation-composer"
+import { EditableUserMessage } from "../chat/message/editable-user-message"
+import { MarkdownBody } from "../chat/message/markdown-body"
+import "../thread-chat.css"
+import "./canonical-thread-chat.css"
+import {
+  ConversationClientError,
+  createConversationClientGateway,
+  type ConversationClientGateway,
+} from "@/lib/thread-chat/client/conversation-client-gateway"
+import { createGenerationCoordinator } from "@/lib/thread-chat/client/generation-coordinator"
+import {
+  createNormalizedConversationStore,
+  canonicalGenerationRecord,
+} from "@/lib/thread-chat/client/normalized-conversation-store"
+import {
+  deriveConversationClientIndexes,
+  selectThreadLineage,
+  selectThreadMessages,
+  selectThreadTitle,
+} from "@/lib/thread-chat/client/conversation-client-selectors"
+import {
+  createConversationUiWorkspaceStore,
+  defaultConversationUiWorkspace,
+  parseConversationUiWorkspace,
+  serializeConversationUiWorkspace,
+} from "@/lib/thread-chat/client/ui-workspace"
+import {
+  conversationId,
+  type ArtifactId,
+  generationId,
+  messageId,
+  threadForkId,
+  threadId,
+  turnId,
+  type ConversationMessage,
+  type ThreadId,
+} from "@/lib/thread-chat/domain/conversation-model"
+import type { MessageFeedback } from "@/lib/thread-chat/contracts/message-feedback"
+
+const CanonicalThreadCanvas = dynamic(
+  () =>
+    import("./canonical-thread-canvas").then(
+      (module) => module.CanonicalThreadCanvas
+    ),
+  { ssr: false, loading: () => <div className="boot-loading">画布加载中…</div> }
+)
+const textOf = (message: ConversationMessage) =>
+  message.content.parts
+    .filter((part) => part.type === "text")
+    .map((part) => part.text)
+    .join("")
+
+export function CanonicalThreadChat({
+  id,
+  expectedSchemaVersion,
+  expectedEpoch,
+}: {
+  id: string
+  expectedSchemaVersion: number
+  expectedEpoch: string
+}) {
+  const router = useRouter()
+  const targetId = conversationId(id)
+  const store = useMemo(() => createNormalizedConversationStore(), [])
+  const gateway = useMemo(
+    () => createConversationClientGateway({ store }),
+    [store]
+  )
+  const coordinator = useMemo(
+    () => createGenerationCoordinator({ store, gateway }),
+    [gateway, store]
+  )
+  const [loaded, setLoaded] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [recoveringMissingConversation, setRecoveringMissingConversation] =
+    useState(false)
+  const [actionError, setActionError] = useState<string | null>(null)
+  const [feedbackByMessageId, setFeedbackByMessageId] = useState<
+    Readonly<Record<string, MessageFeedback>>
+  >({})
+  const [conversationTitleDraft, setConversationTitleDraft] = useState<
+    string | null
+  >(null)
+  const [selectedArtifactId, setSelectedArtifactId] =
+    useState<ArtifactId | null>(null)
+  const [conversationList, setConversationList] = useState<
+    Awaited<ReturnType<typeof gateway.listConversations>>
+  >([])
+  const canonicalVersion = useSyncExternalStore(
+    (fn) => store.subscribe("canonical", fn),
+    () => store.snapshotForKey("canonical"),
+    () => 0
+  )
+  const state = store.getState()
+  const conversation = state.conversationsById[targetId]
+  const workspaceStore = useMemo(
+    () =>
+      createConversationUiWorkspaceStore(
+        defaultConversationUiWorkspace({
+          conversationId: targetId,
+          rootThreadId: threadId(`${targetId}:ui-pending-root`),
+        })
+      ),
+    [targetId]
+  )
+  const workspaceHydrated = useRef(false)
+  const coordinatorDisposeTimer = useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  )
+  const workspace = useSyncExternalStore(
+    workspaceStore.subscribe,
+    workspaceStore.getState,
+    workspaceStore.getState
+  )
+
+  useEffect(() => {
+    if (coordinatorDisposeTimer.current) {
+      clearTimeout(coordinatorDisposeTimer.current)
+      coordinatorDisposeTimer.current = null
+    }
+    gateway
+      .verifyAuthority({
+        authority: "canonical",
+        schemaVersion: expectedSchemaVersion,
+        epoch: expectedEpoch,
+      })
+      .then(() => gateway.loadConversation(targetId))
+      .then(
+        () => setLoaded(true),
+        (cause) => {
+          if (
+            cause instanceof ConversationClientError &&
+            cause.code === "not_found" &&
+            cause.status === 404
+          ) {
+            setRecoveringMissingConversation(true)
+            router.replace("/thread-chat")
+            return
+          }
+          setError(cause instanceof Error ? cause.message : String(cause))
+        }
+      )
+  }, [expectedEpoch, expectedSchemaVersion, gateway, router, targetId])
+  useEffect(() => {
+    if (!loaded) return
+    void gateway.listMessageFeedback(targetId).then(
+      (entries) =>
+        setFeedbackByMessageId(
+          Object.fromEntries(
+            entries.map((entry) => [entry.messageId, entry.feedback])
+          )
+        ),
+      (cause) =>
+        setActionError(cause instanceof Error ? cause.message : String(cause))
+    )
+  }, [gateway, loaded, targetId])
+  useEffect(() => {
+    if (!conversation) return
+    void gateway
+      .listConversations(conversation.projectId, true)
+      .then(setConversationList)
+  }, [canonicalVersion, conversation, gateway])
+  useEffect(() => {
+    const onVisibility = () =>
+      coordinator.setVisibility(
+        document.visibilityState === "hidden" ? "hidden" : "visible"
+      )
+    document.addEventListener("visibilitychange", onVisibility)
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility)
+      // React Strict Mode 会立即 setup → cleanup → setup；延迟释放让第二次 setup 取消它。
+      coordinatorDisposeTimer.current = setTimeout(
+        () => coordinator.dispose(),
+        0
+      )
+    }
+  }, [coordinator])
+  useEffect(() => {
+    if (!conversation) return
+    const key = `thread-chat:canonical-ui:${targetId}`
+    if (!workspaceHydrated.current) {
+      workspaceStore.hydrate(
+        parseConversationUiWorkspace({
+          raw: localStorage.getItem(key),
+          conversationId: targetId,
+          rootThreadId: conversation.rootThreadId,
+          threads: state.threadsById,
+        })
+      )
+      workspaceHydrated.current = true
+    }
+    const release = workspaceStore.subscribe(() => {
+      localStorage.setItem(
+        key,
+        serializeConversationUiWorkspace(workspaceStore.getState())
+      )
+    })
+    return release
+  }, [conversation, state.threadsById, targetId, workspaceStore])
+  useEffect(() => {
+    if (conversation)
+      workspaceStore.reconcileThreads(
+        state.threadsById,
+        conversation.rootThreadId
+      )
+  }, [canonicalVersion, conversation, state.threadsById, workspaceStore])
+
+  if (error)
+    return (
+      <div className="tc">
+        <div className="boot-loading">规范 Conversation 加载失败：{error}</div>
+      </div>
+    )
+  if (recoveringMissingConversation)
+    return (
+      <div className="tc">
+        <div className="boot-loading" role="status">
+          对话已不存在，正在打开可用对话…
+        </div>
+      </div>
+    )
+  if (
+    !loaded ||
+    !conversation ||
+    !workspace.visibleThreadIds.includes(conversation.rootThreadId)
+  )
+    return (
+      <div className="tc">
+        <div className="boot-loading">规范 Conversation 加载中…</div>
+      </div>
+    )
+  const indexes = deriveConversationClientIndexes(state)
+  const allThreads = indexes.threadIdsByConversation[targetId] ?? []
+  const watchGeneration = (
+    targetGenerationId: ReturnType<typeof generationId>
+  ) => {
+    let release = () => {}
+    release = coordinator.subscribe(targetGenerationId, () => {
+      const generation = canonicalGenerationRecord(
+        store.getState().generationsById[targetGenerationId]
+      )
+      if (
+        !generation ||
+        !["completed", "stopped", "failed", "superseded"].includes(
+          generation.status
+        )
+      )
+        return
+      release()
+      void gateway
+        .loadConversation(targetId)
+        .catch((cause) =>
+          setActionError(cause instanceof Error ? cause.message : String(cause))
+        )
+    })
+  }
+  const send = async (targetThreadId: ThreadId, text: string) => {
+    const ids = {
+      turn: turnId(crypto.randomUUID()),
+      user: messageId(crypto.randomUUID()),
+      assistant: messageId(crypto.randomUUID()),
+      generation: generationId(crypto.randomUUID()),
+    }
+    workspaceStore.setDraft(targetThreadId, text)
+    try {
+      await gateway.sendTurn(
+        targetThreadId,
+        {
+          conversationId: targetId,
+          turnId: ids.turn,
+          userMessageId: ids.user,
+          assistantMessageId: ids.assistant,
+          generationId: ids.generation,
+          content: { schemaVersion: 1, parts: [{ type: "text", text }] },
+          modelId: state.threadsById[targetThreadId]!.modelId,
+        },
+        {
+          overlay: {
+            kind: "send",
+            presentationKey: ids.turn,
+            threadId: targetThreadId,
+            draft: text,
+          },
+        }
+      )
+      workspaceStore.setDraft(targetThreadId, "")
+      watchGeneration(ids.generation)
+    } catch (cause) {
+      setActionError(cause instanceof Error ? cause.message : String(cause))
+    }
+  }
+  const fork = async (
+    parent: ThreadId,
+    source: ConversationMessage,
+    quote?: string
+  ) => {
+    const child = threadId(crypto.randomUUID())
+    try {
+      await gateway.forkThread(
+        parent,
+        {
+          conversationId: targetId,
+          forkId: threadForkId(crypto.randomUUID()),
+          childThreadId: child,
+          sourceMessageId: source.id,
+          modelId: state.threadsById[parent]!.modelId,
+          ...(quote
+            ? {
+                anchor: { quote: { exact: quote, prefix: "", suffix: "" } },
+              }
+            : {}),
+        },
+        {
+          overlay: { kind: "fork", presentationKey: child, threadId: parent },
+        }
+      )
+      workspaceStore.openThread(child)
+    } catch (cause) {
+      setActionError(cause instanceof Error ? cause.message : String(cause))
+    }
+  }
+  const runAction = (action: Promise<unknown>) => {
+    setActionError(null)
+    void action.catch((cause) =>
+      setActionError(cause instanceof Error ? cause.message : String(cause))
+    )
+  }
+  const open = (target: ThreadId) => workspaceStore.openThread(target)
+  return (
+    <div className="tc canonical-chat">
+      {actionError && (
+        <div className="canonical-action-error" role="alert">
+          <span>{actionError}</span>
+          <button onClick={() => setActionError(null)}>关闭</button>
+        </div>
+      )}
+      <div className="topbar">
+        <button
+          className="tbtn"
+          onClick={() => {
+            const nextConversationId = conversationId(crypto.randomUUID())
+            runAction(
+              gateway
+                .createConversation(conversation.projectId, {
+                  conversationId: nextConversationId,
+                  rootThreadId: threadId(crypto.randomUUID()),
+                  title: null,
+                  modelId: "glm-5.3",
+                })
+                .then(() => {
+                  router.push(`/thread-chat/${nextConversationId}`)
+                })
+            )
+          }}
+        >
+          新对话
+        </button>
+        <details>
+          <summary className="tbtn">
+            对话列表 · {conversationList.length}
+          </summary>
+          <div className="canonical-tree-menu">
+            {conversationList.map((item) => (
+              <button
+                key={item.id}
+                onClick={() => {
+                  router.push(`/thread-chat/${item.id}`)
+                }}
+              >
+                {item.title ?? "新对话"}
+                {item.lifecycle === "archived" ? "（已归档）" : ""}
+              </button>
+            ))}
+          </div>
+        </details>
+        <button
+          className="tbtn"
+          onClick={() =>
+            setConversationTitleDraft(
+              conversation.customTitle ?? conversation.autoTitle ?? ""
+            )
+          }
+        >
+          重命名
+        </button>
+        <div className="brand">
+          <span className="mark">
+            {conversation.customTitle ?? conversation.autoTitle ?? "新对话"}
+          </span>
+        </div>
+        <div className="spacer" />
+        <button
+          className="tbtn"
+          onClick={() =>
+            runAction(
+              conversation.lifecycle === "active"
+                ? gateway.archiveConversation(targetId)
+                : gateway.restoreConversation(targetId)
+            )
+          }
+        >
+          {conversation.lifecycle === "active" ? "归档对话" : "恢复对话"}
+        </button>
+        <button
+          className="tbtn"
+          onClick={() =>
+            workspaceStore.update((current) => ({
+              ...current,
+              viewMode: current.viewMode === "columns" ? "canvas" : "columns",
+            }))
+          }
+        >
+          {workspace.viewMode === "columns" ? "画布" : "列"}
+        </button>
+        <details>
+          <summary className="tbtn">会话树 · {allThreads.length}</summary>
+          <div className="canonical-tree-menu">
+            {allThreads.map((target) => (
+              <div
+                className="canonical-tree-row"
+                data-thread-id={target}
+                key={target}
+              >
+                <button onClick={() => open(target)}>
+                  {selectThreadTitle(state, target)}
+                  {state.threadsById[target]?.lifecycle === "archived"
+                    ? "（已归档）"
+                    : ""}
+                </button>
+                {target !== conversation.rootThreadId && (
+                  <button
+                    onClick={() =>
+                      runAction(
+                        state.threadsById[target]?.lifecycle === "active"
+                          ? gateway.archiveThread(target)
+                          : gateway.restoreThread(target)
+                      )
+                    }
+                  >
+                    {state.threadsById[target]?.lifecycle === "active"
+                      ? "归档"
+                      : "恢复"}
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        </details>
+      </div>
+      {conversationTitleDraft !== null && (
+        <form
+          className="canonical-title-editor"
+          role="dialog"
+          aria-label="编辑 Conversation 标题"
+          onSubmit={(event) => {
+            event.preventDefault()
+            const title = conversationTitleDraft.trim()
+            if (!title) return
+            runAction(gateway.renameConversation(targetId, { title }))
+            setConversationTitleDraft(null)
+          }}
+        >
+          <label>
+            Conversation 标题
+            <input
+              autoFocus
+              value={conversationTitleDraft}
+              onChange={(event) =>
+                setConversationTitleDraft(event.currentTarget.value)
+              }
+            />
+          </label>
+          <button type="submit">保存</button>
+          <button type="button" onClick={() => setConversationTitleDraft(null)}>
+            取消
+          </button>
+        </form>
+      )}
+      {workspace.viewMode === "canvas" ? (
+        <CanonicalThreadCanvas
+          state={state}
+          conversationId={targetId}
+          onOpenThread={(target) => {
+            open(target)
+            workspaceStore.update((current) => ({
+              ...current,
+              viewMode: "columns",
+            }))
+          }}
+        />
+      ) : (
+        <div className="cols">
+          {workspace.visibleThreadIds.map((targetThreadId) => (
+            <CanonicalColumn
+              key={targetThreadId}
+              threadId={targetThreadId}
+              state={state}
+              onOpen={open}
+              onClose={() => workspaceStore.closeThread(targetThreadId)}
+              onSend={(text) => void send(targetThreadId, text)}
+              onFork={(message, quote) =>
+                void fork(targetThreadId, message, quote)
+              }
+              onStop={(targetGenerationId) =>
+                void gateway.stopGeneration(targetGenerationId)
+              }
+              gateway={gateway}
+              watchGeneration={watchGeneration}
+              feedbackByMessageId={feedbackByMessageId}
+              onFeedback={async (message, feedback) => {
+                const saved = await gateway.setMessageFeedback({
+                  conversationId: targetId,
+                  threadId: message.threadId,
+                  messageId: message.id,
+                  feedback,
+                })
+                setFeedbackByMessageId((current) => {
+                  const next = { ...current }
+                  if (saved) next[message.id] = saved.feedback
+                  else delete next[message.id]
+                  return next
+                })
+              }}
+              runAction={runAction}
+              onOpenArtifact={setSelectedArtifactId}
+            />
+          ))}
+        </div>
+      )}
+      {selectedArtifactId &&
+        state.artifactProvenanceById[selectedArtifactId] && (
+          <aside
+            className="canonical-artifact-drawer"
+            role="dialog"
+            aria-label="Markdown Artifact"
+          >
+            <header>
+              <strong>
+                {state.artifactProvenanceById[selectedArtifactId]!.title}
+              </strong>
+              <button onClick={() => setSelectedArtifactId(null)}>关闭</button>
+            </header>
+            <div className="canonical-artifact-body">
+              <MarkdownBody
+                source={
+                  state.artifactProvenanceById[selectedArtifactId]!.content
+                }
+              />
+            </div>
+          </aside>
+        )}
+    </div>
+  )
+}
+
+function CanonicalColumn({
+  threadId: targetThreadId,
+  state,
+  onOpen,
+  onClose,
+  onSend,
+  onFork,
+  onStop,
+  gateway,
+  watchGeneration,
+  feedbackByMessageId,
+  onFeedback,
+  runAction,
+  onOpenArtifact,
+}: {
+  threadId: ThreadId
+  state: ReturnType<
+    ReturnType<typeof createNormalizedConversationStore>["getState"]
+  >
+  onOpen: (id: ThreadId) => void
+  onClose: () => void
+  onSend: (text: string) => void
+  onFork: (message: ConversationMessage, quote?: string) => void
+  onStop: (id: ReturnType<typeof generationId>) => void
+  gateway: ConversationClientGateway
+  watchGeneration: (id: ReturnType<typeof generationId>) => void
+  feedbackByMessageId: Readonly<Record<string, MessageFeedback>>
+  onFeedback: (
+    message: ConversationMessage,
+    feedback: MessageFeedback | null
+  ) => Promise<void>
+  runAction: (action: Promise<unknown>) => void
+  onOpenArtifact: (id: ArtifactId) => void
+}) {
+  const [threadTitleDraft, setThreadTitleDraft] = useState<string | null>(null)
+  const thread = state.threadsById[targetThreadId]!
+  const conversation = state.conversationsById[thread.conversationId]!
+  const messages = selectThreadMessages(state, targetThreadId)
+  const lineage = selectThreadLineage(state, targetThreadId)
+  const turns = Object.values(state.turnsById)
+    .filter((turn) => turn.threadId === targetThreadId)
+    .sort(
+      (left, right) =>
+        left.position - right.position || left.id.localeCompare(right.id)
+    )
+  const latestTurn = turns.at(-1)
+  const active = Object.values(state.generationsById)
+    .map(canonicalGenerationRecord)
+    .find(
+      (value) =>
+        value?.threadId === targetThreadId &&
+        ["running", "stop_requested"].includes(value.status)
+    )
+  return (
+    <section
+      className={`column ${targetThreadId === conversation.rootThreadId ? "" : "branch"}`}
+      data-thread-id={targetThreadId}
+    >
+      <header className="col-head">
+        <div className="lane">
+          <div className="crumb">
+            {lineage.map((id, index) => (
+              <span key={id}>
+                <button className="seg2" onClick={() => onOpen(id)}>
+                  {selectThreadTitle(state, id)}
+                </button>
+                {index < lineage.length - 1 && <span className="chev">›</span>}
+              </span>
+            ))}
+          </div>
+          <div className="ctitle-row">
+            <span className="ctitle">
+              {selectThreadTitle(state, targetThreadId)}
+            </span>
+            {targetThreadId !== conversation.rootThreadId && (
+              <>
+                <button
+                  className="cbtn"
+                  onClick={() => setThreadTitleDraft(thread.localTitle ?? "")}
+                >
+                  重命名
+                </button>
+                <button
+                  className="cbtn"
+                  onClick={() =>
+                    runAction(gateway.archiveThread(targetThreadId))
+                  }
+                >
+                  归档
+                </button>
+                <button className="cbtn" onClick={onClose}>
+                  关闭
+                </button>
+              </>
+            )}
+          </div>
+          {threadTitleDraft !== null && (
+            <form
+              className="canonical-thread-title-editor"
+              aria-label="编辑 Thread 标题"
+              onSubmit={(event) => {
+                event.preventDefault()
+                const title = threadTitleDraft.trim()
+                if (!title) return
+                runAction(gateway.renameThread(targetThreadId, { title }))
+                setThreadTitleDraft(null)
+              }}
+            >
+              <input
+                autoFocus
+                aria-label="Thread 标题"
+                value={threadTitleDraft}
+                onChange={(event) =>
+                  setThreadTitleDraft(event.currentTarget.value)
+                }
+              />
+              <button type="submit">保存</button>
+              <button type="button" onClick={() => setThreadTitleDraft(null)}>
+                取消
+              </button>
+            </form>
+          )}
+        </div>
+      </header>
+      <MessageScroller.Provider autoScroll defaultScrollPosition="end">
+        <MessageScroller.Root className="msg-scroll-root">
+          <MessageScroller.Viewport
+            className="msg-list"
+            data-list={targetThreadId}
+          >
+            <MessageScroller.Content>
+              <div className="lane">
+                {messages.map((message) => (
+                  <MessageScroller.Item key={message.id} messageId={message.id}>
+                    <CanonicalMessage
+                      message={message}
+                      editable={message.id === latestTurn?.activeUserMessageId}
+                      regeneratable={
+                        message.id === latestTurn?.activeAssistantMessageId
+                      }
+                      onFork={onFork}
+                      state={state}
+                      onEdit={async (source, text) => {
+                        const nextGenerationId = generationId(
+                          crypto.randomUUID()
+                        )
+                        await gateway.editTurnInput(source.turnId, {
+                          conversationId: conversation.id,
+                          userMessageId: messageId(crypto.randomUUID()),
+                          assistantMessageId: messageId(crypto.randomUUID()),
+                          generationId: nextGenerationId,
+                          sourceUserMessageId: source.id,
+                          content: {
+                            schemaVersion: 1,
+                            parts: [{ type: "text", text }],
+                          },
+                          modelId: thread.modelId,
+                        })
+                        watchGeneration(nextGenerationId)
+                      }}
+                      onRegenerate={async (source) => {
+                        const nextGenerationId = generationId(
+                          crypto.randomUUID()
+                        )
+                        await gateway.regenerateTurn(source.turnId, {
+                          conversationId: conversation.id,
+                          assistantMessageId: messageId(crypto.randomUUID()),
+                          generationId: nextGenerationId,
+                          sourceAssistantMessageId: source.id,
+                          modelId: thread.modelId,
+                        })
+                        watchGeneration(nextGenerationId)
+                      }}
+                      onSelect={(source) =>
+                        runAction(
+                          gateway.selectTurnVariant(source.turnId, {
+                            conversationId: conversation.id,
+                            messageId: source.id,
+                            role: source.role as "user" | "assistant",
+                          })
+                        )
+                      }
+                      feedback={feedbackByMessageId[message.id] ?? null}
+                      onFeedback={(feedback) => onFeedback(message, feedback)}
+                      onOpenArtifact={onOpenArtifact}
+                    />
+                  </MessageScroller.Item>
+                ))}
+              </div>
+            </MessageScroller.Content>
+          </MessageScroller.Viewport>
+          <MessageScroller.Button direction="end" className="scroll-end-btn">
+            <span className="scroll-end-icon">↓</span>
+          </MessageScroller.Button>
+        </MessageScroller.Root>
+      </MessageScroller.Provider>
+      <ConversationComposer
+        variant="column"
+        threadId={targetThreadId}
+        isMain={targetThreadId === conversation.rootThreadId}
+        busy={Boolean(active)}
+        modelId={thread.modelId}
+        modelSelectorDisabled
+        modelSelectorDisabledReason={active ? "busy" : "branch"}
+        onSend={onSend}
+        onStop={() => active && onStop(active.id)}
+      />
+    </section>
+  )
+}
+
+function CanonicalMessage({
+  message,
+  editable,
+  regeneratable,
+  onFork,
+  state,
+  onEdit,
+  onRegenerate,
+  onSelect,
+  feedback,
+  onFeedback,
+  onOpenArtifact,
+}: {
+  message: ConversationMessage
+  editable: boolean
+  regeneratable: boolean
+  onFork: (message: ConversationMessage, quote?: string) => void
+  state: ReturnType<
+    ReturnType<typeof createNormalizedConversationStore>["getState"]
+  >
+  onEdit: (message: ConversationMessage, text: string) => Promise<void>
+  onRegenerate: (message: ConversationMessage) => Promise<void>
+  onSelect: (message: ConversationMessage) => void
+  feedback: MessageFeedback | null
+  onFeedback: (feedback: MessageFeedback | null) => Promise<void>
+  onOpenArtifact: (id: ArtifactId) => void
+}) {
+  const [selection, setSelection] = useState("")
+  const text = textOf(message)
+  const variants = Object.values(state.messagesById)
+    .filter(
+      (candidate) =>
+        candidate.turnId === message.turnId && candidate.role === message.role
+    )
+    .sort(
+      (left, right) =>
+        left.createdAt.localeCompare(right.createdAt) ||
+        left.id.localeCompare(right.id)
+    )
+  const variantOptions: MessageVariantOption[] = variants.map((variant) => ({
+    id: variant.id,
+    derivedThreadCount: Object.values(state.threadForksById).filter(
+      (fork) => fork.sourceMessageId === variant.id
+    ).length,
+  }))
+  const variantPicker = (
+    <TurnVariantPicker
+      activeMessageId={message.id}
+      alternatives={variantOptions}
+      label={message.role === "user" ? "提问版本切换" : "回复版本切换"}
+      onSwitch={(targetId) => {
+        const target = variants.find((variant) => variant.id === targetId)
+        if (target) onSelect(target)
+      }}
+    />
+  )
+  const structuredParts = message.content.parts.filter(
+    (part) => part.type === "structured"
+  )
+  const artifactParts = message.content.parts.filter(
+    (part) => part.type === "artifact-reference"
+  )
+  const isWaiting =
+    message.role === "assistant" &&
+    (message.contentState === "pending" ||
+      message.contentState === "streaming") &&
+    text.trim() === "" &&
+    structuredParts.length === 0 &&
+    artifactParts.length === 0
+  return (
+    <article
+      className={`message ${message.role}`}
+      data-msg-id={message.id}
+      onMouseUp={() =>
+        setSelection(window.getSelection()?.toString().trim() ?? "")
+      }
+    >
+      <div className="who">{message.role === "user" ? "你" : "AI"}</div>
+      {message.role === "user" ? (
+        <EditableUserMessage
+          markdown={text}
+          editable={editable}
+          variantPicker={variantPicker}
+          onEdit={(next) => onEdit(message, next)}
+        />
+      ) : (
+        <>
+          <div className="bubble mt-3 mb-1" data-role="assistant">
+            {isWaiting ? (
+              <span className="typing" role="status" aria-label="正在生成回复">
+                <i />
+                <i />
+                <i />
+              </span>
+            ) : (
+              <>
+                <MarkdownBody
+                  source={text}
+                  streaming={message.contentState === "streaming"}
+                />
+                {message.contentState === "streaming" && (
+                  <span className="caret" />
+                )}
+              </>
+            )}
+          </div>
+          {(message.contentState === "complete" ||
+            message.contentState === "incomplete") && (
+            <div className="assistant-actions-row">
+              <AssistantMessageToolbar
+                markdown={text}
+                regeneratable={regeneratable}
+                feedbackEnabled={message.contentState === "complete"}
+                feedback={feedback}
+                forkLabel={
+                  selection
+                    ? MESSAGE_ACTION_LABELS.forkSelection
+                    : MESSAGE_ACTION_LABELS.fork
+                }
+                onFork={() => onFork(message, selection || undefined)}
+                onRegenerate={() => onRegenerate(message)}
+                onFeedback={onFeedback}
+              />
+              {variantPicker}
+            </div>
+          )}
+        </>
+      )}
+      {structuredParts.map((part, index) => (
+        <CanonicalStructuredPart
+          key={`${message.id}:structured:${index}`}
+          kind={part.kind}
+          value={part.value}
+        />
+      ))}
+      {artifactParts.map((part) => (
+        <button
+          className="canonical-artifact"
+          key={part.artifactId}
+          onClick={() => onOpenArtifact(part.artifactId)}
+        >
+          Artifact ·{" "}
+          {state.artifactProvenanceById[part.artifactId]?.title ??
+            part.artifactId}
+        </button>
+      ))}
+    </article>
+  )
+}
+
+function CanonicalStructuredPart({
+  kind,
+  value,
+}: {
+  kind: string
+  value: unknown
+}) {
+  const activities =
+    kind === "research-activities" && Array.isArray(value) ? value : null
+  if (activities)
+    return (
+      <section className="canonical-research" aria-label="研究活动">
+        <strong>研究活动</strong>
+        {activities.map((activity, index) => {
+          const item =
+            activity && typeof activity === "object"
+              ? (activity as Record<string, unknown>)
+              : {}
+          return (
+            <div key={String(item.id ?? index)}>
+              <span>{String(item.kind ?? "研究步骤")}</span>
+              <span> · {String(item.status ?? "unknown")}</span>
+              {Array.isArray(item.sources) && (
+                <span> · {item.sources.length} 个来源</span>
+              )}
+            </div>
+          )
+        })}
+      </section>
+    )
+  return (
+    <details className="canonical-structured">
+      <summary>{kind === "research-plan" ? "研究计划" : kind}</summary>
+      <pre>{JSON.stringify(value, null, 2)}</pre>
+    </details>
+  )
+}

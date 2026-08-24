@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "action": "conversation-backup-verification",
+  "environment": "local-development-cutover",
+  "database": { "host": "localhost", "name": "thread-chat" },
+  "backupId": "sha256:5278aafc7f9d4bf01607133c09dfff7a9846f9543a68d7ee482097337f2cf078",
+  "backupSha256": "5278aafc7f9d4bf01607133c09dfff7a9846f9543a68d7ee482097337f2cf078",
+  "restoreTestId": "local-restore-f6e6289ecb5b",
+  "verifiedAt": "2026-08-23T16:15:32.639Z",
+  "verifiedBy": "issue-34-local-cutover"
+}
