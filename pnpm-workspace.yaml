@@ -6,3 +6,4 @@ allowBuilds:
   unrs-resolver: true
 patchedDependencies:
   '@assistant-ui/react-markdown@0.14.5': patches/@assistant-ui__react-markdown@0.14.5.patch
+  next-themes@0.4.6: patches/next-themes@0.4.6.patch
