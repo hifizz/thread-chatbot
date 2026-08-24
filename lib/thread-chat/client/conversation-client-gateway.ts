@@ -74,6 +74,8 @@ type FetchLike = (
 interface PendingRequest {
   readonly commandId: string
   readonly conversationId: ConversationId
+  /** 新建另一个 Conversation 时，结果属于新的聚合，不能安装进当前页面 store。 */
+  readonly mergeIntoCurrentStore: boolean
   readonly url: string
   readonly init: RequestInit
 }
@@ -230,7 +232,8 @@ export function createConversationClientGateway(input: {
     try {
       response = await fetcher(request.url, request.init)
     } catch (cause) {
-      input.store.markCommandConfirming(request.commandId)
+      if (request.mergeIntoCurrentStore)
+        input.store.markCommandConfirming(request.commandId)
       throw new ConversationClientError({
         code: "network_uncertain",
         message: "网络中断，请使用同一命令重试以确认结果",
@@ -244,7 +247,7 @@ export function createConversationClientGateway(input: {
     const value = await responseJson(response)
     if (!response.ok) {
       const error = responseError(value, response, request.commandId)
-      if (response.status === 409) {
+      if (response.status === 409 && request.mergeIntoCurrentStore) {
         try {
           await loadConversation(request.conversationId)
         } catch {
@@ -255,14 +258,17 @@ export function createConversationClientGateway(input: {
         }
       }
       pending.delete(request.commandId)
-      input.store.failCommand(request.commandId, error.message)
+      if (request.mergeIntoCurrentStore)
+        input.store.failCommand(request.commandId, error.message)
       throw error
     }
     const result = parseCommandSuccess(value)
-    const merged = input.store.mergeCommandResult(result)
     pending.delete(request.commandId)
-    if (merged.requiresReload) await loadConversation(request.conversationId)
-    input.store.resolveCommand(request.commandId)
+    if (request.mergeIntoCurrentStore) {
+      const merged = input.store.mergeCommandResult(result)
+      if (merged.requiresReload) await loadConversation(request.conversationId)
+      input.store.resolveCommand(request.commandId)
+    }
     return result
   }
 
@@ -273,6 +279,7 @@ export function createConversationClientGateway(input: {
       readonly conversationId: ConversationId
       readonly revisionScopeId?: string
       readonly body?: unknown
+      readonly mergeIntoCurrentStore?: boolean
     },
     options: CommandOptions = {}
   ) => {
@@ -295,6 +302,7 @@ export function createConversationClientGateway(input: {
     const request: PendingRequest = {
       commandId,
       conversationId: target.conversationId,
+      mergeIntoCurrentStore: target.mergeIntoCurrentStore ?? true,
       url: target.url,
       init: {
         method: target.method,
@@ -305,18 +313,19 @@ export function createConversationClientGateway(input: {
       },
     }
     pending.set(commandId, request)
-    input.store.beginCommand({
-      commandId,
-      kind: options.overlay?.kind ?? target.method.toLowerCase(),
-      presentationKey: options.overlay?.presentationKey ?? commandId,
-      status: "pending",
-      ...(options.overlay?.threadId
-        ? { threadId: options.overlay.threadId }
-        : {}),
-      ...(options.overlay?.draft !== undefined
-        ? { draft: options.overlay.draft }
-        : {}),
-    })
+    if (request.mergeIntoCurrentStore)
+      input.store.beginCommand({
+        commandId,
+        kind: options.overlay?.kind ?? target.method.toLowerCase(),
+        presentationKey: options.overlay?.presentationKey ?? commandId,
+        status: "pending",
+        ...(options.overlay?.threadId
+          ? { threadId: options.overlay.threadId }
+          : {}),
+        ...(options.overlay?.draft !== undefined
+          ? { draft: options.overlay.draft }
+          : {}),
+      })
     return runPending(request)
   }
 
@@ -372,6 +381,9 @@ export function createConversationClientGateway(input: {
           method: "POST",
           conversationId: payload.conversationId,
           body: payload,
+          // 这是跨聚合导航命令。返回 delta 属于新 Conversation，当前页面的
+          // normalized store 必须保持单一 Conversation 身份，待路由切换后再加载。
+          mergeIntoCurrentStore: false,
         },
         options
       ),

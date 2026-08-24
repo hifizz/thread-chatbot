@@ -14,7 +14,7 @@ Package manager is **pnpm** (pnpm-lock.yaml / pnpm-workspace.yaml).
 - `pnpm build` — production build
 - `pnpm lint` — ESLint (flat config, eslint.config.mjs)
 - `pnpm typecheck` — `tsc --noEmit`
-- `pnpm format` — Prettier (with prettier-plugin-tailwindcss for class sorting)
+- `pnpm format` — 仅供 pre-commit hook 使用，Agent 禁止主动执行
 - `pnpm db:generate` — generate a Drizzle migration from `lib/db/schema.ts`
 - `pnpm db:migrate` — apply pending migrations to `DATABASE_URL`
 - `pnpm db:push` — push schema directly without a migration file (quick local iteration)
@@ -27,7 +27,7 @@ To add a shadcn/ui component: `npx shadcn@latest add <name>` (lands in `componen
 
 ## Development workflow
 
-- **Don't run `pnpm format` while writing code.** Only check logic correctness during development; formatting happens once, right before committing. (No husky/lint-staged is configured yet, so this is a manual discipline, not an enforced hook — set one up if asked.)
+- **禁止 Agent 执行 `pnpm format`，也禁止主动执行其他 Prettier 格式化命令。** 仓库的 pre-commit hook 已负责格式化；如果该环节没有执行 format，不补跑、不排查，也不做任何手动格式化。
 - **Run `pnpm typecheck` after each batch of code changes** (a file, or a set of related edits) and fix any errors immediately rather than letting them accumulate.
 - **凡是 `import`（含 `import type`）某个包的子路径，该包必须是 `package.json` 里的直接依赖 —— 不要依赖幻影依赖（phantom dependency）。** pnpm 有时会把传递依赖 hoist 到 `node_modules/` 根,使得本地 `pnpm typecheck`/`pnpm build` 侥幸通过,但 Vercel 干净安装 + pnpm 严格解析下不可从项目根解析,构建报 `Cannot find module 'X'`。**本地构建过 ≠ Vercel 构建过。** 判据:import 的包名若不在 `package.json` 的 `dependencies`/`devDependencies` 里,就显式声明它(版本对齐同族包)。运行时才需要的进 `dependencies`,纯类型(`import type`,构建时擦除)进 `devDependencies`。已被 shiki 家族咬过两次:`@shikijs/langs`·`@shikijs/themes`·`@shikijs/transformers`(运行时,`dependencies`)、`@shikijs/types`(类型,`devDependencies`)—— 这个包族把 langs/themes/types 拆成一堆子包,直接 import 任一子路径都得声明。
 - **After finishing a module-sized chunk of work, sweep for magic strings and duplicated variables/strings/functions.**

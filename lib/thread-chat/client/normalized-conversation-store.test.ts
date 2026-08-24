@@ -727,6 +727,55 @@ test("共享 gateway 在发起视图卸载后仍合并已提交结果", async ()
   )
 })
 
+test("新建 Conversation 不把新聚合合并进当前页面 store", async () => {
+  const store = createNormalizedConversationStore()
+  store.installSnapshot(fixture())
+  const nextConversation = conversationId("conversation-next")
+  const nextRoot = threadId("thread-next-root")
+  const gateway = createConversationClientGateway({
+    store,
+    fetch: async () =>
+      Response.json({
+        schemaVersion: 1,
+        data: {},
+        revisions: { [nextConversation]: 0, [nextRoot]: 0 },
+        delta: {
+          upsert: {
+            conversations: [
+              {
+                ...fixture().snapshot.conversation,
+                id: nextConversation,
+                rootThreadId: nextRoot,
+              },
+            ],
+            threads: [
+              {
+                ...fixture().snapshot.threads[root]!,
+                id: nextRoot,
+                conversationId: nextConversation,
+              },
+            ],
+          },
+          remove: {},
+          invalidate: [],
+        },
+        replayed: false,
+      }),
+  })
+
+  await gateway.createConversation(project, {
+    conversationId: nextConversation,
+    rootThreadId: nextRoot,
+    title: null,
+    modelId: "glm-5.3",
+  })
+
+  assert.equal(store.getState().conversationsById[conversation]?.id, conversation)
+  assert.equal(store.getState().conversationsById[nextConversation], undefined)
+  assert.equal(store.getState().threadsById[nextRoot], undefined)
+  assert.deepEqual(store.getCommandState().pendingByCommandId, {})
+})
+
 test("Fork 使用 Conversation revision，消息反馈始终使用稳定实体 ID", async () => {
   const store = createNormalizedConversationStore()
   store.installSnapshot(fixture())

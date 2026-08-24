@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic"
 import { useRouter } from "next/navigation"
+import { MessageScroller } from "@shadcn/react/message-scroller"
 import {
   useEffect,
   useMemo,
@@ -10,17 +11,23 @@ import {
   useSyncExternalStore,
 } from "react"
 
-import { MarkdownBody } from "../chat/message/markdown-body"
+import { AssistantMessageToolbar } from "../chat/actions/assistant-message-toolbar"
+import { MESSAGE_ACTION_LABELS } from "../chat/actions/message-action-types"
+import {
+  TurnVariantPicker,
+  type MessageVariantOption,
+} from "../chat/actions/turn-variant-picker"
 import { ConversationComposer } from "../chat/composer/conversation-composer"
+import { EditableUserMessage } from "../chat/message/editable-user-message"
+import { MarkdownBody } from "../chat/message/markdown-body"
 import "../thread-chat.css"
 import "./canonical-thread-chat.css"
 import {
+  ConversationClientError,
   createConversationClientGateway,
   type ConversationClientGateway,
 } from "@/lib/thread-chat/client/conversation-client-gateway"
-import {
-  createGenerationCoordinator,
-} from "@/lib/thread-chat/client/generation-coordinator"
+import { createGenerationCoordinator } from "@/lib/thread-chat/client/generation-coordinator"
 import {
   createNormalizedConversationStore,
   canonicalGenerationRecord,
@@ -85,6 +92,8 @@ export function CanonicalThreadChat({
   )
   const [loaded, setLoaded] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [recoveringMissingConversation, setRecoveringMissingConversation] =
+    useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
   const [feedbackByMessageId, setFeedbackByMessageId] = useState<
     Readonly<Record<string, MessageFeedback>>
@@ -138,10 +147,20 @@ export function CanonicalThreadChat({
       .then(() => gateway.loadConversation(targetId))
       .then(
         () => setLoaded(true),
-        (cause) =>
+        (cause) => {
+          if (
+            cause instanceof ConversationClientError &&
+            cause.code === "not_found" &&
+            cause.status === 404
+          ) {
+            setRecoveringMissingConversation(true)
+            router.replace("/thread-chat")
+            return
+          }
           setError(cause instanceof Error ? cause.message : String(cause))
+        }
       )
-  }, [expectedEpoch, expectedSchemaVersion, gateway, targetId])
+  }, [expectedEpoch, expectedSchemaVersion, gateway, router, targetId])
   useEffect(() => {
     if (!loaded) return
     void gateway.listMessageFeedback(targetId).then(
@@ -210,6 +229,14 @@ export function CanonicalThreadChat({
     return (
       <div className="tc">
         <div className="boot-loading">规范 Conversation 加载失败：{error}</div>
+      </div>
+    )
+  if (recoveringMissingConversation)
+    return (
+      <div className="tc">
+        <div className="boot-loading" role="status">
+          对话已不存在，正在打开可用对话…
+        </div>
       </div>
     )
   if (
@@ -515,11 +542,6 @@ export function CanonicalThreadChat({
                 })
               }}
               runAction={runAction}
-              onActionError={(cause) =>
-                setActionError(
-                  cause instanceof Error ? cause.message : String(cause)
-                )
-              }
               onOpenArtifact={setSelectedArtifactId}
             />
           ))}
@@ -564,7 +586,6 @@ function CanonicalColumn({
   feedbackByMessageId,
   onFeedback,
   runAction,
-  onActionError,
   onOpenArtifact,
 }: {
   threadId: ThreadId
@@ -584,7 +605,6 @@ function CanonicalColumn({
     feedback: MessageFeedback | null
   ) => Promise<void>
   runAction: (action: Promise<unknown>) => void
-  onActionError: (cause: unknown) => void
   onOpenArtifact: (id: ArtifactId) => void
 }) {
   const [threadTitleDraft, setThreadTitleDraft] = useState<string | null>(null)
@@ -592,6 +612,13 @@ function CanonicalColumn({
   const conversation = state.conversationsById[thread.conversationId]!
   const messages = selectThreadMessages(state, targetThreadId)
   const lineage = selectThreadLineage(state, targetThreadId)
+  const turns = Object.values(state.turnsById)
+    .filter((turn) => turn.threadId === targetThreadId)
+    .sort(
+      (left, right) =>
+        left.position - right.position || left.id.localeCompare(right.id)
+    )
+  const latestTurn = turns.at(-1)
   const active = Object.values(state.generationsById)
     .map(canonicalGenerationRecord)
     .find(
@@ -605,114 +632,143 @@ function CanonicalColumn({
       data-thread-id={targetThreadId}
     >
       <header className="col-head">
-        <div className="crumb">
-          {lineage.map((id, index) => (
-            <span key={id}>
-              <button className="seg2" onClick={() => onOpen(id)}>
-                {selectThreadTitle(state, id)}
-              </button>
-              {index < lineage.length - 1 && <span className="chev">›</span>}
+        <div className="lane">
+          <div className="crumb">
+            {lineage.map((id, index) => (
+              <span key={id}>
+                <button className="seg2" onClick={() => onOpen(id)}>
+                  {selectThreadTitle(state, id)}
+                </button>
+                {index < lineage.length - 1 && <span className="chev">›</span>}
+              </span>
+            ))}
+          </div>
+          <div className="ctitle-row">
+            <span className="ctitle">
+              {selectThreadTitle(state, targetThreadId)}
             </span>
-          ))}
-        </div>
-        <div className="ctitle-row">
-          <span className="ctitle">
-            {selectThreadTitle(state, targetThreadId)}
-          </span>
-          {targetThreadId !== conversation.rootThreadId && (
-            <>
-              <button
-                className="cbtn"
-                onClick={() => setThreadTitleDraft(thread.localTitle ?? "")}
-              >
-                重命名
+            {targetThreadId !== conversation.rootThreadId && (
+              <>
+                <button
+                  className="cbtn"
+                  onClick={() => setThreadTitleDraft(thread.localTitle ?? "")}
+                >
+                  重命名
+                </button>
+                <button
+                  className="cbtn"
+                  onClick={() =>
+                    runAction(gateway.archiveThread(targetThreadId))
+                  }
+                >
+                  归档
+                </button>
+                <button className="cbtn" onClick={onClose}>
+                  关闭
+                </button>
+              </>
+            )}
+          </div>
+          {threadTitleDraft !== null && (
+            <form
+              className="canonical-thread-title-editor"
+              aria-label="编辑 Thread 标题"
+              onSubmit={(event) => {
+                event.preventDefault()
+                const title = threadTitleDraft.trim()
+                if (!title) return
+                runAction(gateway.renameThread(targetThreadId, { title }))
+                setThreadTitleDraft(null)
+              }}
+            >
+              <input
+                autoFocus
+                aria-label="Thread 标题"
+                value={threadTitleDraft}
+                onChange={(event) =>
+                  setThreadTitleDraft(event.currentTarget.value)
+                }
+              />
+              <button type="submit">保存</button>
+              <button type="button" onClick={() => setThreadTitleDraft(null)}>
+                取消
               </button>
-              <button
-                className="cbtn"
-                onClick={() => runAction(gateway.archiveThread(targetThreadId))}
-              >
-                归档
-              </button>
-              <button className="cbtn" onClick={onClose}>
-                关闭
-              </button>
-            </>
+            </form>
           )}
         </div>
-        {threadTitleDraft !== null && (
-          <form
-            className="canonical-thread-title-editor"
-            aria-label="编辑 Thread 标题"
-            onSubmit={(event) => {
-              event.preventDefault()
-              const title = threadTitleDraft.trim()
-              if (!title) return
-              runAction(gateway.renameThread(targetThreadId, { title }))
-              setThreadTitleDraft(null)
-            }}
-          >
-            <input
-              autoFocus
-              aria-label="Thread 标题"
-              value={threadTitleDraft}
-              onChange={(event) =>
-                setThreadTitleDraft(event.currentTarget.value)
-              }
-            />
-            <button type="submit">保存</button>
-            <button type="button" onClick={() => setThreadTitleDraft(null)}>
-              取消
-            </button>
-          </form>
-        )}
       </header>
-      <div className="canonical-messages">
-        {messages.map((message) => (
-          <CanonicalMessage
-            key={message.id}
-            message={message}
-            onFork={onFork}
-            state={state}
-            onEdit={async (source, text) => {
-              const nextGenerationId = generationId(crypto.randomUUID())
-              await gateway.editTurnInput(source.turnId, {
-                conversationId: conversation.id,
-                userMessageId: messageId(crypto.randomUUID()),
-                assistantMessageId: messageId(crypto.randomUUID()),
-                generationId: nextGenerationId,
-                sourceUserMessageId: source.id,
-                content: { schemaVersion: 1, parts: [{ type: "text", text }] },
-                modelId: thread.modelId,
-              })
-              watchGeneration(nextGenerationId)
-            }}
-            onRegenerate={async (source) => {
-              const nextGenerationId = generationId(crypto.randomUUID())
-              await gateway.regenerateTurn(source.turnId, {
-                conversationId: conversation.id,
-                assistantMessageId: messageId(crypto.randomUUID()),
-                generationId: nextGenerationId,
-                sourceAssistantMessageId: source.id,
-                modelId: thread.modelId,
-              })
-              watchGeneration(nextGenerationId)
-            }}
-            onSelect={(source) =>
-              runAction(
-                gateway.selectTurnVariant(source.turnId, {
-                  conversationId: conversation.id,
-                  messageId: source.id,
-                  role: source.role as "user" | "assistant",
-                })
-              )
-            }
-            feedback={feedbackByMessageId[message.id] ?? null}
-            onFeedback={(feedback) => runAction(onFeedback(message, feedback))}
-            onActionError={onActionError}
-            onOpenArtifact={onOpenArtifact}
-          />
-        ))}
-      </div>
+      <MessageScroller.Provider autoScroll defaultScrollPosition="end">
+        <MessageScroller.Root className="msg-scroll-root">
+          <MessageScroller.Viewport
+            className="msg-list"
+            data-list={targetThreadId}
+          >
+            <MessageScroller.Content>
+              <div className="lane">
+                {messages.map((message) => (
+                  <MessageScroller.Item key={message.id} messageId={message.id}>
+                    <CanonicalMessage
+                      message={message}
+                      editable={message.id === latestTurn?.activeUserMessageId}
+                      regeneratable={
+                        message.id === latestTurn?.activeAssistantMessageId
+                      }
+                      onFork={onFork}
+                      state={state}
+                      onEdit={async (source, text) => {
+                        const nextGenerationId = generationId(
+                          crypto.randomUUID()
+                        )
+                        await gateway.editTurnInput(source.turnId, {
+                          conversationId: conversation.id,
+                          userMessageId: messageId(crypto.randomUUID()),
+                          assistantMessageId: messageId(crypto.randomUUID()),
+                          generationId: nextGenerationId,
+                          sourceUserMessageId: source.id,
+                          content: {
+                            schemaVersion: 1,
+                            parts: [{ type: "text", text }],
+                          },
+                          modelId: thread.modelId,
+                        })
+                        watchGeneration(nextGenerationId)
+                      }}
+                      onRegenerate={async (source) => {
+                        const nextGenerationId = generationId(
+                          crypto.randomUUID()
+                        )
+                        await gateway.regenerateTurn(source.turnId, {
+                          conversationId: conversation.id,
+                          assistantMessageId: messageId(crypto.randomUUID()),
+                          generationId: nextGenerationId,
+                          sourceAssistantMessageId: source.id,
+                          modelId: thread.modelId,
+                        })
+                        watchGeneration(nextGenerationId)
+                      }}
+                      onSelect={(source) =>
+                        runAction(
+                          gateway.selectTurnVariant(source.turnId, {
+                            conversationId: conversation.id,
+                            messageId: source.id,
+                            role: source.role as "user" | "assistant",
+                          })
+                        )
+                      }
+                      feedback={feedbackByMessageId[message.id] ?? null}
+                      onFeedback={(feedback) => onFeedback(message, feedback)}
+                      onOpenArtifact={onOpenArtifact}
+                    />
+                  </MessageScroller.Item>
+                ))}
+              </div>
+            </MessageScroller.Content>
+          </MessageScroller.Viewport>
+          <MessageScroller.Button direction="end" className="scroll-end-btn">
+            <span className="scroll-end-icon">↓</span>
+          </MessageScroller.Button>
+        </MessageScroller.Root>
+      </MessageScroller.Provider>
       <ConversationComposer
         variant="column"
         threadId={targetThreadId}
@@ -730,6 +786,8 @@ function CanonicalColumn({
 
 function CanonicalMessage({
   message,
+  editable,
+  regeneratable,
   onFork,
   state,
   onEdit,
@@ -737,10 +795,11 @@ function CanonicalMessage({
   onSelect,
   feedback,
   onFeedback,
-  onActionError,
   onOpenArtifact,
 }: {
   message: ConversationMessage
+  editable: boolean
+  regeneratable: boolean
   onFork: (message: ConversationMessage, quote?: string) => void
   state: ReturnType<
     ReturnType<typeof createNormalizedConversationStore>["getState"]
@@ -749,13 +808,10 @@ function CanonicalMessage({
   onRegenerate: (message: ConversationMessage) => Promise<void>
   onSelect: (message: ConversationMessage) => void
   feedback: MessageFeedback | null
-  onFeedback: (feedback: MessageFeedback | null) => void
-  onActionError: (cause: unknown) => void
+  onFeedback: (feedback: MessageFeedback | null) => Promise<void>
   onOpenArtifact: (id: ArtifactId) => void
 }) {
   const [selection, setSelection] = useState("")
-  const [copied, setCopied] = useState(false)
-  const copiedTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const text = textOf(message)
   const variants = Object.values(state.messagesById)
     .filter(
@@ -767,15 +823,36 @@ function CanonicalMessage({
         left.createdAt.localeCompare(right.createdAt) ||
         left.id.localeCompare(right.id)
     )
-  useEffect(
-    () => () => {
-      if (copiedTimer.current) clearTimeout(copiedTimer.current)
-    },
-    []
+  const variantOptions: MessageVariantOption[] = variants.map((variant) => ({
+    id: variant.id,
+    derivedThreadCount: Object.values(state.threadForksById).filter(
+      (fork) => fork.sourceMessageId === variant.id
+    ).length,
+  }))
+  const variantPicker = (
+    <TurnVariantPicker
+      activeMessageId={message.id}
+      alternatives={variantOptions}
+      label={message.role === "user" ? "提问版本切换" : "回复版本切换"}
+      onSwitch={(targetId) => {
+        const target = variants.find((variant) => variant.id === targetId)
+        if (target) onSelect(target)
+      }}
+    />
   )
-  const runMessageAction = (action: Promise<unknown>) => {
-    void action.catch(onActionError)
-  }
+  const structuredParts = message.content.parts.filter(
+    (part) => part.type === "structured"
+  )
+  const artifactParts = message.content.parts.filter(
+    (part) => part.type === "artifact-reference"
+  )
+  const isWaiting =
+    message.role === "assistant" &&
+    (message.contentState === "pending" ||
+      message.contentState === "streaming") &&
+    text.trim() === "" &&
+    structuredParts.length === 0 &&
+    artifactParts.length === 0
   return (
     <article
       className={`message ${message.role}`}
@@ -784,106 +861,75 @@ function CanonicalMessage({
         setSelection(window.getSelection()?.toString().trim() ?? "")
       }
     >
-      <div className="who">{message.role}</div>
-      <div className="bubble">
-        {message.role === "assistant" ? (
-          <MarkdownBody
-            source={text}
-            streaming={
-              message.contentState === "streaming" ||
-              message.contentState === "pending"
-            }
-          />
-        ) : (
-          text
-        )}
-        {message.content.parts
-          .filter((part) => part.type === "structured")
-          .map((part, index) => (
-            <CanonicalStructuredPart
-              key={`${message.id}:structured:${index}`}
-              kind={part.kind}
-              value={part.value}
-            />
-          ))}
-        {message.content.parts
-          .filter((part) => part.type === "artifact-reference")
-          .map((part) => (
-            <button
-              className="canonical-artifact"
-              key={part.artifactId}
-              onClick={() => onOpenArtifact(part.artifactId)}
-            >
-              Artifact ·{" "}
-              {state.artifactProvenanceById[part.artifactId]?.title ??
-                part.artifactId}
-            </button>
-          ))}
-      </div>
-      <div className="canonical-actions">
+      <div className="who">{message.role === "user" ? "你" : "AI"}</div>
+      {message.role === "user" ? (
+        <EditableUserMessage
+          markdown={text}
+          editable={editable}
+          variantPicker={variantPicker}
+          onEdit={(next) => onEdit(message, next)}
+        />
+      ) : (
+        <>
+          <div className="bubble mt-3 mb-1" data-role="assistant">
+            {isWaiting ? (
+              <span className="typing" role="status" aria-label="正在生成回复">
+                <i />
+                <i />
+                <i />
+              </span>
+            ) : (
+              <>
+                <MarkdownBody
+                  source={text}
+                  streaming={message.contentState === "streaming"}
+                />
+                {message.contentState === "streaming" && (
+                  <span className="caret" />
+                )}
+              </>
+            )}
+          </div>
+          {(message.contentState === "complete" ||
+            message.contentState === "incomplete") && (
+            <div className="assistant-actions-row">
+              <AssistantMessageToolbar
+                markdown={text}
+                regeneratable={regeneratable}
+                feedbackEnabled={message.contentState === "complete"}
+                feedback={feedback}
+                forkLabel={
+                  selection
+                    ? MESSAGE_ACTION_LABELS.forkSelection
+                    : MESSAGE_ACTION_LABELS.fork
+                }
+                onFork={() => onFork(message, selection || undefined)}
+                onRegenerate={() => onRegenerate(message)}
+                onFeedback={onFeedback}
+              />
+              {variantPicker}
+            </div>
+          )}
+        </>
+      )}
+      {structuredParts.map((part, index) => (
+        <CanonicalStructuredPart
+          key={`${message.id}:structured:${index}`}
+          kind={part.kind}
+          value={part.value}
+        />
+      ))}
+      {artifactParts.map((part) => (
         <button
-          disabled={!text}
-          onClick={() =>
-            runMessageAction(
-              navigator.clipboard.writeText(text).then(() => {
-                setCopied(true)
-                if (copiedTimer.current) clearTimeout(copiedTimer.current)
-                copiedTimer.current = setTimeout(() => setCopied(false), 2_000)
-              })
-            )
-          }
+          className="canonical-artifact"
+          key={part.artifactId}
+          onClick={() => onOpenArtifact(part.artifactId)}
         >
-          {copied ? "已复制" : "复制"}
+          Artifact ·{" "}
+          {state.artifactProvenanceById[part.artifactId]?.title ??
+            part.artifactId}
         </button>
-        {message.role === "assistant" && (
-          <button onClick={() => onFork(message, selection || undefined)}>
-            {selection ? "从选中内容分叉" : "从此消息分叉"}
-          </button>
-        )}
-        {message.role === "user" && (
-          <button
-            onClick={() => {
-              const next = prompt("编辑用户输入", text)
-              if (next?.trim()) runMessageAction(onEdit(message, next.trim()))
-            }}
-          >
-            编辑
-          </button>
-        )}
-        {message.role === "assistant" && (
-          <>
-            <button
-              aria-pressed={feedback === "positive"}
-              onClick={() =>
-                onFeedback(feedback === "positive" ? null : "positive")
-              }
-            >
-              👍{feedback === "positive" ? " 已赞" : ""}
-            </button>
-            <button
-              aria-pressed={feedback === "negative"}
-              onClick={() =>
-                onFeedback(feedback === "negative" ? null : "negative")
-              }
-            >
-              👎{feedback === "negative" ? " 已踩" : ""}
-            </button>
-            <button onClick={() => runMessageAction(onRegenerate(message))}>
-              重新生成
-            </button>
-          </>
-        )}
-        {variants.length > 1 &&
-          variants.map((variant, index) => (
-            <button
-              key={variant.id}
-              disabled={variant.id === message.id}
-              onClick={() => onSelect(variant)}
-            >
-              变体 {index + 1}/{variants.length}
-            </button>
-          ))}
-      </div>
+      ))}
     </article>
   )
 }

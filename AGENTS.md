@@ -15,3 +15,7 @@ project-wide instructions. `CLAUDE.md` is the single source of truth for shared
 development commands, workflow rules, architecture, and implementation notes.
 
 If an instruction in this file conflicts with `CLAUDE.md`, follow this file.
+
+## Formatting
+
+- **禁止 Agent 执行 `pnpm format`，也禁止主动执行其他 Prettier 格式化命令。** 仓库的 pre-commit hook 已负责格式化；如果该环节没有执行 format，不补跑、不排查，也不做任何手动格式化。

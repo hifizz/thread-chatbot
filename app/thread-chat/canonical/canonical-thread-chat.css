@@ -76,28 +76,6 @@
   grid-template-columns: 1fr auto;
   gap: 4px;
 }
-.canonical-messages {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-  padding: 18px;
-}
-.canonical-actions {
-  display: flex;
-  gap: 8px;
-  margin-top: 5px;
-}
-.canonical-actions button {
-  border: 0;
-  background: transparent;
-  color: var(--ink-faint);
-  font-size: 11px;
-  cursor: pointer;
-}
-.canonical-actions button:disabled {
-  cursor: not-allowed;
-  opacity: 0.45;
-}
 .canonical-research,
 .canonical-structured {
   margin-top: 8px;

@@ -48,7 +48,7 @@ fenced code block 已通过共享 `ShikiCode` 组件获得 token 级语法高亮
 
 - 流式状态下保留 plaintext
 - 内容稳定后交给共享 `ShikiCode` 组件
-- 通过 `next-themes` 选择 `vitesse-light` / `vitesse-dark`
+- 通过全站 `ThemeProvider` 选择 `vitesse-light` / `vitesse-dark`
 
 依赖审计与实现结果：
 
