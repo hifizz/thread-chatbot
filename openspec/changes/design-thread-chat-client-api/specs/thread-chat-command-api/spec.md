@@ -58,11 +58,11 @@ Project metadata 更新 MUST 允许独立修改 customTitle、Target 和 Instruc
 - **AND** 不得创建任何 Project 数据
 
 ### Requirement: 提供 ProjectBootstrap Query
-服务端 MUST 提供 `GET /api/v1/projects/{projectId}/bootstrap`。响应 MUST 包含 Project DTO、全量轻量 ThreadTopologyItem、ProjectArtifactSummary、唯一 Root Thread 的 MessageBundle，以及恢复这些 Message 所需的 AssistantRunState 和关联 Artifact。
+服务端 MUST 提供 `GET /api/v1/projects/{projectId}/bootstrap`。响应 MUST 包含 Project DTO、全量轻量 ThreadTopologyItem、ProjectArtifactSummary、唯一 Root Thread 的 MessageBundle，以及恢复这些 Message 所需的 AssistantRunState。Message 中可以包含 Artifact ID 引用，但 Bootstrap 不得返回 Artifact 正文。
 
 Bootstrap MUST NOT 返回 BaseContext、所有 Branch Message、全部 Project File/Artifact 正文或服务端 Prompt。Thread topology MUST 足以由客户端派生 Root、Child、depth 和 breadcrumb。
 
-ProjectArtifactSummary MUST 统计该 Project 的全部 Artifact，并 MUST 至少返回服务端单调 `changeSequence`、总数和按稳定 `kind` 聚合的数量。它不得退化为 Root MessageBundle 中 `includedArtifacts` 的数量；`total` 必须等于各 kind 计数之和。`changeSequence` 只用于拒绝乱序旧统计，不得成为 Command 请求参数或写入前置条件。
+ProjectArtifactSummary MUST 统计该 Project 的全部 Artifact，并 MUST 至少返回服务端单调 `changeSequence`、总数和按稳定 `kind` 聚合的数量。它不得退化为客户端已经按 ID 加载的 Artifact 数量；`total` 必须等于各 kind 计数之和。`changeSequence` 只用于拒绝乱序旧统计，不得成为 Command 请求参数或写入前置条件。
 
 #### Scenario: 加载现有 Project
 - **WHEN** actor 请求可访问 Project 的 Bootstrap
@@ -78,12 +78,14 @@ ProjectArtifactSummary MUST 统计该 Project 的全部 Artifact，并 MUST 至�
 #### Scenario: 未加载 Branch Artifact 仍计入统计
 - **WHEN** Project 的 Branch Thread 中存在 3 个 Markdown Artifact，但 Bootstrap 不返回该 Branch 的 Message
 - **THEN** `artifactSummary.byKind.markdown` MUST 仍然等于 3
-- **AND** Root bundle 的 `includedArtifacts` MAY 不包含这 3 个 Artifact
+- **AND** Root bundle MUST NOT 因此返回这 3 个 Artifact 的正文
 
 ### Requirement: 按 Thread 提供 MessageBundle
-服务端 MUST 提供 `GET /api/v1/threads/{threadId}/messages`，并 MUST 通过 Thread 所属 Project 校验访问权。响应 MUST 返回有效 Message、相关 AssistantRunState 和渲染这些 Message 所需的 Artifact；默认最多返回最新 200 条，再按 sequence 升序输出。
+服务端 MUST 提供 `GET /api/v1/threads/{threadId}/messages`，并 MUST 通过 Thread 所属 Project 校验访问权。响应 MUST 返回有效 Message 与相关 AssistantRunState；默认最多返回最新 200 条，再按 sequence 升序输出。
 
 响应 MUST 包含 `hasOlderMessages` 和可供未来向前加载的边界 sequence。MVP 客户端可以不请求更早页面，但 API 不得让调用方通过下载整棵 Project 才能读取一个 Thread。
+
+P0 中，Markdown tool result MUST 在符合 AI SDK v7 的 Message part 中保存 `artifactId`，不得复制 Markdown 正文。客户端需要展示正文时 MUST 通过独立 Artifact Query 按 ID 加载。
 
 #### Scenario: Thread 少于 200 条有效 Message
 - **WHEN** 客户端读取包含 80 条有效 Message 的 Thread
@@ -112,6 +114,10 @@ ProjectArtifactSummary MUST 统计该 Project 的全部 Artifact，并 MUST 至�
 服务端 MUST 提供在既有 Thread 中发送 user Message 的常用原子命令。该命令 MUST 在同一事务创建 user Message、assistant Message 和 queued MessageRun，并返回三者；模型执行只能在事务提交后启动。
 
 Path MUST 包含已有 `threadId`；Body MUST 只包含合法 user `parts` 和可选 `requestedModelId`。服务端 MUST 根据当前有效历史构造 Prompt，客户端不得提交 Prompt History、BaseContext、待创建 ID 或整棵 Project 状态。
+
+P0 MUST NOT 额外提供“只创建 user Message、不创建 assistant Message 与 MessageRun”的发送命令。该限制只是当前 API 能力边界，不得被实现为 user/assistant 必须角色交替的数据库约束。
+
+P0 MUST NOT 额外提供“只创建 user Message、不创建 assistant Message 与 MessageRun”的发送命令。该限制只是当前 API 能力边界，不得被实现为 user/assistant 必须角色交替的数据库约束。
 
 #### Scenario: 在 Root Thread 发送消息
 - **WHEN** 客户端请求 `POST /api/v1/threads/{threadId}/messages` 并提交合法 user parts
@@ -158,7 +164,7 @@ Edit 请求 MUST 只提交 sourceUserMessageId、新 parts 和可选 requestedMo
 - **AND** 不得修改任何既有 Message
 
 ### Requirement: 通过 assistantMessageId 管理生成生命周期
-服务端 MUST 允许客户端使用 assistantMessageId 查询、订阅和停止对应 MessageRun，而不要求客户端理解内部 MessageRun ID。事件流 MUST 使用严格递增的 eventSequence，并 MUST 支持 `afterEventSequence` 恢复。每次连接 MUST 先返回当前持久化 checkpoint snapshot 及其 cursor；若仍在运行，后续 live event MUST 严格大于该 cursor。旧 token delta MAY 不逐条重放，但恢复结果不得丢失已经持久化的生成内容。
+服务端 MUST 允许客户端使用 assistantMessageId 查询、通过 SSE 订阅并停止对应 MessageRun，而不要求客户端理解内部 MessageRun ID。SSE 事件流 MUST 使用严格递增的 eventSequence，并 MUST 支持 `afterEventSequence` 恢复。每次连接 MUST 先返回当前持久化 checkpoint snapshot 及其 cursor；若仍在运行，后续 live event MUST 严格大于该 cursor。旧 token delta MAY 不逐条重放，但恢复结果不得丢失已经持久化的生成内容。
 
 Stop MUST 是显式 Command；连接关闭、页面刷新或取消订阅不得自动停止 Run。终态事件 MUST 携带或允许随后取得 finalized Message 和终态 AssistantRunState。`run.snapshot` 与 `run.completed` MUST 携带当前 ProjectArtifactSummary，使客户端能够在刷新、重连和 Artifact 生成完成后校正 Project 页面统计；客户端不得依赖事件次数自行累加。
 
@@ -176,6 +182,18 @@ Stop MUST 是显式 Command；连接关闭、页面刷新或取消订阅不得�
 #### Scenario: 仅断开订阅
 - **WHEN** 浏览器关闭事件连接但未发送 Stop
 - **THEN** MessageRun MUST 继续由服务端执行
+
+### Requirement: 按 ID 加载 Artifact
+服务端 MUST 提供 `GET /api/v1/artifacts/{artifactId}`，并 MUST 通过 Artifact 所属 Project 校验访问权。Message、ThreadMessageBundle、ProjectBootstrap 和生成事件 MUST 只通过 `artifactId` 引用 Artifact，不得复制 Markdown 正文。
+
+#### Scenario: 打开 Markdown Artifact
+- **WHEN** 用户打开 Message tool result 引用的 Markdown Artifact
+- **THEN** 客户端 MUST 使用 `artifactId` 请求 Artifact Query
+- **AND** 服务端 MUST 返回对应 Artifact 的完整内容
+
+#### Scenario: 未打开 Artifact
+- **WHEN** 客户端只加载 ProjectBootstrap 或 ThreadMessageBundle，但用户没有打开 Artifact
+- **THEN** 服务端 MUST NOT 返回 Artifact 正文
 
 ### Requirement: 提供 Message feedback 命令
 服务端 MUST 允许客户端按 assistantMessageId 设置 positive、negative 或 null feedback。只有 finalized 且允许评价的 assistant Message 可以接受 feedback；命令不得修改 Message 内容或 MessageRun。

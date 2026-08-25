@@ -15,7 +15,7 @@
 - 定义 `/thread-chat/new` 为无实体 ID 的本地草稿入口；第一次发送时服务端原子创建 Project、Root Thread、首条 user Message、assistant Message 与 MessageRun，客户端再根据返回的 `project.id` 通过集中式路由构造器替换为已创建 Project 的页面 URL。
 - 定义后端 `/api/v1` 的资源标识、请求参数、响应 DTO、错误、原子性、权限与适用场景；所有新实体 ID 均由服务端生成。
 - MVP 首次加载返回全量轻量 Thread topology 和 Root Thread 数据；其他 Thread 按需一次加载最多 200 条有效 Message，不实现复杂分页替换。
-- 本 change 只形成设计与可测试契约，不实现 Zustand Store、Hooks、Route Handler、Stream Client 或 Transport 封装，也暂不编写实施 tasks。
+- 本 change 作为客户端状态与 `/api/v1` 契约的唯一交付清单；Zustand Store、Hooks、Route Handler、SSE Client 和 Transport 按 `tasks.md` 的阶段门实施，不再为同一目标增建管理性 change。
 
 ## Capabilities
 

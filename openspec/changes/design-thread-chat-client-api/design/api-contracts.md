@@ -24,6 +24,7 @@
 | `POST /api/v1/messages/{id}/edits` | Edit 最后一条 user | `parts`, `requestedModelId?` | ReplacementBundle | 修改最后问题并重答 |
 | `POST /api/v1/messages/{id}/regenerations` | Regenerate assistant | `requestedModelId?` | ReplacementBundle | 重新生成最后回答 |
 | `PUT /api/v1/messages/{id}/feedback` | 设置评价 | `positive/negative/null` | FeedbackDTO | 点赞/点踩 |
+| `GET /api/v1/artifacts/{id}` | 加载 Artifact 内容 | artifactId | ArtifactDTO | 用户打开 Markdown 文档 |
 | `GET /api/v1/assistant-messages/{id}/events` | 恢复事件 | `afterEventSequence` | Event stream | 刷新后续接生成 |
 | `POST /api/v1/assistant-messages/{id}/stop` | 停止生成 | assistantMessageId | AssistantRunState | 用户点击 Stop |
 
@@ -226,15 +227,25 @@ type AssistantRunStateDTO = {
   finishedAt: DateTime | null
 }
 
-type IncludedArtifactDTO = {
+type ArtifactDTO = {
   id: string
   projectId: ProjectId
   sourceMessageId: MessageId
   kind: string
   title: string
-  contentIncluded: boolean
-  content: JsonValue | null
+  content: JsonValue
   createdAt: DateTime
+}
+
+/**
+ * Markdown Artifact 工具完成后的目标 output 协议。
+ *
+ * 当前项目基线由服务端在工具完成后生成 Artifact ID，再写入领域消息的
+ * `message.artifactIds`；V1 契约将这层关系收敛到 AI SDK v7 tool output，
+ * 使 Message 本身携带稳定引用，但仍不复制 Markdown 正文。
+ */
+type MarkdownArtifactToolOutput = {
+  artifactId: string
 }
 
 type ProjectArtifactSummaryDTO = {
@@ -266,9 +277,10 @@ type FeedbackDTO = {
 - `AssistantRunStateDTO.assistantMessageId` 必须指向 role 为 assistant 的 Message；每条 assistant Message 恰有一个 Run。
 - `status=completed` 时，Message 必须已有不可变 `parts` 和 `finalizedAt`；`status=failed|stopped` 时 `finishedAt` 非空。
 - `stopRequestedAt` 非空表示服务端已经接受 Stop；它不等于 Run 已进入 `stopped` 终态。
-- `contentIncluded=false` 时 `IncludedArtifactDTO.content` 必须为 `null`；它只表示本响应未内联正文，不表示 Artifact 不存在。
+- Markdown tool result 必须通过 AI SDK v7 Message part 的 output 保存 `artifactId` 引用；其目标 output 必须符合 `MarkdownArtifactToolOutput`，不得把 Markdown 正文复制进 tool result。
+- `ArtifactDTO` 只由独立 Artifact Query 返回；ThreadMessageBundle、ProjectBootstrap 和生成事件不得内联 Artifact 正文。
 - `ProjectArtifactSummaryDTO.changeSequence` 必须是非负整数，并在该 Project 的 Artifact 集合发生变化时单调递增；它只排序统计快照，不是 revision、ETag 或客户端写入前置条件。
-- `ProjectArtifactSummaryDTO.total` 必须等于 `byKind` 所有非负整数值之和；它统计 Project 全量 Artifact，不能退化为当前响应的 `includedArtifacts.length`。
+- `ProjectArtifactSummaryDTO.total` 必须等于 `byKind` 所有非负整数值之和；它统计 Project 全量 Artifact，不能退化为客户端当前 `artifactsById` 缓存的数量。
 
 ### 1.5 复合响应
 
@@ -277,7 +289,6 @@ type ThreadMessageBundleDTO = {
   threadId: ThreadId
   messages: MessageDTO[]
   assistantRuns: AssistantRunStateDTO[]
-  includedArtifacts: IncludedArtifactDTO[]
   hasOlderMessages: boolean
   oldestReturnedSequence: number | null
   newestReturnedSequence: number | null
@@ -314,9 +325,9 @@ type ReplacementBundleDTO = {
 
 `ThreadMessageBundleDTO.messages` 只返回当前有效时间线，即 `supersededAt === null` 的 Message，并按 `sequence ASC` 排列。旧 replacement Message 仍保存在数据库，但不混入默认 UI 时间线。
 
-`assistantRuns` 必须且只包含本 bundle 中 assistant Message 的 Run；不得返回属于其他 Thread 或未返回 Message 的 Run。`includedArtifacts` 必须且只包含渲染本次 Message 所需且允许内联的 Artifact。
+`assistantRuns` 必须且只包含本 bundle 中 assistant Message 的 Run；不得返回属于其他 Thread 或未返回 Message 的 Run。Message 通过 tool result 中的 `artifactId` 引用 Artifact；本 bundle 不复制 Artifact 正文。
 
-`ProjectBootstrapDTO.artifactSummary` 与 `CreationBundleDTO.artifactSummary` 是 Project 级统计读模型。它不枚举 Artifact，也不能由客户端根据局部 `includedArtifacts` 重建；首次创建且尚未产生 Artifact 时必须返回 `{ changeSequence: 0, total: 0, byKind: {} }`。
+`ProjectBootstrapDTO.artifactSummary` 与 `CreationBundleDTO.artifactSummary` 是 Project 级统计读模型。它不枚举 Artifact，也不能由客户端根据已加载的 `artifactsById` 重建；首次创建且尚未产生 Artifact 时必须返回 `{ changeSequence: 0, total: 0, byKind: {} }`。
 
 ## 2. Project API
 
@@ -422,7 +433,7 @@ Body：无。Query：无。
 - `project.id` 必须等于 path `projectId`。
 - `threadTopology` 返回该 Project 全部轻量 Thread，必须恰有一个 `parentThreadId=null` 的 Root。
 - 每个 Branch 的 `parentThreadId` 必须能在同一 `threadTopology` 找到，且不得形成环。
-- `artifactSummary` 必须统计该 Project 的全部 Artifact，不能只统计 `initialThread.includedArtifacts`。
+- `artifactSummary` 必须统计该 Project 的全部 Artifact，不能只统计客户端已经按 ID 加载的 Artifact。
 - `initialThread.threadId` 必须等于 Root ID。
 - Root bundle 默认返回最新最多 200 条有效 Message，再按 sequence 升序输出。
 - Bootstrap 不返回 BaseContext、Branch Message、Prompt History 或全部 Project Resource 正文。
@@ -757,7 +768,6 @@ type RunSnapshotEvent = {
   cursor: number
   run: AssistantRunStateDTO
   message: MessageDTO
-  includedArtifacts: IncludedArtifactDTO[]
   /** 当前 Project 的最新 Artifact 总量，用于刷新或重连后校正页面统计。 */
   artifactSummary: ProjectArtifactSummaryDTO
 }
@@ -773,7 +783,6 @@ type RunCompletedEvent = {
   eventSequence: number
   run: AssistantRunStateDTO
   message: MessageDTO
-  includedArtifacts: IncludedArtifactDTO[]
   /** 本次完成事务提交后的 Project Artifact 总量。 */
   artifactSummary: ProjectArtifactSummaryDTO
 }
@@ -832,7 +841,28 @@ Body：无。成功响应：`200 ApiResponse<AssistantRunStateDTO>`。
 
 主要错误：`assistant_message_not_found`、`message_run_not_found`、`forbidden`。
 
-## 6. 错误码与 HTTP 映射
+## 6. Artifact API
+
+### 6.1 按 ID 加载 Artifact
+
+```http
+GET /api/v1/artifacts/{artifactId}
+```
+
+Query：无。Body：无。成功响应：`200 ApiResponse<ArtifactDTO>`。
+
+决定性关系：
+
+- 服务端必须从 Artifact 所属 Project 校验当前 actor 的访问权。
+- 返回的 `artifact.id` 必须等于 path `artifactId`。
+- Message tool result 中的 `artifactId` 只是引用；Artifact 正文只从本接口返回。
+- 客户端可以在 ProjectRuntime 生命周期内按 ID 缓存成功结果；刷新后按需重新加载。
+
+主要错误：`artifact_not_found`、`forbidden`、`unauthorized`。
+
+手动 Case：打开包含 Markdown tool result 的 Message，读取其中 `artifactId` 后请求本接口；预期返回对应 Markdown。使用其他用户 Project 的 artifactId 请求时，预期 not_found/forbidden。
+
+## 7. 错误码与 HTTP 映射
 
 ```ts
 type ApiErrorCode =
@@ -847,6 +877,7 @@ type ApiErrorCode =
   | "message_not_found"
   | "assistant_message_not_found"
   | "message_run_not_found"
+  | "artifact_not_found"
   | "model_not_available"
   | "thread_archived"
   | "thread_generation_in_progress"

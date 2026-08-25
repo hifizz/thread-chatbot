@@ -28,9 +28,10 @@
 Thread 的 Root/Branch、children、depth 和 breadcrumb MUST 由 `parentThreadId` 派生；Message 默认时间线 MUST 由 `supersededAt IS NULL` 和 `sequence ASC` 派生。BaseContext MUST 保持为服务端内部事实，不得进入普通客户端实体状态或由客户端重建。
 
 #### Scenario: 合并 ProjectBootstrap
-- **WHEN** 客户端收到包含 Project、Thread topology、Message、AssistantRunState 和 Artifact 的合法 ProjectBootstrap
-- **THEN** 客户端 MUST 按实体 ID 规范化合并各类 DTO
+- **WHEN** 客户端收到包含 Project、Thread topology、Root Message、AssistantRunState 和 Project Artifact Summary 的合法 ProjectBootstrap
+- **THEN** 客户端 MUST 按实体 ID 规范化合并这些 DTO 与读模型
 - **AND** 不得保存第二份整树权威快照
+- **AND** Bootstrap 中的 Message 只通过 tool result 的 `artifactId` 引用 Artifact，不得附带 Artifact 正文
 
 #### Scenario: 派生 Branch 关系
 - **WHEN** 一个 Thread 的 `parentThreadId` 指向同 Project 的另一个 Thread
@@ -129,8 +130,13 @@ Selector MUST 至少覆盖 Root Thread、Child Thread、depth、breadcrumb、有
 
 #### Scenario: 组合 ThreadColumnView
 - **WHEN** UI 请求一个 Thread 的列视图
-- **THEN** selector MUST 组合 Thread、有效 Messages、相关 AssistantRunState、Artifact、breadcrumb 和操作可用性
+- **THEN** selector MUST 组合 Thread、有效 Messages、相关 AssistantRunState、Message 中的 Artifact 引用、breadcrumb 和操作可用性
 - **AND** 该 ViewModel 不得成为 API 写入对象
+
+#### Scenario: 打开 Artifact Drawer
+- **WHEN** 用户打开 Message tool result 中 `artifactId` 指向的 Artifact
+- **THEN** Lifecycle/Command Hook MUST 按 ID 调用 Artifact Query，并将成功结果缓存到当前 Project Store
+- **AND** Message 组件不得自行请求或复制 Artifact 正文
 
 #### Scenario: 组合每列 Header ViewModel
 - **WHEN** UI 请求 Root 或某个 Branch Slot 的 Header
@@ -209,9 +215,11 @@ Application Command MUST 至少覆盖：加载/创建 Project、加载 Thread、
 - **AND** 不得向 ProjectCatalogStore 增加未确认 Project
 
 ### Requirement: 采用轻量 Bootstrap 与按 Thread 加载
-进入持久化 Project 时，客户端 MUST 首先加载 ProjectBootstrap。Bootstrap MUST 包含 Project、全量轻量 Thread topology、Project Artifact Summary、Root Thread 的有效 Message、相关 AssistantRunState 和渲染这些 Message 所需的 Artifact，但 MUST NOT 包含所有 Branch Message、BaseContext 或全部大型资源正文。
+进入持久化 Project 时，客户端 MUST 首先加载 ProjectBootstrap。Bootstrap MUST 包含 Project、全量轻量 Thread topology、Project Artifact Summary、Root Thread 的有效 Message 和相关 AssistantRunState，但 MUST NOT 包含所有 Branch Message、BaseContext 或 Artifact 正文。
 
 其他 Thread 的 Message MUST 在首次打开时按 Thread 加载。MVP 客户端 MUST 支持一次合并最多 200 条按 sequence 升序排列的有效 Message，并 MUST 保留服务端返回的 `hasOlderMessages` 信息，但不要求实现复杂的树内自动分页替换。
+
+P0 的 Markdown tool result MUST 只向客户端提供 `artifactId` 引用。只有用户打开 Artifact Drawer 时，客户端才 MUST 通过 Artifact Query 按 ID 加载正文；加载 ProjectBootstrap、ThreadMessageBundle 或 topology 不得提前下载 Markdown 正文。
 
 客户端 MUST 使用 ProjectRuntime 级 `ThreadMessageLoader` 管理 `threadId → in-flight Promise/AbortController`。Promise、AbortController 和 in-flight Map MUST NOT 进入 Zustand；Store 只保存每个 Thread 的 `LoadState`、窗口边界和已合并实体。同一 Thread 的并发 ensure MUST 复用同一个 Promise，不同 Thread MUST 可以并行加载。
 

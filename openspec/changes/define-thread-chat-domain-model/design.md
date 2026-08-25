@@ -26,18 +26,18 @@ branch_message_feedback ── 以 treeId/threadId/messageId 关联反馈
 - 让 Project 同时成为列表项、Thread 拓扑、标题、共享资源和永久删除边界。
 - 让 Project 在 MVP 中直接归属于当前登录用户，不预建尚不存在的团队/分组层。
 - 保留已确认的 sequence、Message replacement、BaseContext.messageIds、Fork 与 MessageRun 机制。
-- 给出从 `branch_trees`、嵌入实体和 `branch_generations` 迁移到规范化表的 PostgreSQL 目标 Schema 与模块骨架。
+- 给出接替 `branch_trees`、嵌入实体和 `branch_generations` 权威职责的 PostgreSQL 目标 Schema 与模块骨架。
 
 **Non-Goals:**
 
-- 本 change 不修改代码、数据库、API、前端或 `tasks.md`。
+- 本 change 的 design/spec 固定整体领域基线；代码、数据库、API 和前端通过 `tasks.md` 中的分拆交付链逐步落地，不在单一步骤整体重写。
 - 不设计团队、成员、组织切换或平台级共享；出现真实需求后再独立建模。
 - 不完整设计 Project Memory、Instruction、Target 和 File 的内容协议、检索、版本或同步机制；本设计只固定它们的 Project 归属边界。
 - 不引入 Turn、Message Variant、Generation Chat 实体、通用 revision、V1 幂等系统或 ArtifactVersion。
 
 ## Decisions
 
-### D1. 从当前 User → Thread Tree 基线迁移到 User → Project
+### D1. 由 User → Project 接替当前 User → Thread Tree 基线
 
 目标所有权与聊天内容：
 
@@ -119,7 +119,7 @@ Project 的确定边界：
 - `/thread-chat/{projectId}` 是 canonical 内容 URL。
 - Project 永久删除会清理整个 Thread 族群与共享资源。
 
-Project 在目标模型中接替当前一条 `branch_trees` 记录所表达的产品边界，但不继承整树 JSON 的物理存储方式。迁移时，旧 `treeId` 只作为旧数据定位键或映射来源，不继续充当由客户端创建的新 Project ID。
+Project 在目标模型中接替当前一条 `branch_trees` 记录所表达的产品边界，但不继承整树 JSON 的物理存储方式。新 Project ID 由服务端生成；旧 `treeId` 不再作为新模型的资源身份，也不建立历史数据映射。
 
 ### D3. Project Resource 共享范围与来源分离
 
@@ -270,18 +270,18 @@ stateDiagram-v2
 
 字段使用 snake_case；所有新实体 ID 由服务端生成 UUID。目标表继续引用项目现有认证 `user.id`，不在本 change 新增其他所有权层。
 
-#### 当前持久化到目标实体的对应关系
+#### 当前权威职责到目标实体的接替关系
 
-| 当前真实来源 | 目标 | 本 change 固定的边界 |
+| 当前真实来源 | 目标 | 本 change 固定的职责接替边界 |
 |---|---|---|
-| `branch_trees` 一行 | 一个 Project | `user_id` 成为 `owner_user_id`；`title/custom_title` 迁移到 Project 标题；旧 `treeId` 只作迁移定位，不再由客户端生成新 ID |
-| `branch_trees.state.threads` | `threads` 多行 | 每个嵌入 Thread 成为同一 Project 下的独立 row；`parentId/forkFromMsgId/anchorText` 转换为 Parent、source 与 Fork snapshot |
-| `Thread.messages` 消息图 | `messages` 多行 | 当前有效路径迁移为默认时间线；所有保留节点都获得服务端 sequence，非默认节点如何标记 superseded 由持久化迁移 change 给出可验证算法 |
-| `state.artifacts` | `artifacts` 多行 | 保留内容、来源 Thread/Message，并补 Project ownership |
-| `branch_generations` | `message_runs` | 当前 generation 与目标 1:1 MessageRun 的转换必须显式处理历史 attempt；不得把多条 attempt 直接塞给同一 assistant Message |
-| `branch_message_feedback` | 后续 Message feedback 表 | 使用迁移后的 Project/Thread/Message 映射重建关联 |
+| `branch_trees` 一行 | 一个 Project | 接替整簇对话、标题和 owner 边界；Project ID 改由服务端生成 |
+| `branch_trees.state.threads` | `threads` 多行 | 接替嵌入 Thread；Parent、source 与 Fork snapshot 成为规范化关系 |
+| `Thread.messages` 消息图 | `messages` 多行 | 接替消息图；默认时间线改由服务端 sequence 与 superseded 状态表达 |
+| `state.artifacts` | `artifacts` 多行 | 接替内嵌 registry；内容独立保存，并增加 Project ownership 与 Message provenance |
+| `branch_generations` | `message_runs` | 接替 attempt sidecar；目标关系固定为每条 assistant Message 恰有一条 Run |
+| `branch_message_feedback` | Message feedback 表 | 接替 tree/thread/message 复合身份，直接关联规范化 assistant Message |
 
-历史 `branch_trees.user_id IS NULL` 是现有兼容数据，不自动归属于任意用户。迁移实施前必须先按当前“精确 URL 认领”规则完成归属，或把未认领记录隔离；不得猜测 owner。
+上表用于防止实现误读当前基线，不表示需要迁移旧记录。本地开发不保留现有 `branch_trees` 数据，不建立 treeId 映射、未认领记录处理或历史 generation attempt 转换逻辑。
 
 #### `projects`
 
@@ -448,14 +448,14 @@ Provider、Zustand、路由交接和多栏异步加载属于客户端/API 设计
 
 ## Migration Plan
 
-本 change 只更新设计。后续实施顺序：
+本 change 先固定设计，并通过 `tasks.md` 跟踪后端实施。交付顺序：
 
-1. 归档新的 `domain`，确立 Project → Thread → Message 术语。
-2. 建立规范化持久化 change，定义 `branch_trees.state`、嵌入 Thread/Message/Artifact 与 `branch_generations` 到新表的迁移和校验。
-3. 建立 Project/Thread Command API 与 ProjectBootstrap change。
-4. 建立 MessageRun 与恢复流 change。
-5. 建立客户端 Project entities、Thread topology、generationStreams 与 UI selectors。
-6. 完成服务端集成、API 合同、Store/Hook 与端到端验收。
-7. 切换 `/thread-chat/{projectId}` 为唯一入口，再退役旧 ThreadTree/branch generation 权威路径。
+1. 冻结术语、职责与测试门；建立 Vitest、隔离 PostgreSQL 测试数据库和 Fake AI Runtime。
+2. 使用 `pnpm db:push` 在测试数据库建立规范化 Schema，不迁移本地旧数据。
+3. 实现领域、Repository、Application Command/Query 与 MessageRun 后台执行，并通过后端集成测试。
+4. 由 `design-thread-chat-client-api` 实现 `/api/v1`、SSE、前端状态架构和现有 UI 接入；后端/API 测试全部通过前不得开始 UI 接入。
+5. E2E 验收通过后删除旧 ThreadTree/branch generation 权威代码与表，再次 `pnpm db:push`。
+6. 先归档本 domain change，再归档依赖它的客户端/API change，消除循环等待。
+7. 归档完成后，把稳定目标架构提炼到 `openspec/specs/domain/architecture.md`。
 
-切换前可以撤销新入口并保留旧读写路径；切换后的数据禁止回写旧整树 JSON。`tasks.md` 将在领域和配套设计全部确认后统一重写，本轮不更新。
+开发期间旧页面可以继续运行，但新旧后端不双写；前端切换前的回退方式是保留旧实现代码，而不是维护两套数据同步。`tasks.md` 记录唯一实施顺序、阶段门、旧权威退役、归档及永久架构文档提炼。

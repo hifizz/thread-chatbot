@@ -23,7 +23,7 @@ flowchart TD
 
 - App Store：Project 列表摘要与跨 Project 外壳 UI，不保存 `selectedProjectId`。
 - URL/Provider：决定当前 ProjectRuntime。
-- Project Store：规范化保存当前 Project 的 Thread、已加载 Message、Run、Artifact、请求状态和本地工作台状态。
+- Project Store：规范化保存当前 Project 的 Thread、已加载 Message、Run、按需加载的 Artifact、请求状态和本地工作台状态。
 - ThreadMessageLoader：保存非序列化 `threadId → Promise/AbortController`，负责请求去重与 Runtime 级取消。
 - Column Slot：只决定某个物理列当前展示哪个 Thread，不拥有 Message 数据。
 
@@ -158,7 +158,7 @@ async function ensureThreadMessages(threadId: ThreadId): Promise<void> {
         expectedThreadId: threadId,
       })
 
-      // 一次同步 State Transition 合并 Message、Run、Artifact 和 ready 窗口。
+      // 一次同步 State Transition 合并 Message、Run 和 ready 窗口；Artifact 正文按 ID 另行加载。
       store.getState().applyMessageBundle(bundle)
 
       // 只恢复本 Bundle 中 queued/running 的 assistant Run。
@@ -181,7 +181,7 @@ async function ensureThreadMessages(threadId: ThreadId): Promise<void> {
 }
 ```
 
-同一 Thread 的多个调用复用同一个 Promise；不同 Thread 的请求互不等待。`applyMessageBundle` 必须验证 Bundle 的 Thread/Project 归属、Message 的 `threadId`、sequence 窗口和 Run/Artifact 引用后再原子合并。
+同一 Thread 的多个调用复用同一个 Promise；不同 Thread 的请求互不等待。`applyMessageBundle` 必须验证 Bundle 的 Thread/Project 归属、Message 的 `threadId`、sequence 窗口和 Run 关联后再原子合并。Message 中的 `artifactId` 只是引用，不在此流程加载正文。
 
 ## 5. Column 与迟到响应
 
@@ -229,7 +229,7 @@ ColumnSlot.threadId
   + ThreadMessageWindowState
   + active MessageEntity[]
   + AssistantRunState
-  + included ArtifactEntity
+  + Message parts 中的 artifactId 引用
   → ThreadColumnView
 ```
 

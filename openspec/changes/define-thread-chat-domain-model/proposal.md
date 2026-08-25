@@ -21,7 +21,7 @@
 - Fork 只能使用 finalized 且具备 Prompt 资格的 Message；最后一条 assistant queued/running 时，前端禁用且后端拒绝 Fork。
 - 单条 Message 不执行 hard delete；只有永久删除整个 Project 时，统一清理其 Thread、Message、MessageRun 与 Project 附属资源。
 - 每条 assistant Message 对应一条持久化 MessageRun；它取代当前 `branch_generations` 的 attempt/current sidecar 语义。user Message 不具有 MessageRun，浏览器断开不停止后台运行。
-- 本 change 只更新领域规范与目标设计，不修改应用代码、数据库、API 或前端；`tasks.md` 按已确认约定暂不更新。
+- 本 change 作为 Issue #34 的领域基线与后端交付清单；数据库、领域、Repository、Application 与后台运行按 `tasks.md` 的阶段门实施，不再为同一目标增建一组管理性 change。
 
 ## Capabilities
 
@@ -31,13 +31,13 @@
 
 ### Modified Capabilities
 
-- `domain`：从当前 `Thread Tree → embedded Thread → embedded Message` 基线迁移到规范化的 `Project → Thread → Message`，并明确 Fork、replacement、BaseContext 与 MessageRun 的目标边界。
+- `domain`：将当前 `Thread Tree → embedded Thread → embedded Message` 基线重构为规范化的 `Project → Thread → Message`，并明确 Fork、replacement、BaseContext 与 MessageRun 的目标边界。
 
 ## Impact
 
-- OpenSpec：重写 `domain` 增量规范和设计；后续持久化、API、MessageRun、客户端 Store 与退役 change 必须以当前 `ThreadTreeState / branch_trees / branch_generations` 为迁移起点。
+- OpenSpec：重写 `domain` 增量规范和设计；后续实现必须以当前 `ThreadTreeState / branch_trees / branch_generations` 为被替换的真实基线。
 - 后端目标：新增 `projects`、`threads`、`messages`、`message_runs` 等规范化表；逐步退役 `branch_trees.state` 与 `branch_generations` 权威路径。
 - 前端目标：`/thread-chat/{projectId}` 加载 `ProjectBootstrap`；“新对话”创建 Project；“对话列表”列出 Projects；客户端 Store 从整树快照改为规范化实体与衍生拓扑。
 - 身份与权限：Project 先直接引用当前登录用户；所有读取和命令都从服务端 Session 校验用户对 Project 的访问权。
 - 共享资源：Project Memory、Instruction、Target、Files 和 Artifacts 对该 Project 的全部 Thread 可用，不跨 Project 自动共享。
-- 现有数据：迁移必须显式映射 `branch_trees.id/state/title/custom_title/user_id`、嵌入 Thread/Message/Artifact 以及对应 `branch_generations`；不得假设存在其他中间实体或表。
+- 本地数据：当前处于本地开发阶段，不保留旧 `branch_trees` 数据；目标 Schema 通过隔离测试数据库验证后使用 `pnpm db:push` 重建，不实现旧 treeId、嵌入实体或 `branch_generations` 的数据迁移器。

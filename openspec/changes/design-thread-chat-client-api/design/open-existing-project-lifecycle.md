@@ -63,7 +63,7 @@ async function loadProjectBootstrap(): Promise<void> {
        * - Project Entity
        * - 全量轻量 Thread topology
        * - Artifact Summary
-       * - Root Message/Run/Artifact
+       * - Root Message/Run；Artifact 正文仍按 ID 加载
        * - Root ThreadMessageWindow ready
        * - Bootstrap ready
        */
@@ -230,7 +230,7 @@ function selectThreadColumnView(
     thread: state.entities.threadsById[threadId],
     messages: selectActiveMessages(state, threadId),
     assistantRuns: selectRunsForThread(state, threadId),
-    artifacts: selectIncludedArtifactsForThread(state, threadId),
+    artifactRefs: selectArtifactRefsFromMessages(state, threadId),
     hasOlderMessages: window.hasOlderMessages,
   })
 }

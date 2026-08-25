@@ -266,7 +266,8 @@ function onAssistantEvent(event: AssistantMessageEvent) {
 
     case "run.completed":
       /**
-       * 一次合并 finalized A1、completed Run、Artifact 和最新 Summary。
+       * 一次合并 finalized A1、completed Run 和最新 Artifact Summary；
+       * Message tool result 只含 artifactId，正文等用户打开后再按 ID 加载。
        * UI 从 checkpoint/running 直接过渡到 Message.parts/finalized。
       */
       runtime.store.getState().applyRunEvent(event)

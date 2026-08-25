@@ -15,7 +15,7 @@
 - **Artifact**：归属于 Project，并保留来源 Message 身份的持久化产物。
 - **Title**：Project 或 Branch Thread 的短标题。
 
-系统 MUST 将当前 Thread Tree 的聚合职责迁移到 Project，并将当前嵌在 `ThreadTreeState` 中的 Thread、Message 和 Artifact 迁移为可独立寻址的实体。目标规范、数据库、API 和客户端实体模型 MUST 使用 Project 表达整簇 Thread 的聚合边界，且 MUST NOT 继续把 Thread Tree、MainThread、ForkedThread、独立 ThreadFork、Turn、Generation 或 Message Variant 作为目标领域实体。
+目标实现 MUST 由 Project 接替当前 Thread Tree 的聚合职责，并将 Thread、Message 和 Artifact 保存为可独立寻址的实体。目标规范、数据库、API 和客户端实体模型 MUST 使用 Project 表达整簇 Thread 的聚合边界，且 MUST NOT 继续把 Thread Tree、MainThread、ForkedThread、独立 ThreadFork、Turn、Generation 或 Message Variant 作为目标领域实体。
 
 #### Scenario: 将一簇分叉对话称为 Project
 - **WHEN** 用户查看由一个 Root Thread 和多列 Branch Thread 组成的工作项
@@ -30,11 +30,6 @@
 - **WHEN** 产品或代码需要描述由 Fork 创建的非根对话列
 - **THEN** 系统 MUST 将该节点称为 Child Thread 或按相对角色称为 Branch Thread
 - **AND** 必须使用 Fork 描述创建动作，不得把 ForkedThread 作为独立实体类型
-
-#### Scenario: 从当前 Thread Tree 建立 Project
-- **WHEN** 系统迁移一条现有 `branch_trees` 记录
-- **THEN** 它 MUST 建立一个对应 Project，并把该记录中的 Thread、Message 和 Artifact 映射到该 Project 下的规范化实体
-- **AND** 不得把现有整树 JSON 误写成已经规范化的 Project 数据
 
 ### Requirement: 维护 Project 的 Thread 拓扑不变量
 系统 MUST 使用 Project 与 Thread 关系维护分叉拓扑：

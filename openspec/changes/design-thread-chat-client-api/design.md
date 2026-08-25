@@ -33,11 +33,11 @@ chat-controller 同时承担：
 
 **Non-Goals:**
 
-- 不实现 Store、Hook、Route Handler、数据库或迁移。
-- 不确定具体 Transport 类、HTTP 库、SSE parser、重试器和认证包装代码。
+- 不在单一步骤整体重写 Store、Hook、Route Handler 或旧页面；通过 `tasks.md` 中的小步交付链逐层接入。
+- P0 事件 Transport 固定为 SSE；具体 HTTP client、SSE parser、重试器和认证包装库由实现 change 选择，但不得改变共享契约。
 - 不实现离线命令队列、通用 Idempotency-Key、跨设备草稿、协同编辑或 Message Variant。
 - 不重新设计服务端数据库 Schema、BaseContext 或 PromptBuilder。
-- 不在本 change 编写 tasks；等本设计和 API 经过多轮确认后统一拆分。
+- 不在本 change 重新设计 Markdown Artifact 的身份关系；Message 的 AI SDK v7 tool result 只保存 `artifactId` 引用，Artifact 内容仍是独立服务端实体并在用户打开时按 ID 加载。
 
 ## Decisions
 
@@ -199,12 +199,14 @@ type ArtifactEntity = {
   kind: string
   title: string
 
-  /** false 表示本响应只返回元数据/引用，不能据 content=null 推断资源为空。 */
-  contentIncluded: boolean
-
-  /** 仅在 contentIncluded=true 时有值；大型正文允许按需加载。 */
-  content: JsonValue | null
+  /** 通过 Artifact Query 按 ID 加载的完整内容，不嵌入 ThreadMessageBundle。 */
+  content: JsonValue
   createdAt: string
+}
+
+type MarkdownArtifactToolOutput = {
+  /** tool result 只保存独立 Artifact 的稳定引用，不复制 Markdown 正文。 */
+  artifactId: ArtifactId
 }
 
 type ProjectArtifactSummary = {
@@ -391,7 +393,7 @@ type ThreadChatEntitiesState = {
    */
   messageIdsByThreadId: Record<ThreadId, MessageId[]>
 
-  /** 仅保存 Bootstrap/Message bundle 已包含或用户按需加载的 Artifact。 */
+  /** 只保存用户实际打开并通过 Artifact Query 加载过的完整 Artifact。 */
   artifactsById: Record<ArtifactId, ArtifactEntity>
 }
 
@@ -420,6 +422,9 @@ type ThreadChatRequestsState = {
 
   /** 每个 Thread 的加载状态和已合并窗口边界，避免重复请求。 */
   threadMessagesById: Record<ThreadId, ThreadMessageWindowState>
+
+  /** 用户打开 Artifact Drawer 后按 ID 加载内容；MessageBundle 只提供 artifactId 引用。 */
+  artifactById: Record<ArtifactId, LoadState>
 
   /**
    * 当前页面的命令 busy/error 状态，key 由命令名和既有资源 ID 构成，
@@ -552,9 +557,11 @@ type ThreadChatProjectActions = {
   applyThreadCreated: (thread: ThreadEntity) => void
   applyReplacementBundle: (bundle: ReplacementBundle) => void
   applyRunEvent: (event: AssistantMessageEvent) => void
+  applyArtifact: (artifact: ArtifactEntity) => void
   setBootstrapLoadState: (state: LoadState) => void
   setCommandState: (scope: string, state: CommandState | null) => void
   setThreadMessageLoadState: (threadId: ThreadId, state: LoadState) => void
+  setArtifactLoadState: (artifactId: ArtifactId, state: LoadState) => void
   restoreWorkbenchSnapshot: (snapshot: ThreadWorkbenchSnapshotV1) => void
   resetWorkbenchToDefault: () => void
   openThread: (threadId: ThreadId, sourceSlotId: "root" | ColumnSlotId) => void
@@ -671,6 +678,7 @@ type ThreadChatProjectCommands = {
   /** 只在未 seed、未 ready 时加载当前 Provider Project 的 Bootstrap。 */
   loadProjectBootstrap: () => Promise<void>
   ensureThreadMessages: (threadId: ThreadId) => Promise<void>
+  ensureArtifact: (artifactId: ArtifactId) => Promise<void>
   updateProject: (patch: PatchProjectRequest) => Promise<void>
   updateThread: (threadId: ThreadId, patch: PatchThreadRequest) => Promise<void>
   archiveThread: (threadId: ThreadId) => Promise<void>
@@ -1079,8 +1087,9 @@ Store Action 与对应 Zustand Store/slice 共置，只执行同步、可测试�
 ```ts
 mergeBootstrap          → 跨 entities/runs/requests 原子初始化 Project
 setBootstrapLoadState   → 只设置 Bootstrap loading/error；ready 由 mergeBootstrap 提交
-applyMessageBundle      → 合并一个 Thread 的有效 Message、Run 与 Artifact
+applyMessageBundle      → 合并一个 Thread 的有效 Message 与 Run；Artifact 只保留在 Message parts 的 ID 引用
 setThreadMessageLoadState → 独立设置某个 Thread 的 loading/error；ready 由 Bundle 原子提交
+applyArtifact/setArtifactLoadState → 用户打开 Drawer 时按 ID 合并独立 Artifact 内容与加载状态
 applyMessageCreationBundle → 合并发送命令返回的 user、assistant 与 Run
 applyThreadCreated      → 合并服务端创建的 Child Thread
 applyReplacementBundle  → 原子标记 superseded 并合并 replacement 与新 Run
@@ -1232,9 +1241,6 @@ type ThreadMessageBundle = {
   /** 必须且只包含本窗口 assistant Message 对应的 Run。 */
   assistantRuns: AssistantRunState[]
 
-  /** 渲染本窗口 Message 所需且允许内联的 Artifact。 */
-  includedArtifacts: ArtifactEntity[]
-
   /** true 表示服务端还存在更早有效 Message；MVP 不自动加载。 */
   hasOlderMessages: boolean
 
@@ -1271,7 +1277,7 @@ Message Query 与 Assistant Run 是两个正交状态：Column 只有在 Message
 
 已有 Project 的完整冷启动、无 Workbench Snapshot、有 Snapshot、多 Branch 并行加载和 Runtime Message Cache 分支见 [打开已有 Project 生命周期](./design/open-existing-project-lifecycle.md)。
 
-MVP 返回最新最多 200 条有效 Message，并按 sequence 升序交给客户端。`hasOlderMessages` 只保留能力边界，当前 UI 不实现树内自动分页替换。
+MVP 返回最新最多 200 条有效 Message，并按 sequence 升序交给客户端。`hasOlderMessages` 只保留能力边界，当前 UI 不实现树内自动分页替换。Markdown tool result 在 Message parts 中保存 `artifactId`；ThreadMessageBundle 不返回 Markdown 正文。只有用户打开 Artifact 时才按 ID 加载独立 Artifact 内容。
 
 ### D9. 核心 Application Command 伪代码
 
@@ -1399,6 +1405,7 @@ useThreadColumnView(slotId)
 useThreadColumnHeaderView(slotId)
 useProjectTreeRows()
 useAssistantRun(assistantMessageId)
+useArtifact(artifactId)
 useForkAvailability(messageId)
 useVisibleThreadColumns()
 useProjectHeaderView()
@@ -1439,6 +1446,7 @@ useProjectRuntimeLifecycle()      // 仅由 ThreadChatProjectProvider 调用
 useEnsureThreadMessagesLoaded(threadId)
 useActiveGenerationSubscriptions()
 useWorkbenchPersistence()        // projectId 从当前 ProjectRuntime 取得
+useEnsureArtifactLoaded(artifactId) // 仅在 Artifact Drawer 打开时按 ID 加载
 ```
 
 生命周期 Hook 可以使用 Effect；Root/children/messages/canFork 等衍生状态禁止用 Effect 镜像。
@@ -1543,7 +1551,7 @@ API capability interface
 → JSON 或 event stream 解码
 ```
 
-Transport 不决定业务原子性、不访问 Zustand、不生成实体 ID、不构造 ViewModel。事件载体最终选 SSE 或 WebSocket，不改变 `assistantMessageId + eventSequence` 的逻辑契约。
+Transport 不决定业务原子性、不访问 Zustand、不生成实体 ID、不构造 ViewModel。P0 使用 SSE 承载生成事件；未来替换 Transport 也不得改变 `assistantMessageId + eventSequence` 的逻辑契约。
 
 ## Risks / Trade-offs
 
@@ -1557,21 +1565,20 @@ Transport 不决定业务原子性、不访问 Zustand、不生成实体 ID、�
 
 ## Migration Plan
 
-本 change 只完成设计。后续建议拆分：
+本 change 不再为同一目标建立七个额外管理性 change，统一按 `tasks.md` 的阶段门实施：
 
-1. `add-thread-chat-v1-contracts`：共享 DTO/error schemas 与 API 集成测试夹具。
-2. `add-thread-chat-project-queries`：Project list、Bootstrap、Thread Message Query。
-3. `add-thread-chat-command-api`：create/send/fork/edit/regenerate/metadata/feedback。
-4. `add-thread-chat-generation-events`：AssistantRun query/event/stop 与刷新恢复。
-5. `normalize-thread-chat-zustand-store`：ProjectCatalog + Project-scoped entities/runs/requests/ui slices。
-6. `add-thread-chat-client-commands`：Store Actions、Application Commands、normalizer 和 generation coordinator。
-7. `integrate-thread-chat-hooks-ui`：Provider、selector/command/lifecycle Hooks 与现有 UI 接入。
-8. Transport 可在第 2～4 步随契约落地，也可先用接口注入的测试 adapter，不改变 Store Action/Application Command 设计。
+1. 共享 DTO/error schemas、Transport capability 与 API 测试夹具。
+2. Project/Thread Query、Command、Artifact Query、SSE 与 Stop。
+3. 后端集成测试和 API 合同测试；全部通过前不得开始前端重构。
+4. Project-scoped Store、Runtime、Application Commands、Coordinator 与 Hooks。
+5. 使用 Ego Browser 固定现有 UI 参考截图和交互清单后，将新数据链路无损接入现有组件。
+6. 前端集成与 E2E 通过后删除旧客户端权威代码，等待 domain change 清理旧后端并先行归档。
+7. domain change 归档后归档本 change，并提炼稳定客户端架构与 API 合同。
 
-切换期不得让新 Store 回写旧 `branch_trees.state`。回滚以路由/feature flag 切回旧页面为边界，新旧实体不做双向同步。
+开发期间保留旧页面代码作为切换前回退边界，但不引入 feature flag、双写或新旧实体同步。P0 使用 SSE；Store 和 Application Command 可以先通过接口注入的测试 adapter 验证。
 
-## Open Questions
+## Resolved P0 Boundaries
 
-- P0 是否需要“只追加 user Message、不立即创建 assistant Run”的独立命令？当前 UI 和本设计只提供常用的 `user + assistant + Run` 原子发送，但数据库不变量仍允许未来扩展连续 user Message。
-- Artifact 内容在 ThreadMessageBundle 中按 kind/size 何时内联，何时只返回引用，需要在 Artifact API change 中固定阈值。
-- 事件 Transport 选择 SSE 还是 WebSocket 留到 Transport 设计；逻辑恢复契约已经固定。
+- P0 不提供“只追加 user Message”的独立命令。每次发送原子创建 `user Message + assistant Message + MessageRun`；数据库领域模型不要求角色交替，保留未来增加独立 user append 命令的能力。
+- P0 沿用 Artifact 引用关系：Markdown tool result 保存 `artifactId`，正文由独立 Artifact Query 在用户打开时加载。MessageBundle 不复制 Markdown 正文，因此不需要设计“多大才拆开”的阈值。
+- P0 生成事件使用 SSE。客户端按 `assistantMessageId + eventSequence` 恢复；未来若改用其他 Transport，不改变该逻辑契约。
