@@ -11,6 +11,8 @@ export type ThreadChatApplicationDependencies = {
   generateId: IdGenerator
   now: () => Date
   resolveModelId: (requestedModelId?: string) => string
+  wakeRunAfterCommit?: (messageRunId: string) => void | Promise<void>
+  onWakeError?: (error: unknown) => void
 }
 
 export type ProjectArtifactSummary = {

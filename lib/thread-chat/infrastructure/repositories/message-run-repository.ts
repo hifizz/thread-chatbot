@@ -1,6 +1,12 @@
 import type { UIMessage } from "ai"
 import { invariant } from "../../domain/domain-error"
-import type { MessageId, MessageRunId, UserId } from "../../domain/ids"
+import type {
+  MessageId,
+  MessageRunId,
+  ProjectId,
+  ThreadId,
+  UserId,
+} from "../../domain/ids"
 import {
   assertMessageRunTransition,
   type MessageRun,
@@ -131,6 +137,48 @@ export class MessageRunRepository {
     return rows.map(mapMessageRun)
   }
 
+  async findExecutionContext(messageRunId: MessageRunId): Promise<{
+    run: MessageRun
+    actorId: UserId
+    projectId: ProjectId
+    threadId: ThreadId
+  } | null> {
+    const [row] = await this.sql<Record<string, unknown>[]>`
+      select
+        r.id, r.assistant_message_id as "assistantMessageId", r.status,
+        r.model_id as "modelId", r.event_sequence as "eventSequence",
+        r.checkpoint_parts as "checkpointParts", r.error_code as "errorCode",
+        r.error_message as "errorMessage", r.heartbeat_at as "heartbeatAt",
+        r.stop_requested_at as "stopRequestedAt", r.finished_at as "finishedAt",
+        r.created_at as "createdAt", r.updated_at as "updatedAt",
+        p.owner_user_id as "actorId", p.id as "projectId", t.id as "threadId"
+      from thread_chat.message_runs r
+      join thread_chat.messages m on m.id = r.assistant_message_id
+      join thread_chat.threads t on t.id = m.thread_id
+      join thread_chat.projects p on p.id = t.project_id
+      where r.id = ${messageRunId}
+    `
+    return row
+      ? {
+          run: mapMessageRun(row),
+          actorId: String(row.actorId),
+          projectId: String(row.projectId),
+          threadId: String(row.threadId),
+        }
+      : null
+  }
+
+  async listQueuedIds(limit: number): Promise<MessageRunId[]> {
+    const rows = await this.sql<{ id: string }[]>`
+      select id
+      from thread_chat.message_runs
+      where status = 'queued' and stop_requested_at is null
+      order by created_at, id
+      limit ${limit}
+    `
+    return rows.map((row) => row.id)
+  }
+
   async assertNoActiveForThread(actorId: UserId, threadId: string): Promise<void> {
     const [row] = await this.sql`
       select r.id
@@ -158,11 +206,13 @@ export class MessageRunRepository {
     nextStatus: MessageRunStatus
     finishedAt?: Date | null
     error?: { code: string; message: string } | null
+    incrementEventSequence?: boolean
   }): Promise<MessageRun | null> {
     assertMessageRunTransition(input.expectedStatus, input.nextStatus)
     const [row] = await this.sql<Record<string, unknown>[]>`
       update thread_chat.message_runs r
       set status = ${input.nextStatus},
+          event_sequence = event_sequence + ${input.incrementEventSequence ? 1 : 0},
           finished_at = ${input.finishedAt ?? null},
           error_code = ${input.error?.code ?? null},
           error_message = ${input.error?.message ?? null},
@@ -231,6 +281,34 @@ export class MessageRunRepository {
         r.finished_at as "finishedAt",
         r.created_at as "createdAt",
         r.updated_at as "updatedAt"
+    `
+    return row ? mapMessageRun(row) : null
+  }
+
+  async heartbeat(input: {
+    actorId: UserId
+    messageRunId: MessageRunId
+    heartbeatAt: Date
+  }): Promise<MessageRun | null> {
+    const [row] = await this.sql<Record<string, unknown>[]>`
+      update thread_chat.message_runs r
+      set heartbeat_at = ${input.heartbeatAt}, updated_at = now()
+      from thread_chat.messages m,
+           thread_chat.threads t,
+           thread_chat.projects p
+      where r.id = ${input.messageRunId}
+        and r.status = 'running'
+        and r.assistant_message_id = m.id
+        and m.thread_id = t.id
+        and t.project_id = p.id
+        and p.owner_user_id = ${input.actorId}
+      returning
+        r.id, r.assistant_message_id as "assistantMessageId", r.status,
+        r.model_id as "modelId", r.event_sequence as "eventSequence",
+        r.checkpoint_parts as "checkpointParts", r.error_code as "errorCode",
+        r.error_message as "errorMessage", r.heartbeat_at as "heartbeatAt",
+        r.stop_requested_at as "stopRequestedAt", r.finished_at as "finishedAt",
+        r.created_at as "createdAt", r.updated_at as "updatedAt"
     `
     return row ? mapMessageRun(row) : null
   }

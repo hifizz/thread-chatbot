@@ -20,13 +20,13 @@ export class ThreadChatCommands {
     private readonly dependencies: ThreadChatApplicationDependencies
   ) {}
 
-  createProject(input: {
+  async createProject(input: {
     actorId: UserId
     parts: UserMessageInput
     requestedModelId?: string
   }): Promise<CreationBundle> {
     const modelId = this.dependencies.resolveModelId(input.requestedModelId)
-    return this.unitOfWork.transaction(async (repositories) => {
+    const result = await this.unitOfWork.transaction(async (repositories) => {
       const project = await repositories.projects.insert({
         id: this.dependencies.generateId(),
         ownerUserId: input.actorId,
@@ -50,21 +50,25 @@ export class ThreadChatCommands {
         ...created,
       }
     })
+    await this.wakeAfterCommit(result.assistantRun.id)
+    return result
   }
 
-  sendMessage(input: {
+  async sendMessage(input: {
     actorId: UserId
     threadId: string
     parts: UserMessageInput
     requestedModelId?: string
   }): Promise<MessageCreationBundle> {
     const modelId = this.dependencies.resolveModelId(input.requestedModelId)
-    return this.unitOfWork.transaction((repositories) =>
+    const result = await this.unitOfWork.transaction((repositories) =>
       this.appendTurn(repositories, { ...input, modelId })
     )
+    await this.wakeAfterCommit(result.assistantRun.id)
+    return result
   }
 
-  forkThread(input: {
+  async forkThread(input: {
     actorId: UserId
     sourceThreadId: string
     sourceMessageId: string
@@ -166,13 +170,13 @@ export class ThreadChatCommands {
     })
   }
 
-  regenerate(input: {
+  async regenerate(input: {
     actorId: UserId
     sourceAssistantMessageId: string
     requestedModelId?: string
   }): Promise<ReplacementBundle> {
     const modelId = this.dependencies.resolveModelId(input.requestedModelId)
-    return this.unitOfWork.transaction(async (repositories) => {
+    const result = await this.unitOfWork.transaction(async (repositories) => {
       const found = await repositories.messages.findOwnedById(
         input.actorId,
         input.sourceAssistantMessageId
@@ -234,16 +238,18 @@ export class ThreadChatCommands {
         assistantRun,
       }
     })
+    await this.wakeAfterCommit(result.assistantRun.id)
+    return result
   }
 
-  editLastUser(input: {
+  async editLastUser(input: {
     actorId: UserId
     sourceUserMessageId: string
     parts: UserMessageInput
     requestedModelId?: string
   }): Promise<ReplacementBundle> {
     const modelId = this.dependencies.resolveModelId(input.requestedModelId)
-    return this.unitOfWork.transaction(async (repositories) => {
+    const result = await this.unitOfWork.transaction(async (repositories) => {
       const found = await repositories.messages.findOwnedById(
         input.actorId,
         input.sourceUserMessageId
@@ -310,6 +316,8 @@ export class ThreadChatCommands {
         assistantRun,
       }
     })
+    await this.wakeAfterCommit(result.assistantRun.id)
+    return result
   }
 
   patchProject(input: {
@@ -426,5 +434,13 @@ export class ThreadChatCommands {
       modelId: input.modelId,
     })
     return { userMessage, assistantMessage, assistantRun }
+  }
+
+  private async wakeAfterCommit(messageRunId: string): Promise<void> {
+    try {
+      await this.dependencies.wakeRunAfterCommit?.(messageRunId)
+    } catch (error) {
+      this.dependencies.onWakeError?.(error)
+    }
   }
 }

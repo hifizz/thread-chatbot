@@ -5,6 +5,7 @@ export type MarkdownArtifactRuntimeOutput = {
   kind: "markdown"
   title: string
   content: string
+  toolCallId?: string
 }
 
 /** AI Runtime 的供应商无关输出；持久化游标由 MessageRun runner 分配。 */

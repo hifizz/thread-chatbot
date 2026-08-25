@@ -49,12 +49,12 @@
 
 ## 5. 实现 MessageRun 后台执行
 
-- [ ] 5.1 将 `message_runs.status=queued` 作为持久化待执行事实；事务提交后才尝试唤醒执行器，不建立通用任务平台。
-- [ ] 5.2 实现条件领取 queued Run、heartbeat、checkpoint/eventSequence 持久化和 completed/failed/stopped 原子终态提交，防止同一 Run 重复执行。
-- [ ] 5.3 实现最小 queued scanner，补偿事务已提交但即时唤醒失败的 Run；不得创建第二条 assistant Message 或 MessageRun。
-- [ ] 5.4 接入真实 AI Runtime adapter，并确保领域/Application 只依赖 capability；自动测试使用 Fake AI Runtime，不发起真实计费请求。
-- [ ] 5.5 完成 Markdown Artifact 工具结果投影：创建独立 Artifact，最终 Message tool output 保存稳定 `artifactId`。
-- [ ] 5.6 实现显式 Stop；浏览器刷新、断开连接或客户端 Runtime 销毁不得调用 Stop，也不得终止后台执行。
+- [x] 5.1 将 `message_runs.status=queued` 作为持久化待执行事实；事务提交后才尝试唤醒执行器，不建立通用任务平台。
+- [x] 5.2 实现条件领取 queued Run、heartbeat、checkpoint/eventSequence 持久化和 completed/failed/stopped 原子终态提交，防止同一 Run 重复执行。
+- [x] 5.3 实现最小 queued scanner，补偿事务已提交但即时唤醒失败的 Run；不得创建第二条 assistant Message 或 MessageRun。
+- [x] 5.4 接入真实 AI Runtime adapter，并确保领域/Application 只依赖 capability；自动测试使用 Fake AI Runtime，不发起真实计费请求。
+- [x] 5.5 完成 Markdown Artifact 工具结果投影：创建独立 Artifact，最终 Message tool output 保存稳定 `artifactId`。
+- [x] 5.6 实现显式 Stop；浏览器刷新、断开连接或客户端 Runtime 销毁不得调用 Stop，也不得终止后台执行。
 
 ## 6. 后端领域验收门
 
