@@ -61,7 +61,7 @@ export function ThreadSwitcherPanel({
   }, [hi])
 
   const statusOf = (id: string): { label: string } | null => {
-    if (id === "main") return { label: "锚定" }
+    if (state.threads[id]?.parentId === null) return { label: "锚定" }
     const index = slots.findIndex((slot) => slot.id === id)
     if (index < 0) return null
     return { label: slots[index].folded ? "细条" : `第 ${index + 2} 列` }

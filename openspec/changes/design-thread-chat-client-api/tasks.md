@@ -79,14 +79,14 @@
 
 ## 8. 建立 UI Parity 基线并无损接入现有 UI
 
-- [ ] 8.1 在修改 UI 数据接缝前，使用 Ego Browser 和专用本地测试账号记录现有空白页、单列、多栏、Header、Fork、Artifact Drawer、折叠/切换、breadcrumb 与分割线拖拽的参考截图和交互清单。
-- [ ] 8.2 保持现有组件、CSS 类名、布局与交互输出，先只把 Project 列表、`/new` 和已有 Project 页面接到新的 Provider/Runtime。
-- [ ] 8.3 将 Root/Branch Column 改为消费 ThreadColumnView 和 ThreadColumnHeaderView；允许内部拆分复用，但最终呈现不得变化。
-- [ ] 8.4 接入现有 Header 的 Child 选择、Thread 切换、收起和 breadcrumb，保持稳定物理 Slot 与列宽。
-- [ ] 8.5 保留相邻列分割线拖拽；Pointer Move 使用组件瞬时状态，Pointer Up/键盘/双击复位只提交一次 Store Action。
-- [ ] 8.6 实现按 projectId 的 Workbench Snapshot 防抖保存和刷新恢复；恢复多栏、折叠、焦点和列宽，不恢复滚动条或 Composer 草稿。
-- [ ] 8.7 接入 Artifact Drawer 按 `artifactId` 加载及独立 loading/error；生成期间禁用 Fork，服务端仍作最终校验。
-- [ ] 8.8 逐项对照阶段 8.1 的截图和交互清单；任何必须产生用户可见差异的实现立即停止，记录影响并向用户确认后才能继续。
+- [x] 8.1 在修改 UI 数据接缝前，使用 Ego Browser 和专用本地测试账号记录现有空白页、单列、多栏、Header、Fork、Artifact Drawer、折叠/切换、breadcrumb 与分割线拖拽的参考截图和交互清单。
+- [x] 8.2 保持现有组件、CSS 类名、布局与交互输出，先只把 Project 列表、`/new` 和已有 Project 页面接到新的 Provider/Runtime。
+- [x] 8.3 将 Root/Branch Column 改为消费 ThreadColumnView 和 ThreadColumnHeaderView；允许内部拆分复用，但最终呈现不得变化。
+- [x] 8.4 接入现有 Header 的 Child 选择、Thread 切换、收起和 breadcrumb，保持稳定物理 Slot 与列宽。
+- [x] 8.5 保留相邻列分割线拖拽；Pointer Move 使用组件瞬时状态，Pointer Up/键盘/双击复位只提交一次 Store Action。
+- [x] 8.6 实现按 projectId 的 Workbench Snapshot 防抖保存和刷新恢复；恢复多栏、折叠、焦点和列宽，不恢复滚动条或 Composer 草稿。
+- [x] 8.7 接入 Artifact Drawer 按 `artifactId` 加载及独立 loading/error；生成期间禁用 Fork，服务端仍作最终校验。
+- [x] 8.8 逐项对照阶段 8.1 的截图和交互清单；任何必须产生用户可见差异的实现立即停止，记录影响并向用户确认后才能继续。
 
 ## 9. 前后端集成与 Ego Browser E2E
 

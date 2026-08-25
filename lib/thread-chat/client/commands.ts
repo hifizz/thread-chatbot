@@ -200,7 +200,11 @@ export function createThreadChatProjectCommands(input: {
           input.store.getState().applyThreadCreated(result.thread)
           input.store
             .getState()
-            .openThread(result.thread.id, command.sourceSlotId)
+            .openThread(
+              result.thread.id,
+              command.sourceSlotId,
+              command.placement
+            )
         },
       })
     },

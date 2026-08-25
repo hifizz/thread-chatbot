@@ -7,6 +7,23 @@ import {
 } from "../fixtures/thread-chat-api-fixtures"
 
 describe("JsonThreadChatTransport", () => {
+  it("默认 fetch 绑定 globalThis，浏览器调用不会 Illegal invocation", async () => {
+    const nativeLikeFetch = vi.fn(function (this: unknown) {
+      if (this !== globalThis) throw new TypeError("Illegal invocation")
+      return Promise.resolve(
+        Response.json({ data: { items: [], nextCursor: null } })
+      )
+    })
+    vi.stubGlobal("fetch", nativeLikeFetch)
+    try {
+      await expect(new JsonThreadChatTransport().listProjects()).resolves.toEqual(
+        { items: [], nextCursor: null }
+      )
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
   it("编码请求并严格校验成功响应", async () => {
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
       Response.json({

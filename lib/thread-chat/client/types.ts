@@ -194,6 +194,12 @@ export interface ThreadWorkbenchSnapshotV1 {
   canvasPins: Record<ThreadId, Point>
 }
 
+export interface ThreadPlacementOptions {
+  maxExpanded?: number
+  keepSource?: boolean
+  targetSlotId?: ColumnSlotId
+}
+
 export interface ThreadChatProjectActions {
   mergeCreationBundle(bundle: CreationBundle): void
   mergeBootstrap(bootstrap: ProjectBootstrap): void
@@ -217,7 +223,11 @@ export interface ThreadChatProjectActions {
   setArtifactLoadState(artifactId: ArtifactId, state: LoadState): void
   restoreWorkbenchSnapshot(snapshot: ThreadWorkbenchSnapshotV1): void
   resetWorkbenchToDefault(): void
-  openThread(threadId: ThreadId, sourceSlotId: "root" | ColumnSlotId): void
+  openThread(
+    threadId: ThreadId,
+    sourceSlotId: "root" | ColumnSlotId,
+    placement?: ThreadPlacementOptions
+  ): void
   switchColumnThread(slotId: ColumnSlotId, threadId: ThreadId): void
   closeColumn(slotId: ColumnSlotId): void
   setColumnFolded(slotId: ColumnSlotId, folded: boolean): void
@@ -275,6 +285,7 @@ export interface ThreadChatProjectCommands {
   ): Promise<void>
   forkThread(input: {
     sourceSlotId: "root" | ColumnSlotId
+    placement?: ThreadPlacementOptions
     sourceThreadId: ThreadId
     sourceMessageId: MessageId
     anchor?: {

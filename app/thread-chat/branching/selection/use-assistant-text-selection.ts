@@ -59,10 +59,15 @@ export function useAssistantTextSelection({
         const threadId = list?.dataset.list
         const msgId = messageElement?.dataset.msgId
         if (!threadId || !msgId) return
+        const sourceMessage = state.threads[threadId]?.messages.find(
+          (message) => message.id === msgId
+        )
         if (
-          !state.threads[threadId]?.messages.some(
-            (message) => message.id === msgId
-          )
+          !sourceMessage ||
+          sourceMessage.role !== "assistant" ||
+          sourceMessage.status === "pending" ||
+          sourceMessage.status === "streaming" ||
+          sourceMessage.status === "error"
         ) {
           onSelectionChange(null)
           return

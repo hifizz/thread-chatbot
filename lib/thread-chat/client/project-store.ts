@@ -683,7 +683,7 @@ export function createThreadChatProjectStore(input: {
         },
       }))
     },
-    openThread(threadId, sourceSlotId) {
+    openThread(threadId, sourceSlotId, placement) {
       set((state) => {
         const thread = state.entities.threadsById[threadId]
         clientInvariant(
@@ -694,12 +694,46 @@ export function createThreadChatProjectStore(input: {
         const existingIndex = state.ui.columnSlots.findIndex(
           (slot) => slot.threadId === threadId
         )
+        const maxExpanded = Math.max(
+          0,
+          placement?.maxExpanded ??
+            (state.ui.forceColumnCount === null
+              ? Number.POSITIVE_INFINITY
+              : state.ui.forceColumnCount - 1)
+        )
         const clock = state.ui.activationClock + 1
         if (existingIndex >= 0) {
-          const slots = state.ui.columnSlots.map((slot, index) =>
+          let slots = state.ui.columnSlots.map((slot, index) =>
             index === existingIndex ? { ...slot, folded: false } : slot
           )
           const slotId = slots[existingIndex].slotId
+          if (
+            state.ui.placementMode === "fold" &&
+            slots.filter((slot) => !slot.folded).length > maxExpanded
+          ) {
+            const candidates = slots
+              .filter(
+                (slot) =>
+                  !slot.folded &&
+                  slot.slotId !== slotId &&
+                  slot.slotId !== sourceSlotId
+              )
+              .toSorted(
+                (left, right) =>
+                  (state.ui.lastActivatedOrderBySlotId[left.slotId] ?? 0) -
+                  (state.ui.lastActivatedOrderBySlotId[right.slotId] ?? 0)
+              )
+            const fallback = slots.find(
+              (slot) => !slot.folded && slot.slotId !== slotId
+            )
+            const foldTarget = candidates[0] ?? fallback
+            if (foldTarget)
+              slots = slots.map((slot) =>
+                slot.slotId === foldTarget.slotId
+                  ? { ...slot, folded: true }
+                  : slot
+              )
+          }
           return {
             ui: {
               ...state.ui,
@@ -715,50 +749,93 @@ export function createThreadChatProjectStore(input: {
         }
 
         let slots = [...state.ui.columnSlots]
-        const expanded = slots.filter((slot) => !slot.folded)
-        const limit = state.ui.forceColumnCount
-        if (limit !== null && expanded.length + 1 >= limit) {
-          const candidate = expanded.toSorted(
-            (left, right) =>
-              (state.ui.lastActivatedOrderBySlotId[left.slotId] ?? 0) -
-              (state.ui.lastActivatedOrderBySlotId[right.slotId] ?? 0)
-          )[0]
-          if (candidate && state.ui.placementMode === "replace") {
-            const candidateIndex = slots.findIndex(
-              (slot) => slot.slotId === candidate.slotId
-            )
-            slots[candidateIndex] = { ...candidate, threadId, folded: false }
-            return {
-              ui: {
-                ...state.ui,
-                columnSlots: slots,
-                focusedSlotId: candidate.slotId,
-                activationClock: clock,
-                lastActivatedOrderBySlotId: {
-                  ...state.ui.lastActivatedOrderBySlotId,
-                  [candidate.slotId]: clock,
-                },
-              },
-            }
-          }
-          if (candidate)
-            slots = slots.map((slot) =>
-              slot.slotId === candidate.slotId
-                ? { ...slot, folded: true }
-                : slot
-            )
-        }
-        const slotId = generateSlotId()
         const sourceIndex =
           sourceSlotId === "root"
             ? -1
             : slots.findIndex((slot) => slot.slotId === sourceSlotId)
-        slots.splice(sourceIndex + 1, 0, {
+        const expandedSlots = () => slots.filter((slot) => !slot.folded)
+        const lru = (pool: readonly ThreadColumnSlot[]) =>
+          pool.toSorted(
+            (left, right) =>
+              (state.ui.lastActivatedOrderBySlotId[left.slotId] ?? 0) -
+              (state.ui.lastActivatedOrderBySlotId[right.slotId] ?? 0)
+          )[0]
+        const finish = (slotId: string) => ({
+          ui: {
+            ...state.ui,
+            columnSlots: slots,
+            focusedSlotId: slotId,
+            activationClock: clock,
+            lastActivatedOrderBySlotId: {
+              ...state.ui.lastActivatedOrderBySlotId,
+              [slotId]: clock,
+            },
+          },
+        })
+        const replaceSlot = (slotId: string) => {
+          slots = slots.map((slot) =>
+            slot.slotId === slotId
+              ? { ...slot, threadId, folded: false }
+              : slot
+          )
+          return finish(slotId)
+        }
+
+        const target = placement?.targetSlotId
+          ? slots.find((slot) => slot.slotId === placement.targetSlotId)
+          : undefined
+        if (target && state.ui.placementMode === "replace")
+          return replaceSlot(target.slotId)
+
+        if (
+          state.ui.placementMode === "replace" &&
+          expandedSlots().length >= maxExpanded
+        ) {
+          let candidate = target
+          if (!candidate && placement?.keepSource) {
+            candidate = slots[sourceIndex + 1]
+            if (!candidate)
+              candidate = lru(
+                expandedSlots().filter(
+                  (slot) => slot.slotId !== sourceSlotId
+                )
+              )
+          }
+          if (!candidate && sourceSlotId !== "root")
+            candidate = slots.find((slot) => slot.slotId === sourceSlotId)
+          candidate ??= lru(expandedSlots())
+          if (candidate) return replaceSlot(candidate.slotId)
+        }
+
+        const slotId = generateSlotId()
+        const insertAt = placement?.keepSource ? sourceIndex + 1 : slots.length
+        slots.splice(insertAt, 0, {
           slotId,
           threadId,
           folded: false,
           widthPx: null,
         })
+
+        if (state.ui.placementMode === "fold") {
+          let foldTarget = target
+          if (!foldTarget && expandedSlots().length > maxExpanded) {
+            const preferred = expandedSlots().filter(
+              (slot) =>
+                slot.slotId !== slotId && slot.slotId !== sourceSlotId
+            )
+            foldTarget = lru(
+              preferred.length
+                ? preferred
+                : expandedSlots().filter((slot) => slot.slotId !== slotId)
+            )
+          }
+          if (foldTarget && foldTarget.slotId !== slotId)
+            slots = slots.map((slot) =>
+              slot.slotId === foldTarget.slotId
+                ? { ...slot, folded: true }
+                : slot
+            )
+        }
         return {
           ui: {
             ...state.ui,
@@ -781,21 +858,24 @@ export function createThreadChatProjectStore(input: {
             thread.parentThreadId !== null,
           "Column target must be a Branch in this Project."
         )
-        clientInvariant(
-          !state.ui.columnSlots.some(
-            (slot) => slot.slotId !== slotId && slot.threadId === threadId
-          ),
-          "Thread is already open in another column."
+        const source = state.ui.columnSlots.find(
+          (slot) => slot.slotId === slotId
+        )
+        clientInvariant(source, "Column Slot does not exist.")
+        const duplicate = state.ui.columnSlots.find(
+          (slot) => slot.slotId !== slotId && slot.threadId === threadId
         )
         const clock = state.ui.activationClock + 1
         return {
           ui: {
             ...state.ui,
-            columnSlots: state.ui.columnSlots.map((slot) =>
-              slot.slotId === slotId
-                ? { ...slot, threadId, folded: false }
-                : slot
-            ),
+            columnSlots: state.ui.columnSlots.map((slot) => {
+              if (slot.slotId === slotId)
+                return { ...slot, threadId, folded: false }
+              if (duplicate?.slotId === slot.slotId)
+                return { ...slot, threadId: source.threadId }
+              return slot
+            }),
             focusedSlotId: slotId,
             activationClock: clock,
             lastActivatedOrderBySlotId: {

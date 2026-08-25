@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation"
 import { isValidTreeId } from "@/lib/chat/tree-id"
-import { ThreadChatDemo } from "../thread-chat-demo"
+import { ThreadChatProjectProvider } from "@/lib/thread-chat/client/providers"
+import { ThreadChatProject } from "../normalized/thread-chat-project"
 import { threadChatMetadata } from "../page-metadata"
 
 export const metadata = threadChatMetadata
@@ -15,7 +16,11 @@ export default async function ThreadChatTreePage({
 }: {
   params: Promise<{ treeId: string }>
 }) {
-  const { treeId } = await params
-  if (!isValidTreeId(treeId)) notFound()
-  return <ThreadChatDemo key={treeId} treeId={treeId} />
+  const { treeId: projectId } = await params
+  if (!isValidTreeId(projectId)) notFound()
+  return (
+    <ThreadChatProjectProvider key={projectId} projectId={projectId}>
+      <ThreadChatProject projectId={projectId} />
+    </ThreadChatProjectProvider>
+  )
 }

@@ -29,6 +29,16 @@ const branch = {
   },
 }
 
+const branchTwo = {
+  ...branch,
+  id: "00000000-0000-4000-8000-000000000202",
+}
+
+const branchThree = {
+  ...branch,
+  id: "00000000-0000-4000-8000-000000000205",
+}
+
 describe("ThreadChat client stores", () => {
   it("App Store 合并稳定排序的摘要且不保存 selectedProjectId", () => {
     const store = createThreadChatAppStore()
@@ -216,6 +226,86 @@ describe("ThreadChat client stores", () => {
       viewMode: "canvas",
       canvasPins: { [branch.id]: { x: 12, y: 20 } },
     })
+  })
+
+  it("列满时保留物理 Slot、来源替换、指定保留和重复 Thread swap", () => {
+    let nextSlot = 0
+    const store = createThreadChatProjectStore({
+      projectId: projectDTOFixture.id,
+      generateSlotId: () => `slot-${++nextSlot}`,
+    })
+    store.getState().mergeBootstrap({
+      project: projectDTOFixture,
+      threadTopology: [
+        rootThreadDTOFixture,
+        branch,
+        branchTwo,
+        branchThree,
+      ],
+      artifactSummary: { changeSequence: 0, total: 0, byKind: {} },
+      initialThread: {
+        threadId: rootThreadDTOFixture.id,
+        messages: [userMessageDTOFixture, assistantMessageDTOFixture],
+        assistantRuns: [assistantRunDTOFixture],
+        hasOlderMessages: false,
+        oldestReturnedSequence: 1,
+        newestReturnedSequence: 2,
+      },
+    })
+
+    store.getState().openThread(branch.id, "root", { maxExpanded: 2 })
+    store.getState().openThread(branchTwo.id, "slot-1", { maxExpanded: 2 })
+    store.getState().commitColumnWidths({ "slot-1": 400, "slot-2": 500 })
+    store.getState().switchColumnThread("slot-1", branchTwo.id)
+    expect(store.getState().ui.columnSlots).toMatchObject([
+      { slotId: "slot-1", threadId: branchTwo.id, widthPx: 400 },
+      { slotId: "slot-2", threadId: branch.id, widthPx: 500 },
+    ])
+
+    store.getState().openThread(branchThree.id, "slot-1", {
+      maxExpanded: 2,
+      keepSource: true,
+    })
+    expect(store.getState().ui.columnSlots).toMatchObject([
+      { slotId: "slot-1", threadId: branchTwo.id, widthPx: 400 },
+      { slotId: "slot-2", threadId: branchThree.id, widthPx: 500 },
+    ])
+  })
+
+  it("fold placement 展开新列时折叠非来源 LRU Slot", () => {
+    let nextSlot = 0
+    const store = createThreadChatProjectStore({
+      projectId: projectDTOFixture.id,
+      generateSlotId: () => `slot-${++nextSlot}`,
+    })
+    store.getState().mergeBootstrap({
+      project: projectDTOFixture,
+      threadTopology: [
+        rootThreadDTOFixture,
+        branch,
+        branchTwo,
+        branchThree,
+      ],
+      artifactSummary: { changeSequence: 0, total: 0, byKind: {} },
+      initialThread: {
+        threadId: rootThreadDTOFixture.id,
+        messages: [userMessageDTOFixture, assistantMessageDTOFixture],
+        assistantRuns: [assistantRunDTOFixture],
+        hasOlderMessages: false,
+        oldestReturnedSequence: 1,
+        newestReturnedSequence: 2,
+      },
+    })
+    store.getState().setPlacementMode("fold")
+    store.getState().openThread(branch.id, "root", { maxExpanded: 2 })
+    store.getState().openThread(branchTwo.id, "slot-1", { maxExpanded: 2 })
+    store.getState().openThread(branchThree.id, "slot-2", { maxExpanded: 2 })
+
+    expect(store.getState().ui.columnSlots).toMatchObject([
+      { slotId: "slot-1", threadId: branch.id, folded: true },
+      { slotId: "slot-2", threadId: branchTwo.id, folded: false },
+      { slotId: "slot-3", threadId: branchThree.id, folded: false },
+    ])
   })
 
   it("局部 Run、Artifact Summary 与 Column View 不依赖 Artifact 正文", () => {

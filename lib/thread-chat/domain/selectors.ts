@@ -111,7 +111,7 @@ function rowOf(t: Thread, relDepth: number): TreeRow {
     id: t.id,
     depth: t.depth,
     relDepth,
-    isMain: t.id === "main",
+    isMain: t.parentId === null,
     title: t.title,
     footnote: t.footnote,
     anchor: t.anchorText,
@@ -120,7 +120,10 @@ function rowOf(t: Thread, relDepth: number): TreeRow {
 
 /** 整棵树的先序遍历 rows（⌘K / 每列 ⇄ 切换器用） */
 export function allTreeRows(state: ThreadTreeState): TreeRow[] {
-  return subtreeRowsInner(state, "main", 0, true)
+  const root = Object.values(state.threads).find(
+    (thread) => thread.parentId === null
+  )
+  return root ? subtreeRowsInner(state, root.id, 0, true) : []
 }
 
 /** 以 rootId 为根的整棵子树 rows（不含根自身，relDepth 从 0 起），子树弹层用 */

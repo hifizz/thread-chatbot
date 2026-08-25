@@ -48,6 +48,8 @@ import { canvasLayoutPositions } from "./canvas-layout"
  */
 export interface CanvasViewState {
   pins: ReadonlyMap<string, XYPosition>
+  /** 新 Runtime 可把 pin 变更提交到 Project Store；旧壳层不传时仍保留原行为。 */
+  onPinsChange?(pins: ReadonlyMap<string, XYPosition>): void
 }
 
 /** 写宿主镜像：对长寿对象的突变收敛在非 React 代码里（与 core/store 同一约定） */
@@ -56,6 +58,7 @@ function persistPins(
   pins: ReadonlyMap<string, XYPosition>
 ): void {
   host.pins = pins
+  host.onPinsChange?.(pins)
 }
 
 /* ---------------- 卡片尺寸估算（精确尺寸与 CSS 共用 canvas-card-dimensions） ---------------- */
@@ -166,9 +169,9 @@ function buildBaseGraph(
         )
       : undefined
     const data: CanvasCardData = {
-      isMain: t.id === "main",
+      isMain: t.parentId === null,
       title: t.title,
-      subtitle: t.id === "main" ? mainSubtitle : null,
+      subtitle: t.parentId === null ? mainSubtitle : null,
       depth: t.depth,
       footnote: t.footnote,
       anchor: t.anchorText ? clip(t.anchorText, 40) : null,
@@ -229,7 +232,10 @@ function buildBaseGraph(
     }
     t.children.forEach(walk)
   }
-  walk("main")
+  const root = Object.values(state.threads).find(
+    (thread) => thread.parentId === null
+  )
+  if (root) walk(root.id)
   return { nodes, edges, sizes }
 }
 

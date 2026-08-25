@@ -81,7 +81,7 @@ export function BranchableChat({
 }: BranchableChatProps) {
   const thread = state.threads[threadId]
   if (!thread) return null
-  const isMain = threadId === "main"
+  const isMain = thread.parentId === null
   const chain = isMain ? [] : lineage(state, threadId)
   const inherited = isMain ? [] : collectInherited(state, thread)
   const childCount = thread.children.length
@@ -193,7 +193,7 @@ export function BranchableChat({
         <div className="ft">
           <span className="lbl">
             讨论焦点 · 划选自
-            {thread.parentId === "main"
+            {state.threads[thread.parentId ?? ""]?.parentId === null
               ? "主线"
               : `「${threadTitle(state, thread.parentId!)}」`}
           </span>

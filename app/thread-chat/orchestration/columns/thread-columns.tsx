@@ -33,7 +33,7 @@ function ColumnShell({
   width?: number
   children: React.ReactNode
 }) {
-  const isMain = thread.id === "main"
+  const isMain = thread.parentId === null
   return (
     <div
       className={`column ${isMain ? "main" : "branch"} ${flashing ? "flash" : ""}`}
@@ -138,7 +138,9 @@ export function ThreadColumns({
     onCommit: onCommitWidths,
     onReset: onResetWidths,
   })
-  const main = state.threads["main"]
+  const main = Object.values(state.threads).find(
+    (thread) => thread.parentId === null
+  )
 
   // 展平为渲染单元（主线 + 各槽位），在相邻两个「展开列」之间插入分割线
   const cells: { thread: Thread; folded: boolean; vpIndex: number }[] = []

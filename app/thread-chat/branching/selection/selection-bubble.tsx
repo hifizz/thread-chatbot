@@ -291,6 +291,11 @@ export function SelectionBubble({
         </div>
         {preview && (
           <SelectionPlacementMap
+            rootThreadId={
+              Object.values(state.threads).find(
+                (thread) => thread.parentId === null
+              )?.id ?? "main"
+            }
             sourceThreadId={sel.threadId}
             slots={slots}
             preview={preview}

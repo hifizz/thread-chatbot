@@ -28,7 +28,7 @@ type RequestOptions<T> = {
 
 export class JsonThreadChatTransport implements ThreadChatApiCapabilities {
   constructor(
-    private readonly fetcher: typeof fetch = fetch,
+    private readonly fetcher: typeof fetch = globalThis.fetch.bind(globalThis),
     private readonly baseUrl = ""
   ) {}
 

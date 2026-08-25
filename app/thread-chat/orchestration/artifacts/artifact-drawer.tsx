@@ -24,6 +24,9 @@ export interface ArtifactDrawerProps {
   onSelect: (id: string) => void
   /** 定位来源会话（壳层用 openBranchUI 打开） */
   onLocate: (threadId: string, sourceMessageId: string) => void
+  loadState?:
+    | { status: "idle" | "loading" | "ready" }
+    | { status: "error"; message: string; onRetry: () => void }
 }
 
 export function ArtifactDrawer({
@@ -33,6 +36,7 @@ export function ArtifactDrawer({
   onClose,
   onSelect,
   onLocate,
+  loadState,
 }: ArtifactDrawerProps) {
   const titleId = useId()
   const closeButtonRef = useRef<HTMLButtonElement | null>(null)
@@ -123,20 +127,28 @@ export function ArtifactDrawer({
         </div>
       )}
       <div className="art-body">
+        {a && loadState?.status === "loading" && (
+          <div className="art-empty">Markdown 加载中…</div>
+        )}
+        {a && loadState?.status === "error" && (
+          <button className="art-empty" type="button" onClick={loadState.onRetry}>
+            加载失败：{loadState.message} · 点击重试
+          </button>
+        )}
         {!a && (
           <div className="art-empty">
             还没有 Markdown——在主线或分支里生成后会出现在这里。
           </div>
         )}
-        {a && a.kind === "code" && <pre className="art-code">{a.content}</pre>}
-        {a && a.kind === "note" && (
+        {a && loadState?.status !== "loading" && loadState?.status !== "error" && a.kind === "code" && <pre className="art-code">{a.content}</pre>}
+        {a && loadState?.status !== "loading" && loadState?.status !== "error" && a.kind === "note" && (
           <div className="art-note">
             {a.content.split("\n\n").map((p, i) => (
               <p key={i}>{p}</p>
             ))}
           </div>
         )}
-        {a && a.kind === "markdown" && (
+        {a && loadState?.status !== "loading" && loadState?.status !== "error" && a.kind === "markdown" && (
           <div className="mx-auto my-6 max-w-2xl">
             <MarkdownBody source={a.content} />
           </div>

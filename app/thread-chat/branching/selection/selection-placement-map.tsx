@@ -1,6 +1,7 @@
 import type { PlacePreview, Slot } from "../../orchestration/columns/placement"
 
 export function SelectionPlacementMap({
+  rootThreadId,
   sourceThreadId,
   slots,
   preview,
@@ -8,6 +9,7 @@ export function SelectionPlacementMap({
   titleOf,
   onToggleOverride,
 }: {
+  rootThreadId: string
   sourceThreadId: string
   slots: Slot[]
   preview: PlacePreview
@@ -17,12 +19,12 @@ export function SelectionPlacementMap({
 }) {
   const cells: React.ReactNode[] = [
     <span
-      key="main"
+      key={rootThreadId}
       className="smcell main"
       role="button"
       aria-disabled="true"
-      title={titleOf("main")}
-      aria-label={titleOf("main")}
+      title={titleOf(rootThreadId)}
+      aria-label={titleOf(rootThreadId)}
     />,
   ]
   const ghost = (key: string) => (
