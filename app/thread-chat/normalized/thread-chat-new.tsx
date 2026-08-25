@@ -1,7 +1,7 @@
 "use client"
 
 import dynamic from "next/dynamic"
-import { useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { DEFAULT_THREAD_CHAT_MODEL_ID } from "@/constants/model"
 import {
   useNewProjectDraftStore,
@@ -21,6 +21,7 @@ import {
 } from "../orchestration/overlays/workspace-toast"
 import { ArtifactDrawer } from "../orchestration/artifacts/artifact-drawer"
 import { ProjectList } from "./project-list"
+import { withThreadModel } from "./project-view-model"
 
 const NEW_PROJECT_VIEW = emptySeedState()
 const EMPTY_ACTION_VIEW = {
@@ -45,15 +46,11 @@ export function ThreadChatNew() {
   const submit = useSubmitNewProjectDraft()
   const status = useNewProjectDraftStore((state) => state.status)
   const error = useNewProjectDraftStore((state) => state.error)
-  const setDraftParts = useNewProjectDraftStore(
-    (state) => state.setDraftParts
-  )
+  const setDraftParts = useNewProjectDraftStore((state) => state.setDraftParts)
   const setRequestedModelId = useNewProjectDraftStore(
     (state) => state.setRequestedModelId
   )
-  const [modelId, setModelId] = useState<string>(
-    DEFAULT_THREAD_CHAT_MODEL_ID
-  )
+  const [modelId, setModelId] = useState<string>(DEFAULT_THREAD_CHAT_MODEL_ID)
   const [hintDismissed, setHintDismissed] = useState(false)
   const [viewMode, setViewMode] = useState<"columns" | "canvas">("columns")
   const [forceCols, setForceCols] = useState<number | null>(null)
@@ -61,6 +58,21 @@ export function ThreadChatNew() {
     "replace"
   )
   const [canvasStore] = useState(() => createThreadStore(emptySeedState()))
+  const projected = useMemo(
+    () => withThreadModel(NEW_PROJECT_VIEW, "main", modelId),
+    [modelId]
+  )
+  useEffect(
+    () =>
+      canvasStore.subscribe(() =>
+        setModelId(canvasStore.getState().threads.main.modelId)
+      ),
+    [canvasStore]
+  )
+  useEffect(
+    () => canvasStore.setThreadModel("main", modelId),
+    [canvasStore, modelId]
+  )
   const canvasViewState = useMemo(() => ({ pins: new Map() }), [])
   const { windowWidth } = useColumnViewport()
   const {
@@ -117,7 +129,7 @@ export function ThreadChatNew() {
           colsRef={colsRef}
           renderThread={() => (
             <BranchableChat
-              state={NEW_PROJECT_VIEW}
+              state={projected}
               threadId="main"
               subtitle="新对话"
               intro={hint}

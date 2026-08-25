@@ -2,21 +2,13 @@
 
 import dynamic from "next/dynamic"
 import { useRouter } from "next/navigation"
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { DEFAULT_THREAD_CHAT_MODEL_ID } from "@/constants/model"
 import {
   selectThreadColumnHeaderView,
   selectThreadColumnView,
 } from "@/lib/thread-chat/client/selectors"
-import {
-  useThreadChatProjectRuntime,
-} from "@/lib/thread-chat/client/providers"
+import { useThreadChatProjectRuntime } from "@/lib/thread-chat/client/providers"
 import { useThreadChatStore } from "@/lib/thread-chat/client/hooks"
 import type { ThreadChatProjectStore } from "@/lib/thread-chat/client/types"
 import type { ThreadStore } from "../core/store"
@@ -39,7 +31,7 @@ import { BranchableChat } from "../branching/branchable-chat"
 import { SelectionBubble } from "../branching/selection/selection-bubble"
 import { ArtifactDrawer } from "../orchestration/artifacts/artifact-drawer"
 import { ProjectList } from "./project-list"
-import { projectLegacyTreeView } from "./project-view-model"
+import { projectLegacyTreeView, withThreadModel } from "./project-view-model"
 import { useProjectWorkbench } from "./use-project-workbench"
 import { kickoffQuestion } from "@/lib/thread-chat/application/prompt-policy"
 
@@ -87,7 +79,9 @@ function messageActionView(
   for (const thread of Object.values(projected.threads)) {
     const ids = thread.messages.map((message) => message.id)
     activePathByThreadId.set(thread.id, ids)
-    const latestUser = thread.messages.findLast((message) => message.role === "user")
+    const latestUser = thread.messages.findLast(
+      (message) => message.role === "user"
+    )
     const latestAssistant = thread.messages.findLast(
       (message) => message.role === "assistant"
     )
@@ -130,7 +124,6 @@ export function ThreadChatProject({ projectId }: { projectId: string }) {
   const state = useThreadChatStore((snapshot) => snapshot)
   const bootstrapReady = state.requests.bootstrap.status === "ready"
   useProjectWorkbench(runtime, bootstrapReady)
-  const projected = useMemo(() => projectLegacyTreeView(state), [state])
   const [rootModelOverride, setRootModelId] = useState<string | null>(null)
   const root = Object.values(state.entities.threadsById).find(
     (thread) => thread.parentThreadId === null
@@ -143,6 +136,10 @@ export function ThreadChatProject({ projectId }: { projectId: string }) {
     : undefined
   const rootModelId =
     rootModelOverride ?? latestRootModelId ?? DEFAULT_THREAD_CHAT_MODEL_ID
+  const projected = useMemo(() => {
+    const view = projectLegacyTreeView(state)
+    return root ? withThreadModel(view, root.id, rootModelId) : view
+  }, [root, rootModelId, state])
   const projectedStore = useProjectedThreadStore(
     state,
     projected,
@@ -169,7 +166,8 @@ export function ThreadChatProject({ projectId }: { projectId: string }) {
       onPinsChange: (pins: ReadonlyMap<string, { x: number; y: number }>) => {
         const current = runtime.store.getState().ui.canvasPins
         for (const threadId of Object.keys(current))
-          if (!pins.has(threadId)) runtime.store.getState().setCanvasPin(threadId, null)
+          if (!pins.has(threadId))
+            runtime.store.getState().setCanvasPin(threadId, null)
         for (const [threadId, point] of pins)
           runtime.store.getState().setCanvasPin(threadId, point)
       },
@@ -210,7 +208,12 @@ export function ThreadChatProject({ projectId }: { projectId: string }) {
     ].filter((threadId): threadId is string => Boolean(threadId))
     for (const threadId of visible)
       void runtime.commands.ensureThreadMessages(threadId)
-  }, [bootstrapReady, runtime, state.entities.threadsById, state.ui.columnSlots])
+  }, [
+    bootstrapReady,
+    runtime,
+    state.entities.threadsById,
+    state.ui.columnSlots,
+  ])
 
   useEffect(() => {
     const expanded = state.ui.columnSlots.filter((slot) => !slot.folded)
@@ -286,7 +289,10 @@ export function ThreadChatProject({ projectId }: { projectId: string }) {
   const messageCommands = useMemo<ThreadMessageActionCommands>(
     () => ({
       async retryAssistant(threadId, assistantMessageId) {
-        await runtime.commands.regenerateMessage(assistantMessageId, rootModelId)
+        await runtime.commands.regenerateMessage(
+          assistantMessageId,
+          rootModelId
+        )
         const error = scopeError(
           runtime.store.getState(),
           `regenerate:${assistantMessageId}`
@@ -313,7 +319,10 @@ export function ThreadChatProject({ projectId }: { projectId: string }) {
           [{ type: "text", text }],
           rootModelId
         )
-        const error = scopeError(runtime.store.getState(), `edit:${userMessageId}`)
+        const error = scopeError(
+          runtime.store.getState(),
+          `edit:${userMessageId}`
+        )
         return error
           ? { ok: false, code: "network_error", message: error }
           : {
@@ -332,7 +341,8 @@ export function ThreadChatProject({ projectId }: { projectId: string }) {
       },
       async submitFeedback(threadId, messageId, feedback) {
         await runtime.commands.setFeedback(messageId, feedback)
-        const value = runtime.store.getState().entities.feedbackByMessageId[messageId]
+        const value =
+          runtime.store.getState().entities.feedbackByMessageId[messageId]
         return value?.value
           ? {
               messageId,
@@ -364,7 +374,9 @@ export function ThreadChatProject({ projectId }: { projectId: string }) {
       hint?: PlacementHint,
       question?: string
     ) => {
-      const before = new Set(Object.keys(runtime.store.getState().entities.threadsById))
+      const before = new Set(
+        Object.keys(runtime.store.getState().entities.threadsById)
+      )
       const sourceSlotId = slotIdForThread(selection.threadId)
       await runtime.commands.forkThread({
         sourceSlotId,
@@ -397,15 +409,29 @@ export function ThreadChatProject({ projectId }: { projectId: string }) {
       if (question?.trim()) await send(created.id, question.trim())
       if (state.ui.viewMode === "canvas") {
         setFocusNode({ id: created.id, n: ++focusSequence.current })
-        showToast(`已开启分支 · ${projected.threads[created.id]?.title ?? "新分支"}`)
+        showToast(
+          `已开启分支 · ${projected.threads[created.id]?.title ?? "新分支"}`
+        )
       } else {
         flash(created.id)
       }
     },
-    [flash, maxExpanded, projected.threads, runtime, send, showToast, slotIdForThread, state.ui.viewMode]
+    [
+      flash,
+      maxExpanded,
+      projected.threads,
+      runtime,
+      send,
+      showToast,
+      slotIdForThread,
+      state.ui.viewMode,
+    ]
   )
 
-  if (state.requests.bootstrap.status === "idle" || state.requests.bootstrap.status === "loading")
+  if (
+    state.requests.bootstrap.status === "idle" ||
+    state.requests.bootstrap.status === "loading"
+  )
     return (
       <div className="tc">
         <div className="boot-loading">对话加载中…</div>
@@ -435,7 +461,10 @@ export function ThreadChatProject({ projectId }: { projectId: string }) {
   const hintNode = hintVisible ? (
     <UsageHint onDismiss={() => setHintDismissed(true)} />
   ) : null
-  const branchCount = Math.max(0, Object.keys(state.entities.threadsById).length - 1)
+  const branchCount = Math.max(
+    0,
+    Object.keys(state.entities.threadsById).length - 1
+  )
   const markdownCount = state.readModels.artifactSummary?.byKind.markdown ?? 0
   const activeArtifactLoadState = activeArtifactId
     ? state.requests.artifactById[activeArtifactId]
@@ -446,7 +475,8 @@ export function ThreadChatProject({ projectId }: { projectId: string }) {
     if (mode.kind === "column") {
       const slot = state.ui.columnSlots[mode.vpIndex]
       if (!slot) return
-      if (row.id === rootThread?.id) runtime.store.getState().closeColumn(slot.slotId)
+      if (row.id === rootThread?.id)
+        runtime.store.getState().closeColumn(slot.slotId)
       else runtime.store.getState().switchColumnThread(slot.slotId, row.id)
       flash(row.id)
       return
@@ -480,7 +510,9 @@ export function ThreadChatProject({ projectId }: { projectId: string }) {
         onOpenHelp={openHelpPanel}
         onShowColumns={() => runtime.store.getState().setViewMode("columns")}
         onShowCanvas={() => runtime.store.getState().setViewMode("canvas")}
-        onForceCols={(count) => runtime.store.getState().setForceColumnCount(count)}
+        onForceCols={(count) =>
+          runtime.store.getState().setForceColumnCount(count)
+        }
         onPlacementModeChange={(mode) => {
           runtime.store.getState().setPlacementMode(mode)
           if (mode === "replace")
@@ -500,13 +532,18 @@ export function ThreadChatProject({ projectId }: { projectId: string }) {
           flashId={flashId}
           colsRef={colsRef}
           onExpandStrip={(threadId) => {
-            const slot = runtime.store.getState().ui.columnSlots.find(
-              (candidate) => candidate.threadId === threadId
-            )
-            if (slot) runtime.store.getState().setColumnFolded(slot.slotId, false)
+            const slot = runtime.store
+              .getState()
+              .ui.columnSlots.find(
+                (candidate) => candidate.threadId === threadId
+              )
+            if (slot)
+              runtime.store.getState().setColumnFolded(slot.slotId, false)
           }}
           onCommitWidths={(patch) => {
-            const widthsBySlot: Partial<Record<"root" | string, number | null>> = {}
+            const widthsBySlot: Partial<
+              Record<"root" | string, number | null>
+            > = {}
             for (const [threadId, width] of Object.entries(patch))
               widthsBySlot[slotIdForThread(threadId)] = width
             runtime.store.getState().commitColumnWidths(widthsBySlot)
@@ -520,7 +557,10 @@ export function ThreadChatProject({ projectId }: { projectId: string }) {
             runtime.store.getState().commitColumnWidths(reset)
           }}
           renderThread={(threadId, viewportIndex) => {
-            const slotId = viewportIndex < 0 ? "root" : state.ui.columnSlots[viewportIndex]?.slotId
+            const slotId =
+              viewportIndex < 0
+                ? "root"
+                : state.ui.columnSlots[viewportIndex]?.slotId
             if (!slotId) return null
             const columnView = selectThreadColumnView(state, slotId)
             const headerView = selectThreadColumnHeaderView(state, slotId)
@@ -530,7 +570,9 @@ export function ThreadChatProject({ projectId }: { projectId: string }) {
               ) : columnView.status === "error" ? (
                 <button
                   className="boot-loading"
-                  onClick={() => void runtime.commands.ensureThreadMessages(threadId)}
+                  onClick={() =>
+                    void runtime.commands.ensureThreadMessages(threadId)
+                  }
                 >
                   加载失败，点击重试
                 </button>
@@ -545,8 +587,13 @@ export function ThreadChatProject({ projectId }: { projectId: string }) {
                 <BranchableChat
                   state={projected}
                   threadId={threadId}
-                  subtitle={threadId === rootThread?.id ? mainSubtitle : undefined}
-                  intro={loadingIntro ?? (threadId === rootThread?.id ? hintNode : undefined)}
+                  subtitle={
+                    threadId === rootThread?.id ? mainSubtitle : undefined
+                  }
+                  intro={
+                    loadingIntro ??
+                    (threadId === rootThread?.id ? hintNode : undefined)
+                  }
                   onOpenThread={(target) => openThread(target, threadId)}
                   onOpenArtifact={(artifactId) => {
                     void runtime.commands.ensureArtifact(artifactId)
@@ -576,10 +623,15 @@ export function ThreadChatProject({ projectId }: { projectId: string }) {
                     openColumnSwitcher(viewportIndex, button)
                   }
                   onOpenSubtree={(button) => openSubtree(threadId, button)}
-                  onCollapse={() => runtime.store.getState().closeColumn(slotId)}
+                  onCollapse={() =>
+                    runtime.store.getState().closeColumn(slotId)
+                  }
                   busy={busy}
                   onRetry={(message) =>
-                    void runtime.commands.regenerateMessage(message.id, rootModelId)
+                    void runtime.commands.regenerateMessage(
+                      message.id,
+                      rootModelId
+                    )
                   }
                   onStop={() => {
                     const id = activeAssistantId(threadId)
@@ -587,7 +639,9 @@ export function ThreadChatProject({ projectId }: { projectId: string }) {
                   }}
                   composerPrefill={
                     projected.threads[threadId]?.messages.length === 0
-                      ? kickoffQuestion(projected.threads[threadId]?.anchorText ?? "")
+                      ? kickoffQuestion(
+                          projected.threads[threadId]?.anchorText ?? ""
+                        )
                       : undefined
                   }
                   onModelChange={setRootModelId}
@@ -628,7 +682,9 @@ export function ThreadChatProject({ projectId }: { projectId: string }) {
         slots={state.ui.viewMode === "canvas" ? EMPTY_SLOTS : slots}
         mode={state.ui.placementMode}
         maxExpanded={maxExpanded}
-        lastActiveOf={(threadId) => projected.threads[threadId]?.lastActive ?? 0}
+        lastActiveOf={(threadId) =>
+          projected.threads[threadId]?.lastActive ?? 0
+        }
       />
 
       {treeList && (

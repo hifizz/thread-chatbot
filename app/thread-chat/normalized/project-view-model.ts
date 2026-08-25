@@ -24,6 +24,22 @@ export interface ArtifactHint {
   sourceMessageId?: string
 }
 
+export function withThreadModel(
+  state: ThreadTreeState,
+  threadId: string,
+  modelId: string
+): ThreadTreeState {
+  const thread = state.threads[threadId]
+  if (!thread || thread.modelId === modelId) return state
+  return {
+    ...state,
+    threads: {
+      ...state.threads,
+      [threadId]: { ...thread, modelId },
+    },
+  }
+}
+
 export function textFromParts(parts: readonly unknown[] | null | undefined) {
   return (parts ?? [])
     .flatMap((part) => {
@@ -106,7 +122,8 @@ function threadDepths(state: ThreadChatProjectStore) {
     memo.set(threadId, depth)
     return depth
   }
-  for (const threadId of Object.keys(state.entities.threadsById)) visit(threadId)
+  for (const threadId of Object.keys(state.entities.threadsById))
+    visit(threadId)
   return memo
 }
 
@@ -131,9 +148,7 @@ function modelForThread(state: ThreadChatProjectStore, threadId: string) {
 }
 
 function sourceAnchor(quote: string | undefined): TextAnchor | undefined {
-  return quote
-    ? { quote: { exact: quote, prefix: "", suffix: "" } }
-    : undefined
+  return quote ? { quote: { exact: quote, prefix: "", suffix: "" } } : undefined
 }
 
 export function projectLegacyTreeView(
@@ -253,7 +268,10 @@ export function projectLegacyTreeView(
     artifacts[hint.id] = {
       id: hint.id,
       title: loaded?.title ?? hint.title,
-      kind: loaded?.kind === "code" || loaded?.kind === "note" ? loaded.kind : "markdown",
+      kind:
+        loaded?.kind === "code" || loaded?.kind === "note"
+          ? loaded.kind
+          : "markdown",
       content: loaded ? artifactContent(loaded.content) : "",
       sourceThreadId: sourceMessage?.threadId ?? hint.sourceThreadId ?? "",
       sourceMessageId: loaded?.sourceMessageId ?? hint.sourceMessageId ?? "",

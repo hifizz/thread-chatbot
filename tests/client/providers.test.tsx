@@ -13,6 +13,16 @@ vi.mock("next/navigation", () => ({
   usePathname: () => navigationMocks.pathname,
 }))
 
+vi.stubGlobal(
+  "ResizeObserver",
+  class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  }
+)
+HTMLElement.prototype.scrollIntoView = vi.fn()
+
 import {
   useAppShellCommands,
   useNewProjectDraftStore,
@@ -34,6 +44,7 @@ import {
   userMessageDTOFixture,
 } from "../fixtures/thread-chat-api-fixtures"
 import { createTestApi } from "./test-api"
+import { ThreadChatNew } from "@/app/thread-chat/normalized/thread-chat-new"
 
 const bootstrap = {
   project: projectDTOFixture,
@@ -55,6 +66,40 @@ beforeEach(() => {
 })
 
 describe("ThreadChat Providers and hooks", () => {
+  it("/new 切换模型后更新选择器并把模型提交给创建命令", async () => {
+    const createProject = vi.fn().mockResolvedValue(creationBundleDTOFixture)
+    const user = userEvent.setup()
+
+    render(
+      <ThreadChatAppProvider
+        api={createTestApi({ createProject })}
+        navigation={{ replace: navigationMocks.replace }}
+      >
+        <NewProjectDraftProvider>
+          <ThreadChatNew />
+        </NewProjectDraftProvider>
+      </ThreadChatAppProvider>
+    )
+
+    const selector = screen.getByRole("combobox", { name: "选择对话模型" })
+    await user.click(selector)
+    await user.click(
+      screen.getByRole("option", { name: "UMAPIS · GPT-5.6 Sol" })
+    )
+    expect(selector.textContent).toContain("UMAPIS · GPT-5.6 Sol")
+
+    await user.type(
+      screen.getByPlaceholderText("继续在主线提问…"),
+      "验证模型切换"
+    )
+    await user.click(screen.getByRole("button", { name: "发送" }))
+    await waitFor(() => expect(createProject).toHaveBeenCalledTimes(1))
+    expect(createProject).toHaveBeenCalledWith({
+      parts: [{ type: "text", text: "验证模型切换" }],
+      requestedModelId: "umapis-gpt-5.6-sol",
+    })
+  })
+
   it("ProjectProvider 每个 projectId 复用唯一 Runtime，并由 Hook 细粒度读取", async () => {
     const bootstrapProject = vi.fn().mockResolvedValue(bootstrap)
     const user = userEvent.setup()
