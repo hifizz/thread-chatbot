@@ -22,6 +22,7 @@ import {
   assertArtifactProvenance,
   toMarkdownArtifactToolOutput,
 } from "@/lib/thread-chat/domain/artifact"
+import { buildPromptHistory } from "@/lib/thread-chat/domain/prompt-history"
 
 const now = new Date("2026-01-01T00:00:00.000Z")
 
@@ -224,6 +225,40 @@ describe("MessageRun 状态机", () => {
     )
     expect(nextEventSequence(7)).toBe(8)
     expect(() => nextEventSequence(-1)).toThrow(/非负/)
+  })
+})
+
+describe("Prompt History", () => {
+  it("保留 BaseContext 顺序并排除非 completed assistant", () => {
+    const baseAssistant = message({
+      id: "base-assistant",
+      threadId: "parent",
+      role: "assistant",
+      supersededAt: now,
+    })
+    const currentUser = message({ id: "current-user", sequence: 1 })
+    const queuedAssistant = message({
+      id: "queued-assistant",
+      sequence: 2,
+      role: "assistant",
+      finalizedAt: null,
+    })
+
+    expect(
+      buildPromptHistory({
+        baseMessageIds: [baseAssistant.id],
+        baseMessages: [baseAssistant],
+        currentMessages: [currentUser, queuedAssistant],
+        assistantRuns: [
+          run({ assistantMessageId: baseAssistant.id }),
+          run({
+            assistantMessageId: queuedAssistant.id,
+            status: "queued",
+            finishedAt: null,
+          }),
+        ],
+      }).map((entry) => entry.id)
+    ).toEqual([baseAssistant.id, currentUser.id])
   })
 })
 

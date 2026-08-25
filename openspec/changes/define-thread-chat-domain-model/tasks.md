@@ -58,11 +58,11 @@
 
 ## 6. 后端领域验收门
 
-- [ ] 6.1 完成领域单元测试：Root/Branch、拓扑无环、sequence、replacement、Fork 资格、BaseContext、Prompt History 与 MessageRun 状态机。
-- [ ] 6.2 完成 Repository 集成测试：真实 PostgreSQL owner scope、唯一 Root、并发 sequence、finalized 不可变、replacement、Artifact provenance 与单一 MessageRun。
-- [ ] 6.3 完成 Application 集成测试：create/send/Fork/Edit/Regenerate/Stop/delete 的事务提交与整体回滚。
-- [ ] 6.4 使用 Fake AI Runtime 测试 delta、完成、失败、Stop、queued scanner 补偿、刷新时 checkpoint 恢复与 Artifact tool output。
-- [ ] 6.5 执行 `pnpm typecheck`、后端 unit/integration tests 和 `pnpm openspec:validate`，全部通过后记录实现证据；未通过不得进入 API Route 实现。
+- [x] 6.1 完成领域单元测试：Root/Branch、拓扑无环、sequence、replacement、Fork 资格、BaseContext、Prompt History 与 MessageRun 状态机。
+- [x] 6.2 完成 Repository 集成测试：真实 PostgreSQL owner scope、唯一 Root、并发 sequence、finalized 不可变、replacement、Artifact provenance 与单一 MessageRun。
+- [x] 6.3 完成 Application 集成测试：create/send/Fork/Edit/Regenerate/Stop/delete 的事务提交与整体回滚。
+- [x] 6.4 使用 Fake AI Runtime 测试 delta、完成、失败、Stop、queued scanner 补偿、刷新时 checkpoint 恢复与 Artifact tool output。
+- [x] 6.5 执行 `pnpm typecheck`、后端 unit/integration tests 和 `pnpm openspec:validate`，全部通过后记录实现证据；未通过不得进入 API Route 实现。
 
 ## 7. E2E 通过后的旧后端退役
 

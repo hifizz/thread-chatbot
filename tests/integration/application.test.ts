@@ -181,6 +181,24 @@ describe("ThreadChat Application", () => {
       })
       await completeAssistant(actorId, second.assistantMessage.id)
 
+      await expect(
+        commands.editLastUser({
+          actorId,
+          sourceUserMessageId: creation.userMessage.id,
+          parts: [{ type: "text", text: "historical edit" }],
+        })
+      ).rejects.toMatchObject({ code: "fork_required" })
+      await expect(
+        commands.regenerate({
+          actorId,
+          sourceAssistantMessageId: creation.assistantMessage.id,
+        })
+      ).rejects.toMatchObject({ code: "fork_required" })
+      expect(
+        (await queries.threadMessages({ actorId, threadId: creation.rootThread.id }))
+          .messages
+      ).toHaveLength(4)
+
       const edited = await commands.editLastUser({
         actorId,
         sourceUserMessageId: second.userMessage.id,
