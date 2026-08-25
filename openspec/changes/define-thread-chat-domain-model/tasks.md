@@ -38,14 +38,14 @@
 
 ## 4. 实现核心 Application Command 与 Query
 
-- [ ] 4.1 原子创建 `Project + Root Thread + U1 + A1 + queued MessageRun`，所有新实体 ID 由服务端生成，提交前不启动 AI Runtime。
-- [ ] 4.2 原子追加 `user Message + assistant Message + queued MessageRun`，不把 user/assistant 角色交替建成数据库不变量。
-- [ ] 4.3 实现 Fork Thread：验证 finalized source、冻结 ForkSourceSnapshot 和 BaseContext、创建 Child Thread，任一步失败整体回滚。
-- [ ] 4.4 实现 Regenerate：保留旧 assistant Message 内容和 sequence，标记 superseded，追加 replacement assistant Message 与新 MessageRun。
-- [ ] 4.5 实现 Edit last user Message：追加 replacement user Message，将依赖旧输入的有效后缀 supersede，并创建新 assistant Message 与 MessageRun。
-- [ ] 4.6 实现 Project metadata、Branch metadata、archive/unarchive、feedback 与 Project 永久删除 Application Command。
-- [ ] 4.7 实现 Project 列表、ProjectBootstrap、Thread Message 和 Artifact-by-ID Query；Bootstrap 只返回轻量 topology 与 Root bundle，Thread 默认最多 200 条有效 Message。
-- [ ] 4.8 实现 Prompt History：`BaseContext.messageIds + 当前 Thread 有效 Prompt Message`，排除不合格 assistant 状态，且不依赖客户端已加载窗口。
+- [x] 4.1 原子创建 `Project + Root Thread + U1 + A1 + queued MessageRun`，所有新实体 ID 由服务端生成，提交前不启动 AI Runtime。
+- [x] 4.2 原子追加 `user Message + assistant Message + queued MessageRun`，不把 user/assistant 角色交替建成数据库不变量。
+- [x] 4.3 实现 Fork Thread：验证 finalized source、冻结 ForkSourceSnapshot 和 BaseContext、创建 Child Thread，任一步失败整体回滚。
+- [x] 4.4 实现 Regenerate：保留旧 assistant Message 内容和 sequence，标记 superseded，追加 replacement assistant Message 与新 MessageRun。
+- [x] 4.5 实现 Edit last user Message：追加 replacement user Message，将依赖旧输入的有效后缀 supersede，并创建新 assistant Message 与 MessageRun。
+- [x] 4.6 实现 Project metadata、Branch metadata、archive/unarchive、feedback 与 Project 永久删除 Application Command。
+- [x] 4.7 实现 Project 列表、ProjectBootstrap、Thread Message 和 Artifact-by-ID Query；Bootstrap 只返回轻量 topology 与 Root bundle，Thread 默认最多 200 条有效 Message。
+- [x] 4.8 实现 Prompt History：`BaseContext.messageIds + 当前 Thread 有效 Prompt Message`，排除不合格 assistant 状态，且不依赖客户端已加载窗口。
 
 ## 5. 实现 MessageRun 后台执行
 

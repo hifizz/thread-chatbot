@@ -14,6 +14,14 @@ export type ThreadChatDomainErrorCode =
   | "message_run_transition_invalid"
   | "artifact_provenance_invalid"
   | "feedback_not_eligible"
+  | "thread_archived"
+  | "thread_generation_in_progress"
+  | "root_thread_title_owned_by_project"
+  | "root_thread_archive_owned_by_project"
+  | "message_not_editable"
+  | "message_not_regeneratable"
+  | "fork_required"
+  | "fork_anchor_mismatch"
   | "entity_not_found"
 
 export class ThreadChatDomainError extends Error {

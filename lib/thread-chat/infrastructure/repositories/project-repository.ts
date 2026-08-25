@@ -62,6 +62,99 @@ export class ProjectRepository {
     return mapProject(row)
   }
 
+  async listOwned(input: {
+    actorId: UserId
+    status: "active" | "archived" | "all"
+    limit: number
+    before?: { updatedAt: Date; id: ProjectId }
+  }): Promise<Array<Project & { threadCount: number; messageCount: number }>> {
+    const rows = await this.sql<Record<string, unknown>[]>`
+      select
+        p.id,
+        p.owner_user_id as "ownerUserId",
+        p.auto_title as "autoTitle",
+        p.custom_title as "customTitle",
+        p.target,
+        p.instruction,
+        p.archived_at as "archivedAt",
+        p.artifact_change_sequence as "artifactChangeSequence",
+        p.created_at as "createdAt",
+        p.updated_at as "updatedAt",
+        count(distinct t.id)::integer as "threadCount",
+        count(distinct m.id)::integer as "messageCount"
+      from thread_chat.projects p
+      left join thread_chat.threads t on t.project_id = p.id
+      left join thread_chat.messages m on m.thread_id = t.id
+      where p.owner_user_id = ${input.actorId}
+        and (${input.status} = 'all'
+          or (${input.status} = 'active' and p.archived_at is null)
+          or (${input.status} = 'archived' and p.archived_at is not null))
+        and (${input.before?.updatedAt ?? null}::timestamptz is null
+          or (p.updated_at, p.id) < (${input.before?.updatedAt ?? null}, ${input.before?.id ?? null}::uuid))
+      group by p.id
+      order by p.updated_at desc, p.id desc
+      limit ${input.limit}
+    `
+    return rows.map((row) => ({
+      ...mapProject(row),
+      threadCount: Number(row.threadCount),
+      messageCount: Number(row.messageCount),
+    }))
+  }
+
+  async updateMetadata(input: {
+    actorId: UserId
+    projectId: ProjectId
+    customTitle?: string | null
+    target?: ProjectTarget | null
+    instruction?: string | null
+  }): Promise<Project | null> {
+    const [row] = await this.sql<Record<string, unknown>[]>`
+      update thread_chat.projects
+      set custom_title = case when ${input.customTitle !== undefined} then ${input.customTitle ?? null} else custom_title end,
+          target = case when ${input.target !== undefined} then ${input.target ? this.sql.json(input.target) : null} else target end,
+          instruction = case when ${input.instruction !== undefined} then ${input.instruction ?? null} else instruction end,
+          updated_at = now()
+      where id = ${input.projectId} and owner_user_id = ${input.actorId}
+      returning
+        id, owner_user_id as "ownerUserId", auto_title as "autoTitle",
+        custom_title as "customTitle", target, instruction,
+        archived_at as "archivedAt",
+        artifact_change_sequence as "artifactChangeSequence",
+        created_at as "createdAt", updated_at as "updatedAt"
+    `
+    return row ? mapProject(row) : null
+  }
+
+  async setArchived(input: {
+    actorId: UserId
+    projectId: ProjectId
+    archived: boolean
+    now: Date
+  }): Promise<Project | null> {
+    const [row] = await this.sql<Record<string, unknown>[]>`
+      update thread_chat.projects
+      set archived_at = case
+            when ${input.archived} then coalesce(archived_at, ${input.now})
+            else null
+          end,
+          updated_at = case
+            when (${input.archived} and archived_at is null)
+              or (not ${input.archived} and archived_at is not null)
+            then now()
+            else updated_at
+          end
+      where id = ${input.projectId} and owner_user_id = ${input.actorId}
+      returning
+        id, owner_user_id as "ownerUserId", auto_title as "autoTitle",
+        custom_title as "customTitle", target, instruction,
+        archived_at as "archivedAt",
+        artifact_change_sequence as "artifactChangeSequence",
+        created_at as "createdAt", updated_at as "updatedAt"
+    `
+    return row ? mapProject(row) : null
+  }
+
   async assertOwnedForUpdate(
     actorId: UserId,
     projectId: ProjectId

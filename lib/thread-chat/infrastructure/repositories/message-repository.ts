@@ -55,10 +55,143 @@ export class MessageRepository {
           and p.owner_user_id = ${actorId}
         order by m.sequence desc
         limit ${limit}
-      ) window
+      ) message_window
       order by sequence asc
     `
     return rows.map(mapMessage)
+  }
+
+  async listEffectiveWindow(input: {
+    actorId: UserId
+    threadId: ThreadId
+    limit: number
+    beforeSequence?: number
+  }): Promise<Message[]> {
+    const rows = await this.sql<Record<string, unknown>[]>`
+      select * from (
+        select
+          m.id, m.thread_id as "threadId", m.sequence, m.role, m.parts,
+          m.replaces_message_id as "replacesMessageId",
+          m.superseded_at as "supersededAt", m.finalized_at as "finalizedAt",
+          m.created_at as "createdAt"
+        from thread_chat.messages m
+        join thread_chat.threads t on t.id = m.thread_id
+        join thread_chat.projects p on p.id = t.project_id
+        where m.thread_id = ${input.threadId}
+          and m.superseded_at is null
+          and p.owner_user_id = ${input.actorId}
+          and (${input.beforeSequence ?? null}::integer is null or m.sequence < ${input.beforeSequence ?? null})
+        order by m.sequence desc
+        limit ${input.limit}
+      ) message_window
+      order by sequence asc
+    `
+    return rows.map(mapMessage)
+  }
+
+  async listByIdsOwned(
+    actorId: UserId,
+    messageIds: readonly MessageId[]
+  ): Promise<Message[]> {
+    if (messageIds.length === 0) return []
+    const rows = await this.sql<Record<string, unknown>[]>`
+      select
+        m.id, m.thread_id as "threadId", m.sequence, m.role, m.parts,
+        m.replaces_message_id as "replacesMessageId",
+        m.superseded_at as "supersededAt", m.finalized_at as "finalizedAt",
+        m.created_at as "createdAt"
+      from thread_chat.messages m
+      join thread_chat.threads t on t.id = m.thread_id
+      join thread_chat.projects p on p.id = t.project_id
+      where m.id in ${this.sql(messageIds)} and p.owner_user_id = ${actorId}
+    `
+    return rows.map(mapMessage)
+  }
+
+  async findOwnedByIdForUpdate(
+    actorId: UserId,
+    messageId: MessageId
+  ): Promise<Message | null> {
+    const [row] = await this.sql<Record<string, unknown>[]>`
+      select
+        m.id, m.thread_id as "threadId", m.sequence, m.role, m.parts,
+        m.replaces_message_id as "replacesMessageId",
+        m.superseded_at as "supersededAt", m.finalized_at as "finalizedAt",
+        m.created_at as "createdAt"
+      from thread_chat.messages m
+      join thread_chat.threads t on t.id = m.thread_id
+      join thread_chat.projects p on p.id = t.project_id
+      where m.id = ${messageId} and p.owner_user_id = ${actorId}
+      for update of m
+    `
+    return row ? mapMessage(row) : null
+  }
+
+  async isLastEffective(message: Message): Promise<boolean> {
+    const [row] = await this.sql`
+      select 1 from thread_chat.messages
+      where thread_id = ${message.threadId}
+        and superseded_at is null
+        and sequence > ${message.sequence}
+      limit 1
+    `
+    return !row
+  }
+
+  async isLastEffectiveUser(message: Message): Promise<boolean> {
+    const [row] = await this.sql`
+      select 1 from thread_chat.messages
+      where thread_id = ${message.threadId}
+        and role = 'user'
+        and superseded_at is null
+        and sequence > ${message.sequence}
+      limit 1
+    `
+    return !row
+  }
+
+  async supersedeEffectiveSuffix(input: {
+    actorId: UserId
+    threadId: ThreadId
+    fromSequence: number
+    supersededAt: Date
+  }): Promise<MessageId[]> {
+    const rows = await this.sql<{ id: string }[]>`
+      update thread_chat.messages m
+      set superseded_at = ${input.supersededAt}
+      from thread_chat.threads t, thread_chat.projects p
+      where m.thread_id = ${input.threadId}
+        and m.sequence >= ${input.fromSequence}
+        and m.superseded_at is null
+        and m.thread_id = t.id
+        and t.project_id = p.id
+        and p.owner_user_id = ${input.actorId}
+      returning m.id
+    `
+    return rows.map((row) => row.id)
+  }
+
+  async supersedeEffectiveRange(input: {
+    actorId: UserId
+    threadId: ThreadId
+    afterSequence: number
+    beforeSequence: number
+    supersededAt: Date
+  }): Promise<MessageId[]> {
+    const rows = await this.sql<{ id: string }[]>`
+      update thread_chat.messages m
+      set superseded_at = ${input.supersededAt}
+      from thread_chat.threads t, thread_chat.projects p
+      where m.thread_id = ${input.threadId}
+        and m.sequence > ${input.afterSequence}
+        and m.sequence < ${input.beforeSequence}
+        and m.superseded_at is null
+        and m.thread_id = t.id
+        and t.project_id = p.id
+        and p.owner_user_id = ${input.actorId}
+      returning m.id
+    `
+    return rows.map((row) => row.id)
   }
 
   /** 锁定 Thread 后分配 sequence，并在同一事务完成 insert。 */

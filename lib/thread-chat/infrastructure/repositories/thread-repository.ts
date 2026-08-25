@@ -35,6 +35,25 @@ export class ThreadRepository {
     return row ? mapThread(row) : null
   }
 
+  async findOwnedByIdForUpdate(
+    actorId: UserId,
+    threadId: ThreadId
+  ): Promise<Thread | null> {
+    const [row] = await this.sql<Record<string, unknown>[]>`
+      select
+        t.id, t.project_id as "projectId", t.parent_thread_id as "parentThreadId",
+        t.source_message_id as "sourceMessageId", t.fork_source_snapshot as "forkSourceSnapshot",
+        t.base_context as "baseContext", t.auto_title as "autoTitle",
+        t.custom_title as "customTitle", t.archived_at as "archivedAt",
+        t.created_at as "createdAt", t.updated_at as "updatedAt"
+      from thread_chat.threads t
+      join thread_chat.projects p on p.id = t.project_id
+      where t.id = ${threadId} and p.owner_user_id = ${actorId}
+      for update of t
+    `
+    return row ? mapThread(row) : null
+  }
+
   async listOwnedTopology(
     actorId: UserId,
     projectId: ProjectId
@@ -110,6 +129,53 @@ export class ThreadRepository {
       forkSourceSnapshot: input.forkSourceSnapshot,
       baseContext,
     })
+  }
+
+  async updateBranchMetadata(input: {
+    actorId: UserId
+    threadId: ThreadId
+    customTitle?: string | null
+    archived?: boolean
+    now: Date
+  }): Promise<Thread | null> {
+    const current = await this.findOwnedById(input.actorId, input.threadId)
+    if (!current) return null
+    invariant(
+      current.parentThreadId !== null,
+      input.archived === undefined
+        ? "root_thread_title_owned_by_project"
+        : "root_thread_archive_owned_by_project",
+      "Root Thread 的 metadata 由 Project 管理。"
+    )
+    const hasArchived = input.archived !== undefined
+    const archived = input.archived ?? false
+    const [row] = await this.sql<Record<string, unknown>[]>`
+      update thread_chat.threads t
+      set custom_title = case when ${input.customTitle !== undefined} then ${input.customTitle ?? null} else t.custom_title end,
+          archived_at = case
+            when ${!hasArchived} then t.archived_at
+            when ${archived} then coalesce(t.archived_at, ${input.now})
+            else null
+          end,
+          updated_at = case
+            when ${input.customTitle !== undefined}
+              or (${hasArchived && archived} and t.archived_at is null)
+              or (${hasArchived && !archived} and t.archived_at is not null)
+            then now()
+            else t.updated_at
+          end
+      from thread_chat.projects p
+      where t.id = ${input.threadId}
+        and t.project_id = p.id
+        and p.owner_user_id = ${input.actorId}
+      returning
+        t.id, t.project_id as "projectId", t.parent_thread_id as "parentThreadId",
+        t.source_message_id as "sourceMessageId", t.fork_source_snapshot as "forkSourceSnapshot",
+        t.base_context as "baseContext", t.auto_title as "autoTitle",
+        t.custom_title as "customTitle", t.archived_at as "archivedAt",
+        t.created_at as "createdAt", t.updated_at as "updatedAt"
+    `
+    return row ? mapThread(row) : null
   }
 
   private async insert(input: {

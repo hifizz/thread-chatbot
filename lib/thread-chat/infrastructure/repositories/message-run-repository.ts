@@ -85,6 +85,72 @@ export class MessageRunRepository {
     return row ? mapMessageRun(row) : null
   }
 
+  async findOwnedByAssistantMessageIdForUpdate(
+    actorId: UserId,
+    assistantMessageId: MessageId
+  ): Promise<MessageRun | null> {
+    const [row] = await this.sql<Record<string, unknown>[]>`
+      select
+        r.id, r.assistant_message_id as "assistantMessageId", r.status,
+        r.model_id as "modelId", r.event_sequence as "eventSequence",
+        r.checkpoint_parts as "checkpointParts", r.error_code as "errorCode",
+        r.error_message as "errorMessage", r.heartbeat_at as "heartbeatAt",
+        r.stop_requested_at as "stopRequestedAt", r.finished_at as "finishedAt",
+        r.created_at as "createdAt", r.updated_at as "updatedAt"
+      from thread_chat.message_runs r
+      join thread_chat.messages m on m.id = r.assistant_message_id
+      join thread_chat.threads t on t.id = m.thread_id
+      join thread_chat.projects p on p.id = t.project_id
+      where r.assistant_message_id = ${assistantMessageId}
+        and p.owner_user_id = ${actorId}
+      for update of r
+    `
+    return row ? mapMessageRun(row) : null
+  }
+
+  async findOwnedByAssistantMessageIds(
+    actorId: UserId,
+    assistantMessageIds: readonly MessageId[]
+  ): Promise<MessageRun[]> {
+    if (assistantMessageIds.length === 0) return []
+    const rows = await this.sql<Record<string, unknown>[]>`
+      select
+        r.id, r.assistant_message_id as "assistantMessageId", r.status,
+        r.model_id as "modelId", r.event_sequence as "eventSequence",
+        r.checkpoint_parts as "checkpointParts", r.error_code as "errorCode",
+        r.error_message as "errorMessage", r.heartbeat_at as "heartbeatAt",
+        r.stop_requested_at as "stopRequestedAt", r.finished_at as "finishedAt",
+        r.created_at as "createdAt", r.updated_at as "updatedAt"
+      from thread_chat.message_runs r
+      join thread_chat.messages m on m.id = r.assistant_message_id
+      join thread_chat.threads t on t.id = m.thread_id
+      join thread_chat.projects p on p.id = t.project_id
+      where r.assistant_message_id in ${this.sql(assistantMessageIds)}
+        and p.owner_user_id = ${actorId}
+    `
+    return rows.map(mapMessageRun)
+  }
+
+  async assertNoActiveForThread(actorId: UserId, threadId: string): Promise<void> {
+    const [row] = await this.sql`
+      select r.id
+      from thread_chat.threads t
+      join thread_chat.projects p on p.id = t.project_id
+      join thread_chat.messages m on m.thread_id = t.id
+      join thread_chat.message_runs r on r.assistant_message_id = m.id
+      where t.id = ${threadId}
+        and p.owner_user_id = ${actorId}
+        and r.status in ('queued', 'running')
+      for update of r
+      limit 1
+    `
+    invariant(
+      !row,
+      "thread_generation_in_progress",
+      "Thread 已有 queued 或 running MessageRun。"
+    )
+  }
+
   async transition(input: {
     actorId: UserId
     messageRunId: MessageRunId

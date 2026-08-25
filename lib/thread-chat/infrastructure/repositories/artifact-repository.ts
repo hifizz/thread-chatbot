@@ -133,4 +133,30 @@ export class ArtifactRepository {
     `
     return row ? mapArtifact(row) : null
   }
+
+  async summarizeOwnedProject(actorId: UserId, projectId: ProjectId): Promise<{
+    changeSequence: number
+    total: number
+    byKind: Record<string, number>
+  } | null> {
+    const rows = await this.sql<{ changeSequence: number; kind: string | null; count: number }[]>`
+      select
+        p.artifact_change_sequence::integer as "changeSequence",
+        a.kind,
+        count(a.id)::integer as count
+      from thread_chat.projects p
+      left join thread_chat.artifacts a on a.project_id = p.id
+      where p.id = ${projectId} and p.owner_user_id = ${actorId}
+      group by p.id, p.artifact_change_sequence, a.kind
+    `
+    if (rows.length === 0) return null
+    const byKind = Object.fromEntries(
+      rows.filter((row) => row.kind !== null).map((row) => [row.kind!, Number(row.count)])
+    )
+    return {
+      changeSequence: Number(rows[0].changeSequence),
+      total: Object.values(byKind).reduce((sum, count) => sum + count, 0),
+      byKind,
+    }
+  }
 }
