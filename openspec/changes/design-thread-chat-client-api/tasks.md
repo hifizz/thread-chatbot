@@ -56,26 +56,26 @@
 
 ## 6. 建立前端测试基础与 Zustand Store
 
-- [ ] 6.1 增加 Testing Library、user-event 与适配 React Hooks 的 Vitest DOM 环境；不得把 Ego Browser E2E 混入单元测试。
-- [ ] 6.2 使用 vanilla Zustand 建立 Provider-scoped `ThreadChatAppStore`，包含 Project Catalog 与 AppShellUi slices，不保存 selectedProjectId。
-- [ ] 6.3 建立按 projectId 创建的 `ThreadChatProjectStore`，包含 entities、runs、requests、readModels 与 workbench ui slices。
-- [ ] 6.4 实现共享 normalizer，维护 `messagesById + messageIdsByThreadId` 的归属、去重与 sequence 排序。
-- [ ] 6.5 实现 Creation、Bootstrap、Message、replacement、Run Event、Artifact 与 Summary 的语义化 Store Actions。
-- [ ] 6.6 实现稳定 Column Slot、Root/Branch 宽度、折叠、焦点、placement、Canvas pin、overlay 与 Workbench Snapshot Store Actions。
-- [ ] 6.7 确保 Store Action 只同步调用 Zustand `set`/`setState`，不请求 API、不导航、不创建连接，也不原地修改已确认实体。
-- [ ] 6.8 完成 Store/normalizer 测试：归属拒绝、sequence、replacement、重复 DTO、乱序 Summary、局部 Run 更新与 Snapshot 校验。
+- [x] 6.1 增加 Testing Library、user-event 与适配 React Hooks 的 Vitest DOM 环境；不得把 Ego Browser E2E 混入单元测试。
+- [x] 6.2 使用 vanilla Zustand 建立 Provider-scoped `ThreadChatAppStore`，包含 Project Catalog 与 AppShellUi slices，不保存 selectedProjectId。
+- [x] 6.3 建立按 projectId 创建的 `ThreadChatProjectStore`，包含 entities、runs、requests、readModels 与 workbench ui slices。
+- [x] 6.4 实现共享 normalizer，维护 `messagesById + messageIdsByThreadId` 的归属、去重与 sequence 排序。
+- [x] 6.5 实现 Creation、Bootstrap、Message、replacement、Run Event、Artifact 与 Summary 的语义化 Store Actions。
+- [x] 6.6 实现稳定 Column Slot、Root/Branch 宽度、折叠、焦点、placement、Canvas pin、overlay 与 Workbench Snapshot Store Actions。
+- [x] 6.7 确保 Store Action 只同步调用 Zustand `set`/`setState`，不请求 API、不导航、不创建连接，也不原地修改已确认实体。
+- [x] 6.8 完成 Store/normalizer 测试：归属拒绝、sequence、replacement、重复 DTO、乱序 Summary、局部 Run 更新与 Snapshot 校验。
 
 ## 7. 实现 Runtime、Application Commands 与 Hooks
 
-- [ ] 7.1 实现 `ThreadChatAppRuntime`、`ThreadChatProjectRuntime` 与 `ProjectRuntimeRegistry`，保证 Provider 生命周期内 projectId 对应唯一 Runtime。
-- [ ] 7.2 实现 `ThreadChatAppProvider`、`ThreadChatProjectProvider` 与 `NewProjectDraftProvider`，避免 Next.js 服务端模块级 Store 跨请求共享。
-- [ ] 7.3 实现 `/thread-chat/new` seeded Runtime handoff：先合并 CreationBundle，再由客户端 route builder replace，目标 Provider 跳过第二次 Bootstrap。
-- [ ] 7.4 实现 ThreadMessageLoader 的 threadId 级 Promise 去重、跨 Thread 并行与 Runtime destroy 统一 Abort。
-- [ ] 7.5 实现 ArtifactLoader 的 artifactId 级按需缓存，不因 Thread 加载自动请求正文。
-- [ ] 7.6 实现 GenerationCoordinator 的 assistantMessageId 级连接去重、snapshot 合并、断线重连、取消订阅和 destroy。
-- [ ] 7.7 实现 Catalog、Bootstrap、send、Fork、Edit、Regenerate、Stop、feedback 和 metadata Application Commands；客户端不生成服务端实体 ID。
-- [ ] 7.8 实现纯 selectors、Selector Hooks、Command Hooks 与 Lifecycle Hooks；组件不得直接 fetch 或维护第二份领域状态。
-- [ ] 7.9 完成 Runtime、Loader、Coordinator、Command、Selector 与 Hook 的接口注入测试。
+- [x] 7.1 实现 `ThreadChatAppRuntime`、`ThreadChatProjectRuntime` 与 `ProjectRuntimeRegistry`，保证 Provider 生命周期内 projectId 对应唯一 Runtime。
+- [x] 7.2 实现 `ThreadChatAppProvider`、`ThreadChatProjectProvider` 与 `NewProjectDraftProvider`，避免 Next.js 服务端模块级 Store 跨请求共享。
+- [x] 7.3 实现 `/thread-chat/new` seeded Runtime handoff：先合并 CreationBundle，再由客户端 route builder replace，目标 Provider 跳过第二次 Bootstrap。
+- [x] 7.4 实现 ThreadMessageLoader 的 threadId 级 Promise 去重、跨 Thread 并行与 Runtime destroy 统一 Abort。
+- [x] 7.5 实现 ArtifactLoader 的 artifactId 级按需缓存，不因 Thread 加载自动请求正文。
+- [x] 7.6 实现 GenerationCoordinator 的 assistantMessageId 级连接去重、snapshot 合并、断线重连、取消订阅和 destroy。
+- [x] 7.7 实现 Catalog、Bootstrap、send、Fork、Edit、Regenerate、Stop、feedback 和 metadata Application Commands；客户端不生成服务端实体 ID。
+- [x] 7.8 实现纯 selectors、Selector Hooks、Command Hooks 与 Lifecycle Hooks；组件不得直接 fetch 或维护第二份领域状态。
+- [x] 7.9 完成 Runtime、Loader、Coordinator、Command、Selector 与 Hook 的接口注入测试。
 
 ## 8. 建立 UI Parity 基线并无损接入现有 UI
 
