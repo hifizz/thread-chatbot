@@ -31,7 +31,7 @@ import {
 } from "../../core/selectors"
 import type { MessageActionViewState } from "../../chat/actions/message-action-types"
 import { accentOf, dotColorOf, dvar } from "../../theme"
-import { kickoffQuestion } from "../../net/prompt/prompt-pure"
+import { kickoffQuestion } from "@/lib/thread-chat/application/prompt-policy"
 import type { CanvasCardData, CanvasCardNode } from "./canvas-node"
 import {
   CANVAS_CARD_ANCHOR_CHROME_HEIGHT,

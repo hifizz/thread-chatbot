@@ -1,7 +1,12 @@
 import type { MessageFeedback, MessageFeedbackSummary } from "../../core/types"
-import type { MessageActionFailureCode } from "@/lib/thread-chat/contracts/message-action-failure"
 
-export type { MessageActionFailureCode }
+export type MessageActionFailureCode =
+  | "invalid_turn"
+  | "not_latest_turn"
+  | "generation_conflict"
+  | "model_mismatch"
+  | "unauthorized"
+  | "network_error"
 
 export type GenerationActionResult =
   | {

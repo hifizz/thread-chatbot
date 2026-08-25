@@ -8,7 +8,7 @@
  *
  * Phase 2 节点内对话（openspec: add-canvas-conversations）：
  * · 单击选中节点 = 展开外挂面板（canvas-node 的 CanvasExpand）；
- * · CanvasActionsContext 注入 send/abort/retry（壳层 chat-controller）+ 画布内
+ * · CanvasActionsContext 注入 send/abort/retry（Application Commands）+ 画布内
  *   聚焦（focusThread）+ 树快照读取，穿过 React Flow 直达自定义节点（D3）；
  * · focusNode:{id,n}（壳层在画布内 fork 时置值，n 递增去重）→ selectNode +
  *   setCenter 平滑跟随（D4）；偏移按 LR 布局适配（见 focusThread 注释）。
@@ -72,7 +72,7 @@ export interface ThreadCanvasProps {
   onOpenThread: (threadId: string) => void
   /** 打开全局 Markdown 面板并选中对应交付物。 */
   onOpenArtifact: (artifactId: string) => void
-  /** 会话动作（send/abort/retry）：壳层用 chat-controller 组装（D3，同一发送链路） */
+  /** 会话动作（send/abort/retry）：壳层用 Application Commands 组装。 */
   chat: CanvasChatActions
   messageActionState: MessageActionViewState
   /** 画布内 fork 的视口跟随指令：壳层每次 fork 置 {id, n}（n 递增去重），
@@ -128,7 +128,7 @@ function CanvasFlow({
     [selectNode, setCenter, getZoom]
   )
 
-  /* 节点面板的动作面（D3）：chat 三件套直达壳层 chat-controller；
+  /* 节点面板的动作面：chat 三件套直达 Application Commands；
      getState 供面板渲染读树快照（锚点 title 文案等） */
   const actions = useMemo<CanvasActions>(
     () => ({

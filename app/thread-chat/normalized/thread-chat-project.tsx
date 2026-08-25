@@ -41,7 +41,7 @@ import { ArtifactDrawer } from "../orchestration/artifacts/artifact-drawer"
 import { ProjectList } from "./project-list"
 import { projectLegacyTreeView } from "./project-view-model"
 import { useProjectWorkbench } from "./use-project-workbench"
-import { kickoffQuestion } from "../net/prompt/prompt-pure"
+import { kickoffQuestion } from "@/lib/thread-chat/application/prompt-policy"
 
 const ThreadCanvas = dynamic(
   () =>
@@ -335,8 +335,6 @@ export function ThreadChatProject({ projectId }: { projectId: string }) {
         const value = runtime.store.getState().entities.feedbackByMessageId[messageId]
         return value?.value
           ? {
-              treeId: projectId,
-              threadId,
               messageId,
               feedback: value.value,
               updatedAt: value.updatedAt,
@@ -344,7 +342,7 @@ export function ThreadChatProject({ projectId }: { projectId: string }) {
           : null
       },
     }),
-    [projectId, rootModelId, runtime]
+    [rootModelId, runtime]
   )
 
   const send = useCallback(

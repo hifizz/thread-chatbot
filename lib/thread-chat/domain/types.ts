@@ -10,10 +10,13 @@ import type { TextAnchor } from "@/lib/thread-chat/domain/text-anchor"
 import type { WebResearchActivity } from "@/lib/chat/web-research-activity"
 import type { ResearchPlan, ResearchRoute } from "@/lib/chat/research-router"
 import type { THREAD_TREE_SCHEMA_VERSION } from "@/constants/thread-chat"
-export type {
-  MessageFeedback,
-  MessageFeedbackSummary,
-} from "@/lib/thread-chat/contracts/message-feedback"
+export type MessageFeedback = "positive" | "negative"
+
+export interface MessageFeedbackSummary {
+  messageId: string
+  feedback: MessageFeedback
+  updatedAt: string
+}
 
 export type Role = "user" | "assistant"
 export type ArtifactKind = "code" | "note" | "markdown"

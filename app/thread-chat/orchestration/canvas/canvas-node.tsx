@@ -12,7 +12,7 @@
  * 消息渲染复用列模式全套（AnchoredAssistantBody：Markdown + SmoothText + 锚点
  * 手绘 effect，D2）并挂列模式的划选 DOM 契约（.msg-list[data-list] /
  * .message[data-msg-id] / .bubble[data-role]），document 级划选气泡零改动生效；
- * 发送 / 停止 / 重试经 CanvasActionsContext 直达壳层 chat-controller（D3）；
+ * 发送 / 停止 / 重试经 CanvasActionsContext 直达 Application Commands；
  * 手势共处（D5）：面板挂 nodrag/nowheel（选字不拖节点、内滚不缩放画布），
  * 双击 stopPropagation 不误触「回列模式」。
  *

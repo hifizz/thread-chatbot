@@ -10,7 +10,7 @@ import type { ModelCallPurpose } from "@/constants/model-call"
 
 export type ModelCallTrace = {
   requestId?: string
-  treeId?: string
+  projectId?: string
   threadId?: string
   generationId?: string
   assistantMessageId?: string

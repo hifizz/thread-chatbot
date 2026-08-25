@@ -9,12 +9,13 @@ import {
   Waypoints,
 } from "lucide-react"
 import { THREAD_CHAT_SHORTCUTS } from "@/constants/thread-chat"
-import type { ViewMode } from "../../net/persistence/persist"
 import type { PlacementMode } from "../columns/placement"
 import { AccountButton } from "./account-button"
 import { ShortcutHint } from "../overlays/shortcut-hint"
 import { COL_MIN_W } from "../columns/use-column-viewport"
 import { columnCountChoices } from "./thread-chat-topbar-logic"
+
+type ViewMode = "columns" | "canvas"
 
 export function ThreadChatTopbar({
   viewMode,

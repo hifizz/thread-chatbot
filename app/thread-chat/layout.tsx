@@ -4,7 +4,7 @@ import { ROUTES, signInWithRedirect } from "@/constants/routes"
 import { ThreadChatAppProvider } from "@/lib/thread-chat/client/providers"
 import "./thread-chat.css"
 
-// 旗舰访问门禁：一处服务端 layout 同时包住 /thread-chat 跳板与 /thread-chat/[treeId]，
+// 旗舰访问门禁：一处服务端 layout 同时包住 /thread-chat 跳板与 /thread-chat/[projectId]，
 // 用「真会话」判定（getSession），未登录即 302 到带回跳的登录页。
 // 用 server layout 而非 middleware：项目已主动撤除 middleware，且 better-auth 在 edge
 // 只建议查 cookie 存在性（非真校验）；server layout 与 /account 页同构、做真会话校验，

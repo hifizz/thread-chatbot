@@ -5,7 +5,7 @@ import type { ThreadTreeState } from "../../core/types"
 import type { MessageActionViewState } from "../../chat/actions/message-action-types"
 import type { ThreadMessageActionCommands } from "../../chat/actions/message-action-commands"
 
-/** 壳层用 chat-controller 组装后注入画布的会话动作。 */
+/** 壳层用 Application Commands 组装后注入画布的会话动作。 */
 export interface CanvasChatActions extends ThreadMessageActionCommands {
   send: (threadId: string, text: string) => void
   stop: (threadId: string) => void

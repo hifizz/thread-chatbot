@@ -1,7 +1,20 @@
 import type { Message, MessageFeedback } from "../../core/types"
-import type { RecoverableTurn } from "../../generation/types"
 import type { ThreadMessageActionCommands } from "./message-action-commands"
-import type { SourceProvenance } from "../../core/message-graph"
+
+export interface RecoverableTurn {
+  threadId: string
+  userMessageId: string
+  assistantMessageId?: string
+  reason: "missing_assistant" | "missing_generation" | "interrupted_generation"
+}
+
+export interface SourceProvenance {
+  sourceThreadId: string
+  sourceMessageId: string
+  isOnActivePath: boolean
+  alternativeIndex: number | null
+  alternativeCount: number
+}
 
 export const MESSAGE_ACTION_LABELS = {
   toolbar: "消息操作",
