@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 所有输出内容必须使用中文（代码、文件路径、命令等技术内容除外）。
 
+面向用户解释架构或状态变化时，使用“前端状态”“界面状态”“转换结果”等直白说法，禁止使用术语“投影”。
+
 ## Commands
 
 Package manager is **pnpm** (pnpm-lock.yaml / pnpm-workspace.yaml).
