@@ -74,6 +74,9 @@ type ThreadId = string
 type MessageId = string
 type ArtifactId = string
 
+/** 纯客户端工作台中的物理列身份；不是服务端实体 ID，绝不能传给领域 API。 */
+type ColumnSlotId = string
+
 type JsonValue =
   | string
   | number
@@ -202,6 +205,20 @@ type ArtifactEntity = {
   /** 仅在 contentIncluded=true 时有值；大型正文允许按需加载。 */
   content: JsonValue | null
   createdAt: string
+}
+
+type ProjectArtifactSummary = {
+  /**
+   * 服务端在 Project Artifact 集合发生变化时单调递增的读模型游标。
+   * 客户端只用于拒绝乱序旧快照；它不是 Project revision，也不进入请求。
+   */
+  changeSequence: number
+
+  /** 当前 Project 下全部 Artifact 数量，不受客户端已加载窗口影响。 */
+  total: number
+
+  /** 按服务端稳定 kind 统计；Markdown 数量读取 `byKind.markdown ?? 0`。 */
+  byKind: Record<string, number>
 }
 
 type AssistantRunState = {
@@ -411,12 +428,32 @@ type ThreadChatRequestsState = {
   commandByScope: Record<string, CommandState>
 }
 
+type ThreadChatReadModelsState = {
+  /**
+   * 服务端确认的 Project 级 Artifact 统计投影。
+   * 它不是 Artifact 实体集合；不能从局部加载的 artifactsById 反推或覆盖。
+   */
+  artifactSummary: ProjectArtifactSummary | null
+}
+
 type ThreadColumnSlot = {
+  /**
+   * 物理列的稳定本地身份。切换本列 Thread 时保持不变；它可以由客户端生成，
+   * 因为它不是 Project、Thread、Message 或 Artifact 等服务端实体 ID。
+   */
+  slotId: ColumnSlotId
+
   /** 槽位当前展示的 Branch Thread；Root 固定在主列，不进入 slots。 */
   threadId: ThreadId
 
   /** true 表示折叠为窄条，保留位置但不计入展开列上限。 */
   folded: boolean
+
+  /**
+   * 用户为该物理列提交的像素宽度；null 表示自动均分。
+   * 它属于 Slot 而不是 Thread，因此切换 Thread 后宽度不变。
+   */
+  widthPx: number | null
 }
 
 type TextSelectionState = {
@@ -437,7 +474,7 @@ type OverlayState = {
   /** Thread 切换器当前作用域；DOM 坐标和退场动画仍留在组件局部状态。 */
   threadSwitcherScope:
     | { kind: "global" }
-    | { kind: "column"; threadId: ThreadId }
+    | { kind: "column"; slotId: ColumnSlotId }
     | { kind: "subtree"; rootThreadId: ThreadId }
     | null
 
@@ -454,13 +491,13 @@ type ThreadChatUiState = {
   columnSlots: ThreadColumnSlot[]
 
   /**
-   * 当前接收全局快捷键/工具栏命令的 Thread。
-   * 它必须是 Root 或一个未折叠 column slot；ThreadColumn 自身命令仍使用自己的 threadId。
+   * 当前接收全局快捷键/工具栏命令的物理列。`"root"` 表示固定 Root 列；
+   * 非 null 的 ColumnSlotId 必须指向一个未折叠 Slot。当前 Thread 由该 Slot 派生。
    */
-  focusedThreadId: ThreadId | null
+  focusedSlotId: "root" | ColumnSlotId | null
 
-  /** 用户显式调整的展开列宽；无条目表示自动均分，折叠细条不读取此值。 */
-  columnWidths: Record<ThreadId, number>
+  /** Root 物理列的显式像素宽度；null 表示自动均分。 */
+  rootColumnWidthPx: number | null
 
   /** null 表示根据视口自适应；非 null 是用户强制的展开列数量上限。 */
   forceColumnCount: number | null
@@ -483,8 +520,8 @@ type ThreadChatUiState = {
   /** 支撑列满 LRU 策略的本地逻辑时钟；不是服务端活动时间。 */
   activationClock: number
 
-  /** Thread 最近一次获得焦点/被打开时的逻辑顺序，用于选择替换或折叠候选。 */
-  lastActivatedOrderByThreadId: Record<ThreadId, number>
+  /** 物理列最近一次获得焦点/被打开时的逻辑顺序，用于选择替换或折叠候选。 */
+  lastActivatedOrderBySlotId: Record<"root" | ColumnSlotId, number>
 
   /** 只保存跨组件需要共享的语义开关；DOM 引用、坐标和动画计数不进 Store。 */
   overlays: OverlayState
@@ -500,6 +537,9 @@ type ThreadChatProjectState = {
   /** Query/Command 的客户端请求状态；不是服务端领域状态。 */
   requests: ThreadChatRequestsState
 
+  /** Project 级服务端统计等非实体读模型。 */
+  readModels: ThreadChatReadModelsState
+
   /** 当前设备上的 Project 工作台布局和交互焦点。 */
   ui: ThreadChatUiState
 }
@@ -512,11 +552,18 @@ type ThreadChatProjectActions = {
   applyThreadCreated: (thread: ThreadEntity) => void
   applyReplacementBundle: (bundle: ReplacementBundle) => void
   applyRunEvent: (event: AssistantMessageEvent) => void
+  setBootstrapLoadState: (state: LoadState) => void
   setCommandState: (scope: string, state: CommandState | null) => void
-  openThread: (threadId: ThreadId, sourceThreadId: ThreadId | null) => void
-  closeThread: (threadId: ThreadId) => void
-  focusThread: (threadId: ThreadId) => void
-  setColumnWidth: (threadId: ThreadId, width: number | null) => void
+  setThreadMessageLoadState: (threadId: ThreadId, state: LoadState) => void
+  restoreWorkbenchSnapshot: (snapshot: ThreadWorkbenchSnapshotV1) => void
+  resetWorkbenchToDefault: () => void
+  openThread: (threadId: ThreadId, sourceSlotId: "root" | ColumnSlotId) => void
+  switchColumnThread: (slotId: ColumnSlotId, threadId: ThreadId) => void
+  closeColumn: (slotId: ColumnSlotId) => void
+  focusColumn: (slotId: "root" | ColumnSlotId) => void
+  commitColumnWidths: (
+    widths: Partial<Record<"root" | ColumnSlotId, number | null>>,
+  ) => void
   setPlacementMode: (mode: ThreadChatUiState["placementMode"]) => void
   setViewMode: (mode: ThreadChatUiState["viewMode"]) => void
 }
@@ -528,20 +575,83 @@ type ThreadChatProjectStore =
 
 同一个 Project Store 内使用 slices，可以由一个 Store Action 通过一次 `set` 同时更新 Message、Run 和 request state；这不是把 slices 物理拆成多个 Store。组件通过细粒度 selector 订阅。
 
-`columnSlots` 取代原先不充分的 `visibleThreadIds` State：fold 模式必须保存槽位折叠态。`selectVisibleThreadIds` 和 `selectVisibleColumns` 从 Root + `columnSlots` 派生，避免两份分栏权威。
+`columnSlots` 取代原先不充分的 `visibleThreadIds` State：fold 模式必须保存槽位折叠态。每个 Slot 用稳定 `slotId` 表示物理列，`threadId` 只是该列当前展示的内容；切换 Thread 不得重建 Slot 或转移列宽。`selectVisibleThreadIds` 和 `selectVisibleColumns` 从 Root + `columnSlots` 派生，避免两份分栏权威。
+
+现有分栏分割线拖拽能力必须保留。分割线位于相邻两个展开列之间；拖拽时同时调整左右两列，并继续遵守当前 UI/CSS 的最小宽度约束。拖拽过程中的 Pointer 坐标、临时宽度和捕获状态保留在 Resizer Hook/组件局部，不得按每个 Pointer Move 写入 Zustand。Pointer Up、键盘步进或双击复位时，通过一次 `commitColumnWidths` 原子提交受影响物理列的最终宽度；双击复位写入 `null`，恢复当前自动均分行为。
+
+Root 宽度写入 `rootColumnWidthPx`，Branch 宽度写入对应 `ThreadColumnSlot.widthPx`。折叠细条不参与相邻列拖拽；切换 Slot 的 Thread 必须保留宽度。提交后的宽度进入 `ThreadWorkbenchSnapshotV1`，刷新后恢复；拖拽瞬时状态和 Pointer 信息不得持久化。该交互完全是本地工作台行为，不调用后端 API。
 
 Project Store 初始化和分栏变更必须保持：
 
-- 空 Runtime 从 `project=null`、空实体表、`bootstrap=idle`、空 `columnSlots` 和 `focusedThreadId=null` 初始化。
-- Bootstrap 后 `focusedThreadId` 默认是 Root；Root 固定渲染，不进入 `columnSlots`。
-- `columnSlots.threadId` 必须唯一、属于当前 Project 且不是 Root；恢复 localStorage 时过滤失效 ID。
-- `focusedThreadId` 非 Root 时必须指向未折叠槽位；打开/展开 Thread 同时使其获得焦点。
+- 空 Runtime 从 `project=null`、空实体表、`bootstrap=idle`、`artifactSummary=null`、空 `columnSlots` 和 `focusedSlotId=null` 初始化。
+- Bootstrap 后 `focusedSlotId` 默认是 `"root"`；Root 固定渲染，不进入 `columnSlots`。
+- `columnSlots.slotId` 和 `columnSlots.threadId` 都必须唯一；Thread 必须属于当前 Project 且不是 Root。恢复 localStorage 时过滤失效 Thread ID、重复 Slot ID 和重复 Thread ID。
+- `focusedSlotId` 非 Root 时必须指向未折叠槽位；打开/展开 Thread 同时使对应 Slot 获得焦点。
 - 关闭或折叠当前焦点时，按相邻展开槽位、Root 的顺序选择新焦点，不允许留下悬空 ID。
 - App Store 和 Project Store 的 UI slice 可以写入设备 localStorage；entities、runs 和 requests 不得以它作为持久化权威。
+
+#### Project 工作台视图刷新恢复
+
+刷新页面后必须恢复刷新前的 Project 工作台视图，但不恢复任何列的滚动位置。持久化对象使用独立、带版本的投影，不能直接序列化整个 `ThreadChatUiState`：
+
+```ts
+type ThreadWorkbenchSnapshotV1 = {
+  schemaVersion: 1
+
+  /** Root 右侧的物理列、当前 Thread、折叠态和物理列宽。 */
+  columnSlots: ThreadColumnSlot[]
+
+  /** 刷新前接收全局快捷键和工具栏操作的列。 */
+  focusedSlotId: "root" | ColumnSlotId
+
+  /** 固定 Root 列的显式宽度；null 表示自动均分。 */
+  rootColumnWidthPx: number | null
+
+  forceColumnCount: number | null
+  placementMode: "replace" | "fold"
+  viewMode: "columns" | "canvas"
+
+  /** Canvas 节点的设备本地摆放；不存在的 Thread 使用自动布局。 */
+  canvasPins: Record<ThreadId, Point>
+}
+```
+
+该投影按 `projectId + schemaVersion` 写入设备 localStorage，并采用防抖保存。Bootstrap 成功后才能恢复，恢复时必须：
+
+1. 只保留 topology 中仍然存在、属于当前 Project 且不是 Root 的 Slot Thread。
+2. 去除重复或非法的 `slotId`、重复 `threadId`、非法宽度和无效 Canvas pin。
+3. 如果 `focusedSlotId` 已失效或指向折叠列，则回退到相邻未折叠列；仍无候选时回退 `"root"`。
+4. 恢复 Slot、宽度、折叠状态、焦点、列数偏好、放置模式、Columns/Canvas 模式与 Canvas pin。
+5. 不恢复滚动条位置、DOM 引用、弹层坐标、动画状态、文本选区、Switcher/Help 临时打开态、请求错误、命令 busy 状态、流缓冲或 Generation 连接。
+6. Composer 草稿不是“视图恢复”的一部分；如果以后要求跨刷新草稿恢复，必须使用独立草稿投影，不得混入本 Snapshot。
+
+localStorage 不可用、内容损坏或版本未知时，必须安全回退到默认视图：只显示 Root、`focusedSlotId="root"`，其余使用当前 UI 默认值。恢复工作台视图不代表恢复服务端内容；Message 与 Run 仍然只能来自 Bootstrap、MessageBundle 和生成事件。
+
+`artifactSummary` 的合并必须比较 `changeSequence`：只接受大于当前值的快照；相同 sequence 的内容必须完全一致；更小的乱序快照必须忽略。这个游标仅解决多个生成事件乱序覆盖页面统计的问题，不是 Project/Thread revision，客户端不得在 Command 中提交它。
 
 ### D4. Provider、Runtime 与当前 Project 选择
 
 Provider 解决的是“组件树应该使用哪个 Store 实例”，不是第三套业务 State。当前 Project 身份只来自 `/thread-chat/{projectId}` 的路由参数；Catalog 和 AppShellUi 都不保存 `selectedProjectId`。
+
+页面路径属于客户端 Router，不属于后端领域契约。所有 ThreadChat 页面导航必须通过同一个集中式路由构造器完成，Application Command、Hook 和组件不得自行拼接 URL：
+
+```ts
+type ThreadChatRoutes = {
+  /** 无持久化 Project 身份的本地草稿入口。 */
+  newProject: () => string
+
+  /** 根据服务端返回的资源 ID 构造客户端页面路径。 */
+  project: (projectId: ProjectId) => string
+}
+
+const threadChatRoutes: ThreadChatRoutes = {
+  newProject: () => "/thread-chat/new",
+  project: (projectId) =>
+    `/thread-chat/${encodeURIComponent(projectId)}`,
+}
+```
+
+`ThreadChatRoutes` 是客户端 navigation/router 模块的 capability，不进入 Zustand State，也不进入 API DTO。服务端只返回 `project.id`；Web、CLI、MCP 或未来其他客户端各自决定如何呈现或导航该资源。路由结构变化时，只修改客户端路由模块及 Router 配置，不修改后端创建命令。
 
 #### Runtime 类型
 
@@ -588,11 +698,22 @@ type GenerationCoordinator = {
   destroy: () => void
 }
 
+type ThreadMessageLoader = {
+  /**
+   * 确保指定 Thread 的 MessageBundle 已加载；ready 时直接返回，
+   * 同一 threadId 已在飞时复用同一个 Promise。
+   */
+  ensure: (threadId: ThreadId) => Promise<void>
+
+  /** Runtime 销毁时中止当前 Project 的全部 Message Query。 */
+  destroy: () => void
+}
+
 type ThreadChatAppRuntime = {
   /** Provider-scoped App Store；不是模块级服务器单例。 */
   appStore: StoreApi<ThreadChatAppStore>
 
-  /** 管理 ProjectRuntime 身份和从 /new 到 canonical URL 的一次性交接。 */
+  /** 管理 ProjectRuntime 身份和从 /new 到已创建 Project 路由的一次性交接。 */
   projectRuntimeRegistry: ProjectRuntimeRegistry
 
   /** 命令工厂内部共享的已校验 API capability；React 组件不得直接调用。 */
@@ -614,6 +735,12 @@ type ThreadChatProjectRuntime = {
 
   /** 已绑定 api、store 和 coordinator 的 Project 级业务命令集合。 */
   commands: ThreadChatProjectCommands
+
+  /**
+   * 管理 threadId → in-flight Promise/AbortController 的非序列化加载器。
+   * Promise 与 AbortController 不进入 Zustand；UI 只订阅 requests slice。
+   */
+  threadMessageLoader: ThreadMessageLoader
 
   /**
    * 管理该 Project 内 assistantMessageId → 事件连接的客户端协调器。
@@ -699,7 +826,7 @@ type NewProjectDraftProviderProps = {
 `NewProjectDraftProvider`：
 
 - 只存在于 `/thread-chat/new`，保存无实体 ID 的本地草稿与提交状态。
-- 创建成功后调用 `registry.seedFromCreation(bundle)`，再 `router.replace(bundle.canonicalUrl)`。
+- 创建成功后调用 `registry.seedFromCreation(bundle)`，再执行 `router.replace(threadChatRoutes.project(bundle.project.id))`。
 - 目标 ProjectProvider acquire 同一 seeded Runtime，因此无需为了路由切换重新请求 Bootstrap。
 
 Provider 必须只创建一次 vanilla Store/Runtime，不能在 React 重渲染时重新执行 factory：
@@ -809,10 +936,11 @@ function useThreadChatCommands(): ThreadChatProjectCommands {
 ```text
 current Project       = URL routeProjectId
 current Project Store = ProjectProvider 当前提供的 Runtime.store
-focused Thread        = Runtime.store.ui.focusedThreadId
+focused Column        = Runtime.store.ui.focusedSlotId
+focused Thread        = 由 focusedSlotId 对应的 Root/Slot 派生
 ```
 
-一个 Project 可以同时展示多个 `columnSlots`，所以没有全局唯一的“selected Thread 内容”。ThreadColumn 的命令始终使用自己的 `threadId`；`focusedThreadId` 只服务全局快捷键、工具栏和无列级参数的 UI 操作。
+一个 Project 可以同时展示多个 `columnSlots`，所以没有全局唯一的“selected Thread 内容”。ThreadColumn 的命令始终使用自己 Slot 当前的 `threadId`；`focusedSlotId` 只服务全局快捷键、工具栏和无列级参数的 UI 操作。切换本列 Thread 时 Slot 身份与焦点保持不变。
 
 #### Provider 生命周期
 
@@ -855,11 +983,63 @@ activeMessages
 visibleThreadIds
 threadTreeRows
 branchCount
+artifactCount
+markdownArtifactCount
 canFork
 canEdit
 canRegenerate
 threadColumnView
+threadColumnHeaderView
 projectHeaderView
+```
+
+页面统计的来源必须明确区分：`threadCount` 与 `branchCount` 从完整 `threadsById` topology 派生；`artifactCount` 与 `markdownArtifactCount` 从服务端 `artifactSummary` 派生。客户端不得用局部加载的 `artifactsById` 长度冒充 Project 总数。
+
+```ts
+type ProjectHeaderView = {
+  displayTitle: string
+  threadCount: number
+  branchCount: number
+  artifactCount: number
+  markdownArtifactCount: number
+}
+
+type ThreadColumnHeaderView = {
+  /** `"root"` 表示固定 Root 列；其余值标识稳定物理 Slot。 */
+  slotId: "root" | ColumnSlotId
+  threadId: ThreadId
+  title: string
+  isRoot: boolean
+  depth: number
+
+  /** 从 Root 到当前 Thread 的 lineage；不是 Thread Entity 内的持久化数组。 */
+  breadcrumbs: Array<{
+    threadId: ThreadId
+    title: string
+    isCurrent: boolean
+  }>
+
+  /** 只包含直接 Child；完整 Project 搜索仍由全局 Thread 切换器承担。 */
+  directChildCount: number
+  directChildren: Array<{
+    threadId: ThreadId
+    title: string
+    isOpen: boolean
+  }>
+
+  /**
+   * Root 为 null。needs_load 表示仅因 Parent Message 尚未加载而无法判断，
+   * 不得把“本地不存在”误判成来源失效。
+   */
+  forkSource: {
+    parentThreadId: ThreadId
+    sourceMessageId: MessageId
+    availability: "available" | "needs_load" | "unavailable"
+  } | null
+
+  canSwitch: boolean
+  canCollapse: boolean
+}
 ```
 
 核心 selectors：
@@ -871,10 +1051,13 @@ selectThreadLineage(state, threadId): ThreadEntity[]
 selectActiveMessages(state, threadId): MessageEntity[]
 selectMessageView(state, messageId): MessageView
 selectForkAvailability(state, messageId): ForkAvailability
-selectThreadColumnView(state, threadId): ThreadColumnView
+selectThreadColumnView(state, slotId): ThreadColumnView
+selectThreadColumnHeaderView(state, slotId): ThreadColumnHeaderView
 selectProjectTreeRows(state): ProjectTreeRow[]
 selectVisibleThreadIds(state): ThreadId[]
 selectVisibleColumns(state): ThreadColumnView[]
+selectFocusedThreadId(state): ThreadId | null
+selectProjectHeaderView(state): ProjectHeaderView
 ```
 
 `selectActiveMessages` 的唯一规则：
@@ -895,16 +1078,21 @@ Store Action 与对应 Zustand Store/slice 共置，只执行同步、可测试�
 
 ```ts
 mergeBootstrap          → 跨 entities/runs/requests 原子初始化 Project
+setBootstrapLoadState   → 只设置 Bootstrap loading/error；ready 由 mergeBootstrap 提交
 applyMessageBundle      → 合并一个 Thread 的有效 Message、Run 与 Artifact
+setThreadMessageLoadState → 独立设置某个 Thread 的 loading/error；ready 由 Bundle 原子提交
 applyMessageCreationBundle → 合并发送命令返回的 user、assistant 与 Run
 applyThreadCreated      → 合并服务端创建的 Child Thread
 applyReplacementBundle  → 原子标记 superseded 并合并 replacement 与新 Run
-applyRunEvent           → 只更新对应 assistantMessageId 的流状态或终态
-openThread/closeThread  → 根据 placementMode 更新 columnSlots
-focusThread             → 更新全局快捷键与工具栏的 Thread 焦点
+applyRunEvent           → 更新对应 assistantMessageId，并在事件携带时合并 Artifact Summary
+openThread/closeColumn  → 根据现有 placementMode 更新稳定 columnSlots
+switchColumnThread      → 只替换 Slot 的 threadId，保留 slotId、宽度和物理位置
+focusColumn             → 更新全局快捷键与工具栏的物理列焦点
+commitColumnWidths      → 原子提交分割线左右物理列的最终宽度或复位为自动均分
+restoreWorkbenchSnapshot/resetWorkbenchToDefault → Bootstrap 后恢复合法视图或使用当前默认值
 ```
 
-合并类 Store Action 是内部写入口，不直接暴露给 UI；`openThread`、`closeThread`、`focusThread` 这类纯本地 UI Action 可以由 Command Hook 直接调用。Store Action 不调用 API、不导航、不建立 SSE，并且不得原地改写已确认实体内容。
+合并类 Store Action 是内部写入口，不直接暴露给 UI；`openThread`、`switchColumnThread`、`closeColumn`、`focusColumn` 这类纯本地 UI Action 可以由 Command Hook 直接调用。Store Action 不调用 API、不导航、不建立 SSE，并且不得原地改写已确认实体内容。
 
 这遵循 Zustand 将 state 与 actions 共置、使用 `set`/`setState` 提交更新以及用 slices 组织大型 Store 的推荐方式。我们额外规定 Store Action 保持同步、IO 放入 Application Command；这是本项目为了固定副作用边界采用的更严格约束，不是 Zustand 强制要求。
 
@@ -986,6 +1174,8 @@ type NewProjectDraftStore = NewProjectDraftState & NewProjectDraftActions
 
 `NewProjectDraftStore` 由 `NewProjectDraftProvider` 创建并随 `/new` 页面销毁，不放进 ThreadChatAppStore，也不插入 ThreadChatProjectStore.entities。UI 通过 `NewProjectScreen` 复用 Composer 和空白列外观，但传递的是 `onSubmitDraft`，不是假的 threadId。
 
+从空白 Draft 提交、服务端原子创建、Registry seed、目标 ProjectProvider 接管、无空白帧路由交接和完整 AI 回复事件流程见 [`/thread-chat/new` 首条消息与 AI 回复生命周期](./design/new-project-first-message-lifecycle.md)。
+
 ```mermaid
 sequenceDiagram
     participant U as User
@@ -1002,11 +1192,12 @@ sequenceDiagram
     S->>DB: BEGIN
     S->>DB: Project + Root + U1 + A1 + queued Run
     S->>DB: COMMIT
-    S-->>A: 201 CreationBundle + canonicalUrl
+    S-->>A: 201 CreationBundle
     S->>W: commit 后唤醒 Run
+    A->>A: threadChatRoutes.project(project.id)
     A->>Reg: seedFromCreation(CreationBundle)
     Reg-->>A: initialized ProjectRuntime
-    A->>UI: router.replace(canonicalUrl)
+    A->>UI: router.replace(projectUrl)
     A->>Reg: Runtime 按 A1 + eventSequence 订阅
 ```
 
@@ -1023,6 +1214,9 @@ type ProjectBootstrap = {
 
   /** 当前 Project 的全量轻量 Thread topology；不包含 Branch Message。 */
   threadTopology: ThreadEntity[]
+
+  /** Project 全量 Artifact 的服务端统计投影，不受本次内联 Artifact 窗口影响。 */
+  artifactSummary: ProjectArtifactSummary
 
   /** 唯一 Root Thread 的首屏 Message window。 */
   initialThread: ThreadMessageBundle
@@ -1057,15 +1251,25 @@ type ThreadMessageBundle = {
 → ThreadChatProjectProvider acquire(projectId)
 → 若 Runtime 已由 /new seed：跳过 Bootstrap
 → 否则 GET ProjectBootstrap
-→ 校验唯一 Root、Provider projectId 和所有 Thread projectId 关系
-→ mergeBootstrap 一次合并 entities/runs/request state
-→ 读取并过滤 localStorage workbench state
-→ 初始化 focusedThreadId=Root；columnSlots 恢复合法 Branch 槽位
-→ 渲染 Root + topology/columnSlots
-→ generation coordinator 恢复 queued/running Runs
+→ 校验唯一 Root、Provider projectId、所有 Thread projectId 和 Artifact Summary
+→ mergeBootstrap 一次合并 entities/runs/requests/readModels state
+→ 读取、迁移并过滤该 Project 的 localStorage ThreadWorkbenchSnapshot
+→ 默认 focusedSlotId="root"；Snapshot 合法时恢复列槽、列宽、折叠态、焦点和视图模式
+→ 立即渲染已 ready 的 Root 和各 Branch Column Loading Shell
+→ 对恢复出的每个 Branch 非阻塞、并行调用 ensureThreadMessages(threadId)
+→ 每个 Branch 独立进入 ready 或 error；一个失败不得阻塞其他列
+→ 每个 MessageBundle 合并后恢复其中 queued/running Runs
 ```
 
 打开尚未加载的 Branch 时，`ensureThreadMessages(threadId)` 请求一个 ThreadMessageBundle；加载状态为 ready 时直接复用，不重复请求。
+
+同一 `threadId` 的并发 ensure 必须复用 `ThreadMessageLoader` 中同一个 in-flight Promise；不同 Thread 可以并行加载。关闭或切换 Column 不取消已经开始的 Thread Query，成功结果继续按 `threadId` 合并并成为当前 Project Runtime 的缓存；只有 ProjectRuntime 销毁才统一 Abort。Abort 不得写入可重试 error。
+
+Message Query 与 Assistant Run 是两个正交状态：Column 只有在 Message Query ready 后才有完整 Message 时间线；若 Bundle 中某个 Run 为 queued/running，则先展示其 checkpoint，再由 GenerationCoordinator 从 eventSequence 恢复。Loader 的 Promise、AbortController 和 in-flight Map 不进入 Zustand。
+
+完整状态机、刷新并行恢复时序、去重与迟到响应规则见 [Thread Message 异步加载设计](./design/thread-message-loading.md)。
+
+已有 Project 的完整冷启动、无 Workbench Snapshot、有 Snapshot、多 Branch 并行加载和 Runtime Message Cache 分支见 [打开已有 Project 生命周期](./design/open-existing-project-lifecycle.md)。
 
 MVP 返回最新最多 200 条有效 Message，并按 sequence 升序交给客户端。`hasOlderMessages` 只保留能力边界，当前 UI 不实现树内自动分页替换。
 
@@ -1086,6 +1290,7 @@ async function createProjectWithFirstMessage(input: {
       initialMessage: { parts: input.parts },
       requestedModelId: input.requestedModelId,
     })
+    const projectUrl = threadChatRoutes.project(bundle.project.id)
 
     const runtime = projectRuntimeRegistry.seedFromCreation(bundle)
     appStore.getState().upsertProjectSummary(toProjectSummary(bundle.project))
@@ -1094,7 +1299,7 @@ async function createProjectWithFirstMessage(input: {
     runtime.generationCoordinator.subscribeAssistant(
       bundle.assistantRun.assistantMessageId,
     )
-    router.replace(bundle.canonicalUrl)
+    router.replace(projectUrl)
   } catch (error) {
     newDraftStore.getState().markError(normalizeError(error))
   }
@@ -1132,6 +1337,8 @@ async function sendMessage(threadId: ThreadId, parts: UIMessage["parts"]) {
 
 ```ts
 async function forkThread(input: {
+  /** 纯客户端来源物理列，只用于成功后的工作台放置，不进入 API Body。 */
+  sourceSlotId: "root" | ColumnSlotId
   sourceThreadId: ThreadId
   sourceMessageId: MessageId
   anchor?: TextAnchor
@@ -1139,9 +1346,13 @@ async function forkThread(input: {
   const availability = selectForkAvailability(store.getState(), input.sourceMessageId)
   if (!availability.allowed) return availability.failure
 
-  const child = await api.forkThread(input)
+  const child = await api.forkThread({
+    sourceThreadId: input.sourceThreadId,
+    sourceMessageId: input.sourceMessageId,
+    anchor: input.anchor,
+  })
   store.getState().applyThreadCreated(child)
-  store.getState().openThread(child.id, input.sourceThreadId)
+  store.getState().openThread(child.id, input.sourceSlotId)
 }
 ```
 
@@ -1184,11 +1395,14 @@ useProject()
 useProjectTarget()
 useThread(threadId)
 useThreadMessages(threadId)
-useThreadColumnView(threadId)
+useThreadColumnView(slotId)
+useThreadColumnHeaderView(slotId)
 useProjectTreeRows()
 useAssistantRun(assistantMessageId)
 useForkAvailability(messageId)
 useVisibleThreadColumns()
+useProjectHeaderView()
+useFocusedColumnId()
 useFocusedThreadId()
 ```
 

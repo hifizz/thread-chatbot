@@ -421,15 +421,21 @@ thread-chat/
 ```text
 全量 Project 的轻量 Thread topology
                     +
-首屏可见 Thread 的有效 Messages 与 MessageRun 状态
+Root Thread 的有效 Messages 与 AssistantRunState
 ```
 
 不全量加载所有 Branch Message、BaseContext 或大型 Project Resource。具体流程：
 
-1. [从首页进入 ThreadChat](./design/enter-thread-chat-from-home.md)：最近 Project、新建 Project、ProjectBootstrap 与前端恢复。
+1. [从首页进入 ThreadChat](./design/enter-thread-chat-from-home.md)：首页导航、`/new` 无实体草稿边界与已有 Project 入口。
 2. [按 sequence 拉取 Thread 当前有效消息](./design/load-thread-messages-by-sequence.md)：`sequence + supersededAt` 构造默认时间线。
 3. [Regenerate：创建 replacement assistant Message](./design/regenerate-replacement-assistant-message.md)：旧 Message 不可变，新 Message 与 Run 原子创建。
 4. [刷新后恢复正在生成的 assistant Message](./design/resume-running-message-after-refresh.md)：checkpoint、eventSequence 与重新订阅。
+
+Provider、Zustand、路由交接和多栏异步加载属于客户端/API 设计，详见：
+
+- [`/thread-chat/new` 首条消息与 AI 回复生命周期](../design-thread-chat-client-api/design/new-project-first-message-lifecycle.md)
+- [打开已有 Project 生命周期](../design-thread-chat-client-api/design/open-existing-project-lifecycle.md)
+- [Thread Message 异步加载设计](../design-thread-chat-client-api/design/thread-message-loading.md)
 
 ## Risks / Trade-offs
 

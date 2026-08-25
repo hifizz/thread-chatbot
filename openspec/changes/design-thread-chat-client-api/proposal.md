@@ -12,7 +12,7 @@
 - 统一 Store State、Store Action、Application Command、Selector Hook、Command Hook 和 Lifecycle Hook 术语。
 - 定义纯 Selector 与三类 Hook 的职责，避免 UI 组件直接 `fetch`、拼 Prompt 或修改实体。
 - 定义前端 Application Commands：Project 生命周期、Thread 加载与 Fork、消息发送/Edit/Regenerate、生成订阅/Stop、feedback 和 Project 元数据更新。
-- 定义 `/thread-chat/new` 为无实体 ID 的本地草稿入口；第一次发送时服务端原子创建 Project、Root Thread、首条 user Message、assistant Message 与 MessageRun，再替换为 canonical Project URL。
+- 定义 `/thread-chat/new` 为无实体 ID 的本地草稿入口；第一次发送时服务端原子创建 Project、Root Thread、首条 user Message、assistant Message 与 MessageRun，客户端再根据返回的 `project.id` 通过集中式路由构造器替换为已创建 Project 的页面 URL。
 - 定义后端 `/api/v1` 的资源标识、请求参数、响应 DTO、错误、原子性、权限与适用场景；所有新实体 ID 均由服务端生成。
 - MVP 首次加载返回全量轻量 Thread topology 和 Root Thread 数据；其他 Thread 按需一次加载最多 200 条有效 Message，不实现复杂分页替换。
 - 本 change 只形成设计与可测试契约，不实现 Zustand Store、Hooks、Route Handler、Stream Client 或 Transport 封装，也暂不编写实施 tasks。

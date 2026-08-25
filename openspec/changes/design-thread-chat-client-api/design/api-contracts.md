@@ -2,7 +2,7 @@
 
 本文是 `design.md` 引用的 API 可实现合同。接口实现、共享 Zod Schema、服务端集成测试和客户端 Transport 必须以本文为准；总表只用于导航。
 
-### D12. API 总表
+### D1. API 总表
 
 本节只是能力索引。逐接口的 Path、Query、Body、成功响应、输出类型、错误码、参数关系和手动 Case 以 [ThreadChat V1 API 详细合同](#threadchat-v1-api-详细合同) 为准。
 
@@ -27,7 +27,7 @@
 | `GET /api/v1/assistant-messages/{id}/events` | 恢复事件 | `afterEventSequence` | Event stream | 刷新后续接生成 |
 | `POST /api/v1/assistant-messages/{id}/stop` | 停止生成 | assistantMessageId | AssistantRunState | 用户点击 Stop |
 
-### D13. 参数之间的决定性关系
+### D2. 参数之间的决定性关系
 
 以下内容只保留最核心的关系速查；完整 Schema 与所有边界条件见 [ThreadChat V1 API 详细合同](#threadchat-v1-api-详细合同)。
 
@@ -237,6 +237,17 @@ type IncludedArtifactDTO = {
   createdAt: DateTime
 }
 
+type ProjectArtifactSummaryDTO = {
+  /** Project Artifact 集合变化时由服务端单调递增；只用于客户端拒绝旧统计。 */
+  changeSequence: number
+
+  /** 当前 Project 下全部 Artifact 数量，不受本次响应内联窗口影响。 */
+  total: number
+
+  /** 按稳定 Artifact kind 聚合；Markdown 数量读取 `byKind.markdown ?? 0`。 */
+  byKind: Record<string, number>
+}
+
 type FeedbackValue = "positive" | "negative" | null
 
 type FeedbackDTO = {
@@ -256,6 +267,8 @@ type FeedbackDTO = {
 - `status=completed` 时，Message 必须已有不可变 `parts` 和 `finalizedAt`；`status=failed|stopped` 时 `finishedAt` 非空。
 - `stopRequestedAt` 非空表示服务端已经接受 Stop；它不等于 Run 已进入 `stopped` 终态。
 - `contentIncluded=false` 时 `IncludedArtifactDTO.content` 必须为 `null`；它只表示本响应未内联正文，不表示 Artifact 不存在。
+- `ProjectArtifactSummaryDTO.changeSequence` 必须是非负整数，并在该 Project 的 Artifact 集合发生变化时单调递增；它只排序统计快照，不是 revision、ETag 或客户端写入前置条件。
+- `ProjectArtifactSummaryDTO.total` 必须等于 `byKind` 所有非负整数值之和；它统计 Project 全量 Artifact，不能退化为当前响应的 `includedArtifacts.length`。
 
 ### 1.5 复合响应
 
@@ -273,16 +286,17 @@ type ThreadMessageBundleDTO = {
 type ProjectBootstrapDTO = {
   project: ProjectDTO
   threadTopology: ThreadDTO[]
+  artifactSummary: ProjectArtifactSummaryDTO
   initialThread: ThreadMessageBundleDTO
 }
 
 type CreationBundleDTO = {
   project: ProjectDTO
   rootThread: ThreadDTO
+  artifactSummary: ProjectArtifactSummaryDTO
   userMessage: MessageDTO
   assistantMessage: MessageDTO
   assistantRun: AssistantRunStateDTO
-  canonicalUrl: `/thread-chat/${string}`
 }
 
 type MessageCreationBundleDTO = {
@@ -301,6 +315,8 @@ type ReplacementBundleDTO = {
 `ThreadMessageBundleDTO.messages` 只返回当前有效时间线，即 `supersededAt === null` 的 Message，并按 `sequence ASC` 排列。旧 replacement Message 仍保存在数据库，但不混入默认 UI 时间线。
 
 `assistantRuns` 必须且只包含本 bundle 中 assistant Message 的 Run；不得返回属于其他 Thread 或未返回 Message 的 Run。`includedArtifacts` 必须且只包含渲染本次 Message 所需且允许内联的 Artifact。
+
+`ProjectBootstrapDTO.artifactSummary` 与 `CreationBundleDTO.artifactSummary` 是 Project 级统计读模型。它不枚举 Artifact，也不能由客户端根据局部 `includedArtifacts` 重建；首次创建且尚未产生 Artifact 时必须返回 `{ changeSequence: 0, total: 0, byKind: {} }`。
 
 ## 2. Project API
 
@@ -366,7 +382,8 @@ type CreateProjectRequest = {
 - `initialMessage.parts` 决定 U1 内容；服务端不得接受客户端提交的 role，U1 固定为 user。
 - `requestedModelId` 是请求偏好；服务端校验并选择实际模型，结果以 `assistantRun.modelId` 为准。
 - 服务端在同一事务创建 Project、唯一 Root、U1、A1 与 queued Run；U1/A1 属于 Root，且 `U1.sequence < A1.sequence`。
-- `canonicalUrl` 必须由返回的 `project.id` 构造。
+- 初始事务尚未生成 Artifact，因此 `artifactSummary` 必须是 `{ changeSequence: 0, total: 0, byKind: {} }`；后续由生成事件携带最新统计。
+- 创建响应只返回服务端资源身份与领域数据，不返回或拼接 Web 页面 URL。客户端必须使用 `project.id` 和集中式路由构造器决定导航目标。
 - 模型 Worker 只能在事务提交后唤醒。
 
 主要错误：`validation_error`、`model_not_available`、`unauthorized`。
@@ -405,6 +422,7 @@ Body：无。Query：无。
 - `project.id` 必须等于 path `projectId`。
 - `threadTopology` 返回该 Project 全部轻量 Thread，必须恰有一个 `parentThreadId=null` 的 Root。
 - 每个 Branch 的 `parentThreadId` 必须能在同一 `threadTopology` 找到，且不得形成环。
+- `artifactSummary` 必须统计该 Project 的全部 Artifact，不能只统计 `initialThread.includedArtifacts`。
 - `initialThread.threadId` 必须等于 Root ID。
 - Root bundle 默认返回最新最多 200 条有效 Message，再按 sequence 升序输出。
 - Bootstrap 不返回 BaseContext、Branch Message、Prompt History 或全部 Project Resource 正文。
@@ -740,6 +758,8 @@ type RunSnapshotEvent = {
   run: AssistantRunStateDTO
   message: MessageDTO
   includedArtifacts: IncludedArtifactDTO[]
+  /** 当前 Project 的最新 Artifact 总量，用于刷新或重连后校正页面统计。 */
+  artifactSummary: ProjectArtifactSummaryDTO
 }
 
 type RunDeltaEvent = {
@@ -754,6 +774,8 @@ type RunCompletedEvent = {
   run: AssistantRunStateDTO
   message: MessageDTO
   includedArtifacts: IncludedArtifactDTO[]
+  /** 本次完成事务提交后的 Project Artifact 总量。 */
+  artifactSummary: ProjectArtifactSummaryDTO
 }
 
 type RunFailedEvent = {
@@ -787,6 +809,7 @@ type AssistantMessageEvent =
 6. `afterEventSequence` 用于校验客户端游标与服务端当前 Run 的关系；缺失事件已由 snapshot 合并恢复，因此 P0 不要求重放每个旧 token delta。
 7. 如果客户端游标大于服务端游标，返回 `409 invalid_event_cursor`；如果客户端游标小于服务端保留窗口，仍通过 snapshot 恢复。
 8. 网络断开只取消订阅，不停止 Run。客户端用最后接受的 eventSequence 重连。
+9. 客户端必须按 `changeSequence` 合并 `run.snapshot` 或 `run.completed` 携带的 `artifactSummary`：更大值原子替换，相同值必须一致，更小值忽略；不得按重复事件自行累加。
 
 HTTP 连接建立前的主要错误：`assistant_message_not_found`、`message_run_not_found`、`invalid_event_cursor`、`forbidden`。连接建立后的运行失败通过 `run.failed` 表达。
 

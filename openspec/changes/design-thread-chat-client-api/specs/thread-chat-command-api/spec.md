@@ -38,12 +38,19 @@ Project metadata 更新 MUST 允许独立修改 customTitle、Target 和 Instruc
 ### Requirement: 原子创建首个 Project 对话
 服务端 MUST 允许客户端用一条命令提交首条 user Message，并在同一数据库事务创建 Project、唯一 Root Thread、user Message、assistant Message 和 queued MessageRun。事务成功前不得唤醒模型执行；任一实体写入失败 MUST 回滚全部创建。
 
-请求 MUST 包含符合 AI SDK v7 UIMessage.parts 的 `initialMessage.parts`，并 MAY 包含 `requestedModelId`。请求不得包含新实体 ID。响应 MUST 返回全部创建实体、AssistantRunState 和 `/thread-chat/{projectId}` canonical URL。
+请求 MUST 包含符合 AI SDK v7 UIMessage.parts 的 `initialMessage.parts`，并 MAY 包含 `requestedModelId`。请求不得包含新实体 ID。响应 MUST 返回全部创建实体、初始 ProjectArtifactSummary 和 AssistantRunState。服务端 MUST NOT 返回或构造 Web 页面 URL；页面路由由客户端根据响应中的 `project.id` 决定。
 
 #### Scenario: 首次发送成功
 - **WHEN** 客户端请求 `POST /api/v1/projects` 并提交合法 initialMessage
 - **THEN** 服务端 MUST 返回 201 及 Project、Root Thread、U1、A1 和 queued Run
+- **AND** 初始 ProjectArtifactSummary MUST 是 `{ changeSequence: 0, total: 0, byKind: {} }`
 - **AND** 数据库中不得存在缺少 Root Thread 或缺少 A1 Run 的部分 Project
+
+#### Scenario: 创建响应与 Web 路由解耦
+- **WHEN** 服务端成功创建首个 Project 对话
+- **THEN** CreationBundle MUST 包含可作为资源身份的 `project.id`
+- **AND** CreationBundle MUST NOT 包含 `canonicalUrl`、`pageUrl` 或其他客户端页面路径
+- **AND** Web 客户端 MUST 使用集中式路由构造器决定导航目标
 
 #### Scenario: 首次发送校验失败
 - **WHEN** initialMessage.parts 为空、非法或不符合允许的 UIMessage part 协议
@@ -51,19 +58,27 @@ Project metadata 更新 MUST 允许独立修改 customTitle、Target 和 Instruc
 - **AND** 不得创建任何 Project 数据
 
 ### Requirement: 提供 ProjectBootstrap Query
-服务端 MUST 提供 `GET /api/v1/projects/{projectId}/bootstrap`。响应 MUST 包含 Project DTO、全量轻量 ThreadTopologyItem、唯一 Root Thread 的 MessageBundle，以及恢复这些 Message 所需的 AssistantRunState 和关联 Artifact。
+服务端 MUST 提供 `GET /api/v1/projects/{projectId}/bootstrap`。响应 MUST 包含 Project DTO、全量轻量 ThreadTopologyItem、ProjectArtifactSummary、唯一 Root Thread 的 MessageBundle，以及恢复这些 Message 所需的 AssistantRunState 和关联 Artifact。
 
 Bootstrap MUST NOT 返回 BaseContext、所有 Branch Message、全部 Project File/Artifact 正文或服务端 Prompt。Thread topology MUST 足以由客户端派生 Root、Child、depth 和 breadcrumb。
+
+ProjectArtifactSummary MUST 统计该 Project 的全部 Artifact，并 MUST 至少返回服务端单调 `changeSequence`、总数和按稳定 `kind` 聚合的数量。它不得退化为 Root MessageBundle 中 `includedArtifacts` 的数量；`total` 必须等于各 kind 计数之和。`changeSequence` 只用于拒绝乱序旧统计，不得成为 Command 请求参数或写入前置条件。
 
 #### Scenario: 加载现有 Project
 - **WHEN** actor 请求可访问 Project 的 Bootstrap
 - **THEN** 服务端 MUST 返回且只返回一个 Root Thread，并返回全部轻量 topology
 - **AND** Root MessageBundle MUST 按 sequence 升序排列有效 Message
+- **AND** ProjectArtifactSummary MUST 覆盖该 Project 全量 Artifact
 
 #### Scenario: Project 不存在
 - **WHEN** projectId 不存在或不可访问
 - **THEN** 服务端 MUST 返回 not_found
 - **AND** 不得创建空 Project 作为降级结果
+
+#### Scenario: 未加载 Branch Artifact 仍计入统计
+- **WHEN** Project 的 Branch Thread 中存在 3 个 Markdown Artifact，但 Bootstrap 不返回该 Branch 的 Message
+- **THEN** `artifactSummary.byKind.markdown` MUST 仍然等于 3
+- **AND** Root bundle 的 `includedArtifacts` MAY 不包含这 3 个 Artifact
 
 ### Requirement: 按 Thread 提供 MessageBundle
 服务端 MUST 提供 `GET /api/v1/threads/{threadId}/messages`，并 MUST 通过 Thread 所属 Project 校验访问权。响应 MUST 返回有效 Message、相关 AssistantRunState 和渲染这些 Message 所需的 Artifact；默认最多返回最新 200 条，再按 sequence 升序输出。
@@ -145,7 +160,7 @@ Edit 请求 MUST 只提交 sourceUserMessageId、新 parts 和可选 requestedMo
 ### Requirement: 通过 assistantMessageId 管理生成生命周期
 服务端 MUST 允许客户端使用 assistantMessageId 查询、订阅和停止对应 MessageRun，而不要求客户端理解内部 MessageRun ID。事件流 MUST 使用严格递增的 eventSequence，并 MUST 支持 `afterEventSequence` 恢复。每次连接 MUST 先返回当前持久化 checkpoint snapshot 及其 cursor；若仍在运行，后续 live event MUST 严格大于该 cursor。旧 token delta MAY 不逐条重放，但恢复结果不得丢失已经持久化的生成内容。
 
-Stop MUST 是显式 Command；连接关闭、页面刷新或取消订阅不得自动停止 Run。终态事件 MUST 携带或允许随后取得 finalized Message 和终态 AssistantRunState。
+Stop MUST 是显式 Command；连接关闭、页面刷新或取消订阅不得自动停止 Run。终态事件 MUST 携带或允许随后取得 finalized Message 和终态 AssistantRunState。`run.snapshot` 与 `run.completed` MUST 携带当前 ProjectArtifactSummary，使客户端能够在刷新、重连和 Artifact 生成完成后校正 Project 页面统计；客户端不得依赖事件次数自行累加。
 
 #### Scenario: 恢复 running 事件流
 - **WHEN** 客户端请求 assistant Message 事件且提交 `afterEventSequence=42`
