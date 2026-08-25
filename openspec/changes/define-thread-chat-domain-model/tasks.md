@@ -18,12 +18,12 @@
 
 ## 2. 建立规范化数据库 Schema
 
-- [ ] 2.1 在 `lib/db/schema.ts` 中新增 `projects`、`threads`、`messages`、`message_runs`、`artifacts` 与 Message feedback 表；Project Memory/File 只保留后续扩展边界，不实现完整协议。
-- [ ] 2.2 为 Project owner、唯一 Root Thread、Thread 内唯一 sequence、同 Message 单一 replacement 和 assistant Message 单一 MessageRun 建立数据库可表达的约束与索引。
-- [ ] 2.3 为 Root/Branch ForkFacts 的空值组合、Message role、MessageRun status 和非负 eventSequence 建立数据库可表达的约束。
-- [ ] 2.4 明确无法由普通 CHECK 表达的同 Project Parent/source/replacement 关系，交给事务内 Repository 校验，不伪造不可靠约束。
-- [ ] 2.5 为 Project 永久删除定义级联边界；普通 Message Repository 和 Route 不得暴露单 Message hard delete。
-- [ ] 2.6 对隔离测试数据库执行 `pnpm db:push` 等价的测试配置命令，并验证从空库可以一次建立完整目标 Schema。
+- [x] 2.1 在 `lib/db/schema.ts` 中新增 `projects`、`threads`、`messages`、`message_runs`、`artifacts` 与 Message feedback 表；Project Memory/File 只保留后续扩展边界，不实现完整协议。
+- [x] 2.2 为 Project owner、唯一 Root Thread、Thread 内唯一 sequence、同 Message 单一 replacement 和 assistant Message 单一 MessageRun 建立数据库可表达的约束与索引。
+- [x] 2.3 为 Root/Branch ForkFacts 的空值组合、Message role、MessageRun status 和非负 eventSequence 建立数据库可表达的约束。
+- [x] 2.4 明确无法由普通 CHECK 表达的同 Project Parent/source/replacement 关系，交给事务内 Repository 校验，不伪造不可靠约束。
+- [x] 2.5 为 Project 永久删除定义级联边界；普通 Message Repository 和 Route 不得暴露单 Message hard delete。
+- [x] 2.6 对隔离测试数据库执行 `pnpm db:push` 等价的测试配置命令，并验证从空库可以一次建立完整目标 Schema。
 
 ## 3. 实现纯领域模型与 Repository
 

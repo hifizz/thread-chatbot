@@ -8,8 +8,13 @@ import {
   boolean,
   vector,
   primaryKey,
+  bigint,
+  check,
+  uuid,
+  type AnyPgColumn,
 } from "drizzle-orm/pg-core"
 import { sql } from "drizzle-orm"
+import type { UIMessage } from "ai"
 import { dbSchema } from "./pg-schema"
 import { EMBEDDING_DIMENSIONS } from "@/constants/rag"
 import { user } from "./auth-schema"
@@ -172,6 +177,259 @@ export const branchMessageFeedback = dbSchema.table(
       columns: [table.userId, table.treeId, table.threadId, table.messageId],
     }),
     index("branch_message_feedback_tree_idx").on(table.userId, table.treeId),
+  ]
+)
+
+/** Project 是一整簇 Root/Branch Thread 的 owner scope 与永久删除边界。 */
+export const projects = dbSchema.table(
+  "projects",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    ownerUserId: text("owner_user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    autoTitle: text("auto_title"),
+    customTitle: text("custom_title"),
+    target: jsonb("target").$type<{
+      ultimate: string | null
+      shortTerm: string[]
+      midTerm: string[]
+    }>(),
+    instruction: text("instruction"),
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+    artifactChangeSequence: bigint("artifact_change_sequence", {
+      mode: "number",
+    })
+      .notNull()
+      .default(0),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("projects_owner_updated_idx").on(
+      table.ownerUserId,
+      table.updatedAt.desc(),
+      table.id.desc()
+    ),
+    check(
+      "projects_artifact_change_sequence_nonnegative_ck",
+      sql`${table.artifactChangeSequence} >= 0`
+    ),
+  ]
+)
+
+/** Root/Branch 角色由 parent_thread_id 是否为空推导，不建立第二套实体类型。 */
+export const threads = dbSchema.table(
+  "threads",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    parentThreadId: uuid("parent_thread_id").references(
+      (): AnyPgColumn => threads.id,
+      { onDelete: "cascade" }
+    ),
+    // 同 Project、Parent/source 归属与无环关系无法由普通 CHECK 可靠表达，
+    // 必须由后续 Repository 在事务内锁定并校验。
+    sourceMessageId: uuid("source_message_id").references(
+      (): AnyPgColumn => messages.id
+    ),
+    forkSourceSnapshot: jsonb("fork_source_snapshot").$type<{
+      schemaVersion: 1
+      quote?: string
+      sourceRole: "user" | "assistant"
+      sourceSequence: number
+    }>(),
+    baseContext: jsonb("base_context").$type<{
+      schemaVersion: 1
+      messageIds: string[]
+    }>(),
+    autoTitle: text("auto_title"),
+    customTitle: text("custom_title"),
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("threads_one_root_per_project_uq")
+      .on(table.projectId)
+      .where(sql`${table.parentThreadId} is null`),
+    index("threads_project_parent_idx").on(
+      table.projectId,
+      table.parentThreadId
+    ),
+    index("threads_source_message_idx").on(table.sourceMessageId),
+    check(
+      "threads_fork_facts_complete_ck",
+      sql`(
+        ${table.parentThreadId} is null
+        and ${table.sourceMessageId} is null
+        and ${table.forkSourceSnapshot} is null
+        and ${table.baseContext} is null
+      ) or (
+        ${table.parentThreadId} is not null
+        and ${table.sourceMessageId} is not null
+        and ${table.forkSourceSnapshot} is not null
+        and ${table.baseContext} is not null
+      )`
+    ),
+  ]
+)
+
+/** Thread 内的稳定线性时间线；finalized 内容只能通过 replacement 演进。 */
+export const messages = dbSchema.table(
+  "messages",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    threadId: uuid("thread_id")
+      .notNull()
+      .references(() => threads.id, { onDelete: "cascade" }),
+    sequence: bigint("sequence", { mode: "number" }).notNull(),
+    role: text("role").$type<"user" | "assistant">().notNull(),
+    parts: jsonb("parts").$type<UIMessage["parts"] | null>(),
+    // 同 Thread、同角色与来源状态属于跨行事务校验；数据库只保证来源存在且
+    // 每条旧 Message 最多有一个直接 replacement。
+    replacesMessageId: uuid("replaces_message_id").references(
+      (): AnyPgColumn => messages.id
+    ),
+    supersededAt: timestamp("superseded_at", { withTimezone: true }),
+    finalizedAt: timestamp("finalized_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("messages_thread_sequence_uq").on(
+      table.threadId,
+      table.sequence
+    ),
+    uniqueIndex("messages_single_replacement_uq")
+      .on(table.replacesMessageId)
+      .where(sql`${table.replacesMessageId} is not null`),
+    index("messages_thread_active_sequence_idx")
+      .on(table.threadId, table.sequence)
+      .where(sql`${table.supersededAt} is null`),
+    check("messages_sequence_positive_ck", sql`${table.sequence} > 0`),
+    check("messages_role_ck", sql`${table.role} in ('user', 'assistant')`),
+    check(
+      "messages_not_self_replacement_ck",
+      sql`${table.replacesMessageId} is null or ${table.replacesMessageId} <> ${table.id}`
+    ),
+  ]
+)
+
+/** 每条 assistant Message 恰有一条运行记录；user Message 的排除由 Repository 校验。 */
+export const messageRuns = dbSchema.table(
+  "message_runs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    assistantMessageId: uuid("assistant_message_id")
+      .notNull()
+      .unique()
+      .references(() => messages.id, { onDelete: "cascade" }),
+    status: text("status")
+      .$type<"queued" | "running" | "completed" | "failed" | "stopped">()
+      .notNull()
+      .default("queued"),
+    modelId: text("model_id").notNull(),
+    eventSequence: bigint("event_sequence", { mode: "number" })
+      .notNull()
+      .default(0),
+    checkpointParts: jsonb("checkpoint_parts")
+      .$type<UIMessage["parts"]>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    errorCode: text("error_code"),
+    errorMessage: text("error_message"),
+    heartbeatAt: timestamp("heartbeat_at", { withTimezone: true }),
+    stopRequestedAt: timestamp("stop_requested_at", { withTimezone: true }),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("message_runs_status_heartbeat_idx").on(
+      table.status,
+      table.heartbeatAt
+    ),
+    check(
+      "message_runs_status_ck",
+      sql`${table.status} in ('queued', 'running', 'completed', 'failed', 'stopped')`
+    ),
+    check(
+      "message_runs_event_sequence_nonnegative_ck",
+      sql`${table.eventSequence} >= 0`
+    ),
+  ]
+)
+
+/** Artifact 内容独立持久化，Project 决定 owner scope，Message 保留 provenance。 */
+export const artifacts = dbSchema.table(
+  "artifacts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    // source Message 与 Artifact 的 Project 归属由 Repository 在同一事务复验。
+    sourceMessageId: uuid("source_message_id")
+      .notNull()
+      .references(() => messages.id),
+    changeSequence: bigint("change_sequence", { mode: "number" }).notNull(),
+    kind: text("kind").notNull(),
+    title: text("title").notNull(),
+    content: jsonb("content").$type<unknown>().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("artifacts_project_change_sequence_uq").on(
+      table.projectId,
+      table.changeSequence
+    ),
+    index("artifacts_project_kind_idx").on(table.projectId, table.kind),
+    index("artifacts_source_message_idx").on(table.sourceMessageId),
+    check(
+      "artifacts_change_sequence_positive_ck",
+      sql`${table.changeSequence} > 0`
+    ),
+  ]
+)
+
+/** assistant Message 的当前互斥反馈；null 由删除该行表达。 */
+export const messageFeedback = dbSchema.table(
+  "message_feedback",
+  {
+    assistantMessageId: uuid("assistant_message_id")
+      .primaryKey()
+      .references(() => messages.id, { onDelete: "cascade" }),
+    feedback: text("feedback").$type<"positive" | "negative">().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    check(
+      "message_feedback_value_ck",
+      sql`${table.feedback} in ('positive', 'negative')`
+    ),
   ]
 )
 
