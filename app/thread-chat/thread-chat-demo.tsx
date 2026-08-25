@@ -245,13 +245,19 @@ export function ThreadChatDemoInner({
         placementMode={mode}
         branchCount={branchCount}
         markdownCount={markdownCount}
-        onNewConversation={() => {
+        onNewConversation={(openInNewPage) => {
+          const newConversationUrl = `/thread-chat/${crypto.randomUUID()}`
+          if (openInNewPage) {
+            window.open(newConversationUrl, "_blank", "noopener,noreferrer")
+            return
+          }
+
           // 空树已经是新对话；反复点击不应让 URL 持续变化。
           if (!mainHasMessage) {
             showToast("当前就是全新对话，直接开聊吧")
             return
           }
-          router.push(`/thread-chat/${crypto.randomUUID()}`)
+          router.push(newConversationUrl)
         }}
         onToggleTreeList={toggleTreeList}
         onOpenHelp={openHelpPanel}
