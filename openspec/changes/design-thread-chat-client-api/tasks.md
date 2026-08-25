@@ -90,13 +90,13 @@
 
 ## 9. 前后端集成与 Ego Browser E2E
 
-- [ ] 9.1 完成 `/new` 无实体草稿、首次发送、seeded Runtime 无空白帧切换和 AI 事件早于目标 Provider 挂载的集成测试。
-- [ ] 9.2 完成已有 Project 冷启动、有/无 Workbench Snapshot、多 Branch 并行加载、单列失败和刷新恢复 running Run 的集成测试。
-- [ ] 9.3 使用 Ego Browser 通过邮箱注册专用本地测试账号；不得依赖真实邮箱验证或真实模型随机输出作为断言。
-- [ ] 9.4 E2E 验证 Project 创建/列表、首条与后续消息、生成中刷新、Stop、Edit、Regenerate、Fork 与嵌套 Fork。
-- [ ] 9.5 E2E 验证多栏异步加载、Header Child 选择、Thread 切换、收起、breadcrumb、分割线拖拽与刷新视图恢复。
-- [ ] 9.6 E2E 验证 Markdown Artifact 创建、消息 `artifactId` 引用、Drawer 按 ID 加载和其他 Project 访问隔离。
-- [ ] 9.7 对比 UI parity 基线，确认除已批准的 Project loading 外，最终样式和交互行为没有变化。
+- [x] 9.1 完成 `/new` 无实体草稿、首次发送、seeded Runtime 无空白帧切换和 AI 事件早于目标 Provider 挂载的集成测试。
+- [x] 9.2 完成已有 Project 冷启动、有/无 Workbench Snapshot、多 Branch 并行加载、单列失败和刷新恢复 running Run 的集成测试。
+- [x] 9.3 使用 Ego Browser 通过邮箱注册专用本地测试账号；不得依赖真实邮箱验证或真实模型随机输出作为断言。
+- [x] 9.4 E2E 验证 Project 创建/列表、首条与后续消息、生成中刷新、Stop、Edit、Regenerate、Fork 与嵌套 Fork。
+- [x] 9.5 E2E 验证多栏异步加载、Header Child 选择、Thread 切换、收起、breadcrumb、分割线拖拽与刷新视图恢复。
+- [x] 9.6 E2E 验证 Markdown Artifact 创建、消息 `artifactId` 引用、Drawer 按 ID 加载和其他 Project 访问隔离。
+- [x] 9.7 对比 UI parity 基线，确认除已批准的 Project loading 外，最终样式和交互行为没有变化。
 
 ## 10. 旧客户端退役与归档
 

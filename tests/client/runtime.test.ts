@@ -47,6 +47,181 @@ const branch = {
 }
 
 describe("ThreadChat client runtime", () => {
+  it("Project 冷启动先落 Bootstrap，再恢复 Workbench，且 Branch 失败彼此隔离", async () => {
+    const secondBranch = {
+      ...branch,
+      id: "00000000-0000-4000-8000-000000000302",
+    }
+    const branchUser = {
+      ...userMessageDTOFixture,
+      id: "00000000-0000-4000-8000-000000000307",
+      threadId: branch.id,
+      sequence: 1,
+    }
+    const branchAssistant = {
+      ...assistantMessageDTOFixture,
+      id: "00000000-0000-4000-8000-000000000308",
+      threadId: branch.id,
+      sequence: 2,
+    }
+    const loadThreadMessages = vi.fn(
+      async ({ threadId }: { threadId: string }) => {
+        if (threadId === secondBranch.id) throw new Error("branch unavailable")
+        return {
+          threadId,
+          messages: [branchUser, branchAssistant],
+          assistantRuns: [
+            {
+              ...assistantRunDTOFixture,
+              assistantMessageId: branchAssistant.id,
+            },
+          ],
+          hasOlderMessages: false,
+          oldestReturnedSequence: 1,
+          newestReturnedSequence: 2,
+        }
+      }
+    )
+    const runtime = createThreadChatProjectRuntime({
+      projectId: projectDTOFixture.id,
+      api: createTestApi({
+        bootstrapProject: vi.fn().mockResolvedValue({
+          project: projectDTOFixture,
+          threadTopology: [rootThreadDTOFixture, branch, secondBranch],
+          artifactSummary: { changeSequence: 0, total: 0, byKind: {} },
+          initialThread: {
+            threadId: rootThreadDTOFixture.id,
+            messages: [userMessageDTOFixture, assistantMessageDTOFixture],
+            assistantRuns: [assistantRunDTOFixture],
+            hasOlderMessages: false,
+            oldestReturnedSequence: 1,
+            newestReturnedSequence: 2,
+          },
+        }),
+        loadThreadMessages,
+      }),
+      generateSlotId: () => "slot-branch",
+    })
+
+    await runtime.commands.loadProjectBootstrap()
+    expect(runtime.store.getState().ui).toMatchObject({
+      columnSlots: [],
+      focusedSlotId: "root",
+      viewMode: "columns",
+    })
+    runtime.store.getState().restoreWorkbenchSnapshot({
+      schemaVersion: 1,
+      columnSlots: [
+        {
+          slotId: "saved-branch",
+          threadId: branch.id,
+          folded: false,
+          widthPx: 420,
+        },
+      ],
+      focusedSlotId: "saved-branch",
+      rootColumnWidthPx: 560,
+      forceColumnCount: 3,
+      placementMode: "replace",
+      viewMode: "columns",
+      canvasPins: {},
+    })
+    expect(runtime.store.getState().ui).toMatchObject({
+      columnSlots: [
+        {
+          slotId: "saved-branch",
+          threadId: branch.id,
+          folded: false,
+          widthPx: 420,
+        },
+      ],
+      focusedSlotId: "saved-branch",
+      rootColumnWidthPx: 560,
+      forceColumnCount: 3,
+    })
+
+    await Promise.all([
+      runtime.commands.ensureThreadMessages(branch.id),
+      runtime.commands.ensureThreadMessages(secondBranch.id),
+    ])
+    expect(
+      runtime.store.getState().requests.threadMessagesById[branch.id]
+        .loadState.status
+    ).toBe("ready")
+    expect(
+      runtime.store.getState().requests.threadMessagesById[secondBranch.id]
+        .loadState.status
+    ).toBe("error")
+    expect(
+      runtime.store.getState().requests.threadMessagesById[
+        rootThreadDTOFixture.id
+      ].loadState.status
+    ).toBe("ready")
+    runtime.destroy()
+  })
+
+  it("刷新冷启动复用 running Run，并从同一 assistantMessageId 恢复到终态", async () => {
+    const runningRun = {
+      ...assistantRunDTOFixture,
+      status: "running" as const,
+      finishedAt: null,
+    }
+    const subscribeAssistantEvents = vi.fn(async function* () {
+      yield {
+        type: "run.completed" as const,
+        eventSequence: 1,
+        run: {
+          ...assistantRunDTOFixture,
+          status: "completed" as const,
+          eventSequence: 1,
+          finishedAt: "2026-08-25T00:01:00.000Z",
+        },
+        message: {
+          ...assistantMessageDTOFixture,
+          parts: [{ type: "text" as const, text: "recovered" }],
+          finalizedAt: "2026-08-25T00:01:00.000Z",
+        },
+        artifactSummary: { changeSequence: 0, total: 0, byKind: {} },
+      }
+    })
+    const runtime = createThreadChatProjectRuntime({
+      projectId: projectDTOFixture.id,
+      api: createTestApi({
+        bootstrapProject: vi.fn().mockResolvedValue({
+          project: projectDTOFixture,
+          threadTopology: [rootThreadDTOFixture],
+          artifactSummary: { changeSequence: 0, total: 0, byKind: {} },
+          initialThread: {
+            threadId: rootThreadDTOFixture.id,
+            messages: [userMessageDTOFixture, assistantMessageDTOFixture],
+            assistantRuns: [runningRun],
+            hasOlderMessages: false,
+            oldestReturnedSequence: 1,
+            newestReturnedSequence: 2,
+          },
+        }),
+        subscribeAssistantEvents,
+      }),
+    })
+
+    await runtime.commands.loadProjectBootstrap()
+    await vi.waitFor(() =>
+      expect(
+        runtime.store.getState().runs.byAssistantMessageId[
+          assistantMessageDTOFixture.id
+        ].status
+      ).toBe("completed")
+    )
+    expect(subscribeAssistantEvents).toHaveBeenCalledTimes(1)
+    expect(subscribeAssistantEvents).toHaveBeenCalledWith(
+      expect.objectContaining({
+        assistantMessageId: assistantMessageDTOFixture.id,
+        afterEventSequence: 0,
+      })
+    )
+    runtime.destroy()
+  })
+
   it("ThreadMessageLoader 同 Thread 去重、不同 Thread 并行且 destroy 统一 Abort", async () => {
     const store = createThreadChatProjectStore({
       projectId: projectDTOFixture.id,

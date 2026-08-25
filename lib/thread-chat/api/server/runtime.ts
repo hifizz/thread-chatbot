@@ -9,11 +9,21 @@ import { MessageRunner } from "../../application/message-runner"
 import { ThreadChatCommands } from "../../application/thread-chat-commands"
 import { ThreadChatQueries } from "../../application/thread-chat-queries"
 import { AiSdkRuntime } from "../../infrastructure/ai-sdk-runtime"
+import {
+  IsolatedTestAiRuntime,
+  usesIsolatedTestAiRuntime,
+} from "../../infrastructure/isolated-test-ai-runtime"
 import { ThreadChatUnitOfWork } from "../../infrastructure/repositories"
 import { ThreadChatApiError } from "./errors"
 
 const unitOfWork = new ThreadChatUnitOfWork(dbClient)
-const runner = new MessageRunner(dbClient, unitOfWork, new AiSdkRuntime(), {
+const aiRuntime = usesIsolatedTestAiRuntime({
+  databaseUrl: process.env.DATABASE_URL,
+  nodeEnv: process.env.NODE_ENV,
+})
+  ? new IsolatedTestAiRuntime()
+  : new AiSdkRuntime()
+const runner = new MessageRunner(dbClient, unitOfWork, aiRuntime, {
   generateId: randomUUID,
   now: () => new Date(),
 })
