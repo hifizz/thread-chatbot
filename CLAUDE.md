@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 所有输出内容必须使用中文（代码、文件路径、命令等技术内容除外）。
 
-面向用户解释架构或状态变化时，使用“前端状态”“界面状态”“转换结果”等直白说法，禁止使用术语“投影”。
+面向用户解释架构或状态变化时，这类从后端状态转换为前端显示状态的过程统一称为“状态映射”，不要使用晦涩的同义术语。
 
 ## Commands
 
