@@ -117,6 +117,7 @@ describe("MessageRunner", () => {
             toolName: "createMarkdownArtifact",
             toolCallId: "tool-call-1",
             state: "output-available",
+            input: { title: "Result" },
             output: { artifactId: expect.any(String) },
           },
         ],
@@ -139,6 +140,7 @@ describe("MessageRunner", () => {
       expect(
         (toolPart as { output: { artifactId: string } }).output
       ).toEqual({ artifactId })
+      expect(JSON.stringify(toolPart)).not.toContain("# Result")
       expect(
         await repositories.artifacts.findOwnedById(actorId, artifactId)
       ).toMatchObject({

@@ -9,41 +9,41 @@
 
 ## 1. 建立共享 V1 契约与 Transport 边界
 
-- [ ] 1.1 为 `api-contracts.md` 中全部 ID、DTO、Request、Response、Error 和 SSE Event 建立前后端共享严格 Zod Schema。
-- [ ] 1.2 为 AI SDK v7 `UIMessage.parts` 建立共享校验入口，限制客户端提交合法 user parts，并定义 Markdown tool output 的 `artifactId` 结构。
-- [ ] 1.3 定义不依赖 Zustand、React 或具体 HTTP 库的 `ThreadChatApiCapabilities`，覆盖 Project、Thread、Message、Artifact、feedback、SSE 与 Stop。
-- [ ] 1.4 实现 JSON Transport 的 Session/认证处理、请求编码、响应 Schema 校验和统一 `ClientError` 映射。
-- [ ] 1.5 实现集中式 `threadChatRoutes`；页面 URL 只由客户端构造，服务端 DTO 不包含 `canonicalUrl` 或其他页面路径。
-- [ ] 1.6 建立契约 fixture，覆盖成功 DTO、结构化错误、未知字段拒绝、错误实体归属和非法 AI SDK part。
+- [x] 1.1 为 `api-contracts.md` 中全部 ID、DTO、Request、Response、Error 和 SSE Event 建立前后端共享严格 Zod Schema。
+- [x] 1.2 为 AI SDK v7 `UIMessage.parts` 建立共享校验入口，限制客户端提交合法 user parts，并定义 Markdown tool output 的 `artifactId` 结构。
+- [x] 1.3 定义不依赖 Zustand、React 或具体 HTTP 库的 `ThreadChatApiCapabilities`，覆盖 Project、Thread、Message、Artifact、feedback、SSE 与 Stop。
+- [x] 1.4 实现 JSON Transport 的 Session/认证处理、请求编码、响应 Schema 校验和统一 `ClientError` 映射。
+- [x] 1.5 实现集中式 `threadChatRoutes`；页面 URL 只由客户端构造，服务端 DTO 不包含 `canonicalUrl` 或其他页面路径。
+- [x] 1.6 建立契约 fixture，覆盖成功 DTO、结构化错误、未知字段拒绝、错误实体归属和非法 AI SDK part。
 
 ## 2. 实现 Project 与 Thread Query API
 
-- [ ] 2.1 实现 `GET /api/v1/projects` 的 owner scope、active/archived 过滤、稳定排序、limit 和绑定查询条件的不透明 cursor。
-- [ ] 2.2 实现 `GET /api/v1/projects/{projectId}/bootstrap`，返回 Project、全量轻量 topology、ProjectArtifactSummary 与唯一 Root ThreadMessageBundle。
-- [ ] 2.3 实现 `GET /api/v1/threads/{threadId}/messages`，按有效 Message sequence 查询最新最多 200 条并返回窗口边界。
-- [ ] 2.4 确保 Bootstrap 和 MessageBundle 不返回 BaseContext、Prompt History、未打开 Branch Message 或 Artifact 正文。
-- [ ] 2.5 实现 `GET /api/v1/artifacts/{artifactId}`，从 Artifact 所属 Project 校验 actor，并只在按 ID 请求时返回完整内容。
-- [ ] 2.6 实现 ProjectArtifactSummary 的服务端统计和单调 `changeSequence`，不得从客户端已加载 Artifact 数量反推。
+- [x] 2.1 实现 `GET /api/v1/projects` 的 owner scope、active/archived 过滤、稳定排序、limit 和绑定查询条件的不透明 cursor。
+- [x] 2.2 实现 `GET /api/v1/projects/{projectId}/bootstrap`，返回 Project、全量轻量 topology、ProjectArtifactSummary 与唯一 Root ThreadMessageBundle。
+- [x] 2.3 实现 `GET /api/v1/threads/{threadId}/messages`，按有效 Message sequence 查询最新最多 200 条并返回窗口边界。
+- [x] 2.4 确保 Bootstrap 和 MessageBundle 不返回 BaseContext、Prompt History、未打开 Branch Message 或 Artifact 正文。
+- [x] 2.5 实现 `GET /api/v1/artifacts/{artifactId}`，从 Artifact 所属 Project 校验 actor，并只在按 ID 请求时返回完整内容。
+- [x] 2.6 实现 ProjectArtifactSummary 的服务端统计和单调 `changeSequence`，不得从客户端已加载 Artifact 数量反推。
 
 ## 3. 实现 Project、Thread 与 Message Command API
 
-- [ ] 3.1 实现 `POST /api/v1/projects`，调用后端 Application 原子创建 Project、Root、U1、A1 与 queued Run，并在响应中返回 CreationBundle。
-- [ ] 3.2 实现 Project metadata、archive/unarchive 和永久删除 API，保持缺省字段与显式 null 的不同语义。
-- [ ] 3.3 实现 Branch Thread title、archive/unarchive API，并拒绝通过 Thread metadata 修改 Root 标题或归档 Root。
-- [ ] 3.4 实现 `POST /api/v1/threads/{threadId}/messages`，原子返回 user Message、assistant Message 与 queued Run；P0 不增加 user-only append API。
-- [ ] 3.5 实现 Fork API，只接受既有 sourceThreadId、sourceMessageId 与 anchor，不接受 Child ID、BaseContext 或 ForkSourceSnapshot 权威字段。
-- [ ] 3.6 实现 Edit 与 Regenerate replacement API，返回 ReplacementBundle，保证旧 finalized Message parts 与 sequence 不变。
-- [ ] 3.7 实现 feedback API，只允许对合格 assistant Message 设置 positive、negative 或 null。
-- [ ] 3.8 为全部 Route 加入 Session actor、owner scope、归档状态、业务资格、严格字段校验和统一错误映射。
+- [x] 3.1 实现 `POST /api/v1/projects`，调用后端 Application 原子创建 Project、Root、U1、A1 与 queued Run，并在响应中返回 CreationBundle。
+- [x] 3.2 实现 Project metadata、archive/unarchive 和永久删除 API，保持缺省字段与显式 null 的不同语义。
+- [x] 3.3 实现 Branch Thread title、archive/unarchive API，并拒绝通过 Thread metadata 修改 Root 标题或归档 Root。
+- [x] 3.4 实现 `POST /api/v1/threads/{threadId}/messages`，原子返回 user Message、assistant Message 与 queued Run；P0 不增加 user-only append API。
+- [x] 3.5 实现 Fork API，只接受既有 sourceThreadId、sourceMessageId 与 anchor，不接受 Child ID、BaseContext 或 ForkSourceSnapshot 权威字段。
+- [x] 3.6 实现 Edit 与 Regenerate replacement API，返回 ReplacementBundle，保证旧 finalized Message parts 与 sequence 不变。
+- [x] 3.7 实现 feedback API，只允许对合格 assistant Message 设置 positive、negative 或 null。
+- [x] 3.8 为全部 Route 加入 Session actor、owner scope、归档状态、业务资格、严格字段校验和统一错误映射。
 
 ## 4. 实现 SSE 生成恢复与 Stop
 
-- [ ] 4.1 实现 `GET /api/v1/assistant-messages/{id}/events` SSE；每次连接首个业务事件固定为持久化 `run.snapshot`。
-- [ ] 4.2 实现 `afterEventSequence` 校验、重复/倒序过滤和 snapshot 后严格递增的 live event。
-- [ ] 4.3 实现 `run.delta`、`run.completed`、`run.failed`、`run.stopped` Schema，并在 snapshot/completed 携带最新 Artifact Summary。
-- [ ] 4.4 确保 finalized Message tool output 只包含 `artifactId`，SSE 不复制 Artifact 正文。
-- [ ] 4.5 实现显式 Stop API；关闭页面、刷新、切换 Thread 或取消 SSE 不得触发 Stop。
-- [ ] 4.6 验证 queued/running Run 刷新后复用同一 assistantMessageId 和 MessageRun，不启动第二次执行。
+- [x] 4.1 实现 `GET /api/v1/assistant-messages/{id}/events` SSE；每次连接首个业务事件固定为持久化 `run.snapshot`。
+- [x] 4.2 实现 `afterEventSequence` 校验、重复/倒序过滤和 snapshot 后严格递增的 live event。
+- [x] 4.3 实现 `run.delta`、`run.completed`、`run.failed`、`run.stopped` Schema，并在 snapshot/completed 携带最新 Artifact Summary。
+- [x] 4.4 确保 finalized Message tool output 只包含 `artifactId`，SSE 不复制 Artifact 正文。
+- [x] 4.5 实现显式 Stop API；关闭页面、刷新、切换 Thread 或取消 SSE 不得触发 Stop。
+- [x] 4.6 验证 queued/running Run 刷新后复用同一 assistantMessageId 和 MessageRun，不启动第二次执行。
 
 ## 5. 后端 API 验收门
 

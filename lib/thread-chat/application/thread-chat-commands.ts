@@ -82,12 +82,16 @@ export class ThreadChatCommands {
         input.actorId,
         input.sourceThreadId
       )
-      invariant(parent, "entity_not_found", "Parent Thread 不存在。")
+      invariant(parent, "thread_not_found", "Parent Thread 不存在。")
       const source = await repositories.messages.findOwnedByIdForUpdate(
         input.actorId,
         input.sourceMessageId
       )
-      invariant(source, "entity_not_found", "Fork source Message 不存在。")
+      invariant(
+        source,
+        "source_message_not_found",
+        "Fork source Message 不存在。"
+      )
       invariant(
         source.threadId === parent.id,
         "thread_source_invalid",
@@ -100,6 +104,16 @@ export class ThreadChatCommands {
               source.id
             )
           : null
+      invariant(
+        source.finalizedAt !== null,
+        "message_not_finalized",
+        "Fork source 尚未 finalized。"
+      )
+      invariant(
+        source.supersededAt === null,
+        "message_superseded",
+        "Fork source 已 superseded。"
+      )
       assertMessageForkEligible(source, sourceRun)
       if (input.anchor?.textPosition) {
         const sourceText = (source.parts ?? [])
@@ -181,7 +195,7 @@ export class ThreadChatCommands {
         input.actorId,
         input.sourceAssistantMessageId
       )
-      invariant(found, "entity_not_found", "Message 不存在。")
+      invariant(found, "message_not_found", "Message 不存在。")
       await repositories.threads.findOwnedByIdForUpdate(
         input.actorId,
         found.threadId
@@ -190,7 +204,7 @@ export class ThreadChatCommands {
         input.actorId,
         found.id
       )
-      invariant(source, "entity_not_found", "Message 不存在。")
+      invariant(source, "message_not_found", "Message 不存在。")
       invariant(
         source.role === "assistant" &&
           source.finalizedAt !== null &&
@@ -254,7 +268,7 @@ export class ThreadChatCommands {
         input.actorId,
         input.sourceUserMessageId
       )
-      invariant(found, "entity_not_found", "Message 不存在。")
+      invariant(found, "message_not_found", "Message 不存在。")
       await repositories.threads.findOwnedByIdForUpdate(
         input.actorId,
         found.threadId
@@ -263,7 +277,7 @@ export class ThreadChatCommands {
         input.actorId,
         found.id
       )
-      invariant(source, "entity_not_found", "Message 不存在。")
+      invariant(source, "message_not_found", "Message 不存在。")
       invariant(
         source.role === "user" &&
           source.finalizedAt !== null &&
@@ -405,7 +419,7 @@ export class ThreadChatCommands {
           input.actorId,
           input.threadId
         )
-    invariant(thread, "entity_not_found", "Thread 不存在。")
+    invariant(thread, "thread_not_found", "Thread 不存在。")
     invariant(!thread.archivedAt, "thread_archived", "已归档 Thread 不能发送消息。")
     await repositories.messageRuns.assertNoActiveForThread(
       input.actorId,

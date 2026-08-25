@@ -22,6 +22,11 @@ export type ThreadChatDomainErrorCode =
   | "message_not_regeneratable"
   | "fork_required"
   | "fork_anchor_mismatch"
+  | "thread_not_found"
+  | "message_not_found"
+  | "source_message_not_found"
+  | "assistant_message_not_found"
+  | "message_run_not_found"
   | "entity_not_found"
 
 export class ThreadChatDomainError extends Error {

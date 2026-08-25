@@ -113,10 +113,7 @@ export class MessageRunner {
               toolName: "createMarkdownArtifact",
               toolCallId: event.output.toolCallId ?? created.id,
               state: "output-available" as const,
-              input: {
-                title: event.output.title,
-                content: event.output.content,
-              },
+              input: { title: event.output.title },
               output: toMarkdownArtifactToolOutput(created),
             }
             artifactParts.push(toolPart)

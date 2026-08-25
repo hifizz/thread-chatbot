@@ -115,4 +115,36 @@ export class ThreadChatQueries {
     invariant(artifact, "entity_not_found", "Artifact 不存在。")
     return artifact
   }
+
+  async assistantSnapshot(input: {
+    actorId: string
+    assistantMessageId: string
+  }) {
+    const repositories = createThreadChatRepositories(this.sql)
+    const message = await repositories.messages.findOwnedById(
+      input.actorId,
+      input.assistantMessageId
+    )
+    invariant(
+      message?.role === "assistant",
+      "assistant_message_not_found",
+      "assistant Message 不存在。"
+    )
+    const thread = await repositories.threads.findOwnedById(
+      input.actorId,
+      message.threadId
+    )
+    invariant(thread, "entity_not_found", "Thread 不存在。")
+    const run = await repositories.messageRuns.findOwnedByAssistantMessageId(
+      input.actorId,
+      message.id
+    )
+    invariant(run, "message_run_not_found", "MessageRun 不存在。")
+    const artifactSummary = await repositories.artifacts.summarizeOwnedProject(
+      input.actorId,
+      thread.projectId
+    )
+    invariant(artifactSummary, "entity_not_found", "Project 不存在。")
+    return { message, run, artifactSummary }
+  }
 }
