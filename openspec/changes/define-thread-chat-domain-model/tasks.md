@@ -27,14 +27,14 @@
 
 ## 3. 实现纯领域模型与 Repository
 
-- [ ] 3.1 按 design 的模块骨架建立不依赖 React、HTTP、Drizzle 或具体 AI Runtime 的 Project、Thread、Message、MessageRun、BaseContext 与 Artifact 领域类型。
-- [ ] 3.2 实现 Root/Branch 关系判定、唯一 Root、同 Project Parent/source、无环拓扑与 ForkFacts 完整性验证。
-- [ ] 3.3 实现 Thread 内服务端 sequence 分配，并用数据库唯一约束与并发测试保证无重复 sequence。
-- [ ] 3.4 实现 finalized Message 不可变与 replacement 规则；Repository 的更新入口必须明确禁止原地覆盖 finalized parts 和 sequence。
-- [ ] 3.5 实现 BaseContextV1 的验证、持久化和有序 Message ID 解析；BaseContext 只能由服务端计算。
-- [ ] 3.6 实现 MessageRun 的 queued/running/completed/failed/stopped 条件状态转换、checkpointParts、eventSequence 与 Stop 请求持久化。
-- [ ] 3.7 实现 Project、Thread、Message、MessageRun、Artifact 与 feedback Repository；所有 Query 从 actor 校验 Project owner scope。
-- [ ] 3.8 实现 Artifact 独立持久化及 `sourceMessageId` provenance；Message 的 AI SDK v7 tool output 只保存 `artifactId`，不复制 Markdown 正文。
+- [x] 3.1 按 design 的模块骨架建立不依赖 React、HTTP、Drizzle 或具体 AI Runtime 的 Project、Thread、Message、MessageRun、BaseContext 与 Artifact 领域类型。
+- [x] 3.2 实现 Root/Branch 关系判定、唯一 Root、同 Project Parent/source、无环拓扑与 ForkFacts 完整性验证。
+- [x] 3.3 实现 Thread 内服务端 sequence 分配，并用数据库唯一约束与并发测试保证无重复 sequence。
+- [x] 3.4 实现 finalized Message 不可变与 replacement 规则；Repository 的更新入口必须明确禁止原地覆盖 finalized parts 和 sequence。
+- [x] 3.5 实现 BaseContextV1 的验证、持久化和有序 Message ID 解析；BaseContext 只能由服务端计算。
+- [x] 3.6 实现 MessageRun 的 queued/running/completed/failed/stopped 条件状态转换、checkpointParts、eventSequence 与 Stop 请求持久化。
+- [x] 3.7 实现 Project、Thread、Message、MessageRun、Artifact 与 feedback Repository；所有 Query 从 actor 校验 Project owner scope。
+- [x] 3.8 实现 Artifact 独立持久化及 `sourceMessageId` provenance；Message 的 AI SDK v7 tool output 只保存 `artifactId`，不复制 Markdown 正文。
 
 ## 4. 实现核心 Application Command 与 Query
 

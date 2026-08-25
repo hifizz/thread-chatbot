@@ -1,8 +1,9 @@
 import { randomUUID } from "node:crypto"
-import type { UIMessage } from "ai"
-
-type JsonValue =
-  string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue }
+import type { Artifact } from "@/lib/thread-chat/domain/artifact"
+import type { Message } from "@/lib/thread-chat/domain/message"
+import type { MessageRun } from "@/lib/thread-chat/domain/message-run"
+import type { Project } from "@/lib/thread-chat/domain/project"
+import type { Thread } from "@/lib/thread-chat/domain/thread"
 
 const FIXTURE_TIME = new Date("2026-01-01T00:00:00.000Z")
 
@@ -15,69 +16,11 @@ export type UserFixture = {
   updatedAt: Date
 }
 
-export type ProjectFixture = {
-  id: string
-  ownerUserId: string
-  autoTitle: string | null
-  customTitle: string | null
-  target: JsonValue | null
-  instruction: JsonValue | null
-  archivedAt: Date | null
-  createdAt: Date
-  updatedAt: Date
-}
-
-export type ThreadFixture = {
-  id: string
-  projectId: string
-  parentThreadId: string | null
-  sourceMessageId: string | null
-  forkSourceSnapshot: JsonValue | null
-  baseContext: { schemaVersion: 1; messageIds: string[] } | null
-  autoTitle: string | null
-  customTitle: string | null
-  archivedAt: Date | null
-  createdAt: Date
-  updatedAt: Date
-}
-
-export type MessageFixture = {
-  id: string
-  threadId: string
-  sequence: number
-  role: "user" | "assistant"
-  parts: UIMessage["parts"] | null
-  replacesMessageId: string | null
-  supersededAt: Date | null
-  finalizedAt: Date | null
-  createdAt: Date
-}
-
-export type ArtifactFixture = {
-  id: string
-  projectId: string
-  sourceMessageId: string
-  kind: string
-  title: string
-  content: JsonValue
-  createdAt: Date
-}
-
-export type MessageRunFixture = {
-  id: string
-  assistantMessageId: string
-  status: "queued" | "running" | "completed" | "failed" | "stopped"
-  modelId: string
-  eventSequence: number
-  checkpointParts: UIMessage["parts"]
-  errorCode: string | null
-  errorMessage: string | null
-  heartbeatAt: Date | null
-  stopRequestedAt: Date | null
-  finishedAt: Date | null
-  createdAt: Date
-  updatedAt: Date
-}
+export type ProjectFixture = Project
+export type ThreadFixture = Thread
+export type MessageFixture = Message
+export type ArtifactFixture = Artifact
+export type MessageRunFixture = MessageRun
 
 export function createUserFixture(
   overrides: Partial<UserFixture> = {}
@@ -105,6 +48,7 @@ export function createProjectFixture(
     target: null,
     instruction: null,
     archivedAt: null,
+    artifactChangeSequence: 0,
     createdAt: FIXTURE_TIME,
     updatedAt: FIXTURE_TIME,
     ...overrides,
@@ -166,6 +110,7 @@ export function createArtifactFixture(
     id: randomUUID(),
     projectId: randomUUID(),
     sourceMessageId: randomUUID(),
+    changeSequence: 1,
     kind: "markdown",
     title: "测试 Artifact",
     content: { markdown: "# 测试" },
