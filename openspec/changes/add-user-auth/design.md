@@ -75,7 +75,7 @@
 
 ### D6：401 自愈——只包业务 API，不包 better-auth 自身接口
 
-**选择**：新增 `lib/auth/session-recovery.ts`：`fetchWithAuth(input, init)` 包装 `fetch`，命中响应状态 401 时触发 `handleUnauthorized()`（best-effort 调用 `signOut()` 清掉本地已知失效的 cookie，随后硬跳转 `window.location.href = /sign-in?redirect=...`），响应本身原样返回给调用方（不吞掉，不改变既有错误处理路径）。用进程内 `let recovering = false` 加锁，确保并发多个 401 只触发一次登出+跳转。接入范围：`lib/chat/thread-list-adapter.ts`、`lib/chat/use-thread-history-adapter.ts`、`app/page.tsx` 里 `AssistantChatTransport` 的 `fetch`、`app/thread-chat/net/chat-controller.ts`、`app/thread-chat/net/persist.ts`——即所有会话相关的业务数据读写。
+**选择**：新增 `lib/auth/session-recovery.ts`：`fetchWithAuth(input, init)` 包装 `fetch`，命中响应状态 401 时触发 `handleUnauthorized()`（best-effort 调用 `signOut()` 清掉本地已知失效的 cookie，随后硬跳转 `window.location.href = /sign-in?redirect=...`），响应本身原样返回给调用方（不吞掉，不改变既有错误处理路径）。用进程内 `let recovering = false` 加锁，确保并发多个 401 只触发一次登出+跳转。接入范围：`lib/chat/thread-list-adapter.ts`、`lib/chat/use-thread-history-adapter.ts`、`app/page.tsx` 里 `AssistantChatTransport` 的 `fetch`、`app/thread-chat/net/chat-controller.ts`、`app/thread-chat/net/persistence/persist.ts`——即所有会话相关的业务数据读写。
 
 **理由**：D5 修的是「中间件不再错误地挡住登录页」，但没有解决「用户已经打开着受保护页面、会话在使用过程中失效」这种场景——此时页面不会重新经过中间件，只会看到业务 API 陆续返回 401 且大多数前端代码对 401 没有特殊处理（表现为静默失败或控制台报错）。`fetchWithAuth` 把「拿到 401」到「登出并引导重新登录」这条恢复路径做成通用包装，接入各处业务 fetch 即可。**刻意排除** better-auth 自身的 `/api/auth/*` 接口：登录表单提交密码错误时同样会拿到 401，如果这个包装也覆盖了登录请求本身，就会把一次正常的「密码错了、请重试」误判成「会话失效」，触发不必要的 `signOut()` 和跳转，形成体验上的另一种死循环。
 

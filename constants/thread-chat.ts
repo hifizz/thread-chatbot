@@ -10,10 +10,14 @@ export const THREAD_CHAT_SYSTEM =
   "你是一位乐于深入讲解的助手。回答要结构清晰、有层次、尽量讲透：" +
   "善用 Markdown 组织内容——用标题分段、用有序 / 无序列表罗列要点、" +
   "用代码块承载代码或公式、用表格对比、用**加粗**突出关键概念。" +
-  "在有价值处展开细节、举例、说明常见误区或延伸，不必刻意压缩篇幅。" +
-  "当用户以中文、英文、中英混合或任何等价表达要求创建、生成、撰写、输出、整理、改写、转换、总结成或交付独立的 Markdown/.md 文档时，必须调用 createMarkdownArtifact；只看交付意图，不要求固定关键词或句式。" +
+  "在有价值处展开细节、举例、说明常见误区或延伸，不必刻意压缩篇幅。"
+
+/** 仅在本轮明确要求独立交付物、且 createMarkdownArtifact 已挂载时注入。 */
+export const THREAD_CHAT_MARKDOWN_ARTIFACT_SYSTEM =
+  "普通回答始终直接在对话正文中完成，即使回答很长、包含多个章节、联网研究、总结、列表、表格或 Markdown 排版，也不要把它变成独立文件。" +
+  "只有当用户明确要求文章、文档、文件、报告、Markdown/.md、产物等独立交付物时，才调用 createMarkdownArtifact。" +
   "用户明确要求多份独立文档时，必须在同一回复中为每一份分别调用一次 createMarkdownArtifact，不要把它们合并成一个文件，也不要要求用户下一轮再继续。工具 content 写可直接渲染的原始 Markdown，不要给整份文档套外层 markdown 代码围栏。" +
-  "用户只是询问 Markdown 的概念、用法、语法，或普通回答仅使用 Markdown 排版时，不要调用工具。" +
+  "用户只是要求详细回答、分析、解释、研究或总结，或者询问 Markdown 的概念、用法、语法时，不要调用工具。" +
   "When the user asks for multiple standalone Markdown/.md deliverables, call createMarkdownArtifact once for each document in the same reply. Do not call it for conceptual Markdown questions or ordinary Markdown-formatted prose."
 
 /** 分支焦点段的前半：后接被划选的锚点原文（见 lib/chat/thread-chat-prompt.ts） */
@@ -33,11 +37,8 @@ export const THREAD_CHAT_BRANCH_SUFFIX =
  */
 export const INHERITED_CHAR_BUDGET = 6000
 
-/**
- * 异步分支标题（openspec: add-bubble-composer D7）的生成长度上限（字符）：
- * 提示词要求 4–8 字，服务端对超长输出按此截断兜底。
- */
-export const BRANCH_TITLE_GEN_MAX_LEN = 8
+/** ThreadTreeState JSONB 中消息 DAG 结构的当前版本。 */
+export const THREAD_TREE_SCHEMA_VERSION = 2 as const
 
 /* ---------------- 分支树持久化（DB + localStorage） ---------------- */
 
@@ -47,13 +48,21 @@ export const LAST_TREE_ID_KEY = "thread-chat:last-tree-id"
 /** localStorage：每棵树的工作台状态（列槽/列宽/列数/放置策略/视图），按 treeId 分键 */
 export const TREE_UI_KEY_PREFIX = "thread-chat:ui:"
 
+/**
+ * sessionStorage：本标签页中某个主线或分支已触发过标题生成，避免状态尚未落库时
+ * 刷新页面又发起一次模型请求。持久化状态仍以 Thread.titleGenerationAttempted 为准。
+ * 标题接口已统一，不保留旧分支标题键名的兼容路径。
+ */
+export const THREAD_TITLE_ATTEMPT_STORAGE_KEY_PREFIX =
+  "thread-chat:title-attempt:"
+
 /** store version 变化后的整树存库防抖（毫秒）：流式高频跳变合并为结束后一次 PUT */
 export const TREE_SAVE_DEBOUNCE_MS = 1500
 
 /** 工作台状态写 localStorage 的轻防抖（毫秒，纯本地写很便宜） */
 export const UI_SAVE_DEBOUNCE_MS = 300
 
-/** 派生树标题：取 main 首条 user 消息的前多少个字符 */
+/** 自动标题尚未成功生成时，派生树标题取 main 首条 user 消息的前多少个字符。 */
 export const TREE_TITLE_MAX_LEN = 20
 
 /** 用户自定义标题（重命名，写 custom_title 列）的最大长度：trim 后超过即 400 */

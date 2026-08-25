@@ -12,15 +12,24 @@
     "start": "next start",
     "lint": "eslint",
     "format": "prettier --write \"**/*.{ts,tsx}\"",
+    "test": "pnpm test:unit && pnpm test:client && pnpm test:integration && pnpm test:api",
+    "test:unit": "vitest run --config vitest.config.ts",
+    "test:client": "vitest run --config vitest.client.config.ts",
+    "test:integration": "pnpm test:db:reset && vitest run --config vitest.integration.config.ts",
+    "test:api": "pnpm test:db:reset && vitest run --config vitest.api.config.ts",
+    "test:watch": "vitest --config vitest.config.ts",
     "typecheck": "tsc --noEmit",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:reset-schema": "node scripts/reset-thread-chat-schema.mjs",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
+    "test:db:create": "node scripts/create-test-database.mjs",
+    "test:db:reset": "node scripts/reset-test-schema.mjs",
     "openspec:validate": "openspec validate --all --strict"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^4.0.39",
     "@ai-sdk/openai-compatible": "^3.0.5",
     "@ai-sdk/react": "^4.0.15",
     "@assistant-ui/core": "^0.2.20",
@@ -81,6 +90,8 @@
     "@fission-ai/openspec": "1.5.0",
     "@shikijs/types": "4.3.1",
     "@tailwindcss/postcss": "^4",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.6",
     "@types/node": "^20",
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.4",
@@ -88,11 +99,13 @@
     "drizzle-kit": "^0.31.10",
     "eslint": "^9",
     "eslint-config-next": "16.3.1",
+    "jsdom": "^30.0.1",
     "playwright-core": "^1.61.1",
     "prettier": "^3.8.3",
     "prettier-plugin-tailwindcss": "^0.8.0",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.11"
   },
   "pnpm": {
     "overrides": {

@@ -8,7 +8,9 @@
 .tc .cols {
   flex: 1;
   display: flex;
+  min-height: 0;
   overflow-x: auto;
+  overflow-y: hidden;
 }
 .tc .column {
   flex: 1 1 0;
@@ -196,6 +198,17 @@
 .tc .cbtn:hover {
   border-color: var(--accent, var(--d1));
   color: var(--accent, var(--d1));
+}
+.tc .cbtn.tree {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.tc .cbtn.tree .n {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
 }
 
 .tc .focus-banner {

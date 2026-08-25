@@ -54,7 +54,7 @@ pnpm dev
 
 以下能力均为按需配置，快速开始不需要它们：
 
-- 深度研究：`SEARCH_API_KEY`（以及可选的 `SEARCH_BASE_URL`）
+- Web 搜索与网页读取：AnySearch 可匿名使用；配置 `ANYSEARCH_API_KEY` 可获得更高配额与限流
 - 附件与 PDF 处理：Cloudflare R2 变量（`R2_ACCOUNT_ID`、`R2_ACCESS_KEY_ID`、`R2_SECRET_ACCESS_KEY`、`R2_BUCKET`）
 - 大文档向量检索：`EMBEDDINGS_BASE_URL`、`EMBEDDINGS_API_KEY`、`EMBEDDINGS_MODEL`，以及 PostgreSQL `pgvector`
 - 其他模型提供商和网关：`.env.example` 中说明的提供商 key、Cloudflare AI Gateway 或 Vercel AI Gateway 变量
@@ -68,7 +68,7 @@ Thread Chat 提供 13 个固定走 OpenRouter 的内部模型 id：`openrouter-g
 
 ## UMAPIS 预览模型
 
-Thread Chat Prompt 输入关联的模型选择器提供 `umapis-claude-opus-4-6`、`umapis-claude-sonnet-5`、`umapis-gpt-5.6-sol` 和 `umapis-gpt-5.6-terra`。Claude 模型配置 `UMAPIS_API_KEY_CLAUDE`，GPT 模型配置 `UMAPIS_API_KEY_GPT`；`UMAPIS_BASE_URL` 可选，可填写站点根路径或 `/v1` API 根路径。请求保持上游默认行为，不发送 Effort 参数。这些模型是未计费预览：不要求用户余额为正、不扣额度、不展示未经验证的价格。Effort 配置与 UMAPIS 计费由后续 spec 单独定义。
+Thread Chat Prompt 输入关联的模型选择器提供 `constants/model.ts` 中注册的 UMAPIS Claude 与 GPT 预览模型。Claude 模型配置 `UMAPIS_API_KEY_CLAUDE`，GPT 模型配置 `UMAPIS_API_KEY_GPT`；`UMAPIS_BASE_URL` 可选，可填写站点根路径或 `/v1` API 根路径。请求保持上游默认行为，不发送 Effort 参数。这些模型是未计费预览：不要求用户余额为正、不扣额度、不展示未经验证的价格。Effort 配置与 UMAPIS 计费由后续 spec 单独定义。
 
 ## 架构
 
@@ -77,9 +77,10 @@ Thread Chat Prompt 输入关联的模型选择器提供 `umapis-claude-opus-4-6`
 | 边界   | 位置                                                                 | 职责                                                     |
 | ------ | -------------------------------------------------------------------- | -------------------------------------------------------- |
 | 核心   | [`app/thread-chat/core/`](./app/thread-chat/core/)                   | 对话树状态、选择器和分支对话 store                       |
-| 分支   | [`app/thread-chat/branching/`](./app/thread-chat/branching/)         | 文本选择、锚点、上下文分支和分支感知的聊天渲染           |
-| 编排   | [`app/thread-chat/orchestration/`](./app/thread-chat/orchestration/) | 多列工作区、树画布、切换、交付物和工作台控件             |
-| 网络   | [`app/thread-chat/net/`](./app/thread-chat/net/)                     | 树加载、清理、防抖持久化、提示词和流式 UI 事件           |
+| 分支   | [`app/thread-chat/branching/`](./app/thread-chat/branching/)         | `selection/` 管文本锚点与划选交互，`assistant/` 管分支感知渲染 |
+| 对话   | [`app/thread-chat/chat/`](./app/thread-chat/chat/)                   | 用 `message/`、`composer/`、`actions/` 聚合三个对话功能集 |
+| 编排   | [`app/thread-chat/orchestration/`](./app/thread-chat/orchestration/) | 用 `canvas/`、`columns/`、`navigation/`、`artifacts/`、`overlays/`、`workspace/` 组合工作台 |
+| 网络   | [`app/thread-chat/net/`](./app/thread-chat/net/)                     | 用 `boot/`、`commands/`、`persistence/`、`prompt/`、`stream/`、`titles/` 隔离客户端 I/O |
 | 服务端 | [`app/api/`](./app/api/) 和 [`lib/chat/`](./lib/chat/)               | 认证、模型流式输出、工具处理、分支树 API、附件和研究工具 |
 
 仓库内提供了更详细的设计材料：

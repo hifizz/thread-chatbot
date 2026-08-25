@@ -22,4 +22,5 @@ const client =
   })
 if (process.env.NODE_ENV !== "production") globalThis.__dbClient = client
 
+export const dbClient = client
 export const db = drizzle(client, { schema })

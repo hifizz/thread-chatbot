@@ -98,7 +98,7 @@ Open <http://localhost:4040/thread-chat> to enter the Thread Chat workspace. Sig
 
 The following features are opt-in and are not required for the quick start:
 
-- Deep research: `SEARCH_API_KEY` (and optionally `SEARCH_BASE_URL`)
+- Web search and page fetch: AnySearch works anonymously; set `ANYSEARCH_API_KEY` for higher quotas and rate limits
 - Attachments and PDF processing: Cloudflare R2 variables (`R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`)
 - Large-document vector retrieval: `EMBEDDINGS_BASE_URL`, `EMBEDDINGS_API_KEY`, and `EMBEDDINGS_MODEL`, plus PostgreSQL `pgvector`
 - Additional model providers and gateways: provider keys, Cloudflare AI Gateway, or Vercel AI Gateway variables documented in `.env.example`
@@ -112,7 +112,7 @@ Thread Chat offers thirteen fixed OpenRouter-backed internal model IDs: `openrou
 
 ## UMAPIS preview models
 
-The Thread Chat Prompt input model selector includes `umapis-claude-opus-4-6`, `umapis-claude-sonnet-5`, `umapis-gpt-5.6-sol`, and `umapis-gpt-5.6-terra`. Set `UMAPIS_API_KEY_CLAUDE` for the Claude models and `UMAPIS_API_KEY_GPT` for the GPT models; `UMAPIS_BASE_URL` is optional and accepts either the site root or the `/v1` API root. Requests use the upstream default behavior and do not send an Effort parameter. These models are unbilled previews: they do not require a positive user balance, do not debit credits, and do not display an unverified price. Effort configuration and UMAPIS billing belong to a later spec.
+The Thread Chat Prompt input model selector includes the UMAPIS Claude and GPT preview models registered in `constants/model.ts`. Set `UMAPIS_API_KEY_CLAUDE` for the Claude models and `UMAPIS_API_KEY_GPT` for the GPT models; `UMAPIS_BASE_URL` is optional and accepts either the site root or the `/v1` API root. Requests use the upstream default behavior and do not send an Effort parameter. These models are unbilled previews: they do not require a positive user balance, do not debit credits, and do not display an unverified price. Effort configuration and UMAPIS billing belong to a later spec.
 
 ## Architecture
 
@@ -121,9 +121,10 @@ The project is a Next.js 16 App Router application using React, TypeScript, Tail
 | Boundary      | Location                                                             | Responsibility                                                                                    |
 | ------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
 | Core          | [`app/thread-chat/core/`](./app/thread-chat/core/)                   | Tree state, selectors, and the branch-conversation store                                          |
-| Branching     | [`app/thread-chat/branching/`](./app/thread-chat/branching/)         | Text selection, anchors, contextual branches, and branch-aware chat rendering                     |
-| Orchestration | [`app/thread-chat/orchestration/`](./app/thread-chat/orchestration/) | Column workspace, tree canvas, switching, artifacts, and workbench controls                       |
-| Network       | [`app/thread-chat/net/`](./app/thread-chat/net/)                     | Tree loading, sanitization, debounced persistence, prompts, and streaming UI events               |
+| Branching     | [`app/thread-chat/branching/`](./app/thread-chat/branching/)         | `selection/` owns text anchors and selection UI; `assistant/` owns branch-aware assistant rendering |
+| Chat          | [`app/thread-chat/chat/`](./app/thread-chat/chat/)                   | `message/`, `composer/`, and `actions/` group the three conversation feature sets                 |
+| Orchestration | [`app/thread-chat/orchestration/`](./app/thread-chat/orchestration/) | `canvas/`, `columns/`, `navigation/`, `artifacts/`, `overlays/`, and `workspace/` compose the workbench |
+| Network       | [`app/thread-chat/net/`](./app/thread-chat/net/)                     | `boot/`, `commands/`, `persistence/`, `prompt/`, `stream/`, and `titles/` isolate client-side I/O |
 | Server        | [`app/api/`](./app/api/) and [`lib/chat/`](./lib/chat/)              | Authentication, model streaming, tool handling, branch-tree APIs, attachments, and research tools |
 
 Detailed design material is available in the repository:

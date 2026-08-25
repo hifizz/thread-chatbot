@@ -50,7 +50,7 @@ Enter（无修饰）= 提交（带问/留空同走 `submit()`）；Shift+Enter �
 
 ### D7：异步分支标题
 
-**选择**：新小路由 `POST /api/branch-title`（body：anchorText + 首轮问答摘录）→ `minimaxModel()` 裸模型 `generateText` 出 4–8 字标题（截断兜底）；客户端在分支首答 finish 后触发一次（壳层 effect 或 controller finish 钩子，Set ref 防重），成功走新 store mutator `setThreadTitle(threadId, title)`（原子 + notify），随整树防抖存盘自然持久化；失败 console.warn 静默。**弃选**：复用 /api/chat（整套流式/工具管线杀鸡用牛刀）；在 threadChat 请求里顺带出标题（污染对话流）。与树级 custom_title 无冲突——那是 branch_trees 行的标题，这是树内单个分支节点的标题，层级不同。
+**选择**：统一路由 `POST /api/title` 接收显式的 `{ kind: "branch", anchorText, question, answer }`，使用标题专用模型调用生成完整语义标题；客户端在分支首答 finish 后触发一次，成功后通过统一标题 store mutator 原子写入并随整树防抖存盘，失败时静默保留回退标题。**弃选**：复用 `/api/chat`（整套流式/工具管线杀鸡用牛刀）；在 threadChat 请求里顺带出标题（污染对话流）。与树级 `custom_title` 无冲突——那是 branch_trees 行的用户标题，这是树内单个分支节点的自动标题，层级不同。
 
 ### D8：继承段字符预算
 

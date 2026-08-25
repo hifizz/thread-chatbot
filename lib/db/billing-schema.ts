@@ -1,4 +1,11 @@
-import { text, timestamp, integer, bigint, index } from "drizzle-orm/pg-core"
+import {
+  text,
+  timestamp,
+  integer,
+  bigint,
+  index,
+  uniqueIndex,
+} from "drizzle-orm/pg-core"
 import { dbSchema } from "./pg-schema"
 import { user } from "./auth-schema"
 
@@ -28,6 +35,8 @@ export const usageRecords = dbSchema.table(
       .references(() => user.id, { onDelete: "cascade" }),
     threadId: text("thread_id"), // 关联对话（不加外键约束，避免删除对话时连带丢失账单）
     messageId: text("message_id"), // 关联 assistant 消息 id
+    // 应用级 generation id；thread-chat 用于计费幂等，普通线性聊天保持 null。
+    appGenerationId: text("app_generation_id"),
     model: text("model").notNull(), // 模型注册表 id
     inputTokens: integer("input_tokens").notNull().default(0),
     outputTokens: integer("output_tokens").notNull().default(0),
@@ -52,5 +61,8 @@ export const usageRecords = dbSchema.table(
     index("usage_records_thread_id_idx").on(table.threadId),
     // 对账扫描：按来源筛未对账 + 有 generationId 的行
     index("usage_records_cost_source_idx").on(table.costSource),
+    uniqueIndex("usage_records_app_generation_id_uq").on(
+      table.appGenerationId
+    ),
   ]
 )

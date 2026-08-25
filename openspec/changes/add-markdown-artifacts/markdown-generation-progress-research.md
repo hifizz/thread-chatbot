@@ -17,7 +17,7 @@
 
 ### 2.1 UI stream 丢弃了工具输入进度
 
-`app/thread-chat/net/ui-stream.ts` 原先只处理：
+`app/thread-chat/net/stream/ui-stream.ts` 原先只处理：
 
 - `text-delta`
 - `error`
@@ -34,7 +34,7 @@
 
 ### 2.3 空白 delta 会触发光标
 
-`app/thread-chat/chat/chat-view.tsx` 与 `app/thread-chat/orchestration/canvas-node.tsx` 原先使用 `msg.text` 的 truthy 值决定是否渲染正文气泡。单个空格或换行在 JavaScript 中是 truthy，但 Markdown 渲染后没有可见内容，于是只剩 `.caret`。
+`app/thread-chat/chat/chat-view.tsx` 与 `app/thread-chat/orchestration/canvas/canvas-node.tsx` 原先使用 `msg.text` 的 truthy 值决定是否渲染正文气泡。单个空格或换行在 JavaScript 中是 truthy，但 Markdown 渲染后没有可见内容，于是只剩 `.caret`。
 
 controller 原先也按 `delta.length` 统计有效正文，使纯空白响应可能被错误判为成功。
 

@@ -1,5 +1,7 @@
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible"
 import { embed, embedMany } from "ai"
+import { MODEL_CALL_PURPOSE } from "@/constants/model-call"
+import { withEmbeddingCallLogging } from "@/lib/ai/model-call-logger"
 
 // Embedding 模型走独立的、可配置的 OpenAI 兼容 provider。
 // MiniMax 国际站没有可用的 embeddings，因此 RAG 的向量化交给任意 OpenAI 兼容服务
@@ -20,7 +22,11 @@ function embeddingModel() {
 export async function embedTexts(texts: string[]): Promise<number[][]> {
   if (texts.length === 0) return []
   const { embeddings } = await embedMany({
-    model: embeddingModel(),
+    model: withEmbeddingCallLogging(
+      embeddingModel(),
+      MODEL_CALL_PURPOSE.embeddingBatch,
+      { requestId: crypto.randomUUID() }
+    ),
     values: texts,
   })
   return embeddings
@@ -28,6 +34,13 @@ export async function embedTexts(texts: string[]): Promise<number[][]> {
 
 /** 单条向量化（查询时用） */
 export async function embedQuery(text: string): Promise<number[]> {
-  const { embedding } = await embed({ model: embeddingModel(), value: text })
+  const { embedding } = await embed({
+    model: withEmbeddingCallLogging(
+      embeddingModel(),
+      MODEL_CALL_PURPOSE.embeddingQuery,
+      { requestId: crypto.randomUUID() }
+    ),
+    value: text,
+  })
   return embedding
 }

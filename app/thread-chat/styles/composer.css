@@ -39,7 +39,7 @@
   line-height: 1.5;
   background: transparent;
   color: var(--ink);
-  max-height: 120px;
+  max-height: var(--composer-max-height);
   min-height: 20px;
 }
 .tc .thread-model-selector {

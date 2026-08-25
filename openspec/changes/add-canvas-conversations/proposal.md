@@ -23,8 +23,8 @@
 
 ## Impact
 
-- `app/thread-chat/orchestration/canvas-node.tsx`（外挂面板 CanvasExpand，~120–160 行）
-- `app/thread-chat/orchestration/thread-canvas.tsx`（ActionsContext + focusNode/setCenter，~40 行）
+- `app/thread-chat/orchestration/canvas/canvas-node.tsx`（外挂面板 CanvasExpand，~120–160 行）
+- `app/thread-chat/orchestration/canvas/thread-canvas.tsx`（ActionsContext + focusNode/setCenter，~40 行）
 - `app/thread-chat/thread-chat-demo.tsx`（画布分叉的 handleFork 不走 cols.openThread + focusNode 状态，~30 行）
 - `app/thread-chat/thread-chat.css`（面板样式，~40 行）
 - `e2e/thread-chat/verify-canvas-chat.mjs`（新入库脚本，断言面参考 playground verify10）

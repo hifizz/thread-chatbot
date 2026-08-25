@@ -33,8 +33,8 @@
 - **DB**：`lib/db/auth-schema.ts` 新增 `user`/`session`/`account`/`verification` 四表（`thread_chat` schema，字段遵循 better-auth 官方 drizzle 生成结果）。
 - **认证配置**：`lib/auth/index.ts`（betterAuth 主配置）、`lib/auth/social.ts`（Google 判定单一事实来源）、`lib/auth/client.ts`（浏览器端）、`lib/auth/server.ts`（服务端读会话）、`lib/auth/session-recovery.ts`（401 自愈）。
 - **路由**：`app/api/auth/[...all]/route.ts`（better-auth catch-all）、`proxy.ts`（页面保护中间件）。
-- **页面**：`app/(auth)/sign-in|sign-up|forgot-password|reset-password/page.tsx`（服务端组件，下传 `googleAuthEnabled`）、`components/auth/auth-form.tsx`、`components/auth/turnstile.tsx`、`components/auth/google-icon.tsx`、`components/auth/user-menu.tsx`、`app/thread-chat/orchestration/account-button.tsx`。
+- **页面**：`app/(auth)/sign-in|sign-up|forgot-password|reset-password/page.tsx`（服务端组件，下传 `googleAuthEnabled`）、`components/auth/auth-form.tsx`、`components/auth/turnstile.tsx`、`components/auth/google-icon.tsx`、`components/auth/user-menu.tsx`、`app/thread-chat/orchestration/navigation/account-button.tsx`。
 - **法务**：`constants/legal.ts`、`components/legal/legal-article.tsx`、`/terms` `/privacy` `/refund` 页面。
 - **计费交叉引用**：`lib/billing/credits.ts` 的 `ensureUserCredits`（幂等发放初始额度）；本变更只改**调用时机**，额度机制本体见计费模块的 change。
-- **既有前端 fetch 接入 401 自愈**：`lib/chat/thread-list-adapter.ts`、`lib/chat/use-thread-history-adapter.ts`、`app/page.tsx`（`AssistantChatTransport` 的 `fetch`）、`app/thread-chat/net/chat-controller.ts`、`app/thread-chat/net/persist.ts`。
+- **既有前端 fetch 接入 401 自愈**：`lib/chat/thread-list-adapter.ts`、`lib/chat/use-thread-history-adapter.ts`、`app/page.tsx`（`AssistantChatTransport` 的 `fetch`）、`app/thread-chat/net/chat-controller.ts`、`app/thread-chat/net/persistence/persist.ts`。
 - **运行前提**：`.env.local` 需 `BETTER_AUTH_SECRET`/`BETTER_AUTH_URL`；`RESEND_API_KEY`/`TURNSTILE_SECRET_KEY`/`GOOGLE_CLIENT_ID`+`GOOGLE_CLIENT_SECRET` 均为可选——未配置时各自降级，不阻塞本地开发。

@@ -12,16 +12,19 @@ export const webSearchTool = tool({
   inputSchema: z.object({
     query: z.string().describe("检索关键词或问题，尽量具体"),
   }),
-  execute: async ({ query }) => {
-    const { answer, results } = await webSearch(query, SEARCH_MAX_RESULTS)
+  execute: async ({ query }, { abortSignal }) => {
+    const { results } = await webSearch(
+      query,
+      SEARCH_MAX_RESULTS,
+      abortSignal
+    )
     // 返回给模型的结构：带 url 的结果列表，供其继续深读或引用
     return {
       query,
-      answer,
       results: results.map((r) => ({
         title: r.title,
         url: r.url,
-        snippet: r.content,
+        snippet: r.snippet,
       })),
     }
   },
@@ -29,12 +32,12 @@ export const webSearchTool = tool({
 
 export const readUrlTool = tool({
   description:
-    "深读某个网页的完整正文。当搜索快照不足以回答、需要页面细节时，用搜索结果里的 url 调用。",
+    "深读某个网页的完整正文。URL 可以由用户直接提供，也可以来自搜索结果；翻译、总结或分析指定页面时应直接调用。",
   inputSchema: z.object({
     url: z.string().describe("要深读的网页 URL（来自搜索结果）"),
   }),
-  execute: async ({ url }) => {
-    const content = await extractUrl(url)
+  execute: async ({ url }, { abortSignal }) => {
+    const content = await extractUrl(url, abortSignal)
     return { url, content: content.slice(0, EXTRACT_CHAR_LIMIT) }
   },
 })
