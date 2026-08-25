@@ -7,8 +7,29 @@ import type { Thread } from "../../domain/thread"
 
 export type ThreadChatSql = postgres.Sql | postgres.TransactionSql
 
-export function toSqlJson(value: unknown): postgres.JSONValue {
-  return value as postgres.JSONValue
+export function toSqlJsonText(value: unknown): string {
+  return JSON.stringify(value)
+}
+
+export function toSqlTimestamp(value: Date | null | undefined): string | null {
+  return value?.toISOString() ?? null
+}
+
+function toDate(value: unknown): Date {
+  return value instanceof Date ? value : new Date(String(value))
+}
+
+function toNullableDate(value: unknown): Date | null {
+  return value === null || value === undefined ? null : toDate(value)
+}
+
+function fromSqlJson(value: unknown): unknown {
+  if (typeof value !== "string") return value
+  try {
+    return JSON.parse(value)
+  } catch {
+    return value
+  }
 }
 
 export function mapProject(row: Record<string, unknown>): Project {
@@ -19,10 +40,10 @@ export function mapProject(row: Record<string, unknown>): Project {
     customTitle: (row.customTitle as string | null) ?? null,
     target: (row.target as Project["target"]) ?? null,
     instruction: (row.instruction as string | null) ?? null,
-    archivedAt: (row.archivedAt as Date | null) ?? null,
+    archivedAt: toNullableDate(row.archivedAt),
     artifactChangeSequence: Number(row.artifactChangeSequence),
-    createdAt: row.createdAt as Date,
-    updatedAt: row.updatedAt as Date,
+    createdAt: toDate(row.createdAt),
+    updatedAt: toDate(row.updatedAt),
   }
 }
 
@@ -33,13 +54,15 @@ export function mapThread(row: Record<string, unknown>): Thread {
     parentThreadId: (row.parentThreadId as string | null) ?? null,
     sourceMessageId: (row.sourceMessageId as string | null) ?? null,
     forkSourceSnapshot:
-      (row.forkSourceSnapshot as Thread["forkSourceSnapshot"]) ?? null,
-    baseContext: (row.baseContext as Thread["baseContext"]) ?? null,
+      (fromSqlJson(row.forkSourceSnapshot) as Thread["forkSourceSnapshot"]) ??
+      null,
+    baseContext:
+      (fromSqlJson(row.baseContext) as Thread["baseContext"]) ?? null,
     autoTitle: (row.autoTitle as string | null) ?? null,
     customTitle: (row.customTitle as string | null) ?? null,
-    archivedAt: (row.archivedAt as Date | null) ?? null,
-    createdAt: row.createdAt as Date,
-    updatedAt: row.updatedAt as Date,
+    archivedAt: toNullableDate(row.archivedAt),
+    createdAt: toDate(row.createdAt),
+    updatedAt: toDate(row.updatedAt),
   }
 }
 
@@ -49,11 +72,11 @@ export function mapMessage(row: Record<string, unknown>): Message {
     threadId: String(row.threadId),
     sequence: Number(row.sequence),
     role: row.role as Message["role"],
-    parts: (row.parts as Message["parts"]) ?? null,
+    parts: (fromSqlJson(row.parts) as Message["parts"]) ?? null,
     replacesMessageId: (row.replacesMessageId as string | null) ?? null,
-    supersededAt: (row.supersededAt as Date | null) ?? null,
-    finalizedAt: (row.finalizedAt as Date | null) ?? null,
-    createdAt: row.createdAt as Date,
+    supersededAt: toNullableDate(row.supersededAt),
+    finalizedAt: toNullableDate(row.finalizedAt),
+    createdAt: toDate(row.createdAt),
   }
 }
 
@@ -64,14 +87,16 @@ export function mapMessageRun(row: Record<string, unknown>): MessageRun {
     status: row.status as MessageRun["status"],
     modelId: String(row.modelId),
     eventSequence: Number(row.eventSequence),
-    checkpointParts: row.checkpointParts as MessageRun["checkpointParts"],
+    checkpointParts: fromSqlJson(
+      row.checkpointParts
+    ) as MessageRun["checkpointParts"],
     errorCode: (row.errorCode as string | null) ?? null,
     errorMessage: (row.errorMessage as string | null) ?? null,
-    heartbeatAt: (row.heartbeatAt as Date | null) ?? null,
-    stopRequestedAt: (row.stopRequestedAt as Date | null) ?? null,
-    finishedAt: (row.finishedAt as Date | null) ?? null,
-    createdAt: row.createdAt as Date,
-    updatedAt: row.updatedAt as Date,
+    heartbeatAt: toNullableDate(row.heartbeatAt),
+    stopRequestedAt: toNullableDate(row.stopRequestedAt),
+    finishedAt: toNullableDate(row.finishedAt),
+    createdAt: toDate(row.createdAt),
+    updatedAt: toDate(row.updatedAt),
   }
 }
 
@@ -83,7 +108,7 @@ export function mapArtifact(row: Record<string, unknown>): Artifact {
     changeSequence: Number(row.changeSequence),
     kind: String(row.kind),
     title: String(row.title),
-    content: row.content,
-    createdAt: row.createdAt as Date,
+    content: fromSqlJson(row.content),
+    createdAt: toDate(row.createdAt),
   }
 }

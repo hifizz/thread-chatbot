@@ -69,18 +69,34 @@ export const forkSourceSnapshotSchema = z.strictObject({
   sourceSequence: z.int().positive(),
 })
 
-export const threadSchema = z.strictObject({
-  id: idSchema,
-  projectId: idSchema,
-  parentThreadId: idSchema.nullable(),
-  sourceMessageId: idSchema.nullable(),
-  forkSourceSnapshot: forkSourceSnapshotSchema.nullable(),
-  autoTitle: z.string().nullable(),
-  customTitle: z.string().nullable(),
-  archivedAt: dateTimeSchema.nullable(),
-  createdAt: dateTimeSchema,
-  updatedAt: dateTimeSchema,
-})
+export const threadSchema = z
+  .strictObject({
+    id: idSchema,
+    projectId: idSchema,
+    parentThreadId: idSchema.nullable(),
+    sourceMessageId: idSchema.nullable(),
+    forkSourceSnapshot: forkSourceSnapshotSchema.nullable(),
+    autoTitle: z.string().nullable(),
+    customTitle: z.string().nullable(),
+    archivedAt: dateTimeSchema.nullable(),
+    createdAt: dateTimeSchema,
+    updatedAt: dateTimeSchema,
+  })
+  .superRefine((thread, context) => {
+    const rootFactsValid =
+      thread.parentThreadId === null &&
+      thread.sourceMessageId === null &&
+      thread.forkSourceSnapshot === null
+    const branchFactsValid =
+      thread.parentThreadId !== null &&
+      thread.sourceMessageId !== null &&
+      thread.forkSourceSnapshot !== null
+    if (!rootFactsValid && !branchFactsValid)
+      context.addIssue({
+        code: "custom",
+        message: "Thread ForkFacts are inconsistent.",
+      })
+  })
 
 export const messageSchema = z.strictObject({
   id: idSchema,
@@ -100,9 +116,7 @@ export const assistantRunStateSchema = z.strictObject({
   modelId: z.string().min(1),
   checkpointParts: messagePartsSchema,
   eventSequence: z.int().nonnegative(),
-  error: z
-    .strictObject({ code: z.string(), message: z.string() })
-    .nullable(),
+  error: z.strictObject({ code: z.string(), message: z.string() }).nullable(),
   stopRequestedAt: dateTimeSchema.nullable(),
   finishedAt: dateTimeSchema.nullable(),
 })
@@ -117,11 +131,18 @@ export const artifactSchema = z.strictObject({
   createdAt: dateTimeSchema,
 })
 
-export const artifactSummarySchema = z.strictObject({
-  changeSequence: z.int().nonnegative(),
-  total: z.int().nonnegative(),
-  byKind: z.record(z.string(), z.int().nonnegative()),
-})
+export const artifactSummarySchema = z
+  .strictObject({
+    changeSequence: z.int().nonnegative(),
+    total: z.int().nonnegative(),
+    byKind: z.record(z.string(), z.int().nonnegative()),
+  })
+  .refine(
+    (summary) =>
+      Object.values(summary.byKind).reduce((sum, count) => sum + count, 0) ===
+      summary.total,
+    "Artifact summary total must equal byKind counts."
+  )
 
 export const feedbackSchema = z.strictObject({
   messageId: idSchema,
@@ -129,36 +150,98 @@ export const feedbackSchema = z.strictObject({
   updatedAt: dateTimeSchema,
 })
 
-export const threadMessageBundleSchema = z.strictObject({
-  threadId: idSchema,
-  messages: z.array(messageSchema),
-  assistantRuns: z.array(assistantRunStateSchema),
-  hasOlderMessages: z.boolean(),
-  oldestReturnedSequence: z.int().positive().nullable(),
-  newestReturnedSequence: z.int().positive().nullable(),
-})
+export const threadMessageBundleSchema = z
+  .strictObject({
+    threadId: idSchema,
+    messages: z.array(messageSchema),
+    assistantRuns: z.array(assistantRunStateSchema),
+    hasOlderMessages: z.boolean(),
+    oldestReturnedSequence: z.int().positive().nullable(),
+    newestReturnedSequence: z.int().positive().nullable(),
+  })
+  .superRefine((bundle, context) => {
+    if (bundle.messages.some((message) => message.threadId !== bundle.threadId))
+      context.addIssue({
+        code: "custom",
+        message: "Message belongs to another Thread.",
+      })
+    const assistantIds = bundle.messages
+      .filter((message) => message.role === "assistant")
+      .map((message) => message.id)
+      .toSorted()
+    const runIds = bundle.assistantRuns
+      .map((run) => run.assistantMessageId)
+      .toSorted()
+    if (JSON.stringify(assistantIds) !== JSON.stringify(runIds))
+      context.addIssue({
+        code: "custom",
+        message: "Assistant Run coverage is invalid.",
+      })
+  })
 
-export const projectBootstrapSchema = z.strictObject({
-  project: projectSchema,
-  threadTopology: z.array(threadSchema),
-  artifactSummary: artifactSummarySchema,
-  initialThread: threadMessageBundleSchema,
-})
+export const projectBootstrapSchema = z
+  .strictObject({
+    project: projectSchema,
+    threadTopology: z.array(threadSchema),
+    artifactSummary: artifactSummarySchema,
+    initialThread: threadMessageBundleSchema,
+  })
+  .superRefine((bootstrap, context) => {
+    const roots = bootstrap.threadTopology.filter(
+      (thread) => thread.parentThreadId === null
+    )
+    if (
+      roots.length !== 1 ||
+      roots[0].id !== bootstrap.initialThread.threadId ||
+      bootstrap.threadTopology.some(
+        (thread) => thread.projectId !== bootstrap.project.id
+      )
+    )
+      context.addIssue({
+        code: "custom",
+        message: "Project Bootstrap ownership is invalid.",
+      })
+  })
 
-export const creationBundleSchema = z.strictObject({
-  project: projectSchema,
-  rootThread: threadSchema,
-  artifactSummary: artifactSummarySchema,
-  userMessage: messageSchema,
-  assistantMessage: messageSchema,
-  assistantRun: assistantRunStateSchema,
-})
+export const creationBundleSchema = z
+  .strictObject({
+    project: projectSchema,
+    rootThread: threadSchema,
+    artifactSummary: artifactSummarySchema,
+    userMessage: messageSchema,
+    assistantMessage: messageSchema,
+    assistantRun: assistantRunStateSchema,
+  })
+  .superRefine((bundle, context) => {
+    if (
+      bundle.rootThread.projectId !== bundle.project.id ||
+      bundle.rootThread.parentThreadId !== null ||
+      bundle.userMessage.threadId !== bundle.rootThread.id ||
+      bundle.assistantMessage.threadId !== bundle.rootThread.id ||
+      bundle.assistantRun.assistantMessageId !== bundle.assistantMessage.id
+    )
+      context.addIssue({
+        code: "custom",
+        message: "Creation Bundle ownership is invalid.",
+      })
+  })
 
-export const messageCreationBundleSchema = creationBundleSchema.pick({
-  userMessage: true,
-  assistantMessage: true,
-  assistantRun: true,
-})
+export const messageCreationBundleSchema = z
+  .strictObject({
+    userMessage: messageSchema,
+    assistantMessage: messageSchema,
+    assistantRun: assistantRunStateSchema,
+  })
+  .superRefine((bundle, context) => {
+    if (
+      bundle.userMessage.threadId !== bundle.assistantMessage.threadId ||
+      bundle.assistantRun.assistantMessageId !== bundle.assistantMessage.id
+    )
+      context.addIssue({
+        code: "custom",
+        message: "Message Bundle ownership is invalid.",
+      })
+  })
 
 export const replacementBundleSchema = z.strictObject({
   supersededMessageIds: z.array(idSchema),
@@ -198,7 +281,10 @@ export const patchProjectRequestSchema = z
     target: projectTargetSchema.nullable().optional(),
     instruction: z.string().max(20_000).nullable().optional(),
   })
-  .refine((value) => Object.keys(value).length > 0, "At least one field is required.")
+  .refine(
+    (value) => Object.keys(value).length > 0,
+    "At least one field is required."
+  )
 export const patchThreadRequestSchema = z.strictObject({
   customTitle: z.string().trim().min(1).max(120).nullable(),
 })

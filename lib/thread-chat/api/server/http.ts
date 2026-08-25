@@ -19,12 +19,17 @@ export async function readJson(request: Request): Promise<unknown> {
 
 export async function withActor(
   action: (actorId: string) => Promise<Response>,
-  fallbackNotFound: ApiErrorCode = "internal_error"
+  fallbackNotFound: ApiErrorCode = "internal_error",
+  resolveActor: () => Promise<string | null> = getCurrentUserId
 ): Promise<Response> {
   try {
-    const actorId = await getCurrentUserId()
+    const actorId = await resolveActor()
     if (!actorId)
-      throw new ThreadChatApiError("unauthorized", 401, "Authentication required.")
+      throw new ThreadChatApiError(
+        "unauthorized",
+        401,
+        "Authentication required."
+      )
     return await action(actorId)
   } catch (error) {
     return errorResponse(error, fallbackNotFound)

@@ -2,7 +2,12 @@ import type { UIMessage } from "ai"
 import { assertMessageCanBeReplaced, type Message } from "../../domain/message"
 import { invariant } from "../../domain/domain-error"
 import type { MessageId, ThreadId, UserId } from "../../domain/ids"
-import { mapMessage, toSqlJson, type ThreadChatSql } from "./database"
+import {
+  mapMessage,
+  toSqlJsonText,
+  toSqlTimestamp,
+  type ThreadChatSql,
+} from "./database"
 
 export class MessageRepository {
   constructor(private readonly sql: ThreadChatSql) {}
@@ -158,7 +163,7 @@ export class MessageRepository {
   }): Promise<MessageId[]> {
     const rows = await this.sql<{ id: string }[]>`
       update thread_chat.messages m
-      set superseded_at = ${input.supersededAt}
+      set superseded_at = ${toSqlTimestamp(input.supersededAt)}::timestamptz
       from thread_chat.threads t, thread_chat.projects p
       where m.thread_id = ${input.threadId}
         and m.sequence >= ${input.fromSequence}
@@ -180,7 +185,7 @@ export class MessageRepository {
   }): Promise<MessageId[]> {
     const rows = await this.sql<{ id: string }[]>`
       update thread_chat.messages m
-      set superseded_at = ${input.supersededAt}
+      set superseded_at = ${toSqlTimestamp(input.supersededAt)}::timestamptz
       from thread_chat.threads t, thread_chat.projects p
       where m.thread_id = ${input.threadId}
         and m.sequence > ${input.afterSequence}
@@ -262,9 +267,9 @@ export class MessageRepository {
         ${input.threadId},
         ${sequenceRow.nextSequence},
         ${input.role},
-        ${input.parts === null ? null : this.sql.json(toSqlJson(input.parts))},
+        ${input.parts === null ? null : toSqlJsonText(input.parts)}::jsonb,
         ${input.replacesMessageId ?? null},
-        ${input.finalizedAt}
+        ${toSqlTimestamp(input.finalizedAt)}::timestamptz
       )
       returning
         id,
@@ -297,8 +302,8 @@ export class MessageRepository {
   }): Promise<Message | null> {
     const [row] = await this.sql<Record<string, unknown>[]>`
       update thread_chat.messages m
-      set parts = ${this.sql.json(toSqlJson(input.parts))},
-          finalized_at = ${input.finalizedAt}
+      set parts = ${toSqlJsonText(input.parts)}::jsonb,
+          finalized_at = ${toSqlTimestamp(input.finalizedAt)}::timestamptz
       from thread_chat.threads t, thread_chat.projects p
       where m.id = ${input.messageId}
         and m.thread_id = t.id

@@ -5,7 +5,12 @@ import {
 import { invariant } from "../../domain/domain-error"
 import type { ProjectId, ThreadId, UserId } from "../../domain/ids"
 import type { ForkSourceSnapshot, Thread } from "../../domain/thread"
-import { mapThread, type ThreadChatSql } from "./database"
+import {
+  mapThread,
+  toSqlJsonText,
+  toSqlTimestamp,
+  type ThreadChatSql,
+} from "./database"
 import { ProjectRepository } from "./project-repository"
 
 export class ThreadRepository {
@@ -154,7 +159,10 @@ export class ThreadRepository {
       set custom_title = case when ${input.customTitle !== undefined} then ${input.customTitle ?? null} else t.custom_title end,
           archived_at = case
             when ${!hasArchived} then t.archived_at
-            when ${archived} then coalesce(t.archived_at, ${input.now})
+            when ${archived} then coalesce(
+              t.archived_at,
+              ${toSqlTimestamp(input.now)}::timestamptz
+            )
             else null
           end,
           updated_at = case
@@ -201,10 +209,10 @@ export class ThreadRepository {
         ${input.sourceMessageId ?? null},
         ${
           input.forkSourceSnapshot
-            ? this.sql.json(input.forkSourceSnapshot)
+            ? toSqlJsonText(input.forkSourceSnapshot)
             : null
-        },
-        ${input.baseContext ? this.sql.json(input.baseContext) : null}
+        }::jsonb,
+        ${input.baseContext ? toSqlJsonText(input.baseContext) : null}::jsonb
       )
       returning
         id,

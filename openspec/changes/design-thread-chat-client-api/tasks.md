@@ -47,12 +47,12 @@
 
 ## 5. 后端 API 验收门
 
-- [ ] 5.1 在 domain change 的 Vitest 与隔离 PostgreSQL 基础上完成 API 合同测试；自动测试统一使用 Fake AI Runtime，不调用真实模型。
-- [ ] 5.2 覆盖 Project list/bootstrap、Thread Message window、Artifact-by-ID、metadata、archive/delete、feedback 和全部错误码。
-- [ ] 5.3 覆盖 create/send/Fork/Edit/Regenerate/Stop 的权限、严格输入、原子响应与事务回滚；确认服务端不返回页面 URL。
-- [ ] 5.4 覆盖 SSE snapshot、eventSequence、delta、terminal、断开重连、重复连接和显式 Stop。
-- [ ] 5.5 覆盖 Markdown Artifact：Message 只保存 `artifactId`、Bootstrap/MessageBundle/SSE 无正文、Artifact Query 按 ID 返回正文。
-- [ ] 5.6 执行 `pnpm typecheck`、domain unit/integration、API tests、`pnpm build` 与 `pnpm openspec:validate`；全部通过并记录证据后才能开始第 6 节前端工作。
+- [x] 5.1 在 domain change 的 Vitest 与隔离 PostgreSQL 基础上完成 API 合同测试；自动测试统一使用 Fake AI Runtime，不调用真实模型。
+- [x] 5.2 覆盖 Project list/bootstrap、Thread Message window、Artifact-by-ID、metadata、archive/delete、feedback 和全部错误码。
+- [x] 5.3 覆盖 create/send/Fork/Edit/Regenerate/Stop 的权限、严格输入、原子响应与事务回滚；确认服务端不返回页面 URL。
+- [x] 5.4 覆盖 SSE snapshot、eventSequence、delta、terminal、断开重连、重复连接和显式 Stop。
+- [x] 5.5 覆盖 Markdown Artifact：Message 只保存 `artifactId`、Bootstrap/MessageBundle/SSE 无正文、Artifact Query 按 ID 返回正文。
+- [x] 5.6 执行 `pnpm typecheck`、domain unit/integration、API tests、`pnpm build` 与 `pnpm openspec:validate`；全部通过并记录证据后才能开始第 6 节前端工作。
 
 ## 6. 建立前端测试基础与 Zustand Store
 

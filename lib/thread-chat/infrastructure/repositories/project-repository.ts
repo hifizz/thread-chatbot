@@ -1,7 +1,12 @@
 import { invariant } from "../../domain/domain-error"
 import type { ProjectId, UserId } from "../../domain/ids"
 import type { Project, ProjectTarget } from "../../domain/project"
-import { mapProject, type ThreadChatSql } from "./database"
+import {
+  mapProject,
+  toSqlJsonText,
+  toSqlTimestamp,
+  type ThreadChatSql,
+} from "./database"
 
 export class ProjectRepository {
   constructor(private readonly sql: ThreadChatSql) {}
@@ -44,7 +49,7 @@ export class ProjectRepository {
         ${input.ownerUserId},
         ${input.autoTitle ?? null},
         ${input.customTitle ?? null},
-        ${input.target ? this.sql.json(input.target) : null},
+        ${input.target ? toSqlJsonText(input.target) : null}::jsonb,
         ${input.instruction ?? null}
       )
       returning
@@ -89,8 +94,8 @@ export class ProjectRepository {
         and (${input.status} = 'all'
           or (${input.status} = 'active' and p.archived_at is null)
           or (${input.status} = 'archived' and p.archived_at is not null))
-        and (${input.before?.updatedAt ?? null}::timestamptz is null
-          or (p.updated_at, p.id) < (${input.before?.updatedAt ?? null}, ${input.before?.id ?? null}::uuid))
+        and (${toSqlTimestamp(input.before?.updatedAt)}::timestamptz is null
+          or (p.updated_at, p.id) < (${toSqlTimestamp(input.before?.updatedAt)}::timestamptz, ${input.before?.id ?? null}::uuid))
       group by p.id
       order by p.updated_at desc, p.id desc
       limit ${input.limit}
@@ -112,7 +117,7 @@ export class ProjectRepository {
     const [row] = await this.sql<Record<string, unknown>[]>`
       update thread_chat.projects
       set custom_title = case when ${input.customTitle !== undefined} then ${input.customTitle ?? null} else custom_title end,
-          target = case when ${input.target !== undefined} then ${input.target ? this.sql.json(input.target) : null} else target end,
+          target = case when ${input.target !== undefined} then ${input.target ? toSqlJsonText(input.target) : null}::jsonb else target end,
           instruction = case when ${input.instruction !== undefined} then ${input.instruction ?? null} else instruction end,
           updated_at = now()
       where id = ${input.projectId} and owner_user_id = ${input.actorId}
@@ -135,7 +140,10 @@ export class ProjectRepository {
     const [row] = await this.sql<Record<string, unknown>[]>`
       update thread_chat.projects
       set archived_at = case
-            when ${input.archived} then coalesce(archived_at, ${input.now})
+            when ${input.archived} then coalesce(
+              archived_at,
+              ${toSqlTimestamp(input.now)}::timestamptz
+            )
             else null
           end,
           updated_at = case

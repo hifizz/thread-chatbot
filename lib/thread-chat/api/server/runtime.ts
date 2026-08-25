@@ -1,4 +1,5 @@
 import { after } from "next/server"
+import { randomUUID } from "node:crypto"
 import {
   DEFAULT_THREAD_CHAT_MODEL_ID,
   isThreadChatModelId,
@@ -13,7 +14,7 @@ import { ThreadChatApiError } from "./errors"
 
 const unitOfWork = new ThreadChatUnitOfWork(dbClient)
 const runner = new MessageRunner(dbClient, unitOfWork, new AiSdkRuntime(), {
-  generateId: crypto.randomUUID,
+  generateId: randomUUID,
   now: () => new Date(),
 })
 
@@ -22,7 +23,7 @@ export const threadChatServer = {
   runner,
   commands() {
     return new ThreadChatCommands(unitOfWork, {
-      generateId: crypto.randomUUID,
+      generateId: randomUUID,
       now: () => new Date(),
       resolveModelId(requestedModelId) {
         if (requestedModelId === undefined) return DEFAULT_THREAD_CHAT_MODEL_ID

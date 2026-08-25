@@ -6,7 +6,7 @@ import {
   mapArtifact,
   mapMessage,
   mapThread,
-  toSqlJson,
+  toSqlJsonText,
   type ThreadChatSql,
 } from "./database"
 
@@ -98,7 +98,7 @@ export class ArtifactRepository {
         ${counter.changeSequence},
         ${input.kind},
         ${input.title},
-        ${this.sql.json(toSqlJson(input.content))}
+        ${toSqlJsonText(input.content)}::jsonb
       )
       returning
         id,
@@ -134,12 +134,17 @@ export class ArtifactRepository {
     return row ? mapArtifact(row) : null
   }
 
-  async summarizeOwnedProject(actorId: UserId, projectId: ProjectId): Promise<{
+  async summarizeOwnedProject(
+    actorId: UserId,
+    projectId: ProjectId
+  ): Promise<{
     changeSequence: number
     total: number
     byKind: Record<string, number>
   } | null> {
-    const rows = await this.sql<{ changeSequence: number; kind: string | null; count: number }[]>`
+    const rows = await this.sql<
+      { changeSequence: number; kind: string | null; count: number }[]
+    >`
       select
         p.artifact_change_sequence::integer as "changeSequence",
         a.kind,
@@ -151,7 +156,9 @@ export class ArtifactRepository {
     `
     if (rows.length === 0) return null
     const byKind = Object.fromEntries(
-      rows.filter((row) => row.kind !== null).map((row) => [row.kind!, Number(row.count)])
+      rows
+        .filter((row) => row.kind !== null)
+        .map((row) => [row.kind!, Number(row.count)])
     )
     return {
       changeSequence: Number(rows[0].changeSequence),

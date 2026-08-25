@@ -12,7 +12,12 @@ import {
   type MessageRun,
   type MessageRunStatus,
 } from "../../domain/message-run"
-import { mapMessageRun, toSqlJson, type ThreadChatSql } from "./database"
+import {
+  mapMessageRun,
+  toSqlJsonText,
+  toSqlTimestamp,
+  type ThreadChatSql,
+} from "./database"
 
 export class MessageRunRepository {
   constructor(private readonly sql: ThreadChatSql) {}
@@ -179,7 +184,10 @@ export class MessageRunRepository {
     return rows.map((row) => row.id)
   }
 
-  async assertNoActiveForThread(actorId: UserId, threadId: string): Promise<void> {
+  async assertNoActiveForThread(
+    actorId: UserId,
+    threadId: string
+  ): Promise<void> {
     const [row] = await this.sql`
       select r.id
       from thread_chat.threads t
@@ -213,7 +221,7 @@ export class MessageRunRepository {
       update thread_chat.message_runs r
       set status = ${input.nextStatus},
           event_sequence = event_sequence + ${input.incrementEventSequence ? 1 : 0},
-          finished_at = ${input.finishedAt ?? null},
+          finished_at = ${toSqlTimestamp(input.finishedAt)}::timestamptz,
           error_code = ${input.error?.code ?? null},
           error_message = ${input.error?.message ?? null},
           updated_at = now()
@@ -253,9 +261,9 @@ export class MessageRunRepository {
   }): Promise<MessageRun | null> {
     const [row] = await this.sql<Record<string, unknown>[]>`
       update thread_chat.message_runs r
-      set checkpoint_parts = ${this.sql.json(toSqlJson(input.checkpointParts))},
+      set checkpoint_parts = ${toSqlJsonText(input.checkpointParts)}::jsonb,
           event_sequence = event_sequence + 1,
-          heartbeat_at = ${input.heartbeatAt},
+          heartbeat_at = ${toSqlTimestamp(input.heartbeatAt)}::timestamptz,
           updated_at = now()
       from thread_chat.messages m,
            thread_chat.threads t,
@@ -292,7 +300,8 @@ export class MessageRunRepository {
   }): Promise<MessageRun | null> {
     const [row] = await this.sql<Record<string, unknown>[]>`
       update thread_chat.message_runs r
-      set heartbeat_at = ${input.heartbeatAt}, updated_at = now()
+      set heartbeat_at = ${toSqlTimestamp(input.heartbeatAt)}::timestamptz,
+          updated_at = now()
       from thread_chat.messages m,
            thread_chat.threads t,
            thread_chat.projects p
@@ -320,7 +329,10 @@ export class MessageRunRepository {
   ): Promise<MessageRun | null> {
     const [row] = await this.sql<Record<string, unknown>[]>`
       update thread_chat.message_runs r
-      set stop_requested_at = coalesce(r.stop_requested_at, ${requestedAt}),
+      set stop_requested_at = coalesce(
+            r.stop_requested_at,
+            ${toSqlTimestamp(requestedAt)}::timestamptz
+          ),
           updated_at = now()
       from thread_chat.messages m,
            thread_chat.threads t,
