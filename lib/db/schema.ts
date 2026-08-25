@@ -21,6 +21,10 @@ import type {
 } from "@/lib/thread-chat/domain/generation"
 import type { MessageFeedback } from "@/lib/thread-chat/domain/types"
 
+// drizzle-kit 必须能从 schema 入口发现自定义 namespace；只导出其中的表会把
+// thread_chat 误判为待删除 schema。
+export { dbSchema } from "./pg-schema"
+
 // 认证与计费表在独立文件中定义，这里统一 re-export，使 drizzle 客户端与迁移能感知它们。
 export * from "./auth-schema"
 export * from "./billing-schema"

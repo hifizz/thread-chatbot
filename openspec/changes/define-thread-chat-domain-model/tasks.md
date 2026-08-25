@@ -8,13 +8,13 @@
 
 ## 1. 建立后端测试基础设施
 
-- [ ] 1.1 增加 Vitest 及 `test`、`test:unit`、`test:integration`、`test:api`、`test:watch` 脚本；默认命令不得调用真实模型供应商。
-- [ ] 1.2 建立物理隔离的 PostgreSQL 测试数据库配置，例如 `thread-chat-test`，并让测试专用 Drizzle 配置只读取 `TEST_DATABASE_URL`。
-- [ ] 1.3 在测试初始化中校验数据库名称或明确 allowlist；目标不是测试数据库时立即终止，禁止误删开发数据库。
-- [ ] 1.4 建立测试 Schema 重建流程：只删除测试库的 `thread_chat` schema，再执行测试配置对应的 `drizzle-kit push`。
-- [ ] 1.5 建立用户、Project、Thread、Message、Artifact 与 MessageRun fixture factory；测试 ID 仍由服务端/fixture factory 生成，不进入生产客户端逻辑。
-- [ ] 1.6 定义可注入的 AI Runtime capability 与 Fake AI Runtime，支持固定 delta、completed、failed、stopped、Markdown Artifact tool output 和恢复事件。
-- [ ] 1.7 约束测试并行：纯单元测试可以并行；共享 PostgreSQL 的集成/API 测试在证明数据隔离前使用单 worker 或独立事务边界。
+- [x] 1.1 增加 Vitest 及 `test`、`test:unit`、`test:integration`、`test:api`、`test:watch` 脚本；默认命令不得调用真实模型供应商。
+- [x] 1.2 建立物理隔离的 PostgreSQL 测试数据库配置，例如 `thread-chat-test`，并让测试专用 Drizzle 配置只读取 `TEST_DATABASE_URL`。
+- [x] 1.3 在测试初始化中校验数据库名称或明确 allowlist；目标不是测试数据库时立即终止，禁止误删开发数据库。
+- [x] 1.4 建立测试 Schema 重建流程：只删除测试库的 `thread_chat` schema，再执行测试配置对应的 `drizzle-kit push`。
+- [x] 1.5 建立用户、Project、Thread、Message、Artifact 与 MessageRun fixture factory；测试 ID 仍由服务端/fixture factory 生成，不进入生产客户端逻辑。
+- [x] 1.6 定义可注入的 AI Runtime capability 与 Fake AI Runtime，支持固定 delta、completed、failed、stopped、Markdown Artifact tool output 和恢复事件。
+- [x] 1.7 约束测试并行：纯单元测试可以并行；共享 PostgreSQL 的集成/API 测试在证明数据隔离前使用单 worker 或独立事务边界。
 
 ## 2. 建立规范化数据库 Schema
 

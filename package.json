@@ -12,12 +12,19 @@
     "start": "next start",
     "lint": "eslint",
     "format": "prettier --write \"**/*.{ts,tsx}\"",
+    "test": "pnpm test:unit && pnpm test:integration && pnpm test:api",
+    "test:unit": "vitest run --config vitest.config.ts",
+    "test:integration": "pnpm test:db:reset && vitest run --config vitest.integration.config.ts",
+    "test:api": "pnpm test:db:reset && vitest run --config vitest.api.config.ts",
+    "test:watch": "vitest --config vitest.config.ts",
     "typecheck": "tsc --noEmit",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:reset-schema": "node scripts/reset-thread-chat-schema.mjs",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
+    "test:db:create": "node scripts/create-test-database.mjs",
+    "test:db:reset": "node scripts/reset-test-schema.mjs",
     "openspec:validate": "openspec validate --all --strict"
   },
   "dependencies": {
@@ -93,7 +100,8 @@
     "prettier": "^3.8.3",
     "prettier-plugin-tailwindcss": "^0.8.0",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.11"
   },
   "pnpm": {
     "overrides": {
