@@ -39,6 +39,7 @@ export interface ResolveResearchRouteInput {
   recentConversation: string
   searchReady: boolean
   modelCallTrace?: ModelCallTrace
+  abortSignal?: AbortSignal
 }
 
 function errorSummary(error: unknown): string {
@@ -242,6 +243,7 @@ export async function resolveResearchRoute({
   recentConversation,
   searchReady,
   modelCallTrace,
+  abortSignal,
 }: ResolveResearchRouteInput): Promise<ResearchRoute> {
   const contextualFollowUp = contextualUrlFollowUpRoute(
     latestUserText,
@@ -275,6 +277,7 @@ export async function resolveResearchRoute({
       ].join("\n"),
       output: Output.object({ schema: researchRouteSchema }),
       maxOutputTokens: RESEARCH_ROUTER_MAX_OUTPUT_TOKENS,
+      abortSignal,
     })
     return normalizeModelRoute(result.output, searchReady)
   } catch (error) {
@@ -295,11 +298,13 @@ export async function createResearchPlan({
   userRequest,
   route: resolvedRoute,
   modelCallTrace,
+  abortSignal,
 }: {
   model: LanguageModel
   userRequest: string
   route: ResearchRoute
   modelCallTrace?: ModelCallTrace
+  abortSignal?: AbortSignal
 }): Promise<ResearchPlan> {
   try {
     const result = await generateText({
@@ -325,6 +330,7 @@ export async function createResearchPlan({
       ].join("\n"),
       output: Output.object({ schema: researchPlanSchema }),
       maxOutputTokens: RESEARCH_PLANNER_MAX_OUTPUT_TOKENS,
+      abortSignal,
     })
     return result.output
   } catch (error) {

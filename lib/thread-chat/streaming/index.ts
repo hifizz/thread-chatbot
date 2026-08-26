@@ -1,4 +1,11 @@
-/**
- * 进程内 Stream Session 模块边界。Gate 2 前不导出实现或启动任何后台任务。
- */
-export {}
+export * from "@/lib/thread-chat/streaming/artifacts"
+export * from "@/lib/thread-chat/streaming/checkpoint"
+export * from "@/lib/thread-chat/streaming/finalize"
+export * from "@/lib/thread-chat/streaming/generation-plan"
+export * from "@/lib/thread-chat/streaming/generation-tools"
+export * from "@/lib/thread-chat/streaming/run-generation"
+export * from "@/lib/thread-chat/streaming/runtime"
+export * from "@/lib/thread-chat/streaming/session-store"
+export * from "@/lib/thread-chat/streaming/sse"
+export * from "@/lib/thread-chat/streaming/stream-session"
+export * from "@/lib/thread-chat/streaming/ui-message-pipeline"

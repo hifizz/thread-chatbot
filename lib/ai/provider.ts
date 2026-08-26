@@ -7,7 +7,6 @@ import {
 } from "ai"
 import { minimaxChatModel, isMinimaxConfigured } from "@/lib/ai/minimax"
 import { arkCodingChatModel, isArkCodingConfigured } from "@/lib/ai/ark"
-import { isVercelGatewayConfigured } from "@/lib/payments/vercel-gateway"
 import {
   getChatModel,
   type ChatModel,
@@ -29,6 +28,11 @@ import { isUMAPISConfigured, umapisChatModel } from "@/lib/ai/umapis"
 const CF_ACCOUNT = process.env.CF_AI_GATEWAY_ACCOUNT_ID
 const CF_GATEWAY = process.env.CF_AI_GATEWAY_ID
 const CF_TOKEN = process.env.CF_AI_GATEWAY_TOKEN
+
+/** 模型路由只关心网关凭据是否存在，不依赖计费模块。 */
+function isVercelGatewayConfigured(): boolean {
+  return Boolean(process.env.AI_GATEWAY_API_KEY)
+}
 
 /** CF AI 网关 compat 端点是否已配置。 */
 export function isGatewayConfigured(): boolean {

@@ -32,25 +32,25 @@
 
 ## 3. Gate 2 — 独立 Stream Session、AI SDK v7 pipeline 与 v1 API
 
-- [ ] 3.1 在 `constants/` 定义 Session terminal TTL、cleanup 周期、heartbeat、checkpoint 节流和客户端轮询退避常量，附用途注释并消除旧 generation 常量复用。
-- [ ] 3.2 实现 `StreamSession` 类型和 `globalThis` 单例 `SessionStore`，包含 Map、AbortController、完整 UI Message snapshot、event sequence、subscriber Set、finishedAt 与已 catch 的 task Promise。
-- [ ] 3.3 实现 Session 创建幂等和“先注册 subscriber→发送 snapshot/throughSeq→发送后续 chunk”的原子订阅路径，保证同一 Message 不启动第二个 task。
-- [ ] 3.4 实现 cleanup timer，只清理超过 TTL 且无订阅者的终态 Session，调用 `unref()`，并用 fake clock 覆盖活跃 Session 不误删和终态 Session 不泄漏。
-- [ ] 3.5 实现 AI SDK v7 pipeline：`streamText().stream` → 独立 `toUIMessageStream` → `readUIMessageStream`，固定 response Message ID，启用 reasoning/sources，先更新 snapshot 再编号广播标准 chunk。
-- [ ] 3.6 将现有 Markdown Artifact、联网搜索/深读和引用进度映射为 typed tool/data parts，删除新 pipeline 中的纯 `textStream` 拼接与临时旁路消息字段。
-- [ ] 3.7 实现 generating Message 的非 transient `parts[]` 节流 checkpoint，使用 `status='generating'` CAS、跳过无变化快照，并在 finalize 前强制 flush。
-- [ ] 3.8 实现唯一 finalize service：根据 AI SDK `onEnd` 的 responseMessage/isAborted/finishReason 或捕获异常决定 completed/stopped/failed，条件更新 Message，并在同一事务写最终 Artifact 和 provider raw usage。
-- [ ] 3.9 实现 `run-generation` orchestration，在 DB commit 后先登记 Session 再启动模型任务；不使用 request.signal，不依赖 Route Handler/`after()` 持有任务，所有异常都回到 finalize。
-- [ ] 3.10 将 Stop application command 接到 Session abort；验证 Stop 不直接写 stopped、重复 Stop 幂等、Stop-vs-complete 恰有一个终态，Session 丢失时收敛为 failed 而非伪造 stopped。
-- [ ] 3.11 实现一次性 runtime initialization Promise，在进程接受 v1 ThreadChat 请求前把旧进程遗留 generating 行条件更新为 `failed/PROCESS_RESTARTED`，保留 checkpoint parts。
-- [ ] 3.12 实现 `/api/thread-chat/v1` 的 auth、owner resolution、strict parse、错误映射与 no-cache route utilities；动态路由使用 `await ctx.params`。
-- [ ] 3.13 实现 Project list/bootstrap、Message poll、Artifact read、Project/Thread mutation 的薄 Route Handlers，并验证响应只返回 DTO、不泄露 DB row 或 error stack。
-- [ ] 3.14 实现 start/send/fork/edit/retry/stop/feedback 命令 Route Handlers，确保只有 `replayed:false` 的新生成结果尝试 `SessionStore.start()`，replay 只返回原结果。
-- [ ] 3.15 实现 Message stream Route Handler 和 SSE encoder，发送 snapshot/chunk/terminal/heartbeat，设置 no-cache/no-transform/X-Accel-Buffering headers，并在连接取消时仅注销 subscriber。
-- [ ] 3.16 用可控 fake model stream 增加协议测试，覆盖 text、reasoning、sources、files、tool input delta/output、data parts、Artifact-only、partial error、abort 与空回复的最终 `parts[]`。
-- [ ] 3.17 增加 Session 竞态测试，覆盖 POST 后立即订阅、chunk 与订阅并发、两个订阅者、最后订阅者断开后继续完成、迟到订阅终态快照、TTL cleanup 和重复启动。
-- [ ] 3.18 增加 API/DB 集成测试，覆盖认证/404、strict body、幂等 replay 不重复模型、SSE 不可用仍可 poll、checkpoint、Stop/完成竞态、进程重启 sweep 与 Artifact 原子落库。
-- [ ] 3.19 运行 Gate 2 全部纯测试/DB 测试、依赖扫描和 `pnpm typecheck`；确认无新代码访问 balance/credits/billing/cost 后才允许前端接线。
+- [x] 3.1 在 `constants/` 定义 Session terminal TTL、cleanup 周期、heartbeat、checkpoint 节流和客户端轮询退避常量，附用途注释并消除旧 generation 常量复用。
+- [x] 3.2 实现 `StreamSession` 类型和 `globalThis` 单例 `SessionStore`，包含 Map、AbortController、完整 UI Message snapshot、event sequence、subscriber Set、finishedAt 与已 catch 的 task Promise。
+- [x] 3.3 实现 Session 创建幂等和“先注册 subscriber→发送 snapshot/throughSeq→发送后续 chunk”的原子订阅路径，保证同一 Message 不启动第二个 task。
+- [x] 3.4 实现 cleanup timer，只清理超过 TTL 且无订阅者的终态 Session，调用 `unref()`，并用 fake clock 覆盖活跃 Session 不误删和终态 Session 不泄漏。
+- [x] 3.5 实现 AI SDK v7 pipeline：`streamText().stream` → 独立 `toUIMessageStream` → `readUIMessageStream`，固定 response Message ID，启用 reasoning/sources，先更新 snapshot 再编号广播标准 chunk。
+- [x] 3.6 将现有 Markdown Artifact、联网搜索/深读和引用进度映射为 typed tool/data parts，删除新 pipeline 中的纯 `textStream` 拼接与临时旁路消息字段。
+- [x] 3.7 实现 generating Message 的非 transient `parts[]` 节流 checkpoint，使用 `status='generating'` CAS、跳过无变化快照，并在 finalize 前强制 flush。
+- [x] 3.8 实现唯一 finalize service：根据 AI SDK `onEnd` 的 responseMessage/isAborted/finishReason 或捕获异常决定 completed/stopped/failed，条件更新 Message，并在同一事务写最终 Artifact 和 provider raw usage。
+- [x] 3.9 实现 `run-generation` orchestration，在 DB commit 后先登记 Session 再启动模型任务；不使用 request.signal，不依赖 Route Handler/`after()` 持有任务，所有异常都回到 finalize。
+- [x] 3.10 将 Stop application command 接到 Session abort；验证 Stop 不直接写 stopped、重复 Stop 幂等、Stop-vs-complete 恰有一个终态，Session 丢失时收敛为 failed 而非伪造 stopped。
+- [x] 3.11 实现一次性 runtime initialization Promise，在进程接受 v1 ThreadChat 请求前把旧进程遗留 generating 行条件更新为 `failed/PROCESS_RESTARTED`，保留 checkpoint parts。
+- [x] 3.12 实现 `/api/thread-chat/v1` 的 auth、owner resolution、strict parse、错误映射与 no-cache route utilities；动态路由使用 `await ctx.params`。
+- [x] 3.13 实现 Project list/bootstrap、Message poll、Artifact read、Project/Thread mutation 的薄 Route Handlers，并验证响应只返回 DTO、不泄露 DB row 或 error stack。
+- [x] 3.14 实现 start/send/fork/edit/retry/stop/feedback 命令 Route Handlers，确保只有 `replayed:false` 的新生成结果尝试 `SessionStore.start()`，replay 只返回原结果。
+- [x] 3.15 实现 Message stream Route Handler 和 SSE encoder，发送 snapshot/chunk/terminal/heartbeat，设置 no-cache/no-transform/X-Accel-Buffering headers，并在连接取消时仅注销 subscriber。
+- [x] 3.16 用可控 fake model stream 增加协议测试，覆盖 text、reasoning、sources、files、tool input delta/output、data parts、Artifact-only、partial error、abort 与空回复的最终 `parts[]`。
+- [x] 3.17 增加 Session 竞态测试，覆盖 POST 后立即订阅、chunk 与订阅并发、两个订阅者、最后订阅者断开后继续完成、迟到订阅终态快照、TTL cleanup 和重复启动。
+- [x] 3.18 增加 API/DB 集成测试，覆盖认证/404、strict body、幂等 replay 不重复模型、SSE 不可用仍可 poll、checkpoint、Stop/完成竞态、进程重启 sweep 与 Artifact 原子落库。
+- [x] 3.19 运行 Gate 2 全部纯测试/DB 测试、依赖扫描和 `pnpm typecheck`；确认无新代码访问 balance/credits/billing/cost 后才允许前端接线。
 
 ## 4. Gate 3 — 规范化前端 Store 与既有组件适配
 

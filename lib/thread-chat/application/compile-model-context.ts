@@ -1,6 +1,7 @@
 import { convertToModelMessages, type ModelMessage } from "ai"
 import { db } from "@/lib/db"
 import { INHERITED_CHAR_BUDGET } from "@/constants/thread-chat"
+import { resolveAttachmentParts } from "@/lib/chat/resolve-attachments"
 import type { ThreadChatUIMessage } from "@/lib/thread-chat/contracts/ui-message"
 import {
   applyInheritedBudget,
@@ -101,20 +102,18 @@ export async function compileModelContext({
     ...budgeted.kept,
     ...currentMessages,
   ]
-  return convertToModelMessages(
-    uiMessages.map(({ role, parts, metadata }) => ({ role, parts, metadata })),
-    {
-      ignoreIncompleteToolCalls: true,
-      convertDataPart: (part) => {
-        if (part.type !== "data-quote") return undefined
-        const data = part.data
-        return typeof data === "object" &&
-          data !== null &&
-          "text" in data &&
-          typeof data.text === "string"
-          ? { type: "text", text: data.text }
-          : undefined
-      },
-    }
-  )
+  const resolvedMessages = await resolveAttachmentParts(uiMessages, userId)
+  return convertToModelMessages(resolvedMessages, {
+    ignoreIncompleteToolCalls: true,
+    convertDataPart: (part) => {
+      if (part.type !== "data-quote") return undefined
+      const data = part.data
+      return typeof data === "object" &&
+        data !== null &&
+        "text" in data &&
+        typeof data.text === "string"
+        ? { type: "text", text: data.text }
+        : undefined
+    },
+  })
 }

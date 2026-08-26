@@ -21,6 +21,10 @@
     "db:test:reset": "node scripts/setup-thread-chat-test-database.mjs --reset-schema",
     "db:test:migrate": "drizzle-kit migrate --config drizzle.test.config.ts",
     "test:thread-chat:gate1-db": "node --import tsx e2e/thread-chat/normalized-conversation-db.test.mjs",
+    "test:thread-chat:gate2-session": "node --import tsx e2e/thread-chat/normalized-stream-session.test.mjs",
+    "test:thread-chat:gate2-pipeline": "node --import tsx e2e/thread-chat/normalized-ui-message-pipeline.test.mjs",
+    "test:thread-chat:gate2-db": "node --import tsx e2e/thread-chat/normalized-generation-db.test.mjs",
+    "test:thread-chat:gate2-api": "node --import tsx e2e/thread-chat/normalized-v1-api-contract.test.mjs",
     "db:studio": "drizzle-kit studio",
     "openspec:validate": "openspec validate --all --strict"
   },
