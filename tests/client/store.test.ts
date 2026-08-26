@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import { createThreadChatAppStore } from "@/lib/thread-chat/client/app-store"
 import { createThreadChatProjectStore } from "@/lib/thread-chat/client/project-store"
+import { projectLegacyTreeView } from "@/app/thread-chat/normalized/project-view-model"
 import {
   selectForkAvailability,
   selectThreadColumnView,
@@ -40,6 +41,82 @@ const branchThree = {
 }
 
 describe("ThreadChat client stores", () => {
+  it("区分本页新生成与页面加载后继续生成", () => {
+    const runningRun = {
+      ...assistantRunDTOFixture,
+      status: "running" as const,
+    }
+    const freshStore = createThreadChatProjectStore({
+      projectId: projectDTOFixture.id,
+    })
+    freshStore.getState().mergeCreationBundle(creationBundleDTOFixture)
+    freshStore.getState().applyRunEvent({
+      type: "run.snapshot",
+      cursor: 0,
+      run: runningRun,
+      message: assistantMessageDTOFixture,
+      artifactSummary: { changeSequence: 0, total: 0, byKind: {} },
+    })
+    expect(
+      projectLegacyTreeView(freshStore.getState()).threads[
+        rootThreadDTOFixture.id
+      ].messages.at(-1)
+    ).toMatchObject({ status: "streaming" })
+    expect(
+      projectLegacyTreeView(freshStore.getState()).threads[
+        rootThreadDTOFixture.id
+      ].messages.at(-1)?.backgroundGeneration
+    ).toBeUndefined()
+
+    const resumedStore = createThreadChatProjectStore({
+      projectId: projectDTOFixture.id,
+    })
+    resumedStore.getState().mergeBootstrap({
+      project: projectDTOFixture,
+      threadTopology: [rootThreadDTOFixture],
+      artifactSummary: { changeSequence: 0, total: 0, byKind: {} },
+      initialThread: {
+        threadId: rootThreadDTOFixture.id,
+        messages: [userMessageDTOFixture, assistantMessageDTOFixture],
+        assistantRuns: [runningRun],
+        hasOlderMessages: false,
+        oldestReturnedSequence: 1,
+        newestReturnedSequence: 2,
+      },
+    })
+    expect(
+      projectLegacyTreeView(resumedStore.getState()).threads[
+        rootThreadDTOFixture.id
+      ].messages.at(-1)
+    ).toMatchObject({
+      status: "streaming",
+      backgroundGeneration: true,
+    })
+
+    resumedStore.getState().applyRunEvent({
+      type: "run.completed",
+      eventSequence: 1,
+      run: {
+        ...runningRun,
+        status: "completed",
+        checkpointParts: [{ type: "text", text: "done" }],
+        eventSequence: 1,
+        finishedAt: "2026-08-25T00:01:00.000Z",
+      },
+      message: {
+        ...assistantMessageDTOFixture,
+        parts: [{ type: "text", text: "done" }],
+        finalizedAt: "2026-08-25T00:01:00.000Z",
+      },
+      artifactSummary: { changeSequence: 0, total: 0, byKind: {} },
+    })
+    expect(
+      resumedStore.getState().runs.resumedAssistantMessageIds[
+        assistantMessageDTOFixture.id
+      ]
+    ).toBeUndefined()
+  })
+
   it("App Store 合并稳定排序的摘要且不保存 selectedProjectId", () => {
     const store = createThreadChatAppStore()
     expect(store.getState().catalog.loadState.status).toBe("idle")

@@ -30,6 +30,7 @@ function initialState(): ThreadChatProjectState {
     runs: {
       byAssistantMessageId: {},
       streamBuffersByAssistantMessageId: {},
+      resumedAssistantMessageIds: {},
     },
     requests: {
       bootstrap: { status: "idle" },
@@ -90,6 +91,33 @@ function withMessages(
       }),
     },
   }
+}
+
+function markResumedRuns(
+  resumedAssistantMessageIds: Record<string, true>,
+  runs: readonly AssistantRunState[]
+): Record<string, true> {
+  return {
+    ...resumedAssistantMessageIds,
+    ...Object.fromEntries(
+      runs
+        .filter((run) => run.status === "queued" || run.status === "running")
+        .map((run) => [run.assistantMessageId, true as const])
+    ),
+  }
+}
+
+function clearResumedRun(
+  resumedAssistantMessageIds: Record<string, true>,
+  run: AssistantRunState
+): Record<string, true> {
+  if (run.status === "queued" || run.status === "running")
+    return resumedAssistantMessageIds
+  if (!resumedAssistantMessageIds[run.assistantMessageId])
+    return resumedAssistantMessageIds
+  const next = { ...resumedAssistantMessageIds }
+  delete next[run.assistantMessageId]
+  return next
 }
 
 function isValidWidth(width: number | null): boolean {
@@ -277,7 +305,13 @@ export function createThreadChatProjectStore(input: {
             ...merged.entities,
             project: bootstrap.project,
           },
-          runs: merged.runs,
+          runs: {
+            ...merged.runs,
+            resumedAssistantMessageIds: markResumedRuns(
+              merged.runs.resumedAssistantMessageIds,
+              bootstrap.initialThread.assistantRuns
+            ),
+          },
           requests: {
             ...state.requests,
             bootstrap: { status: "ready" },
@@ -322,7 +356,13 @@ export function createThreadChatProjectStore(input: {
         )
         return {
           entities: merged.entities,
-          runs: merged.runs,
+          runs: {
+            ...merged.runs,
+            resumedAssistantMessageIds: markResumedRuns(
+              merged.runs.resumedAssistantMessageIds,
+              bundle.assistantRuns
+            ),
+          },
           requests: {
             ...state.requests,
             threadMessagesById: {
@@ -431,6 +471,7 @@ export function createThreadChatProjectStore(input: {
           )
           return {
             runs: {
+              ...state.runs,
               byAssistantMessageId: {
                 ...state.runs.byAssistantMessageId,
                 [assistantMessageId]: {
@@ -471,6 +512,7 @@ export function createThreadChatProjectStore(input: {
         return {
           entities,
           runs: {
+            ...state.runs,
             byAssistantMessageId: normalizeRuns({
               current: state.runs.byAssistantMessageId,
               incoming: [run],
@@ -483,6 +525,10 @@ export function createThreadChatProjectStore(input: {
                 ([assistantMessageId]) =>
                   assistantMessageId !== run.assistantMessageId
               )
+            ),
+            resumedAssistantMessageIds: clearResumedRun(
+              state.runs.resumedAssistantMessageIds,
+              run
             ),
           },
           readModels:
@@ -507,6 +553,10 @@ export function createThreadChatProjectStore(input: {
             incoming: [run],
             messagesById: state.entities.messagesById,
           }),
+          resumedAssistantMessageIds: clearResumedRun(
+            state.runs.resumedAssistantMessageIds,
+            run
+          ),
         },
       }))
     },
@@ -527,6 +577,7 @@ export function createThreadChatProjectStore(input: {
         }
         return {
           runs: {
+            ...state.runs,
             byAssistantMessageId: {
               ...state.runs.byAssistantMessageId,
               [assistantMessageId]: { ...run, checkpointParts },

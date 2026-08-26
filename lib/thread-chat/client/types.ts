@@ -112,6 +112,7 @@ export interface StreamBuffer {
 export interface ThreadChatRunsState {
   byAssistantMessageId: Record<MessageId, AssistantRunState>
   streamBuffersByAssistantMessageId: Record<MessageId, StreamBuffer>
+  resumedAssistantMessageIds: Record<MessageId, true>
 }
 
 export interface ThreadChatRequestsState {

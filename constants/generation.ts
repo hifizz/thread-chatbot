@@ -37,4 +37,4 @@ export const GENERATION_ERRORS = {
   streamFailed: "生成失败，请重试。",
 } as const
 
-export const GENERATION_BACKGROUND_LABEL = "正在后台生成，完成后显示"
+export const GENERATION_BACKGROUND_LABEL = "正在后台继续生成"

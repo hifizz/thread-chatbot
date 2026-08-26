@@ -89,13 +89,21 @@ function statusOf(
   text: string
 ): { status?: MessageStatus; error?: string; backgroundGeneration?: boolean } {
   const run = state.runs.byAssistantMessageId[messageId]
+  const resumed = state.runs.resumedAssistantMessageIds[messageId] === true
   if (!run)
     return state.entities.messagesById[messageId]?.finalizedAt
       ? { status: "done" }
       : { status: "pending" }
-  if (run.status === "queued") return { status: "pending" }
+  if (run.status === "queued")
+    return {
+      status: "pending",
+      ...(resumed ? { backgroundGeneration: true } : {}),
+    }
   if (run.status === "running")
-    return { status: "streaming", backgroundGeneration: true }
+    return {
+      status: "streaming",
+      ...(resumed ? { backgroundGeneration: true } : {}),
+    }
   if (run.status === "completed" || (run.status === "stopped" && text))
     return { status: "done" }
   return {
