@@ -108,7 +108,10 @@ export async function POST(req: Request) {
     })
 
     // MiniMax 不接受 file part：先把附件（PDF→提取文本，其余→占位说明）转换为 text part
-    const resolvedMessages = await resolveAttachmentParts(authoritativeMessages)
+    const resolvedMessages = await resolveAttachmentParts(
+      authoritativeMessages,
+      userId
+    )
 
     const system = buildChatSystemPrompt({
       threadChat: isThreadChat,

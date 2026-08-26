@@ -12,23 +12,23 @@
 
 ## 2. Gate 1 — 规范化数据库与应用命令
 
-- [ ] 2.1 在 `lib/db/schema.ts` 定义 `projects`、`threads`、`messages`、`artifacts`、`conversation_commands` 的 Drizzle schema、check/unique/partial indexes 和关系类型，不改现有 billing/payment 表。
-- [ ] 2.2 生成并人工审查 Drizzle migration，验证 `user.id`/所有新 ID 均为 text、FK 删除策略正确、根线程与脚注唯一约束正确，且此 Gate 尚不 rename/drop 旧表。
-- [ ] 2.3 实现 owner-scoped Project/Thread/Message/Artifact 查询仓储和 DTO mapper，确保跨用户与不存在资源统一返回不泄露信息的 404 语义。
-- [ ] 2.4 实现 Project bootstrap/list/message/artifact queries，返回 superseded 历史实体但由 DTO 明确标识，并为合法未落库 Project URL 返回空工作台投影。
-- [ ] 2.5 实现 `conversation_commands` 收据仓储：规范化请求哈希、事务内首次插入、并发唯一冲突后的回读、相同语义 replay 和异义 `COMMAND_ID_CONFLICT`。
-- [ ] 2.6 实现 Thread `next_sequence` 的原子 UPDATE RETURNING 分配器与 Project `next_footnote` 分配器，支持一次分配 1 或 2 个连续序号且禁止 `max(sequence)+1` 读改写。
-- [ ] 2.7 实现创建 Project + 根 Thread + 首轮 user/assistant 的 `start-project` 命令事务，确保失败时零部分记录、成功时 assistant 为 generating。
-- [ ] 2.8 实现普通 `send-message` 命令事务，验证模型 ID、附件所有权、当前 Thread 状态和两个连续 sequence，并返回权威 accepted DTO。
-- [ ] 2.9 实现 `fork-thread` 命令事务：校验来源、原子脚注、父子同 Project、完整 TextAnchor、`parent.fork_context + parent 当前路径至 source` 冻结数组，以及可选首轮的原子创建。
-- [ ] 2.10 实现 `retry-message` 命令事务：仅允许最新活跃终态 assistant，创建新 Message、设置 `replaces_message_id` 和旧行 `superseded_at`，不修改旧 status/parts/Artifact。
-- [ ] 2.11 实现 `edit-turn` 命令事务：仅允许最新活跃 user turn，soft-supersede 旧 user/assistant 并追加新 user/assistant；暴露需在 commit 后 abort 的旧 generation ID。
-- [ ] 2.12 实现 Stop 请求登记、反馈 set/switch/clear、Project rename/archive/delete、Thread model/title 更新，并确保每个写命令都使用 owner lock、strict schema 和 command receipt。
-- [ ] 2.13 实现 `compile-model-context`：按 frozen ID 顺序批量加载历史 `parts[]`、追加本 Thread 当前时间线、应用现有 prompt budget，并由服务端单独注入 system prompt。
-- [ ] 2.14 实现无计费依赖的双轨 title service 与“一次尝试”CAS，保持 MainThread 自定义标题同时作用于 Project 导航标题的现有展示优先级。
-- [ ] 2.15 增加数据库测试，覆盖 owner isolation、跨 Project FK 伪造、并发 sequence/footnote、重复 start/send/fork、Retry 竞态、Edit 原子性、删除竞态与 command 异义冲突；每个脚本使用随机用户并在 finally 清理。
-- [ ] 2.16 增加持久化协议测试，往 Message 写入包含 text/reasoning/source/file/tool/data parts 的完整 UI Message，读取后做结构等价断言，并验证 transient data parts 不落库。
-- [ ] 2.17 在空开发数据库执行 migrate up、约束负例、全量 Gate 1 DB 脚本和 `pnpm typecheck`；通过后记录 schema 快照与 Gate 出场证据。
+- [x] 2.1 在 `lib/db/schema.ts` 定义 `projects`、`threads`、`messages`、`artifacts`、`conversation_commands` 的 Drizzle schema、check/unique/partial indexes 和关系类型，不改现有 billing/payment 表。
+- [x] 2.2 生成并人工审查 Drizzle migration，验证 `user.id`/所有新 ID 均为 text、FK 删除策略正确、根线程与脚注唯一约束正确，且此 Gate 尚不 rename/drop 旧表。
+- [x] 2.3 实现 owner-scoped Project/Thread/Message/Artifact 查询仓储和 DTO mapper，确保跨用户与不存在资源统一返回不泄露信息的 404 语义。
+- [x] 2.4 实现 Project bootstrap/list/message/artifact queries，返回 superseded 历史实体但由 DTO 明确标识，并为合法未落库 Project URL 返回空工作台投影。
+- [x] 2.5 实现 `conversation_commands` 收据仓储：规范化请求哈希、事务内首次插入、并发唯一冲突后的回读、相同语义 replay 和异义 `COMMAND_ID_CONFLICT`。
+- [x] 2.6 实现 Thread `next_sequence` 的原子 UPDATE RETURNING 分配器与 Project `next_footnote` 分配器，支持一次分配 1 或 2 个连续序号且禁止 `max(sequence)+1` 读改写。
+- [x] 2.7 实现创建 Project + 根 Thread + 首轮 user/assistant 的 `start-project` 命令事务，确保失败时零部分记录、成功时 assistant 为 generating。
+- [x] 2.8 实现普通 `send-message` 命令事务，验证模型 ID、附件所有权、当前 Thread 状态和两个连续 sequence，并返回权威 accepted DTO。
+- [x] 2.9 实现 `fork-thread` 命令事务：校验来源、原子脚注、父子同 Project、完整 TextAnchor、`parent.fork_context + parent 当前路径至 source` 冻结数组，以及可选首轮的原子创建。
+- [x] 2.10 实现 `retry-message` 命令事务：仅允许最新活跃终态 assistant，创建新 Message、设置 `replaces_message_id` 和旧行 `superseded_at`，不修改旧 status/parts/Artifact。
+- [x] 2.11 实现 `edit-turn` 命令事务：仅允许最新活跃 user turn，soft-supersede 旧 user/assistant 并追加新 user/assistant；暴露需在 commit 后 abort 的旧 generation ID。
+- [x] 2.12 实现 Stop 请求登记、反馈 set/switch/clear、Project rename/archive/delete、Thread model/title 更新，并确保每个写命令都使用 owner lock、strict schema 和 command receipt。
+- [x] 2.13 实现 `compile-model-context`：按 frozen ID 顺序批量加载历史 `parts[]`、追加本 Thread 当前时间线、应用现有 prompt budget，并由服务端单独注入 system prompt。
+- [x] 2.14 实现无计费依赖的双轨 title service 与“一次尝试”CAS，保持 MainThread 自定义标题同时作用于 Project 导航标题的现有展示优先级。
+- [x] 2.15 增加数据库测试，覆盖 owner isolation、跨 Project FK 伪造、并发 sequence/footnote、重复 start/send/fork、Retry 竞态、Edit 原子性、删除竞态与 command 异义冲突；每个脚本使用随机用户并在 finally 清理。
+- [x] 2.16 增加持久化协议测试，往 Message 写入包含 text/reasoning/source/file/tool/data parts 的完整 UI Message，读取后做结构等价断言，并验证 transient data parts 不落库。
+- [x] 2.17 在空开发数据库执行 migrate up、约束负例、全量 Gate 1 DB 脚本和 `pnpm typecheck`；通过后记录 schema 快照与 Gate 出场证据。
 
 ## 3. Gate 2 — 独立 Stream Session、AI SDK v7 pipeline 与 v1 API
 

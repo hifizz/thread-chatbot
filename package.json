@@ -17,6 +17,10 @@
     "db:migrate": "drizzle-kit migrate",
     "db:reset-schema": "node scripts/reset-thread-chat-schema.mjs",
     "db:push": "drizzle-kit push",
+    "db:test:setup": "node scripts/setup-thread-chat-test-database.mjs",
+    "db:test:reset": "node scripts/setup-thread-chat-test-database.mjs --reset-schema",
+    "db:test:migrate": "drizzle-kit migrate --config drizzle.test.config.ts",
+    "test:thread-chat:gate1-db": "node --import tsx e2e/thread-chat/normalized-conversation-db.test.mjs",
     "db:studio": "drizzle-kit studio",
     "openspec:validate": "openspec validate --all --strict"
   },
@@ -93,6 +97,7 @@
     "prettier": "^3.8.3",
     "prettier-plugin-tailwindcss": "^0.8.0",
     "tailwindcss": "^4",
+    "tsx": "4.23.0",
     "typescript": "^5"
   },
   "pnpm": {

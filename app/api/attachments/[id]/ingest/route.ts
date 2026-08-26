@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm"
+import { and, eq } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { attachments } from "@/lib/db/schema"
 import {
@@ -14,16 +14,22 @@ import {
 } from "@/lib/attachments/pdf"
 import { indexAttachment } from "@/lib/attachments/index-chunks"
 import { ATTACHMENT_POLICIES } from "@/constants/attachment"
+import { getCurrentUserId } from "@/lib/auth/server"
 
 type RouteContext = { params: Promise<{ id: string }> }
 
-async function markFailed(id: string, key: string, error: string) {
+async function markFailed(
+  userId: string,
+  id: string,
+  key: string,
+  error: string
+) {
   // 校验/解析失败的对象一并从 R2 清掉，不留不可用的孤儿文件
   await deleteObject(key).catch(() => {})
   await db
     .update(attachments)
     .set({ status: "failed", error })
-    .where(eq(attachments.id, id))
+    .where(and(eq(attachments.id, id), eq(attachments.userId, userId)))
   return Response.json({ status: "failed", error }, { status: 422 })
 }
 
@@ -33,6 +39,8 @@ async function markFailed(id: string, key: string, error: string) {
  * 提取在上传阶段一次完成，对话阶段零解析开销。
  */
 export async function POST(_req: Request, { params }: RouteContext) {
+  const userId = await getCurrentUserId()
+  if (!userId) return Response.json({ error: "未登录" }, { status: 401 })
   if (!isR2Configured()) {
     return Response.json({ error: "未配置 R2 存储" }, { status: 503 })
   }
@@ -40,7 +48,7 @@ export async function POST(_req: Request, { params }: RouteContext) {
   const [row] = await db
     .select()
     .from(attachments)
-    .where(eq(attachments.id, id))
+    .where(and(eq(attachments.id, id), eq(attachments.userId, userId)))
     .limit(1)
   if (!row) return Response.json({ error: "附件不存在" }, { status: 404 })
   if (row.status === "ready") {
@@ -56,23 +64,29 @@ export async function POST(_req: Request, { params }: RouteContext) {
     return Response.json({ error: "文件尚未上传完成" }, { status: 409 })
   }
   if (policy && actualSize > policy.maxBytes) {
-    return markFailed(id, row.key, "文件超过大小上限")
+    return markFailed(userId, id, row.key, "文件超过大小上限")
   }
 
   if (row.mimeType === "application/pdf") {
     const bytes = await getObjectBytes(row.key)
     if (!looksLikePdf(bytes)) {
-      return markFailed(id, row.key, "文件内容不是有效的 PDF")
+      return markFailed(userId, id, row.key, "文件内容不是有效的 PDF")
     }
     let extraction
     try {
       extraction = await extractPdfPages(bytes)
     } catch {
-      return markFailed(id, row.key, "PDF 解析失败（文件可能已损坏或加密）")
+      return markFailed(
+        userId,
+        id,
+        row.key,
+        "PDF 解析失败（文件可能已损坏或加密）"
+      )
     }
     if (!hasTextLayer(extraction)) {
       // 显式失败优于静默空上下文：扫描件没有文本层，注入空内容只会诱发模型幻觉
       return markFailed(
+        userId,
         id,
         row.key,
         "该 PDF 没有可提取的文本层（可能是扫描件），暂不支持"
@@ -86,7 +100,7 @@ export async function POST(_req: Request, { params }: RouteContext) {
         pageCount: extraction.pageCount,
         pages: extraction.pages,
       })
-      .where(eq(attachments.id, id))
+      .where(and(eq(attachments.id, id), eq(attachments.userId, userId)))
 
     // 建立向量索引（配置了 embeddings 时）。失败不影响附件可用性——
     // 对话时若无索引会自动回退到全文注入。
@@ -103,6 +117,6 @@ export async function POST(_req: Request, { params }: RouteContext) {
   await db
     .update(attachments)
     .set({ status: "ready", size: actualSize })
-    .where(eq(attachments.id, id))
+    .where(and(eq(attachments.id, id), eq(attachments.userId, userId)))
   return Response.json({ status: "ready" })
 }

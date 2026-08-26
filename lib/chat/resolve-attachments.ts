@@ -1,5 +1,5 @@
 import type { UIMessage } from "ai"
-import { inArray } from "drizzle-orm"
+import { and, eq, inArray } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { attachments } from "@/lib/db/schema"
 import {
@@ -119,7 +119,8 @@ function latestUserQuery(messages: UIMessage[]): string {
 }
 
 export async function resolveAttachmentParts(
-  messages: UIMessage[]
+  messages: UIMessage[],
+  userId: string
 ): Promise<UIMessage[]> {
   // 1) 收集本次请求引用的全部附件 id，一次批量查库
   const ids = new Set<string>()
@@ -135,7 +136,9 @@ export async function resolveAttachmentParts(
     ? await db
         .select()
         .from(attachments)
-        .where(inArray(attachments.id, [...ids]))
+        .where(
+          and(eq(attachments.userId, userId), inArray(attachments.id, [...ids]))
+        )
     : []
   const rowById = new Map(rows.map((row) => [row.id, row]))
 

@@ -29,6 +29,13 @@
       "when": 1787150821829,
       "tag": "0003_strong_bulldozer",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1787749855891,
+      "tag": "0004_normalized_thread_chat_conversations",
+      "breakpoints": true
     }
   ]
 }

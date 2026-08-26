@@ -1,7 +1,8 @@
-import { eq } from "drizzle-orm"
+import { and, eq } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { attachments } from "@/lib/db/schema"
 import { deleteObject, isR2Configured, presignDownload } from "@/lib/storage/r2"
+import { getCurrentUserId } from "@/lib/auth/server"
 
 type RouteContext = { params: Promise<{ id: string }> }
 
@@ -10,6 +11,8 @@ type RouteContext = { params: Promise<{ id: string }> }
  * 消息 parts 里持久化的是本路由的相对路径，presigned URL 每次请求现签，天然不过期。
  */
 export async function GET(_req: Request, { params }: RouteContext) {
+  const userId = await getCurrentUserId()
+  if (!userId) return Response.json({ error: "未登录" }, { status: 401 })
   if (!isR2Configured()) {
     return Response.json({ error: "未配置 R2 存储" }, { status: 503 })
   }
@@ -17,7 +20,7 @@ export async function GET(_req: Request, { params }: RouteContext) {
   const [row] = await db
     .select()
     .from(attachments)
-    .where(eq(attachments.id, id))
+    .where(and(eq(attachments.id, id), eq(attachments.userId, userId)))
     .limit(1)
   if (!row) return Response.json({ error: "附件不存在" }, { status: 404 })
 
@@ -26,11 +29,13 @@ export async function GET(_req: Request, { params }: RouteContext) {
 
 /** composer 里移除附件时清理 R2 对象与 DB 行 */
 export async function DELETE(_req: Request, { params }: RouteContext) {
+  const userId = await getCurrentUserId()
+  if (!userId) return Response.json({ error: "未登录" }, { status: 401 })
   const { id } = await params
   const [row] = await db
     .select()
     .from(attachments)
-    .where(eq(attachments.id, id))
+    .where(and(eq(attachments.id, id), eq(attachments.userId, userId)))
     .limit(1)
   if (!row) return Response.json({ ok: true })
 
@@ -39,6 +44,8 @@ export async function DELETE(_req: Request, { params }: RouteContext) {
       // R2 清理失败不阻塞：DB 行删除后对象成为孤儿，可由后台任务兜底回收
     })
   }
-  await db.delete(attachments).where(eq(attachments.id, id))
+  await db
+    .delete(attachments)
+    .where(and(eq(attachments.id, id), eq(attachments.userId, userId)))
   return Response.json({ ok: true })
 }
