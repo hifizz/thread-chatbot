@@ -40,3 +40,5 @@ next-env.d.ts
 # thread-chat e2e 验收脚本的截图输出
 e2e/thread-chat/shots/
 .vercel
+
+.local-backups
