@@ -23,15 +23,15 @@ export function useConversationRuntime(projectId: string) {
       commands: createConversationCommands({ store, client }),
     }
   }, [])
-  const [status, setStatus] = useState<"loading" | "ready" | "error">(
-    "loading"
-  )
-  const [error, setError] = useState<unknown>(null)
+  const [bootState, setBootState] = useState<{
+    projectId: string
+    status: "loading" | "ready" | "error"
+    error: unknown
+  }>({ projectId, status: "loading", error: null })
 
   useEffect(() => {
     let disposed = false
     let boot: ConversationBootHandle | null = null
-    setStatus("loading")
     void bootConversationProject({
       projectId,
       store: runtime.store,
@@ -42,13 +42,12 @@ export function useConversationRuntime(projectId: string) {
         if (disposed) handle.dispose()
         else {
           boot = handle
-          setStatus("ready")
+          setBootState({ projectId, status: "ready", error: null })
         }
       },
       (cause) => {
         if (!disposed) {
-          setError(cause)
-          setStatus("error")
+          setBootState({ projectId, status: "error", error: cause })
         }
       }
     )
@@ -59,6 +58,9 @@ export function useConversationRuntime(projectId: string) {
   }, [projectId, runtime])
 
   useEffect(() => () => runtime.commands.dispose(), [runtime])
-  return { ...runtime, status, error }
+  const current =
+    bootState.projectId === projectId
+      ? bootState
+      : { projectId, status: "loading" as const, error: null }
+  return { ...runtime, status: current.status, error: current.error }
 }
-

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict"
-import { readFile } from "node:fs/promises"
+import { access, readFile } from "node:fs/promises"
 import { columnCountChoices } from "../../app/thread-chat/orchestration/navigation/thread-chat-topbar-logic.ts"
 
 assert.deepEqual(columnCountChoices(null), [
@@ -13,7 +13,7 @@ assert.deepEqual(
   [{ value: 3, label: "3", active: true }]
 )
 
-const [topbar, variantPicker] = await Promise.all([
+const [topbar, messageActionsCss] = await Promise.all([
   readFile(
     new URL(
       "../../app/thread-chat/orchestration/navigation/thread-chat-topbar.tsx",
@@ -23,7 +23,7 @@ const [topbar, variantPicker] = await Promise.all([
   ),
   readFile(
     new URL(
-      "../../app/thread-chat/chat/actions/turn-variant-picker.tsx",
+      "../../app/thread-chat/styles/message-actions.css",
       import.meta.url
     ),
     "utf8"
@@ -34,8 +34,20 @@ assert.match(topbar, /aria-label="列数"/)
 assert.match(topbar, /aria-pressed=\{viewMode === "columns"\}/)
 assert.match(topbar, /aria-pressed=\{choice\.active\}/)
 assert.match(topbar, /aria-pressed=\{placementMode === "replace"\}/)
-assert.match(variantPicker, /role="group"[\s\S]*aria-label="回复版本切换"/)
+await assert.rejects(
+  access(
+    new URL(
+      "../../app/thread-chat/chat/actions/turn-variant-picker.tsx",
+      import.meta.url
+    )
+  ),
+  { code: "ENOENT" }
+)
+assert.doesNotMatch(
+  messageActionsCss,
+  /turn-variant|variant-arrow|variant-label/
+)
 
 console.log(
-  "PASS  Thread Chat topbar exposes one active auto/forced column choice"
+  "PASS  Thread Chat topbar exposes one active column choice and no variant picker"
 )

@@ -19,6 +19,8 @@ export async function bootConversationProject(options: {
   store: ConversationStore
   client: ThreadChatClient
   storage?: Storage
+  pollDelays?: readonly number[]
+  wait?: (delayMs: number, signal: AbortSignal) => Promise<void>
 }): Promise<ConversationBootHandle> {
   const { projectId, store, client } = options
   const bootstrap = await client.getProject(projectId)
@@ -30,7 +32,13 @@ export async function bootConversationProject(options: {
 
   // 刷新后的 generating 只轮询，不尝试恢复进程内 SSE。
   const background = bootstrap.activeGenerationIds.map((messageId) =>
-    pollBackgroundGeneration({ store, client, messageId })
+    pollBackgroundGeneration({
+      store,
+      client,
+      messageId,
+      pollDelays: options.pollDelays,
+      wait: options.wait,
+    })
   )
   const unsubscribe = options.storage
     ? store.subscribe((state, previous) => {
@@ -47,4 +55,3 @@ export async function bootConversationProject(options: {
     },
   }
 }
-

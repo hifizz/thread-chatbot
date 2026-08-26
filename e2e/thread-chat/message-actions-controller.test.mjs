@@ -5,7 +5,6 @@
 import assert from "node:assert/strict"
 import { createThreadStore } from "../../app/thread-chat/core/store.ts"
 import { createChatController } from "../../app/thread-chat/net/chat-controller.ts"
-import { setKnownTreeRevision } from "../../app/thread-chat/net/persistence/persist.ts"
 
 const treeId = "11111111-1111-4111-8111-111111111111"
 
@@ -167,49 +166,6 @@ await test("accepted edit preserves the old turn and quote on the new user sibli
     assert.equal(nextUser.text, "编辑后的问题")
     assert.deepEqual(nextUser.quote, { text: "原引用" })
     assert.equal(thread.activeLeafMessageId, result.assistantMessageId)
-  } finally {
-    harness.restore()
-  }
-})
-
-await test("variant conflicts do not move the local leaf; success does", async () => {
-  let conflict = true
-  const harness = controllerWith(async (input, init) => {
-    assert.match(String(input), /active-leaf$/)
-    const body = JSON.parse(init.body)
-    assert.equal(body.baseRevision, conflict ? 7 : 8)
-    return conflict
-      ? Response.json(
-          {
-            error: {
-              code: "tree_revision_conflict",
-              message: "该对话已更新",
-            },
-          },
-          { status: 409 }
-        )
-      : Response.json({
-          revision: 9,
-          thread: { id: "main", activeLeafMessageId: "a2" },
-        })
-  })
-  try {
-    setKnownTreeRevision(treeId, 7)
-    const rejected = await harness.controller.switchTurnVariant("main", "a2")
-    assert.equal(rejected.ok, false)
-    assert.equal(
-      harness.store.getState().threads.main.activeLeafMessageId,
-      "a1"
-    )
-
-    conflict = false
-    setKnownTreeRevision(treeId, 8)
-    const accepted = await harness.controller.switchTurnVariant("main", "a2")
-    assert.equal(accepted.ok, true)
-    assert.equal(
-      harness.store.getState().threads.main.activeLeafMessageId,
-      "a2"
-    )
   } finally {
     harness.restore()
   }

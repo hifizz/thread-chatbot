@@ -115,7 +115,7 @@ export function ArtifactDrawer({
                 <span className="dot" />
                 {art.title}
                 {!artifactSourceProvenance(state, art).isOnActivePath && (
-                  <span className="historical-artifact">历史版本</span>
+                  <span className="historical-artifact">历史回复</span>
                 )}
               </button>
             )
@@ -151,13 +151,7 @@ export function ArtifactDrawer({
           <span className="nm">
             来源会话：{src.title}
             {src.footnote !== null ? ` · 脚注 ${src.footnote}` : ""}
-            {provenance && !provenance.isOnActivePath
-              ? ` · 来自回复 ${
-                  provenance.alternativeIndex === null
-                    ? "?"
-                    : provenance.alternativeIndex + 1
-                }/${provenance.alternativeCount} · 历史版本`
-              : ""}
+            {provenance && !provenance.isOnActivePath ? " · 来自历史回复" : ""}
           </span>
           <button
             className="loc"

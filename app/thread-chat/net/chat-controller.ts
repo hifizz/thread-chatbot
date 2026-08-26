@@ -27,13 +27,9 @@ import { buildRequestBody } from "./prompt/prompt"
 import { consumeUIMessageStream } from "./stream/ui-stream"
 import type { MessageFeedback, MessageFeedbackSummary } from "../core/types"
 import { GENERATION_ERRORS } from "@/constants/generation"
-import {
-  getKnownTreeRevision,
-  setKnownTreeRevision,
-} from "./persistence/persist"
+import { setKnownTreeRevision } from "./persistence/persist"
 import { activeLeafTurn } from "../core/message-graph"
 import { submitMessageFeedback } from "./commands/message-feedback-command"
-import { switchActiveLeaf } from "./commands/switch-active-leaf-command"
 import { requestGenerationStop } from "./commands/stop-generation-command"
 import { requestChatGeneration } from "./commands/chat-generation-command"
 import {
@@ -51,13 +47,11 @@ import { createLocalGenerationExecutions } from "./stream/local-generation-execu
 import type {
   GenerationActionResult,
   ThreadMessageActionCommands,
-  VariantSwitchResult,
 } from "../chat/actions/message-action-commands"
 
 export type {
   GenerationActionResult,
   MessageActionFailureCode,
-  VariantSwitchResult,
 } from "../chat/actions/message-action-commands"
 
 /** 网络异常（非中止）的兜底错误文案 */
@@ -348,27 +342,6 @@ export function createChatController(
       })
       if (!prepared.ok) return prepared
       return startPreparedRegeneration(prepared.start)
-    },
-
-    async switchTurnVariant(
-      threadId: string,
-      assistantMessageId: string
-    ): Promise<VariantSwitchResult> {
-      const result = await switchActiveLeaf({
-        treeId: options.treeId,
-        threadId,
-        assistantMessageId,
-        baseRevision: getKnownTreeRevision(options.treeId),
-      })
-      if (!result.ok) return result
-      setKnownTreeRevision(options.treeId, result.revision)
-      if (!store.setActiveLeaf(threadId, assistantMessageId))
-        return {
-          ok: false,
-          code: "generation_conflict",
-          message: "本地消息图需要刷新",
-        }
-      return result
     },
 
     async submitFeedback(

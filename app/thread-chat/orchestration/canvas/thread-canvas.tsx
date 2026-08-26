@@ -32,8 +32,10 @@ import {
 } from "@xyflow/react"
 import "@xyflow/react/dist/style.css"
 import { RotateCcw } from "lucide-react"
-import type { ThreadStore } from "../../core/store"
-import { useThreadStore } from "../../core/use-thread-store"
+import {
+  useThreadStore,
+  type ThreadTreeReadableStore,
+} from "../../core/use-thread-store"
 import { dc } from "../../theme"
 import {
   CanvasActionsContext,
@@ -63,7 +65,7 @@ const minimapNodeClass = (n: CanvasCardNode) =>
   n.data.depth > 0 ? `fc-${dc(n.data.depth)}` : ""
 
 export interface ThreadCanvasProps {
-  store: ThreadStore
+  store: ThreadTreeReadableStore
   /** 主线卡的主题副标题（与列模式主线副标题同源） */
   mainSubtitle?: string
   /** 画布视图状态宿主（pin 表跨「列 ⇄ 画布」切换存活），壳层持有的稳定对象 */

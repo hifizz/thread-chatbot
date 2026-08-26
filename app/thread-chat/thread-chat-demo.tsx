@@ -385,19 +385,7 @@ export function ThreadChatDemoInner({
         activeId={activeArt}
         onClose={closeDrawer}
         onSelect={setActiveArt}
-        onLocate={(threadId, sourceMessageId) => {
-          const sourceThread = state.threads[threadId]
-          if (
-            sourceThread &&
-            sourceThread.activeLeafMessageId !== sourceMessageId
-          )
-            void chat
-              .switchTurnVariant(threadId, sourceMessageId)
-              .then((result) => {
-                if (result.ok) openBranchUI(threadId, null)
-              })
-          else openBranchUI(threadId, null)
-        }}
+        onLocate={(threadId) => openBranchUI(threadId, null)}
       />
 
       <WorkspaceToast toast={toast} onDismiss={dismissToast} />

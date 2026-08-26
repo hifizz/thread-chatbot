@@ -13,7 +13,12 @@ import { useStore } from "zustand"
 import type { ConversationStore } from "./store"
 import type { NormalizedThreadChatState } from "./types"
 
-export function useThreadStore(store: ThreadStore): number {
+export type ThreadTreeReadableStore = Pick<
+  ThreadStore,
+  "subscribe" | "getVersion" | "getState" | "setThreadModel"
+>
+
+export function useThreadStore(store: ThreadTreeReadableStore): number {
   return useSyncExternalStore(
     store.subscribe,
     store.getVersion,

@@ -17,17 +17,41 @@ import type { ResearchPlan, ResearchRoute } from "@/lib/chat/research-router"
 import { THREAD_TREE_SCHEMA_VERSION } from "@/constants/thread-chat"
 import { selectDisplayTitle, selectVisibleMessages } from "./selectors"
 
-function dataPart<T>(part: { type: string; data?: unknown }, type: string): T | null {
+function dataPart<T>(
+  part: { type: string; data?: unknown },
+  type: string
+): T | null {
   return part.type === type ? (part.data as T) : null
 }
 
 function messageText(message: MessageDTO): string {
   return message.parts
-    .filter((part): part is Extract<typeof part, { type: "text" }> =>
-      part.type === "text"
+    .filter(
+      (part): part is Extract<typeof part, { type: "text" }> =>
+        part.type === "text"
     )
     .map((part) => part.text)
     .join("")
+}
+
+/**
+ * 现有工作台组件以 `main` 作为根列的展示标识；规范化模型的根 Thread 则使用 UUID。
+ * 这个别名只存在于只读 UI facade，任何 v1 command/DTO 都继续使用真实 Thread ID。
+ */
+export function toConversationViewThreadId(
+  state: NormalizedThreadChatState,
+  threadId: string
+): string {
+  return state.project?.rootThreadId === threadId ? "main" : threadId
+}
+
+export function fromConversationViewThreadId(
+  state: NormalizedThreadChatState,
+  threadId: string
+): string {
+  return threadId === "main"
+    ? (state.project?.rootThreadId ?? threadId)
+    : threadId
 }
 
 export function projectMessageDTO(input: {
@@ -41,7 +65,7 @@ export function projectMessageDTO(input: {
     .map((thread) => ({
       text: thread.anchorText ?? "",
       num: thread.footnote ?? 0,
-      threadId: thread.id,
+      threadId: toConversationViewThreadId(state, thread.id),
       depth: thread.depth,
       ...(thread.forkAnchor ? { anchor: thread.forkAnchor } : {}),
     }))
@@ -106,9 +130,12 @@ export function projectThreadDTO(
     return projected
   })
   return {
-    id: thread.id,
+    id: toConversationViewThreadId(state, thread.id),
     modelId: thread.modelId,
-    parentId: thread.parentId,
+    parentId:
+      thread.parentId === null
+        ? null
+        : toConversationViewThreadId(state, thread.parentId),
     depth: thread.depth,
     title: selectDisplayTitle(thread),
     anchorText: thread.anchorText,
@@ -117,7 +144,7 @@ export function projectThreadDTO(
     children: Object.values(state.threadsById)
       .filter((child) => child.parentId === thread.id)
       .sort((left, right) => (left.footnote ?? 0) - (right.footnote ?? 0))
-      .map((child) => child.id),
+      .map((child) => toConversationViewThreadId(state, child.id)),
     messages,
     activeLeafMessageId: messages.at(-1)?.id ?? null,
     lastActive: Math.max(0, state.workspace.recents.indexOf(thread.id) * -1),
@@ -138,8 +165,10 @@ export function projectArtifactDTO(
     kind: artifact.kind,
     ...(artifact.language ? { lang: artifact.language } : {}),
     content: artifact.content,
-    sourceThreadId:
-      state.messagesById[artifact.sourceMessageId]?.threadId ?? "",
+    sourceThreadId: toConversationViewThreadId(
+      state,
+      state.messagesById[artifact.sourceMessageId]?.threadId ?? ""
+    ),
     sourceMessageId: artifact.sourceMessageId,
   }
 }
@@ -150,7 +179,7 @@ export function projectConversationTree(
 ): ThreadTreeState {
   const threads = Object.fromEntries(
     Object.values(state.threadsById).map((thread) => [
-      thread.id,
+      toConversationViewThreadId(state, thread.id),
       projectThreadDTO(state, thread),
     ])
   )
@@ -165,7 +194,9 @@ export function projectConversationTree(
     threads,
     artifacts,
     artifactOrder: state.artifactOrder.filter((id) => Boolean(artifacts[id])),
-    recents: state.workspace.recents,
+    recents: state.workspace.recents.map((threadId) =>
+      toConversationViewThreadId(state, threadId)
+    ),
     footnoteCounter: Math.max(
       0,
       ...Object.values(state.threadsById).map((thread) => thread.footnote ?? 0)
@@ -174,4 +205,3 @@ export function projectConversationTree(
     tick: state.workspace.recents.length,
   }
 }
-

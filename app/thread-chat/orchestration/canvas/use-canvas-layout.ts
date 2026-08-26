@@ -24,7 +24,7 @@ import type {
   XYPosition,
 } from "@xyflow/react"
 import type { ThreadTreeState } from "../../core/types"
-import type { ThreadStore } from "../../core/store"
+import type { ThreadTreeReadableStore } from "../../core/use-thread-store"
 import {
   messagesByIdOrder,
   validArtifactsOfMessage,
@@ -236,7 +236,7 @@ function buildBaseGraph(
 /* ---------------- hook ---------------- */
 
 export interface UseCanvasLayoutArgs {
-  store: ThreadStore
+  store: ThreadTreeReadableStore
   /** store 快照版本号（useThreadStore 返回值）：state 引用稳定，派生必须以它为 key */
   version: number
   /** 主线卡副标题（壳层传入，与列模式同源） */

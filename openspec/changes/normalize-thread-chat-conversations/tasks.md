@@ -55,25 +55,25 @@
 
 ## 4. Gate 3 — 规范化前端 Store 与既有组件适配
 
-- [ ] 4.1 将 `app/thread-chat/core/store.ts` 改为 `zustand/vanilla` 规范化实体 store，建立 conversation/workspace slices、optimistic patch 记录与 React `useStore` 绑定，禁止把业务实体写入 localStorage。
-- [ ] 4.2 实现 visible messages、全部历史实体、树拓扑、lineage/children、fork marker/source provenance、Artifact、标题、busy/可执行动作 selectors，visible timeline 默认过滤 superseded Message。
-- [ ] 4.3 实现 Project bootstrap 与空 URL boot：hydrate 规范化 DTO、恢复本地 workspace、对 generating Message 直接标 background 并启动 poll，不恢复 SSE。
-- [ ] 4.4 实现 v1 JSON client 和统一错误处理，所有写请求生成/保留 command ID 与实体 UUID，网络重试必须复用原 ID 和原语义负载。
-- [ ] 4.5 实现 fetch-SSE client 与 `StreamEvent` decoder，用 AI SDK v7 reducer归并 snapshot/chunk；断开时禁止自动 reconnect/Last-Event-ID，并清理 reader/subscription。
-- [ ] 4.6 实现 terminal poller 与退避：保留较新的内存 live snapshot，不被旧 generating checkpoint 回退；收到 completed/stopped/failed 后用权威 DTO 原子收敛并停止轮询。
-- [ ] 4.7 实现 start/send/stop 命令 orchestration：乐观 user/assistant、成功 DTO 校正、一次 stream 连接、失败精确回滚及现有 toast/busy/stop 文案保持。
-- [ ] 4.8 实现 Fork 命令 orchestration：客户端 UUID 乐观新列/画布节点、服务端 footnote/context 校正、失败只移除临时分支，留空与带问分支流程保持现状。
-- [ ] 4.9 实现 Edit/Retry/feedback/model/title/archive/delete 命令 orchestration，确保 A/B/C soft-supersede、反馈乐观回滚和标题双轨不改变现有操作流程。
-- [ ] 4.10 改造 `ChatView`/`ConversationMessage` 的数据适配，以完整 `parts[]` 渲染正文、reasoning、source、file、tool/data 内容，并保持现有 Markdown、研究面板与消息 toolbar DOM/CSS 契约。
-- [ ] 4.11 改造列视图、画布、tree list、thread switcher 和 workspace runtime 只消费规范化 selectors；验证节点/边、LRU 列槽、最近访问和本地展开状态不依赖整树业务 JSON。
-- [ ] 4.12 改造选择锚点与 source provenance：ForkedThread 使用持久化 TextAnchor/anchorText/footnote，来源 Message supersede 后子分支仍能在树/画布打开且说明不迁移到新回复。
-- [ ] 4.13 改造 Artifact card/drawer 和 web research overlays，从 tool/data parts + ArtifactDTO 投影现有 UI，保持 Artifact-only 回复、抽屉来源、代码高亮和刷新恢复行为。
-- [ ] 4.14 保留 Project 级 localStorage 工作区 schema（视图、打开列、画布、面板尺寸、折叠/展开），增加 sanitize/version 测试并删除其中任何会话内容/active-leaf 权威字段。
-- [ ] 4.15 删除 `turn-variant-picker.tsx`、variant/active-leaf command、版本计数与切换 selector/样式引用；保留 superseded 实体供 frozen branch/source 查询，但不提供切回入口。
-- [ ] 4.16 改写纯 Node 客户端测试，覆盖 bootstrap、Store merge、chunk parts、terminal poll、断流不重连、optimistic rollback、A→B→C、旧分支可达、Artifact/research 和本地工作区隔离。
-- [ ] 4.17 建立仅用于 Gate 3 验收的 normalized runtime 测试 harness：复用现有列视图、画布、Composer、消息、Artifact 和 workspace 组件，注入 mock v1 API/SSE；不得替换正式 `/thread-chat` 入口、不得读写旧整树 API，也不得形成生产双轨运行路径。
-- [ ] 4.18 使用 `ego-browser nodejs` 在 localhost 操作 4.17 的测试 harness，覆盖正常流、POST 后迟到 SSE、半途中断后只轮询不重连、刷新后 background poll、Stop/Retry/Edit、留空与带问 Fork、嵌套分支、Artifact/research、标题/反馈/归档/删除、本地布局恢复和 variant 消失；逐项比对 Gate 0 清单。若除 variant 外发现无法等价保持的 UX/UI 冲突，停止对应任务并提交用户决策。
-- [ ] 4.19 运行 Gate 3 全部纯测试、`pnpm typecheck`、`pnpm lint`、依赖边界扫描、OpenSpec strict validation 和 UI 回归；记录 Gate 3 evidence。只有列/画布/Composer/分叉/Artifact/标题/Stop/Retry 均保持且 variant 已移除，才逐项勾选 4.1–4.19，并按用户要求创建独立的 Gate 3 完成 commit 后进入 cutover。
+- [x] 4.1 将 `app/thread-chat/core/store.ts` 改为 `zustand/vanilla` 规范化实体 store，建立 conversation/workspace slices、optimistic patch 记录与 React `useStore` 绑定，禁止把业务实体写入 localStorage。
+- [x] 4.2 实现 visible messages、全部历史实体、树拓扑、lineage/children、fork marker/source provenance、Artifact、标题、busy/可执行动作 selectors，visible timeline 默认过滤 superseded Message。
+- [x] 4.3 实现 Project bootstrap 与空 URL boot：hydrate 规范化 DTO、恢复本地 workspace、对 generating Message 直接标 background 并启动 poll，不恢复 SSE。
+- [x] 4.4 实现 v1 JSON client 和统一错误处理，所有写请求生成/保留 command ID 与实体 UUID，网络重试必须复用原 ID 和原语义负载。
+- [x] 4.5 实现 fetch-SSE client 与 `StreamEvent` decoder，用 AI SDK v7 reducer归并 snapshot/chunk；断开时禁止自动 reconnect/Last-Event-ID，并清理 reader/subscription。
+- [x] 4.6 实现 terminal poller 与退避：保留较新的内存 live snapshot，不被旧 generating checkpoint 回退；收到 completed/stopped/failed 后用权威 DTO 原子收敛并停止轮询。
+- [x] 4.7 实现 start/send/stop 命令 orchestration：乐观 user/assistant、成功 DTO 校正、一次 stream 连接、失败精确回滚及现有 toast/busy/stop 文案保持。
+- [x] 4.8 实现 Fork 命令 orchestration：客户端 UUID 乐观新列/画布节点、服务端 footnote/context 校正、失败只移除临时分支，留空与带问分支流程保持现状。
+- [x] 4.9 实现 Edit/Retry/feedback/model/title/archive/delete 命令 orchestration，确保 A/B/C soft-supersede、反馈乐观回滚和标题双轨不改变现有操作流程。
+- [x] 4.10 改造 `ChatView`/`ConversationMessage` 的数据适配，以完整 `parts[]` 渲染正文、reasoning、source、file、tool/data 内容，并保持现有 Markdown、研究面板与消息 toolbar DOM/CSS 契约。
+- [x] 4.11 改造列视图、画布、tree list、thread switcher 和 workspace runtime 只消费规范化 selectors；验证节点/边、LRU 列槽、最近访问和本地展开状态不依赖整树业务 JSON。
+- [x] 4.12 改造选择锚点与 source provenance：ForkedThread 使用持久化 TextAnchor/anchorText/footnote，来源 Message supersede 后子分支仍能在树/画布打开且说明不迁移到新回复。
+- [x] 4.13 改造 Artifact card/drawer 和 web research overlays，从 tool/data parts + ArtifactDTO 投影现有 UI，保持 Artifact-only 回复、抽屉来源、代码高亮和刷新恢复行为。
+- [x] 4.14 保留 Project 级 localStorage 工作区 schema（视图、打开列、画布、面板尺寸、折叠/展开），增加 sanitize/version 测试并删除其中任何会话内容/active-leaf 权威字段。
+- [x] 4.15 删除 `turn-variant-picker.tsx`、variant/active-leaf command、版本计数与切换 selector/样式引用；保留 superseded 实体供 frozen branch/source 查询，但不提供切回入口。
+- [x] 4.16 改写纯 Node 客户端测试，覆盖 bootstrap、Store merge、chunk parts、terminal poll、断流不重连、optimistic rollback、A→B→C、旧分支可达、Artifact/research 和本地工作区隔离。
+- [x] 4.17 建立仅用于 Gate 3 验收的 normalized runtime 测试 harness：复用现有列视图、画布、Composer、消息、Artifact 和 workspace 组件，注入 mock v1 API/SSE；不得替换正式 `/thread-chat` 入口、不得读写旧整树 API，也不得形成生产双轨运行路径。
+- [x] 4.18 使用 `ego-browser nodejs` 在 localhost 操作 4.17 的测试 harness，覆盖正常流、POST 后迟到 SSE、半途中断后只轮询不重连、刷新后 background poll、Stop/Retry/Edit、留空与带问 Fork、嵌套分支、Artifact/research、标题/反馈/归档/删除、本地布局恢复和 variant 消失；逐项比对 Gate 0 清单。若除 variant 外发现无法等价保持的 UX/UI 冲突，停止对应任务并提交用户决策。
+- [x] 4.19 运行 Gate 3 全部纯测试、`pnpm typecheck`、`pnpm lint`、依赖边界扫描、OpenSpec strict validation 和 UI 回归；记录 Gate 3 evidence。只有列/画布/Composer/分叉/Artifact/标题/Stop/Retry 均保持且 variant 已移除，才逐项勾选 4.1–4.19，并按用户要求创建独立的 Gate 3 完成 commit 后进入 cutover。
 
 ## 5. Gate 4 — 一次性 cutover 与旧运行路径退役
 

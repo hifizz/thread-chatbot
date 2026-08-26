@@ -66,7 +66,6 @@ export function useThreadChatWorkspace({
       retryAssistant: messageCommands.retryAssistant,
       retryUserTurn: messageCommands.retryUserTurn,
       editAndRegenerate: messageCommands.editAndRegenerate,
-      switchTurnVariant: messageCommands.switchTurnVariant,
       submitFeedback: messageCommands.submitFeedback,
     }),
     [chat, messageCommands]

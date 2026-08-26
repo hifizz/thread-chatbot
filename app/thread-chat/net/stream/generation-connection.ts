@@ -1,4 +1,5 @@
 import type { GenerationAcceptedDTO } from "@/lib/thread-chat/contracts/dto"
+import type { MessageDTO } from "@/lib/thread-chat/contracts/dto"
 import type { ConversationStore } from "../../core/store"
 import type { ThreadChatClient } from "../client"
 import { subscribeToMessageStream, type StreamSubscription } from "./sse-client"
@@ -12,6 +13,37 @@ export interface GenerationConnection {
   messageId: string
   finished: Promise<void>
   close(): void
+}
+
+function artifactIdsFromMessage(message: MessageDTO): string[] {
+  return [
+    ...new Set(
+      message.parts.flatMap((part) => {
+        if (
+          part.type !== "tool-createMarkdownArtifact" ||
+          part.state !== "output-available"
+        )
+          return []
+        const output = part.output
+        return output?.created && typeof output.artifactId === "string"
+          ? [output.artifactId]
+          : []
+      })
+    ),
+  ]
+}
+
+async function reconcileMessageArtifacts(
+  store: ConversationStore,
+  client: ThreadChatClient,
+  message: MessageDTO
+): Promise<void> {
+  await Promise.all(
+    artifactIdsFromMessage(message).map(async (artifactId) => {
+      const artifact = await client.getArtifact(artifactId)
+      store.getState().upsertArtifact(artifact)
+    })
+  )
 }
 
 export function reconcileAcceptedGeneration(
@@ -34,6 +66,8 @@ export function followAcceptedGeneration(options: {
   client: ThreadChatClient
   accepted: GenerationAcceptedDTO
   fetch?: typeof globalThis.fetch
+  pollDelays?: readonly number[]
+  wait?: (delayMs: number, signal: AbortSignal) => Promise<void>
 }): GenerationConnection {
   const { store, client, accepted } = options
   reconcileAcceptedGeneration(store, accepted)
@@ -56,14 +90,19 @@ export function followAcceptedGeneration(options: {
     poller = startTerminalPoller({
       messageId,
       getMessage: client.getMessage,
+      delays: options.pollDelays,
+      wait: options.wait,
       onGenerating(message) {
         // Store 保留 liveMessage；checkpoint 只更新权威 DTO，不覆盖较新的内存 parts。
         store.getState().mergePolledMessage(message)
       },
       onTerminal(message) {
         store.getState().reconcileTerminalMessage(message)
-        resolveFinished()
       },
+    })
+    void poller.finished.then(async (message) => {
+      if (message) await reconcileMessageArtifacts(store, client, message)
+      resolveFinished()
     })
   }
 
@@ -96,9 +135,11 @@ export function followAcceptedGeneration(options: {
             beginPoll()
           },
         })
+        // snapshot 可能附带迟到订阅前已产生的 replay chunks；首帧必须直接展示
+        // reducer 重放后的完整结果，不能等下一枚未来 chunk 才把 replay 内容刷出来。
         store
           .getState()
-          .applyStreamSnapshot(messageId, event.message, event.throughSeq)
+          .applyStreamSnapshot(messageId, reducer.current(), event.throughSeq)
       } else if (event.type === "chunk") {
         if (!reducer) throw new Error("STREAM_CHUNK_BEFORE_SNAPSHOT")
         if (event.seq !== lastServerSeq + 1)
@@ -108,6 +149,7 @@ export function followAcceptedGeneration(options: {
       } else if (event.type === "terminal") {
         reducer?.setHandlers({})
         store.getState().reconcileTerminalMessage(event.message)
+        await reconcileMessageArtifacts(store, client, event.message)
         reducer?.close()
         reducer = null
         resolveFinished()
@@ -144,18 +186,24 @@ export function pollBackgroundGeneration(options: {
   store: ConversationStore
   client: ThreadChatClient
   messageId: string
+  pollDelays?: readonly number[]
+  wait?: (delayMs: number, signal: AbortSignal) => Promise<void>
 }): GenerationConnection {
   const { store, client, messageId } = options
   store.getState().markBackgroundGeneration(messageId)
   const poller = startTerminalPoller({
     messageId,
     getMessage: client.getMessage,
+    delays: options.pollDelays,
+    wait: options.wait,
     onGenerating: (message) => store.getState().mergePolledMessage(message),
     onTerminal: (message) => store.getState().reconcileTerminalMessage(message),
   })
   return {
     messageId,
-    finished: poller.finished.then(() => undefined),
+    finished: poller.finished.then(async (message) => {
+      if (message) await reconcileMessageArtifacts(store, client, message)
+    }),
     close: poller.stop,
   }
 }

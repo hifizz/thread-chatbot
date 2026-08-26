@@ -29,7 +29,6 @@ import type {
   ProjectDTO,
   ThreadDTO,
 } from "@/lib/thread-chat/contracts/dto"
-import type { ThreadChatUIMessage } from "@/lib/thread-chat/contracts/ui-message"
 import type {
   ConversationEntitySnapshot,
   ConversationStreamState,
@@ -137,19 +136,6 @@ export function createThreadStore(
       )
       thread.activeLeafMessageId = patch.nextActiveLeafMessageId
       touchSilently(patch.threadId)
-      notify()
-      return true
-    },
-
-    setActiveLeaf(threadId: string, assistantMessageId: string): boolean {
-      const thread = state.threads[threadId]
-      const target = thread?.messages.find(
-        (message) =>
-          message.id === assistantMessageId && message.role === "assistant"
-      )
-      if (!thread || !target) return false
-      thread.activeLeafMessageId = target.id
-      touchSilently(threadId)
       notify()
       return true
     },
@@ -455,12 +441,16 @@ function orderedMessageIds(messages: MessageDTO[]): Record<string, string[]> {
   return Object.fromEntries(
     Object.entries(byThread).map(([threadId, rows]) => [
       threadId,
-      rows.sort((left, right) => left.sequence - right.sequence).map((row) => row.id),
+      rows
+        .sort((left, right) => left.sequence - right.sequence)
+        .map((row) => row.id),
     ])
   )
 }
 
-function streamState(phase: ConversationStreamState["phase"]): ConversationStreamState {
+function streamState(
+  phase: ConversationStreamState["phase"]
+): ConversationStreamState {
   return { phase, lastEventSeq: 0, pollAttempt: 0 }
 }
 
@@ -470,7 +460,9 @@ function entitiesFromBootstrap(
   const active = new Set(bootstrap.activeGenerationIds)
   return {
     project: bootstrap.project,
-    threadsById: Object.fromEntries(bootstrap.threads.map((thread) => [thread.id, thread])),
+    threadsById: Object.fromEntries(
+      bootstrap.threads.map((thread) => [thread.id, thread])
+    ),
     messagesById: Object.fromEntries(
       bootstrap.messages.map((message) => [message.id, message])
     ),
@@ -633,7 +625,8 @@ export function createConversationStore(input?: {
     },
     markBackgroundGeneration(messageId) {
       set((state) => {
-        const current = state.streamByMessageId[messageId] ?? streamState("background")
+        const current =
+          state.streamByMessageId[messageId] ?? streamState("background")
         return {
           streamByMessageId: {
             ...state.streamByMessageId,

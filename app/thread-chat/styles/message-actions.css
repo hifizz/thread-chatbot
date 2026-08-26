@@ -116,41 +116,6 @@
   color: #a8443a;
   font-size: 11.5px;
 }
-.tc .turn-variant-picker {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  margin-left: 4px;
-  color: var(--ink-faint);
-  font-family: var(--font-mono);
-  font-size: 10.5px;
-}
-.tc .turn-variant-picker button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
-}
-.tc .turn-variant-picker button:hover:not(:disabled),
-.tc .turn-variant-picker button:focus-visible {
-  background: color-mix(in srgb, var(--ink) 8%, transparent);
-  color: var(--ink);
-  outline: none;
-}
-.tc .turn-variant-picker button:disabled {
-  opacity: 0.3;
-  cursor: default;
-}
-.tc .variant-derived {
-  margin-left: 4px;
-  font-family: var(--font-ui);
-}
 @media (hover: none), (pointer: coarse) {
   .tc .message.user > .message-toolbar {
     opacity: 1;

@@ -68,7 +68,6 @@ export function useMessageActions({
           )
         return result
       },
-      switchTurnVariant: commands.switchTurnVariant,
       async submitFeedback(threadId, messageId, feedback) {
         const previous = feedbackByMessageId.get(messageId) ?? null
         setFeedbackByMessageId((current) =>

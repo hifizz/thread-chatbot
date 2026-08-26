@@ -13,10 +13,7 @@ import type {
 import type { TextAnchor } from "@/lib/thread-chat/domain/text-anchor"
 import type { ConversationStore } from "../../core/store"
 import type { ConversationEntitySnapshot } from "../../core/types"
-import {
-  ThreadChatApiError,
-  type ThreadChatClient,
-} from "../client"
+import { ThreadChatApiError, type ThreadChatClient } from "../client"
 import {
   followAcceptedGeneration,
   type GenerationConnection,
@@ -34,6 +31,8 @@ export interface ConversationCommandOptions {
   fetch?: typeof globalThis.fetch
   createId?: () => string
   networkAttempts?: number
+  pollDelays?: readonly number[]
+  wait?: (delayMs: number, signal: AbortSignal) => Promise<void>
 }
 
 export interface ForkCommandInput {
@@ -46,7 +45,10 @@ export interface ForkCommandInput {
   files?: CommandFileReference[]
 }
 
-function userParts(text: string, files: CommandFileReference[]): MessageDTO["parts"] {
+function userParts(
+  text: string,
+  files: CommandFileReference[]
+): MessageDTO["parts"] {
   return [
     { type: "text", text },
     ...files.map((file) => ({
@@ -88,13 +90,18 @@ function temporaryMessage(input: {
   }
 }
 
-function nextSequence(snapshot: ConversationEntitySnapshot, threadId: string): number {
-  return Math.max(
-    0,
-    ...(snapshot.messageIdsByThread[threadId] ?? []).map(
-      (id) => snapshot.messagesById[id]?.sequence ?? 0
-    )
-  ) + 1
+function nextSequence(
+  snapshot: ConversationEntitySnapshot,
+  threadId: string
+): number {
+  return (
+    Math.max(
+      0,
+      ...(snapshot.messageIdsByThread[threadId] ?? []).map(
+        (id) => snapshot.messagesById[id]?.sequence ?? 0
+      )
+    ) + 1
+  )
 }
 
 function withMessages(
@@ -124,7 +131,9 @@ function supersede(
   return message ? { ...message, supersededAt: at, updatedAt: at } : undefined
 }
 
-export function createConversationCommands(options: ConversationCommandOptions) {
+export function createConversationCommands(
+  options: ConversationCommandOptions
+) {
   const { store, client } = options
   const createId = options.createId ?? (() => crypto.randomUUID())
   const attempts = Math.max(1, options.networkAttempts ?? 2)
@@ -144,16 +153,22 @@ export function createConversationCommands(options: ConversationCommandOptions) 
     throw lastError
   }
 
-  function follow(accepted: Parameters<typeof followAcceptedGeneration>[0]["accepted"]) {
+  function follow(
+    accepted: Parameters<typeof followAcceptedGeneration>[0]["accepted"]
+  ) {
     connections.get(accepted.assistantMessage.id)?.close()
     const connection = followAcceptedGeneration({
       store,
       client,
       accepted,
       fetch: options.fetch,
+      pollDelays: options.pollDelays,
+      wait: options.wait,
     })
     connections.set(connection.messageId, connection)
-    void connection.finished.finally(() => connections.delete(connection.messageId))
+    void connection.finished.finally(() =>
+      connections.delete(connection.messageId)
+    )
     return connection
   }
 
@@ -229,7 +244,9 @@ export function createConversationCommands(options: ConversationCommandOptions) 
       streamByMessageId: {},
     }))
     try {
-      const response = await execute(() => client.startProject(project.id, command))
+      const response = await execute(() =>
+        client.startProject(project.id, command)
+      )
       store.getState().commitOptimisticCommand(command.commandId)
       return { command, response, connection: follow(response.data) }
     } catch (error) {
@@ -278,7 +295,9 @@ export function createConversationCommands(options: ConversationCommandOptions) 
       ])
     })
     try {
-      const response = await execute(() => client.sendMessage(input.threadId, command))
+      const response = await execute(() =>
+        client.sendMessage(input.threadId, command)
+      )
       store.getState().commitOptimisticCommand(command.commandId)
       return { command, response, connection: follow(response.data) }
     } catch (error) {
@@ -314,10 +333,13 @@ export function createConversationCommands(options: ConversationCommandOptions) 
     })
     const now = new Date().toISOString()
     store.getState().beginOptimisticCommand(command.commandId, (snapshot) => {
-      const footnote = Math.max(
-        0,
-        ...Object.values(snapshot.threadsById).map((thread) => thread.footnote ?? 0)
-      ) + 1
+      const footnote =
+        Math.max(
+          0,
+          ...Object.values(snapshot.threadsById).map(
+            (thread) => thread.footnote ?? 0
+          )
+        ) + 1
       const thread: ThreadDTO = {
         id: command.threadId,
         projectId: project.id,
@@ -361,13 +383,17 @@ export function createConversationCommands(options: ConversationCommandOptions) 
       }
     })
     try {
-      const response = await execute(() => client.forkThread(parent.id, command))
+      const response = await execute(() =>
+        client.forkThread(parent.id, command)
+      )
       store.getState().commitOptimisticCommand(command.commandId)
       store.getState().upsertThread(response.data.thread)
       return {
         command,
         response,
-        connection: response.data.generation ? follow(response.data.generation) : null,
+        connection: response.data.generation
+          ? follow(response.data.generation)
+          : null,
       }
     } catch (error) {
       store.getState().rollbackOptimisticCommand(command.commandId)
@@ -375,10 +401,7 @@ export function createConversationCommands(options: ConversationCommandOptions) 
     }
   }
 
-  async function retryMessage(input: {
-    messageId: string
-    modelId: string
-  }) {
+  async function retryMessage(input: { messageId: string; modelId: string }) {
     const source = store.getState().messagesById[input.messageId]
     if (!source) throw new Error("回复尚未加载")
     const command: RetryMessageCommand = Object.freeze({
@@ -405,7 +428,9 @@ export function createConversationCommands(options: ConversationCommandOptions) 
       }
     })
     try {
-      const response = await execute(() => client.retryMessage(source.id, command))
+      const response = await execute(() =>
+        client.retryMessage(source.id, command)
+      )
       store.getState().commitOptimisticCommand(command.commandId)
       return { command, response, connection: follow(response.data) }
     } catch (error) {
@@ -462,10 +487,15 @@ export function createConversationCommands(options: ConversationCommandOptions) 
           replacesMessageId: input.assistantMessageId ?? null,
         }),
       ])
-      return { ...partial, messagesById: { ...messagesById, ...partial.messagesById } }
+      return {
+        ...partial,
+        messagesById: { ...messagesById, ...partial.messagesById },
+      }
     })
     try {
-      const response = await execute(() => client.editMessage(source.id, command))
+      const response = await execute(() =>
+        client.editMessage(source.id, command)
+      )
       store.getState().commitOptimisticCommand(command.commandId)
       return { command, response, connection: follow(response.data.generation) }
     } catch (error) {
@@ -481,7 +511,10 @@ export function createConversationCommands(options: ConversationCommandOptions) 
     return { command, response }
   }
 
-  async function setFeedback(messageId: string, feedback: "up" | "down" | null) {
+  async function setFeedback(
+    messageId: string,
+    feedback: "up" | "down" | null
+  ) {
     const command = Object.freeze({ commandId: createId(), feedback })
     const current = store.getState().messagesById[messageId]
     if (!current) throw new Error("回复尚未加载")
@@ -492,7 +525,9 @@ export function createConversationCommands(options: ConversationCommandOptions) 
       },
     }))
     try {
-      const response = await execute(() => client.setFeedback(messageId, command))
+      const response = await execute(() =>
+        client.setFeedback(messageId, command)
+      )
       store.getState().commitOptimisticCommand(command.commandId)
       store.getState().upsertMessage(response.data)
       return { command, response }
@@ -514,7 +549,9 @@ export function createConversationCommands(options: ConversationCommandOptions) 
 
   async function renameProject(projectId: string, customTitle: string) {
     const command = Object.freeze({ commandId: createId(), customTitle })
-    const response = await execute(() => client.renameProject(projectId, command))
+    const response = await execute(() =>
+      client.renameProject(projectId, command)
+    )
     store.getState().upsertProject(response.data)
     const root = store.getState().threadsById[response.data.rootThreadId]
     if (root) store.getState().upsertThread({ ...root, customTitle })
@@ -532,7 +569,9 @@ export function createConversationCommands(options: ConversationCommandOptions) 
 
   async function deleteProject(projectId: string) {
     const command = Object.freeze({ commandId: createId() })
-    const response = await execute(() => client.deleteProject(projectId, command))
+    const response = await execute(() =>
+      client.deleteProject(projectId, command)
+    )
     store.getState().removeProject(projectId)
     for (const connection of connections.values()) connection.close()
     connections.clear()
@@ -559,4 +598,3 @@ export function createConversationCommands(options: ConversationCommandOptions) 
 }
 
 export type ConversationCommands = ReturnType<typeof createConversationCommands>
-

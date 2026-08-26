@@ -201,29 +201,7 @@ export function BranchableChat({
         </div>
         {sourceProvenance && !sourceProvenance.isOnActivePath && (
           <div className="inactive-source">
-            <span>
-              基于回复
-              {sourceProvenance.alternativeIndex === null
-                ? ""
-                : " " +
-                  (sourceProvenance.alternativeIndex + 1) +
-                  "/" +
-                  sourceProvenance.alternativeCount}{" "}
-              · 当前未展示
-            </span>
-            <button
-              type="button"
-              onClick={() => {
-                if (!thread.parentId || !thread.forkFromMsgId) return
-                void messageCommands
-                  ?.switchTurnVariant(thread.parentId, thread.forkFromMsgId)
-                  .then((result) => {
-                    if (result.ok) onOpenThread(thread.parentId!)
-                  })
-              }}
-            >
-              查看来源
-            </button>
+            <span>基于历史回复 · 当前时间线不展示该回复</span>
           </div>
         )}
       </div>

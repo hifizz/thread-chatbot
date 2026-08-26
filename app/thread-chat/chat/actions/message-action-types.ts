@@ -29,10 +29,6 @@ export function hasCompletedAssistantActions(message: Message): boolean {
 export interface ThreadMessageActionPresentation {
   latestUserMessageId?: string
   latestAssistantMessageId?: string
-  alternatives: readonly {
-    assistantMessageId: string
-    derivedThreadCount: number
-  }[]
   sourceProvenance: SourceProvenance | null
 }
 

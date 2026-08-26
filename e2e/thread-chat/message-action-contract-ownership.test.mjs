@@ -9,7 +9,7 @@ const contract = await readFile(
 
 assert.match(contract, /export interface ThreadMessageActionCommands/)
 assert.match(contract, /export type GenerationActionResult/)
-assert.match(contract, /export type VariantSwitchResult/)
+assert.doesNotMatch(contract, /VariantSwitchResult|switchTurnVariant/)
 
 for (const path of [
   "chat/actions/message-action-types.ts",
@@ -35,5 +35,5 @@ assert.match(controller, /chat\/actions\/message-action-commands/)
 assert.doesNotMatch(controller, /export interface ThreadMessageActionCommands/)
 
 console.log(
-  "PASS  message action capability contract belongs to chat and net only implements it"
+  "PASS  message action contract belongs to chat, omits variant switching, and net only implements it"
 )

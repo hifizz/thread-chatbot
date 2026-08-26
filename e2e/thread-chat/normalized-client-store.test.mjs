@@ -1,4 +1,5 @@
 import assert from "node:assert/strict"
+import { readFile } from "node:fs/promises"
 import { createConversationStore } from "../../app/thread-chat/core/store.ts"
 import {
   selectAllMessageEntities,
@@ -21,6 +22,8 @@ import {
   saveWorkspaceState,
 } from "../../app/thread-chat/net/persistence/workspace-state.ts"
 import { createConversationCommands } from "../../app/thread-chat/net/commands/conversation-commands.ts"
+import { followAcceptedGeneration } from "../../app/thread-chat/net/stream/generation-connection.ts"
+import { bootConversationProject } from "../../app/thread-chat/net/boot/conversation-boot.ts"
 
 const stamp = "2026-08-26T00:00:00.000Z"
 
@@ -152,8 +155,10 @@ async function testStoreAndSelectors() {
     [thread().id, child.id]
   )
   const tree = projectConversationTree(store.getState())
+  assert.equal(tree.threads.main.id, "main")
+  assert.equal(tree.threads[child.id].parentId, "main")
   assert.ok(tree.threads[child.id], "旧来源被 supersede 后子分支仍可投影")
-  assert.equal(tree.threads[thread().id].messages.length, 1)
+  assert.equal(tree.threads.main.messages.length, 1)
 }
 
 async function testAiSdkReducer() {
@@ -292,6 +297,192 @@ async function testTerminalPoller() {
   assert.deepEqual(seen, ["generating", "stopped"])
 }
 
+async function testLateSnapshotAndDisconnectPolling() {
+  const generating = message({
+    status: "generating",
+    error: null,
+    finishedAt: null,
+    parts: [],
+  })
+  const terminal = message({
+    status: "completed",
+    error: null,
+    parts: [
+      { type: "text", text: "迟到快照 + 后续 chunk + 轮询终态" },
+      {
+        type: "tool-createMarkdownArtifact",
+        toolCallId: "tool-artifact",
+        state: "output-available",
+        input: { title: "断流报告", content: "# 断流报告" },
+        output: {
+          created: true,
+          artifactId: "00000000-0000-4000-8000-000000000320",
+        },
+      },
+    ],
+  })
+  const terminalArtifact = {
+    id: "00000000-0000-4000-8000-000000000320",
+    projectId: project().id,
+    sourceMessageId: terminal.id,
+    kind: "markdown",
+    title: "断流报告",
+    content: "# 断流报告",
+    language: null,
+    metadata: {},
+    createdAt: stamp,
+    updatedAt: stamp,
+  }
+  const store = createConversationStore({
+    bootstrap: bootstrap({ messages: [generating] }),
+  })
+  let sseCalls = 0
+  let polls = 0
+  const liveTexts = []
+  const unsubscribe = store.subscribe((state) => {
+    const live = state.streamByMessageId[generating.id]?.liveMessage
+    const text = live?.parts
+      .filter((part) => part.type === "text")
+      .map((part) => part.text)
+      .join("")
+    if (text) liveTexts.push(text)
+  })
+  const connection = followAcceptedGeneration({
+    store,
+    accepted: {
+      project: project(),
+      thread: thread(),
+      assistantMessage: generating,
+      streamUrl: "/late-stream",
+    },
+    client: {
+      async getMessage() {
+        polls += 1
+        return terminal
+      },
+      async getArtifact(id) {
+        assert.equal(id, terminalArtifact.id)
+        return terminalArtifact
+      },
+    },
+    pollDelays: [0],
+    wait: async () => undefined,
+    fetch: async () => {
+      sseCalls += 1
+      return sseResponse([
+        {
+          type: "snapshot",
+          message: {
+            id: generating.id,
+            role: "assistant",
+            parts: [{ type: "text", text: "迟到快照", state: "streaming" }],
+          },
+          throughSeq: 2,
+          replay: [
+            { seq: 1, chunk: { type: "text-start", id: "text-late" } },
+            {
+              seq: 2,
+              chunk: {
+                type: "text-delta",
+                id: "text-late",
+                delta: "迟到快照",
+              },
+            },
+          ],
+        },
+        {
+          type: "chunk",
+          seq: 3,
+          chunk: { type: "text-delta", id: "text-late", delta: " + 后续" },
+        },
+      ])
+    },
+  })
+  await connection.finished
+  unsubscribe()
+  assert.equal(sseCalls, 1, "断流不得自动重连 SSE")
+  assert.equal(polls, 1)
+  assert.ok(
+    liveTexts.includes("迟到快照"),
+    "replay 应在未来 chunk 前直接入 Store"
+  )
+  assert.ok(liveTexts.includes("迟到快照 + 后续"))
+  assert.equal(store.getState().messagesById[terminal.id].status, "completed")
+  assert.equal(
+    store.getState().streamByMessageId[terminal.id].phase,
+    "terminal"
+  )
+  assert.equal(
+    store.getState().artifactsById[terminalArtifact.id].title,
+    "断流报告"
+  )
+}
+
+async function testBootstrapBackgroundPollAndWorkspace() {
+  const generating = message({
+    status: "generating",
+    error: null,
+    finishedAt: null,
+  })
+  const terminal = message({ status: "completed", error: null })
+  const store = createConversationStore()
+  const key = `thread-chat:workspace:${project().id}`
+  const saved = new Map([
+    [
+      key,
+      JSON.stringify({
+        version: 1,
+        workspace: {
+          view: "canvas",
+          openThreadIds: [thread().id],
+          selectedThreadId: thread().id,
+          recents: [],
+          canvas: { pins: {} },
+          panelSizes: {},
+          expandedNodes: [],
+        },
+      }),
+    ],
+  ])
+  const storage = {
+    getItem(name) {
+      return saved.get(name) ?? null
+    },
+    setItem(name, value) {
+      saved.set(name, value)
+    },
+  }
+  const handle = await bootConversationProject({
+    projectId: project().id,
+    store,
+    storage,
+    client: {
+      async getProject() {
+        return bootstrap({
+          messages: [generating],
+          activeGenerationIds: [generating.id],
+        })
+      },
+      async getMessage() {
+        return terminal
+      },
+    },
+    pollDelays: [0],
+    wait: async () => undefined,
+  })
+  assert.equal(store.getState().workspace.view, "canvas")
+  assert.equal(
+    store.getState().streamByMessageId[generating.id].phase,
+    "background"
+  )
+  await handle.background[0].finished
+  assert.equal(store.getState().messagesById[generating.id].status, "completed")
+  store.getState().setWorkspace({ view: "columns" })
+  assert.match(saved.get(key), /"view":"columns"/)
+  assert.doesNotMatch(saved.get(key), /messagesById/)
+  handle.dispose()
+}
+
 async function testOptimisticRollbackIsolation() {
   const store = createConversationStore({ bootstrap: bootstrap() })
   const original = store.getState().messagesById[message().id]
@@ -379,6 +570,82 @@ async function testRetryABC() {
   commands.dispose()
 }
 
+async function testCommandNetworkRetryReusesFrozenPayload() {
+  const store = createConversationStore({
+    bootstrap: bootstrap({ messages: [] }),
+  })
+  const seen = []
+  const assistant = message({
+    id: "00000000-0000-4000-8000-000000000302",
+    sequence: 2,
+    status: "generating",
+    error: null,
+    finishedAt: null,
+    parts: [],
+  })
+  const user = message({
+    id: "00000000-0000-4000-8000-000000000301",
+    sequence: 1,
+    role: "user",
+    status: "completed",
+    error: null,
+    parts: [{ type: "text", text: "同一负载" }],
+  })
+  const commands = createConversationCommands({
+    store,
+    networkAttempts: 2,
+    createId: (() => {
+      const ids = [
+        "00000000-0000-4000-8000-000000000310",
+        user.id,
+        assistant.id,
+      ]
+      return () => ids.shift()
+    })(),
+    client: {
+      async sendMessage(_threadId, command) {
+        seen.push(command)
+        if (seen.length === 1) throw new Error("temporary network failure")
+        return {
+          ok: true,
+          replayed: false,
+          data: {
+            project: project(),
+            thread: thread(),
+            userMessage: user,
+            assistantMessage: assistant,
+            streamUrl: "/retry-once",
+          },
+        }
+      },
+      async getMessage(id) {
+        return message({ id, status: "completed", error: null })
+      },
+    },
+    fetch: async () =>
+      sseResponse([
+        {
+          type: "terminal",
+          message: message({
+            id: assistant.id,
+            status: "completed",
+            error: null,
+          }),
+        },
+      ]),
+  })
+  const result = await commands.sendMessage({
+    threadId: thread().id,
+    modelId: "test/model",
+    text: "同一负载",
+  })
+  await result.connection.finished
+  assert.equal(seen.length, 2)
+  assert.equal(seen[0], seen[1], "网络重试必须复用同一个冻结 command 对象")
+  assert.equal(Object.isFrozen(seen[0]), true)
+  commands.dispose()
+}
+
 async function testPartsProjectionAndWorkspaceIsolation() {
   const artifact = {
     id: "00000000-0000-4000-8000-000000000201",
@@ -456,12 +723,59 @@ async function testPartsProjectionAndWorkspaceIsolation() {
   )
 }
 
+async function testGate3HarnessIsolation() {
+  const root = new URL("../../", import.meta.url)
+  const [page, harness, mockRuntime, proxy, productionPage] = await Promise.all(
+    [
+      readFile(
+        new URL("app/thread-chat-gate-3-harness/[projectId]/page.tsx", root),
+        "utf8"
+      ),
+      readFile(
+        new URL("app/thread-chat/gate-3-harness/normalized-harness.tsx", root),
+        "utf8"
+      ),
+      readFile(
+        new URL("app/thread-chat/gate-3-harness/mock-v1-runtime.ts", root),
+        "utf8"
+      ),
+      readFile(new URL("proxy.ts", root), "utf8"),
+      readFile(new URL("app/thread-chat/[treeId]/page.tsx", root), "utf8"),
+    ]
+  )
+
+  assert.match(page, /process\.env\.NODE_ENV !== "development"/)
+  assert.match(page, /notFound\(\)/)
+  assert.match(
+    proxy,
+    /pathname\.startsWith\("\/thread-chat-gate-3-harness\/"\)/
+  )
+  assert.match(proxy, /\["localhost", "127\.0\.0\.1"\]/)
+  for (const component of [
+    "ThreadColumns",
+    "ThreadCanvas",
+    "BranchableChat",
+    "ArtifactDrawer",
+    "createConversationCommands",
+  ])
+    assert.match(harness, new RegExp(component))
+  assert.doesNotMatch(
+    `${page}\n${harness}\n${mockRuntime}`,
+    /\/api\/(?:chat|branch-trees)/
+  )
+  assert.doesNotMatch(productionPage, /gate-3-harness/i)
+}
+
 await testStoreAndSelectors()
 await testAiSdkReducer()
 await testOneShotSse()
 await testTerminalPoller()
+await testLateSnapshotAndDisconnectPolling()
+await testBootstrapBackgroundPollAndWorkspace()
 await testOptimisticRollbackIsolation()
 await testRetryABC()
+await testCommandNetworkRetryReusesFrozenPayload()
 await testPartsProjectionAndWorkspaceIsolation()
+await testGate3HarnessIsolation()
 
 console.log("normalized client/store tests passed")
