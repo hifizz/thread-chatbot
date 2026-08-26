@@ -1,30 +1,17 @@
 import type { GenerationAcceptedDTO } from "@/lib/thread-chat/contracts/dto"
-import type { ThreadChatUIMessage } from "@/lib/thread-chat/contracts/ui-message"
 import type { ConversationStore } from "../../core/store"
 import type { ThreadChatClient } from "../client"
 import { subscribeToMessageStream, type StreamSubscription } from "./sse-client"
 import { startTerminalPoller, type TerminalPoller } from "./terminal-poller"
-import { reduceThreadChatUIMessage } from "./ui-message-reducer"
+import {
+  replayThreadChatUIMessage,
+  type ThreadChatUIMessageReducer,
+} from "./ui-message-reducer"
 
 export interface GenerationConnection {
   messageId: string
   finished: Promise<void>
   close(): void
-}
-
-function initialUIMessage(accepted: GenerationAcceptedDTO): ThreadChatUIMessage {
-  return {
-    id: accepted.assistantMessage.id,
-    role: "assistant",
-    metadata: {
-      messageId: accepted.assistantMessage.id,
-      threadId: accepted.thread.id,
-      ...(accepted.assistantMessage.modelId
-        ? { modelId: accepted.assistantMessage.modelId }
-        : {}),
-    },
-    parts: accepted.assistantMessage.parts,
-  }
 }
 
 export function reconcileAcceptedGeneration(
@@ -51,10 +38,12 @@ export function followAcceptedGeneration(options: {
   const { store, client, accepted } = options
   reconcileAcceptedGeneration(store, accepted)
   const messageId = accepted.assistantMessage.id
-  let current = initialUIMessage(accepted)
+  let reducer: ThreadChatUIMessageReducer | null = null
   let subscription: StreamSubscription | null = null
   let poller: TerminalPoller | null = null
   let closed = false
+  let lastServerSeq = 0
+  let renderRevision = 0
 
   let resolveFinished!: () => void
   const finished = new Promise<void>((resolve) => {
@@ -85,19 +74,49 @@ export function followAcceptedGeneration(options: {
     async onEvent(event) {
       if (closed) return
       if (event.type === "snapshot") {
-        current = event.message
+        reducer?.close()
+        reducer = await replayThreadChatUIMessage({
+          snapshot: event.message,
+          replay: event.replay,
+        })
+        lastServerSeq = event.throughSeq
+        renderRevision = event.throughSeq
+        reducer.setHandlers({
+          onMessage(message) {
+            renderRevision += 1
+            store
+              .getState()
+              .applyStreamChunk(messageId, message, renderRevision)
+          },
+          onError() {
+            reducer?.setHandlers({})
+            reducer?.close()
+            reducer = null
+            subscription?.close()
+            beginPoll()
+          },
+        })
         store
           .getState()
           .applyStreamSnapshot(messageId, event.message, event.throughSeq)
       } else if (event.type === "chunk") {
-        current = await reduceThreadChatUIMessage(current, event.chunk)
-        store.getState().applyStreamChunk(messageId, current, event.seq)
+        if (!reducer) throw new Error("STREAM_CHUNK_BEFORE_SNAPSHOT")
+        if (event.seq !== lastServerSeq + 1)
+          throw new Error("STREAM_CHUNK_SEQUENCE_MISMATCH")
+        lastServerSeq = event.seq
+        reducer.push(event.chunk)
       } else if (event.type === "terminal") {
+        reducer?.setHandlers({})
         store.getState().reconcileTerminalMessage(event.message)
+        reducer?.close()
+        reducer = null
         resolveFinished()
       }
     },
     onDisconnect() {
+      reducer?.setHandlers({})
+      reducer?.close()
+      reducer = null
       beginPoll()
     },
   })
@@ -114,6 +133,8 @@ export function followAcceptedGeneration(options: {
       closed = true
       subscription?.close()
       poller?.stop()
+      reducer?.setHandlers({})
+      reducer?.close()
       resolveFinished()
     },
   }
@@ -138,4 +159,3 @@ export function pollBackgroundGeneration(options: {
     close: poller.stop,
   }
 }
-

@@ -10,7 +10,10 @@ import {
   projectConversationTree,
   projectMessageDTO,
 } from "../../app/thread-chat/core/projections.ts"
-import { reduceThreadChatUIMessage } from "../../app/thread-chat/net/stream/ui-message-reducer.ts"
+import {
+  replayThreadChatUIMessage,
+  ThreadChatUIMessageReducer,
+} from "../../app/thread-chat/net/stream/ui-message-reducer.ts"
 import { subscribeToMessageStream } from "../../app/thread-chat/net/stream/sse-client.ts"
 import { startTerminalPoller } from "../../app/thread-chat/net/stream/terminal-poller.ts"
 import {
@@ -94,7 +97,9 @@ function sseResponse(events) {
     new ReadableStream({
       start(controller) {
         for (const event of events)
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`))
+          controller.enqueue(
+            encoder.encode(`data: ${JSON.stringify(event)}\n\n`)
+          )
         controller.close()
       },
     }),
@@ -134,33 +139,110 @@ async function testStoreAndSelectors() {
     selectVisibleMessages(store.getState(), thread().id).map((row) => row.id),
     [current.id]
   )
-  assert.equal(selectAllMessageEntities(store.getState(), thread().id).length, 2)
-  assert.equal(selectSourceProvenance(store.getState(), child.id)?.message?.id, source.id)
-  assert.deepEqual(selectThreadTree(store.getState()).map((row) => row.id), [
-    thread().id,
-    child.id,
-  ])
+  assert.equal(
+    selectAllMessageEntities(store.getState(), thread().id).length,
+    2
+  )
+  assert.equal(
+    selectSourceProvenance(store.getState(), child.id)?.message?.id,
+    source.id
+  )
+  assert.deepEqual(
+    selectThreadTree(store.getState()).map((row) => row.id),
+    [thread().id, child.id]
+  )
   const tree = projectConversationTree(store.getState())
   assert.ok(tree.threads[child.id], "旧来源被 supersede 后子分支仍可投影")
   assert.equal(tree.threads[thread().id].messages.length, 1)
 }
 
 async function testAiSdkReducer() {
-  let uiMessage = { id: "assistant", role: "assistant", parts: [] }
-  uiMessage = await reduceThreadChatUIMessage(uiMessage, {
+  const reducer = new ThreadChatUIMessageReducer({
+    id: "assistant",
+    role: "assistant",
+    parts: [],
+  })
+  reducer.push({
     type: "text-start",
     id: "text-1",
   })
-  uiMessage = await reduceThreadChatUIMessage(uiMessage, {
+  reducer.push({
     type: "text-delta",
     id: "text-1",
     delta: "完整 parts",
   })
-  uiMessage = await reduceThreadChatUIMessage(uiMessage, {
+  reducer.push({
     type: "text-end",
     id: "text-1",
   })
-  assert.deepEqual(uiMessage.parts, [{ type: "text", text: "完整 parts" }])
+  const uiMessage = await reducer.flush()
+  assert.equal(uiMessage.parts[0].text, "完整 parts")
+  assert.equal(uiMessage.parts[0].state, "done")
+  reducer.close()
+
+  const history = [
+    { seq: 1, chunk: { type: "text-start", id: "late-text" } },
+    {
+      seq: 2,
+      chunk: { type: "text-delta", id: "late-text", delta: "半成" },
+    },
+  ]
+  const resumed = await replayThreadChatUIMessage({
+    snapshot: {
+      id: "late-assistant",
+      role: "assistant",
+      parts: [{ type: "text", text: "半成", state: "streaming" }],
+    },
+    replay: history,
+  })
+  resumed.push({
+    type: "text-delta",
+    id: "late-text",
+    delta: "品",
+  })
+  resumed.push({ type: "text-end", id: "late-text" })
+  const completed = await resumed.flush()
+  assert.equal(completed.parts[0].text, "半成品")
+  resumed.close()
+
+  const progress = {
+    type: "data-artifact-progress",
+    id: "artifact-progress:tool-1",
+    transient: true,
+    data: {
+      toolCallId: "tool-1",
+      phase: "streaming",
+      characterCount: 12,
+      lineCount: 2,
+      headings: [],
+    },
+  }
+  const progressReducer = await replayThreadChatUIMessage({
+    snapshot: {
+      id: "artifact-assistant",
+      role: "assistant",
+      parts: [progress],
+    },
+    replay: [{ seq: 1, chunk: progress }],
+  })
+  assert.equal(
+    progressReducer.current().parts[0].type,
+    "data-artifact-progress"
+  )
+  progressReducer.close()
+
+  const abortedReducer = new ThreadChatUIMessageReducer({
+    id: "aborted-assistant",
+    role: "assistant",
+    parts: [],
+  })
+  abortedReducer.push({
+    type: "abort",
+    reason: "user-stop",
+  })
+  const afterAbort = await abortedReducer.flush()
+  assert.deepEqual(afterAbort.parts, [])
+  abortedReducer.close()
 }
 
 async function testOneShotSse() {
@@ -174,8 +256,9 @@ async function testOneShotSse() {
       return sseResponse([
         {
           type: "snapshot",
-          message: { id: terminal.id, role: "assistant", parts: terminal.parts },
-          throughSeq: 1,
+          message: { id: terminal.id, role: "assistant", parts: [] },
+          throughSeq: 0,
+          replay: [],
         },
         { type: "heartbeat", at: stamp },
         { type: "terminal", message: terminal },
@@ -228,7 +311,9 @@ async function testOptimisticRollbackIsolation() {
 
 async function testRetryABC() {
   const a = message()
-  const store = createConversationStore({ bootstrap: bootstrap({ messages: [a] }) })
+  const store = createConversationStore({
+    bootstrap: bootstrap({ messages: [a] }),
+  })
   const ids = [
     "00000000-0000-4000-8000-000000000101",
     "00000000-0000-4000-8000-000000000102",
@@ -239,7 +324,7 @@ async function testRetryABC() {
     project: project(),
     thread: thread(),
     assistantMessage,
-    streamUrl: "/stream",
+    streamUrl: `/stream/${assistantMessage.id}`,
   })
   const client = {
     async retryMessage(sourceId, command) {
@@ -264,20 +349,27 @@ async function testRetryABC() {
     client,
     networkAttempts: 1,
     createId: () => ids.shift(),
-    fetch: async () =>
+    fetch: async (url) =>
       sseResponse([
         {
           type: "terminal",
-          message: message({ status: "completed", error: null }),
+          message: message({
+            id: String(url).split("/").at(-1),
+            status: "failed",
+          }),
         },
       ]),
   })
-  const retryB = await commands.retryMessage({ messageId: a.id, modelId: "test/model" })
+  const retryB = await commands.retryMessage({
+    messageId: a.id,
+    modelId: "test/model",
+  })
   const bId = retryB.command.assistantMessageId
-  store.getState().reconcileTerminalMessage(
-    message({ id: bId, sequence: 2, replacesMessageId: a.id })
-  )
-  const retryC = await commands.retryMessage({ messageId: bId, modelId: "test/model" })
+  await retryB.connection.finished
+  const retryC = await commands.retryMessage({
+    messageId: bId,
+    modelId: "test/model",
+  })
   const cId = retryC.command.assistantMessageId
   assert.equal(store.getState().messagesById[a.id].status, "failed")
   assert.equal(store.getState().messagesById[a.id].supersededAt !== null, true)
@@ -336,7 +428,11 @@ async function testPartsProjectionAndWorkspaceIsolation() {
 
   let saved = ""
   saveWorkspaceState(
-    { setItem(_key, value) { saved = value } },
+    {
+      setItem(_key, value) {
+        saved = value
+      },
+    },
     project().id,
     store.getState().workspace
   )
@@ -369,4 +465,3 @@ await testRetryABC()
 await testPartsProjectionAndWorkspaceIsolation()
 
 console.log("normalized client/store tests passed")
-

@@ -12,18 +12,50 @@ export type StreamEvent =
       type: "snapshot"
       message: ThreadChatUIMessage
       throughSeq: number
+      replay: StreamReplayChunk[]
     }
   | { type: "chunk"; seq: number; chunk: ThreadChatUIMessageChunk }
   | { type: "terminal"; message: MessageDTO }
   | { type: "heartbeat"; at: string }
+
+export interface StreamReplayChunk {
+  seq: number
+  chunk: ThreadChatUIMessageChunk
+}
+
+const replayChunkSchema = z
+  .object({
+    seq: z.number().int().positive(),
+    chunk: z.custom<ThreadChatUIMessageChunk>(isThreadChatUIMessageChunk),
+  })
+  .strict()
 
 const snapshotEventSchema = z
   .object({
     type: z.literal("snapshot"),
     message: z.custom<ThreadChatUIMessage>(isThreadChatUIMessage),
     throughSeq: z.number().int().min(0),
+    replay: z.array(replayChunkSchema),
   })
   .strict()
+  .superRefine((event, context) => {
+    if (event.replay.length !== event.throughSeq) {
+      context.addIssue({
+        code: "custom",
+        path: ["replay"],
+        message: "replay 必须覆盖 throughSeq 之前的全部 chunk",
+      })
+      return
+    }
+    for (let index = 0; index < event.replay.length; index += 1) {
+      if (event.replay[index]?.seq !== index + 1)
+        context.addIssue({
+          code: "custom",
+          path: ["replay", index, "seq"],
+          message: "replay sequence 必须从 1 连续递增",
+        })
+    }
+  })
 
 const chunkEventSchema = z
   .object({

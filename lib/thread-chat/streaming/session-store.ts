@@ -71,6 +71,7 @@ export class SessionStore {
       status: "running",
       snapshot: structuredClone(input.initialSnapshot),
       eventSeq: 0,
+      replay: [],
       finishedAt: null,
       terminalMessage: null,
       task: null,
@@ -94,6 +95,7 @@ export class SessionStore {
       type: "snapshot",
       message: structuredClone(session.snapshot),
       throughSeq: session.eventSeq,
+      replay: structuredClone(session.replay),
     })
     if (session.terminalMessage) {
       subscriber({
@@ -165,10 +167,15 @@ export class SessionStore {
     // snapshot 必须先覆盖当前 chunk，再提高 sequence 并广播。
     session.snapshot = structuredClone(snapshot)
     session.eventSeq += 1
+    const replayChunk = {
+      seq: session.eventSeq,
+      chunk: structuredClone(chunk),
+    }
+    session.replay.push(replayChunk)
     this.broadcast(session, {
       type: "chunk",
       seq: session.eventSeq,
-      chunk: structuredClone(chunk),
+      chunk: structuredClone(replayChunk.chunk),
     })
   }
 

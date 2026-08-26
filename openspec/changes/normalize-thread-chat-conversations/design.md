@@ -10,38 +10,38 @@
 
 #### `projects`
 
-| 列 | 类型/约束 | 含义 |
-|---|---|---|
-| `id` | `text primary key` | URL 中的 Project ID，允许客户端预生成 UUID |
-| `user_id` | `text not null references user(id) on delete cascade` | 唯一所有者 |
-| `auto_title` | `text null` | 主线程派生标题 |
-| `custom_title` | `text null` | 用户标题，展示优先级高于 `auto_title` |
-| `next_footnote` | `integer not null default 1` | 项目级脚注号原子分配器 |
-| `archived_at` | `timestamptz null` | 会话列表归档状态 |
-| `created_at` / `updated_at` | `timestamptz not null` | 创建与最后业务变更时间 |
+| 列                          | 类型/约束                                             | 含义                                       |
+| --------------------------- | ----------------------------------------------------- | ------------------------------------------ |
+| `id`                        | `text primary key`                                    | URL 中的 Project ID，允许客户端预生成 UUID |
+| `user_id`                   | `text not null references user(id) on delete cascade` | 唯一所有者                                 |
+| `auto_title`                | `text null`                                           | 主线程派生标题                             |
+| `custom_title`              | `text null`                                           | 用户标题，展示优先级高于 `auto_title`      |
+| `next_footnote`             | `integer not null default 1`                          | 项目级脚注号原子分配器                     |
+| `archived_at`               | `timestamptz null`                                    | 会话列表归档状态                           |
+| `created_at` / `updated_at` | `timestamptz not null`                                | 创建与最后业务变更时间                     |
 
 索引：`(user_id, updated_at desc)`、`(user_id, archived_at, updated_at desc)`。Project 不保存整棵树 JSON。
 
 #### `threads`
 
-| 列 | 类型/约束 | 含义 |
-|---|---|---|
-| `id` | `text primary key` | Thread ID，允许客户端预生成 UUID |
-| `project_id` | `text not null references projects(id) on delete cascade` | 所属 Project |
-| `parent_id` | `text null references threads(id)` | 根线程为 null，分支为父 Thread |
-| `fork_message_id` | `text null` | 创建分支的来源 Message；在建表后的约束阶段加 FK |
-| `fork_context` | `jsonb not null default '[]'` | 创建时冻结的有序 Message ID 数组 |
-| `fork_anchor` | `jsonb null` | 现有 `TextAnchor` 的完整结构 |
-| `anchor_text` | `text null` | 选区原文，用于标题、引用条与来源说明 |
-| `footnote` | `integer null` | 根线程为 null；分支为项目内唯一脚注号 |
-| `depth` | `integer not null` | 根为 0，子线程为父深度 + 1 |
-| `model_id` | `text not null` | 下一轮使用的模型注册表 ID |
-| `auto_title` / `custom_title` | `text null` | Thread 标题双轨；自定义优先 |
-| `title_generation_attempted` | `boolean not null default false` | 保持现有“自动标题只触发一次”语义 |
-| `title_generated` | `boolean not null default false` | 自动标题是否成功 |
-| `next_sequence` | `integer not null default 1` | 线程内消息序号分配器 |
-| `archived_at` | `timestamptz null` | 为未来线程级隐藏保留；本次 UI 不新增入口 |
-| `created_at` / `updated_at` | `timestamptz not null` | 时间戳 |
+| 列                            | 类型/约束                                                 | 含义                                            |
+| ----------------------------- | --------------------------------------------------------- | ----------------------------------------------- |
+| `id`                          | `text primary key`                                        | Thread ID，允许客户端预生成 UUID                |
+| `project_id`                  | `text not null references projects(id) on delete cascade` | 所属 Project                                    |
+| `parent_id`                   | `text null references threads(id)`                        | 根线程为 null，分支为父 Thread                  |
+| `fork_message_id`             | `text null`                                               | 创建分支的来源 Message；在建表后的约束阶段加 FK |
+| `fork_context`                | `jsonb not null default '[]'`                             | 创建时冻结的有序 Message ID 数组                |
+| `fork_anchor`                 | `jsonb null`                                              | 现有 `TextAnchor` 的完整结构                    |
+| `anchor_text`                 | `text null`                                               | 选区原文，用于标题、引用条与来源说明            |
+| `footnote`                    | `integer null`                                            | 根线程为 null；分支为项目内唯一脚注号           |
+| `depth`                       | `integer not null`                                        | 根为 0，子线程为父深度 + 1                      |
+| `model_id`                    | `text not null`                                           | 下一轮使用的模型注册表 ID                       |
+| `auto_title` / `custom_title` | `text null`                                               | Thread 标题双轨；自定义优先                     |
+| `title_generation_attempted`  | `boolean not null default false`                          | 保持现有“自动标题只触发一次”语义                |
+| `title_generated`             | `boolean not null default false`                          | 自动标题是否成功                                |
+| `next_sequence`               | `integer not null default 1`                              | 线程内消息序号分配器                            |
+| `archived_at`                 | `timestamptz null`                                        | 为未来线程级隐藏保留；本次 UI 不新增入口        |
+| `created_at` / `updated_at`   | `timestamptz not null`                                    | 时间戳                                          |
 
 约束与索引：
 
@@ -52,25 +52,25 @@
 
 #### `messages`
 
-| 列 | 类型/约束 | 含义 |
-|---|---|---|
-| `id` | `text primary key` | UI Message ID/客户端幂等实体 ID |
-| `project_id` | `text not null references projects(id) on delete cascade` | 冗余归属，用于所有权查询与同项目校验 |
-| `thread_id` | `text not null references threads(id) on delete cascade` | 所属 Thread |
-| `sequence` | `integer not null` | 服务端原子分配的线程内顺序 |
-| `role` | `text not null check in ('user','assistant')` | system prompt 永远由服务端构造，不入库 |
-| `parts` | `jsonb not null` | `ThreadChatUIMessage['parts']`；生成中可写节流快照，终态写最终快照 |
-| `status` | `text not null check in ('generating','completed','stopped','failed')` | 用户消息创建即 `completed`；助手消息遵循终态状态机 |
-| `model_id` | `text null` | 助手生成实际模型；用户消息为空 |
-| `replaces_message_id` | `text null references messages(id)` | Retry/Regenerate/Edit 新消息指向被取代消息 |
-| `superseded_at` | `timestamptz null` | soft-supersede 元数据；不删除、不改旧终态 |
-| `stop_requested_at` | `timestamptz null` | Stop 请求审计与幂等 |
-| `feedback` | `text null check in ('up','down')` | 当前互斥反馈，避免再建 generation 旁路身份 |
-| `provider_usage` | `jsonb null` | 提供商原始 usage，仅协议/诊断；禁止费用解释 |
-| `finish_reason` | `text null` | AI SDK finish reason |
-| `error_code` / `error_message` | `text null` | 安全、可展示的失败分类与文案，不保存密钥/上游响应正文 |
-| `started_at` / `finished_at` | `timestamptz null` | 执行时间；用户消息无需 started_at |
-| `created_at` / `updated_at` | `timestamptz not null` | 时间戳 |
+| 列                             | 类型/约束                                                              | 含义                                                               |
+| ------------------------------ | ---------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| `id`                           | `text primary key`                                                     | UI Message ID/客户端幂等实体 ID                                    |
+| `project_id`                   | `text not null references projects(id) on delete cascade`              | 冗余归属，用于所有权查询与同项目校验                               |
+| `thread_id`                    | `text not null references threads(id) on delete cascade`               | 所属 Thread                                                        |
+| `sequence`                     | `integer not null`                                                     | 服务端原子分配的线程内顺序                                         |
+| `role`                         | `text not null check in ('user','assistant')`                          | system prompt 永远由服务端构造，不入库                             |
+| `parts`                        | `jsonb not null`                                                       | `ThreadChatUIMessage['parts']`；生成中可写节流快照，终态写最终快照 |
+| `status`                       | `text not null check in ('generating','completed','stopped','failed')` | 用户消息创建即 `completed`；助手消息遵循终态状态机                 |
+| `model_id`                     | `text null`                                                            | 助手生成实际模型；用户消息为空                                     |
+| `replaces_message_id`          | `text null references messages(id)`                                    | Retry/Regenerate/Edit 新消息指向被取代消息                         |
+| `superseded_at`                | `timestamptz null`                                                     | soft-supersede 元数据；不删除、不改旧终态                          |
+| `stop_requested_at`            | `timestamptz null`                                                     | Stop 请求审计与幂等                                                |
+| `feedback`                     | `text null check in ('up','down')`                                     | 当前互斥反馈，避免再建 generation 旁路身份                         |
+| `provider_usage`               | `jsonb null`                                                           | 提供商原始 usage，仅协议/诊断；禁止费用解释                        |
+| `finish_reason`                | `text null`                                                            | AI SDK finish reason                                               |
+| `error_code` / `error_message` | `text null`                                                            | 安全、可展示的失败分类与文案，不保存密钥/上游响应正文              |
+| `started_at` / `finished_at`   | `timestamptz null`                                                     | 执行时间；用户消息无需 started_at                                  |
+| `created_at` / `updated_at`    | `timestamptz not null`                                                 | 时间戳                                                             |
 
 约束与索引：
 
@@ -84,17 +84,17 @@
 
 #### `artifacts`
 
-| 列 | 类型/约束 | 含义 |
-|---|---|---|
-| `id` | `text primary key` | Artifact ID；由工具调用稳定派生或客户端预生成 |
-| `project_id` | `text not null references projects(id) on delete cascade` | 所属 Project |
-| `source_message_id` | `text not null references messages(id)` | 不可变来源助手 Message |
-| `kind` | `text not null` | 当前 `markdown/code/note`，保留可扩展字符串契约 |
-| `title` | `text not null` | 展示标题 |
-| `content` | `text not null` | 完整产物正文 |
-| `language` | `text null` | 代码类语言 |
-| `metadata` | `jsonb not null default '{}'` | 非正文扩展信息 |
-| `created_at` / `updated_at` | `timestamptz not null` | 时间戳 |
+| 列                          | 类型/约束                                                 | 含义                                            |
+| --------------------------- | --------------------------------------------------------- | ----------------------------------------------- |
+| `id`                        | `text primary key`                                        | Artifact ID；由工具调用稳定派生或客户端预生成   |
+| `project_id`                | `text not null references projects(id) on delete cascade` | 所属 Project                                    |
+| `source_message_id`         | `text not null references messages(id)`                   | 不可变来源助手 Message                          |
+| `kind`                      | `text not null`                                           | 当前 `markdown/code/note`，保留可扩展字符串契约 |
+| `title`                     | `text not null`                                           | 展示标题                                        |
+| `content`                   | `text not null`                                           | 完整产物正文                                    |
+| `language`                  | `text null`                                               | 代码类语言                                      |
+| `metadata`                  | `jsonb not null default '{}'`                             | 非正文扩展信息                                  |
+| `created_at` / `updated_at` | `timestamptz not null`                                    | 时间戳                                          |
 
 索引：`(project_id, created_at)`、`(source_message_id)`；来源 Message 被 supersede 不级联删除 Artifact。工具最终输出与 Message 终态在同一 finalize 事务内 upsert，避免孤立产物。
 
@@ -102,15 +102,15 @@
 
 该表是幂等收据，不是第二份会话状态。
 
-| 列 | 类型/约束 | 含义 |
-|---|---|---|
-| `user_id` | `text not null references user(id) on delete cascade` | 命令所有者 |
-| `id` | `text not null` | 客户端 command ID |
-| `kind` | `text not null` | `start/send/fork/edit/retry/stop/feedback/rename/archive/delete` |
-| `scope_id` | `text not null` | Project/Thread/Message 主目标 |
-| `request_hash` | `text not null` | 规范化语义负载哈希，用于拒绝同 ID 异义重放 |
-| `result` | `jsonb not null` | 第一次提交的权威 DTO/删除回执 |
-| `created_at` | `timestamptz not null` | 收据时间 |
+| 列             | 类型/约束                                             | 含义                                                             |
+| -------------- | ----------------------------------------------------- | ---------------------------------------------------------------- |
+| `user_id`      | `text not null references user(id) on delete cascade` | 命令所有者                                                       |
+| `id`           | `text not null`                                       | 客户端 command ID                                                |
+| `kind`         | `text not null`                                       | `start/send/fork/edit/retry/stop/feedback/rename/archive/delete` |
+| `scope_id`     | `text not null`                                       | Project/Thread/Message 主目标                                    |
+| `request_hash` | `text not null`                                       | 规范化语义负载哈希，用于拒绝同 ID 异义重放                       |
+| `result`       | `jsonb not null`                                      | 第一次提交的权威 DTO/删除回执                                    |
+| `created_at`   | `timestamptz not null`                                | 收据时间                                                         |
 
 主键为 `(user_id, id)`；重复命令先比较 `kind + scope_id + request_hash`，一致则返回 `result`，不一致返回 `409 COMMAND_ID_CONFLICT`。
 
@@ -123,11 +123,7 @@
 ```ts
 import type { UIMessage, UIMessageChunk, UITool } from "ai"
 
-export type MessageStatus =
-  | "generating"
-  | "completed"
-  | "stopped"
-  | "failed"
+export type MessageStatus = "generating" | "completed" | "stopped" | "failed"
 
 export interface ThreadChatMessageMetadata {
   messageId: string
@@ -161,8 +157,12 @@ export type ThreadChatUIMessageChunk = UIMessageChunk<
   ThreadChatDataParts
 >
 
-export interface ProjectDTO { /* id, titles, rootThreadId, archive/timestamps */ }
-export interface ThreadDTO { /* topology, frozen context, titles, model */ }
+export interface ProjectDTO {
+  /* id, titles, rootThreadId, archive/timestamps */
+}
+export interface ThreadDTO {
+  /* topology, frozen context, titles, model */
+}
 export interface MessageDTO {
   id: string
   projectId: string
@@ -179,12 +179,14 @@ export interface MessageDTO {
   createdAt: string
   finishedAt: string | null
 }
-export interface ArtifactDTO { /* sourceMessageId + existing artifact fields */ }
+export interface ArtifactDTO {
+  /* sourceMessageId + existing artifact fields */
+}
 
 export interface ProjectBootstrapDTO {
   project: ProjectDTO | null
   threads: ThreadDTO[]
-  messages: MessageDTO[]       // 含 superseded，但 selector 默认不显示
+  messages: MessageDTO[] // 含 superseded，但 selector 默认不显示
   artifacts: ArtifactDTO[]
   activeGenerationIds: string[]
 }
@@ -196,8 +198,7 @@ export interface ProjectBootstrapDTO {
 
 ```ts
 type CommandResponse<T> =
-  | { ok: true; replayed: boolean; data: T }
-  | { ok: false; error: ApiErrorDTO }
+  { ok: true; replayed: boolean; data: T } | { ok: false; error: ApiErrorDTO }
 
 interface GenerationAcceptedDTO {
   project: ProjectDTO
@@ -212,33 +213,54 @@ interface GenerationAcceptedDTO {
 
 ```ts
 type StreamEvent =
-  | { type: "snapshot"; message: ThreadChatUIMessage; throughSeq: number }
+  | {
+      type: "snapshot"
+      message: ThreadChatUIMessage
+      throughSeq: number
+      replay: StreamReplayChunk[]
+    }
   | { type: "chunk"; seq: number; chunk: ThreadChatUIMessageChunk }
   | { type: "terminal"; message: MessageDTO }
   | { type: "heartbeat"; at: string }
+
+interface StreamReplayChunk {
+  seq: number
+  chunk: ThreadChatUIMessageChunk
+}
 ```
+
+各事件的含义和客户端处理规则：
+
+| `type`      | 何时发送                                                                            | 字段含义                                                                                                                                            | 客户端行为                                                                                                                                            |
+| ----------- | ----------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `snapshot`  | SSE 建立后发送的第一条业务事件                                                      | `message` 是服务器此刻的完整回复；`throughSeq` 表示它已包含前多少个原始 chunk；`replay` 是从 sequence 1 到 `throughSeq` 的完整 AI SDK v7 chunk 历史 | 先使用同一个官方 reducer 重放 `replay`，确认重建结果与 `message.parts[]` 等价，再等待实时 chunk。它只同步显示状态，不重新启动模型，也不修改数据库终态 |
+| `chunk`     | 模型生成过程中每产生一个 UI Message chunk 时发送                                    | `seq` 是本次生成内从 1 开始连续递增的编号；`chunk` 可以是 text、reasoning、source、file、tool 或 typed data part                                    | 按顺序交给当前连接持有的 AI SDK v7 reducer；不得自行使用 `text += delta` 或为工具、研究状态建立另一套消息协议                                         |
+| `terminal`  | Message 已经由唯一 finalize service 收敛到终态时发送，是本次 SSE 的最后一条业务事件 | `message` 是数据库权威 `MessageDTO`，其 status 为 `completed`、`stopped` 或 `failed`                                                                | 用权威 DTO 覆盖生成中状态并关闭 SSE/停止轮询。终态不可逆；Retry 创建新 Message，不把原 Message 改回 `generating`                                      |
+| `heartbeat` | 没有新内容时按固定间隔发送                                                          | `at` 是服务器发送心跳的时间                                                                                                                         | 只用于防止 VPS 反向代理回收空闲连接；不更新消息内容、不算生成进度，也不延长或改变模型任务                                                             |
+
+`StreamReplayChunk.seq` 是历史 chunk 在本次生成内的连续编号；`chunk` 必须保持 AI SDK v7 原始 `ThreadChatUIMessageChunk`，不得转换成自定义文本增量。`replay.length` 必须等于 `throughSeq`，且 sequence 必须从 1 连续递增。replay 只保存在进程内 Session，不写数据库，并随终态 Session 的 TTL cleanup 一起释放。
 
 ### 1.3 API
 
 新 API 使用 `/api/thread-chat/v1` 命名空间，避免复用包含整树与计费耦合的 `/api/chat`。所有 handler 使用 Next.js 16 原生 `Request`/`Response`/`ReadableStream`，动态参数通过 `await ctx.params` 读取，默认 Node.js runtime 且禁用缓存。
 
-| Method + path | 请求/响应 | 原子行为 |
-|---|---|---|
-| `GET /projects?archived=false` | Project 列表 | owner-scoped，按 updated_at 排序 |
-| `GET /projects/:projectId` | `ProjectBootstrapDTO` | 返回完整规范化投影；合法但未创建的新 URL 返回 `project:null` 空壳 |
-| `POST /projects/:projectId/start` | IDs、首条 text/files、modelId | 原子创建 Project、根 Thread、user Message、assistant Message、命令收据；提交后启动 Session |
-| `PATCH /projects/:projectId` | rename/archive command | 只更新 custom title 或 archive；返回 ProjectDTO |
-| `DELETE /projects/:projectId` | delete command | owner lock 后级联删除；重复删除返回同一回执 |
-| `PATCH /threads/:threadId` | model/title command | 更新下一轮模型或自定义标题，不改变历史 Message modelId |
-| `POST /threads/:threadId/messages` | user/assistant IDs、text/files、modelId | 分配两个连续 sequence，创建 turn，提交后启动 Session |
-| `POST /threads/:threadId/forks` | sourceMessageId、anchor、newThreadId、可选首轮 IDs/text | 锁 Project 脚注计数，冻结上下文；有首轮时同事务创建并启动生成 |
-| `POST /messages/:messageId/edit` | 新 user/assistant IDs、text、commandId | 仅最新活跃 user turn；soft-supersede 旧 turn，追加新 turn |
-| `POST /messages/:messageId/retry` | newAssistantMessageId、commandId | 仅最新活跃 assistant；soft-supersede 目标，追加新 assistant |
-| `POST /messages/:messageId/stop` | commandId | 写 `stop_requested_at` 并请求 Session abort；终态则返回现状 |
-| `PUT /messages/:messageId/feedback` | commandId、`up/down/null` | 只允许 owner 对 assistant Message 设置互斥反馈 |
-| `GET /messages/:messageId` | `MessageDTO` | 断流/刷新后的权威轮询端点 |
-| `GET /messages/:messageId/stream` | SSE `StreamEvent` | 仅活跃或宽限期内 Session；先 snapshot，再 chunk/terminal |
-| `GET /artifacts/:artifactId` | `ArtifactDTO` | owner-scoped drawer 延迟读取（bootstrap 也带摘要/现有所需内容） |
+| Method + path                       | 请求/响应                                               | 原子行为                                                                                   |
+| ----------------------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `GET /projects?archived=false`      | Project 列表                                            | owner-scoped，按 updated_at 排序                                                           |
+| `GET /projects/:projectId`          | `ProjectBootstrapDTO`                                   | 返回完整规范化投影；合法但未创建的新 URL 返回 `project:null` 空壳                          |
+| `POST /projects/:projectId/start`   | IDs、首条 text/files、modelId                           | 原子创建 Project、根 Thread、user Message、assistant Message、命令收据；提交后启动 Session |
+| `PATCH /projects/:projectId`        | rename/archive command                                  | 只更新 custom title 或 archive；返回 ProjectDTO                                            |
+| `DELETE /projects/:projectId`       | delete command                                          | owner lock 后级联删除；重复删除返回同一回执                                                |
+| `PATCH /threads/:threadId`          | model/title command                                     | 更新下一轮模型或自定义标题，不改变历史 Message modelId                                     |
+| `POST /threads/:threadId/messages`  | user/assistant IDs、text/files、modelId                 | 分配两个连续 sequence，创建 turn，提交后启动 Session                                       |
+| `POST /threads/:threadId/forks`     | sourceMessageId、anchor、newThreadId、可选首轮 IDs/text | 锁 Project 脚注计数，冻结上下文；有首轮时同事务创建并启动生成                              |
+| `POST /messages/:messageId/edit`    | 新 user/assistant IDs、text、commandId                  | 仅最新活跃 user turn；soft-supersede 旧 turn，追加新 turn                                  |
+| `POST /messages/:messageId/retry`   | newAssistantMessageId、commandId                        | 仅最新活跃 assistant；soft-supersede 目标，追加新 assistant                                |
+| `POST /messages/:messageId/stop`    | commandId                                               | 写 `stop_requested_at` 并请求 Session abort；终态则返回现状                                |
+| `PUT /messages/:messageId/feedback` | commandId、`up/down/null`                               | 只允许 owner 对 assistant Message 设置互斥反馈                                             |
+| `GET /messages/:messageId`          | `MessageDTO`                                            | 断流/刷新后的权威轮询端点                                                                  |
+| `GET /messages/:messageId/stream`   | SSE `StreamEvent`                                       | 仅活跃或宽限期内 Session；先 snapshot，再 chunk/terminal                                   |
+| `GET /artifacts/:artifactId`        | `ArtifactDTO`                                           | owner-scoped drawer 延迟读取（bootstrap 也带摘要/现有所需内容）                            |
 
 错误码稳定为 `VALIDATION_ERROR`、`NOT_FOUND`、`COMMAND_ID_CONFLICT`、`STATE_CONFLICT`、`MODEL_NOT_ALLOWED`、`SESSION_NOT_AVAILABLE`、`GENERATION_FAILED`。owner 不匹配与资源不存在都对外表现为 404。命令成功但 Session 已不在内存时，返回的 Message ID 仍可轮询；不得因 SSE 不可用再次执行命令。
 
@@ -256,12 +278,15 @@ interface ConversationEntityState {
   messageIdsByThread: Record<string, string[]> // 始终按 sequence
   artifactsById: Record<string, ArtifactDTO>
   artifactOrder: string[]
-  streamByMessageId: Record<string, {
-    phase: "connecting" | "live" | "background" | "terminal"
-    liveMessage?: ThreadChatUIMessage
-    lastEventSeq: number
-    pollAttempt: number
-  }>
+  streamByMessageId: Record<
+    string,
+    {
+      phase: "connecting" | "live" | "background" | "terminal"
+      liveMessage?: ThreadChatUIMessage
+      lastEventSeq: number
+      pollAttempt: number
+    }
+  >
   optimisticByCommandId: Record<string, OptimisticPatch>
 }
 
@@ -358,20 +383,20 @@ app/thread-chat/
 
 ### 1.6 组件拆分与 UX 保留表
 
-| 现有区域/组件 | 改造方式 | 可见变化 |
-|---|---|---|
-| `thread-chat-demo.tsx`、workspace runtime | 改接 normalized store facade 与 bootstrap DTO | 无 |
-| `thread-columns.tsx` | selector 提供 ThreadDTO/可见消息/children | 无 |
-| `thread-canvas.tsx`、`canvas-node.tsx` | 从 parentId 派生节点/边，展开对话仍复用 ChatView | 无 |
-| `tree-list*`、`thread-switcher*` | Project API 与 ThreadDTO 替代整树列表/recents 业务数据 | 无；本地 recent 布局继续保留 |
-| `chat-view.tsx`、`conversation-message.tsx` | 渲染 `UIMessage.parts[]` 投影；tool/data/source 交给既有对应视图 | 无 |
-| `conversation-composer.tsx`、模型选择 | 调新命令 API；busy/stop 状态来自 stream slice | 无 |
-| `selection-bubble.tsx`、branch actions | Fork command 原子分配 footnote 与冻结 context，乐观新列/节点 | 无 |
-| `assistant-message-toolbar.tsx` | Retry/feedback 调新命令；动作可用性来自状态机 selector | 无 |
-| `turn-variant-picker.tsx` | 删除组件、样式入口、active-leaf/variant command 与 selector | **已批准移除** |
-| `message-artifacts.tsx`、`artifact-drawer.tsx` | ArtifactDTO + tool parts 投影，来源保持 message ID | 无 |
-| 标题 hooks/topbar | 新 title service 和双轨字段 | 无 |
-| overlays/toast/help/research panel | 数据改从 typed data parts/Store selector 获取 | 无 |
+| 现有区域/组件                                  | 改造方式                                                         | 可见变化                     |
+| ---------------------------------------------- | ---------------------------------------------------------------- | ---------------------------- |
+| `thread-chat-demo.tsx`、workspace runtime      | 改接 normalized store facade 与 bootstrap DTO                    | 无                           |
+| `thread-columns.tsx`                           | selector 提供 ThreadDTO/可见消息/children                        | 无                           |
+| `thread-canvas.tsx`、`canvas-node.tsx`         | 从 parentId 派生节点/边，展开对话仍复用 ChatView                 | 无                           |
+| `tree-list*`、`thread-switcher*`               | Project API 与 ThreadDTO 替代整树列表/recents 业务数据           | 无；本地 recent 布局继续保留 |
+| `chat-view.tsx`、`conversation-message.tsx`    | 渲染 `UIMessage.parts[]` 投影；tool/data/source 交给既有对应视图 | 无                           |
+| `conversation-composer.tsx`、模型选择          | 调新命令 API；busy/stop 状态来自 stream slice                    | 无                           |
+| `selection-bubble.tsx`、branch actions         | Fork command 原子分配 footnote 与冻结 context，乐观新列/节点     | 无                           |
+| `assistant-message-toolbar.tsx`                | Retry/feedback 调新命令；动作可用性来自状态机 selector           | 无                           |
+| `turn-variant-picker.tsx`                      | 删除组件、样式入口、active-leaf/variant command 与 selector      | **已批准移除**               |
+| `message-artifacts.tsx`、`artifact-drawer.tsx` | ArtifactDTO + tool parts 投影，来源保持 message ID               | 无                           |
+| 标题 hooks/topbar                              | 新 title service 和双轨字段                                      | 无                           |
+| overlays/toast/help/research panel             | 数据改从 typed data parts/Store selector 获取                    | 无                           |
 
 旧回复被 supersede 后不在父 Thread 当前时间线显示，也不提供切回入口；由它派生的 Thread 仍出现在树、切换器和画布，其来源说明继续使用冻结 `anchor_text` 与来源 Message。若实现过程中发现除此之外的可见交互无法等价投影，必须停止该项并让用户决策。
 
@@ -447,7 +472,7 @@ readUIMessageStream({ stream, ... })   -> evolving UIMessage snapshots
 
 `SessionStore` 以 `globalThis` Symbol 保存，避免开发 HMR 重复实例；Session 包含 messageId、status、snapshot、eventSeq、AbortController、subscriber Set、finishedAt、task Promise。task Promise 在 Store 内立即附加 catch，任何 handler 不拥有它，也不需要 Next.js `after()` 保活。
 
-订阅方法在同一同步临界段完成“加入 subscriber → 发送 snapshot/throughSeq → 发送之后的事件”；JS 单线程与 snapshot-before-broadcast 规则避免 subscribe race。终态 Session 保留 5 分钟（常量可调）后清理；cleanup 比较 `now - finishedAt >= ttl`，只删终态、无订阅者的 Session，timer 调用 `unref()`。
+订阅方法在同一同步临界段完成“加入 subscriber → 发送 snapshot/throughSeq/replay → 发送之后的事件”；JS 单线程与 snapshot-before-broadcast 规则避免 subscribe race。AI SDK v7 的 `UIMessage.parts[]` 不保留 text/reasoning/tool chunk 的内部 ID，因此 Session 必须在内存保留从 sequence 1 开始的完整原始 UI chunk 日志：迟到的首次 SSE 订阅先用 replay 在同一个官方 reducer 中重建 active 状态，校验结果与 snapshot 等价，再继续处理实时 chunk。日志不写数据库，随终态 Session 的 5 分钟 TTL cleanup 一并释放。cleanup 比较 `now - finishedAt >= ttl`，只删终态、无订阅者的 Session，timer 调用 `unref()`。
 
 这个选择不适用于 PM2 cluster、多容器或滚动双副本。部署 Gate 必须检查只有一个副本和一个 Node 进程。
 

@@ -14,3 +14,6 @@ export const THREAD_CHAT_CHECKPOINT_THROTTLE_MS = 850
 export const THREAD_CHAT_TERMINAL_POLL_DELAYS_MS = [
   1_000, 2_000, 2_000, 3_000, 5_000,
 ] as const
+
+/** 客户端等待 AI SDK reducer 重放 barrier 的上限；超时后放弃 SSE 并转轮询。 */
+export const THREAD_CHAT_REDUCER_FLUSH_TIMEOUT_MS = 15_000

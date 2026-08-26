@@ -75,25 +75,37 @@ const eventsA = []
 const eventsB = []
 const unsubscribeA = store.subscribe(initial.id, (event) => eventsA.push(event))
 const unsubscribeB = store.subscribe(initial.id, (event) => eventsB.push(event))
-assert.deepEqual(eventsA.map((event) => event.type), ["snapshot"])
+assert.deepEqual(
+  eventsA.map((event) => event.type),
+  ["snapshot"]
+)
 assert.equal(eventsA[0].throughSeq, 0)
+assert.deepEqual(eventsA[0].replay, [])
 unsubscribeA()
 release()
 await first.session.task
-assert.deepEqual(eventsA.map((event) => event.type), ["snapshot"])
-assert.deepEqual(eventsB.map((event) => event.type), [
-  "snapshot",
-  "chunk",
-  "terminal",
-])
+assert.deepEqual(
+  eventsA.map((event) => event.type),
+  ["snapshot"]
+)
+assert.deepEqual(
+  eventsB.map((event) => event.type),
+  ["snapshot", "chunk", "terminal"]
+)
 assert.equal(eventsB[1].seq, 1)
 assert.equal(eventsB[0].message.parts.length, 0)
 assert.equal(eventsB[2].message.status, "completed")
 
 const late = []
 const unsubscribeLate = store.subscribe(initial.id, (event) => late.push(event))
-assert.deepEqual(late.map((event) => event.type), ["snapshot", "terminal"])
+assert.deepEqual(
+  late.map((event) => event.type),
+  ["snapshot", "terminal"]
+)
 assert.equal(late[0].throughSeq, 1)
+assert.equal(late[0].replay.length, 1)
+assert.equal(late[0].replay[0].seq, 1)
+assert.equal(late[0].replay[0].chunk.type, "text-start")
 assert.equal(late[0].message.parts[0].text, "done")
 
 const lateSse = createSessionSseResponse({
@@ -153,6 +165,7 @@ const unsubscribeMidRace = store.subscribe(raceInitial.id, (event) =>
   midRaceEvents.push(event)
 )
 assert.equal(midRaceEvents[0].throughSeq, 1)
+assert.equal(midRaceEvents[0].replay.length, 1)
 assert.equal(midRaceEvents[0].message.parts[0].text, "one")
 unsubscribeEarlyRace()
 unsubscribeMidRace()
@@ -162,6 +175,10 @@ assert.equal(racing.session.status, "terminal", "零订阅者时后台任务仍�
 const afterRaceEvents = []
 store.subscribe(raceInitial.id, (event) => afterRaceEvents.push(event))
 assert.equal(afterRaceEvents[0].throughSeq, 2)
+assert.deepEqual(
+  afterRaceEvents[0].replay.map((entry) => entry.seq),
+  [1, 2]
+)
 assert.equal(afterRaceEvents[0].message.parts[0].text, "one-two")
 assert.equal(afterRaceEvents[1].type, "terminal")
 
