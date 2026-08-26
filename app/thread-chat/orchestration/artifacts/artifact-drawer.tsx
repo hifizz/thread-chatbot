@@ -6,9 +6,10 @@
  */
 
 import React, { useEffect, useId, useRef } from "react"
-import { FileText, LocateFixed, X } from "lucide-react"
+import { Check, Copy, FileText, LocateFixed, X } from "lucide-react"
 import type { Artifact, ThreadTreeState } from "../../core/types"
 import { MarkdownBody } from "../../chat/message/markdown-body"
+import { useCopyMarkdown } from "../../chat/actions/use-copy-markdown"
 import { dotColorOf } from "../../theme"
 import {
   activePathArtifacts,
@@ -38,6 +39,7 @@ export function ArtifactDrawer({
   const closeButtonRef = useRef<HTMLButtonElement | null>(null)
   const returnFocusRef = useRef<HTMLElement | null>(null)
   const wasOpenRef = useRef(false)
+  const { copied, copy } = useCopyMarkdown()
 
   useEffect(() => {
     if (open) {
@@ -85,6 +87,19 @@ export function ArtifactDrawer({
       <div className="art-head">
         <FileText size={16} color="#6a6357" />
         <h3 id={titleId}>Markdown</h3>
+        {a?.kind === "markdown" && (
+          <button
+            type="button"
+            className="art-copy"
+            title={
+              copied ? "Markdown raw 内容已复制" : "复制 Markdown raw 内容"
+            }
+            onClick={() => void copy(a.content)}
+          >
+            {copied ? <Check size={13} /> : <Copy size={13} />}
+            <span aria-live="polite">{copied ? "已复制" : "复制"}</span>
+          </button>
+        )}
         <button
           ref={closeButtonRef}
           type="button"
