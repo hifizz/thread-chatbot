@@ -4,9 +4,9 @@ import { handleGetArtifact } from "@/lib/thread-chat/server/handlers"
 export const dynamic = "force-dynamic"
 
 export async function GET(
-  _request: Request,
+  request: Request,
   context: RouteContext<{ artifactId: string }>
 ) {
   const { artifactId } = await context.params
-  return handleGetArtifact(artifactId)
+  return handleGetArtifact(request, artifactId)
 }

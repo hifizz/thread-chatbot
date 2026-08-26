@@ -502,6 +502,8 @@ Project 与 Thread 都保存 auto/custom 字段。主 Thread 的自定义标题�
 
 仓库已有大量 `node --import tsx` 与数据库脚本，且没有直接测试框架依赖；本 change 不为架构改造额外引入 Vitest。纯领域、contracts、Store 和 stream reducer 用现有 Node assert 脚本；仓储/命令/竞态用随机测试用户和事务清理的 Postgres 脚本；真实 UI 必须按仓库规则用 `ego-browser nodejs` 对 localhost 做验收。旧版本切换、billing 和整树持久化测试在 cutover Gate 删除或改写，不能作为新契约通过的假信号。
 
+Gate 2 的 API 验证分为两层，证据不得混称：API contract 测试负责 strict schema、响应 envelope、错误映射、headers 和 Route 文件边界；Route Handler 数据库集成测试携带 Better Auth 签名 session cookie 调用实际 v1 Route exports，并连接专用 `thread-chat-normalized-test` PostgreSQL，完整经过 auth、handler、application、repository 与事务。后者只在 Session 的模型执行位置注入可控 generation，以稳定复现完成、断流、Stop、Retry 和 Artifact，不 mock 会话业务或数据库。它不启动监听端口；部署后的真实网络 HTTP smoke 仍属于 Gate 5。
+
 ## 5. 并发与状态流程
 
 ### 5.1 Send

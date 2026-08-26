@@ -52,7 +52,7 @@ function validation(message: string): never {
 }
 
 export function handleListProjects(request: Request): Promise<Response> {
-  return withThreadChatRoute(async (userId) => {
+  return withThreadChatRoute(request, async (userId) => {
     const url = new URL(request.url)
     const unknown = [...url.searchParams.keys()].filter(
       (key) => key !== "archived"
@@ -69,8 +69,11 @@ export function handleListProjects(request: Request): Promise<Response> {
   })
 }
 
-export function handleGetProject(projectId: string): Promise<Response> {
-  return withThreadChatRoute(async (userId) =>
+export function handleGetProject(
+  request: Request,
+  projectId: string
+): Promise<Response> {
+  return withThreadChatRoute(request, async (userId) =>
     jsonNoCache(await getProjectBootstrap(userId, parseId(projectId)))
   )
 }
@@ -79,7 +82,7 @@ export function handleStartProject(
   request: Request,
   projectId: string
 ): Promise<Response> {
-  return withThreadChatRoute(async (userId) => {
+  return withThreadChatRoute(request, async (userId) => {
     const command = await parseJson(request, startProjectCommandSchema)
     if (command.projectId !== parseId(projectId))
       validation("path projectId 与请求体不一致")
@@ -93,7 +96,7 @@ export function handlePatchProject(
   request: Request,
   projectId: string
 ): Promise<Response> {
-  return withThreadChatRoute(async (userId) => {
+  return withThreadChatRoute(request, async (userId) => {
     const id = parseId(projectId)
     const command = await parseJson(
       request,
@@ -111,7 +114,7 @@ export function handleDeleteProject(
   request: Request,
   projectId: string
 ): Promise<Response> {
-  return withThreadChatRoute(async (userId) => {
+  return withThreadChatRoute(request, async (userId) => {
     const id = parseId(projectId)
     const beforeDelete = await getProjectBootstrap(userId, id)
     const result = await deleteProject(
@@ -143,7 +146,7 @@ export function handlePatchThread(
   request: Request,
   threadId: string
 ): Promise<Response> {
-  return withThreadChatRoute(async (userId) =>
+  return withThreadChatRoute(request, async (userId) =>
     commandResponse(
       await updateThread(
         userId,
@@ -158,7 +161,7 @@ export function handleSendMessage(
   request: Request,
   threadId: string
 ): Promise<Response> {
-  return withThreadChatRoute(async (userId) => {
+  return withThreadChatRoute(request, async (userId) => {
     const result = await sendMessage(
       userId,
       parseId(threadId),
@@ -173,7 +176,7 @@ export function handleForkThread(
   request: Request,
   threadId: string
 ): Promise<Response> {
-  return withThreadChatRoute(async (userId) => {
+  return withThreadChatRoute(request, async (userId) => {
     const result = await forkThread(
       userId,
       parseId(threadId),
@@ -189,7 +192,7 @@ export function handleEditMessage(
   request: Request,
   messageId: string
 ): Promise<Response> {
-  return withThreadChatRoute(async (userId) => {
+  return withThreadChatRoute(request, async (userId) => {
     const result = await editLatestTurn(
       userId,
       parseId(messageId),
@@ -214,7 +217,7 @@ export function handleRetryMessage(
   request: Request,
   messageId: string
 ): Promise<Response> {
-  return withThreadChatRoute(async (userId) => {
+  return withThreadChatRoute(request, async (userId) => {
     const result = await retryMessage(
       userId,
       parseId(messageId),
@@ -229,7 +232,7 @@ export function handleStopMessage(
   request: Request,
   messageId: string
 ): Promise<Response> {
-  return withThreadChatRoute(async (userId) => {
+  return withThreadChatRoute(request, async (userId) => {
     const id = parseId(messageId)
     const result = await requestMessageStop(
       userId,
@@ -248,7 +251,7 @@ export function handleSetFeedback(
   request: Request,
   messageId: string
 ): Promise<Response> {
-  return withThreadChatRoute(async (userId) =>
+  return withThreadChatRoute(request, async (userId) =>
     commandResponse(
       await setMessageFeedback(
         userId,
@@ -259,8 +262,11 @@ export function handleSetFeedback(
   )
 }
 
-export function handleGetMessage(messageId: string): Promise<Response> {
-  return withThreadChatRoute(async (userId) => {
+export function handleGetMessage(
+  request: Request,
+  messageId: string
+): Promise<Response> {
+  return withThreadChatRoute(request, async (userId) => {
     const message = await getMessage(userId, parseId(messageId))
     if (!message)
       throw new ConversationApplicationError("NOT_FOUND", "资源不存在")
@@ -268,8 +274,11 @@ export function handleGetMessage(messageId: string): Promise<Response> {
   })
 }
 
-export function handleGetArtifact(artifactId: string): Promise<Response> {
-  return withThreadChatRoute(async (userId) => {
+export function handleGetArtifact(
+  request: Request,
+  artifactId: string
+): Promise<Response> {
+  return withThreadChatRoute(request, async (userId) => {
     const artifact = await getArtifact(userId, parseId(artifactId))
     if (!artifact)
       throw new ConversationApplicationError("NOT_FOUND", "资源不存在")
@@ -277,8 +286,11 @@ export function handleGetArtifact(artifactId: string): Promise<Response> {
   })
 }
 
-export function handleMessageStream(messageId: string): Promise<Response> {
-  return withThreadChatRoute(async (userId) => {
+export function handleMessageStream(
+  request: Request,
+  messageId: string
+): Promise<Response> {
+  return withThreadChatRoute(request, async (userId) => {
     const id = parseId(messageId)
     const message = await getMessage(userId, id)
     if (!message)

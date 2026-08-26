@@ -2,6 +2,8 @@
 
 日期：2026-08-26
 
+Route Handler + PostgreSQL 补充验证：2026-08-27
+
 ## 运行边界
 
 - `SessionStore` 使用 `globalThis` Symbol 单例，先登记 Session 再以已 catch 的 Promise 启动任务。
@@ -28,12 +30,17 @@
 
 ## 自动化验证
 
+- `pnpm db:test:reset && pnpm db:test:migrate`：通过；从空 `thread_chat` schema 和空 migration 账本重建专用测试库后再运行以下数据库测试。
 - `pnpm test:thread-chat:gate2-session`：通过
   - 重复 start、同步 snapshot 订阅、chunk/订阅竞态、两个订阅者、零订阅继续运行、迟到终态、TTL cleanup、SSE 终态关闭、checkpoint 节流。
 - `pnpm test:thread-chat:gate2-pipeline`：通过
   - text/reasoning/source/file/tool input delta/output/data、Artifact-only、partial error、abort、空回复。
 - `pnpm test:thread-chat:gate2-api`：通过
   - strict JSON、no-cache、401/404/409、command envelope、error stack 隔离、13 个 Route Handlers、Next.js 16 params 与禁用 request.signal/after/textStream。
+- `pnpm test:thread-chat:gate2-api-db`：专用 `thread-chat-normalized-test` PostgreSQL 通过
+  - 使用真实 Better Auth 签名 session cookie，直接调用实际 v1 Route Handler exports；请求完整经过 auth、handler、application、repository 与数据库事务。
+  - 模型执行位置使用可控 fake generation，未 mock API、会话业务或 PostgreSQL；覆盖首发与重放、strict body 零写入、bootstrap/Message poll、终态及活跃 SSE、断流不 abort、Stop、Retry、Edit、Fork、Artifact 原子落库和 owner 404、反馈、Project/Thread 标题、列表及级联删除。
+  - 该脚本是 Route Handler 数据库集成测试，不启动监听端口；部署后经真实网络栈的 HTTP smoke 保留在 Gate 5。
 - `pnpm test:thread-chat:gate2-db`：专用 `thread-chat-normalized-test` PostgreSQL 通过
   - 单 Message 单 pipeline、checkpoint、重启 sweep、Session 丢失 Stop、终态 CAS、空回复、部分错误、Artifact/usage 原子落库、owner isolation、SSE 不可用后 Message poll。
 - `pnpm test:thread-chat:gate1-db`：Gate 1 PostgreSQL 回归通过。

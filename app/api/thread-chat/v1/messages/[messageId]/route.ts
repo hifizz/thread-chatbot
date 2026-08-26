@@ -4,9 +4,9 @@ import { handleGetMessage } from "@/lib/thread-chat/server/handlers"
 export const dynamic = "force-dynamic"
 
 export async function GET(
-  _request: Request,
+  request: Request,
   context: RouteContext<{ messageId: string }>
 ) {
   const { messageId } = await context.params
-  return handleGetMessage(messageId)
+  return handleGetMessage(request, messageId)
 }

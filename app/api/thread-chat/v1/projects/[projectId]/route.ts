@@ -9,9 +9,9 @@ export const dynamic = "force-dynamic"
 
 type Context = RouteContext<{ projectId: string }>
 
-export async function GET(_request: Request, context: Context) {
+export async function GET(request: Request, context: Context) {
   const { projectId } = await context.params
-  return handleGetProject(projectId)
+  return handleGetProject(request, projectId)
 }
 
 export async function PATCH(request: Request, context: Context) {

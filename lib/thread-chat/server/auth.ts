@@ -1,7 +1,9 @@
 import { getCurrentUserId } from "@/lib/auth/server"
 
-export async function requireThreadChatUser(): Promise<string> {
-  const userId = await getCurrentUserId()
+export async function requireThreadChatUser(
+  requestHeaders: Headers
+): Promise<string> {
+  const userId = await getCurrentUserId(requestHeaders)
   if (!userId) throw new ThreadChatUnauthorizedError()
   return userId
 }

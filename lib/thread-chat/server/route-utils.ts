@@ -104,11 +104,12 @@ export function mapRouteError(error: unknown): Response {
 }
 
 export async function withThreadChatRoute(
+  request: Request,
   execute: (userId: string) => Promise<Response>
 ): Promise<Response> {
   try {
     await ensureThreadChatRuntimeInitialized()
-    const userId = await requireThreadChatUser()
+    const userId = await requireThreadChatUser(request.headers)
     return await execute(userId)
   } catch (error) {
     return mapRouteError(error)

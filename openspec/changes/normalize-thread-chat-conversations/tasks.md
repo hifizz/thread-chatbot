@@ -50,6 +50,7 @@
 - [x] 3.16 用可控 fake model stream 增加协议测试，覆盖 text、reasoning、sources、files、tool input delta/output、data parts、Artifact-only、partial error、abort 与空回复的最终 `parts[]`。
 - [x] 3.17 增加 Session 竞态测试，覆盖 POST 后立即订阅、chunk 与订阅并发、两个订阅者、最后订阅者断开后继续完成、迟到订阅终态快照、TTL cleanup 和重复启动。
 - [x] 3.18 增加 API/DB 集成测试，覆盖认证/404、strict body、幂等 replay 不重复模型、SSE 不可用仍可 poll、checkpoint、Stop/完成竞态、进程重启 sweep 与 Artifact 原子落库。
+- [x] 3.18a 增加 v1 Route Handler + Better Auth + 专用测试 PostgreSQL 集成测试：携带真实签名 session cookie 调用 Route Handler，以可控 fake generation 替代上游模型但不 mock application/repository/DB，覆盖首发、Send、SSE 断开、poll、Stop、Retry、Edit、Fork、Artifact、owner isolation、strict body、命令重放、标题/反馈和级联删除。
 - [x] 3.19 运行 Gate 2 全部纯测试/DB 测试、依赖扫描和 `pnpm typecheck`；确认无新代码访问 balance/credits/billing/cost 后才允许前端接线。
 
 ## 4. Gate 3 — 规范化前端 Store 与既有组件适配
@@ -70,8 +71,9 @@
 - [ ] 4.14 保留 Project 级 localStorage 工作区 schema（视图、打开列、画布、面板尺寸、折叠/展开），增加 sanitize/version 测试并删除其中任何会话内容/active-leaf 权威字段。
 - [ ] 4.15 删除 `turn-variant-picker.tsx`、variant/active-leaf command、版本计数与切换 selector/样式引用；保留 superseded 实体供 frozen branch/source 查询，但不提供切回入口。
 - [ ] 4.16 改写纯 Node 客户端测试，覆盖 bootstrap、Store merge、chunk parts、terminal poll、断流不重连、optimistic rollback、A→B→C、旧分支可达、Artifact/research 和本地工作区隔离。
-- [ ] 4.17 使用 `ego-browser nodejs` 在 localhost 对 mock v1 API 做视觉/交互回归，逐项比对 Gate 0 清单；若除 variant 外发现无法等价保持的 UX/UI 冲突，停止对应任务并提交用户决策。
-- [ ] 4.18 运行 Gate 3 测试、`pnpm typecheck` 和 UI 回归；只有列/画布/Composer/分叉/Artifact/标题/Stop/Retry 均保持且 variant 已移除才进入 cutover。
+- [ ] 4.17 建立仅用于 Gate 3 验收的 normalized runtime 测试 harness：复用现有列视图、画布、Composer、消息、Artifact 和 workspace 组件，注入 mock v1 API/SSE；不得替换正式 `/thread-chat` 入口、不得读写旧整树 API，也不得形成生产双轨运行路径。
+- [ ] 4.18 使用 `ego-browser nodejs` 在 localhost 操作 4.17 的测试 harness，覆盖正常流、POST 后迟到 SSE、半途中断后只轮询不重连、刷新后 background poll、Stop/Retry/Edit、留空与带问 Fork、嵌套分支、Artifact/research、标题/反馈/归档/删除、本地布局恢复和 variant 消失；逐项比对 Gate 0 清单。若除 variant 外发现无法等价保持的 UX/UI 冲突，停止对应任务并提交用户决策。
+- [ ] 4.19 运行 Gate 3 全部纯测试、`pnpm typecheck`、`pnpm lint`、依赖边界扫描、OpenSpec strict validation 和 UI 回归；记录 Gate 3 evidence。只有列/画布/Composer/分叉/Artifact/标题/Stop/Retry 均保持且 variant 已移除，才逐项勾选 4.1–4.19，并按用户要求创建独立的 Gate 3 完成 commit 后进入 cutover。
 
 ## 5. Gate 4 — 一次性 cutover 与旧运行路径退役
 
