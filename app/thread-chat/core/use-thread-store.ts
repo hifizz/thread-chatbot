@@ -8,15 +8,17 @@
  */
 
 import { useSyncExternalStore } from "react"
-import type { ThreadStore } from "./store"
 import { useStore } from "zustand"
 import type { ConversationStore } from "./store"
 import type { NormalizedThreadChatState } from "./types"
+import type { ThreadTreeState } from "./types"
 
-export type ThreadTreeReadableStore = Pick<
-  ThreadStore,
-  "subscribe" | "getVersion" | "getState" | "setThreadModel"
->
+export interface ThreadTreeReadableStore {
+  subscribe(listener: () => void): () => void
+  getVersion(): number
+  getState(): ThreadTreeState
+  setThreadModel(threadId: string, modelId: string): void
+}
 
 export function useThreadStore(store: ThreadTreeReadableStore): number {
   return useSyncExternalStore(

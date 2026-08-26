@@ -5,8 +5,6 @@ function build(overrides = {}) {
   return buildChatToolSet({
     researchMode: "answer",
     searchReady: true,
-    threadChat: false,
-    markdownArtifactRequested: false,
     ...overrides,
   })
 }
@@ -46,13 +44,12 @@ assert.deepEqual(Object.keys(unavailable.tools).sort(), [
 
 const composed = build({
   researchMode: "fetch",
-  threadChat: true,
-  markdownArtifactRequested: true,
   frontendToolSet: { clientEcho: { kind: "frontend" } },
 })
 assert.equal(composed.webToolsEnabled, true)
 assert.deepEqual(Object.keys(composed.tools), [
-  "createMarkdownArtifact",
+  "getWeather",
+  "compareTable",
   "readUrl",
   "clientEcho",
 ])

@@ -9,13 +9,27 @@
 import { useEffect } from "react"
 import { useRouter } from "next/navigation"
 import "./thread-chat.css"
-import { getLastTreeId } from "./net/persistence/persist"
+import { createThreadChatClient } from "./net/client"
 
 export function TreeRedirect() {
   const router = useRouter()
   useEffect(() => {
-    const id = getLastTreeId() ?? crypto.randomUUID()
-    router.replace(`/thread-chat/${id}`)
+    let cancelled = false
+    const client = createThreadChatClient()
+    void client
+      .listProjects(false)
+      .then((projects) => {
+        if (!cancelled)
+          router.replace(
+            `/thread-chat/${projects[0]?.id ?? crypto.randomUUID()}`
+          )
+      })
+      .catch(() => {
+        if (!cancelled) router.replace(`/thread-chat/${crypto.randomUUID()}`)
+      })
+    return () => {
+      cancelled = true
+    }
   }, [router])
   return (
     <div className="tc">

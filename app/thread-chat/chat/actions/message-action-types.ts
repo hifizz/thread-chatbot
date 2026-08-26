@@ -1,5 +1,4 @@
 import type { Message, MessageFeedback } from "../../core/types"
-import type { RecoverableTurn } from "../../generation/types"
 import type { ThreadMessageActionCommands } from "./message-action-commands"
 import type { SourceProvenance } from "../../core/message-graph"
 
@@ -20,6 +19,14 @@ export const MESSAGE_ACTION_ERRORS = {
   noMarkdown: "该回复没有可复制的 Markdown 正文",
   feedbackSave: "反馈保存失败，请重试",
 } as const
+
+/** Legacy recovery UI shape retained only as a read-only presentation slot. */
+export interface RecoverableTurn {
+  threadId: string
+  userMessageId: string
+  assistantMessageId?: string
+  reason: "missing_assistant" | "missing_generation" | "interrupted_generation"
+}
 
 /** 未完成回复不暴露复制或评价；失败恢复由独立 Retry 入口负责。 */
 export function hasCompletedAssistantActions(message: Message): boolean {

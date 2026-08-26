@@ -1,186 +1,182 @@
 "use client"
-/**
- * --------------------------------------------------------------------------
- * Thread Chat · 分支对话（方案⑥ 自适应列 + 列满策略：替换⑥ / 细条⑤）
- * --------------------------------------------------------------------------
- * 顶层壳：只负责状态编排与各层拼装，具体能力分四层实现——
- * · core/          headless 会话树 store + 选择器（useSyncExternalStore 绑定）；
- * · chat/          单会话视图（消息列表 + composer），不知道树/列/分支；
- * · branching/     把「分支能力」注入 chat：锚点/脚注/面包屑/继承上文/划选气泡；
- * · orchestration/ 视图编排：列视图（放置策略：替换⑥/细条⑤、切换器、Artifact 抽屉）
- *                  与画布视图（thread-canvas，React Flow 全树纵览，懒加载）两个平级视图层。
- *
- * 「打开某会话」的统一意图入口是 openBranchUI：脚注 / ⌘K / 每列 ⇄ / 子树弹层 /
- * Artifact 定位来源 / 画布双击节点全部走它——画布模式下先切回列视图（打开 = 去列里读），
- * 列满时按当前策略替换（可撤销）或折叠细条。
- *
- * 持久化（loader + inner 拆分）：默认导出 ThreadChatDemo 通过 useThreadChatBoot
- * 完成远端加载、strict-v2 清理与工作台恢复，随后才渲染 ThreadChatDemoInner
- * （store 以已存状态为种子一次性创建）。inner 订阅 store
- * version，useTreePersistence 防抖整树 PUT（流式高频跳变合并）+ 卸载 flush；
- * 工作台状态（列槽/列宽/列数/策略/视图）按 treeId 分键防抖写 localStorage。
- * --------------------------------------------------------------------------
- */
 
 import dynamic from "next/dynamic"
 import { useRouter } from "next/navigation"
-import React, { useState } from "react"
-import "./thread-chat.css"
-import { activePathArtifacts } from "./core/selectors"
-import type {
-  Message,
-  MessageFeedbackSummary,
-  ThreadTreeState,
-} from "./core/types"
-import { deriveTreeTitle, type TreeUiState } from "./net/persistence/persist"
-import type { GenerationSummary } from "./generation/types"
-import type { RecoverableTurn } from "./generation/types"
-import { useThreadChatBoot } from "./net/boot/use-thread-chat-boot"
+import React, { useCallback, useEffect, useMemo, useState } from "react"
+
+import { DEFAULT_THREAD_CHAT_MODEL_ID } from "@/constants/model"
+import {
+  activePathArtifacts,
+  threadTitle,
+  type TreeRow,
+} from "./core/selectors"
+import { useConversationStore } from "./core/use-thread-store"
+import {
+  fromConversationViewThreadId,
+  projectConversationTree,
+} from "./core/projections"
+import { createProjectedConversationStore } from "./core/projected-store"
+import { selectThreadBusy, selectVisibleMessages } from "./core/selectors"
+import type { Message, MessageFeedback } from "./core/types"
 import { BranchableChat } from "./branching/branchable-chat"
-import { SelectionBubble } from "./branching/selection/selection-bubble"
-import { type Slot } from "./orchestration/columns/placement"
+import {
+  SelectionBubble,
+  type SelectionInfo,
+} from "./branching/selection/selection-bubble"
+import { buildMessageActionViewState } from "./chat/actions/message-action-presentation"
+import type {
+  GenerationActionResult,
+  ThreadMessageActionCommands,
+} from "./chat/actions/message-action-commands"
+import type { MessageActionViewState } from "./chat/actions/message-action-types"
+import { kickoffQuestion } from "./net/prompt/prompt-pure"
+import { removeWorkspaceState } from "./net/persistence/workspace-state"
 import { ThreadColumns } from "./orchestration/columns/thread-columns"
-import { ThreadSwitcher } from "./orchestration/navigation/thread-switcher"
-import { TreeList } from "./orchestration/navigation/tree-list"
-import { ArtifactDrawer } from "./orchestration/artifacts/artifact-drawer"
-import { HelpPanel, UsageHint } from "./orchestration/overlays/help-panel"
+import type {
+  PlacementHint,
+  PlacementMode,
+} from "./orchestration/columns/placement"
 import { ThreadChatTopbar } from "./orchestration/navigation/thread-chat-topbar"
+import {
+  ThreadSwitcher,
+  type SwitcherMode,
+} from "./orchestration/navigation/thread-switcher"
+import {
+  TreeList,
+  type TreeListItem,
+} from "./orchestration/navigation/tree-list"
+import { ArtifactDrawer } from "./orchestration/artifacts/artifact-drawer"
+import type { CanvasChatActions } from "./orchestration/canvas/canvas-actions"
+import { HelpPanel, UsageHint } from "./orchestration/overlays/help-panel"
 import { useWorkspaceOverlays } from "./orchestration/overlays/use-workspace-overlays"
 import {
   useWorkspaceToast,
   WorkspaceToast,
 } from "./orchestration/overlays/workspace-toast"
-import { useThreadChatRuntime } from "./orchestration/workspace/use-thread-chat-runtime"
-import { useThreadChatWorkspace } from "./orchestration/workspace/use-thread-chat-workspace"
-import { createBranchWorkspaceActions } from "./orchestration/workspace/branch-workspace-actions"
+import { useConversationRuntime } from "./orchestration/workspace/use-conversation-runtime"
+import { useNormalizedWorkspace } from "./orchestration/workspace/use-normalized-workspace"
 
-/** 画布视图层懒加载：React Flow 只在首次进入画布模式时才落地（且跳过 SSR） */
 const ThreadCanvas = dynamic(
   () =>
-    import("./orchestration/canvas/thread-canvas").then((m) => m.ThreadCanvas),
+    import("./orchestration/canvas/thread-canvas").then(
+      (module) => module.ThreadCanvas
+    ),
   {
     ssr: false,
     loading: () => <div className="canvas-loading">画布加载中…</div>,
   }
 )
 
-/** 主线列头副标题的兜底：整棵树还没有任何用户消息（也没被重命名）时展示 */
 const SUBTITLE_FALLBACK = "新对话"
+const EMPTY_SLOTS: [] = []
 
-/** 画布模式喂给划选气泡的空列槽（稳定引用）：画布 fork 不占列槽（D4），
-    气泡据此不渲染迷你列条（hasMap=false），提交路径由 handleFork 按视图分流 */
-const EMPTY_SLOTS: Slot[] = []
+function legacyFeedback(value: "up" | "down" | null): MessageFeedback | null {
+  return value === "up" ? "positive" : value === "down" ? "negative" : null
+}
 
-/**
- * 默认导出的 loader：先完成远端加载（GET → sanitize → 读工作台记忆）再渲染 inner。
- * 加载失败 / 未命中都以空树降级（loadTree 内部已 console.warn），不阻塞页面。
- * treeId 变化由上层路由的 key={treeId} 整体重挂，不在此处处理切树。
- */
+function normalizedFeedback(
+  value: MessageFeedback | null
+): "up" | "down" | null {
+  return value === "positive" ? "up" : value === "negative" ? "down" : null
+}
+
+function actionResult(input: {
+  userMessageId?: string
+  assistantMessageId: string
+  sourceUserMessageId?: string
+  sourceAssistantMessageId?: string
+}): GenerationActionResult {
+  return {
+    ok: true,
+    generationId: input.assistantMessageId,
+    userMessageId: input.userMessageId ?? input.assistantMessageId,
+    assistantMessageId: input.assistantMessageId,
+    ...(input.sourceUserMessageId
+      ? { sourceUserMessageId: input.sourceUserMessageId }
+      : {}),
+    ...(input.sourceAssistantMessageId
+      ? { sourceAssistantMessageId: input.sourceAssistantMessageId }
+      : {}),
+  }
+}
+
+function actionFailure(error: unknown): GenerationActionResult {
+  return {
+    ok: false,
+    code: "network_error",
+    message: error instanceof Error ? error.message : "请求失败，请重试",
+  }
+}
+
 export function ThreadChatDemo({ treeId }: { treeId: string }) {
-  const boot = useThreadChatBoot(treeId)
-
-  if (!boot) {
+  const runtime = useConversationRuntime(treeId)
+  if (runtime.status === "loading") {
     return (
       <div className="tc">
         <div className="boot-loading">对话加载中…</div>
       </div>
     )
   }
-  return (
-    <ThreadChatDemoInner
-      treeId={treeId}
-      initialState={boot.seed}
-      initialUi={boot.ui}
-      initialCustomTitle={boot.customTitle}
-      initialGenerations={boot.generations}
-      initialMessageFeedbacks={boot.messageFeedbacks}
-      initialRecoverableTurns={boot.recoverableTurns}
-    />
-  )
+  if (runtime.status === "error") {
+    return (
+      <div className="tc">
+        <div className="boot-loading">对话加载失败，请刷新重试。</div>
+      </div>
+    )
+  }
+  return <NormalizedThreadChat treeId={treeId} runtime={runtime} />
 }
 
-interface ThreadChatDemoInnerProps {
-  treeId: string
-  /** store 种子：已 sanitize 的持久化状态，或空树 */
-  initialState: ThreadTreeState
-  /** 该树的工作台记忆（loader 已校验），null = 默认布局（只开主线） */
-  initialUi: TreeUiState | null
-  /** 用户重命名过的标题（未改过为 null）——主线列头副标题优先展示 */
-  initialCustomTitle?: string | null
-  initialGenerations: GenerationSummary[]
-  initialMessageFeedbacks: MessageFeedbackSummary[]
-  initialRecoverableTurns: RecoverableTurn[]
-}
-
-export function ThreadChatDemoInner({
+function NormalizedThreadChat({
   treeId,
-  initialState,
-  initialUi,
-  initialCustomTitle = null,
-  initialGenerations,
-  initialMessageFeedbacks,
-  initialRecoverableTurns,
-}: ThreadChatDemoInnerProps) {
+  runtime,
+}: {
+  treeId: string
+  runtime: ReturnType<typeof useConversationRuntime>
+}) {
   const router = useRouter()
-
-  const { toast, showToast, dismissToast } = useWorkspaceToast()
-  const {
-    store,
-    state,
-    chat,
-    messageActionState,
-    messageCommands,
-    setTreeSaveSuppressed,
-    isTreeSaveSuppressed,
-  } = useThreadChatRuntime({
-    treeId,
-    initialState,
-    initialGenerations,
-    initialMessageFeedbacks,
-    initialRecoverableTurns,
-    onToast: showToast,
-  })
-
-  const {
-    windowWidth: winW,
-    forceCols,
-    setForceCols,
-    maxExpanded,
-    mode,
-    setMode,
-    columns: cols,
-    viewMode,
-    setViewMode,
-    focusNode,
-    focusCanvasNode,
-    showColumnsView,
-    canvasChat,
-    canvasViewState,
-  } = useThreadChatWorkspace({
-    treeId,
-    store,
-    chat,
-    messageCommands,
-    initialUi,
-    isSaveSuppressed: isTreeSaveSuppressed,
-  })
-
-  /* ---------- 主线列头副标题：customTitle（用户重命名）→ 自动标题 / 派生回退 → 兜底 ----------
-       customTitle 本地态由对话列表的 onRenamedCurrent 同步（重命名当前树立即生效，无需重载） */
-  const [customTitle, setCustomTitle] = useState<string | null>(
-    initialCustomTitle
+  const state = useConversationStore(runtime.store, (value) => value)
+  const [draftModelId, setDraftModelId] = useState<string>(
+    DEFAULT_THREAD_CHAT_MODEL_ID
   )
-  const mainHasMessage = (state.threads.main?.messages.length ?? 0) > 0
-  const mainSubtitle =
-    customTitle ?? (mainHasMessage ? deriveTreeTitle(state) : SUBTITLE_FALLBACK)
+  const { toast, showToast, dismissToast } = useWorkspaceToast()
+  const setThreadModel = useCallback(
+    (threadId: string, modelId: string) => {
+      const current = runtime.store.getState()
+      if (!current.project || !current.threadsById[threadId]) {
+        setDraftModelId(modelId)
+        return
+      }
+      void runtime.commands
+        .updateThread(threadId, { modelId })
+        .catch(() => showToast("模型切换失败，请重试"))
+    },
+    [runtime.commands, runtime.store, showToast]
+  )
+  const projectedStore = useMemo(
+    () =>
+      createProjectedConversationStore({
+        store: runtime.store,
+        setThreadModel,
+        emptyRootModelId: draftModelId,
+      }),
+    [draftModelId, runtime.store, setThreadModel]
+  )
+  useEffect(() => () => projectedStore.dispose(), [projectedStore])
 
-  /* ---------- 其余 UI 状态 ---------- */
-  /* 首次内联提示：仅「未关过 && 还没开始聊」时可见；顶栏帮助另走 Dialog。 */
-  const [hintDismissed, setHintDismissed] = useState(false)
+  const tree = useMemo(() => {
+    const projected = projectConversationTree(state)
+    if (!state.project) projected.threads.main.modelId = draftModelId
+    return projected
+  }, [draftModelId, state])
+  const workspace = useNormalizedWorkspace({
+    store: runtime.store,
+    projectedStore,
+  })
   const {
-    rootRef: tcRootRef,
-    selection: sel,
-    setSelection: setSel,
+    rootRef,
+    selection,
+    setSelection,
     switcher,
     closeSwitcher,
     toggleGlobalSwitcher,
@@ -193,60 +189,355 @@ export function ThreadChatDemoInner({
     closeHelpPanel,
     openHelpPanel,
     drawerOpen,
-    activeArtifactId: activeArt,
-    setActiveArtifactId: setActiveArt,
+    activeArtifactId,
+    setActiveArtifactId,
     openArtifact,
     toggleDrawer,
     closeDrawer,
   } = useWorkspaceOverlays()
+  const [hintDismissed, setHintDismissed] = useState(false)
 
-  const {
-    openBranchUI,
-    handleFork,
-    changeMode,
-    pickRow,
-    isThreadBusy,
-    composerPrefillFor,
-  } = createBranchWorkspaceActions({
-    state,
-    store,
-    chat,
-    columns: cols,
-    viewMode,
-    mode,
-    setMode,
-    showColumnsView,
-    focusCanvasNode,
-    closeSwitcher,
-    showToast,
-  })
+  const feedbackByMessageId = useMemo(
+    () =>
+      new Map(
+        Object.values(state.messagesById).flatMap((message) => {
+          const feedback = legacyFeedback(message.feedback)
+          return feedback ? [[message.id, feedback] as const] : []
+        })
+      ),
+    [state.messagesById]
+  )
+  const messageActionState = useMemo<MessageActionViewState>(
+    () =>
+      buildMessageActionViewState({
+        state: tree,
+        recoverableByUserMessageId: new Map(),
+        feedbackByMessageId,
+      }),
+    [feedbackByMessageId, tree]
+  )
 
-  /* ---------- 主线 hint 卡片：仅整棵树还没有任何消息时展示（判 main 即可——
-       分支必经主线产生），首条消息一出现即随派生状态消失；× 可提前手动关。 ---------- */
+  const messageCommands = useMemo<ThreadMessageActionCommands>(
+    () => ({
+      async retryAssistant(viewThreadId, assistantMessageId) {
+        try {
+          const threadId = fromConversationViewThreadId(state, viewThreadId)
+          const result = await runtime.commands.retryMessage({
+            messageId: assistantMessageId,
+            modelId:
+              state.threadsById[threadId]?.modelId ??
+              DEFAULT_THREAD_CHAT_MODEL_ID,
+          })
+          return actionResult({
+            assistantMessageId: result.command.assistantMessageId,
+            sourceAssistantMessageId: assistantMessageId,
+          })
+        } catch (error) {
+          return actionFailure(error)
+        }
+      },
+      async retryUserTurn(viewThreadId, userMessageId) {
+        try {
+          const threadId = fromConversationViewThreadId(state, viewThreadId)
+          const source = state.messagesById[userMessageId]
+          if (!source)
+            return { ok: false, code: "not_found", message: "消息不存在" }
+          const assistant = selectVisibleMessages(state, threadId).find(
+            (message) =>
+              message.role === "assistant" && message.sequence > source.sequence
+          )
+          const result = await runtime.commands.editLatestTurn({
+            userMessageId,
+            assistantMessageId: assistant?.id,
+            modelId:
+              state.threadsById[threadId]?.modelId ??
+              DEFAULT_THREAD_CHAT_MODEL_ID,
+            text: source.parts
+              .filter((part) => part.type === "text")
+              .map((part) => part.text)
+              .join(""),
+          })
+          return actionResult({
+            userMessageId: result.command.userMessageId,
+            assistantMessageId: result.command.assistantMessageId,
+            sourceUserMessageId: userMessageId,
+            sourceAssistantMessageId: assistant?.id,
+          })
+        } catch (error) {
+          return actionFailure(error)
+        }
+      },
+      async editAndRegenerate(viewThreadId, userMessageId, text) {
+        try {
+          const threadId = fromConversationViewThreadId(state, viewThreadId)
+          const source = state.messagesById[userMessageId]
+          const assistant = source
+            ? selectVisibleMessages(state, threadId).find(
+                (message) =>
+                  message.role === "assistant" &&
+                  message.sequence > source.sequence
+              )
+            : undefined
+          const result = await runtime.commands.editLatestTurn({
+            userMessageId,
+            assistantMessageId: assistant?.id,
+            modelId:
+              state.threadsById[threadId]?.modelId ??
+              DEFAULT_THREAD_CHAT_MODEL_ID,
+            text,
+          })
+          return actionResult({
+            userMessageId: result.command.userMessageId,
+            assistantMessageId: result.command.assistantMessageId,
+            sourceUserMessageId: userMessageId,
+            sourceAssistantMessageId: assistant?.id,
+          })
+        } catch (error) {
+          return actionFailure(error)
+        }
+      },
+      async submitFeedback(viewThreadId, messageId, feedback) {
+        const result = await runtime.commands.setFeedback(
+          messageId,
+          normalizedFeedback(feedback)
+        )
+        if (!feedback) return null
+        return {
+          treeId,
+          threadId: fromConversationViewThreadId(state, viewThreadId),
+          messageId,
+          feedback,
+          updatedAt: result.response.data.updatedAt,
+        }
+      },
+    }),
+    [runtime.commands, state, treeId]
+  )
+
+  const send = useCallback(
+    (viewThreadId: string, text: string) => {
+      const current = runtime.store.getState()
+      const normalizedThreadId = fromConversationViewThreadId(
+        current,
+        viewThreadId
+      )
+      const operation = current.project
+        ? runtime.commands.sendMessage({
+            threadId: normalizedThreadId,
+            modelId:
+              current.threadsById[normalizedThreadId]?.modelId ?? draftModelId,
+            text,
+          })
+        : runtime.commands.startProject({
+            projectId: treeId,
+            modelId: draftModelId,
+            text,
+          })
+      void operation.catch((error) =>
+        showToast(error instanceof Error ? error.message : "发送失败，请重试")
+      )
+    },
+    [draftModelId, runtime.commands, runtime.store, showToast, treeId]
+  )
+  const stop = useCallback(
+    (viewThreadId: string) => {
+      const current = runtime.store.getState()
+      const threadId = fromConversationViewThreadId(current, viewThreadId)
+      const active = [...selectVisibleMessages(current, threadId)]
+        .reverse()
+        .find(
+          (message) =>
+            message.role === "assistant" && message.status === "generating"
+        )
+      if (!active) return
+      void runtime.commands
+        .stopMessage(active.id)
+        .catch(() => showToast("停止失败，请重试"))
+    },
+    [runtime.commands, runtime.store, showToast]
+  )
+  const retry = useCallback(
+    (viewThreadId: string, message: Message) => {
+      void messageCommands.retryAssistant(viewThreadId, message.id)
+    },
+    [messageCommands]
+  )
+
+  const openBranchUI = useCallback(
+    (id: string, sourceId?: string | null, hint?: PlacementHint) => {
+      workspace.showColumnsView()
+      if (id === "main") {
+        workspace.columns.flashThread("main")
+        return
+      }
+      const effect = workspace.columns.openThread(id, sourceId ?? null, hint)
+      if (effect.kind === "replaced") {
+        showToast(
+          `第 ${effect.idx + 2} 列已替换：「${threadTitle(tree, effect.replacedId)}」→「${threadTitle(tree, id)}」`,
+          () => {
+            workspace.columns.restoreSlots(effect.prevSlots)
+            workspace.columns.flashThread(effect.replacedId)
+          }
+        )
+      } else if (effect.kind === "folded") {
+        showToast(
+          `已打开「${threadTitle(tree, id)}」，「${threadTitle(tree, effect.foldedId)}」已折叠为细条`
+        )
+      }
+    },
+    [showToast, tree, workspace]
+  )
+
+  const handleFork = useCallback(
+    (info: SelectionInfo, hint?: PlacementHint, question?: string) => {
+      const current = runtime.store.getState()
+      const parentThreadId = fromConversationViewThreadId(
+        current,
+        info.threadId
+      )
+      const modelId =
+        current.threadsById[parentThreadId]?.modelId ??
+        DEFAULT_THREAD_CHAT_MODEL_ID
+      void runtime.commands
+        .forkThread({
+          parentThreadId,
+          sourceMessageId: info.msgId,
+          anchorText: info.text,
+          anchor: info.anchor,
+          modelId,
+          ...(question?.trim() ? { text: question.trim() } : {}),
+        })
+        .then(({ command }) => {
+          const title =
+            info.text.length > 13 ? `${info.text.slice(0, 13)}…` : info.text
+          if (workspace.viewMode === "canvas") {
+            workspace.focusCanvasNode(command.threadId)
+            showToast(`已开启分支 · ${title}`)
+            return
+          }
+          openBranchUI(command.threadId, info.threadId, hint)
+          showToast(`已开启分支 · ${title}`)
+        })
+        .catch(() => showToast("创建分支失败，请重试"))
+    },
+    [openBranchUI, runtime.commands, runtime.store, showToast, workspace]
+  )
+
+  const changeMode = useCallback(
+    (nextMode: PlacementMode) => {
+      if (nextMode === workspace.mode) return
+      workspace.setMode(nextMode)
+      if (nextMode !== "replace") return
+      const dropped = workspace.columns.normalizeToReplace()
+      if (dropped.length)
+        showToast(
+          `已切回替换⑥：细条全部展开后，超出列数的「${dropped
+            .map((id) => threadTitle(tree, id))
+            .join("」「")}」已收起`
+        )
+    },
+    [showToast, tree, workspace]
+  )
+
+  const pickRow = useCallback(
+    (row: TreeRow, mode: SwitcherMode) => {
+      closeSwitcher()
+      if (mode.kind === "column") {
+        if (workspace.columns.slots[mode.vpIndex]?.id === row.id) {
+          workspace.columns.flashThread(row.id)
+          return
+        }
+        workspace.columns.navColumn(mode.vpIndex, row.id, "swap")
+      } else if (mode.kind === "subtree") {
+        openBranchUI(row.id, mode.rootId)
+      } else {
+        openBranchUI(row.id, null)
+      }
+    },
+    [closeSwitcher, openBranchUI, workspace.columns]
+  )
+
+  const canvasChat = useMemo<CanvasChatActions>(
+    () => ({
+      send,
+      stop,
+      retry(viewThreadId, messageId) {
+        void messageCommands.retryAssistant(viewThreadId, messageId)
+      },
+      ...messageCommands,
+    }),
+    [messageCommands, send, stop]
+  )
+
+  const loadTreeItems = useCallback(async (): Promise<TreeListItem[]> => {
+    const projects = await runtime.client.listProjects(false)
+    return Promise.all(
+      projects.map(async (project) => {
+        const bootstrap = await runtime.client.getProject(project.id)
+        return {
+          id: project.id,
+          title: project.customTitle ?? project.autoTitle ?? SUBTITLE_FALLBACK,
+          updatedAt: project.updatedAt,
+          threadCount: bootstrap.threads.length,
+        }
+      })
+    )
+  }, [runtime.client])
+  const renameTreeItem = useCallback(
+    async (projectId: string, title: string) => {
+      if (projectId === state.project?.id) {
+        await runtime.commands.renameProject(projectId, title)
+        return
+      }
+      await runtime.client.renameProject(projectId, {
+        commandId: crypto.randomUUID(),
+        customTitle: title,
+      })
+    },
+    [runtime.client, runtime.commands, state.project?.id]
+  )
+  const deleteTreeItem = useCallback(
+    async (projectId: string) => {
+      if (projectId === state.project?.id)
+        await runtime.commands.deleteProject(projectId)
+      else
+        await runtime.client.deleteProject(projectId, {
+          commandId: crypto.randomUUID(),
+        })
+      removeWorkspaceState(window.localStorage, projectId)
+    },
+    [runtime.client, runtime.commands, state.project?.id]
+  )
+
+  const mainHasMessage = (tree.threads.main?.messages.length ?? 0) > 0
+  const firstUserText = tree.threads.main?.messages
+    .find((message) => message.role === "user")
+    ?.text.trim()
+  const derivedSubtitle = firstUserText
+    ? firstUserText.length > 28
+      ? `${firstUserText.slice(0, 28)}…`
+      : firstUserText
+    : SUBTITLE_FALLBACK
+  const mainSubtitle =
+    state.project?.customTitle ?? state.project?.autoTitle ?? derivedSubtitle
   const hintVisible = !hintDismissed && !mainHasMessage
-  const hintNode = hintVisible ? (
-    <UsageHint onDismiss={() => setHintDismissed(true)} />
-  ) : null
-
-  /* ---------- 顶栏数据 ---------- */
-  const branchCount = Object.keys(state.threads).length - 1
-  const markdownCount = activePathArtifacts(state).reduce(
+  const branchCount = Math.max(0, Object.keys(tree.threads).length - 1)
+  const markdownCount = activePathArtifacts(tree).reduce(
     (count, artifact) => count + (artifact.kind === "markdown" ? 1 : 0),
     0
   )
 
   return (
-    <div className="tc" ref={tcRootRef}>
+    <div className="tc" ref={rootRef}>
       <ThreadChatTopbar
-        viewMode={viewMode}
-        showHelp={viewMode === "canvas" || !hintVisible}
-        windowWidth={winW}
-        forceCols={forceCols}
-        placementMode={mode}
+        viewMode={workspace.viewMode}
+        showHelp={workspace.viewMode === "canvas" || !hintVisible}
+        windowWidth={workspace.windowWidth}
+        forceCols={workspace.forceCols}
+        placementMode={workspace.mode}
         branchCount={branchCount}
         markdownCount={markdownCount}
         onNewConversation={() => {
-          // 空树已经是新对话；反复点击不应让 URL 持续变化。
           if (!mainHasMessage) {
             showToast("当前就是全新对话，直接开聊吧")
             return
@@ -255,103 +546,115 @@ export function ThreadChatDemoInner({
         }}
         onToggleTreeList={toggleTreeList}
         onOpenHelp={openHelpPanel}
-        onShowColumns={showColumnsView}
-        onShowCanvas={() => setViewMode("canvas")}
-        onForceCols={setForceCols}
+        onShowColumns={workspace.showColumnsView}
+        onShowCanvas={() => workspace.setViewMode("canvas")}
+        onForceCols={workspace.setForceCols}
         onPlacementModeChange={changeMode}
         onToggleThreadTree={toggleGlobalSwitcher}
         onToggleMarkdown={toggleDrawer}
       />
 
-      {viewMode === "columns" ? (
+      {workspace.viewMode === "columns" ? (
         <ThreadColumns
-          state={state}
-          slots={cols.slots}
-          widths={cols.widths}
-          flashId={cols.flashId}
-          colsRef={cols.colsRef}
+          state={tree}
+          slots={workspace.columns.slots}
+          widths={workspace.columns.widths}
+          flashId={workspace.columns.flashId}
+          colsRef={workspace.columns.colsRef}
           onExpandStrip={(id) => openBranchUI(id, null)}
-          onCommitWidths={cols.commitWidths}
-          onResetWidths={cols.resetWidths}
-          renderThread={(threadId, vpIndex) => (
-            <BranchableChat
-              state={state}
-              threadId={threadId}
-              subtitle={threadId === "main" ? mainSubtitle : undefined}
-              intro={threadId === "main" ? hintNode : undefined}
-              onOpenThread={(target, opts) =>
-                openBranchUI(target, threadId, opts)
-              }
-              onOpenArtifact={openArtifact}
-              onCrumbNav={(target) =>
-                cols.navColumn(vpIndex, target, "collapse")
-              }
-              onOpenSwitcher={(btn) => openColumnSwitcher(vpIndex, btn)}
-              onOpenSubtree={(btn) => openSubtree(threadId, btn)}
-              onCollapse={() => cols.closeColumn(vpIndex)}
-              busy={isThreadBusy(threadId)}
-              composerPrefill={composerPrefillFor(threadId)}
-              onModelChange={(modelId) =>
-                store.setThreadModel(threadId, modelId)
-              }
-              onRetry={(msg: Message) => chat.retry(threadId, msg.id)}
-              onStop={() => chat.stop(threadId)}
-              onSend={(text) => chat.send(threadId, text)}
-              messageActionState={messageActionState}
-              messageCommands={messageCommands}
-            />
-          )}
+          onCommitWidths={workspace.columns.commitWidths}
+          onResetWidths={workspace.columns.resetWidths}
+          renderThread={(viewThreadId, viewportIndex) => {
+            const threadId = fromConversationViewThreadId(state, viewThreadId)
+            const thread = tree.threads[viewThreadId]
+            return (
+              <BranchableChat
+                state={tree}
+                threadId={viewThreadId}
+                subtitle={viewThreadId === "main" ? mainSubtitle : undefined}
+                intro={
+                  viewThreadId === "main" && hintVisible ? (
+                    <UsageHint onDismiss={() => setHintDismissed(true)} />
+                  ) : undefined
+                }
+                onOpenThread={(target, options) =>
+                  openBranchUI(target, viewThreadId, options)
+                }
+                onOpenArtifact={openArtifact}
+                onCrumbNav={(target) =>
+                  workspace.columns.navColumn(viewportIndex, target, "collapse")
+                }
+                onOpenSwitcher={(button) =>
+                  openColumnSwitcher(viewportIndex, button)
+                }
+                onOpenSubtree={(button) => openSubtree(viewThreadId, button)}
+                onCollapse={() => workspace.columns.closeColumn(viewportIndex)}
+                busy={
+                  Boolean(state.project) && selectThreadBusy(state, threadId)
+                }
+                composerPrefill={
+                  thread?.anchorText && thread.messages.length === 0
+                    ? kickoffQuestion(thread.anchorText)
+                    : undefined
+                }
+                onModelChange={(modelId) => {
+                  if (!state.project) setDraftModelId(modelId)
+                  else setThreadModel(threadId, modelId)
+                }}
+                onRetry={(message) => retry(viewThreadId, message)}
+                onStop={() => stop(viewThreadId)}
+                onSend={(text) => send(viewThreadId, text)}
+                messageActionState={messageActionState}
+                messageCommands={messageCommands}
+              />
+            )
+          }}
         />
       ) : (
         <ThreadCanvas
-          store={store}
+          store={projectedStore}
           mainSubtitle={mainSubtitle}
-          viewState={canvasViewState}
+          viewState={workspace.canvasViewState}
           chat={canvasChat}
           messageActionState={messageActionState}
-          focusNode={focusNode}
+          focusNode={workspace.focusNode}
           onOpenThread={(id) => openBranchUI(id, null)}
           onOpenArtifact={openArtifact}
         />
       )}
 
-      {/* 划选气泡两种视图都在（画布面板消息与列模式同一套 .md-body 划选 DOM 契约，
-          openspec: add-canvas-conversations）。列模式：列槽上下文喂迷你列条，预览与
-          提交共用 placement 规则；画布模式：喂空槽（不渲染列条，fork 不占列槽 D4）。 */}
       <SelectionBubble
-        state={state}
-        sel={sel}
-        onSelChange={setSel}
+        state={tree}
+        sel={selection}
+        onSelChange={setSelection}
         onFork={handleFork}
-        slots={viewMode === "canvas" ? EMPTY_SLOTS : cols.slots}
-        mode={mode}
-        maxExpanded={maxExpanded}
-        lastActiveOf={(id) => state.threads[id]?.lastActive ?? 0}
+        slots={
+          workspace.viewMode === "canvas"
+            ? EMPTY_SLOTS
+            : workspace.columns.slots
+        }
+        mode={workspace.mode}
+        maxExpanded={workspace.maxExpanded}
+        lastActiveOf={(id) => tree.threads[id]?.lastActive ?? 0}
       />
 
       {treeList !== null && (
         <TreeList
           key={treeList.n}
           currentTreeId={treeId}
-          currentTitle={customTitle ?? deriveTreeTitle(state)}
-          currentThreadCount={Object.keys(state.threads).length}
+          currentTitle={mainSubtitle ?? SUBTITLE_FALLBACK}
+          currentThreadCount={Object.keys(tree.threads).length}
+          loadItems={loadTreeItems}
+          renameItem={renameTreeItem}
+          deleteItem={deleteTreeItem}
           closing={treeList.closing}
-          container={tcRootRef}
+          container={rootRef}
           onClose={closeTreeList}
           onSwitch={(id) => router.push(`/thread-chat/${id}`)}
-          onSuppressCurrentSave={(v) => {
-            // 删除前置位（失败恢复）：挡住防抖回调与卸载 flush 的新写；
-            // 已在飞的 PUT 由 persist 写链保证先于 DELETE 落库，两头闭环
-            setTreeSaveSuppressed(v)
-          }}
           onDeleteCurrent={(nextId) => {
-            // 当前树已被删除：抑制卸载 flush / 防抖尾巴的回写（否则 DB 行复活），
-            // 再跳剩余最近一棵；一棵不剩则开新 UUID。replace 不给被删 URL 留历史。
-            setTreeSaveSuppressed(true)
             closeTreeList()
             router.replace(`/thread-chat/${nextId ?? crypto.randomUUID()}`)
           }}
-          onRenamedCurrent={setCustomTitle}
           onToast={showToast}
         />
       )}
@@ -359,12 +662,12 @@ export function ThreadChatDemoInner({
       {switcher && (
         <ThreadSwitcher
           key={switcher.n}
-          state={state}
+          state={tree}
           mode={switcher}
-          slots={cols.slots}
-          recents={state.recents}
+          slots={workspace.columns.slots}
+          recents={tree.recents}
           closing={switcher.closing}
-          container={tcRootRef}
+          container={rootRef}
           onPick={pickRow}
           onClose={closeSwitcher}
         />
@@ -374,20 +677,19 @@ export function ThreadChatDemoInner({
         <HelpPanel
           key={helpPanel.n}
           closing={helpPanel.closing}
-          container={tcRootRef}
+          container={rootRef}
           onClose={closeHelpPanel}
         />
       )}
 
       <ArtifactDrawer
-        state={state}
+        state={tree}
         open={drawerOpen}
-        activeId={activeArt}
+        activeId={activeArtifactId}
         onClose={closeDrawer}
-        onSelect={setActiveArt}
+        onSelect={setActiveArtifactId}
         onLocate={(threadId) => openBranchUI(threadId, null)}
       />
-
       <WorkspaceToast toast={toast} onDismiss={dismissToast} />
     </div>
   )

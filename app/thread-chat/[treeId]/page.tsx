@@ -6,9 +6,8 @@ import { threadChatMetadata } from "../page-metadata"
 export const metadata = threadChatMetadata
 
 /**
- * URL 即树身份：/thread-chat/{treeId} 打开指定的分支树（直访新 UUID = 开新树）。
- * treeId 做 UUID 形状校验（安全阀），不合法 404。key={treeId} 保证切树（如「新对话」
- * 跳转）时 loader/store 整体重挂，不残留上一棵树的内存状态。
+ * URL 即 Project 身份：/thread-chat/{treeId} 打开规范化分支会话；直访新 UUID
+ * 得到空工作台，首条消息原子创建 Project。路径仍沿用 treeId 参数名以保持 URL/UX。
  */
 export default async function ThreadChatTreePage({
   params,

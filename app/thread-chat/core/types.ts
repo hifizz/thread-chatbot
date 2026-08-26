@@ -21,10 +21,7 @@ export interface ConversationViewMessage extends LegacyMessage {
 }
 
 export type ConversationStreamPhase =
-  | "connecting"
-  | "live"
-  | "background"
-  | "terminal"
+  "connecting" | "live" | "background" | "terminal"
 
 export interface ConversationStreamState {
   phase: ConversationStreamPhase
@@ -46,6 +43,10 @@ export interface WorkspacePanelSizes {
 export interface WorkspaceUiState {
   view: "columns" | "canvas"
   openThreadIds: string[]
+  columnSlots: Array<{ threadId: string; folded: boolean }>
+  columnWidths: Record<string, number>
+  forceColumns: number | null
+  placementMode: "replace" | "fold"
   selectedThreadId: string
   recents: string[]
   canvas: WorkspaceCanvasSnapshot

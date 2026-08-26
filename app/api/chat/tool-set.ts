@@ -12,8 +12,6 @@ const RESEARCH_TOOLS = {
 type ChatToolSetInput = {
   researchMode: ResearchRoute["mode"]
   searchReady: boolean
-  threadChat: boolean
-  markdownArtifactRequested: boolean
   /** assistant-ui 使用其内嵌 AI SDK 类型；只在最终组合出口统一适配。 */
   frontendToolSet?: Record<string, unknown>
 }
@@ -22,8 +20,6 @@ type ChatToolSetInput = {
 export function buildChatToolSet({
   researchMode,
   searchReady,
-  threadChat,
-  markdownArtifactRequested,
   frontendToolSet,
 }: ChatToolSetInput): { tools: ToolSet; webToolsEnabled: boolean } {
   const webToolsEnabled = searchReady && researchMode !== "answer"
@@ -34,7 +30,7 @@ export function buildChatToolSet({
   return {
     webToolsEnabled,
     tools: {
-      ...surfaceTools({ threadChat, markdownArtifactRequested }),
+      ...surfaceTools(),
       ...(webToolsEnabled ? routedWebTools : {}),
       ...(frontendToolSet ?? {}),
     } as ToolSet,

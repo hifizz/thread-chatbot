@@ -293,6 +293,10 @@ interface ConversationEntityState {
 interface WorkspaceUiState {
   view: "columns" | "canvas"
   openThreadIds: string[]
+  columnSlots: Array<{ threadId: string; folded: boolean }>
+  columnWidths: Record<string, number>
+  forceColumns: number | null
+  placementMode: "replace" | "fold"
   selectedThreadId: string
   recents: string[]
   canvas: CanvasUiSnapshot
@@ -300,6 +304,10 @@ interface WorkspaceUiState {
   expandedNodes: string[]
 }
 ```
+
+`columnSlots/columnWidths/forceColumns/placementMode` 是现有列放置、细条折叠、
+拖拽列宽和强制列数的纯工作区状态。它们必须随 Project 本地保存，才能在切换到
+规范化实体后保持原有 UX；这些字段不包含 Message、active leaf 或其他业务权威数据。
 
 业务 actions：`hydrateProject`、`upsertProject/Thread/Message/Artifact`、`applyStreamSnapshot`、`applyStreamChunk`、`reconcileTerminalMessage`、`markBackgroundGeneration`、`begin/commit/rollbackOptimisticCommand`、`removeProject`。流 chunk 通过 AI SDK v7 的 UI Message reducer 归并，不再维护 `text += delta`、独立 Markdown 临时字段或 web research 旁路字段。
 

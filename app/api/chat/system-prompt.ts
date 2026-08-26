@@ -3,7 +3,6 @@ import {
   RESEARCH_SYSTEM_PROMPT,
   WEB_ACCESS_SYSTEM_PROMPT,
 } from "@/constants/research"
-import { buildThreadChatSystem } from "@/lib/chat/thread-chat-prompt"
 import {
   researchPlanExecutionPrompt,
   type ResearchPlan,
@@ -11,9 +10,6 @@ import {
 } from "@/lib/chat/research-router"
 
 type ChatSystemPromptInput = {
-  threadChat: boolean
-  anchorText: string | null
-  markdownArtifactRequested: boolean
   researchMode: ResearchRoute["mode"]
   researchPlan: ResearchPlan | null
   deepResearchRequested: boolean
@@ -25,20 +21,12 @@ const SEARCH_UNAVAILABLE_PROMPT =
 
 /** 将各能力拥有的 system 片段按既有优先顺序组合为单一服务端提示。 */
 export function buildChatSystemPrompt({
-  threadChat,
-  anchorText,
-  markdownArtifactRequested,
   researchMode,
   researchPlan,
   deepResearchRequested,
   searchReady,
 }: ChatSystemPromptInput): string {
   return [
-    threadChat
-      ? buildThreadChatSystem(anchorText, {
-          enableMarkdownArtifact: markdownArtifactRequested,
-        })
-      : null,
     researchMode === "fetch" ? DIRECT_FETCH_SYSTEM_PROMPT : null,
     researchMode === "search" || researchMode === "research"
       ? WEB_ACCESS_SYSTEM_PROMPT

@@ -77,17 +77,17 @@
 
 ## 5. Gate 4 — 一次性 cutover 与旧运行路径退役
 
-- [ ] 5.1 建立旧路径退役清单，映射 `branch_trees`、`branch_generations`、active-leaf/variant、generation reconciliation、整树 PUT/save gate、旧 `/api/chat` threadChat mode 和 billing settlement 的每个生产引用及对应新模块。
-- [ ] 5.2 编写维护窗口与数据库备份 runbook，记录备份验证、应用停写、migration、空新表检查、应用切换、smoke 和运维级 rollback 命令；不得把旧数据迁入新表。
-- [ ] 5.3 编写 cutover migration：将旧 `branch_trees`、`branch_generations`、`branch_message_feedback` rename 为明确 legacy backup 表名，新应用 schema 不 export 它们；不 drop 备份、不建兼容 view、不双写。
-- [ ] 5.4 将 `/thread-chat` 唯一接线到 v1 bootstrap/normalized store/session pipeline，移除对旧整树 GET/PUT、旧 generation poll 和旧 `/api/chat` threadChat mode 的运行时调用。
-- [ ] 5.5 删除或隔离旧 `lib/thread-chat-generation`、generation reconciliation、tree persistence/save gate、active-leaf/variant contracts 与已无消费者代码，保留与新架构复用的纯 TextAnchor、prompt policy、Artifact 和研究逻辑。
-- [ ] 5.6 从旧 `/api/chat` 或共享工具中抽取仍需复用的无计费 model/tool 配置，确保 v1 生成和 title 路径不经过 generation settlement、credits、balance、cost evidence 或 billing routes。
-- [ ] 5.7 删除/改写宣称整树、generation sidecar、variant switching 或一次扣费为正确行为的旧测试；保留 CSS/布局/锚点/Artifact/研究等仍适用回归，避免假阳性。
-- [ ] 5.8 增加静态扫描与运行时 spy，证明 `/thread-chat` 请求只访问新表/API，旧 legacy backup 表零读取/零写入，billing functions 零调用。
-- [ ] 5.9 在一次性空 schema 演练中执行完整 cutover：旧表含种子历史、新表为空；migration 后旧 URL 不 fallback、首条消息只写新表、旧历史不可见且没有双写。
-- [ ] 5.10 运行全量 Node/DB 脚本、`pnpm typecheck`、`pnpm lint`、`pnpm build` 与 `pnpm openspec:validate`，审查无未提交生成代码和无意 UI/CSS diff。
-- [ ] 5.11 完成 Gate 4 出场审查：新模型为唯一权威、旧数据未迁移、旧计费未调用、legacy 表仅运维备份、rollback runbook 可执行后才允许部署。
+- [x] 5.1 建立旧路径退役清单，映射 `branch_trees`、`branch_generations`、active-leaf/variant、generation reconciliation、整树 PUT/save gate、旧 `/api/chat` threadChat mode 和 billing settlement 的每个生产引用及对应新模块。
+- [x] 5.2 编写维护窗口与数据库备份 runbook，记录备份验证、应用停写、migration、空新表检查、应用切换、smoke 和运维级 rollback 命令；不得把旧数据迁入新表。
+- [x] 5.3 编写 cutover migration：将旧 `branch_trees`、`branch_generations`、`branch_message_feedback` rename 为明确 legacy backup 表名，新应用 schema 不 export 它们；不 drop 备份、不建兼容 view、不双写。
+- [x] 5.4 将 `/thread-chat` 唯一接线到 v1 bootstrap/normalized store/session pipeline，移除对旧整树 GET/PUT、旧 generation poll 和旧 `/api/chat` threadChat mode 的运行时调用。
+- [x] 5.5 删除或隔离旧 `lib/thread-chat-generation`、generation reconciliation、tree persistence/save gate、active-leaf/variant contracts 与已无消费者代码，保留与新架构复用的纯 TextAnchor、prompt policy、Artifact 和研究逻辑。
+- [x] 5.6 从旧 `/api/chat` 或共享工具中抽取仍需复用的无计费 model/tool 配置，确保 v1 生成和 title 路径不经过 generation settlement、credits、balance、cost evidence 或 billing routes。
+- [x] 5.7 删除/改写宣称整树、generation sidecar、variant switching 或一次扣费为正确行为的旧测试；保留 CSS/布局/锚点/Artifact/研究等仍适用回归，避免假阳性。
+- [x] 5.8 增加静态扫描与运行时 spy，证明 `/thread-chat` 请求只访问新表/API，旧 legacy backup 表零读取/零写入，billing functions 零调用。
+- [x] 5.9 在一次性空 schema 演练中执行完整 cutover：旧表含种子历史、新表为空；migration 后旧 URL 不 fallback、首条消息只写新表、旧历史不可见且没有双写。
+- [x] 5.10 运行全量 Node/DB 脚本、`pnpm typecheck`、`pnpm lint`、`pnpm build` 与 `pnpm openspec:validate`，审查无未提交生成代码和无意 UI/CSS diff。
+- [x] 5.11 完成 Gate 4 出场审查：新模型为唯一权威、旧数据未迁移、旧计费未调用、legacy 表仅运维备份、rollback runbook 可执行后才允许部署。
 
 ## 6. Gate 5 — VPS 部署、故障演练与验收
 

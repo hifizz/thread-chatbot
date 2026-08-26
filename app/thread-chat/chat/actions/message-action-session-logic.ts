@@ -1,5 +1,5 @@
 import type { MessageFeedback, MessageFeedbackSummary } from "../../core/types"
-import type { RecoverableTurn } from "../../generation/types"
+import type { RecoverableTurn } from "./message-action-types"
 
 export function indexRecoverableTurns(turns: readonly RecoverableTurn[]) {
   return new Map(turns.map((turn) => [turn.userMessageId, turn]))

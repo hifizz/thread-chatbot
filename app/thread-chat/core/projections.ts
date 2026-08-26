@@ -16,6 +16,7 @@ import type { WebResearchActivity } from "@/lib/chat/web-research-activity"
 import type { ResearchPlan, ResearchRoute } from "@/lib/chat/research-router"
 import { THREAD_TREE_SCHEMA_VERSION } from "@/constants/thread-chat"
 import { selectDisplayTitle, selectVisibleMessages } from "./selectors"
+import { emptySeedState } from "./seed"
 
 function dataPart<T>(
   part: { type: string; data?: unknown },
@@ -137,7 +138,16 @@ export function projectThreadDTO(
         ? null
         : toConversationViewThreadId(state, thread.parentId),
     depth: thread.depth,
-    title: selectDisplayTitle(thread),
+    title:
+      thread.customTitle ??
+      thread.autoTitle ??
+      (thread.depth === 0
+        ? "主线"
+        : thread.anchorText
+          ? thread.anchorText.length > 13
+            ? `${thread.anchorText.slice(0, 13)}…`
+            : thread.anchorText
+          : selectDisplayTitle(thread)),
     anchorText: thread.anchorText,
     forkFromMsgId: thread.forkMessageId,
     footnote: thread.footnote,
@@ -177,6 +187,7 @@ export function projectArtifactDTO(
 export function projectConversationTree(
   state: NormalizedThreadChatState
 ): ThreadTreeState {
+  if (!state.project) return emptySeedState()
   const threads = Object.fromEntries(
     Object.values(state.threadsById).map((thread) => [
       toConversationViewThreadId(state, thread.id),

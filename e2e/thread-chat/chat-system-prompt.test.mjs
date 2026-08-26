@@ -4,13 +4,9 @@ import {
   RESEARCH_SYSTEM_PROMPT,
   WEB_ACCESS_SYSTEM_PROMPT,
 } from "../../constants/research.ts"
-import { THREAD_CHAT_SYSTEM } from "../../constants/thread-chat.ts"
 import { buildChatSystemPrompt } from "../../app/api/chat/system-prompt.ts"
 
 const base = {
-  threadChat: false,
-  anchorText: null,
-  markdownArtifactRequested: false,
   researchMode: "answer",
   researchPlan: null,
   deepResearchRequested: false,
@@ -18,15 +14,6 @@ const base = {
 }
 
 assert.equal(buildChatSystemPrompt(base), "")
-
-const threadPrompt = buildChatSystemPrompt({
-  ...base,
-  threadChat: true,
-  anchorText: "原始锚点",
-})
-assert.ok(threadPrompt.includes(THREAD_CHAT_SYSTEM))
-assert.ok(threadPrompt.includes("原始锚点"))
-assert.ok(!threadPrompt.includes(WEB_ACCESS_SYSTEM_PROMPT))
 
 const fetchPrompt = buildChatSystemPrompt({
   ...base,
@@ -74,5 +61,5 @@ const unavailablePrompt = buildChatSystemPrompt({
 assert.match(unavailablePrompt, /服务端未启用搜索服务/)
 
 console.log(
-  "PASS  chat system prompt composes Thread, web, research plan, and unavailable-search segments"
+  "PASS  linear chat system prompt composes web, research plan, and unavailable-search segments"
 )

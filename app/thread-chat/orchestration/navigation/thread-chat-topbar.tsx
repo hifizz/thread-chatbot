@@ -9,7 +9,7 @@ import {
   Waypoints,
 } from "lucide-react"
 import { THREAD_CHAT_SHORTCUTS } from "@/constants/thread-chat"
-import type { ViewMode } from "../../net/persistence/persist"
+type ViewMode = "columns" | "canvas"
 import type { PlacementMode } from "../columns/placement"
 import { AccountButton } from "./account-button"
 import { ShortcutHint } from "../overlays/shortcut-hint"

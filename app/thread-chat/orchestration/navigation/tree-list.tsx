@@ -31,13 +31,13 @@ import {
 import { dialogCloseToShell } from "../overlays/dialog-close-to-shell"
 import { ShortcutHint } from "../overlays/shortcut-hint"
 import { TreeListRow } from "./tree-list-row"
-import {
-  cleanupAfterTreeDelete,
-  deleteTree,
-  listTrees,
-  renameTree,
-  type TreeListItem,
-} from "../../net/persistence/persist"
+
+export interface TreeListItem {
+  id: string
+  title: string
+  updatedAt: string
+  threadCount: number
+}
 
 export interface TreeListProps {
   /** 当前打开的树（用于高亮置顶与「未保存」合成） */
@@ -45,12 +45,13 @@ export interface TreeListProps {
   /** 当前树的本地合成信息：未入库时用它拼「未保存」条目 */
   currentTitle: string
   currentThreadCount: number
+  loadItems(): Promise<TreeListItem[]>
+  renameItem(projectId: string, title: string): Promise<void>
+  deleteItem(projectId: string): Promise<void>
   /** 点击非当前树条目：壳层负责跳转（组件已先自关） */
   onSwitch: (treeId: string) => void
   /** 删除的是当前树：nextTreeId = 剩余最近一棵（null = 一棵不剩，开新树） */
   onDeleteCurrent: (nextTreeId: string | null) => void
-  /** 删除当前树前抑制其存盘（true），失败时恢复（false）——防 DELETE 期间防抖 PUT 复活 */
-  onSuppressCurrentSave?: (suppressed: boolean) => void
   /** 重命名成功且改的是当前树时回调新标题——壳层用它同步主线列头副标题 */
   onRenamedCurrent?: (title: string) => void
   onClose: () => void
@@ -66,9 +67,11 @@ export function TreeList({
   currentTreeId,
   currentTitle,
   currentThreadCount,
+  loadItems,
+  renameItem,
+  deleteItem,
   onSwitch,
   onDeleteCurrent,
-  onSuppressCurrentSave,
   onRenamedCurrent,
   onClose,
   onToast,
@@ -88,13 +91,13 @@ export function TreeList({
   // 打开现拉（组件每次打开重挂，天然只拉一次）
   useEffect(() => {
     let cancelled = false
-    void listTrees().then((trees) => {
+    void loadItems().then((trees) => {
       if (!cancelled) setItems(trees)
     })
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [loadItems])
 
   // Esc：编辑态 / 确认态在捕获期先于壳层关闭链被消费
   useEffect(() => {
@@ -153,7 +156,7 @@ export function TreeList({
     setItems((list) =>
       (list ?? []).map((t) => (t.id === id ? { ...t, title: next } : t))
     )
-    renameTree(id, next)
+    renameItem(id, next)
       .then(() => {
         // 改的是当前树：通知壳层同步本地 customTitle（主线列头副标题即时更新）
         if (id === currentTreeId) onRenamedCurrent?.(next)
@@ -170,18 +173,13 @@ export function TreeList({
   async function doDelete(id: string) {
     setConfirmId(null)
     setDeletingId(id)
-    // 删的是当前树：先行抑制存盘（codex review：DELETE 往返期间防抖定时器可能触发 PUT，
-    // 晚到的 upsert 会复活刚删的行——抑制位挡新写，persist 写链保证在飞旧写先于 DELETE 落库）
-    if (id === currentTreeId) onSuppressCurrentSave?.(true)
     try {
-      await deleteTree(id)
+      await deleteItem(id)
     } catch {
-      if (id === currentTreeId) onSuppressCurrentSave?.(false) // 删除失败：树还在，恢复存盘
       setDeletingId(null)
       onToast("删除失败，请重试")
       return
     }
-    cleanupAfterTreeDelete(id) // 清工作台记忆 + 悬空「最近一棵」指针
     const remaining = (items ?? []).filter((t) => t.id !== id)
     setItems(remaining)
     setDeletingId(null)

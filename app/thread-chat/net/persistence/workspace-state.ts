@@ -18,7 +18,30 @@ function finite(value: unknown, fallback: number): number {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback
 }
 
-export function sanitizeWorkspaceState(value: unknown): WorkspaceUiState | null {
+function columnSlots(value: unknown): WorkspaceUiState["columnSlots"] {
+  if (!Array.isArray(value)) return []
+  return value.flatMap((item) => {
+    if (typeof item !== "object" || item === null) return []
+    const slot = item as Record<string, unknown>
+    return typeof slot.threadId === "string"
+      ? [{ threadId: slot.threadId, folded: slot.folded === true }]
+      : []
+  })
+}
+
+function numericRecord(value: unknown): Record<string, number> {
+  if (typeof value !== "object" || value === null) return {}
+  return Object.fromEntries(
+    Object.entries(value).filter(
+      (entry): entry is [string, number] =>
+        typeof entry[1] === "number" && Number.isFinite(entry[1])
+    )
+  )
+}
+
+export function sanitizeWorkspaceState(
+  value: unknown
+): WorkspaceUiState | null {
   if (typeof value !== "object" || value === null) return null
   const envelope = value as Record<string, unknown>
   if (envelope.version !== WORKSPACE_VERSION) return null
@@ -52,6 +75,16 @@ export function sanitizeWorkspaceState(value: unknown): WorkspaceUiState | null 
   return {
     view: workspace.view === "canvas" ? "canvas" : "columns",
     openThreadIds: stringArray(workspace.openThreadIds),
+    columnSlots: columnSlots(workspace.columnSlots),
+    columnWidths: numericRecord(workspace.columnWidths),
+    forceColumns:
+      typeof workspace.forceColumns === "number" &&
+      Number.isInteger(workspace.forceColumns) &&
+      workspace.forceColumns >= 2 &&
+      workspace.forceColumns <= 4
+        ? workspace.forceColumns
+        : null,
+    placementMode: workspace.placementMode === "fold" ? "fold" : "replace",
     selectedThreadId:
       typeof workspace.selectedThreadId === "string"
         ? workspace.selectedThreadId
@@ -109,3 +142,9 @@ export function saveWorkspaceState(
   storage.setItem(`${KEY_PREFIX}${projectId}`, JSON.stringify(value))
 }
 
+export function removeWorkspaceState(
+  storage: Pick<Storage, "removeItem">,
+  projectId: string
+): void {
+  storage.removeItem(`${KEY_PREFIX}${projectId}`)
+}

@@ -4,7 +4,6 @@ import { GENERATION_ERRORS } from "@/constants/generation"
 import { chargeUsage } from "@/lib/billing/credits"
 import { usageCostEvidence } from "@/lib/billing/usage-cost-evidence"
 import type { OpenRouterStepLike } from "@/lib/ai/openrouter"
-import type { FinalizeGenerationUsage } from "@/lib/thread-chat-generation/finalize"
 
 type UsageStep = OpenRouterStepLike & {
   usage: {
@@ -17,7 +16,6 @@ type StreamLifecycleInput = {
   userId: string
   modelId: string
   model: Pick<ChatModel, "id" | "provider">
-  persistentGeneration: boolean
   unbilledPreview: boolean
   linearThreadId?: string
 }
@@ -36,15 +34,12 @@ export function createStreamLifecycle(
     userId,
     modelId,
     model,
-    persistentGeneration,
     unbilledPreview,
     linearThreadId,
   }: StreamLifecycleInput,
   dependencies: StreamLifecycleDependencies = defaultDependencies
 ) {
-  let capturedUsage: FinalizeGenerationUsage | undefined
   let modelStreamError: string | undefined
-  let abortedUsageUnavailable = false
 
   return {
     onError({ error }: { error: unknown }) {
@@ -52,30 +47,7 @@ export function createStreamLifecycle(
       console.error("[chat] 模型流错误:", error)
     },
 
-    onAbort({ steps }: { steps: readonly UsageStep[] }) {
-      if (!persistentGeneration) return
-      const inputTokens = steps.reduce(
-        (total, step) => total + (step.usage.inputTokens ?? 0),
-        0
-      )
-      const outputTokens = steps.reduce(
-        (total, step) => total + (step.usage.outputTokens ?? 0),
-        0
-      )
-      const providerMetadata = steps.at(-1)?.providerMetadata
-      if (steps.length > 0) {
-        capturedUsage = {
-          inputTokens,
-          outputTokens,
-          costEvidence: usageCostEvidence({
-            provider: model.provider,
-            steps,
-            providerMetadata,
-          }),
-        }
-      }
-      abortedUsageUnavailable = true
-    },
+    onAbort() {},
 
     async onEnd({
       usage,
@@ -100,14 +72,6 @@ export function createStreamLifecycle(
           `[chat] OpenRouter 成本元数据不完整，使用静态估值：${model.id}`
         )
       }
-      if (persistentGeneration) {
-        capturedUsage = {
-          inputTokens: usage.inputTokens ?? 0,
-          outputTokens: usage.outputTokens ?? 0,
-          costEvidence,
-        }
-        return
-      }
       await dependencies.charge({
         userId,
         model: modelId,
@@ -120,9 +84,7 @@ export function createStreamLifecycle(
 
     snapshot() {
       return {
-        capturedUsage,
         modelStreamError,
-        abortedUsageUnavailable,
       }
     },
   }
