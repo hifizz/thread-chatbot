@@ -1,14 +1,14 @@
 ## 1. Gate 0 — 契约、边界与回归安全网
 
-- [ ] 1.1 建立本 change 的实现分支基线，列出 `/thread-chat` 当前列视图、画布、Composer、模型选择、选择分叉、Artifact 抽屉、标题、反馈、Stop、Retry 和本地工作区状态的可见验收清单，并明确 variant picker 是唯一允许移除的 UI。
-- [ ] 1.2 按 `design.md` 创建 `lib/thread-chat/domain`、`contracts`、`persistence`、`application`、`streaming`、`server` 模块目录与只读依赖出口，确保尚未接线到生产请求。
-- [ ] 1.3 定义 `ThreadChatUIMessage`、typed data parts、typed tools、`ProjectDTO/ThreadDTO/MessageDTO/ArtifactDTO/ProjectBootstrapDTO`，直接引用当前 `ai@7` 类型并用类型测试覆盖 text/reasoning/source/file/tool/data parts。
-- [ ] 1.4 为 start/send/fork/edit/retry/stop/feedback/rename/archive/delete 定义 Zod v4 strict command schemas、稳定 API error codes、`CommandResponse` 与 `StreamEvent` 契约，覆盖未知字段和同 ID 异义重放错误。
-- [ ] 1.5 实现纯领域状态机、当前时间线、latest turn、soft-supersede 可执行性和 frozen fork context 构造/校验函数，不引用 React、DB 或计费模块。
-- [ ] 1.6 增加 Node assert 契约测试，覆盖 A failed→Retry B→B failed→Retry C、终态不可逆、重复 command、Edit 仅最新 turn、旧来源分支 context 不迁移以及 superseded Message 仍可查。
-- [ ] 1.7 增加依赖边界扫描，禁止新 v1 API/application/streaming/title 模块 import `lib/billing/*`、`lib/payments/*`、`lib/chat/usage-store.ts`、旧 generation billing 类型或旧整树 persistence 模块。
-- [ ] 1.8 检查 Next.js 16 本地 Route Handler 文档和安装版 AI SDK v7 类型，将 params Promise、Web API Response、非废弃 `toUIMessageStream`/`readUIMessageStream` 用法固化为源码级测试或注释引用。
-- [ ] 1.9 运行 Gate 0 的 Node 测试、`pnpm typecheck` 与依赖扫描；只有契约、状态机和计费隔离全部通过才进入 Gate 1。
+- [x] 1.1 建立本 change 的实现分支基线，列出 `/thread-chat` 当前列视图、画布、Composer、模型选择、选择分叉、Artifact 抽屉、标题、反馈、Stop、Retry 和本地工作区状态的可见验收清单，并明确 variant picker 是唯一允许移除的 UI。
+- [x] 1.2 按 `design.md` 创建 `lib/thread-chat/domain`、`contracts`、`persistence`、`application`、`streaming`、`server` 模块目录与只读依赖出口，确保尚未接线到生产请求。
+- [x] 1.3 定义 `ThreadChatUIMessage`、typed data parts、typed tools、`ProjectDTO/ThreadDTO/MessageDTO/ArtifactDTO/ProjectBootstrapDTO`，直接引用当前 `ai@7` 类型并用类型测试覆盖 text/reasoning/source/file/tool/data parts。
+- [x] 1.4 为 start/send/fork/edit/retry/stop/feedback/rename/archive/delete 定义 Zod v4 strict command schemas、稳定 API error codes、`CommandResponse` 与 `StreamEvent` 契约，覆盖未知字段和同 ID 异义重放错误。
+- [x] 1.5 实现纯领域状态机、当前时间线、latest turn、soft-supersede 可执行性和 frozen fork context 构造/校验函数，不引用 React、DB 或计费模块。
+- [x] 1.6 增加 Node assert 契约测试，覆盖 A failed→Retry B→B failed→Retry C、终态不可逆、重复 command、Edit 仅最新 turn、旧来源分支 context 不迁移以及 superseded Message 仍可查。
+- [x] 1.7 增加依赖边界扫描，禁止新 v1 API/application/streaming/title 模块 import `lib/billing/*`、`lib/payments/*`、`lib/chat/usage-store.ts`、旧 generation billing 类型或旧整树 persistence 模块。
+- [x] 1.8 检查 Next.js 16 本地 Route Handler 文档和安装版 AI SDK v7 类型，将 params Promise、Web API Response、非废弃 `toUIMessageStream`/`readUIMessageStream` 用法固化为源码级测试或注释引用。
+- [x] 1.9 运行 Gate 0 的 Node 测试、`pnpm typecheck` 与依赖扫描；只有契约、状态机和计费隔离全部通过才进入 Gate 1。
 
 ## 2. Gate 1 — 规范化数据库与应用命令
 
