@@ -39,7 +39,8 @@
   align-items: baseline;
   gap: 8px;
 }
-.tc .art-x {
+.tc .art-x,
+.tc .art-copy {
   cursor: pointer;
   color: var(--ink-soft);
   border: 1px solid var(--rule-strong);
@@ -53,7 +54,15 @@
   font-size: 13px;
   line-height: 1;
 }
-.tc .art-x:hover {
+.tc .art-copy {
+  width: auto;
+  gap: 5px;
+  padding: 0 9px;
+  font-family: var(--font-ui);
+  font-size: 12px;
+}
+.tc .art-x:hover,
+.tc .art-copy:hover {
   color: var(--ink);
   border-color: var(--ink-faint);
 }
