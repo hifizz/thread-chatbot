@@ -268,7 +268,6 @@ export function BranchableChat({
       messageCommands={messageCommands}
       editableUserMessageId={presentation?.latestUserMessageId}
       regeneratableAssistantMessageId={presentation?.latestAssistantMessageId}
-      turnAlternatives={presentation?.alternatives}
     />
   )
 }

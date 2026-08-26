@@ -25,6 +25,7 @@
     "test:thread-chat:gate2-pipeline": "node --import tsx e2e/thread-chat/normalized-ui-message-pipeline.test.mjs",
     "test:thread-chat:gate2-db": "node --import tsx e2e/thread-chat/normalized-generation-db.test.mjs",
     "test:thread-chat:gate2-api": "node --import tsx e2e/thread-chat/normalized-v1-api-contract.test.mjs",
+    "test:thread-chat:gate3-client": "node --import tsx e2e/thread-chat/normalized-client-store.test.mjs",
     "db:studio": "drizzle-kit studio",
     "openspec:validate": "openspec validate --all --strict"
   },

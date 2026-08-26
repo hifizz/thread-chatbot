@@ -92,7 +92,6 @@ export function CanvasExpand({
             regeneratableAssistantMessageId={
               presentation?.latestAssistantMessageId
             }
-            turnAlternatives={presentation?.alternatives ?? []}
           />
         ))}
       </div>

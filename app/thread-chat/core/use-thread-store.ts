@@ -9,6 +9,9 @@
 
 import { useSyncExternalStore } from "react"
 import type { ThreadStore } from "./store"
+import { useStore } from "zustand"
+import type { ConversationStore } from "./store"
+import type { NormalizedThreadChatState } from "./types"
 
 export function useThreadStore(store: ThreadStore): number {
   return useSyncExternalStore(
@@ -16,4 +19,11 @@ export function useThreadStore(store: ThreadStore): number {
     store.getVersion,
     store.getVersion
   )
+}
+
+export function useConversationStore<T>(
+  store: ConversationStore,
+  selector: (state: NormalizedThreadChatState) => T
+): T {
+  return useStore(store, selector)
 }

@@ -2,16 +2,16 @@
 
 import React from "react"
 import { GENERATION_BACKGROUND_LABEL } from "@/constants/generation"
-import type { Message } from "../../core/types"
+import type { ConversationViewMessage } from "../../core/types"
 import type { ThreadMessageActionCommands } from "../actions/message-action-commands"
 import { AssistantMessageToolbar } from "../actions/assistant-message-toolbar"
 import { assistantMessagePresentation } from "./conversation-message-logic"
 import { EditableUserMessage } from "./editable-user-message"
+import { UIMessageSupplementalParts } from "./ui-message-parts"
 import {
   hasCompletedAssistantActions,
   type MessageActionViewState,
 } from "../actions/message-action-types"
-import { TurnVariantPicker } from "../actions/turn-variant-picker"
 
 /** 把换行转成 br；默认 assistant 正文用它保留段内换行。 */
 function withBreaks(text: string, keyBase: string): React.ReactNode[] {
@@ -24,7 +24,7 @@ function withBreaks(text: string, keyBase: string): React.ReactNode[] {
   return output
 }
 
-function defaultAssistantBody(message: Message): React.ReactNode {
+function defaultAssistantBody(message: ConversationViewMessage): React.ReactNode {
   return message.text
     .split("\n\n")
     .map((paragraph, index) => (
@@ -32,7 +32,7 @@ function defaultAssistantBody(message: Message): React.ReactNode {
     ))
 }
 
-function defaultUserFallback(message: Message): React.ReactNode {
+function defaultUserFallback(message: ConversationViewMessage): React.ReactNode {
   return (
     <div className="bubble" data-role="user">
       {message.quote && <div className="msg-quote">{message.quote.text}</div>}
@@ -43,21 +43,17 @@ function defaultUserFallback(message: Message): React.ReactNode {
 
 export interface ConversationMessageProps {
   threadId: string
-  message: Message
+  message: ConversationViewMessage
   showRoleLabel?: boolean
   assistantBubbleClassName?: string
-  renderAssistantBody?: (message: Message) => React.ReactNode
-  renderAfterMessage?: (message: Message) => React.ReactNode
-  renderUserFallback?: (message: Message) => React.ReactNode
-  onRetry?: (message: Message) => void
+  renderAssistantBody?: (message: ConversationViewMessage) => React.ReactNode
+  renderAfterMessage?: (message: ConversationViewMessage) => React.ReactNode
+  renderUserFallback?: (message: ConversationViewMessage) => React.ReactNode
+  onRetry?: (message: ConversationViewMessage) => void
   messageActionState?: MessageActionViewState
   messageCommands?: ThreadMessageActionCommands
   editableUserMessageId?: string
   regeneratableAssistantMessageId?: string
-  turnAlternatives?: readonly {
-    assistantMessageId: string
-    derivedThreadCount: number
-  }[]
 }
 
 export function ConversationMessage({
@@ -73,7 +69,6 @@ export function ConversationMessage({
   messageCommands,
   editableUserMessageId,
   regeneratableAssistantMessageId,
-  turnAlternatives = [],
 }: ConversationMessageProps) {
   const presentation = assistantMessagePresentation(message)
 
@@ -122,6 +117,7 @@ export function ConversationMessage({
               ) : (
                 <>
                   {renderAssistantBody(message)}
+                  <UIMessageSupplementalParts message={message} />
                   {presentation.showCaret && <span className="caret" />}
                 </>
               )}
@@ -146,14 +142,6 @@ export function ConversationMessage({
                 )}
                 commands={messageCommands}
               />
-              {message.id === regeneratableAssistantMessageId && (
-                <TurnVariantPicker
-                  threadId={threadId}
-                  activeAssistantMessageId={message.id}
-                  alternatives={turnAlternatives}
-                  onSwitch={messageCommands.switchTurnVariant}
-                />
-              )}
             </div>
           )}
           {renderAfterMessage?.(message)}

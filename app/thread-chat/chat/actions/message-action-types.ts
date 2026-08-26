@@ -65,13 +65,3 @@ export interface AssistantMessageToolbarProps {
     "retryAssistant" | "submitFeedback"
   >
 }
-
-export interface TurnVariantPickerProps {
-  threadId: string
-  activeAssistantMessageId: string
-  alternatives: readonly {
-    assistantMessageId: string
-    derivedThreadCount: number
-  }[]
-  onSwitch: ThreadMessageActionCommands["switchTurnVariant"]
-}
