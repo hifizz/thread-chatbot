@@ -227,11 +227,80 @@ const errorEnd = await consumeUIMessagePipeline({
   ]),
 })
 assert.equal(errorEnd.finishReason, "error")
-assert(protocolErrors.length > 0)
+assert.equal(
+  protocolErrors.length,
+  0,
+  "UI error chunk 不应被 pipeline onError 误记为 reducer protocol error"
+)
 assert(
   partialError
     .getSnapshot()
     .parts.some((part) => part.type === "text" && part.text === "kept")
+)
+
+const recoverableToolError = fakeSession({
+  ...initial,
+  id: "recoverable-tool-error",
+})
+const recoverableProtocolErrors = []
+const recoverableEnd = await consumeUIMessagePipeline({
+  initialMessage: { ...initial, id: "recoverable-tool-error" },
+  session: recoverableToolError.session,
+  onProtocolError: (error) => recoverableProtocolErrors.push(error),
+  textStream: streamOf([
+    { type: "start" },
+    {
+      type: "tool-call",
+      toolCallId: "read-failed",
+      toolName: "readUrl",
+      input: { url: "https://example.com/article" },
+    },
+    {
+      type: "tool-error",
+      toolCallId: "read-failed",
+      toolName: "readUrl",
+      error: new Error("timeout"),
+    },
+    {
+      type: "tool-call",
+      toolCallId: "read-success",
+      toolName: "readUrl",
+      input: { url: "https://example.com/article" },
+    },
+    {
+      type: "tool-result",
+      toolCallId: "read-success",
+      toolName: "readUrl",
+      output: { url: "https://example.com/article", content: "ok" },
+    },
+    { type: "text-start", id: "recoverable-text" },
+    { type: "text-delta", id: "recoverable-text", text: "final answer" },
+    { type: "text-end", id: "recoverable-text" },
+    {
+      type: "finish",
+      finishReason: "stop",
+      rawFinishReason: "stop",
+      totalUsage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
+    },
+  ]),
+})
+assert.equal(recoverableEnd.outcome.status, "completed")
+assert.equal(recoverableEnd.finishReason, "stop")
+assert.equal(recoverableProtocolErrors.length, 0)
+assert(
+  recoverableToolError
+    .getSnapshot()
+    .parts.some(
+      (part) => part.type === "tool-readUrl" && part.state === "output-error"
+    ),
+  "可恢复工具错误应保留为 tool part，而不是整条生成失败"
+)
+assert(
+  recoverableToolError
+    .getSnapshot()
+    .parts.some(
+      (part) => part.type === "text" && part.text === "final answer"
+    )
 )
 
 const emptyReply = fakeSession({ ...initial, id: "empty-reply" })

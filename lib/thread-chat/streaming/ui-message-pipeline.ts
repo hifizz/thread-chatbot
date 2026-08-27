@@ -4,6 +4,7 @@ import {
   type FinishReason,
   type TextStreamPart,
   type ToolSet,
+  type UIMessageStreamOutcome,
 } from "ai"
 import type {
   ThreadChatUIMessage,
@@ -16,6 +17,7 @@ import type { StreamSessionController } from "@/lib/thread-chat/streaming/stream
 export interface UIMessagePipelineEnd {
   responseMessage: ThreadChatUIMessage
   isAborted: boolean
+  outcome: UIMessageStreamOutcome
   finishReason?: FinishReason
 }
 
@@ -142,14 +144,12 @@ export async function consumeUIMessagePipeline<TOOLS extends ToolSet>({
     generateMessageId: () => initialMessage.id,
     sendReasoning: true,
     sendSources: true,
-    onError: (error) => {
-      onProtocolError?.(error)
-      return "生成过程中发生错误"
-    },
+    onError: () => "生成过程中发生错误",
     onEnd: (event) => {
       end = {
         responseMessage: event.responseMessage,
         isAborted: event.isAborted,
+        outcome: event.outcome,
         finishReason: event.finishReason,
       }
     },
@@ -172,7 +172,7 @@ export async function consumeUIMessagePipeline<TOOLS extends ToolSet>({
   const transientParts = new Map<string, ThreadChatUIMessageChunk>()
   try {
     for await (const chunk of injectLeadingChunks(generated, leadingChunks)) {
-      await reducerWriter.write(chunk)
+      if (chunk.type !== "error") await reducerWriter.write(chunk)
 
       if (chunkEmitsSnapshot(chunk)) {
         const next = await snapshotReader.read()
@@ -203,6 +203,9 @@ export async function consumeUIMessagePipeline<TOOLS extends ToolSet>({
     end ?? {
       responseMessage: liveSnapshot,
       isAborted: session.signal.aborted,
+      outcome: session.signal.aborted
+        ? { status: "aborted" }
+        : { status: "unknown" },
     }
   )
 }

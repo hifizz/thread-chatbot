@@ -127,7 +127,7 @@ async function runGenerationCore({
 
   const snapshot = session.getSnapshot()
   await checkpointer.flush(snapshot).catch((error) => {
-    thrown ??= error
+    console.warn("[thread-chat] 生成 checkpoint flush 失败:", error)
   })
   checkpointer.stop()
   const usage = prepared?.usage
@@ -136,6 +136,7 @@ async function runGenerationCore({
   const outcome = resolveGenerationTerminalOutcome({
     signal: session.signal,
     pipelineAborted: pipelineEnd?.isAborted === true,
+    sdkOutcome: pipelineEnd?.outcome,
     thrown,
     protocolError,
     ...(pipelineEnd?.finishReason

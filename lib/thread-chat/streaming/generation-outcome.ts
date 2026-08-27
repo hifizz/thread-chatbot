@@ -1,4 +1,4 @@
-import type { FinishReason } from "ai"
+import type { FinishReason, UIMessageStreamOutcome } from "ai"
 import type { RequestedTerminalStatus } from "@/lib/thread-chat/streaming/finalize"
 
 export interface GenerationTerminalOutcome {
@@ -12,6 +12,7 @@ export interface GenerationTerminalOutcome {
 export function resolveGenerationTerminalOutcome(input: {
   signal: AbortSignal
   pipelineAborted: boolean
+  sdkOutcome?: UIMessageStreamOutcome
   thrown: unknown | null
   protocolError: unknown | null
   finishReason?: FinishReason
@@ -19,10 +20,15 @@ export function resolveGenerationTerminalOutcome(input: {
   if (input.signal.aborted || input.pipelineAborted) {
     return { status: "stopped", failed: false }
   }
+  if (input.sdkOutcome?.status === "aborted") {
+    return { status: "stopped", failed: false }
+  }
+  if (input.thrown !== null || input.sdkOutcome?.status === "failed") {
+    return { status: "failed", failed: true }
+  }
   const failed =
-    input.thrown !== null ||
-    input.protocolError !== null ||
-    input.finishReason === "error"
+    input.finishReason === "error" ||
+    (input.protocolError !== null && input.sdkOutcome?.status !== "completed")
   return {
     status: failed ? "failed" : "completed",
     failed,

@@ -244,12 +244,25 @@ assert.deepEqual(
   resolveGenerationTerminalOutcome({
     signal: cancelled.session.abortController.signal,
     pipelineAborted: false,
+    sdkOutcome: { status: "failed", error: new Error("provider abort") },
     thrown: new Error("provider surfaced cancellation as an error"),
     protocolError: new Error("abort chunk was not produced"),
     finishReason: "error",
   }),
   { status: "stopped", failed: false },
   "应用取消必须优先于 SDK / Provider 错误形态"
+)
+assert.deepEqual(
+  resolveGenerationTerminalOutcome({
+    signal: new AbortController().signal,
+    pipelineAborted: false,
+    sdkOutcome: { status: "completed" },
+    thrown: null,
+    protocolError: new Error("recoverable UI chunk error"),
+    finishReason: "stop",
+  }),
+  { status: "completed", failed: false },
+  "SDK 已完成时，可恢复 UI chunk error 不得把完整回复降级为 failed"
 )
 assert.equal(errors.length, 1, "预期取消不得进入 Session task error")
 
