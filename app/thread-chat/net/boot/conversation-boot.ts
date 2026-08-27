@@ -48,7 +48,7 @@ export async function bootConversationProject(options: {
       store,
       client,
       messageId,
-      onTerminalMessage: (message) => generateTitleIfNeeded(message.threadId),
+      onFinishMessage: (message) => generateTitleIfNeeded(message.threadId),
       pollDelays: options.pollDelays,
       wait: options.wait,
     })

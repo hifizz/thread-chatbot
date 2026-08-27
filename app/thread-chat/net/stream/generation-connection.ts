@@ -65,7 +65,7 @@ export function followAcceptedGeneration(options: {
   store: ConversationStore
   client: ThreadChatClient
   accepted: GenerationAcceptedDTO
-  onTerminalMessage?: (message: MessageDTO) => void | Promise<void>
+  onFinishMessage?: (message: MessageDTO) => void | Promise<void>
   fetch?: typeof globalThis.fetch
   pollDelays?: readonly number[]
   wait?: (delayMs: number, signal: AbortSignal) => Promise<void>
@@ -104,7 +104,7 @@ export function followAcceptedGeneration(options: {
     void poller.finished.then(async (message) => {
       if (message) {
         await reconcileMessageArtifacts(store, client, message)
-        await options.onTerminalMessage?.(message)
+        await options.onFinishMessage?.(message)
       }
       resolveFinished()
     })
@@ -158,7 +158,7 @@ export function followAcceptedGeneration(options: {
         }
         store.getState().reconcileTerminalMessage(event.message)
         await reconcileMessageArtifacts(store, client, event.message)
-        await options.onTerminalMessage?.(event.message)
+        await options.onFinishMessage?.(event.message)
         currentReducer?.close()
         if (reducer === currentReducer) reducer = null
         resolveFinished()
@@ -199,7 +199,7 @@ export function pollBackgroundGeneration(options: {
   store: ConversationStore
   client: ThreadChatClient
   messageId: string
-  onTerminalMessage?: (message: MessageDTO) => void | Promise<void>
+  onFinishMessage?: (message: MessageDTO) => void | Promise<void>
   pollDelays?: readonly number[]
   wait?: (delayMs: number, signal: AbortSignal) => Promise<void>
 }): GenerationConnection {
@@ -218,7 +218,7 @@ export function pollBackgroundGeneration(options: {
     finished: poller.finished.then(async (message) => {
       if (message) {
         await reconcileMessageArtifacts(store, client, message)
-        await options.onTerminalMessage?.(message)
+        await options.onFinishMessage?.(message)
       }
     }),
     close: poller.stop,

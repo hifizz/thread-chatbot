@@ -155,15 +155,15 @@ export function createConversationCommands(
 
   function follow(
     accepted: Parameters<typeof followAcceptedGeneration>[0]["accepted"],
-    afterTerminal?: (threadId: string) => void | Promise<void>
+    afterFinish?: (threadId: string) => void | Promise<void>
   ) {
     connections.get(accepted.assistantMessage.id)?.close()
     const connection = followAcceptedGeneration({
       store,
       client,
       accepted,
-      onTerminalMessage: afterTerminal
-        ? (message) => afterTerminal(message.threadId)
+      onFinishMessage: afterFinish
+        ? (message) => afterFinish(message.threadId)
         : undefined,
       fetch: options.fetch,
       pollDelays: options.pollDelays,
