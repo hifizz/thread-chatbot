@@ -8,7 +8,6 @@
 
 import { useEffect } from "react"
 import { useRouter } from "next/navigation"
-import "./thread-chat.css"
 import { createThreadChatClient } from "./net/client"
 
 export function TreeRedirect() {

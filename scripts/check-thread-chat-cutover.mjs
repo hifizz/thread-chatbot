@@ -33,6 +33,7 @@ for (const rename of [
 assert.doesNotMatch(migration, /\b(?:DROP|CREATE\s+VIEW|INSERT|UPDATE|DELETE)\b/i)
 
 const productionFiles = [
+  "app/thread-chat/layout.tsx",
   "app/thread-chat/thread-chat-demo.tsx",
   "app/thread-chat/tree-redirect.tsx",
   "app/thread-chat/orchestration/workspace/use-conversation-runtime.ts",
@@ -61,5 +62,22 @@ for (const forbidden of [
 
 const route = await read("app/api/chat/route.ts")
 assert.doesNotMatch(route, /prepareThreadGenerationContext|generationSettlement/)
+
+const threadChatLayout = await read("app/thread-chat/layout.tsx")
+assert.match(
+  threadChatLayout,
+  /import\s+["']\.\/thread-chat\.css["']/,
+  "ThreadChat 公共 layout 必须加载路由级样式"
+)
+for (const routeComponent of [
+  "app/thread-chat/tree-redirect.tsx",
+  "app/thread-chat/thread-chat-demo.tsx",
+]) {
+  assert.doesNotMatch(
+    await read(routeComponent),
+    /import\s+["']\.\/thread-chat\.css["']/,
+    `${routeComponent} 不应重复加载 ThreadChat 路由级样式`
+  )
+}
 
 console.log("thread-chat Gate 4 cutover static checks passed")
