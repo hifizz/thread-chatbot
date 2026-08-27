@@ -12,6 +12,11 @@ import type {
   StreamSessionController,
   StreamSubscriber,
 } from "@/lib/thread-chat/streaming/stream-session"
+import { GENERATION_CANCEL_REASONS } from "@/constants/generation"
+import {
+  abortGeneration,
+  type GenerationCancelReason,
+} from "@/lib/ai/generation-cancellation"
 
 export interface SessionStoreOptions {
   now?: () => number
@@ -106,17 +111,21 @@ export class SessionStore {
     return () => session.subscribers.delete(subscriber)
   }
 
-  abort(messageId: string, reason?: unknown): boolean {
+  abort(messageId: string, reason: GenerationCancelReason): boolean {
     const session = this.sessions.get(messageId)
     if (!session || session.status !== "running") return false
-    session.abortController.abort(reason)
+    abortGeneration(session.abortController, reason)
     return true
   }
 
   discard(messageId: string, terminalMessage: MessageDTO): boolean {
     const session = this.sessions.get(messageId)
     if (!session) return false
-    if (session.status === "running") session.abortController.abort("discarded")
+    if (session.status === "running")
+      abortGeneration(
+        session.abortController,
+        GENERATION_CANCEL_REASONS.discarded
+      )
     this.finish(session, terminalMessage)
     this.sessions.delete(messageId)
     return true

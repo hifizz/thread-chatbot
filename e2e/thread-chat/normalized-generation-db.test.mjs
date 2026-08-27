@@ -13,7 +13,15 @@ testUrl.searchParams.set(
 process.env.DATABASE_URL = testUrl.toString()
 process.env.DIRECT_URL = testUrl.toString()
 
-const [drizzle, { db }, schema, application, streaming, constants] =
+const [
+  drizzle,
+  { db },
+  schema,
+  application,
+  streaming,
+  constants,
+  generationConstants,
+] =
   await Promise.all([
     import("drizzle-orm"),
     import("../../lib/db/index.ts"),
@@ -21,6 +29,7 @@ const [drizzle, { db }, schema, application, streaming, constants] =
     import("../../lib/thread-chat/application/index.ts"),
     import("../../lib/thread-chat/streaming/index.ts"),
     import("../../constants/model.ts"),
+    import("../../constants/generation.ts"),
   ])
 const { and, eq } = drizzle
 const id = () => crypto.randomUUID()
@@ -183,6 +192,58 @@ try {
     null,
     "Artifact read 必须 owner-scoped"
   )
+
+  // Stop 发生在模型准备 / 研究阶段时，即使底层以异常退出也必须收敛为 stopped。
+  const cancelledTurn = await send(rootThreadId, "取消准备阶段")
+  const cancelledId = cancelledTurn.result.assistantMessage.id
+  const cancelledStore = new streaming.SessionStore({
+    startCleanupTimer: false,
+  })
+  let signalPrepared
+  const preparedSignal = new Promise((resolve) => {
+    signalPrepared = resolve
+  })
+  const cancelledRun = cancelledStore.start({
+    messageId: cancelledId,
+    initialSnapshot: streaming.initialAssistantSnapshot({
+      messageId: cancelledId,
+      threadId: rootThreadId,
+      modelId,
+    }),
+    run: (session) =>
+      streaming.runGeneration({
+        userId,
+        messageId: cancelledId,
+        session,
+        dependencies: {
+          prepare: async ({ abortSignal }) => {
+            signalPrepared()
+            await new Promise((_resolve, reject) => {
+              abortSignal.addEventListener(
+                "abort",
+                () => reject(abortSignal.reason),
+                { once: true }
+              )
+            })
+            throw new Error("unreachable")
+          },
+        },
+      }),
+  })
+  await preparedSignal
+  assert.equal(
+    cancelledStore.abort(
+      cancelledId,
+      generationConstants.GENERATION_CANCEL_REASONS.userStop
+    ),
+    true
+  )
+  await cancelledRun.session.task
+  const cancelledMessage = await application.getMessage(userId, cancelledId)
+  assert.equal(cancelledMessage.status, "stopped")
+  assert.equal(cancelledMessage.error, null)
+  assert.equal(cancelledMessage.parts.length, 0)
+  cancelledStore.dispose()
 
   // checkpoint 必须保留 parts；进程重启只把状态收敛为 failed。
   const restartTurn = await send(rootThreadId, "重启演练")

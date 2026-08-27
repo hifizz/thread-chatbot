@@ -12,6 +12,7 @@ import { finalizeGeneration } from "@/lib/thread-chat/streaming/finalize"
 import { prepareGeneration } from "@/lib/thread-chat/streaming/generation-plan"
 import type { StreamSessionController } from "@/lib/thread-chat/streaming/stream-session"
 import { consumeUIMessagePipeline } from "@/lib/thread-chat/streaming/ui-message-pipeline"
+import { resolveGenerationTerminalOutcome } from "@/lib/thread-chat/streaming/generation-outcome"
 
 export interface PreparedGeneration {
   textStream: ReadableStream<TextStreamPart<ToolSet>>
@@ -132,19 +133,23 @@ async function runGenerationCore({
   const usage = prepared?.usage
     ? await Promise.resolve(prepared.usage).catch(() => undefined)
     : undefined
-  const stopped = pipelineEnd?.isAborted === true
-  const failed =
-    !stopped &&
-    (thrown !== null ||
-      protocolError !== null ||
-      pipelineEnd?.finishReason === "error")
+  const outcome = resolveGenerationTerminalOutcome({
+    signal: session.signal,
+    pipelineAborted: pipelineEnd?.isAborted === true,
+    thrown,
+    protocolError,
+    ...(pipelineEnd?.finishReason
+      ? { finishReason: pipelineEnd.finishReason }
+      : {}),
+  })
   const terminal = await (dependencies.finalize ?? finalizeGeneration)({
     messageId: message.id,
     snapshot,
-    status: stopped ? "stopped" : failed ? "failed" : "completed",
-    finishReason: pipelineEnd?.finishReason ?? (failed ? "error" : undefined),
+    status: outcome.status,
+    finishReason:
+      pipelineEnd?.finishReason ?? (outcome.failed ? "error" : undefined),
     providerUsage: rawUsage(usage),
-    ...(failed
+    ...(outcome.failed
       ? {
           error: {
             code: "GENERATION_FAILED",

@@ -23,6 +23,7 @@ import {
   type ResearchRoute,
   type ResearchRouteMode,
 } from "@/lib/chat/research-contract"
+import { throwIfGenerationCancelled } from "@/lib/ai/generation-cancellation"
 
 export {
   researchPlanSchema,
@@ -245,6 +246,7 @@ export async function resolveResearchRoute({
   modelCallTrace,
   abortSignal,
 }: ResolveResearchRouteInput): Promise<ResearchRoute> {
+  throwIfGenerationCancelled(abortSignal)
   const contextualFollowUp = contextualUrlFollowUpRoute(
     latestUserText,
     recentConversation
@@ -279,8 +281,10 @@ export async function resolveResearchRoute({
       maxOutputTokens: RESEARCH_ROUTER_MAX_OUTPUT_TOKENS,
       abortSignal,
     })
+    throwIfGenerationCancelled(abortSignal)
     return normalizeModelRoute(result.output, searchReady)
   } catch (error) {
+    throwIfGenerationCancelled(abortSignal)
     const recovered = researchRouteSchema.safeParse(
       jsonObjectFromFailedStructuredOutput(error)
     )
@@ -306,6 +310,7 @@ export async function createResearchPlan({
   modelCallTrace?: ModelCallTrace
   abortSignal?: AbortSignal
 }): Promise<ResearchPlan> {
+  throwIfGenerationCancelled(abortSignal)
   try {
     const result = await generateText({
       model: withModelCallLogging(
@@ -332,8 +337,10 @@ export async function createResearchPlan({
       maxOutputTokens: RESEARCH_PLANNER_MAX_OUTPUT_TOKENS,
       abortSignal,
     })
+    throwIfGenerationCancelled(abortSignal)
     return result.output
   } catch (error) {
+    throwIfGenerationCancelled(abortSignal)
     const recovered = researchPlanSchema.safeParse(
       normalizePlannerCandidate(jsonObjectFromFailedStructuredOutput(error))
     )

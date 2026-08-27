@@ -21,6 +21,7 @@ import {
 import { buildThreadChatSystem } from "@/lib/chat/thread-chat-prompt"
 import type { ThreadChatUIMessageChunk } from "@/lib/thread-chat/contracts/ui-message"
 import { buildGenerationTools } from "@/lib/thread-chat/streaming/generation-tools"
+import { throwIfGenerationCancelled } from "@/lib/ai/generation-cancellation"
 
 export interface PrepareGenerationInput {
   messageId: string
@@ -93,6 +94,7 @@ export async function prepareGeneration(input: PrepareGenerationInput) {
     .filter((part): part is string => part !== null)
     .join("\n\n")
 
+  throwIfGenerationCancelled(input.abortSignal)
   const result = streamText({
     model: withModelCallLogging(model, MODEL_CALL_PURPOSE.chatAnswer, trace),
     abortSignal: input.abortSignal,

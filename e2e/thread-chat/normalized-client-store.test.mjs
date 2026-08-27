@@ -24,6 +24,7 @@ import {
 import { createConversationCommands } from "../../app/thread-chat/net/commands/conversation-commands.ts"
 import { followAcceptedGeneration } from "../../app/thread-chat/net/stream/generation-connection.ts"
 import { bootConversationProject } from "../../app/thread-chat/net/boot/conversation-boot.ts"
+import { hasCompletedAssistantActions } from "../../app/thread-chat/chat/actions/message-action-types.ts"
 
 const stamp = "2026-08-26T00:00:00.000Z"
 
@@ -723,6 +724,44 @@ async function testPartsProjectionAndWorkspaceIsolation() {
   )
 }
 
+async function testStoppedProjectionPreservesExistingPresentation() {
+  const emptyStopped = message({
+    status: "stopped",
+    error: null,
+    parts: [],
+  })
+  const emptyStore = createConversationStore({
+    bootstrap: bootstrap({ messages: [emptyStopped] }),
+  })
+  const emptyProjected = projectMessageDTO({
+    state: emptyStore.getState(),
+    message: emptyStopped,
+    parentMessageId: null,
+  })
+  assert.equal(emptyProjected.status, "stopped")
+  assert.equal(emptyProjected.error, undefined)
+  assert.equal(hasCompletedAssistantActions(emptyProjected), false)
+
+  const partialStopped = message({
+    status: "stopped",
+    error: null,
+    parts: [{ type: "text", text: "已经生成的部分内容" }],
+  })
+  const partialStore = createConversationStore({
+    bootstrap: bootstrap({ messages: [partialStopped] }),
+  })
+  const partialProjected = projectMessageDTO({
+    state: partialStore.getState(),
+    message: partialStopped,
+    parentMessageId: null,
+  })
+  assert.equal(partialProjected.status, "stopped")
+  assert.equal(partialProjected.error, undefined)
+  assert.equal(partialProjected.text, "已经生成的部分内容")
+  assert.deepEqual(partialProjected.uiParts, partialStopped.parts)
+  assert.equal(hasCompletedAssistantActions(partialProjected), false)
+}
+
 async function testGate3HarnessIsolation() {
   const root = new URL("../../", import.meta.url)
   const [page, harness, mockRuntime, proxy, productionPage] = await Promise.all(
@@ -776,6 +815,7 @@ await testOptimisticRollbackIsolation()
 await testRetryABC()
 await testCommandNetworkRetryReusesFrozenPayload()
 await testPartsProjectionAndWorkspaceIsolation()
+await testStoppedProjectionPreservesExistingPresentation()
 await testGate3HarnessIsolation()
 
 console.log("normalized client/store tests passed")

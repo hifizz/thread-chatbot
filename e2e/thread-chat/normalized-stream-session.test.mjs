@@ -3,6 +3,8 @@ import { SessionStore } from "../../lib/thread-chat/streaming/session-store.ts"
 import { initialAssistantSnapshot } from "../../lib/thread-chat/streaming/stream-session.ts"
 import { createSessionSseResponse } from "../../lib/thread-chat/streaming/sse.ts"
 import { MessageCheckpointer } from "../../lib/thread-chat/streaming/checkpoint.ts"
+import { GENERATION_CANCEL_REASONS } from "../../constants/generation.ts"
+import { resolveGenerationTerminalOutcome } from "../../lib/thread-chat/streaming/generation-outcome.ts"
 
 const tick = () => new Promise((resolve) => setImmediate(resolve))
 
@@ -206,6 +208,50 @@ const failed = store.start({
 })
 await failed.session.task
 assert.equal(errors.length, 1, "task Promise 必须在 Store 内 catch")
+
+let observedCancelReason
+const cancelled = store.start({
+  messageId: "assistant-cancelled",
+  initialSnapshot: initialAssistantSnapshot({
+    messageId: "assistant-cancelled",
+    threadId: "thread",
+  }),
+  run: async (session) =>
+    new Promise((resolve) => {
+      session.signal.addEventListener(
+        "abort",
+        () => {
+          observedCancelReason = session.signal.reason
+          resolve()
+        },
+        { once: true }
+      )
+    }),
+})
+await tick()
+assert.equal(
+  store.abort(
+    cancelled.session.messageId,
+    GENERATION_CANCEL_REASONS.userStop
+  ),
+  true
+)
+await cancelled.session.task
+assert(observedCancelReason instanceof DOMException)
+assert.equal(observedCancelReason.name, "AbortError")
+assert.equal(observedCancelReason.message, GENERATION_CANCEL_REASONS.userStop)
+assert.deepEqual(
+  resolveGenerationTerminalOutcome({
+    signal: cancelled.session.abortController.signal,
+    pipelineAborted: false,
+    thrown: new Error("provider surfaced cancellation as an error"),
+    protocolError: new Error("abort chunk was not produced"),
+    finishReason: "error",
+  }),
+  { status: "stopped", failed: false },
+  "应用取消必须优先于 SDK / Provider 错误形态"
+)
+assert.equal(errors.length, 1, "预期取消不得进入 Session task error")
 
 const discarded = store.start({
   messageId: "assistant-discarded",

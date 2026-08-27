@@ -1,7 +1,10 @@
 "use client"
 
 import React from "react"
-import { GENERATION_BACKGROUND_LABEL } from "@/constants/generation"
+import {
+  GENERATION_BACKGROUND_LABEL,
+  GENERATION_STOPPED_LABEL,
+} from "@/constants/generation"
 import type { ConversationViewMessage } from "../../core/types"
 import type { ThreadMessageActionCommands } from "../actions/message-action-commands"
 import { AssistantMessageToolbar } from "../actions/assistant-message-toolbar"
@@ -126,6 +129,14 @@ export function ConversationMessage({
           {message.status === "error" && (
             <div className="msg-error">
               {message.error ?? "生成失败"}
+              <button className="retry" onClick={() => onRetry?.(message)}>
+                重试
+              </button>
+            </div>
+          )}
+          {message.status === "stopped" && (
+            <div className="msg-stopped" role="status">
+              <span>{GENERATION_STOPPED_LABEL}</span>
               <button className="retry" onClick={() => onRetry?.(message)}>
                 重试
               </button>

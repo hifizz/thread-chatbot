@@ -40,6 +40,7 @@ import {
 import { failOrphanedGeneratingMessage } from "@/lib/thread-chat/streaming/finalize"
 import { getSessionStore } from "@/lib/thread-chat/streaming/session-store"
 import { createSessionSseResponse } from "@/lib/thread-chat/streaming/sse"
+import { GENERATION_CANCEL_REASONS } from "@/constants/generation"
 
 const idSchema = z.uuid()
 
@@ -203,7 +204,7 @@ export function handleEditMessage(
         if (
           !getSessionStore().abort(
             result.result.abortMessageId,
-            "superseded-by-edit"
+            GENERATION_CANCEL_REASONS.supersededByEdit
           )
         )
           await failOrphanedGeneratingMessage(result.result.abortMessageId)
@@ -240,7 +241,10 @@ export function handleStopMessage(
       await parseJson(request, stopMessageCommandSchema)
     )
     if (!result.replayed && result.result.status === "generating") {
-      const aborted = getSessionStore().abort(id, "user-stop")
+      const aborted = getSessionStore().abort(
+        id,
+        GENERATION_CANCEL_REASONS.userStop
+      )
       if (!aborted) await failOrphanedGeneratingMessage(id)
     }
     return commandResponse(result)

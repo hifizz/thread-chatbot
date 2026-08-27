@@ -35,6 +35,24 @@ function messageText(message: MessageDTO): string {
     .join("")
 }
 
+function projectMessageState(
+  message: MessageDTO
+): Pick<ConversationViewMessage, "status" | "error"> {
+  switch (message.status) {
+    case "generating":
+      return { status: message.parts.length === 0 ? "pending" : "streaming" }
+    case "completed":
+      return { status: "done" }
+    case "stopped":
+      return { status: "stopped" }
+    case "failed":
+      return {
+        status: "error",
+        ...(message.error ? { error: message.error.message } : {}),
+      }
+  }
+}
+
 /**
  * 现有工作台组件以 `main` 作为根列的展示标识；规范化模型的根 Thread 则使用 UUID。
  * 这个别名只存在于只读 UI facade，任何 v1 command/DTO 都继续使用真实 Thread ID。
@@ -89,22 +107,13 @@ export function projectMessageDTO(input: {
   const quote = message.parts
     .map((part) => dataPart<{ text: string }>(part, "data-quote"))
     .find((value): value is { text: string } => value !== null)
-  const status =
-    message.status === "generating"
-      ? message.parts.length === 0
-        ? "pending"
-        : "streaming"
-      : message.status === "failed"
-        ? "error"
-        : "done"
   return {
     id: message.id,
     parentMessageId: input.parentMessageId,
     role: message.role,
     text: messageText(message),
     forks,
-    status,
-    ...(message.error ? { error: message.error.message } : {}),
+    ...projectMessageState(message),
     ...(quote ? { quote } : {}),
     ...(activities.length > 0 ? { webResearch: activities } : {}),
     ...(route ? { researchRoute: route } : {}),
