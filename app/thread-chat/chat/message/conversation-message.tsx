@@ -10,7 +10,6 @@ import type { ThreadMessageActionCommands } from "../actions/message-action-comm
 import { AssistantMessageToolbar } from "../actions/assistant-message-toolbar"
 import { assistantMessagePresentation } from "./conversation-message-logic"
 import { EditableUserMessage } from "./editable-user-message"
-import { UIMessageSupplementalParts } from "./ui-message-parts"
 import {
   hasCompletedAssistantActions,
   type MessageActionViewState,
@@ -120,7 +119,6 @@ export function ConversationMessage({
               ) : (
                 <>
                   {renderAssistantBody(message)}
-                  <UIMessageSupplementalParts message={message} />
                   {presentation.showCaret && <span className="caret" />}
                 </>
               )}

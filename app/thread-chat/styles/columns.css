@@ -280,6 +280,9 @@
   padding: 2px 12px 12px;
   border-top: 1px dashed var(--rule);
 }
+.tc .reasoning-body {
+  white-space: pre-wrap;
+}
 .tc .inh-msg {
   font-size: 12.5px;
   line-height: 1.55;

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 语言
 
-所有输出内容必须使用中文（代码、文件路径、命令等技术内容除外）。
+所有输出内容必须使用中文（代码、文件路径、命令等技术内容除外）。输出时减少中英文夹杂，先中文说明白。禁止说“投影、缺省”，理解不了它的意思。
 
 ## Commands
 
