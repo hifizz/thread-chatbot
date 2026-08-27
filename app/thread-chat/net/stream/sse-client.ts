@@ -11,7 +11,7 @@ export interface StreamSubscription {
 export interface SubscribeToMessageStreamOptions {
   url: string
   onEvent(event: StreamEvent): void | Promise<void>
-  onDisconnect?(error?: unknown): void
+  onDisconnect?(error?: unknown): void | Promise<void>
   fetch?: typeof globalThis.fetch
 }
 
@@ -75,7 +75,7 @@ export function subscribeToMessageStream(
       if (!controller.signal.aborted) disconnectError = error
     } finally {
       if (!endedByTerminal && !controller.signal.aborted)
-        options.onDisconnect?.(disconnectError)
+        await options.onDisconnect?.(disconnectError)
     }
   })()
   return {
@@ -85,4 +85,3 @@ export function subscribeToMessageStream(
     },
   }
 }
-

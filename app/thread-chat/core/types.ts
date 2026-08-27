@@ -91,6 +91,7 @@ export interface NormalizedThreadChatState extends ConversationEntityState {
     message: ThreadChatUIMessage,
     seq: number
   ): void
+  markConnectingGeneration(messageId: string): void
   markBackgroundGeneration(messageId: string): void
   mergePolledMessage(message: MessageDTO): void
   reconcileTerminalMessage(message: MessageDTO): void

@@ -407,7 +407,10 @@ async function testLateSnapshotAndDisconnectPolling() {
     liveTexts.includes("迟到快照"),
     "replay 应在未来 chunk 前直接入 Store"
   )
-  assert.ok(liveTexts.includes("迟到快照 + 后续"))
+  assert.ok(
+    liveTexts.includes("迟到快照 + 后续"),
+    `应显示 snapshot 后续 chunk，实际 liveTexts=${JSON.stringify(liveTexts)}`
+  )
   assert.equal(store.getState().messagesById[terminal.id].status, "completed")
   assert.equal(
     store.getState().streamByMessageId[terminal.id].phase,
@@ -417,6 +420,63 @@ async function testLateSnapshotAndDisconnectPolling() {
     store.getState().artifactsById[terminalArtifact.id].title,
     "断流报告"
   )
+}
+
+async function testAcceptedGenerationStartsConnectingBeforeFirstSse() {
+  const generating = message({
+    status: "generating",
+    error: null,
+    finishedAt: null,
+    parts: [],
+  })
+  const store = createConversationStore({
+    bootstrap: bootstrap({ messages: [generating] }),
+  })
+  let releaseFetch
+  const fetchStarted = new Promise((resolve) => {
+    releaseFetch = resolve
+  })
+  const connection = followAcceptedGeneration({
+    store,
+    accepted: {
+      project: project(),
+      thread: thread(),
+      assistantMessage: generating,
+      streamUrl: "/waiting-stream",
+    },
+    client: {
+      async getMessage() {
+        return message({ status: "completed", error: null })
+      },
+      async getArtifact() {
+        throw new Error("unexpected artifact fetch")
+      },
+    },
+    fetch: async () => {
+      await fetchStarted
+      return sseResponse([
+        {
+          type: "terminal",
+          message: message({ status: "completed", error: null }),
+        },
+      ])
+    },
+  })
+
+  assert.equal(
+    store.getState().streamByMessageId[generating.id].phase,
+    "connecting"
+  )
+  assert.equal(
+    projectMessageDTO({
+      state: store.getState(),
+      message: generating,
+      parentMessageId: null,
+    }).backgroundGeneration,
+    false
+  )
+  releaseFetch()
+  await connection.finished
 }
 
 async function testBootstrapBackgroundPollAndWorkspace() {
@@ -810,6 +870,7 @@ await testAiSdkReducer()
 await testOneShotSse()
 await testTerminalPoller()
 await testLateSnapshotAndDisconnectPolling()
+await testAcceptedGenerationStartsConnectingBeforeFirstSse()
 await testBootstrapBackgroundPollAndWorkspace()
 await testOptimisticRollbackIsolation()
 await testRetryABC()

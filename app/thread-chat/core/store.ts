@@ -220,6 +220,18 @@ export function createConversationStore(input?: {
         }
       })
     },
+    markConnectingGeneration(messageId) {
+      set((state) => {
+        const current =
+          state.streamByMessageId[messageId] ?? streamState("connecting")
+        return {
+          streamByMessageId: {
+            ...state.streamByMessageId,
+            [messageId]: { ...current, phase: "connecting" },
+          },
+        }
+      })
+    },
     markBackgroundGeneration(messageId) {
       set((state) => {
         const current =

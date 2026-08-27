@@ -106,7 +106,7 @@ export function followAcceptedGeneration(options: {
     })
   }
 
-  store.getState().markBackgroundGeneration(messageId)
+  store.getState().markConnectingGeneration(messageId)
   subscription = subscribeToMessageStream({
     url: accepted.streamUrl,
     fetch: options.fetch,
@@ -147,18 +147,26 @@ export function followAcceptedGeneration(options: {
         lastServerSeq = event.seq
         reducer.push(event.chunk)
       } else if (event.type === "terminal") {
-        reducer?.setHandlers({})
+        const currentReducer = reducer
+        if (currentReducer) {
+          await currentReducer.flush().catch(() => undefined)
+          currentReducer.setHandlers({})
+        }
         store.getState().reconcileTerminalMessage(event.message)
         await reconcileMessageArtifacts(store, client, event.message)
-        reducer?.close()
-        reducer = null
+        currentReducer?.close()
+        if (reducer === currentReducer) reducer = null
         resolveFinished()
       }
     },
-    onDisconnect() {
-      reducer?.setHandlers({})
-      reducer?.close()
-      reducer = null
+    async onDisconnect() {
+      const currentReducer = reducer
+      if (currentReducer) {
+        await currentReducer.flush().catch(() => undefined)
+        currentReducer.setHandlers({})
+        currentReducer.close()
+        if (reducer === currentReducer) reducer = null
+      }
       beginPoll()
     },
   })
