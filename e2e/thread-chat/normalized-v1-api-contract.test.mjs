@@ -94,7 +94,15 @@ async function filesUnder(directory) {
 
 const routeRoot = path.join(root, "app/api/thread-chat/v1")
 const routeFiles = await filesUnder(routeRoot)
-assert.equal(routeFiles.length, 13, "v1 应实现全部查询、命令和 stream 路由文件")
+assert.equal(routeFiles.length, 14, "v1 应实现全部查询、命令和 stream 路由文件")
+assert.ok(
+  routeFiles.some((filename) =>
+    filename.endsWith(
+      path.join("threads", "[threadId]", "title", "route.ts")
+    )
+  ),
+  "v1 应提供 Thread 自动标题持久化路由"
+)
 for (const filename of routeFiles) {
   const source = await readFile(filename, "utf8")
   assert.match(source, /export const dynamic = "force-dynamic"/)

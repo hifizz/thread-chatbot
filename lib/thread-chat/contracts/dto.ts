@@ -80,3 +80,10 @@ export interface GenerationAcceptedDTO {
   assistantMessage: MessageDTO
   streamUrl: string
 }
+
+export interface ThreadTitleDTO {
+  project: ProjectDTO
+  thread: ThreadDTO
+  title: string | null
+  generated: boolean
+}

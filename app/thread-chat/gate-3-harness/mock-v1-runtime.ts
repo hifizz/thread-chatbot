@@ -564,6 +564,40 @@ export function createGate3MockRuntime(
       scenarioByMessageId.set(assistant.id, selectedScenario)
       return commandResponse(accepted(thread, assistant, user))
     },
+    async generateThreadTitle(threadId) {
+      const thread = threads.get(threadId)
+      if (!thread || !project) throw new Error("THREAD_NOT_FOUND")
+      const firstUser = [...messages.values()]
+        .filter(
+          (message) =>
+            message.threadId === threadId &&
+            message.role === "user" &&
+            message.supersededAt === null
+        )
+        .sort((left, right) => left.sequence - right.sequence)[0]
+      const firstUserText = firstUser ? textOf(firstUser) : ""
+      const fallbackTitle =
+        thread.parentId === null
+          ? firstUserText.slice(0, 20)
+          : (thread.anchorText ?? firstUserText).slice(0, 13)
+      const title = fallbackTitle || null
+      const updated = {
+        ...thread,
+        autoTitle: title,
+        titleGenerationAttempted: true,
+        titleGenerated: title !== null,
+        updatedAt: now(),
+      }
+      threads.set(threadId, updated)
+      if (thread.parentId === null)
+        project = { ...project, autoTitle: title, updatedAt: updated.updatedAt }
+      return {
+        project: clone(project),
+        thread: clone(updated),
+        title,
+        generated: title !== null,
+      }
+    },
     async forkThread(parentThreadId, input) {
       const parent = threads.get(parentThreadId)
       if (!parent) throw new Error("THREAD_NOT_FOUND")

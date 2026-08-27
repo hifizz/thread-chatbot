@@ -26,6 +26,7 @@ import {
   sendMessage,
   setMessageFeedback,
   setProjectArchived,
+  generateAndSaveThreadTitle,
   startProject,
   updateThread,
 } from "@/lib/thread-chat/application"
@@ -155,6 +156,15 @@ export function handlePatchThread(
         await parseJson(request, updateThreadCommandSchema)
       )
     )
+  )
+}
+
+export function handleGenerateThreadTitle(
+  request: Request,
+  threadId: string
+): Promise<Response> {
+  return withThreadChatRoute(request, async (userId) =>
+    jsonNoCache(await generateAndSaveThreadTitle(userId, parseId(threadId)))
   )
 }
 

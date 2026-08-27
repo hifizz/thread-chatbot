@@ -17,6 +17,7 @@ import type {
   MessageDTO,
   ProjectBootstrapDTO,
   ProjectDTO,
+  ThreadTitleDTO,
   ThreadDTO,
 } from "@/lib/thread-chat/contracts/dto"
 import type {
@@ -155,6 +156,13 @@ export function createThreadChatClient(options: ThreadChatClientOptions = {}) {
         input
       )
     },
+    generateThreadTitle(threadId: string) {
+      return requestJson<ThreadTitleDTO>(
+        fetcher,
+        url(`/api/thread-chat/v1/threads/${threadId}/title`),
+        { method: "POST" }
+      )
+    },
     forkThread(threadId: string, input: ForkThreadCommand) {
       return command<ForkAcceptedDTO>(
         fetcher,
@@ -231,4 +239,3 @@ export function createThreadChatClient(options: ThreadChatClientOptions = {}) {
 }
 
 export type ThreadChatClient = ReturnType<typeof createThreadChatClient>
-

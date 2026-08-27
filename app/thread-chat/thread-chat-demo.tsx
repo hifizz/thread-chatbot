@@ -5,6 +5,10 @@ import { useRouter } from "next/navigation"
 import React, { useCallback, useEffect, useMemo, useState } from "react"
 
 import { DEFAULT_THREAD_CHAT_MODEL_ID } from "@/constants/model"
+import type {
+  MessageDTO,
+  ProjectBootstrapDTO,
+} from "@/lib/thread-chat/contracts/dto"
 import {
   activePathArtifacts,
   threadTitle,
@@ -68,7 +72,41 @@ const ThreadCanvas = dynamic(
 )
 
 const SUBTITLE_FALLBACK = "新对话"
+const MAIN_SUBTITLE_MAX_LEN = 28
 const EMPTY_SLOTS: [] = []
+
+function compactTitle(text: string, maxLength: number): string {
+  return text.length > maxLength ? `${text.slice(0, maxLength)}…` : text
+}
+
+function messageText(message: MessageDTO): string {
+  return message.parts
+    .filter(
+      (part): part is Extract<MessageDTO["parts"][number], { type: "text" }> =>
+        part.type === "text"
+    )
+    .map((part) => part.text)
+    .join("")
+    .trim()
+}
+
+function deriveProjectTitle(bootstrap: ProjectBootstrapDTO): string {
+  const rootThreadId = bootstrap.project?.rootThreadId
+  if (!rootThreadId) return SUBTITLE_FALLBACK
+  const firstUserText = bootstrap.messages
+    .filter(
+      (message) =>
+        message.threadId === rootThreadId &&
+        message.role === "user" &&
+        message.supersededAt === null
+    )
+    .sort((left, right) => left.sequence - right.sequence)
+    .map(messageText)
+    .find(Boolean)
+  return firstUserText
+    ? compactTitle(firstUserText, MAIN_SUBTITLE_MAX_LEN)
+    : SUBTITLE_FALLBACK
+}
 
 function legacyFeedback(value: "up" | "down" | null): MessageFeedback | null {
   return value === "up" ? "positive" : value === "down" ? "negative" : null
@@ -476,7 +514,8 @@ function NormalizedThreadChat({
         const bootstrap = await runtime.client.getProject(project.id)
         return {
           id: project.id,
-          title: project.customTitle ?? project.autoTitle ?? SUBTITLE_FALLBACK,
+          title:
+            project.customTitle ?? project.autoTitle ?? deriveProjectTitle(bootstrap),
           updatedAt: project.updatedAt,
           threadCount: bootstrap.threads.length,
         }
@@ -514,9 +553,7 @@ function NormalizedThreadChat({
     .find((message) => message.role === "user")
     ?.text.trim()
   const derivedSubtitle = firstUserText
-    ? firstUserText.length > 28
-      ? `${firstUserText.slice(0, 28)}…`
-      : firstUserText
+    ? compactTitle(firstUserText, MAIN_SUBTITLE_MAX_LEN)
     : SUBTITLE_FALLBACK
   const mainSubtitle =
     state.project?.customTitle ?? state.project?.autoTitle ?? derivedSubtitle

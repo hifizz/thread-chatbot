@@ -30,12 +30,25 @@ export async function bootConversationProject(options: {
     if (workspace) store.getState().setWorkspace(workspace)
   }
 
+  async function generateTitleIfNeeded(threadId: string) {
+    const thread = store.getState().threadsById[threadId]
+    if (!thread || thread.titleGenerationAttempted) return
+    try {
+      const title = await client.generateThreadTitle(threadId)
+      store.getState().upsertProject(title.project)
+      store.getState().upsertThread(title.thread)
+    } catch {
+      // 自动标题失败不影响刷新后的生成恢复。
+    }
+  }
+
   // 刷新后的 generating 只轮询，不尝试恢复进程内 SSE。
   const background = bootstrap.activeGenerationIds.map((messageId) =>
     pollBackgroundGeneration({
       store,
       client,
       messageId,
+      onTerminalMessage: (message) => generateTitleIfNeeded(message.threadId),
       pollDelays: options.pollDelays,
       wait: options.wait,
     })

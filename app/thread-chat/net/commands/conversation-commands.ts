@@ -154,13 +154,17 @@ export function createConversationCommands(
   }
 
   function follow(
-    accepted: Parameters<typeof followAcceptedGeneration>[0]["accepted"]
+    accepted: Parameters<typeof followAcceptedGeneration>[0]["accepted"],
+    afterTerminal?: (threadId: string) => void | Promise<void>
   ) {
     connections.get(accepted.assistantMessage.id)?.close()
     const connection = followAcceptedGeneration({
       store,
       client,
       accepted,
+      onTerminalMessage: afterTerminal
+        ? (message) => afterTerminal(message.threadId)
+        : undefined,
       fetch: options.fetch,
       pollDelays: options.pollDelays,
       wait: options.wait,
@@ -170,6 +174,18 @@ export function createConversationCommands(
       connections.delete(connection.messageId)
     )
     return connection
+  }
+
+  async function generateTitleIfNeeded(threadId: string) {
+    const thread = store.getState().threadsById[threadId]
+    if (!thread || thread.titleGenerationAttempted) return
+    try {
+      const response = await client.generateThreadTitle(threadId)
+      store.getState().upsertProject(response.project)
+      store.getState().upsertThread(response.thread)
+    } catch {
+      // 自动标题是非阻塞增强；失败保留现有回退标题，不影响消息流。
+    }
   }
 
   async function startProject(input: {
@@ -248,7 +264,9 @@ export function createConversationCommands(
         client.startProject(project.id, command)
       )
       store.getState().commitOptimisticCommand(command.commandId)
-      return { command, response, connection: follow(response.data) }
+      const connection = follow(response.data)
+      void generateTitleIfNeeded(command.rootThreadId)
+      return { command, response, connection }
     } catch (error) {
       store.getState().rollbackOptimisticCommand(command.commandId)
       throw error
@@ -299,7 +317,11 @@ export function createConversationCommands(
         client.sendMessage(input.threadId, command)
       )
       store.getState().commitOptimisticCommand(command.commandId)
-      return { command, response, connection: follow(response.data) }
+      return {
+        command,
+        response,
+        connection: follow(response.data, generateTitleIfNeeded),
+      }
     } catch (error) {
       store.getState().rollbackOptimisticCommand(command.commandId)
       throw error
@@ -392,7 +414,7 @@ export function createConversationCommands(
         command,
         response,
         connection: response.data.generation
-          ? follow(response.data.generation)
+          ? follow(response.data.generation, generateTitleIfNeeded)
           : null,
       }
     } catch (error) {
@@ -432,7 +454,11 @@ export function createConversationCommands(
         client.retryMessage(source.id, command)
       )
       store.getState().commitOptimisticCommand(command.commandId)
-      return { command, response, connection: follow(response.data) }
+      return {
+        command,
+        response,
+        connection: follow(response.data, generateTitleIfNeeded),
+      }
     } catch (error) {
       store.getState().rollbackOptimisticCommand(command.commandId)
       throw error
@@ -497,7 +523,11 @@ export function createConversationCommands(
         client.editMessage(source.id, command)
       )
       store.getState().commitOptimisticCommand(command.commandId)
-      return { command, response, connection: follow(response.data.generation) }
+      return {
+        command,
+        response,
+        connection: follow(response.data.generation, generateTitleIfNeeded),
+      }
     } catch (error) {
       store.getState().rollbackOptimisticCommand(command.commandId)
       throw error

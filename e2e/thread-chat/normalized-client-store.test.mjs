@@ -527,6 +527,18 @@ async function testBootstrapBackgroundPollAndWorkspace() {
       async getMessage() {
         return terminal
       },
+      async generateThreadTitle() {
+        return {
+          project: project({ autoTitle: "后台标题" }),
+          thread: thread({
+            autoTitle: "后台标题",
+            titleGenerationAttempted: true,
+            titleGenerated: true,
+          }),
+          title: "后台标题",
+          generated: true,
+        }
+      },
     },
     pollDelays: [0],
     wait: async () => undefined,
@@ -594,6 +606,18 @@ async function testRetryABC() {
     },
     async getMessage(id) {
       return store.getState().messagesById[id]
+    },
+    async generateThreadTitle() {
+      return {
+        project: project({ autoTitle: "重试标题" }),
+        thread: thread({
+          autoTitle: "重试标题",
+          titleGenerationAttempted: true,
+          titleGenerated: true,
+        }),
+        title: "重试标题",
+        generated: true,
+      }
     },
   }
   const commands = createConversationCommands({
@@ -682,6 +706,18 @@ async function testCommandNetworkRetryReusesFrozenPayload() {
       async getMessage(id) {
         return message({ id, status: "completed", error: null })
       },
+      async generateThreadTitle() {
+        return {
+          project: project({ autoTitle: "网络重试标题" }),
+          thread: thread({
+            autoTitle: "网络重试标题",
+            titleGenerationAttempted: true,
+            titleGenerated: true,
+          }),
+          title: "网络重试标题",
+          generated: true,
+        }
+      },
     },
     fetch: async () =>
       sseResponse([
@@ -704,6 +740,194 @@ async function testCommandNetworkRetryReusesFrozenPayload() {
   assert.equal(seen.length, 2)
   assert.equal(seen[0], seen[1], "网络重试必须复用同一个冻结 command 对象")
   assert.equal(Object.isFrozen(seen[0]), true)
+  commands.dispose()
+}
+
+async function testCommandTitleGenerationUpdatesStore() {
+  const ids = [
+    "00000000-0000-4000-8000-000000000901",
+    "00000000-0000-4000-8000-000000000902",
+    "00000000-0000-4000-8000-000000000903",
+    "00000000-0000-4000-8000-000000000904",
+    "00000000-0000-4000-8000-000000000905",
+    "00000000-0000-4000-8000-000000000906",
+    "00000000-0000-4000-8000-000000000907",
+    "00000000-0000-4000-8000-000000000908",
+  ]
+  const store = createConversationStore()
+  const titleCalls = []
+  const terminalThreadByMessageId = new Map()
+  const commands = createConversationCommands({
+    store,
+    networkAttempts: 1,
+    createId: () => ids.shift(),
+    client: {
+      async startProject(_projectId, command) {
+        terminalThreadByMessageId.set(
+          command.assistantMessageId,
+          command.rootThreadId
+        )
+        return {
+          ok: true,
+          replayed: false,
+          data: {
+            project: project({
+              id: command.projectId,
+              rootThreadId: command.rootThreadId,
+              autoTitle: null,
+            }),
+            thread: thread({
+              id: command.rootThreadId,
+              projectId: command.projectId,
+              autoTitle: null,
+              titleGenerationAttempted: false,
+              titleGenerated: false,
+            }),
+            userMessage: message({
+              id: command.userMessageId,
+              projectId: command.projectId,
+              threadId: command.rootThreadId,
+              sequence: 1,
+              role: "user",
+              status: "completed",
+              error: null,
+              parts: [{ type: "text", text: command.text }],
+            }),
+            assistantMessage: message({
+              id: command.assistantMessageId,
+              projectId: command.projectId,
+              threadId: command.rootThreadId,
+              sequence: 2,
+              status: "generating",
+              error: null,
+              finishedAt: null,
+              parts: [],
+            }),
+            streamUrl: `/title-start/${command.assistantMessageId}`,
+          },
+        }
+      },
+      async forkThread(parentThreadId, command) {
+        const child = thread({
+          id: command.threadId,
+          parentId: parentThreadId,
+          forkMessageId: command.sourceMessageId,
+          anchorText: command.anchorText,
+          footnote: 1,
+          depth: 1,
+          autoTitle: null,
+          titleGenerationAttempted: false,
+          titleGenerated: false,
+        })
+        terminalThreadByMessageId.set(
+          command.firstTurn.assistantMessageId,
+          child.id
+        )
+        return {
+          ok: true,
+          replayed: false,
+          data: {
+            thread: child,
+            generation: {
+              project: store.getState().project,
+              thread: child,
+              userMessage: message({
+                id: command.firstTurn.userMessageId,
+                threadId: child.id,
+                sequence: 1,
+                role: "user",
+                status: "completed",
+                error: null,
+                parts: [{ type: "text", text: command.firstTurn.text }],
+              }),
+              assistantMessage: message({
+                id: command.firstTurn.assistantMessageId,
+                threadId: child.id,
+                sequence: 2,
+                status: "generating",
+                error: null,
+                finishedAt: null,
+                parts: [],
+              }),
+              streamUrl: `/title-branch/${command.firstTurn.assistantMessageId}`,
+            },
+          },
+        }
+      },
+      async getMessage(id) {
+        return message({ id, status: "completed", error: null })
+      },
+      async getArtifact() {
+        throw new Error("unexpected artifact fetch")
+      },
+      async generateThreadTitle(threadId) {
+        titleCalls.push(threadId)
+        const current = store.getState()
+        const target = current.threadsById[threadId]
+        const autoTitle =
+          target.parentId === null ? "主线自动标题" : "分支自动标题"
+        return {
+          project: {
+            ...current.project,
+            ...(target.parentId === null ? { autoTitle } : {}),
+          },
+          thread: {
+            ...target,
+            autoTitle,
+            titleGenerationAttempted: true,
+            titleGenerated: true,
+          },
+          title: autoTitle,
+          generated: true,
+        }
+      },
+    },
+    fetch: async (url) => {
+      const messageId = String(url).split("/").at(-1)
+      return sseResponse([
+        {
+          type: "terminal",
+          message: message({
+            id: messageId,
+            threadId: terminalThreadByMessageId.get(messageId),
+            status: "completed",
+            error: null,
+          }),
+        },
+      ])
+    },
+  })
+
+  const started = await commands.startProject({
+    projectId: project().id,
+    modelId: "test/model",
+    text: "研究主线标题",
+  })
+  await Promise.resolve()
+  await started.connection.finished
+  assert.equal(store.getState().project.autoTitle, "主线自动标题")
+  assert.equal(
+    store.getState().threadsById[started.command.rootThreadId].autoTitle,
+    "主线自动标题"
+  )
+
+  const forked = await commands.forkThread({
+    parentThreadId: started.command.rootThreadId,
+    sourceMessageId: started.command.assistantMessageId,
+    anchorText: "锚点",
+    anchor: { quote: { exact: "锚点", prefix: "", suffix: "" } },
+    modelId: "test/model",
+    text: "解释锚点",
+  })
+  await forked.connection.finished
+  assert.equal(
+    store.getState().threadsById[forked.command.threadId].autoTitle,
+    "分支自动标题"
+  )
+  assert.deepEqual(titleCalls, [
+    started.command.rootThreadId,
+    forked.command.threadId,
+  ])
   commands.dispose()
 }
 
@@ -875,6 +1099,7 @@ await testBootstrapBackgroundPollAndWorkspace()
 await testOptimisticRollbackIsolation()
 await testRetryABC()
 await testCommandNetworkRetryReusesFrozenPayload()
+await testCommandTitleGenerationUpdatesStore()
 await testPartsProjectionAndWorkspaceIsolation()
 await testStoppedProjectionPreservesExistingPresentation()
 await testGate3HarnessIsolation()
