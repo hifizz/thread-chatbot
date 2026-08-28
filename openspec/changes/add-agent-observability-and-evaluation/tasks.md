@@ -67,17 +67,17 @@
 
 ## 7. 项目自有评测基础设施
 
-- [ ] 7.1 在 `evals/agent/` 建立 cases、fixtures、scorers、runner 和文档结构，定义可验证的 case、suite、tag、sensitivity 和 schema version 类型
-- [ ] 7.2 实现稳定 case ID 和仓库 dataset revision，确保 Hosted Dataset 的最新版本行为不会取代 Git revision 的可复现性
-- [ ] 7.3 实现配置指纹生成器，覆盖 candidate、model、prompt、Search policy/provider、memory/context、toolset、multimodal parser、release/commit、environment 和 evaluator version，并排除 secrets
-- [ ] 7.4 定义统一 experiment result envelope，包含 output、Trace ID、timing、usage、tool/provider attempts、terminal state、scores 和 error classification
-- [ ] 7.5 实现按 suite/tag/case ID 选择的 Node.js + `tsx` runner，支持 smoke、ci、scheduled/release 模式和明确的并发/超时预算
-- [ ] 7.6 抽取或复用生产 route/prompt/context/tool execution core，让内容质量 case 运行代表性 Agent 逻辑而不是仅调用 prompt playground
-- [ ] 7.7 为生命周期 case 建立隔离测试数据库执行器，创建测试 Project/Thread/Message、调用真实 `runGeneration`、读取终态并清理测试数据，禁止连接生产数据库
-- [ ] 7.8 实现 repo case 到 Langfuse Dataset 的幂等同步，保持稳定 item ID、suite/tags、expected/rubric 和 sensitivity 约束
-- [ ] 7.9 实现 Langfuse Experiment adapter，把 case、candidate、fingerprint、Trace 和 scores 关联到同一 run，并在短生命周期 CLI 结束前显式 flush
-- [ ] 7.10 增加 `package.json` 评测命令、server-only 环境隔离和安全启动检查，明确 evaluation traffic 不使用 production user/session/analytics identity
-- [ ] 7.11 为 case schema、fingerprint 稳定性、selection、result envelope、Dataset 重放、remote failure 和 flush 增加不依赖真实模型的合同测试
+- [x] 7.1 在 `evals/agent/` 建立 cases、fixtures、scorers、runner 和文档结构，定义可验证的 case、suite、tag、sensitivity 和 schema version 类型
+- [x] 7.2 实现稳定 case ID 和仓库 dataset revision，确保 Hosted Dataset 的最新版本行为不会取代 Git revision 的可复现性
+- [x] 7.3 实现配置指纹生成器，覆盖 candidate、model、prompt、Search policy/provider、memory/context、toolset、multimodal parser、release/commit、environment 和 evaluator version，并排除 secrets
+- [x] 7.4 定义统一 experiment result envelope，包含 output、Trace ID、timing、usage、tool/provider attempts、terminal state、scores 和 error classification
+- [x] 7.5 实现按 suite/tag/case ID 选择的 Node.js + `tsx` runner，支持 smoke、ci、scheduled/release 模式和明确的并发/超时预算
+- [x] 7.6 抽取或复用生产 route/prompt/context/tool execution core，让内容质量 case 运行代表性 Agent 逻辑而不是仅调用 prompt playground
+- [x] 7.7 为生命周期 case 建立隔离测试数据库执行器，创建测试 Project/Thread/Message、调用真实 `runGeneration`、读取终态并清理测试数据，禁止连接生产数据库
+- [x] 7.8 实现 repo case 到 Langfuse Dataset 的幂等同步，保持稳定 item ID、suite/tags、expected/rubric 和 sensitivity 约束
+- [x] 7.9 实现 Langfuse Experiment adapter，把 case、candidate、fingerprint、Trace 和 scores 关联到同一 run，并在短生命周期 CLI 结束前显式 flush
+- [x] 7.10 增加 `package.json` 评测命令、server-only 环境隔离和安全启动检查，明确 evaluation traffic 不使用 production user/session/analytics identity
+- [x] 7.11 为 case schema、fingerprint 稳定性、selection、result envelope、Dataset 重放、remote failure 和 flush 增加不依赖真实模型的合同测试
 
 ## 8. 初始评测集与评分器
 

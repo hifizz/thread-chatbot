@@ -1,0 +1,34 @@
+{
+  "schemaVersion": "agent-case-v1",
+  "id": "foundation-local-answer",
+  "suite": "core-answer",
+  "tags": ["smoke", "fixture"],
+  "sensitivity": "synthetic",
+  "execution": "fixture",
+  "input": {
+    "messages": [
+      {
+        "role": "user",
+        "text": "请用一句话解释什么是幂等。"
+      }
+    ],
+    "attachments": []
+  },
+  "expected": {
+    "route": "answer",
+    "tools": [],
+    "terminalState": "completed",
+    "contains": ["重复"]
+  },
+  "fixtureResult": {
+    "text": "幂等是指同一操作重复执行多次，结果与执行一次相同。",
+    "route": "answer",
+    "tools": [],
+    "terminalState": "completed",
+    "usage": {
+      "inputTokens": 12,
+      "outputTokens": 18,
+      "totalTokens": 30
+    }
+  }
+}
