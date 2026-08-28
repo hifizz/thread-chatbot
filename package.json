@@ -22,6 +22,7 @@
     "observability:check-release": "node --import tsx scripts/check-observability-release.ts",
     "test:observability:release": "node --import tsx e2e/observability/langfuse-release.test.mjs",
     "test:observability:eval-foundation": "node --import tsx e2e/observability/eval-foundation.test.mjs",
+    "test:observability:eval-scorers": "node --import tsx e2e/observability/eval-scorers.test.mjs",
     "eval:agent": "node --import tsx evals/agent/cli.ts --mode=smoke",
     "eval:agent:ci": "node --import tsx evals/agent/cli.ts --mode=ci",
     "eval:agent:scheduled": "node --import tsx evals/agent/cli.ts --mode=scheduled",

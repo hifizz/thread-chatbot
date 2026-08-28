@@ -57,6 +57,13 @@ export const agentCaseSchema = z
         excludes: z.array(z.string().min(1)).optional(),
         citationsRequired: z.boolean().optional(),
         memoryFacts: z.array(z.string().min(1)).optional(),
+        forbiddenFacts: z.array(z.string().min(1)).optional(),
+        groundingFacts: z.array(z.string().min(1)).optional(),
+        sourceDomains: z.array(z.string().min(1)).optional(),
+        jsonKeys: z.array(z.string().min(1)).optional(),
+        maxToolCount: z.number().int().min(0).optional(),
+        fallbackExpected: z.boolean().optional(),
+        errorCategory: z.string().min(1).optional(),
         rubric: z.string().min(1).max(4_000).optional(),
       })
       .strict(),
@@ -67,6 +74,11 @@ export const agentCaseSchema = z
         tools: z.array(z.string()).default([]),
         terminalState: terminalStateSchema.default("completed"),
         usage: z.record(z.string(), z.number()).optional(),
+        providerAttempts: z
+          .array(
+            z.record(z.string(), z.union([z.string(), z.number(), z.boolean()]))
+          )
+          .default([]),
       })
       .strict()
       .optional(),

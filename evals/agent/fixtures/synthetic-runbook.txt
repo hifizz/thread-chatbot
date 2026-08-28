@@ -1,0 +1,4 @@
+Synthetic observability runbook
+Project: Aurora
+Rollback: AI_TELEMETRY_ENABLED=false
+No production credentials or user content are present in this fixture.

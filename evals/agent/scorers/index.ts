@@ -8,4 +8,11 @@ import type {
 export type AgentScorer = (input: {
   evaluationCase: AgentCase
   result: AgentExperimentResult
-}) => EvaluationScore | EvaluationScore[]
+}) =>
+  | EvaluationScore
+  | EvaluationScore[]
+  | Promise<EvaluationScore | EvaluationScore[]>
+
+export { deterministicScorer } from "@/evals/agent/scorers/deterministic"
+export { searchQualityScorer } from "@/evals/agent/scorers/search"
+export { memorySafetyScorer } from "@/evals/agent/scorers/memory"

@@ -14,6 +14,8 @@ import {
   selectAgentCases,
   type EvaluationSelection,
 } from "@/evals/agent/selection"
+import { scoreAgentResult } from "@/evals/agent/scoring"
+import type { AgentScorer } from "@/evals/agent/scorers"
 
 export type EvaluationRunMode = "smoke" | "ci" | "scheduled" | "release"
 
@@ -40,6 +42,7 @@ export type RunAgentEvaluationOptions = {
   executor: AgentCaseExecutor
   concurrency?: number
   timeoutMs?: number
+  scorers?: AgentScorer[]
 }
 
 async function withTimeout<T>(operation: Promise<T>, timeoutMs: number) {
@@ -69,7 +72,17 @@ export async function runAgentEvaluation(
   candidate: EvaluationCandidateConfig
   results: AgentExperimentResult[]
 }> {
-  const selected = selectAgentCases(cases, options.selection)
+  const modeCases =
+    options.selection ||
+    options.mode === "scheduled" ||
+    options.mode === "release"
+      ? cases
+      : cases.filter((item) =>
+          options.mode === "smoke"
+            ? item.tags.includes("smoke")
+            : item.tags.includes("smoke") || item.tags.includes("ci")
+        )
+  const selected = selectAgentCases(modeCases, options.selection)
   const revision = datasetRevision(cases)
   const candidate = publicEvaluationConfig(options.candidate)
   const fingerprint = evaluationConfigFingerprint(candidate)
@@ -108,7 +121,7 @@ export async function runAgentEvaluation(
         }
       }
       const ended = Date.now()
-      results[index] = {
+      const result: AgentExperimentResult = {
         schemaVersion: "agent-result-v1",
         caseId: evaluationCase.id,
         suite: evaluationCase.suite,
@@ -132,6 +145,11 @@ export async function runAgentEvaluation(
         scores: [],
         ...(error ? { error } : {}),
       }
+      results[index] = await scoreAgentResult({
+        evaluationCase,
+        result,
+        ...(options.scorers ? { scorers: options.scorers } : {}),
+      })
     }
   }
 

@@ -39,7 +39,7 @@ const candidate = {
 test("case schema, selection, revision, and fingerprint are stable", async () => {
   const cases = await loadAgentCases()
   assert.ok(cases.length > 0)
-  assert.equal(selectAgentCases(cases, { tags: ["smoke"] }).length, 1)
+  assert.ok(selectAgentCases(cases, { tags: ["smoke"] }).length >= 5)
   assert.equal(datasetRevision(cases), datasetRevision([...cases].reverse()))
   assert.equal(
     stableDatasetItemId(cases[0].id),
@@ -65,6 +65,7 @@ test("runner preserves order, selection, envelope, timeout, and mode budgets", a
   const run = await runAgentEvaluation(cases, {
     mode: "smoke",
     candidate,
+    selection: { caseIds: [cases[0].id] },
     executor: async ({ evaluationCase }) => ({
       traceId: "actual-executor-trace",
       text: evaluationCase.fixtureResult.text,
@@ -86,6 +87,7 @@ test("runner preserves order, selection, envelope, timeout, and mode budgets", a
   const timeout = await runAgentEvaluation(cases, {
     mode: "smoke",
     candidate,
+    selection: { caseIds: [cases[0].id] },
     timeoutMs: 5,
     executor: () => new Promise(() => {}),
   })

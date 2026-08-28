@@ -81,17 +81,17 @@
 
 ## 8. 初始评测集与评分器
 
-- [ ] 8.1 建立 `core-answer` 初始 case，覆盖不联网回答、中英文、指令遵循、结构化/Artifact 输出和无需工具的问题
-- [ ] 8.2 建立 `search-routing` 初始 case，覆盖 answer/fetch/search/research、最新事实、引用、provider fallback、空结果、timeout/429 和工具调用预算
-- [ ] 8.3 建立 `memory-context` 初始 case，覆盖同线程事实、长上下文、冲突、冻结分支、retrieval/embedding 和跨 Project 不泄漏
-- [ ] 8.4 建立 `multimodal` 初始 case 与可提交合成图片/PDF/文本 fixture，覆盖 grounding、页/内容依据、损坏、不支持和大小边界
-- [ ] 8.5 建立 `reliability` 初始 case，覆盖 Stop、Retry、command replay、SSE 断开、初始化/协议失败、provider 故障和进程重启收敛
-- [ ] 8.6 实现 success、schema、expected route/tool、tool count、fallback、empty/error 和 terminal-state 确定性 scorer
-- [ ] 8.7 实现 citation presence、URL/来源匹配、可验证 grounding 与 freshness-aware Search scorer，并将 live Web 波动标记为独立维度
-- [ ] 8.8 实现 memory fact、contradiction 和 cross-Project no-leak scorer，保证泄漏失败不能被高主观质量分覆盖
-- [ ] 8.9 实现 p50/p95 latency、provider/model usage、工具次数、fallback 率、错误率、空结果率和可用估算成本聚合器
-- [ ] 8.10 实现可选模型裁判 adapter，版本化 judge model 与 rubric，并用一小组人工标签校准 correctness、faithfulness、helpfulness、completeness 和 citation support
-- [ ] 8.11 增加 scorer 自测与固定样例，证明确定性失败优先、用户 feedback 保持独立信号、报告不压缩为一个不可解释总分
+- [x] 8.1 建立 `core-answer` 初始 case，覆盖不联网回答、中英文、指令遵循、结构化/Artifact 输出和无需工具的问题
+- [x] 8.2 建立 `search-routing` 初始 case，覆盖 answer/fetch/search/research、最新事实、引用、provider fallback、空结果、timeout/429 和工具调用预算
+- [x] 8.3 建立 `memory-context` 初始 case，覆盖同线程事实、长上下文、冲突、冻结分支、retrieval/embedding 和跨 Project 不泄漏
+- [x] 8.4 建立 `multimodal` 初始 case 与可提交合成图片/PDF/文本 fixture，覆盖 grounding、页/内容依据、损坏、不支持和大小边界
+- [x] 8.5 建立 `reliability` 初始 case，覆盖 Stop、Retry、command replay、SSE 断开、初始化/协议失败、provider 故障和进程重启收敛
+- [x] 8.6 实现 success、schema、expected route/tool、tool count、fallback、empty/error 和 terminal-state 确定性 scorer
+- [x] 8.7 实现 citation presence、URL/来源匹配、可验证 grounding 与 freshness-aware Search scorer，并将 live Web 波动标记为独立维度
+- [x] 8.8 实现 memory fact、contradiction 和 cross-Project no-leak scorer，保证泄漏失败不能被高主观质量分覆盖
+- [x] 8.9 实现 p50/p95 latency、provider/model usage、工具次数、fallback 率、错误率、空结果率和可用估算成本聚合器
+- [x] 8.10 实现可选模型裁判 adapter，版本化 judge model 与 rubric，并用一小组人工标签校准 correctness、faithfulness、helpfulness、completeness 和 citation support
+- [x] 8.11 增加 scorer 自测与固定样例，证明确定性失败优先、用户 feedback 保持独立信号、报告不压缩为一个不可解释总分
 
 ## 9. Baseline、生产回流与持续实验
 

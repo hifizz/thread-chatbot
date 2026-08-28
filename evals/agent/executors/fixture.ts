@@ -15,5 +15,6 @@ export async function executeFixtureCase(
     tools: evaluationCase.fixtureResult.tools,
     terminalState: evaluationCase.fixtureResult.terminalState,
     usage: evaluationCase.fixtureResult.usage ?? {},
+    providerAttempts: evaluationCase.fixtureResult.providerAttempts,
   }
 }

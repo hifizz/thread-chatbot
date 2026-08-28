@@ -4,6 +4,8 @@ export type EvaluationScore = {
   name: string
   value: number | string
   deterministic: boolean
+  severity: "hard" | "quality" | "diagnostic"
+  signal: "evaluation" | "judge"
   passed?: boolean
   comment?: string
   evaluatorVersion: string

@@ -16,6 +16,12 @@ import {
   type EvaluationRunMode,
 } from "@/evals/agent/runner"
 import type { AgentSuite } from "@/evals/agent/schema"
+import { aggregateEvaluationResults } from "@/evals/agent/scorers/aggregate"
+import { runModelJudge } from "@/evals/agent/scorers/judge"
+import {
+  DEFAULT_AGENT_SCORERS,
+  hasHardEvaluationFailure,
+} from "@/evals/agent/scoring"
 
 function argument(name: string): string | undefined {
   const prefix = `--${name}=`
@@ -99,11 +105,28 @@ const selection = {
   tags: listArgument("tag"),
   caseIds: listArgument("case"),
 }
+const hasExplicitSelection = Object.values(selection).some(
+  (value) => value !== undefined
+)
+const judgeModelId = argument("judge-model")
 const run = await runAgentEvaluation(cases, {
   mode,
   candidate,
-  selection,
+  ...(hasExplicitSelection ? { selection } : {}),
   executor,
+  ...(judgeModelId
+    ? {
+        scorers: [
+          ...DEFAULT_AGENT_SCORERS,
+          ({ evaluationCase, result }) =>
+            runModelJudge({
+              evaluationCase,
+              result,
+              judgeModelId,
+            }),
+        ],
+      }
+    : {}),
 })
 
 if (process.argv.includes("--langfuse-experiment")) {
@@ -121,5 +144,15 @@ if (process.argv.includes("--langfuse-experiment")) {
   })
 }
 
-console.log(JSON.stringify(run, null, 2))
-if (run.results.some((result) => result.error)) process.exitCode = 1
+console.log(
+  JSON.stringify(
+    { ...run, aggregate: aggregateEvaluationResults(run.results) },
+    null,
+    2
+  )
+)
+if (
+  run.results.some((result) => result.error || hasHardEvaluationFailure(result))
+) {
+  process.exitCode = 1
+}

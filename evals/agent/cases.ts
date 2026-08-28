@@ -13,11 +13,14 @@ export async function loadAgentCases(
     .filter((entry) => entry.isFile() && entry.name.endsWith(".json"))
     .map((entry) => path.join(entry.parentPath, entry.name))
     .sort()
-  const cases = await Promise.all(
-    files.map(async (file) =>
-      parseAgentCase(JSON.parse(await readFile(file, "utf8")))
+  const cases = (
+    await Promise.all(
+      files.map(async (file) => {
+        const value: unknown = JSON.parse(await readFile(file, "utf8"))
+        return (Array.isArray(value) ? value : [value]).map(parseAgentCase)
+      })
     )
-  )
+  ).flat()
   const ids = new Set<string>()
   for (const item of cases) {
     if (ids.has(item.id))

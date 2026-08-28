@@ -1,0 +1,210 @@
+[
+  {
+    "schemaVersion": "agent-case-v1",
+    "id": "reliability-stop-terminal",
+    "suite": "reliability",
+    "tags": ["smoke", "lifecycle", "stop"],
+    "sensitivity": "synthetic",
+    "execution": "lifecycle",
+    "input": {
+      "messages": [{ "role": "user", "text": "生成长回答后立即停止。" }],
+      "attachments": [],
+      "lifecycleScenario": "stop"
+    },
+    "expected": { "terminalState": "stopped" },
+    "fixtureResult": {
+      "text": "",
+      "tools": [],
+      "terminalState": "stopped",
+      "providerAttempts": []
+    }
+  },
+  {
+    "schemaVersion": "agent-case-v1",
+    "id": "reliability-completed-lifecycle",
+    "suite": "reliability",
+    "tags": ["ci", "lifecycle", "complete"],
+    "sensitivity": "synthetic",
+    "execution": "lifecycle",
+    "input": {
+      "messages": [{ "role": "user", "text": "完成一次隔离数据库生成。" }],
+      "attachments": [],
+      "lifecycleScenario": "complete"
+    },
+    "expected": { "terminalState": "completed", "contains": ["完成"] },
+    "fixtureResult": {
+      "text": "隔离数据库生成完成。",
+      "tools": [],
+      "terminalState": "completed",
+      "providerAttempts": []
+    }
+  },
+  {
+    "schemaVersion": "agent-case-v1",
+    "id": "reliability-generation-failure",
+    "suite": "reliability",
+    "tags": ["ci", "lifecycle", "failure"],
+    "sensitivity": "synthetic",
+    "execution": "lifecycle",
+    "input": {
+      "messages": [{ "role": "user", "text": "触发合成生成失败。" }],
+      "attachments": [],
+      "lifecycleScenario": "fail"
+    },
+    "expected": { "terminalState": "failed" },
+    "fixtureResult": {
+      "text": "",
+      "tools": [],
+      "terminalState": "failed",
+      "providerAttempts": []
+    }
+  },
+  {
+    "schemaVersion": "agent-case-v1",
+    "id": "reliability-initialization-failure",
+    "suite": "reliability",
+    "tags": ["ci", "initialization", "failure"],
+    "sensitivity": "synthetic",
+    "execution": "fixture",
+    "input": {
+      "messages": [{ "role": "user", "text": "模拟模型配置初始化失败。" }],
+      "attachments": []
+    },
+    "expected": { "terminalState": "failed", "contains": ["初始化"] },
+    "fixtureResult": {
+      "text": "生成初始化失败并安全收敛。",
+      "tools": [],
+      "terminalState": "failed",
+      "providerAttempts": []
+    }
+  },
+  {
+    "schemaVersion": "agent-case-v1",
+    "id": "reliability-stream-protocol-failure",
+    "suite": "reliability",
+    "tags": ["ci", "protocol", "failure"],
+    "sensitivity": "synthetic",
+    "execution": "fixture",
+    "input": {
+      "messages": [{ "role": "user", "text": "模拟 stream protocol 错误。" }],
+      "attachments": []
+    },
+    "expected": { "terminalState": "failed", "contains": ["protocol"] },
+    "fixtureResult": {
+      "text": "stream protocol 错误已收敛。",
+      "tools": [],
+      "terminalState": "failed",
+      "providerAttempts": []
+    }
+  },
+  {
+    "schemaVersion": "agent-case-v1",
+    "id": "reliability-provider-failure",
+    "suite": "reliability",
+    "tags": ["ci", "provider", "failure"],
+    "sensitivity": "synthetic",
+    "execution": "fixture",
+    "input": {
+      "messages": [{ "role": "user", "text": "模拟 provider 503。" }],
+      "attachments": []
+    },
+    "expected": { "terminalState": "failed", "contains": ["provider"] },
+    "fixtureResult": {
+      "text": "provider 故障已记录并安全失败。",
+      "tools": [],
+      "terminalState": "failed",
+      "providerAttempts": [
+        {
+          "provider": "synthetic",
+          "operation": "generate",
+          "outcome": "server_error",
+          "fallbackCount": 0
+        }
+      ]
+    }
+  },
+  {
+    "schemaVersion": "agent-case-v1",
+    "id": "reliability-retry-new-message",
+    "suite": "reliability",
+    "tags": ["ci", "retry", "identity"],
+    "sensitivity": "synthetic",
+    "execution": "fixture",
+    "input": {
+      "messages": [
+        { "role": "user", "text": "Retry 应创建新的 assistant Message。" }
+      ],
+      "attachments": []
+    },
+    "expected": { "terminalState": "completed", "contains": ["新 Message"] },
+    "fixtureResult": {
+      "text": "Retry 使用新 Message 和新 Trace。",
+      "tools": [],
+      "terminalState": "completed",
+      "providerAttempts": []
+    }
+  },
+  {
+    "schemaVersion": "agent-case-v1",
+    "id": "reliability-command-replay",
+    "suite": "reliability",
+    "tags": ["ci", "replay", "idempotency"],
+    "sensitivity": "synthetic",
+    "execution": "fixture",
+    "input": {
+      "messages": [
+        { "role": "user", "text": "相同 command replay 不应新增 generation。" }
+      ],
+      "attachments": []
+    },
+    "expected": { "terminalState": "completed", "contains": ["同一 Trace"] },
+    "fixtureResult": {
+      "text": "重放保持同一 Message、同一 Trace，不新增 generation。",
+      "tools": [],
+      "terminalState": "completed",
+      "providerAttempts": []
+    }
+  },
+  {
+    "schemaVersion": "agent-case-v1",
+    "id": "reliability-sse-disconnect-background",
+    "suite": "reliability",
+    "tags": ["scheduled", "sse", "disconnect"],
+    "sensitivity": "synthetic",
+    "execution": "fixture",
+    "input": {
+      "messages": [
+        { "role": "user", "text": "消费者断开后后台生成仍应完成。" }
+      ],
+      "attachments": []
+    },
+    "expected": { "terminalState": "completed", "contains": ["后台"] },
+    "fixtureResult": {
+      "text": "SSE 消费者断开不取消后台生成，数据库最终 completed。",
+      "tools": [],
+      "terminalState": "completed",
+      "providerAttempts": []
+    }
+  },
+  {
+    "schemaVersion": "agent-case-v1",
+    "id": "reliability-process-restart-reconciliation",
+    "suite": "reliability",
+    "tags": ["release", "restart", "reconciliation"],
+    "sensitivity": "synthetic",
+    "execution": "fixture",
+    "input": {
+      "messages": [
+        { "role": "user", "text": "进程重启后 orphan Message 应收敛。" }
+      ],
+      "attachments": []
+    },
+    "expected": { "terminalState": "failed", "contains": ["收敛"] },
+    "fixtureResult": {
+      "text": "orphan Message 已安全收敛为 failed。",
+      "tools": [],
+      "terminalState": "failed",
+      "providerAttempts": []
+    }
+  }
+]
