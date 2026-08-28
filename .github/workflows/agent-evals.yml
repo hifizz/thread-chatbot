@@ -1,0 +1,85 @@
+name: Agent Evals
+
+on:
+  pull_request:
+    paths:
+      - "constants/**"
+      - "evals/agent/**"
+      - "lib/ai/**"
+      - "lib/chat/**"
+      - "lib/observability/**"
+      - "lib/thread-chat/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+
+permissions:
+  contents: read
+
+env:
+  AI_OBSERVABILITY_ENVIRONMENT: evaluation
+  AI_TELEMETRY_ENABLED: "false"
+  AI_LANGFUSE_ENABLED: "false"
+  AI_DEVTOOLS_ENABLED: "false"
+  AI_TELEMETRY_RECORD_CONTENT: "false"
+  EVAL_CANDIDATE: pr-${{ github.event.pull_request.number }}
+  AI_OBSERVABILITY_RELEASE: ${{ github.sha }}
+  GIT_COMMIT_SHA: ${{ github.sha }}
+
+jobs:
+  deterministic:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Evaluation contracts
+        run: |
+          pnpm test:observability:eval-foundation
+          pnpm test:observability:eval-scorers
+      - name: Stable CI subset
+        run: pnpm eval:agent:ci -- --write-snapshot=evals/agent/results/local/ci.json
+      - name: Baseline comparison and deterministic gate
+        run: >-
+          pnpm eval:agent:compare --
+          --baseline=evals/agent/baselines/fixture-v1.json
+          --candidate=evals/agent/results/local/ci.json
+          --output=evals/agent/results/local/comparison.md
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: agent-eval-${{ github.sha }}
+          path: evals/agent/results/local/
+
+  langfuse-pr-experiment:
+    if: vars.LANGFUSE_PR_EVAL_ENABLED == 'true'
+    needs: deterministic
+    runs-on: ubuntu-latest
+    env:
+      AI_TELEMETRY_ENABLED: "true"
+      AI_LANGFUSE_ENABLED: "true"
+      LANGFUSE_PUBLIC_KEY: ${{ secrets.LANGFUSE_PUBLIC_KEY }}
+      LANGFUSE_SECRET_KEY: ${{ secrets.LANGFUSE_SECRET_KEY }}
+      LANGFUSE_BASE_URL: ${{ vars.LANGFUSE_BASE_URL }}
+      AI_OBSERVABILITY_ID_SALT: ${{ secrets.AI_OBSERVABILITY_ID_SALT }}
+      EVAL_MODEL_ID: ${{ vars.EVAL_MODEL_ID }}
+      UMAPIS_API_KEY_CLAUDE: ${{ secrets.UMAPIS_API_KEY_CLAUDE }}
+      UMAPIS_API_KEY_GPT: ${{ secrets.UMAPIS_API_KEY_GPT }}
+      ANYSEARCH_API_KEY: ${{ secrets.ANYSEARCH_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Official Langfuse client experiment on stable content cases
+        run: >-
+          pnpm eval:agent:ci -- --executor=declared
+          --suite=core-answer,search-routing --tag=smoke
+          --langfuse-experiment
+          --experiment=thread-chat-pr-stable

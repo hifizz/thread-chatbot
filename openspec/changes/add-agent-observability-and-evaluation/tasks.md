@@ -96,13 +96,13 @@
 ## 9. Baseline、生产回流与持续实验
 
 - [ ] 9.1 在相同 case IDs 上运行并保存当前模型、prompt、AnySearch、记忆与多模态配置的 baseline fingerprint、分项结果和 Langfuse Experiment 链接
-- [ ] 9.2 实现 baseline/candidate 比较报告，按 suite 展示 case delta、确定性失败、judge 差异、p50/p95、usage/成本、provider 故障和配置差异
-- [ ] 9.3 编写生产 Trace/错误/down feedback 筛选、授权复盘、脱敏、最小化、fixture 替换和加入 repo dataset 的人工策展流程
+- [x] 9.2 实现 baseline/candidate 比较报告，按 suite 展示 case delta、确定性失败、judge 差异、p50/p95、usage/成本、provider 故障和配置差异
+- [x] 9.3 编写生产 Trace/错误/down feedback 筛选、授权复盘、脱敏、最小化、fixture 替换和加入 repo dataset 的人工策展流程
 - [ ] 9.4 从一个已知非敏感问题完成一次端到端演练：Trace 定位、脱敏 case、Dataset 同步、baseline/candidate 实验、修复验证和回滚记录
-- [ ] 9.5 配置快速本地 smoke subset，确保常见 prompt/工具改动可以低成本获得 case-level 结果和 candidate fingerprint
-- [ ] 9.6 在 baseline 校准后接入官方 Langfuse experiment CI action 或等价官方 runner，只对稳定小集和明确确定性阈值启用 PR 阻断
-- [ ] 9.7 配置 broader scheduled/release workflow，运行 Search、记忆、多模态、可靠性和可选 judge 套件，并将报告链接/摘要保存为可追溯 artifact
-- [ ] 9.8 将 CI 与 scheduled Trace 标记为 evaluation environment/experiment/case/candidate，验证不会混入 production session、用户反馈或产品分析
+- [x] 9.5 配置快速本地 smoke subset，确保常见 prompt/工具改动可以低成本获得 case-level 结果和 candidate fingerprint
+- [x] 9.6 在 baseline 校准后接入官方 Langfuse experiment CI action 或等价官方 runner，只对稳定小集和明确确定性阈值启用 PR 阻断
+- [x] 9.7 配置 broader scheduled/release workflow，运行 Search、记忆、多模态、可靠性和可选 judge 套件，并将报告链接/摘要保存为可追溯 artifact
+- [x] 9.8 将 CI 与 scheduled Trace 标记为 evaluation environment/experiment/case/candidate，验证不会混入 production session、用户反馈或产品分析
 - [ ] 9.9 根据真实 Cloud units 调整 smoke 数量和 scheduled 频率；任何 sampling、付费升级或 OSS 迁移决策都记录触发指标和回滚方案
 
 ## 10. 完整验收与文档

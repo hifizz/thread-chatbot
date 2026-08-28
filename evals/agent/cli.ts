@@ -1,6 +1,9 @@
 import { DEFAULT_THREAD_CHAT_MODEL_ID } from "@/constants/model"
 import { OBSERVABILITY_POLICY_VERSIONS } from "@/constants/observability"
-import { loadAgentCases } from "@/evals/agent/cases"
+import { mkdir, writeFile } from "node:fs/promises"
+import path from "node:path"
+import { createAgentRunSnapshot } from "@/evals/agent/baseline"
+import { AGENT_EVAL_ROOT, loadAgentCases } from "@/evals/agent/cases"
 import { executeProductionContentCase } from "@/evals/agent/executors/content"
 import { executeFixtureCase } from "@/evals/agent/executors/fixture"
 import { executeLifecycleCase } from "@/evals/agent/executors/lifecycle"
@@ -129,11 +132,12 @@ const run = await runAgentEvaluation(cases, {
     : {}),
 })
 
+let experimentUrl: string | null = null
 if (process.argv.includes("--langfuse-experiment")) {
   const selectedIds = new Set(run.results.map((result) => result.caseId))
   const selectedCases = cases.filter((item) => selectedIds.has(item.id))
   const client = await createEvaluationLangfuseClient()
-  await runLangfuseAgentExperiment({
+  const remote = await runLangfuseAgentExperiment({
     name: argument("experiment") ?? `thread-chat-agent-${mode}`,
     runName: argument("run-name"),
     cases: selectedCases,
@@ -142,11 +146,37 @@ if (process.argv.includes("--langfuse-experiment")) {
     client,
     maxConcurrency: mode === "release" ? 1 : 2,
   })
+  if (
+    remote &&
+    typeof remote === "object" &&
+    "datasetRunUrl" in remote &&
+    typeof remote.datasetRunUrl === "string"
+  ) {
+    experimentUrl = remote.datasetRunUrl
+  }
+}
+
+const snapshot = createAgentRunSnapshot({
+  ...run,
+  kind: executorMode === "declared" ? "live" : "fixture",
+  experimentUrl,
+})
+const snapshotArgument = argument("write-snapshot")
+if (snapshotArgument) {
+  const output = path.resolve(snapshotArgument)
+  const allowedRoot = path.join(AGENT_EVAL_ROOT, "results", "local")
+  if (!output.startsWith(`${allowedRoot}${path.sep}`)) {
+    throw new Error(
+      "Snapshots may only be written under evals/agent/results/local"
+    )
+  }
+  await mkdir(path.dirname(output), { recursive: true })
+  await writeFile(output, `${JSON.stringify(snapshot, null, 2)}\n`)
 }
 
 console.log(
   JSON.stringify(
-    { ...run, aggregate: aggregateEvaluationResults(run.results) },
+    { ...run, aggregate: aggregateEvaluationResults(run.results), snapshot },
     null,
     2
   )

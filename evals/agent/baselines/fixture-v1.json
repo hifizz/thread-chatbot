@@ -1,0 +1,358 @@
+{
+  "schemaVersion": "agent-run-snapshot-v1",
+  "kind": "fixture",
+  "createdAt": "2026-08-28T00:00:00.000Z",
+  "datasetRevision": "0c6aa37f97edc2ba9b87f974e37226dc0d7a83749bdf090d21081aae1b13ca3b",
+  "candidateFingerprint": "e0df629218bdb734bf460fff9a866851a2c169f55c64c7797e705ed1599e7dee",
+  "candidate": {
+    "candidate": "fixture-baseline-v1",
+    "model": "umapis-claude-opus-4-6",
+    "promptVersion": "thread-chat-prompt-v1",
+    "searchPolicyVersion": "anysearch-v1",
+    "searchProvider": "anysearch",
+    "memoryPolicyVersion": "thread-context-v1",
+    "contextPolicy": "production-compile-model-context-v1",
+    "toolsetVersion": "thread-chat-tools-v1",
+    "multimodalParserVersion": "attachment-parser-v1",
+    "release": "baseline-v1",
+    "commit": "f23dedb",
+    "environment": "evaluation",
+    "evaluatorVersion": "deterministic-v1"
+  },
+  "experimentUrl": null,
+  "aggregate": {
+    "cases": 32,
+    "hardFailures": 0,
+    "p50LatencyMs": 0,
+    "p95LatencyMs": 0,
+    "totalUsage": { "inputTokens": 12, "outputTokens": 18, "totalTokens": 30 },
+    "toolCalls": 10,
+    "providerAttempts": 8,
+    "fallbackRate": 0.125,
+    "errorRate": 0,
+    "emptyOutputRate": 0.0625,
+    "estimatedCostUsd": null
+  },
+  "cases": [
+    {
+      "caseId": "core-english-instruction-following",
+      "suite": "core-answer",
+      "hardFailures": [],
+      "judgeScores": {},
+      "latencyMs": 0,
+      "usage": {},
+      "providerAttempts": 0,
+      "errorCategory": null
+    },
+    {
+      "caseId": "core-structured-json",
+      "suite": "core-answer",
+      "hardFailures": [],
+      "judgeScores": {},
+      "latencyMs": 0,
+      "usage": {},
+      "providerAttempts": 0,
+      "errorCategory": null
+    },
+    {
+      "caseId": "core-markdown-artifact",
+      "suite": "core-answer",
+      "hardFailures": [],
+      "judgeScores": {},
+      "latencyMs": 0,
+      "usage": {},
+      "providerAttempts": 0,
+      "errorCategory": null
+    },
+    {
+      "caseId": "foundation-local-answer",
+      "suite": "core-answer",
+      "hardFailures": [],
+      "judgeScores": {},
+      "latencyMs": 0,
+      "usage": { "inputTokens": 12, "outputTokens": 18, "totalTokens": 30 },
+      "providerAttempts": 0,
+      "errorCategory": null
+    },
+    {
+      "caseId": "memory-same-thread-fact",
+      "suite": "memory-context",
+      "hardFailures": [],
+      "judgeScores": {},
+      "latencyMs": 0,
+      "usage": {},
+      "providerAttempts": 0,
+      "errorCategory": null
+    },
+    {
+      "caseId": "memory-conflicting-update",
+      "suite": "memory-context",
+      "hardFailures": [],
+      "judgeScores": {},
+      "latencyMs": 0,
+      "usage": {},
+      "providerAttempts": 0,
+      "errorCategory": null
+    },
+    {
+      "caseId": "memory-long-context-retrieval",
+      "suite": "memory-context",
+      "hardFailures": [],
+      "judgeScores": {},
+      "latencyMs": 0,
+      "usage": {},
+      "providerAttempts": 0,
+      "errorCategory": null
+    },
+    {
+      "caseId": "memory-embedding-retrieval-fact",
+      "suite": "memory-context",
+      "hardFailures": [],
+      "judgeScores": {},
+      "latencyMs": 0,
+      "usage": {},
+      "providerAttempts": 0,
+      "errorCategory": null
+    },
+    {
+      "caseId": "memory-frozen-branch-context",
+      "suite": "memory-context",
+      "hardFailures": [],
+      "judgeScores": {},
+      "latencyMs": 0,
+      "usage": {},
+      "providerAttempts": 0,
+      "errorCategory": null
+    },
+    {
+      "caseId": "memory-cross-project-no-leak",
+      "suite": "memory-context",
+      "hardFailures": [],
+      "judgeScores": {},
+      "latencyMs": 0,
+      "usage": {},
+      "providerAttempts": 0,
+      "errorCategory": null
+    },
+    {
+      "caseId": "multimodal-synthetic-chart",
+      "suite": "multimodal",
+      "hardFailures": [],
+      "judgeScores": {},
+      "latencyMs": 0,
+      "usage": {},
+      "providerAttempts": 0,
+      "errorCategory": null
+    },
+    {
+      "caseId": "multimodal-synthetic-pdf-page",
+      "suite": "multimodal",
+      "hardFailures": [],
+      "judgeScores": {},
+      "latencyMs": 0,
+      "usage": {},
+      "providerAttempts": 0,
+      "errorCategory": null
+    },
+    {
+      "caseId": "multimodal-text-attachment",
+      "suite": "multimodal",
+      "hardFailures": [],
+      "judgeScores": {},
+      "latencyMs": 0,
+      "usage": {},
+      "providerAttempts": 0,
+      "errorCategory": null
+    },
+    {
+      "caseId": "multimodal-corrupt-file",
+      "suite": "multimodal",
+      "hardFailures": [],
+      "judgeScores": {},
+      "latencyMs": 0,
+      "usage": {},
+      "providerAttempts": 0,
+      "errorCategory": null
+    },
+    {
+      "caseId": "multimodal-unsupported-and-size-boundary",
+      "suite": "multimodal",
+      "hardFailures": [],
+      "judgeScores": {},
+      "latencyMs": 0,
+      "usage": {},
+      "providerAttempts": 0,
+      "errorCategory": null
+    },
+    {
+      "caseId": "reliability-stop-terminal",
+      "suite": "reliability",
+      "hardFailures": [],
+      "judgeScores": {},
+      "latencyMs": 0,
+      "usage": {},
+      "providerAttempts": 0,
+      "errorCategory": null
+    },
+    {
+      "caseId": "reliability-completed-lifecycle",
+      "suite": "reliability",
+      "hardFailures": [],
+      "judgeScores": {},
+      "latencyMs": 0,
+      "usage": {},
+      "providerAttempts": 0,
+      "errorCategory": null
+    },
+    {
+      "caseId": "reliability-generation-failure",
+      "suite": "reliability",
+      "hardFailures": [],
+      "judgeScores": {},
+      "latencyMs": 0,
+      "usage": {},
+      "providerAttempts": 0,
+      "errorCategory": null
+    },
+    {
+      "caseId": "reliability-initialization-failure",
+      "suite": "reliability",
+      "hardFailures": [],
+      "judgeScores": {},
+      "latencyMs": 0,
+      "usage": {},
+      "providerAttempts": 0,
+      "errorCategory": null
+    },
+    {
+      "caseId": "reliability-stream-protocol-failure",
+      "suite": "reliability",
+      "hardFailures": [],
+      "judgeScores": {},
+      "latencyMs": 0,
+      "usage": {},
+      "providerAttempts": 0,
+      "errorCategory": null
+    },
+    {
+      "caseId": "reliability-provider-failure",
+      "suite": "reliability",
+      "hardFailures": [],
+      "judgeScores": {},
+      "latencyMs": 0,
+      "usage": {},
+      "providerAttempts": 1,
+      "errorCategory": null
+    },
+    {
+      "caseId": "reliability-retry-new-message",
+      "suite": "reliability",
+      "hardFailures": [],
+      "judgeScores": {},
+      "latencyMs": 0,
+      "usage": {},
+      "providerAttempts": 0,
+      "errorCategory": null
+    },
+    {
+      "caseId": "reliability-command-replay",
+      "suite": "reliability",
+      "hardFailures": [],
+      "judgeScores": {},
+      "latencyMs": 0,
+      "usage": {},
+      "providerAttempts": 0,
+      "errorCategory": null
+    },
+    {
+      "caseId": "reliability-sse-disconnect-background",
+      "suite": "reliability",
+      "hardFailures": [],
+      "judgeScores": {},
+      "latencyMs": 0,
+      "usage": {},
+      "providerAttempts": 0,
+      "errorCategory": null
+    },
+    {
+      "caseId": "reliability-process-restart-reconciliation",
+      "suite": "reliability",
+      "hardFailures": [],
+      "judgeScores": {},
+      "latencyMs": 0,
+      "usage": {},
+      "providerAttempts": 0,
+      "errorCategory": null
+    },
+    {
+      "caseId": "search-routing-no-web-answer",
+      "suite": "search-routing",
+      "hardFailures": [],
+      "judgeScores": {},
+      "latencyMs": 0,
+      "usage": {},
+      "providerAttempts": 0,
+      "errorCategory": null
+    },
+    {
+      "caseId": "search-explicit-url-fetch",
+      "suite": "search-routing",
+      "hardFailures": [],
+      "judgeScores": {},
+      "latencyMs": 0,
+      "usage": {},
+      "providerAttempts": 1,
+      "errorCategory": null
+    },
+    {
+      "caseId": "search-explicit-web-search",
+      "suite": "search-routing",
+      "hardFailures": [],
+      "judgeScores": {},
+      "latencyMs": 0,
+      "usage": {},
+      "providerAttempts": 1,
+      "errorCategory": null
+    },
+    {
+      "caseId": "search-multi-source-research",
+      "suite": "search-routing",
+      "hardFailures": [],
+      "judgeScores": {},
+      "latencyMs": 0,
+      "usage": {},
+      "providerAttempts": 1,
+      "errorCategory": null
+    },
+    {
+      "caseId": "search-current-freshness",
+      "suite": "search-routing",
+      "hardFailures": [],
+      "judgeScores": {},
+      "latencyMs": 0,
+      "usage": {},
+      "providerAttempts": 1,
+      "errorCategory": null
+    },
+    {
+      "caseId": "search-provider-fallback-429",
+      "suite": "search-routing",
+      "hardFailures": [],
+      "judgeScores": {},
+      "latencyMs": 0,
+      "usage": {},
+      "providerAttempts": 2,
+      "errorCategory": null
+    },
+    {
+      "caseId": "search-empty-timeout",
+      "suite": "search-routing",
+      "hardFailures": [],
+      "judgeScores": {},
+      "latencyMs": 0,
+      "usage": {},
+      "providerAttempts": 1,
+      "errorCategory": null
+    }
+  ]
+}
