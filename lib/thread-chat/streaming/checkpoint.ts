@@ -10,6 +10,14 @@ export type CheckpointWriter = (
   parts: ThreadChatUIMessage["parts"]
 ) => Promise<boolean>
 
+export type CheckpointSummary = {
+  scheduledSnapshots: number
+  writeAttempts: number
+  successfulWrites: number
+  finalPartCount: number
+  finalSerializedBytes: number
+}
+
 async function writeCheckpoint(
   messageId: string,
   parts: ThreadChatUIMessage["parts"]
@@ -30,6 +38,13 @@ export class MessageCheckpointer {
   private timer: ReturnType<typeof setTimeout> | null = null
   private writeChain = Promise.resolve(true)
   private active = true
+  private summary: CheckpointSummary = {
+    scheduledSnapshots: 0,
+    writeAttempts: 0,
+    successfulWrites: 0,
+    finalPartCount: 0,
+    finalSerializedBytes: 0,
+  }
 
   constructor(
     private readonly messageId: string,
@@ -47,6 +62,11 @@ export class MessageCheckpointer {
       serialized === this.pendingSerialized
     )
       return
+    this.summary.scheduledSnapshots += 1
+    this.summary.finalPartCount = parts.length
+    this.summary.finalSerializedBytes = new TextEncoder().encode(
+      serialized
+    ).byteLength
     this.pending = structuredClone(parts)
     this.pendingSerialized = serialized
     if (this.timer) return
@@ -63,6 +83,12 @@ export class MessageCheckpointer {
       const parts = stripTransientParts(snapshot.parts)
       const serialized = JSON.stringify(parts)
       if (serialized !== this.lastWritten) {
+        if (serialized !== this.pendingSerialized)
+          this.summary.scheduledSnapshots += 1
+        this.summary.finalPartCount = parts.length
+        this.summary.finalSerializedBytes = new TextEncoder().encode(
+          serialized
+        ).byteLength
         this.pending = structuredClone(parts)
         this.pendingSerialized = serialized
       }
@@ -81,6 +107,10 @@ export class MessageCheckpointer {
     this.pendingSerialized = null
   }
 
+  getSummary(): CheckpointSummary {
+    return { ...this.summary }
+  }
+
   private async writePending(): Promise<void> {
     const parts = this.pending
     const serialized = this.pendingSerialized
@@ -89,8 +119,10 @@ export class MessageCheckpointer {
     if (!parts || !serialized || serialized === this.lastWritten) return
     this.writeChain = this.writeChain.then(async (stillGenerating) => {
       if (!stillGenerating) return false
+      this.summary.writeAttempts += 1
       const updated = await this.writer(this.messageId, parts)
       if (updated) {
+        this.summary.successfulWrites += 1
         this.lastWritten = serialized
         this.lastWriteAt = this.now()
       } else {

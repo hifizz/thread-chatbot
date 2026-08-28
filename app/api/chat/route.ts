@@ -27,6 +27,9 @@ import { buildChatToolSet } from "@/app/api/chat/tool-set"
 import { createStreamLifecycle } from "@/app/api/chat/stream-lifecycle"
 import { prepareChatRequestContext } from "@/app/api/chat/request-context"
 import { buildAiTelemetryConfig } from "@/lib/observability/ai-sdk"
+import { buildLegacyChatTraceInput } from "@/lib/observability/context"
+import { safeErrorMetadata } from "@/lib/observability/error"
+import { runDetachedAgentTrace } from "@/lib/observability/trace"
 
 // AnySearch 搜索与网页深读可能形成多步循环，放宽单次请求时长上限。
 export const maxDuration = 300
@@ -55,111 +58,157 @@ export async function POST(req: Request) {
       requestId: crypto.randomUUID(),
       ...(linearThreadId ? { threadId: linearThreadId } : {}),
     }
-    const { researchRoute, researchPlan } = await resolveResearchContext({
-      model: chatModel,
-      messages,
-      deepResearchRequested: research,
-      searchReady,
-      modelCallTrace,
-    })
-    const { tools: allTools, webToolsEnabled } = buildChatToolSet({
-      researchMode: researchRoute.mode,
-      searchReady,
-      frontendToolSet: frontendTools(tools ?? {}),
-    })
-
-    // MiniMax 不接受 file part：先把附件（PDF→提取文本，其余→占位说明）转换为 text part
-    const resolvedMessages = await resolveAttachmentParts(messages, userId)
-
-    const system = buildChatSystemPrompt({
-      researchMode: researchRoute.mode,
-      researchPlan,
-      deepResearchRequested: research,
-      searchReady,
-    })
-
-    const streamLifecycle = createStreamLifecycle({
+    const legacyTraceInput = await buildLegacyChatTraceInput({
       userId,
+      requestId: modelCallTrace.requestId!,
+      ...(linearThreadId ? { linearThreadId } : {}),
       modelId,
-      model,
-      unbilledPreview: isUnbilledPreview,
-      linearThreadId,
     })
-
-    const result = streamText({
-      ...buildAiTelemetryConfig(MODEL_CALL_PURPOSE.chatAnswer, {
-        ...modelCallTrace,
-        modelId,
-        entrypoint: "legacy-chat",
-      }),
-      model: withModelCallLogging(
-        chatModel,
-        MODEL_CALL_PURPOSE.chatAnswer,
-        modelCallTrace
-      ),
-      reasoning: reasoningForResearchRoute(researchRoute.mode, model),
-      system,
-      messages: await convertToModelMessages(resolvedMessages, {
-        tools: allTools,
-      }),
-      tools: allTools,
-      // 明确 Markdown 交付请求只强制第 0 步启动工具调用；后续步骤仍保留工具，
-      // 让模型在用户要求多份独立文档时，为每份文档分别创建一个 Artifact。
-      prepareStep: createToolStepPolicy({
-        isThreadChat: false,
-        markdownArtifactRequested: false,
-        researchMode: researchRoute.mode,
-      }),
-      maxOutputTokens: MAX_OUTPUT_TOKENS,
-      stopWhen: isStepCount(webToolsEnabled ? RESEARCH_MAX_STEPS : 5),
-      onError: streamLifecycle.onError,
-      onAbort: streamLifecycle.onAbort,
-      onEnd: streamLifecycle.onEnd,
-    })
-
-    const uiStream = createUIMessageStream({
-      execute: ({ writer }) => {
-        writer.write({
-          type: "data-research-route",
-          id: "research-route",
-          data: researchRoute,
-        })
-        if (researchPlan) {
-          writer.write({
-            type: "data-research-plan",
-            id: "research-plan",
-            data: researchPlan,
+    return await runDetachedAgentTrace(
+      legacyTraceInput,
+      async (legacyObservation) => {
+        try {
+          const { researchRoute, researchPlan } = await resolveResearchContext({
+            model: chatModel,
+            messages,
+            deepResearchRequested: research,
+            searchReady,
+            modelCallTrace,
           })
+          const { tools: allTools, webToolsEnabled } = buildChatToolSet({
+            researchMode: researchRoute.mode,
+            searchReady,
+            frontendToolSet: frontendTools(tools ?? {}),
+          })
+
+          // MiniMax 不接受 file part：先把附件（PDF→提取文本，其余→占位说明）转换为 text part
+          const resolvedMessages = await resolveAttachmentParts(
+            messages,
+            userId
+          )
+
+          const system = buildChatSystemPrompt({
+            researchMode: researchRoute.mode,
+            researchPlan,
+            deepResearchRequested: research,
+            searchReady,
+          })
+
+          const streamLifecycle = createStreamLifecycle({
+            userId,
+            modelId,
+            model,
+            unbilledPreview: isUnbilledPreview,
+            linearThreadId,
+          })
+
+          const result = streamText({
+            ...buildAiTelemetryConfig(MODEL_CALL_PURPOSE.chatAnswer, {
+              ...modelCallTrace,
+              modelId,
+              entrypoint: "legacy-chat",
+            }),
+            model: withModelCallLogging(
+              chatModel,
+              MODEL_CALL_PURPOSE.chatAnswer,
+              modelCallTrace
+            ),
+            reasoning: reasoningForResearchRoute(researchRoute.mode, model),
+            system,
+            messages: await convertToModelMessages(resolvedMessages, {
+              tools: allTools,
+            }),
+            tools: allTools,
+            // 明确 Markdown 交付请求只强制第 0 步启动工具调用；后续步骤仍保留工具，
+            // 让模型在用户要求多份独立文档时，为每份文档分别创建一个 Artifact。
+            prepareStep: createToolStepPolicy({
+              isThreadChat: false,
+              markdownArtifactRequested: false,
+              researchMode: researchRoute.mode,
+            }),
+            maxOutputTokens: MAX_OUTPUT_TOKENS,
+            stopWhen: isStepCount(webToolsEnabled ? RESEARCH_MAX_STEPS : 5),
+            onError: streamLifecycle.onError,
+            onAbort: streamLifecycle.onAbort,
+            onEnd: streamLifecycle.onEnd,
+          })
+
+          const uiStream = createUIMessageStream({
+            execute: ({ writer }) => {
+              writer.write({
+                type: "data-research-route",
+                id: "research-route",
+                data: researchRoute,
+              })
+              if (researchPlan) {
+                writer.write({
+                  type: "data-research-plan",
+                  id: "research-plan",
+                  data: researchPlan,
+                })
+              }
+              writer.merge(
+                result.toUIMessageStream({
+                  onError: (error) => {
+                    console.error("[chat] 流内错误:", error)
+                    return "An error occurred."
+                  },
+                  messageMetadata: ({ part }) =>
+                    part.type === "finish"
+                      ? buildUsageMetadata(modelId, part.totalUsage)
+                      : undefined,
+                })
+              )
+            },
+          })
+
+          const response = createUIMessageStreamResponse({
+            stream: uiStream,
+            consumeSseStream: ({ stream }) => {
+              after(async () => {
+                let streamFailed = false
+                try {
+                  await consumeStream({
+                    stream,
+                    onError: (error) => {
+                      streamFailed = true
+                      console.error("[chat] 服务端 UI stream 消费失败", error)
+                    },
+                  })
+                  legacyObservation.update({
+                    level: streamFailed ? "ERROR" : "DEFAULT",
+                    statusMessage: streamFailed
+                      ? "legacy stream failed"
+                      : "legacy stream completed",
+                    output: {
+                      status: streamFailed ? "failed" : "completed",
+                      researchMode: researchRoute.mode,
+                    },
+                  })
+                } catch (error) {
+                  legacyObservation.update({
+                    level: "ERROR",
+                    statusMessage: "legacy stream consumer failed",
+                    metadata: safeErrorMetadata(error),
+                  })
+                } finally {
+                  legacyObservation.end()
+                }
+              })
+            },
+          })
+          return response
+        } catch (error) {
+          legacyObservation.update({
+            level: "ERROR",
+            statusMessage: "legacy request initialization failed",
+            metadata: safeErrorMetadata(error),
+          })
+          legacyObservation.end()
+          throw error
         }
-        writer.merge(
-          result.toUIMessageStream({
-            onError: (error) => {
-              console.error("[chat] 流内错误:", error)
-              return "An error occurred."
-            },
-            messageMetadata: ({ part }) =>
-              part.type === "finish"
-                ? buildUsageMetadata(modelId, part.totalUsage)
-                : undefined,
-          })
-        )
-      },
-    })
-
-    const response = createUIMessageStreamResponse({
-      stream: uiStream,
-      consumeSseStream: ({ stream }) => {
-        after(async () => {
-          await consumeStream({
-            stream,
-            onError: (error) => {
-              console.error("[chat] 服务端 UI stream 消费失败", error)
-            },
-          })
-        })
-      },
-    })
-    return response
+      }
+    )
   } catch (error) {
     console.error("[chat] 请求初始化失败", error)
     return Response.json({ error: "生成初始化失败，请重试。" }, { status: 500 })

@@ -15,6 +15,7 @@
     "start": "next start",
     "observability:devtools": "devtools",
     "test:observability:foundation": "node --import tsx e2e/observability/observability-foundation.test.mjs",
+    "test:observability:trace": "node --import tsx e2e/observability/agent-trace-contract.test.mjs",
     "lint": "eslint",
     "format": "prettier --write \"**/*.{ts,tsx}\"",
     "typecheck": "tsc --noEmit",

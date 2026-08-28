@@ -65,4 +65,12 @@ export type ObservabilityAttributeKey =
 
 export const DEFAULT_OBSERVABILITY_RELEASE = "local"
 
+export const OBSERVABILITY_POLICY_VERSIONS = {
+  prompt: "thread-chat-prompt-v1",
+  search: "anysearch-v1",
+  memory: "thread-context-v1",
+  toolset: "thread-chat-tools-v1",
+  multimodalParser: "attachment-parser-v1",
+} as const
+
 export const TELEMETRY_REDACTED_VALUE = "[REDACTED]"

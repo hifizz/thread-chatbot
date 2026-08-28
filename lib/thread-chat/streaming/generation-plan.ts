@@ -23,11 +23,16 @@ import type { ThreadChatUIMessageChunk } from "@/lib/thread-chat/contracts/ui-me
 import { buildGenerationTools } from "@/lib/thread-chat/streaming/generation-tools"
 import { throwIfGenerationCancelled } from "@/lib/ai/generation-cancellation"
 import { buildAiTelemetryConfig } from "@/lib/observability/ai-sdk"
+import { OBSERVATION_NAMES } from "@/constants/observability"
+import { observeAppOperation } from "@/lib/observability/trace"
+import type { ObservabilityContext } from "@/lib/observability/types"
 
 export interface PrepareGenerationInput {
   messageId: string
+  projectId: string
   threadId: string
   modelId: string
+  observabilityContext: ObservabilityContext
   latestUserText: string
   recentConversation: string
   anchorText: string | null
@@ -41,27 +46,65 @@ export async function prepareGeneration(input: PrepareGenerationInput) {
   const model = resolveChatModel(input.modelId)
   const trace = {
     requestId: crypto.randomUUID(),
-    threadId: input.threadId,
-    assistantMessageId: input.messageId,
+    ...input.observabilityContext,
   }
   const searchReady = isSearchConfigured()
-  const researchRoute = await resolveResearchRoute({
-    model,
-    latestUserText: input.latestUserText,
-    recentConversation: input.recentConversation,
-    searchReady,
-    modelCallTrace: trace,
-    abortSignal: input.abortSignal,
-  })
+  const researchRoute = await observeAppOperation(
+    OBSERVATION_NAMES.researchRoute,
+    {
+      metadata: {
+        searchReady,
+        assistantMessageId: input.messageId,
+      },
+    },
+    async (observation) => {
+      const route = await resolveResearchRoute({
+        model,
+        latestUserText: input.latestUserText,
+        recentConversation: input.recentConversation,
+        searchReady,
+        modelCallTrace: trace,
+        abortSignal: input.abortSignal,
+      })
+      observation.update({
+        output: {
+          mode: route.mode,
+          reasonCode: route.reasonCode,
+          urlCount: route.urls.length,
+          suggestedQueryCount: route.suggestedQueries.length,
+        },
+      })
+      return route
+    }
+  )
   const researchPlan =
     researchRoute.mode === "research"
-      ? await createResearchPlan({
-          model,
-          userRequest: input.latestUserText,
-          route: researchRoute,
-          modelCallTrace: trace,
-          abortSignal: input.abortSignal,
-        })
+      ? await observeAppOperation(
+          OBSERVATION_NAMES.researchPlan,
+          {
+            metadata: {
+              assistantMessageId: input.messageId,
+              routeMode: researchRoute.mode,
+            },
+          },
+          async (observation) => {
+            const plan = await createResearchPlan({
+              model,
+              userRequest: input.latestUserText,
+              route: researchRoute,
+              modelCallTrace: trace,
+              abortSignal: input.abortSignal,
+            })
+            observation.update({
+              output: {
+                subquestionCount: plan.subquestions.length,
+                minimumIndependentSources:
+                  plan.exitCriteria.minimumIndependentSources,
+              },
+            })
+            return plan
+          }
+        )
       : null
   const artifactRequested = isExplicitMarkdownArtifactRequest(
     input.latestUserText
@@ -100,7 +143,6 @@ export async function prepareGeneration(input: PrepareGenerationInput) {
     ...buildAiTelemetryConfig(MODEL_CALL_PURPOSE.chatAnswer, {
       ...trace,
       modelId: input.modelId,
-      entrypoint: "thread-chat",
     }),
     model: withModelCallLogging(model, MODEL_CALL_PURPOSE.chatAnswer, trace),
     abortSignal: input.abortSignal,

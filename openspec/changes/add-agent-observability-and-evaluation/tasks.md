@@ -25,17 +25,17 @@
 
 ## 3. 规范化 Thread Chat 与过渡入口 Trace
 
-- [ ] 3.1 将 Project ID、Thread ID、assistant Message ID、model ID、匿名用户 ID 和发布/策略版本加入规范化生成的观测上下文，不改变现有命令或 Message DTO 契约
-- [ ] 3.2 用 Message 派生的确定性 Trace 包住 `runGeneration` 的完整后台生命周期，并以 Project 作为 session、Thread 作为可搜索分支属性
-- [ ] 3.3 为 research route、research plan 和正式回答补齐稳定 purpose、结果摘要、耗时、错误类别与父子关联，避免重复记录输入正文
-- [ ] 3.4 为 checkpoint 聚合和 finalize 建立自定义 Observation，只记录次数/字节或 parts 数量、终态、finish reason、provider usage 和安全错误
-- [ ] 3.5 让 AI SDK 自动生成的模型 step/tool Observations 继承根 active context，并验证多步 Search/Fetch/Artifact 工具调用仍位于同一 Trace
-- [ ] 3.6 将 completed、stopped、failed、abort、初始化错误和协议错误映射为一致的 Trace outcome/status，确保数据库终态提交后才结束根 Trace
-- [ ] 3.7 增加断开测试，证明 SSE/浏览器消费者离开后根 Trace 仍跟随后台任务直到终态，而不是在 HTTP response 返回时提前成功
-- [ ] 3.8 增加 Retry/Regenerate 与 command replay 测试，证明新 assistant Message 产生新 Trace、相同 Message 重放保持同一 Trace 且不新增 generation 实体
-- [ ] 3.9 为进程重启后的 orphan Message 收敛增加可重复 reconciliation hook 或运维脚本，以相同 Trace ID 记录安全失败结果并保持数据库为事实源
-- [ ] 3.10 为过渡期 `/api/chat` 增加 request-scoped 根 Trace、linear thread session 和模型/工具关联；显式标记为 legacy，且让 `after(consumeStream)` 的错误/终态可关联
-- [ ] 3.11 使用可注入的内存/fake telemetry integration 增加端到端测试，断言 Trace 树、身份、顺序、usage、终态和 error attributes，而不依赖真实 Langfuse 网络
+- [x] 3.1 将 Project ID、Thread ID、assistant Message ID、model ID、匿名用户 ID 和发布/策略版本加入规范化生成的观测上下文，不改变现有命令或 Message DTO 契约
+- [x] 3.2 用 Message 派生的确定性 Trace 包住 `runGeneration` 的完整后台生命周期，并以 Project 作为 session、Thread 作为可搜索分支属性
+- [x] 3.3 为 research route、research plan 和正式回答补齐稳定 purpose、结果摘要、耗时、错误类别与父子关联，避免重复记录输入正文
+- [x] 3.4 为 checkpoint 聚合和 finalize 建立自定义 Observation，只记录次数/字节或 parts 数量、终态、finish reason、provider usage 和安全错误
+- [x] 3.5 让 AI SDK 自动生成的模型 step/tool Observations 继承根 active context，并验证多步 Search/Fetch/Artifact 工具调用仍位于同一 Trace
+- [x] 3.6 将 completed、stopped、failed、abort、初始化错误和协议错误映射为一致的 Trace outcome/status，确保数据库终态提交后才结束根 Trace
+- [x] 3.7 增加断开测试，证明 SSE/浏览器消费者离开后根 Trace 仍跟随后台任务直到终态，而不是在 HTTP response 返回时提前成功
+- [x] 3.8 增加 Retry/Regenerate 与 command replay 测试，证明新 assistant Message 产生新 Trace、相同 Message 重放保持同一 Trace 且不新增 generation 实体
+- [x] 3.9 为进程重启后的 orphan Message 收敛增加可重复 reconciliation hook 或运维脚本，以相同 Trace ID 记录安全失败结果并保持数据库为事实源
+- [x] 3.10 为过渡期 `/api/chat` 增加 request-scoped 根 Trace、linear thread session 和模型/工具关联；显式标记为 legacy，且让 `after(consumeStream)` 的错误/终态可关联
+- [x] 3.11 使用可注入的内存/fake telemetry integration 增加端到端测试，断言 Trace 树、身份、顺序、usage、终态和 error attributes，而不依赖真实 Langfuse 网络
 
 ## 4. Search provider attempt 统一观测
 

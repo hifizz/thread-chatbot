@@ -5,23 +5,36 @@ import type {
 
 export type ObservabilityAttributeValue = string | number | boolean
 
-export type ObservabilityContext = Partial<
-  Record<ObservabilityAttributeKey, ObservabilityAttributeValue>
-> & {
-  /** 只作为本次调用的策略输入，不会进入 exporter。 */
-  allowContentCapture?: boolean
-}
-
-export type ModelCallTrace = Pick<
-  ObservabilityContext,
+type ObservabilityIdentifierKey =
   | "requestId"
-  | "treeId"
-  | "threadId"
-  | "generationId"
-  | "assistantMessageId"
   | "projectId"
+  | "threadId"
+  | "assistantMessageId"
+  | "generationId"
+  | "treeId"
+  | "modelId"
   | "pseudonymousUserId"
->
+
+export type ObservabilityContext = Partial<
+  Record<
+    Exclude<ObservabilityAttributeKey, ObservabilityIdentifierKey>,
+    ObservabilityAttributeValue
+  >
+> &
+  Partial<Record<ObservabilityIdentifierKey, string>> & {
+    /** 只作为本次调用的策略输入，不会进入 exporter。 */
+    allowContentCapture?: boolean
+  }
+
+export type ModelCallTrace = {
+  requestId?: string
+  treeId?: string
+  threadId?: string
+  generationId?: string
+  assistantMessageId?: string
+  projectId?: string
+  pseudonymousUserId?: string
+}
 
 export type TelemetryContentPolicy = {
   enabled: boolean
