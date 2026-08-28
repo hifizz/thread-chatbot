@@ -48,12 +48,12 @@
 
 ## 5. 产品反馈幂等镜像
 
-- [ ] 5.1 建立 Langfuse feedback Score adapter，使用 Message 派生 Trace ID、确定性 Score ID、categorical `up/down/cleared` 和 product source metadata
-- [ ] 5.2 在现有 feedback 数据库事务提交后通过 `after(...)` 或等价 post-commit hook 调用 mirror，保证 HTTP 成功与产品状态只依赖数据库
-- [ ] 5.3 实现 feedback 从 up/down 互换与清除时的 update/upsert/replace 语义，确认远端只保留一个当前逻辑评分而非矛盾历史评分
-- [ ] 5.4 实现支持 dry-run、批次和最终 flush 的 feedback backfill 脚本，可由现有 Message 数据重放到相同 Trace/Score ID
-- [ ] 5.5 增加 feedback 测试，覆盖首次写入、重复 command、修改、清除、Langfuse timeout/异常、Score 先于 Trace 和 backfill 重放
-- [ ] 5.6 更新反馈运维文档，说明数据库事实源、远程延迟一致性、失败诊断和 backfill 操作，不承诺外部 Score 强一致
+- [x] 5.1 建立 Langfuse feedback Score adapter，使用 Message 派生 Trace ID、确定性 Score ID、categorical `up/down/cleared` 和 product source metadata
+- [x] 5.2 在现有 feedback 数据库事务提交后通过 `after(...)` 或等价 post-commit hook 调用 mirror，保证 HTTP 成功与产品状态只依赖数据库
+- [x] 5.3 实现 feedback 从 up/down 互换与清除时的 update/upsert/replace 语义，确认远端只保留一个当前逻辑评分而非矛盾历史评分
+- [x] 5.4 实现支持 dry-run、批次和最终 flush 的 feedback backfill 脚本，可由现有 Message 数据重放到相同 Trace/Score ID
+- [x] 5.5 增加 feedback 测试，覆盖首次写入、重复 command、修改、清除、Langfuse timeout/异常、Score 先于 Trace 和 backfill 重放
+- [x] 5.6 更新反馈运维文档，说明数据库事实源、远程延迟一致性、失败诊断和 backfill 操作，不承诺外部 Score 强一致
 
 ## 6. Langfuse Cloud 验证与渐进发布
 

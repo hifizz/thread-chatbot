@@ -42,6 +42,7 @@ import { failOrphanedGeneratingMessage } from "@/lib/thread-chat/streaming/final
 import { getSessionStore } from "@/lib/thread-chat/streaming/session-store"
 import { createSessionSseResponse } from "@/lib/thread-chat/streaming/sse"
 import { GENERATION_CANCEL_REASONS } from "@/constants/generation"
+import { scheduleFeedbackMirrorAfterCommit } from "@/lib/observability/feedback-post-commit"
 
 const idSchema = z.uuid()
 
@@ -265,15 +266,15 @@ export function handleSetFeedback(
   request: Request,
   messageId: string
 ): Promise<Response> {
-  return withThreadChatRoute(request, async (userId) =>
-    commandResponse(
-      await setMessageFeedback(
-        userId,
-        parseId(messageId),
-        await parseJson(request, setFeedbackCommandSchema)
-      )
+  return withThreadChatRoute(request, async (userId) => {
+    const result = await setMessageFeedback(
+      userId,
+      parseId(messageId),
+      await parseJson(request, setFeedbackCommandSchema)
     )
-  )
+    scheduleFeedbackMirrorAfterCommit(result.result)
+    return commandResponse(result)
+  })
 }
 
 export function handleGetMessage(
