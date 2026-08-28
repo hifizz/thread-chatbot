@@ -39,12 +39,12 @@
 
 ## 4. Search provider attempt 统一观测
 
-- [ ] 4.1 定义共享 provider attempt observation schema，覆盖 correlation、provider、operation、route reason、attempt index、fallback count、outcome、duration、原始 usage unit/quantity 和安全错误类别
-- [ ] 4.2 实现共享 observation sink，使开发日志和 Langfuse child Observation 消费同一事件，而不是维护两套不一致字段
-- [ ] 4.3 将当前 AnySearch Search/Extract 的每次实际调用接入共享 sink，保留开发环境可见的 provider/operation 摘要
-- [ ] 4.4 为 `add-web-search-provider-routing` 的 Attempt Engine/adapter 预留并接入同一 sink，确保后续 Parallel、Firecrawl 或其他 provider 无需再建遥测系统
-- [ ] 4.5 增加 Search/Fetch 成功、timeout、429、5xx、auth、empty/unusable、取消、预算耗尽和 fallback 链路测试，验证每个 attempt 都关联到同一 Agent Trace
-- [ ] 4.6 增加 provider 观测隐私测试，证明只输出 query fingerprint/域名级信息，不输出完整 query、URL、页面正文、响应体、Authorization 或 key
+- [x] 4.1 定义共享 provider attempt observation schema，覆盖 correlation、provider、operation、route reason、attempt index、fallback count、outcome、duration、原始 usage unit/quantity 和安全错误类别
+- [x] 4.2 实现共享 observation sink，使开发日志和 Langfuse child Observation 消费同一事件，而不是维护两套不一致字段
+- [x] 4.3 将当前 AnySearch Search/Extract 的每次实际调用接入共享 sink，保留开发环境可见的 provider/operation 摘要
+- [x] 4.4 为 `add-web-search-provider-routing` 的 Attempt Engine/adapter 预留并接入同一 sink，确保后续 Parallel、Firecrawl 或其他 provider 无需再建遥测系统
+- [x] 4.5 增加 Search/Fetch 成功、timeout、429、5xx、auth、empty/unusable、取消、预算耗尽和 fallback 链路测试，验证每个 attempt 都关联到同一 Agent Trace
+- [x] 4.6 增加 provider 观测隐私测试，证明只输出 query fingerprint/域名级信息，不输出完整 query、URL、页面正文、响应体、Authorization 或 key
 
 ## 5. 产品反馈幂等镜像
 

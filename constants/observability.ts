@@ -20,6 +20,7 @@ export const OBSERVATION_NAMES = {
   chatAnswer: "model.chat-answer",
   persistenceCheckpoint: "persistence.checkpoint",
   generationFinalize: "generation.finalize",
+  searchProviderAttempt: "search.provider-attempt",
 } as const
 
 export const OBSERVABILITY_ERROR_CATEGORIES = {

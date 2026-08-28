@@ -6,41 +6,54 @@ import { EXTRACT_CHAR_LIMIT, SEARCH_MAX_RESULTS } from "@/constants/research"
 // 深度研究的后端工具：联网搜索 + 网页深读。工具调用与结果会在 assistant-ui 里渲染，
 // 天然提供「研究过程可见」；模型据搜索/深读结果多步推进，最终综合成带引用的报告。
 
-export const webSearchTool = tool({
-  description:
-    "联网搜索以获取实时或事实性信息。用于回答需要最新资料、外部知识的问题。可多次调用以覆盖不同子问题。",
-  inputSchema: z.object({
-    query: z.string().describe("检索关键词或问题，尽量具体"),
-  }),
-  execute: async ({ query }, { abortSignal }) => {
-    const { results } = await webSearch(
-      query,
-      SEARCH_MAX_RESULTS,
-      abortSignal
-    )
-    // 返回给模型的结构：带 url 的结果列表，供其继续深读或引用
-    return {
-      query,
-      results: results.map((r) => ({
-        title: r.title,
-        url: r.url,
-        snippet: r.snippet,
-      })),
-    }
-  },
-})
+type ResearchToolObservabilityContext = { routeReason?: string }
 
-export const readUrlTool = tool({
-  description:
-    "深读某个网页的完整正文。URL 可以由用户直接提供，也可以来自搜索结果；翻译、总结或分析指定页面时应直接调用。",
-  inputSchema: z.object({
-    url: z.string().describe("要深读的网页 URL（来自搜索结果）"),
-  }),
-  execute: async ({ url }, { abortSignal }) => {
-    const content = await extractUrl(url, abortSignal)
-    return { url, content: content.slice(0, EXTRACT_CHAR_LIMIT) }
-  },
-})
+export function createResearchTools(
+  context: ResearchToolObservabilityContext = {}
+) {
+  const webSearchTool = tool({
+    description:
+      "联网搜索以获取实时或事实性信息。用于回答需要最新资料、外部知识的问题。可多次调用以覆盖不同子问题。",
+    inputSchema: z.object({
+      query: z.string().describe("检索关键词或问题，尽量具体"),
+    }),
+    execute: async ({ query }, { abortSignal }) => {
+      const { results } = await webSearch(
+        query,
+        SEARCH_MAX_RESULTS,
+        abortSignal,
+        context
+      )
+      // 返回给模型的结构：带 url 的结果列表，供其继续深读或引用
+      return {
+        query,
+        results: results.map((r) => ({
+          title: r.title,
+          url: r.url,
+          snippet: r.snippet,
+        })),
+      }
+    },
+  })
+
+  const readUrlTool = tool({
+    description:
+      "深读某个网页的完整正文。URL 可以由用户直接提供，也可以来自搜索结果；翻译、总结或分析指定页面时应直接调用。",
+    inputSchema: z.object({
+      url: z.string().describe("要深读的网页 URL（来自搜索结果）"),
+    }),
+    execute: async ({ url }, { abortSignal }) => {
+      const content = await extractUrl(url, abortSignal, context)
+      return { url, content: content.slice(0, EXTRACT_CHAR_LIMIT) }
+    },
+  })
+
+  return { webSearch: webSearchTool, readUrl: readUrlTool }
+}
+
+const defaultResearchTools = createResearchTools()
+export const webSearchTool = defaultResearchTools.webSearch
+export const readUrlTool = defaultResearchTools.readUrl
 
 export const researchTools = {
   webSearch: webSearchTool,

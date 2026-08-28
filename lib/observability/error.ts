@@ -22,8 +22,10 @@ function errorStatus(error: unknown): number | undefined {
 export function classifyObservabilityError(
   error: unknown
 ): ObservabilityErrorCategory {
-  if (error instanceof DOMException && error.name === "AbortError")
-    return OBSERVABILITY_ERROR_CATEGORIES.abort
+  const errorName = error instanceof Error ? error.name.toLowerCase() : ""
+  if (errorName === "aborterror") return OBSERVABILITY_ERROR_CATEGORIES.abort
+  if (errorName === "timeouterror")
+    return OBSERVABILITY_ERROR_CATEGORIES.timeout
   const code = errorCode(error)
   const status = errorStatus(error)
   if (code.includes("abort") || code.includes("cancel"))
@@ -37,6 +39,7 @@ export function classifyObservabilityError(
   if (code.includes("protocol")) return OBSERVABILITY_ERROR_CATEGORIES.protocol
   if (code.includes("config") || code.includes("not_ready"))
     return OBSERVABILITY_ERROR_CATEGORIES.configuration
+  if (code.includes("provider")) return OBSERVABILITY_ERROR_CATEGORIES.provider
   if (status && status >= 500) return OBSERVABILITY_ERROR_CATEGORIES.provider
   return OBSERVABILITY_ERROR_CATEGORIES.unknown
 }

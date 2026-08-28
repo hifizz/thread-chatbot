@@ -113,6 +113,7 @@ export async function prepareGeneration(input: PrepareGenerationInput) {
     messageId: input.messageId,
     artifactRequested,
     researchMode: researchRoute.mode,
+    routeReason: researchRoute.reasonCode,
     searchReady,
   })
   const activeTools = Object.keys(tools) as Array<keyof typeof tools>

@@ -3,7 +3,7 @@ import {
   MARKDOWN_ARTIFACT_TOOL_DESCRIPTION,
   markdownArtifactInputSchema,
 } from "@/lib/chat/markdown-artifact"
-import { readUrlTool, webSearchTool } from "@/lib/chat/research-tools"
+import { createResearchTools } from "@/lib/chat/research-tools"
 import { artifactIdForTool } from "@/lib/thread-chat/streaming/artifacts"
 
 export function createMarkdownArtifactTool(messageId: string) {
@@ -21,8 +21,11 @@ export function buildGenerationTools(input: {
   messageId: string
   artifactRequested: boolean
   researchMode: "answer" | "fetch" | "search" | "research"
+  routeReason?: string
   searchReady: boolean
 }) {
+  const { readUrl: readUrlTool, webSearch: webSearchTool } =
+    createResearchTools({ routeReason: input.routeReason })
   return {
     ...(input.artifactRequested
       ? { createMarkdownArtifact: createMarkdownArtifactTool(input.messageId) }

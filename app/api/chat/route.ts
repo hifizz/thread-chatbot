@@ -77,6 +77,7 @@ export async function POST(req: Request) {
           })
           const { tools: allTools, webToolsEnabled } = buildChatToolSet({
             researchMode: researchRoute.mode,
+            routeReason: researchRoute.reasonCode,
             searchReady,
             frontendToolSet: frontendTools(tools ?? {}),
           })
