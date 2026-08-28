@@ -63,7 +63,7 @@
 - [ ] 6.4 进行 Langfuse endpoint 不可达、401、429、超时和 exporter flush 失败演练，确认 Agent 响应、后台生成、终态落库与 feedback 保存不受影响
 - [ ] 6.5 记录 metadata-only 场景的平均/高位 units 每次 Agent、ingestion 速率和历史窗口需求，并编写接近 50k units、30 天或 2 用户边界时的检查与决策清单
 - [ ] 6.6 先对 production 小范围开启，再逐步到低流量 metadata-only 全量；记录开关、release、验证证据和一键关闭 remote export 的回滚步骤
-- [ ] 6.7 用非生产兼容 endpoint 或配置测试验证 Cloud base URL 可替换，且切换不改变 Agent 编排、Trace seed、Message schema 或 feedback 事实源
+- [x] 6.7 用非生产兼容 endpoint 或配置测试验证 Cloud base URL 可替换，且切换不改变 Agent 编排、Trace seed、Message schema 或 feedback 事实源
 
 ## 7. 项目自有评测基础设施
 

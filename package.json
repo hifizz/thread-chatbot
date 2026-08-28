@@ -19,6 +19,8 @@
     "test:observability:provider-attempt": "node --import tsx e2e/observability/provider-attempt.test.mjs",
     "test:observability:feedback": "node --import tsx e2e/observability/feedback-score.test.mjs",
     "observability:feedback:backfill": "tsx scripts/backfill-feedback-scores.ts",
+    "observability:check-release": "tsx scripts/check-observability-release.ts",
+    "test:observability:release": "node --import tsx e2e/observability/langfuse-release.test.mjs",
     "lint": "eslint",
     "format": "prettier --write \"**/*.{ts,tsx}\"",
     "typecheck": "tsc --noEmit",
