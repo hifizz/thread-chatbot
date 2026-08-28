@@ -2,6 +2,9 @@
   "name": "thread-chat-agent",
   "version": "0.0.1",
   "packageManager": "pnpm@10.32.1",
+  "engines": {
+    "node": ">=22"
+  },
   "type": "module",
   "private": true,
   "license": "AGPL-3.0-only",
@@ -10,6 +13,7 @@
     "build": "next build",
     "vercel-build": "node scripts/vercel-migrate.mjs && next build",
     "start": "next start",
+    "observability:devtools": "devtools",
     "lint": "eslint",
     "format": "prettier --write \"**/*.{ts,tsx}\"",
     "typecheck": "tsc --noEmit",
@@ -34,6 +38,7 @@
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.44",
     "@ai-sdk/openai-compatible": "^3.0.39",
+    "@ai-sdk/otel": "^1.0.83",
     "@ai-sdk/react": "^4.0.86",
     "@assistant-ui/core": "^0.2.20",
     "@assistant-ui/react": "^0.14.26",
@@ -46,7 +51,13 @@
     "@aws-sdk/s3-request-presigner": "^3.1079.0",
     "@base-ui/react": "^1.6.0",
     "@dagrejs/dagre": "^3.0.0",
+    "@langfuse/client": "^5.11.0",
+    "@langfuse/otel": "^5.11.0",
+    "@langfuse/tracing": "^5.11.0",
+    "@langfuse/vercel-ai-sdk": "^5.11.0",
     "@openrouter/ai-sdk-provider": "^3.0.0",
+    "@opentelemetry/api": "^1.9.1",
+    "@opentelemetry/sdk-node": "^0.221.0",
     "@shadcn/react": "^0.2.0",
     "@shikijs/langs": "4.3.1",
     "@shikijs/themes": "4.3.1",
@@ -90,10 +101,11 @@
     "zustand": "^5.0.14"
   },
   "devDependencies": {
+    "@ai-sdk/devtools": "^1.0.13",
     "@fission-ai/openspec": "1.5.0",
     "@shikijs/types": "4.3.1",
     "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
+    "@types/node": "^24.13.3",
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.4",
     "dotenv": "^17.4.2",

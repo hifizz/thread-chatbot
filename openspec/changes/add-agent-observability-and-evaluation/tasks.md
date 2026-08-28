@@ -1,12 +1,12 @@
 ## 1. 运行时、依赖与实施基线
 
-- [ ] 1.1 在实施当日重新核对 AI SDK v7、AI SDK DevTools、Langfuse Vercel AI SDK/OpenTelemetry 和 Next.js instrumentation 的项目内类型或官方文档，记录最终采用的包名、版本与 Node.js 要求
-- [ ] 1.2 记录当前 Node.js/pnpm 版本，以及 `typecheck`、`build`、现有 Thread Chat Gate 测试和 OpenSpec 校验的实施前基线结果
-- [ ] 1.3 将 `package.json` engines、`@types/node`、README、CI 和 VPS/Coolify 运行镜像统一到 Node.js 22 以上，并选定一个通过现有基线的固定运行时版本
-- [ ] 1.4 安装并锁定 AI SDK DevTools、AI SDK OpenTelemetry、Langfuse client/Vercel AI SDK/OpenTelemetry 和 OpenTelemetry SDK 的直接依赖，确认每个子路径 import 都有对应直接依赖
-- [ ] 1.5 增加 server-only 遥测环境变量契约和示例，覆盖总开关、DevTools、Langfuse key/base URL/region、environment、release、内容策略和匿名 ID salt，且不暴露为 `NEXT_PUBLIC_`
-- [ ] 1.6 将 `.devtools/` 和本地评测临时输出加入 `.gitignore`，同时保留允许提交的 case、fixture、基线摘要和阈值配置
-- [ ] 1.7 在 Node.js 运行时升级和依赖安装后再次运行实施前基线，修复本 change 引入的兼容问题再进入遥测接线
+- [x] 1.1 在实施当日重新核对 AI SDK v7、AI SDK DevTools、Langfuse Vercel AI SDK/OpenTelemetry 和 Next.js instrumentation 的项目内类型或官方文档，记录最终采用的包名、版本与 Node.js 要求
+- [x] 1.2 记录当前 Node.js/pnpm 版本，以及 `typecheck`、`build`、现有 Thread Chat Gate 测试和 OpenSpec 校验的实施前基线结果
+- [x] 1.3 将 `package.json` engines、`@types/node`、README、CI 和 VPS/Coolify 运行镜像统一到 Node.js 22 以上，并选定一个通过现有基线的固定运行时版本
+- [x] 1.4 安装并锁定 AI SDK DevTools、AI SDK OpenTelemetry、Langfuse client/Vercel AI SDK/OpenTelemetry 和 OpenTelemetry SDK 的直接依赖，确认每个子路径 import 都有对应直接依赖
+- [x] 1.5 增加 server-only 遥测环境变量契约和示例，覆盖总开关、DevTools、Langfuse key/base URL/region、environment、release、内容策略和匿名 ID salt，且不暴露为 `NEXT_PUBLIC_`
+- [x] 1.6 将 `.devtools/` 和本地评测临时输出加入 `.gitignore`，同时保留允许提交的 case、fixture、基线摘要和阈值配置
+- [x] 1.7 在 Node.js 运行时升级和依赖安装后再次运行实施前基线，修复本 change 引入的兼容问题再进入遥测接线
 
 ## 2. 遥测注册、隐私策略与本地 DevTools
 

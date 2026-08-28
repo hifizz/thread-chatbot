@@ -1,2 +1,3 @@
 [phases.setup]
+# 与 package.json engines 配合固定 Coolify/Nixpacks 的 Node.js 24 nixpkgs 映射。
 nixpkgsArchive = "23f9169c4ccce521379e602cc82ed873a1f1b52b"
