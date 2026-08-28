@@ -7,14 +7,10 @@ import {
   type LanguageModelMiddleware,
 } from "ai"
 import type { ModelCallPurpose } from "@/constants/model-call"
+import { buildObservabilityRuntimeContext } from "@/lib/observability/ai-sdk"
+import type { ModelCallTrace } from "@/lib/observability/types"
 
-export type ModelCallTrace = {
-  requestId?: string
-  treeId?: string
-  threadId?: string
-  generationId?: string
-  assistantMessageId?: string
-}
+export type { ModelCallTrace } from "@/lib/observability/types"
 
 type PromptSummary = {
   messageCount: number
@@ -80,7 +76,7 @@ function writeModelCallLog(input: {
       purpose: input.purpose,
       provider: input.provider,
       model: input.model,
-      ...input.trace,
+      correlation: buildObservabilityRuntimeContext(input.trace),
       context: input.context,
     })
   )

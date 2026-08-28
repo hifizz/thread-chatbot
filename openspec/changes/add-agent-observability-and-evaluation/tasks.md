@@ -10,18 +10,18 @@
 
 ## 2. 遥测注册、隐私策略与本地 DevTools
 
-- [ ] 2.1 在 `constants/` 和 `lib/observability/` 定义稳定的环境、Trace/Observation 名称、attribute allowlist、错误类别和应用自有遥测上下文类型
-- [ ] 2.2 实现 assistant Message/request 到确定性 Trace ID、feedback Score ID 和带 salt HMAC 用户匿名 ID 的 server-only helper，并增加稳定性与不泄漏原始用户 ID 的测试
-- [ ] 2.3 实现集中 telemetry policy，默认 production `recordInputs=false`、`recordOutputs=false`，只允许 evaluation、staging 或显式 cohort 开启内容
-- [ ] 2.4 实现 Langfuse 出口 mask，递归清除 credential、Authorization、Cookie、secret、个人信息、完整敏感 query/URL、附件/网页正文、原始 provider payload 和隐藏推理字段
-- [ ] 2.5 增加根级 Next.js `instrumentation.ts` 与 Node.js 专用初始化模块，以进程级 singleton 防止开发热更新或测试重复注册
-- [ ] 2.6 在 development 条件注册官方 AI SDK DevTools，提供本地启动/查看命令，并加入生产环境不得初始化 DevTools 的显式保护
-- [ ] 2.7 在配置完整时注册 Langfuse Vercel AI SDK integration、span processor 和批量 exporter；配置缺失或初始化失败时安全降级到现有服务端摘要日志
-- [ ] 2.8 实现共享 AI SDK telemetry option builder，统一 `functionId`、内容记录策略、environment/release 和 runtime context，避免各模型调用散落不同设置
-- [ ] 2.9 将回答、研究路由、研究计划、标题、附件洞察、embedding batch/query 等现有 AI SDK 调用接到共享 telemetry option builder
-- [ ] 2.10 让 `withModelCallLogging` 复用新的关联上下文与 attribute 命名，同时继续只输出结构摘要，不输出 prompt/output 正文
-- [ ] 2.11 增加注册合同测试，覆盖重复 register、development、test、production、缺失 Langfuse 凭据、远程初始化异常和 production DevTools 禁用
-- [ ] 2.12 增加脱敏测试，注入 API key、Authorization、Cookie、邮箱/手机号、完整 URL/query、附件/页面正文、原始 provider error 和 `<think>` 内容，确认 exporter 只能收到允许字段
+- [x] 2.1 在 `constants/` 和 `lib/observability/` 定义稳定的环境、Trace/Observation 名称、attribute allowlist、错误类别和应用自有遥测上下文类型
+- [x] 2.2 实现 assistant Message/request 到确定性 Trace ID、feedback Score ID 和带 salt HMAC 用户匿名 ID 的 server-only helper，并增加稳定性与不泄漏原始用户 ID 的测试
+- [x] 2.3 实现集中 telemetry policy，默认 production `recordInputs=false`、`recordOutputs=false`，只允许 evaluation、staging 或显式 cohort 开启内容
+- [x] 2.4 实现 Langfuse 出口 mask，递归清除 credential、Authorization、Cookie、secret、个人信息、完整敏感 query/URL、附件/网页正文、原始 provider payload 和隐藏推理字段
+- [x] 2.5 增加根级 Next.js `instrumentation.ts` 与 Node.js 专用初始化模块，以进程级 singleton 防止开发热更新或测试重复注册
+- [x] 2.6 在 development 条件注册官方 AI SDK DevTools，提供本地启动/查看命令，并加入生产环境不得初始化 DevTools 的显式保护
+- [x] 2.7 在配置完整时注册 Langfuse Vercel AI SDK integration、span processor 和批量 exporter；配置缺失或初始化失败时安全降级到现有服务端摘要日志
+- [x] 2.8 实现共享 AI SDK telemetry option builder，统一 `functionId`、内容记录策略、environment/release 和 runtime context，避免各模型调用散落不同设置
+- [x] 2.9 将回答、研究路由、研究计划、标题、附件洞察、embedding batch/query 等现有 AI SDK 调用接到共享 telemetry option builder
+- [x] 2.10 让 `withModelCallLogging` 复用新的关联上下文与 attribute 命名，同时继续只输出结构摘要，不输出 prompt/output 正文
+- [x] 2.11 增加注册合同测试，覆盖重复 register、development、test、production、缺失 Langfuse 凭据、远程初始化异常和 production DevTools 禁用
+- [x] 2.12 增加脱敏测试，注入 API key、Authorization、Cookie、邮箱/手机号、完整 URL/query、附件/页面正文、原始 provider error 和 `<think>` 内容，确认 exporter 只能收到允许字段
 
 ## 3. 规范化 Thread Chat 与过渡入口 Trace
 

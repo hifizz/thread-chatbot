@@ -8,6 +8,7 @@ import { MODEL_CALL_PURPOSE } from "@/constants/model-call"
 import { arkCodingChatModel, isArkCodingConfigured } from "@/lib/ai/ark"
 import { withModelCallLogging } from "@/lib/ai/model-call-logger"
 import type { ThreadTitleInput } from "@/lib/thread-chat/contracts/title-request"
+import { buildAiTelemetryConfig } from "@/lib/observability/ai-sdk"
 
 /** 喂给标题模型的首答摘录上限（字符）：标题只需主旨，控制成本与延迟。 */
 const ANSWER_EXCERPT_LIMIT = 600
@@ -57,11 +58,17 @@ export async function generateThreadTitleText(
   if (!isArkCodingConfigured()) return null
 
   try {
+    const trace = { requestId: crypto.randomUUID() }
     const { text } = await generateText({
+      ...buildAiTelemetryConfig(MODEL_CALL_PURPOSE.threadTitle, {
+        ...trace,
+        modelId: ARK_BRANCH_TITLE_MODEL,
+        entrypoint: "thread-title",
+      }),
       model: withModelCallLogging(
         arkCodingChatModel(ARK_BRANCH_TITLE_MODEL),
         MODEL_CALL_PURPOSE.threadTitle,
-        { requestId: crypto.randomUUID() }
+        trace
       ),
       maxOutputTokens: ARK_BRANCH_TITLE_MAX_OUTPUT_TOKENS,
       // 标题是可选增强；配额不足、鉴权失败等确定性错误不应额外消耗请求。

@@ -22,6 +22,7 @@ import { buildThreadChatSystem } from "@/lib/chat/thread-chat-prompt"
 import type { ThreadChatUIMessageChunk } from "@/lib/thread-chat/contracts/ui-message"
 import { buildGenerationTools } from "@/lib/thread-chat/streaming/generation-tools"
 import { throwIfGenerationCancelled } from "@/lib/ai/generation-cancellation"
+import { buildAiTelemetryConfig } from "@/lib/observability/ai-sdk"
 
 export interface PrepareGenerationInput {
   messageId: string
@@ -96,6 +97,11 @@ export async function prepareGeneration(input: PrepareGenerationInput) {
 
   throwIfGenerationCancelled(input.abortSignal)
   const result = streamText({
+    ...buildAiTelemetryConfig(MODEL_CALL_PURPOSE.chatAnswer, {
+      ...trace,
+      modelId: input.modelId,
+      entrypoint: "thread-chat",
+    }),
     model: withModelCallLogging(model, MODEL_CALL_PURPOSE.chatAnswer, trace),
     abortSignal: input.abortSignal,
     reasoning: reasoningForResearchRoute(researchRoute.mode, registeredModel),

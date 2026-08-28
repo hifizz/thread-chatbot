@@ -26,6 +26,7 @@ import { resolveResearchContext } from "@/app/api/chat/research-context"
 import { buildChatToolSet } from "@/app/api/chat/tool-set"
 import { createStreamLifecycle } from "@/app/api/chat/stream-lifecycle"
 import { prepareChatRequestContext } from "@/app/api/chat/request-context"
+import { buildAiTelemetryConfig } from "@/lib/observability/ai-sdk"
 
 // AnySearch 搜索与网页深读可能形成多步循环，放宽单次请求时长上限。
 export const maxDuration = 300
@@ -86,6 +87,11 @@ export async function POST(req: Request) {
     })
 
     const result = streamText({
+      ...buildAiTelemetryConfig(MODEL_CALL_PURPOSE.chatAnswer, {
+        ...modelCallTrace,
+        modelId,
+        entrypoint: "legacy-chat",
+      }),
       model: withModelCallLogging(
         chatModel,
         MODEL_CALL_PURPOSE.chatAnswer,
