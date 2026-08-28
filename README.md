@@ -107,6 +107,16 @@ The following features are opt-in and are not required for the quick start:
 
 Do not commit `.env.local` or credentials.
 
+### Agent observability and evaluation
+
+The observability stack is opt-in and keeps production prompt/output content off by default. For the complete local DevTools, Langfuse Cloud, evaluation, acceptance, and incident-to-regression workflow, see [Agent observability operations](./docs/observability/08-operations-and-acceptance.md). The shortest safe checks are:
+
+```bash
+pnpm test:observability
+pnpm test:agent-evals
+pnpm observability:check-release
+```
+
 ## OpenRouter models
 
 Thread Chat offers thirteen fixed OpenRouter-backed internal model IDs: `openrouter-gpt-5.6-luna`, `openrouter-gpt-5.6-luna-pro`, `openrouter-gpt-5.6-terra`, `openrouter-gpt-5.6-terra-pro`, `openrouter-gpt-5.6-sol`, `openrouter-gpt-5.6-sol-pro`, `openrouter-gpt-5.5`, `openrouter-gpt-5.5-pro`, `openrouter-kimi-k3`, `openrouter-deepseek-v4-flash-0731`, `openrouter-qwen3.8-max`, `openrouter-grok-4.5`, and `openrouter-grok-4.6`. Configure `OPENROUTER_API_KEY`; `OPENROUTER_HTTP_REFERER` and `OPENROUTER_APP_TITLE` are optional attribution values. These IDs always use the dedicated OpenRouter provider—arbitrary external slugs are rejected. GLM 5.3 is not included because OpenRouter does not currently list it. Completed requests use OpenRouter's real per-step USD cost when complete, with conservative static pricing as fallback. Attachments remain on the existing text-extraction path.

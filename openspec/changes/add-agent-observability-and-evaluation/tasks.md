@@ -107,10 +107,10 @@
 
 ## 10. 完整验收与文档
 
-- [ ] 10.1 运行所有 observability、privacy、Trace identity、background lifecycle、Search attempt、feedback mirror 和 evaluation 合同测试并修复本 change 引入的问题
+- [x] 10.1 运行所有 observability、privacy、Trace identity、background lifecycle、Search attempt、feedback mirror 和 evaluation 合同测试并修复本 change 引入的问题
 - [ ] 10.2 运行现有 Thread Chat 数据库、Session、UI Message pipeline、API、client store 和 cutover gates，证明遥测不会改变会话状态机和用户行为
 - [ ] 10.3 运行 local smoke 和至少一次 baseline/candidate Experiment，确认 case、Trace、scores、fingerprint、报告和 final flush 完整
-- [ ] 10.4 运行 `pnpm typecheck`、`pnpm lint` 和适用生产 build；若存在无关既有失败，单独记录基线且不掩盖新增失败
+- [x] 10.4 运行 `pnpm typecheck`、`pnpm lint` 和适用生产 build；若存在无关既有失败，单独记录基线且不掩盖新增失败
 - [ ] 10.5 在本地实际查看 DevTools 的普通回答与多步工具运行，在 Langfuse staging 实际查看 metadata-only Trace、反馈 Score 和 Experiment，并保存无敏感内容的验收证据
-- [ ] 10.6 完成开发、环境变量、Cloud region/额度、隐私策略、故障处置、feedback backfill、评测数据维护、CI override、生产回流和 Cloud→OSS 切换文档
-- [ ] 10.7 运行 `git diff --check` 与 `openspec validate add-agent-observability-and-evaluation --strict`，确认所有 capability scenarios 均有实现或明确的分 Gate 验收证据
+- [x] 10.6 完成开发、环境变量、Cloud region/额度、隐私策略、故障处置、feedback backfill、评测数据维护、CI override、生产回流和 Cloud→OSS 切换文档
+- [x] 10.7 运行 `git diff --check` 与 `openspec validate add-agent-observability-and-evaluation --strict`，确认所有 capability scenarios 均有实现或明确的分 Gate 验收证据

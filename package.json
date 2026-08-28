@@ -24,6 +24,8 @@
     "test:observability:eval-foundation": "node --import tsx e2e/observability/eval-foundation.test.mjs",
     "test:observability:eval-scorers": "node --import tsx e2e/observability/eval-scorers.test.mjs",
     "test:observability:eval-loop": "node --import tsx e2e/observability/eval-loop.test.mjs",
+    "test:observability": "pnpm test:observability:foundation && pnpm test:observability:trace && pnpm test:observability:provider-attempt && pnpm test:observability:feedback && pnpm test:observability:release && pnpm test:observability:eval-foundation && pnpm test:observability:eval-scorers && pnpm test:observability:eval-loop",
+    "test:agent-evals": "pnpm test:observability:eval-foundation && pnpm test:observability:eval-scorers && pnpm test:observability:eval-loop && pnpm eval:agent:ci",
     "eval:agent": "node --import tsx evals/agent/cli.ts --mode=smoke",
     "eval:agent:ci": "node --import tsx evals/agent/cli.ts --mode=ci",
     "eval:agent:scheduled": "node --import tsx evals/agent/cli.ts --mode=scheduled",
