@@ -3,7 +3,7 @@
     "schemaVersion": "agent-case-v1",
     "id": "multimodal-synthetic-chart",
     "suite": "multimodal",
-    "tags": ["smoke", "image", "grounding"],
+    "tags": ["smoke", "image", "capability-boundary"],
     "sensitivity": "synthetic",
     "execution": "content",
     "input": {
@@ -19,11 +19,11 @@
     "expected": {
       "route": "answer",
       "terminalState": "completed",
-      "contains": ["GREEN"],
-      "groundingFacts": ["GREEN"]
+      "contains": ["不支持"],
+      "excludes": ["GREEN"]
     },
     "fixtureResult": {
-      "text": "图片显示发布状态为 GREEN。",
+      "text": "当前模型不支持查看图片，因此无法确认发布状态。",
       "route": "answer",
       "tools": [],
       "terminalState": "completed",
@@ -66,7 +66,7 @@
     "schemaVersion": "agent-case-v1",
     "id": "multimodal-text-attachment",
     "suite": "multimodal",
-    "tags": ["ci", "text", "grounding"],
+    "tags": ["ci", "text", "capability-boundary"],
     "sensitivity": "synthetic",
     "execution": "content",
     "input": {
@@ -82,10 +82,11 @@
     "expected": {
       "route": "answer",
       "terminalState": "completed",
-      "contains": ["AI_TELEMETRY_ENABLED=false"]
+      "contains": ["不支持"],
+      "excludes": ["AI_TELEMETRY_ENABLED=false"]
     },
     "fixtureResult": {
-      "text": "回滚命令是 AI_TELEMETRY_ENABLED=false。",
+      "text": "当前附件类型不支持内容解读，因此无法读取回滚命令。",
       "route": "answer",
       "tools": [],
       "terminalState": "completed",

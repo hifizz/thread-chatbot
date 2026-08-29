@@ -29,6 +29,7 @@ import {
 } from "../../evals/agent/remote-policy.ts"
 import { runProviderAttempt } from "../../lib/observability/provider-attempt.ts"
 import { setAgentTraceBackendForTests } from "../../lib/observability/trace.ts"
+import { buildProductionEvaluationSeed } from "../../evals/agent/executors/production-harness.ts"
 
 const candidate = {
   candidate: "test",
@@ -68,6 +69,39 @@ test("case schema, selection, revision, and fingerprint are stable", async () =>
       "secret-a"
     )
   )
+})
+
+test("declared eval seed preserves production memory and attachment context", async () => {
+  const cases = await loadAgentCases()
+  const memoryCase = cases.find((item) => item.id === "memory-same-thread-fact")
+  const pdfCase = cases.find(
+    (item) => item.id === "multimodal-synthetic-pdf-page"
+  )
+  assert.ok(memoryCase)
+  assert.ok(pdfCase)
+
+  const memory = await buildProductionEvaluationSeed({
+    evaluationCase: memoryCase,
+    modelId: "test/model",
+  })
+  assert.deepEqual(
+    memory.messages.slice(0, -1).map((message) => message.role),
+    ["user", "assistant", "user"]
+  )
+  assert.equal(memory.messages.at(-1).status, "generating")
+  assert.equal(memory.thread.nextSequence, memory.messages.length + 1)
+
+  const pdf = await buildProductionEvaluationSeed({
+    evaluationCase: pdfCase,
+    modelId: "test/model",
+  })
+  assert.deepEqual(pdf.attachments[0].pages, [
+    "Project Aurora status: GREEN. Synthetic page 1.",
+  ])
+  const latestUser = pdf.messages.at(-2)
+  assert.equal(latestUser.role, "user")
+  assert.equal(latestUser.parts[1].type, "file")
+  assert.match(latestUser.parts[1].url, /^\/api\/attachments\//)
 })
 
 test("runner preserves order, selection, envelope, timeout, and mode budgets", async () => {

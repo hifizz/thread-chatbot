@@ -17,7 +17,7 @@ const candidate = {
   searchPolicyVersion: "anysearch-v1",
   searchProvider: "anysearch",
   memoryPolicyVersion: "thread-context-v1",
-  contextPolicy: "production-compile-model-context-v1",
+  contextPolicy: "fixture-context-v1",
   toolsetVersion: "thread-chat-tools-v1",
   multimodalParserVersion: "attachment-parser-v1",
   release: "baseline-v1",

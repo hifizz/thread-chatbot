@@ -80,3 +80,39 @@ export async function assertEvaluationDatabaseGuard(input: {
     throw new Error("Evaluation database guard does not match")
   }
 }
+
+/**
+ * Validate the isolated evaluation database before importing the application
+ * database singleton. Live content and lifecycle evals must run in a fresh
+ * process so every production code path observes the same guarded database.
+ */
+export async function prepareEvaluationDatabase(): Promise<string> {
+  const evalUrl = evaluationDatabaseUrl()
+  const runtime = globalThis as typeof globalThis & {
+    __dbClient?: unknown
+  }
+  if (runtime.__dbClient && process.env.DATABASE_URL !== evalUrl) {
+    throw new Error(
+      "Database client already initialized; run declared evals in a fresh process"
+    )
+  }
+  const { default: postgres } = await import("postgres")
+  const guardClient = postgres(evalUrl, { max: 1, prepare: false })
+  try {
+    await assertEvaluationDatabaseGuard({
+      readGuard: async () => {
+        const rows = await guardClient<
+          [{ evaluation_guard: string | null }]
+        >`
+          select current_setting('thread_chat.evaluation_guard', true)
+            as evaluation_guard
+        `
+        return rows[0]?.evaluation_guard
+      },
+    })
+  } finally {
+    await guardClient.end()
+  }
+  process.env.DATABASE_URL = evalUrl
+  return evalUrl
+}
