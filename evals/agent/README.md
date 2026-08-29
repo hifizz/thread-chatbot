@@ -30,7 +30,7 @@ AI_OBSERVABILITY_ENVIRONMENT=evaluation pnpm eval:agent:sync
 AI_OBSERVABILITY_ENVIRONMENT=evaluation pnpm eval:agent:sync -- --execute
 ```
 
-`authorized-private` case 默认不上传。Experiment 使用 `--langfuse-experiment`，结束或异常都会 final flush。evaluation 的 case/candidate identity 与 production user/session 隔离。
+`authorized-private` case 默认不上传 Dataset 或 Experiment。仅在同时传入 `--include-authorized-private` 且设置 `EVAL_ALLOW_PRIVATE_REMOTE=true` 时才允许。Experiment 使用 `--langfuse-experiment`，结束或异常都会 final flush。evaluation 的 case/candidate identity 与 production user/session 隔离。
 
 可选模型裁判用 `--judge-model=<registered-model-id>` 开启，只增加 correctness、faithfulness、helpfulness、completeness 和 citation support 五个独立分数。judge model 与 rubric version 会写入 evaluator version；它不能覆盖 deterministic hard failure。`fixtures/judge-calibration.json` 是合成人工标签校准小集，调整 judge/rubric 时应更新并复核 MAE。
 

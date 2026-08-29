@@ -19,6 +19,10 @@ import {
   runAgentEvaluation,
 } from "../../evals/agent/runner.ts"
 import { selectAgentCases } from "../../evals/agent/selection.ts"
+import {
+  resolveRemoteEvaluationPolicy,
+  selectRemoteEligibleCases,
+} from "../../evals/agent/remote-policy.ts"
 
 const candidate = {
   candidate: "test",
@@ -117,6 +121,7 @@ function fakeLangfuse() {
   const items = new Map()
   let flushes = 0
   let experimentRuns = 0
+  let experimentData = []
   return {
     items,
     get flushes() {
@@ -124,6 +129,9 @@ function fakeLangfuse() {
     },
     get experimentRuns() {
       return experimentRuns
+    },
+    get experimentData() {
+      return experimentData
     },
     dataset: {
       async createItem(item) {
@@ -134,6 +142,7 @@ function fakeLangfuse() {
     experiment: {
       async run(config) {
         experimentRuns += 1
+        experimentData = structuredClone(config.data)
         for (const item of config.data) await config.task(item)
         return { experimentId: "fake-experiment" }
       },
@@ -166,14 +175,44 @@ test("dataset sync is idempotent, sensitivity-aware, and final-flushed", async (
   assert.equal(second.eligible, 1)
   assert.equal(client.items.size, 1)
   assert.equal(client.flushes, 2)
+
+  assert.deepEqual(
+    resolveRemoteEvaluationPolicy({
+      includeAuthorizedPrivateRequested: true,
+      source: {},
+    }),
+    { includeAuthorizedPrivate: false }
+  )
+  assert.deepEqual(
+    resolveRemoteEvaluationPolicy({
+      includeAuthorizedPrivateRequested: false,
+      source: { EVAL_ALLOW_PRIVATE_REMOTE: "true" },
+    }),
+    { includeAuthorizedPrivate: false }
+  )
+  const authorizedPolicy = resolveRemoteEvaluationPolicy({
+    includeAuthorizedPrivateRequested: true,
+    source: { EVAL_ALLOW_PRIVATE_REMOTE: "true" },
+  })
+  assert.deepEqual(
+    selectRemoteEligibleCases([base, privateCase], authorizedPolicy).map(
+      (item) => item.id
+    ),
+    [base.id, privateCase.id]
+  )
 })
 
 test("Langfuse experiment flushes on success and remote failure", async () => {
   const cases = await loadAgentCases()
+  const privateCase = {
+    ...cases[0],
+    id: "private-experiment-case",
+    sensitivity: "authorized-private",
+  }
   const client = fakeLangfuse()
   await runLangfuseAgentExperiment({
     name: "test",
-    cases,
+    cases: [...cases, privateCase],
     candidate,
     execute: async ({ evaluationCase }) => ({
       text: evaluationCase.fixtureResult.text,
@@ -185,6 +224,12 @@ test("Langfuse experiment flushes on success and remote failure", async () => {
   })
   assert.equal(client.experimentRuns, 1)
   assert.equal(client.flushes, 1)
+  assert.ok(
+    !client.experimentData.some(
+      (item) => item.input.evaluationCase.id === privateCase.id
+    ),
+    "authorized-private case 默认不得进入 Langfuse Experiment data"
+  )
 
   const failing = fakeLangfuse()
   failing.experiment.run = async () => {

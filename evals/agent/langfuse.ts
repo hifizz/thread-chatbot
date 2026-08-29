@@ -6,6 +6,10 @@ import type { EvaluationCandidateConfig } from "@/evals/agent/fingerprint"
 import { evaluationConfigFingerprint } from "@/evals/agent/fingerprint"
 import { datasetRevision, stableDatasetItemId } from "@/evals/agent/identity"
 import { assertEvaluationEnvironment } from "@/evals/agent/isolation"
+import {
+  selectRemoteEligibleCases,
+  type RemoteEvaluationPolicy,
+} from "@/evals/agent/remote-policy"
 
 export type EvaluationLangfuseClient = {
   dataset: {
@@ -69,14 +73,10 @@ export async function syncAgentCasesToLangfuse(input: {
   datasetName: string
   client: EvaluationLangfuseClient
   dryRun?: boolean
-  includeAuthorizedPrivate?: boolean
+  remotePolicy?: RemoteEvaluationPolicy
 }): Promise<{ revision: string; eligible: number; synced: number }> {
   const revision = datasetRevision(input.cases)
-  const eligible = input.cases.filter(
-    (item) =>
-      item.sensitivity !== "authorized-private" ||
-      input.includeAuthorizedPrivate === true
-  )
+  const eligible = selectRemoteEligibleCases(input.cases, input.remotePolicy)
   let synced = 0
   try {
     if (!input.dryRun) {
@@ -112,8 +112,13 @@ export async function runLangfuseAgentExperiment(input: {
   execute: AgentCaseExecutor
   client: EvaluationLangfuseClient
   maxConcurrency: number
+  remotePolicy?: RemoteEvaluationPolicy
 }): Promise<unknown> {
   const candidateFingerprint = evaluationConfigFingerprint(input.candidate)
+  const eligibleCases = selectRemoteEligibleCases(
+    input.cases,
+    input.remotePolicy
+  )
   try {
     return await input.client.experiment.run({
       name: input.name,
@@ -126,12 +131,13 @@ export async function runLangfuseAgentExperiment(input: {
         repositoryDatasetRevision: datasetRevision(input.cases),
         environment: "evaluation",
       },
-      data: input.cases.map((evaluationCase) => ({
+      data: eligibleCases.map((evaluationCase) => ({
         input: { evaluationCase },
         expectedOutput: evaluationCase.expected,
         metadata: {
           caseId: evaluationCase.id,
           suite: evaluationCase.suite,
+          sensitivity: evaluationCase.sensitivity,
           candidate: input.candidate.candidate,
           candidateFingerprint,
         },

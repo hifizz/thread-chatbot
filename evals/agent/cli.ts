@@ -19,6 +19,7 @@ import {
   type EvaluationRunMode,
 } from "@/evals/agent/runner"
 import type { AgentSuite } from "@/evals/agent/schema"
+import { resolveRemoteEvaluationPolicy } from "@/evals/agent/remote-policy"
 import { aggregateEvaluationResults } from "@/evals/agent/scorers/aggregate"
 import { runModelJudge } from "@/evals/agent/scorers/judge"
 import {
@@ -66,6 +67,11 @@ const candidate: EvaluationCandidateConfig = {
   evaluatorVersion: "deterministic-v1",
 }
 const cases = await loadAgentCases()
+const remotePolicy = resolveRemoteEvaluationPolicy({
+  includeAuthorizedPrivateRequested: process.argv.includes(
+    "--include-authorized-private"
+  ),
+})
 
 const declaredExecutor: AgentCaseExecutor = async (input) => {
   switch (input.evaluationCase.execution) {
@@ -98,6 +104,7 @@ if (process.argv.includes("--sync-dataset")) {
     datasetName: argument("dataset") ?? "thread-chat-agent",
     client,
     dryRun: !process.argv.includes("--execute"),
+    remotePolicy,
   })
   console.log(JSON.stringify({ operation: "dataset-sync", ...sync }, null, 2))
   process.exit(0)
@@ -145,6 +152,7 @@ if (process.argv.includes("--langfuse-experiment")) {
     execute: executor,
     client,
     maxConcurrency: mode === "release" ? 1 : 2,
+    remotePolicy,
   })
   if (
     remote &&
