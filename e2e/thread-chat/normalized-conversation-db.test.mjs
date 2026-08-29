@@ -14,15 +14,23 @@ testUrl.searchParams.set(
 process.env.DATABASE_URL = testUrl.toString()
 process.env.DIRECT_URL = testUrl.toString()
 
-const [{ and, eq }, { db }, schema, commands, repositories, constants] =
-  await Promise.all([
-    import("drizzle-orm"),
-    import("../../lib/db/index.ts"),
-    import("../../lib/db/schema.ts"),
-    import("../../lib/thread-chat/application/index.ts"),
-    import("../../lib/thread-chat/persistence/index.ts"),
-    import("../../constants/model.ts"),
-  ])
+const [
+  { and, eq },
+  { db },
+  schema,
+  commands,
+  repositories,
+  constants,
+  feedbackOutbox,
+] = await Promise.all([
+  import("drizzle-orm"),
+  import("../../lib/db/index.ts"),
+  import("../../lib/db/schema.ts"),
+  import("../../lib/thread-chat/application/index.ts"),
+  import("../../lib/thread-chat/persistence/index.ts"),
+  import("../../constants/model.ts"),
+  import("../../lib/observability/feedback-outbox.ts"),
+])
 
 const id = () => crypto.randomUUID()
 const prefix = `gate1-${id()}`
@@ -284,18 +292,73 @@ try {
     .update(schema.messages)
     .set({ parts: [{ type: "text", text: "可用于分支的回复" }] })
     .where(eq(schema.messages.id, sendCommand.assistantMessageId))
+  const feedbackCommand = { commandId: id(), feedback: "up" }
   const feedback = await commands.setMessageFeedback(
     userA,
     sendCommand.assistantMessageId,
-    { commandId: id(), feedback: "up" }
+    feedbackCommand
   )
   assert.equal(feedback.result.feedback, "up")
+  assert.equal(
+    (
+      await commands.setMessageFeedback(
+        userA,
+        sendCommand.assistantMessageId,
+        feedbackCommand
+      )
+    ).replayed,
+    true
+  )
   const clearedFeedback = await commands.setMessageFeedback(
     userA,
     sendCommand.assistantMessageId,
     { commandId: id(), feedback: null }
   )
   assert.equal(clearedFeedback.result.feedback, null)
+  const [feedbackDelivery] = await db
+    .select()
+    .from(schema.feedbackScoreOutbox)
+    .where(
+      eq(schema.feedbackScoreOutbox.messageId, sendCommand.assistantMessageId)
+    )
+  assert.equal(feedbackDelivery.value, "cleared")
+  assert.equal(feedbackDelivery.version, 2)
+  assert.equal(feedbackDelivery.deliveredVersion, 0)
+  const mirroredFeedback = []
+  const concurrentDrains = await Promise.all(
+    [0, 1].map(() =>
+      feedbackOutbox.drainFeedbackScoreOutbox({
+        messageId: sendCommand.assistantMessageId,
+        mirror: async (value) => {
+          mirroredFeedback.push(value)
+          return {
+            status: "mirrored",
+            traceId: "test-trace",
+            scoreId: "test-score",
+            value: "cleared",
+          }
+        },
+      })
+    )
+  )
+  assert.equal(
+    concurrentDrains.reduce((total, result) => total + result.claimed, 0),
+    1
+  )
+  assert.deepEqual(
+    mirroredFeedback.map((value) => ({
+      feedback: value.feedback,
+      version: value.version,
+    })),
+    [{ feedback: null, version: 2 }]
+  )
+  const [deliveredFeedback] = await db
+    .select()
+    .from(schema.feedbackScoreOutbox)
+    .where(
+      eq(schema.feedbackScoreOutbox.messageId, sendCommand.assistantMessageId)
+    )
+  assert.equal(deliveredFeedback.deliveredVersion, 2)
 
   const forkCommand = {
     commandId: id(),

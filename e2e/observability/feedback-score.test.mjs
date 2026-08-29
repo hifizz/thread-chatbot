@@ -10,6 +10,7 @@ import {
 } from "../../lib/observability/feedback-score.ts"
 import { backfillFeedbackScores } from "../../lib/observability/feedback-backfill.ts"
 import { scheduleFeedbackMirrorAfterCommit } from "../../lib/observability/feedback-post-commit.ts"
+import { drainFeedbackScoreOutbox } from "../../lib/observability/feedback-outbox.ts"
 
 const messageId = "9ee270ad-314f-44d9-a69a-0df461dfb3a9"
 
@@ -47,8 +48,164 @@ test("feedback Score IDs and Trace IDs are deterministic", async () => {
     source: "thread-chat.product-db",
     sourceEntity: "assistant-message",
     sourceUpdatedAt: "2026-08-28T00:00:00.000Z",
-    schemaVersion: "feedback-score-v1",
+    sourceVersion: 0,
+    schemaVersion: "feedback-score-v2",
   })
+})
+
+function createFakeOutbox(value = "up") {
+  const row = {
+    messageId,
+    value,
+    sourceUpdatedAt: new Date("2026-08-28T00:00:00.000Z"),
+    version: 1,
+    deliveredVersion: 0,
+    attempts: 0,
+    nextAttemptAt: new Date("2026-08-28T00:00:00.000Z"),
+    lockToken: null,
+    lockedUntil: null,
+  }
+  return {
+    row,
+    enqueue(nextValue, updatedAt) {
+      row.value = nextValue
+      row.sourceUpdatedAt = updatedAt
+      row.version += 1
+      row.attempts = 0
+      row.nextAttemptAt = updatedAt
+    },
+    async claim({ now }) {
+      if (
+        row.deliveredVersion >= row.version ||
+        row.nextAttemptAt > now ||
+        (row.lockedUntil && row.lockedUntil > now)
+      ) {
+        return []
+      }
+      row.lockToken = crypto.randomUUID()
+      row.lockedUntil = new Date(now.getTime() + 30_000)
+      return [
+        {
+          messageId: row.messageId,
+          value: row.value,
+          sourceUpdatedAt: row.sourceUpdatedAt,
+          version: row.version,
+          attempts: row.attempts,
+          lockToken: row.lockToken,
+        },
+      ]
+    },
+    async succeed(item) {
+      if (row.version === item.version && row.lockToken === item.lockToken) {
+        row.deliveredVersion = item.version
+        row.lockToken = null
+        row.lockedUntil = null
+        return "acknowledged"
+      }
+      if (row.lockToken === item.lockToken) {
+        row.lockToken = null
+        row.lockedUntil = null
+      }
+      return "superseded"
+    },
+    async fail({ item, nextAttemptAt }) {
+      if (row.version === item.version && row.lockToken === item.lockToken) {
+        row.attempts += 1
+        row.nextAttemptAt = nextAttemptAt
+        row.lockToken = null
+        row.lockedUntil = null
+        return "rescheduled"
+      }
+      if (row.lockToken === item.lockToken) {
+        row.lockToken = null
+        row.lockedUntil = null
+      }
+      return "superseded"
+    },
+  }
+}
+
+test("outbox version confirmation prevents an old worker acknowledging a newer clear", async () => {
+  const store = createFakeOutbox("up")
+  let releaseOld
+  const oldRemote = new Promise((resolve) => {
+    releaseOld = resolve
+  })
+  const sent = []
+  const firstDrain = drainFeedbackScoreOutbox({
+    store,
+    now: new Date("2026-08-28T00:00:01.000Z"),
+    mirror: async (value) => {
+      sent.push({ feedback: value.feedback, version: value.version })
+      await oldRemote
+      return { status: "mirrored", traceId: "t", scoreId: "s", value: "up" }
+    },
+  })
+  await new Promise((resolve) => setImmediate(resolve))
+  store.enqueue("cleared", new Date("2026-08-28T00:00:02.000Z"))
+
+  const concurrent = await drainFeedbackScoreOutbox({
+    store,
+    now: new Date("2026-08-28T00:00:03.000Z"),
+    mirror: async () =>
+      assert.fail("new version must wait for the active lease"),
+  })
+  assert.equal(concurrent.claimed, 0)
+  releaseOld()
+  const stale = await firstDrain
+  assert.equal(stale.superseded, 1)
+  assert.equal(store.row.deliveredVersion, 0)
+
+  const latest = await drainFeedbackScoreOutbox({
+    store,
+    now: new Date("2026-08-28T00:00:04.000Z"),
+    mirror: async (value) => {
+      sent.push({ feedback: value.feedback, version: value.version })
+      return {
+        status: "mirrored",
+        traceId: "t",
+        scoreId: "s",
+        value: "cleared",
+      }
+    },
+  })
+  assert.equal(latest.mirrored, 1)
+  assert.equal(store.row.deliveredVersion, 2)
+  assert.deepEqual(sent, [
+    { feedback: "up", version: 1 },
+    { feedback: null, version: 2 },
+  ])
+})
+
+test("outbox retry state survives a failed drain and is reclaimable later", async () => {
+  const store = createFakeOutbox("down")
+  const failed = await drainFeedbackScoreOutbox({
+    store,
+    now: new Date("2026-08-28T00:00:01.000Z"),
+    mirror: async () => ({ status: "failed", errorCategory: "timeout" }),
+  })
+  assert.equal(failed.retried, 1)
+  assert.equal(store.row.attempts, 1)
+
+  const early = await drainFeedbackScoreOutbox({
+    store,
+    now: new Date("2026-08-28T00:00:02.000Z"),
+    mirror: async () => assert.fail("backoff must remain durable"),
+  })
+  assert.equal(early.claimed, 0)
+
+  const recovered = await drainFeedbackScoreOutbox({
+    store,
+    now: new Date("2026-08-28T00:00:07.000Z"),
+    mirror: async () => ({
+      status: "mirrored",
+      traceId: "t",
+      scoreId: "s",
+      value: "down",
+    }),
+  })
+  assert.equal(recovered.mirrored, 1)
+  assert.equal(store.row.deliveredVersion, 1)
 })
 
 test("first, repeated, changed, and cleared feedback keep one logical Score", async () => {

@@ -27,7 +27,7 @@
 **Non-Goals:**
 
 - 不把 `streamText`/现有工具循环重构成新的 Agent 框架或 `ToolLoopAgent`。
-- 不新增 generation 业务表、遥测 outbox 或另一份 Message 状态。
+- 不新增 generation 业务表或另一份 Message 状态；feedback Score 使用一张仅承载投递状态的持久化 outbox，产品 `messages.feedback` 仍是唯一事实源。
 - 不在第一阶段部署 OpenTelemetry Collector、ClickHouse、Grafana、Phoenix、Promptfoo 或自建观测 UI。
 - 不将 AI Elements 引入为第二套聊天组件系统；产品内公开活动时间线另立 change。
 - 不记录或展示隐藏思维链；现有可公开 reasoning part 仍按产品协议处理。
@@ -42,13 +42,13 @@
 
 环境矩阵：
 
-| 环境 | AI SDK DevTools | Langfuse | 内容记录 |
-|---|---:|---:|---:|
-| 本地开发 | 默认开启，可显式关闭 | 默认关闭 | 仅本机，可包含完整开发输入输出 |
-| 自动测试 | 关闭 | 默认关闭 | 关闭 |
-| 显式评测 | 关闭 | 使用独立 environment/project | 对批准 fixture 开启并脱敏 |
-| staging | 关闭 | 开启 | 默认关闭，允许受控开启 |
-| production | 强制关闭 | 有凭据时开启 | 默认关闭，仅显式抽样 cohort 可开启 |
+| 环境       |      AI SDK DevTools |                     Langfuse |                           内容记录 |
+| ---------- | -------------------: | ---------------------------: | ---------------------------------: |
+| 本地开发   | 默认开启，可显式关闭 |                     默认关闭 |     仅本机，可包含完整开发输入输出 |
+| 自动测试   |                 关闭 |                     默认关闭 |                               关闭 |
+| 显式评测   |                 关闭 | 使用独立 environment/project |          对批准 fixture 开启并脱敏 |
+| staging    |                 关闭 |                         开启 |             默认关闭，允许受控开启 |
+| production |             强制关闭 |                 有凭据时开启 | 默认关闭，仅显式抽样 cohort 可开启 |
 
 所有 `streamText`、`generateText`、embedding 和后续 rerank 调用通过共享 helper 设置稳定的 `functionId`、是否记录输入输出以及运行上下文。`functionId` 优先复用 `MODEL_CALL_PURPOSE`；新增工具/步骤名称进入 `constants/`，不在调用点散落字符串。
 
@@ -151,7 +151,7 @@ sampling = 100% metadata-only（低流量初期）
 
 ### D6. 反馈先提交数据库，再异步幂等镜像
 
-`setMessageFeedback` 的现有事务、所有权和 idempotent command 保持不变。handler 获得已提交结果后，用 Next.js `after(...)` 或等价 server-owned post-commit hook 调用 feedback mirror；HTTP 成功只依赖数据库结果。
+`setMessageFeedback` 的现有事务、所有权和 idempotent command 保持不变。同一事务在更新 `messages.feedback` 后 upsert 一条 `feedback_score_outbox`：每次新状态单调增加 `version`，保存 `up/down/cleared`、源更新时间、重试时间、租约 token 与已确认版本。handler 获得已提交结果后，用 Next.js `after(...)` 或等价 server-owned post-commit hook 唤醒 outbox drain；HTTP 成功只依赖数据库提交结果。
 
 Score 设计：
 
@@ -161,14 +161,14 @@ scoreId   = create deterministic id("user-feedback:" + messageId)
 name      = "user-feedback"
 dataType  = categorical
 value     = "up" | "down" | "cleared"
-metadata  = { source: "product", environment, updatedAt }
+metadata  = { source: "product", environment, updatedAt, sourceVersion }
 ```
 
 实现用当前 Langfuse SDK 支持的 update/upsert 语义维持一个逻辑 Score；若 SDK 只能 create/delete，则 adapter 内先更新或替换同 ID，不能把多次点击累积为彼此矛盾的评分。Score adapter 返回结构化结果供日志和测试使用，但失败不得抛回产品请求。
 
-不新增 feedback outbox。提供一个可重复执行的 backfill 脚本，按 owner-independent 运维查询遍历 `feedback is not null` 的 assistant Message 并以确定性 ID 重放；清除状态由 post-commit 立即镜像。若未来需要严格送达保证，再单独评估通用 outbox，而不是为 Langfuse 单建业务表。
+drain 使用数据库行锁与 `SKIP LOCKED` 领取到期任务，并写入租约 token，允许多个 VPS/实例安全并发。远端成功后只在 `messageId + version + lease token` 仍匹配时确认；若投递期间用户又修改或清除反馈，旧 worker 只能释放新版本，不能把它误标为已送达。失败按持久化 attempt/next-at 重试，进程重启后可由运维 drain 命令继续处理。另保留可重复执行的 Message backfill，用于修复启用 outbox 前的数据或重建远端 Score。
 
-**替代方案：**在反馈事务里同步请求 Langfuse。它会把外部延迟和故障带进产品写路径，并破坏“数据库是事实源”的边界。
+**替代方案：**仅依赖 `after(...)` 内存任务或在反馈事务里同步请求 Langfuse。前者会在进程退出、多实例切换和 clear 事件后丢失状态，后者会把外部延迟和故障带进产品写路径；两者都不能满足可恢复投递边界。
 
 ### D7. 评测 case 以仓库为事实源，Langfuse Dataset 为运行副本
 

@@ -124,5 +124,5 @@
 - [x] 11.5 将 eval deadline 传递为 AbortSignal，取消模型、Search 与 stream 消费并等待有界清理
 - [x] 11.6 通过 URL 规范化、严格命名与库内 guard 防止 evaluation 误写生产数据库
 - [x] 11.7 让 live memory/multimodal case 通过隔离数据库与真实 `runGeneration`/`compileModelContext`/附件解析路径执行
-- [ ] 11.8 用持久化 feedback Score outbox 和版本化确认修复乱序覆盖、clear 丢失与多实例重试
+- [x] 11.8 用持久化 feedback Score outbox 和版本化确认修复乱序覆盖、clear 丢失与多实例重试
 - [ ] 11.9 为每个 eval mode 建立精确 case manifest，在缺失、重复、空集合或 dataset 不兼容时阻断 baseline 比较

@@ -26,6 +26,7 @@ export type FeedbackScoreBody = {
     source: string
     sourceEntity: "assistant-message"
     sourceUpdatedAt: string
+    sourceVersion: number
     schemaVersion: string
   }
 }
@@ -41,6 +42,7 @@ export type FeedbackMirrorInput = {
   messageId: string
   feedback: MessageFeedback | null
   updatedAt: string
+  version?: number
 }
 
 export type FeedbackMirrorResult =
@@ -118,6 +120,7 @@ export async function prepareFeedbackScore(
       source: FEEDBACK_SCORE_SOURCE,
       sourceEntity: "assistant-message",
       sourceUpdatedAt: input.updatedAt,
+      sourceVersion: input.version ?? 0,
       schemaVersion: FEEDBACK_SCORE_SCHEMA_VERSION,
     },
   }
