@@ -120,7 +120,7 @@
 - [x] 11.1 合并 Observation metadata 并分离通用 operation outcome 与 provider domain outcome，防止 finish 终态被覆盖
 - [x] 11.2 让 Dataset Sync 与 Langfuse Experiment 共用默认拒绝 `authorized-private` 的远程数据资格策略
 - [x] 11.3 让 Snapshot 与 Langfuse Experiment 复用同一次 case 执行结果，并为每次 run 生成唯一 Trace 身份
-- [ ] 11.4 用 request-scoped collector 采集 live Search provider finish attempts，保证并发 case 隔离
+- [x] 11.4 用 request-scoped collector 采集 live Search provider finish attempts，保证并发 case 隔离
 - [ ] 11.5 将 eval deadline 传递为 AbortSignal，取消模型、Search 与 stream 消费并等待有界清理
 - [ ] 11.6 通过 URL 规范化、严格命名与库内 guard 防止 evaluation 误写生产数据库
 - [ ] 11.7 让 live memory/multimodal case 通过隔离数据库与真实 `runGeneration`/`compileModelContext`/附件解析路径执行

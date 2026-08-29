@@ -16,6 +16,11 @@ import {
 } from "@/evals/agent/selection"
 import { scoreAgentResult } from "@/evals/agent/scoring"
 import type { AgentScorer } from "@/evals/agent/scorers"
+import {
+  finishedProviderAttemptRecords,
+  type ProviderAttemptEvent,
+  withProviderAttemptEventCollection,
+} from "@/lib/observability/provider-attempt"
 
 export type EvaluationRunMode = "smoke" | "ci" | "scheduled" | "release"
 
@@ -112,9 +117,12 @@ export async function runAgentEvaluation(
       const startedAt = new Date(started).toISOString()
       let output: AgentExecutionOutput
       let error: AgentExperimentResult["error"]
+      const providerEvents: ProviderAttemptEvent[] = []
       try {
         output = await withTimeout(
-          options.executor({ evaluationCase, traceId, candidate }),
+          withProviderAttemptEventCollection(providerEvents, () =>
+            options.executor({ evaluationCase, traceId, candidate })
+          ),
           timeoutMs
         )
       } catch (cause) {
@@ -124,6 +132,8 @@ export async function runAgentEvaluation(
           message: cause instanceof Error ? cause.name : "UnknownError",
         }
       }
+      const collectedProviderAttempts =
+        finishedProviderAttemptRecords(providerEvents)
       const ended = Date.now()
       const result: AgentExperimentResult = {
         schemaVersion: "agent-result-v1",
@@ -146,7 +156,10 @@ export async function runAgentEvaluation(
           durationMs: ended - started,
         },
         usage: output.usage ?? {},
-        providerAttempts: output.providerAttempts ?? [],
+        providerAttempts:
+          collectedProviderAttempts.length > 0
+            ? collectedProviderAttempts
+            : (output.providerAttempts ?? []),
         scores: [],
         ...(error ? { error } : {}),
       }

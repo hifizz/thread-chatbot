@@ -23,6 +23,8 @@ import {
   resolveRemoteEvaluationPolicy,
   selectRemoteEligibleCases,
 } from "../../evals/agent/remote-policy.ts"
+import { runProviderAttempt } from "../../lib/observability/provider-attempt.ts"
+import { setAgentTraceBackendForTests } from "../../lib/observability/trace.ts"
 
 const candidate = {
   candidate: "test",
@@ -119,6 +121,61 @@ test("runner preserves order, selection, envelope, timeout, and mode budgets", a
   })
   assert.equal(timeout.results[0].error.category, "timeout")
   assert.equal(timeout.results[0].output.terminalState, "failed")
+})
+
+test("runner collects provider attempts without leaking across concurrent cases", async () => {
+  const cases = (await loadAgentCases()).slice(0, 2)
+  const observation = {
+    id: "provider-collector-test",
+    traceId: "provider-collector-test",
+    update() {},
+    end() {},
+  }
+  setAgentTraceBackendForTests({
+    runRoot(_input, fn) {
+      return fn(observation)
+    },
+    observe(_name, _attributes, fn) {
+      return fn(observation)
+    },
+  })
+  try {
+    const run = await runAgentEvaluation(cases, {
+      runId: "provider-collector-run",
+      mode: "release",
+      candidate,
+      concurrency: 2,
+      executor: async ({ evaluationCase }) => {
+        await new Promise((resolve) => setImmediate(resolve))
+        await runProviderAttempt(
+          {
+            provider: evaluationCase.id,
+            operation: "search",
+            attemptIndex: 0,
+          },
+          async () => ({ results: [evaluationCase.id] }),
+          ({ results }) => ({
+            outcome: "success",
+            resultCount: results.length,
+          })
+        )
+        return { text: evaluationCase.fixtureResult.text, tools: [] }
+      },
+    })
+    assert.deepEqual(
+      run.results.map((result) =>
+        result.providerAttempts.map((attempt) => attempt.provider)
+      ),
+      cases.map((evaluationCase) => [evaluationCase.id])
+    )
+    assert.ok(
+      run.results.every(
+        (result) => result.providerAttempts[0].phase === "finish"
+      )
+    )
+  } finally {
+    setAgentTraceBackendForTests(null)
+  }
 })
 
 test("lifecycle database safety rejects production-shaped targets", () => {

@@ -94,7 +94,6 @@ export async function executeProductionContentCase(input: {
         text: "",
         tools: [],
         terminalState: "completed",
-        providerAttempts: [],
       }
       const reader = (
         prepared.textStream as ReadableStream<TextStreamPart<ToolSet>>

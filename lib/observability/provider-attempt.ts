@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto"
+import { AsyncLocalStorage } from "node:async_hooks"
 import { getActiveSpanId, getActiveTraceId } from "@langfuse/tracing"
 import { OBSERVATION_NAMES } from "@/constants/observability"
 import { classifyObservabilityError } from "@/lib/observability/error"
@@ -64,11 +65,28 @@ export type ProviderAttemptEvent = {
 
 type ProviderAttemptEventConsumer = (event: ProviderAttemptEvent) => void
 
+type ProviderAttemptCollector = {
+  events: ProviderAttemptEvent[]
+}
+
 const CONSUMER_KEY = Symbol.for(
   "thread-chat.observability.provider-attempt-consumer.v1"
 )
 type ConsumerScope = typeof globalThis & {
   [CONSUMER_KEY]?: ProviderAttemptEventConsumer
+}
+
+const COLLECTOR_KEY = Symbol.for(
+  "thread-chat.observability.provider-attempt-collector.v1"
+)
+type CollectorScope = typeof globalThis & {
+  [COLLECTOR_KEY]?: AsyncLocalStorage<ProviderAttemptCollector>
+}
+
+function collectorStorage(): AsyncLocalStorage<ProviderAttemptCollector> {
+  const scope = globalThis as CollectorScope
+  scope[COLLECTOR_KEY] ??= new AsyncLocalStorage<ProviderAttemptCollector>()
+  return scope[COLLECTOR_KEY]
 }
 
 export function fingerprintProviderQuery(query: string): string {
@@ -95,6 +113,33 @@ function eventConsumer(): ProviderAttemptEventConsumer {
       )
     })
   )
+}
+
+function emitProviderAttemptEvent(event: ProviderAttemptEvent): void {
+  eventConsumer()(event)
+  collectorStorage().getStore()?.events.push(structuredClone(event))
+}
+
+export function withProviderAttemptEventCollection<T>(
+  events: ProviderAttemptEvent[],
+  execute: () => Promise<T>
+): Promise<T> {
+  return collectorStorage().run({ events }, execute)
+}
+
+export function finishedProviderAttemptRecords(
+  events: readonly ProviderAttemptEvent[]
+): Array<Record<string, string | number | boolean>> {
+  return events
+    .filter((event) => event.phase === "finish")
+    .map((event) =>
+      Object.fromEntries(
+        Object.entries(event).filter(
+          (entry): entry is [string, string | number | boolean] =>
+            ["string", "number", "boolean"].includes(typeof entry[1])
+        )
+      )
+    )
 }
 
 export function setProviderAttemptEventConsumerForTests(
@@ -180,7 +225,7 @@ export async function runProviderAttempt<T>(
     phase: "start",
     outcome: "running",
   }
-  eventConsumer()(startEvent)
+  emitProviderAttemptEvent(startEvent)
 
   return observeAppOperation(
     `${OBSERVATION_NAMES.searchProviderAttempt}.${input.provider.toLowerCase()}.${input.operation}`,
@@ -195,7 +240,7 @@ export async function runProviderAttempt<T>(
           durationMs: Math.round(performance.now() - startedAt),
           ...summary,
         }
-        eventConsumer()(finishEvent)
+        emitProviderAttemptEvent(finishEvent)
         observation.update({
           output: {
             outcome: finishEvent.outcome,
@@ -214,7 +259,7 @@ export async function runProviderAttempt<T>(
           durationMs: Math.round(performance.now() - startedAt),
           errorCategory: classifyObservabilityError(error),
         }
-        eventConsumer()(finishEvent)
+        emitProviderAttemptEvent(finishEvent)
         observation.update({
           level: outcome === "cancelled" ? "DEFAULT" : "ERROR",
           statusMessage: `provider attempt ${outcome}`,
