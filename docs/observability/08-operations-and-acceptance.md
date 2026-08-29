@@ -77,7 +77,7 @@ pnpm eval:agent:compare -- \
   --candidate=evals/agent/results/local/candidate.json
 ```
 
-真实模型/工具内容评测必须使用 `evaluation` 环境和 `--executor=declared`；真实生命周期评测还必须使用独立 `EVAL_DATABASE_URL`，database 名包含 `eval` 或 `test`，且显式设置 `EVAL_ALLOW_DATABASE_WRITES=true`。安全检查会拒绝 production DB。详细参数见 [Agent eval README](../../evals/agent/README.md)。
+真实模型/工具内容评测必须使用 `evaluation` 环境和 `--executor=declared`；真实生命周期评测还必须使用独立 `EVAL_DATABASE_URL`，database 名匹配 `thread_chat_eval[_suffix]`，显式设置 `EVAL_ALLOW_DATABASE_WRITES=true`，并使 `EVAL_DATABASE_GUARD_TOKEN` 与 PostgreSQL 库级 `thread_chat.evaluation_guard` setting 一致。安全检查会在首次写入前拒绝 production DB。详细参数见 [Agent eval README](../../evals/agent/README.md)。
 
 Langfuse Dataset 同步默认 dry-run；确认差异后才执行，并可把同一次 run 记录为 Experiment：
 

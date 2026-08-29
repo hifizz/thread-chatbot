@@ -19,7 +19,7 @@ AI_OBSERVABILITY_ENVIRONMENT=evaluation \
   pnpm eval:agent -- --executor=declared --suite=core-answer
 ```
 
-lifecycle 还要求 `EVAL_DATABASE_URL` 的 database 名包含 `eval` 或 `test`、与 `DATABASE_URL` 不同，并显式设置 `EVAL_ALLOW_DATABASE_WRITES=true`。应在全新进程运行 lifecycle suite；安全检查拒绝生产数据库。
+lifecycle 还要求 database 名匹配 `thread_chat_eval[_suffix]`、与规范化后的 `DATABASE_URL` 不同，并显式设置 `EVAL_ALLOW_DATABASE_WRITES=true`。运行前需在 Evaluation PostgreSQL 库执行 `ALTER DATABASE thread_chat_eval SET thread_chat.evaluation_guard = '<24+字符随机值>';`，重连后将同一值配置为 `EVAL_DATABASE_GUARD_TOKEN`。应在全新进程运行 lifecycle suite；URL 别名、严格命名和库内 guard 任一不通过都会在首次写入前终止。
 
 ## Langfuse
 

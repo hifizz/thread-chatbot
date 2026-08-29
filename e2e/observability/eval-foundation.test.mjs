@@ -9,7 +9,11 @@ import {
   datasetRevision,
   stableDatasetItemId,
 } from "../../evals/agent/identity.ts"
-import { evaluationDatabaseUrl } from "../../evals/agent/isolation.ts"
+import {
+  assertEvaluationDatabaseGuard,
+  canonicalEvaluationDatabaseIdentity,
+  evaluationDatabaseUrl,
+} from "../../evals/agent/isolation.ts"
 import {
   runLangfuseAgentExperiment,
   syncAgentCasesToLangfuse,
@@ -209,6 +213,52 @@ test("lifecycle database safety rejects production-shaped targets", () => {
       AI_OBSERVABILITY_ENVIRONMENT: "evaluation",
       EVAL_ALLOW_DATABASE_WRITES: "true",
       EVAL_DATABASE_URL: "postgres://db/customer-production",
+    })
+  )
+  assert.throws(() =>
+    evaluationDatabaseUrl({
+      AI_OBSERVABILITY_ENVIRONMENT: "evaluation",
+      EVAL_ALLOW_DATABASE_WRITES: "true",
+      DATABASE_URL: "postgres://user@localhost:5432/thread_chat_eval",
+      EVAL_DATABASE_URL:
+        "postgres://other@127.0.0.1:6543/thread_chat_eval",
+    })
+  )
+  assert.deepEqual(
+    canonicalEvaluationDatabaseIdentity(
+      "postgres://user:secret@LOCALHOST:5432/thread_chat_eval_ci?ssl=true"
+    ),
+    { host: "loopback", database: "thread_chat_eval_ci" }
+  )
+  assert.equal(
+    evaluationDatabaseUrl({
+      AI_OBSERVABILITY_ENVIRONMENT: "evaluation",
+      EVAL_ALLOW_DATABASE_WRITES: "true",
+      DATABASE_URL: "postgres://db/thread_chat_prod",
+      EVAL_DATABASE_URL: "postgres://db/thread_chat_eval_ci",
+    }),
+    "postgres://db/thread_chat_eval_ci"
+  )
+})
+
+test("lifecycle database guard must match before writes", async () => {
+  const token = "evaluation-guard-token-123456789"
+  await assert.rejects(() =>
+    assertEvaluationDatabaseGuard({
+      source: { EVAL_DATABASE_GUARD_TOKEN: token },
+      readGuard: async () => "different-evaluation-guard-token",
+    })
+  )
+  await assert.rejects(() =>
+    assertEvaluationDatabaseGuard({
+      source: {},
+      readGuard: async () => token,
+    })
+  )
+  await assert.doesNotReject(() =>
+    assertEvaluationDatabaseGuard({
+      source: { EVAL_DATABASE_GUARD_TOKEN: token },
+      readGuard: async () => token,
     })
   )
 })

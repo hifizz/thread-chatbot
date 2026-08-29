@@ -1,6 +1,9 @@
 import type { AgentCase } from "@/evals/agent/schema"
 import type { AgentExecutionOutput } from "@/evals/agent/result"
-import { evaluationDatabaseUrl } from "@/evals/agent/isolation"
+import {
+  assertEvaluationDatabaseGuard,
+  evaluationDatabaseUrl,
+} from "@/evals/agent/isolation"
 import { GENERATION_CANCEL_REASONS } from "@/constants/generation"
 import { assistantMessageTraceId } from "@/lib/observability/identity"
 
@@ -43,6 +46,21 @@ export async function executeLifecycleCase(input: {
     throw new Error(
       "Database client already initialized; run lifecycle evals in a fresh process"
     )
+  }
+  const { default: postgres } = await import("postgres")
+  const guardClient = postgres(evalUrl, { max: 1, prepare: false })
+  try {
+    await assertEvaluationDatabaseGuard({
+      readGuard: async () => {
+        const rows = await guardClient<[{ evaluation_guard: string | null }]>`
+          select current_setting('thread_chat.evaluation_guard', true)
+            as evaluation_guard
+        `
+        return rows[0]?.evaluation_guard
+      },
+    })
+  } finally {
+    await guardClient.end()
   }
   process.env.DATABASE_URL = evalUrl
 
