@@ -1,5 +1,6 @@
 {
   "schemaVersion": "agent-run-snapshot-v1",
+  "runId": "fixture-baseline-v1",
   "kind": "fixture",
   "createdAt": "2026-08-28T00:00:00.000Z",
   "datasetRevision": "0c6aa37f97edc2ba9b87f974e37226dc0d7a83749bdf090d21081aae1b13ca3b",

@@ -72,6 +72,7 @@ test("cross-project leak is a hard failure that a high judge score cannot hide",
   )
   const result = {
     schemaVersion: "agent-result-v1",
+    runId: "scorer-test-run",
     caseId: evaluationCase.id,
     suite: evaluationCase.suite,
     candidate: "bad",

@@ -66,6 +66,8 @@ const candidate: EvaluationCandidateConfig = {
   environment: "evaluation",
   evaluatorVersion: "deterministic-v1",
 }
+const runId =
+  argument("run-id") ?? process.env.EVAL_RUN_ID ?? crypto.randomUUID()
 const cases = await loadAgentCases()
 const remotePolicy = resolveRemoteEvaluationPolicy({
   includeAuthorizedPrivateRequested: process.argv.includes(
@@ -120,6 +122,7 @@ const hasExplicitSelection = Object.values(selection).some(
 )
 const judgeModelId = argument("judge-model")
 const run = await runAgentEvaluation(cases, {
+  runId,
   mode,
   candidate,
   ...(hasExplicitSelection ? { selection } : {}),
@@ -149,7 +152,7 @@ if (process.argv.includes("--langfuse-experiment")) {
     runName: argument("run-name"),
     cases: selectedCases,
     candidate,
-    execute: executor,
+    results: run.results,
     client,
     maxConcurrency: mode === "release" ? 1 : 2,
     remotePolicy,

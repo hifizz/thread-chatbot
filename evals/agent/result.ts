@@ -13,6 +13,7 @@ export type EvaluationScore = {
 
 export type AgentExperimentResult = {
   schemaVersion: "agent-result-v1"
+  runId: string
   caseId: string
   suite: AgentSuite
   candidate: string

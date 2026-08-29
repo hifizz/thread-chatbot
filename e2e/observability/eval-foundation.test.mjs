@@ -67,6 +67,7 @@ test("case schema, selection, revision, and fingerprint are stable", async () =>
 test("runner preserves order, selection, envelope, timeout, and mode budgets", async () => {
   const cases = await loadAgentCases()
   const run = await runAgentEvaluation(cases, {
+    runId: "foundation-run",
     mode: "smoke",
     candidate,
     selection: { caseIds: [cases[0].id] },
@@ -80,6 +81,7 @@ test("runner preserves order, selection, envelope, timeout, and mode budgets", a
   })
   assert.equal(run.results.length, 1)
   assert.equal(run.results[0].schemaVersion, "agent-result-v1")
+  assert.equal(run.results[0].runId, "foundation-run")
   assert.equal(run.results[0].caseId, cases[0].id)
   assert.equal(run.results[0].traceId, "actual-executor-trace")
   assert.equal(run.results[0].output.route, "answer")
@@ -87,6 +89,26 @@ test("runner preserves order, selection, envelope, timeout, and mode budgets", a
     concurrency: 1,
     timeoutMs: 300000,
   })
+
+  const traceRuns = await Promise.all(
+    ["trace-run-a", "trace-run-b"].map((runId) =>
+      runAgentEvaluation(cases, {
+        runId,
+        mode: "smoke",
+        candidate,
+        selection: { caseIds: [cases[0].id] },
+        executor: async ({ evaluationCase }) => ({
+          text: evaluationCase.fixtureResult.text,
+          tools: [],
+        }),
+      })
+    )
+  )
+  assert.notEqual(
+    traceRuns[0].results[0].traceId,
+    traceRuns[1].results[0].traceId,
+    "相同 case/candidate 的不同 run 必须生成不同 Trace"
+  )
 
   const timeout = await runAgentEvaluation(cases, {
     mode: "smoke",
@@ -122,6 +144,7 @@ function fakeLangfuse() {
   let flushes = 0
   let experimentRuns = 0
   let experimentData = []
+  let experimentOutputs = []
   return {
     items,
     get flushes() {
@@ -133,6 +156,9 @@ function fakeLangfuse() {
     get experimentData() {
       return experimentData
     },
+    get experimentOutputs() {
+      return experimentOutputs
+    },
     dataset: {
       async createItem(item) {
         items.set(item.id, structuredClone(item))
@@ -143,7 +169,10 @@ function fakeLangfuse() {
       async run(config) {
         experimentRuns += 1
         experimentData = structuredClone(config.data)
-        for (const item of config.data) await config.task(item)
+        experimentOutputs = []
+        for (const item of config.data) {
+          experimentOutputs.push(await config.task(item))
+        }
         return { experimentId: "fake-experiment" }
       },
     },
@@ -210,20 +239,37 @@ test("Langfuse experiment flushes on success and remote failure", async () => {
     sensitivity: "authorized-private",
   }
   const client = fakeLangfuse()
+  let executions = 0
+  const experimentCases = [cases[0], privateCase]
+  const precomputed = await runAgentEvaluation(experimentCases, {
+    runId: "single-execution-run",
+    mode: "release",
+    candidate,
+    executor: async ({ evaluationCase }) => {
+      executions += 1
+      return {
+        text: evaluationCase.fixtureResult.text,
+        tools: [],
+        terminalState: "completed",
+      }
+    },
+  })
   await runLangfuseAgentExperiment({
     name: "test",
-    cases: [...cases, privateCase],
+    cases: experimentCases,
     candidate,
-    execute: async ({ evaluationCase }) => ({
-      text: evaluationCase.fixtureResult.text,
-      tools: [],
-      terminalState: "completed",
-    }),
+    results: precomputed.results,
     client,
     maxConcurrency: 1,
   })
+  assert.equal(executions, experimentCases.length)
   assert.equal(client.experimentRuns, 1)
   assert.equal(client.flushes, 1)
+  assert.equal(client.experimentOutputs.length, 1)
+  assert.equal(
+    client.experimentOutputs[0].traceId,
+    precomputed.results[0].traceId
+  )
   assert.ok(
     !client.experimentData.some(
       (item) => item.input.evaluationCase.id === privateCase.id
@@ -238,9 +284,9 @@ test("Langfuse experiment flushes on success and remote failure", async () => {
   await assert.rejects(() =>
     runLangfuseAgentExperiment({
       name: "test-failure",
-      cases,
+      cases: experimentCases,
       candidate,
-      execute: async () => ({ text: "", tools: [] }),
+      results: precomputed.results,
       client: failing,
       maxConcurrency: 1,
     })

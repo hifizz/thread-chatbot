@@ -1,7 +1,6 @@
 import { resolveObservabilityConfig } from "@/lib/observability/config"
 import type { AgentCase } from "@/evals/agent/schema"
 import type { AgentExperimentResult } from "@/evals/agent/result"
-import type { AgentCaseExecutor } from "@/evals/agent/runner"
 import type { EvaluationCandidateConfig } from "@/evals/agent/fingerprint"
 import { evaluationConfigFingerprint } from "@/evals/agent/fingerprint"
 import { datasetRevision, stableDatasetItemId } from "@/evals/agent/identity"
@@ -109,7 +108,7 @@ export async function runLangfuseAgentExperiment(input: {
   runName?: string
   cases: readonly AgentCase[]
   candidate: EvaluationCandidateConfig
-  execute: AgentCaseExecutor
+  results: readonly AgentExperimentResult[]
   client: EvaluationLangfuseClient
   maxConcurrency: number
   remotePolicy?: RemoteEvaluationPolicy
@@ -119,6 +118,30 @@ export async function runLangfuseAgentExperiment(input: {
     input.cases,
     input.remotePolicy
   )
+  const resultByCaseId = new Map(
+    input.results.map((result) => [result.caseId, result])
+  )
+  if (resultByCaseId.size !== input.results.length) {
+    throw new Error("Langfuse experiment results contain duplicate case IDs")
+  }
+  const runIds = new Set(input.results.map((result) => result.runId))
+  if (runIds.size !== 1) {
+    throw new Error("Langfuse experiment results must belong to one run")
+  }
+  const runId = input.results[0]?.runId
+  for (const evaluationCase of eligibleCases) {
+    const result = resultByCaseId.get(evaluationCase.id)
+    if (!result) {
+      throw new Error(
+        `Langfuse experiment has no precomputed result for ${evaluationCase.id}`
+      )
+    }
+    if (result.candidateFingerprint !== candidateFingerprint) {
+      throw new Error(
+        `Langfuse experiment result fingerprint mismatch for ${evaluationCase.id}`
+      )
+    }
+  }
   try {
     return await input.client.experiment.run({
       name: input.name,
@@ -128,6 +151,7 @@ export async function runLangfuseAgentExperiment(input: {
       metadata: {
         candidate: input.candidate.candidate,
         candidateFingerprint,
+        runId,
         repositoryDatasetRevision: datasetRevision(input.cases),
         environment: "evaluation",
       },
@@ -140,21 +164,16 @@ export async function runLangfuseAgentExperiment(input: {
           sensitivity: evaluationCase.sensitivity,
           candidate: input.candidate.candidate,
           candidateFingerprint,
+          runId,
+          traceId: resultByCaseId.get(evaluationCase.id)!.traceId,
         },
       })),
       task: async (item) => {
         if (!item.input)
           throw new Error("Langfuse experiment item has no input")
         const evaluationCase = item.input.evaluationCase
-        const { runAgentEvaluation } = await import("@/evals/agent/runner")
-        const run = await runAgentEvaluation(input.cases, {
-          mode: "release",
-          candidate: input.candidate,
-          executor: input.execute,
-          concurrency: 1,
-          selection: { caseIds: [evaluationCase.id] },
-        })
-        return run.results[0]
+        const result = resultByCaseId.get(evaluationCase.id)
+        return result!
       },
       evaluators: [
         async ({ output }) =>

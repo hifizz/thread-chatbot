@@ -24,6 +24,7 @@ env:
   EVAL_CANDIDATE: pr-${{ github.event.pull_request.number }}
   AI_OBSERVABILITY_RELEASE: ${{ github.sha }}
   GIT_COMMIT_SHA: ${{ github.sha }}
+  EVAL_RUN_ID: github-${{ github.run_id }}-${{ github.run_attempt }}
 
 jobs:
   deterministic:

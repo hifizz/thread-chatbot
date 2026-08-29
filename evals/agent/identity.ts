@@ -15,11 +15,12 @@ export function datasetRevision(cases: readonly AgentCase[]): string {
 }
 
 export async function evaluationTraceId(input: {
+  runId: string
   caseId: string
   candidateFingerprint: string
   datasetRevision: string
 }): Promise<string> {
   return createTraceId(
-    `evaluation:${input.datasetRevision}:${input.caseId}:${input.candidateFingerprint}`
+    `evaluation:${input.runId}:${input.datasetRevision}:${input.caseId}:${input.candidateFingerprint}`
   )
 }

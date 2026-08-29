@@ -4,6 +4,7 @@ import { aggregateEvaluationResults } from "@/evals/agent/scorers/aggregate"
 
 export type AgentRunSnapshot = {
   schemaVersion: "agent-run-snapshot-v1"
+  runId: string
   kind: "fixture" | "live"
   createdAt: string
   datasetRevision: string
@@ -25,6 +26,7 @@ export type AgentRunSnapshot = {
 }
 
 export function createAgentRunSnapshot(input: {
+  runId: string
   datasetRevision: string
   candidateFingerprint: string
   candidate: EvaluationCandidateConfig
@@ -35,6 +37,7 @@ export function createAgentRunSnapshot(input: {
 }): AgentRunSnapshot {
   return {
     schemaVersion: "agent-run-snapshot-v1",
+    runId: input.runId,
     kind: input.kind,
     createdAt: input.createdAt ?? new Date().toISOString(),
     datasetRevision: input.datasetRevision,

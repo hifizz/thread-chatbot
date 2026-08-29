@@ -36,6 +36,7 @@ export type AgentCaseExecutor = (input: {
 }) => Promise<AgentExecutionOutput>
 
 export type RunAgentEvaluationOptions = {
+  runId?: string
   mode: EvaluationRunMode
   candidate: EvaluationCandidateConfig
   selection?: EvaluationSelection
@@ -67,6 +68,7 @@ export async function runAgentEvaluation(
   cases: readonly AgentCase[],
   options: RunAgentEvaluationOptions
 ): Promise<{
+  runId: string
   datasetRevision: string
   candidateFingerprint: string
   candidate: EvaluationCandidateConfig
@@ -83,6 +85,7 @@ export async function runAgentEvaluation(
             : item.tags.includes("smoke") || item.tags.includes("ci")
         )
   const selected = selectAgentCases(modeCases, options.selection)
+  const runId = options.runId ?? crypto.randomUUID()
   const revision = datasetRevision(cases)
   const candidate = publicEvaluationConfig(options.candidate)
   const fingerprint = evaluationConfigFingerprint(candidate)
@@ -100,6 +103,7 @@ export async function runAgentEvaluation(
       const index = cursor++
       const evaluationCase = selected[index]
       const traceId = await evaluationTraceId({
+        runId,
         caseId: evaluationCase.id,
         candidateFingerprint: fingerprint,
         datasetRevision: revision,
@@ -123,6 +127,7 @@ export async function runAgentEvaluation(
       const ended = Date.now()
       const result: AgentExperimentResult = {
         schemaVersion: "agent-result-v1",
+        runId,
         caseId: evaluationCase.id,
         suite: evaluationCase.suite,
         candidate: candidate.candidate,
@@ -157,6 +162,7 @@ export async function runAgentEvaluation(
     Array.from({ length: Math.min(concurrency, selected.length) }, worker)
   )
   return {
+    runId,
     datasetRevision: revision,
     candidateFingerprint: fingerprint,
     candidate,

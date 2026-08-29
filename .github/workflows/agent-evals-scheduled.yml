@@ -26,6 +26,7 @@ env:
   EVAL_CANDIDATE: scheduled-${{ github.run_id }}
   AI_OBSERVABILITY_RELEASE: ${{ github.sha }}
   GIT_COMMIT_SHA: ${{ github.sha }}
+  EVAL_RUN_ID: github-${{ github.run_id }}-${{ github.run_attempt }}
 
 jobs:
   broad-fixture:
