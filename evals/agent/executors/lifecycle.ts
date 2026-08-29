@@ -33,6 +33,7 @@ function failedStream() {
 export async function executeLifecycleCase(input: {
   evaluationCase: AgentCase
   modelId: string
+  abortSignal: AbortSignal
 }): Promise<AgentExecutionOutput> {
   const evalUrl = evaluationDatabaseUrl()
   const runtime = globalThis as typeof globalThis & {
@@ -122,25 +123,45 @@ export async function executeLifecycleCase(input: {
           },
         }),
     })
+    const abortForEvaluationDeadline = () => {
+      store.abort(
+        assistantMessageId,
+        GENERATION_CANCEL_REASONS.evaluationTimeout
+      )
+    }
+    input.abortSignal.addEventListener(
+      "abort",
+      abortForEvaluationDeadline,
+      { once: true }
+    )
+    if (input.abortSignal.aborted) abortForEvaluationDeadline()
     if (scenario === "stop") {
       store.abort(assistantMessageId, GENERATION_CANCEL_REASONS.userStop)
     }
-    await run.session.task
-    const terminal = await application.getMessage(userId, assistantMessageId)
-    if (!terminal)
-      throw new Error("Lifecycle evaluation terminal message missing")
-    return {
-      traceId: await assistantMessageTraceId(assistantMessageId),
-      text: terminal.parts
-        .filter((part) => part.type === "text")
-        .map((part) => part.text)
-        .join("\n"),
-      tools: terminal.parts
-        .filter((part) => part.type.startsWith("tool-"))
-        .map((part) => part.type.slice("tool-".length)),
-      terminalState:
-        terminal.status === "generating" ? "failed" : terminal.status,
-      usage: { inputTokens: 4, outputTokens: 3, totalTokens: 7 },
+    try {
+      await run.session.task
+      const terminal = await application.getMessage(userId, assistantMessageId)
+      if (!terminal)
+        throw new Error("Lifecycle evaluation terminal message missing")
+      return {
+        traceId: await assistantMessageTraceId(assistantMessageId),
+        text: terminal.parts
+          .filter((part) => part.type === "text")
+          .map((part) => part.text)
+          .join("\n"),
+        tools: terminal.parts
+          .filter((part) => part.type.startsWith("tool-"))
+          .map((part) => part.type.slice("tool-".length)),
+        terminalState:
+          terminal.status === "generating" ? "failed" : terminal.status,
+        usage: { inputTokens: 4, outputTokens: 3, totalTokens: 7 },
+      }
+    } finally {
+      input.abortSignal.removeEventListener(
+        "abort",
+        abortForEvaluationDeadline
+      )
+      store.dispose()
     }
   } finally {
     await db.delete(schema.user).where(drizzle.eq(schema.user.id, userId))

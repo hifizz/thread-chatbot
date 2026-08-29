@@ -85,11 +85,13 @@ const declaredExecutor: AgentCaseExecutor = async (input) => {
         modelId: input.candidate.model,
         traceId: input.traceId,
         candidate: input.candidate.candidate,
+        abortSignal: input.signal,
       })
     case "lifecycle":
       return executeLifecycleCase({
         evaluationCase: input.evaluationCase,
         modelId: input.candidate.model,
+        abortSignal: input.signal,
       })
   }
 }

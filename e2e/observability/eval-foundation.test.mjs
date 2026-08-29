@@ -112,13 +112,30 @@ test("runner preserves order, selection, envelope, timeout, and mode budgets", a
     "相同 case/candidate 的不同 run 必须生成不同 Trace"
   )
 
+  let timeoutSignal
+  let cleanupObserved = false
   const timeout = await runAgentEvaluation(cases, {
     mode: "smoke",
     candidate,
     selection: { caseIds: [cases[0].id] },
     timeoutMs: 5,
-    executor: () => new Promise(() => {}),
+    cleanupGraceMs: 50,
+    executor: ({ signal }) =>
+      new Promise((resolve) => {
+        timeoutSignal = signal
+        signal.addEventListener(
+          "abort",
+          () => {
+            cleanupObserved = true
+            resolve({ text: "cancelled after deadline", tools: [] })
+          },
+          { once: true }
+        )
+      }),
   })
+  assert.equal(timeoutSignal.aborted, true)
+  assert.equal(timeoutSignal.reason.name, "TimeoutError")
+  assert.equal(cleanupObserved, true)
   assert.equal(timeout.results[0].error.category, "timeout")
   assert.equal(timeout.results[0].output.terminalState, "failed")
 })

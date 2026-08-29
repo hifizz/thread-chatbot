@@ -38,6 +38,7 @@ export type AgentCaseExecutor = (input: {
   evaluationCase: AgentCase
   traceId: string
   candidate: EvaluationCandidateConfig
+  signal: AbortSignal
 }) => Promise<AgentExecutionOutput>
 
 export type RunAgentEvaluationOptions = {
@@ -48,22 +49,45 @@ export type RunAgentEvaluationOptions = {
   executor: AgentCaseExecutor
   concurrency?: number
   timeoutMs?: number
+  cleanupGraceMs?: number
   scorers?: AgentScorer[]
 }
 
-async function withTimeout<T>(operation: Promise<T>, timeoutMs: number) {
+async function withTimeout<T>(
+  execute: (signal: AbortSignal) => Promise<T>,
+  timeoutMs: number,
+  cleanupGraceMs: number
+) {
+  const controller = new AbortController()
+  const timeoutError = new Error(`Evaluation case exceeded ${timeoutMs}ms`)
+  timeoutError.name = "TimeoutError"
   let timeout: ReturnType<typeof setTimeout> | undefined
+  const operation = Promise.resolve().then(() => execute(controller.signal))
   try {
     return await Promise.race([
       operation,
       new Promise<never>((_, reject) => {
         timeout = setTimeout(() => {
-          const error = new Error(`Evaluation case exceeded ${timeoutMs}ms`)
-          error.name = "TimeoutError"
-          reject(error)
+          reject(timeoutError)
+          controller.abort(timeoutError)
         }, timeoutMs)
       }),
     ])
+  } catch (error) {
+    if (error === timeoutError) {
+      let cleanupTimer: ReturnType<typeof setTimeout> | undefined
+      await Promise.race([
+        operation.then(
+          () => undefined,
+          () => undefined
+        ),
+        new Promise<void>((resolve) => {
+          cleanupTimer = setTimeout(resolve, cleanupGraceMs)
+        }),
+      ])
+      if (cleanupTimer) clearTimeout(cleanupTimer)
+    }
+    throw error
   } finally {
     if (timeout) clearTimeout(timeout)
   }
@@ -100,6 +124,7 @@ export async function runAgentEvaluation(
     Math.floor(options.concurrency ?? budget.concurrency)
   )
   const timeoutMs = options.timeoutMs ?? budget.timeoutMs
+  const cleanupGraceMs = options.cleanupGraceMs ?? Math.min(5_000, timeoutMs)
   const results = new Array<AgentExperimentResult>(selected.length)
   let cursor = 0
 
@@ -120,10 +145,17 @@ export async function runAgentEvaluation(
       const providerEvents: ProviderAttemptEvent[] = []
       try {
         output = await withTimeout(
-          withProviderAttemptEventCollection(providerEvents, () =>
-            options.executor({ evaluationCase, traceId, candidate })
-          ),
-          timeoutMs
+          (signal) =>
+            withProviderAttemptEventCollection(providerEvents, () =>
+              options.executor({
+                evaluationCase,
+                traceId,
+                candidate,
+                signal,
+              })
+            ),
+          timeoutMs,
+          cleanupGraceMs
         )
       } catch (cause) {
         output = { text: "", tools: [], terminalState: "failed" }

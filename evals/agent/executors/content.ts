@@ -52,6 +52,7 @@ export async function executeProductionContentCase(input: {
   modelId: string
   traceId: string
   candidate: string
+  abortSignal: AbortSignal
 }): Promise<AgentExecutionOutput> {
   assertEvaluationEnvironment()
   const latestUser = [...input.evaluationCase.input.messages]
@@ -88,7 +89,7 @@ export async function executeProductionContentCase(input: {
         recentConversation: recentConversation(input.evaluationCase),
         anchorText: null,
         modelMessages: await modelMessages(input.evaluationCase),
-        abortSignal: AbortSignal.timeout(300_000),
+        abortSignal: input.abortSignal,
       })
       const output: AgentExecutionOutput = {
         text: "",
@@ -98,12 +99,23 @@ export async function executeProductionContentCase(input: {
       const reader = (
         prepared.textStream as ReadableStream<TextStreamPart<ToolSet>>
       ).getReader()
-      while (true) {
-        const { done, value: part } = await reader.read()
-        if (done) break
-        if (part.type === "text-delta") output.text += part.text
-        if (part.type === "tool-call") output.tools!.push(part.toolName)
-        if (part.type === "error") output.terminalState = "failed"
+      try {
+        while (true) {
+          const { done, value: part } = await reader.read()
+          if (done) break
+          if (part.type === "text-delta") output.text += part.text
+          if (part.type === "tool-call") output.tools!.push(part.toolName)
+          if (part.type === "error") output.terminalState = "failed"
+          if (part.type === "abort") {
+            output.terminalState = "stopped"
+            break
+          }
+        }
+      } finally {
+        if (input.abortSignal.aborted) {
+          await reader.cancel(input.abortSignal.reason).catch(() => undefined)
+        }
+        reader.releaseLock()
       }
       const routeChunk = prepared.leadingChunks?.find(
         (chunk) => chunk.type === "data-research-route"
@@ -111,6 +123,7 @@ export async function executeProductionContentCase(input: {
       if (routeChunk?.type === "data-research-route") {
         output.route = routeChunk.data.mode
       }
+      if (input.abortSignal.aborted) return output
       const usage = prepared.usage
         ? await Promise.resolve(prepared.usage)
         : undefined
