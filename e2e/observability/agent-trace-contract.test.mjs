@@ -270,6 +270,8 @@ assert.ok(
     (update) =>
       update.level === "ERROR" &&
       update.metadata?.errorCategory === "timeout" &&
+      update.metadata?.purpose === "failure-contract" &&
+      update.metadata?.operationOutcome === "error" &&
       !JSON.stringify(update).includes("private provider payload")
   )
 )

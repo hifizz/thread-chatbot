@@ -241,6 +241,33 @@ try {
   )
   assert.equal(fallbackObservations.at(-2).traceId, traceId)
   assert.equal(fallbackObservations.at(-1).traceId, traceId)
+  assert.deepEqual(
+    {
+      phase: fallbackObservations.at(-2).updates.at(-1).metadata.phase,
+      outcome: fallbackObservations.at(-2).updates.at(-1).metadata.outcome,
+      operationOutcome:
+        fallbackObservations.at(-2).updates.at(-1).metadata.operationOutcome,
+    },
+    {
+      phase: "finish",
+      outcome: "rate_limit",
+      operationOutcome: "error",
+    },
+    "通用 operation 终态不能覆盖 provider 的 finish/outcome"
+  )
+  assert.deepEqual(
+    {
+      phase: fallbackObservations.at(-1).updates.at(-1).metadata.phase,
+      outcome: fallbackObservations.at(-1).updates.at(-1).metadata.outcome,
+      operationOutcome:
+        fallbackObservations.at(-1).updates.at(-1).metadata.operationOutcome,
+    },
+    {
+      phase: "finish",
+      outcome: "success",
+      operationOutcome: "success",
+    }
+  )
   assert.equal(events.at(-2).fallbackCount, 1)
   assert.equal(events.at(-2).attemptIndex, 1)
 } finally {

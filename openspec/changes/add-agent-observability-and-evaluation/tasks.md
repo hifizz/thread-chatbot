@@ -114,3 +114,15 @@
 - [ ] 10.5 在本地实际查看 DevTools 的普通回答与多步工具运行，在 Langfuse staging 实际查看 metadata-only Trace、反馈 Score 和 Experiment，并保存无敏感内容的验收证据
 - [x] 10.6 完成开发、环境变量、Cloud region/额度、隐私策略、故障处置、feedback backfill、评测数据维护、CI override、生产回流和 Cloud→OSS 切换文档
 - [x] 10.7 运行 `git diff --check` 与 `openspec validate add-agent-observability-and-evaluation --strict`，确认所有 capability scenarios 均有实现或明确的分 Gate 验收证据
+
+## 11. Thermo-nuclear CR remediation
+
+- [x] 11.1 合并 Observation metadata 并分离通用 operation outcome 与 provider domain outcome，防止 finish 终态被覆盖
+- [ ] 11.2 让 Dataset Sync 与 Langfuse Experiment 共用默认拒绝 `authorized-private` 的远程数据资格策略
+- [ ] 11.3 让 Snapshot 与 Langfuse Experiment 复用同一次 case 执行结果，并为每次 run 生成唯一 Trace 身份
+- [ ] 11.4 用 request-scoped collector 采集 live Search provider finish attempts，保证并发 case 隔离
+- [ ] 11.5 将 eval deadline 传递为 AbortSignal，取消模型、Search 与 stream 消费并等待有界清理
+- [ ] 11.6 通过 URL 规范化、严格命名与库内 guard 防止 evaluation 误写生产数据库
+- [ ] 11.7 让 live memory/multimodal case 通过隔离数据库与真实 `runGeneration`/`compileModelContext`/附件解析路径执行
+- [ ] 11.8 用持久化 feedback Score outbox 和版本化确认修复乱序覆盖、clear 丢失与多实例重试
+- [ ] 11.9 为每个 eval mode 建立精确 case manifest，在缺失、重复、空集合或 dataset 不兼容时阻断 baseline 比较

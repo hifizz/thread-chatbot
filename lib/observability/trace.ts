@@ -181,29 +181,40 @@ export async function observeAppOperation<T>(
   fn: (observation: AppObservation) => Promise<T>
 ): Promise<T> {
   const startedAt = performance.now()
+  let metadata = { ...attributes.metadata }
   return getAgentTraceBackend().observe(
     name,
     attributes,
     async (observation) => {
+      const mergedObservation: AppObservation = {
+        ...observation,
+        update(update) {
+          if (update.metadata) {
+            metadata = { ...metadata, ...update.metadata }
+          }
+          observation.update({
+            ...update,
+            ...(update.metadata ? { metadata } : {}),
+          })
+        },
+      }
       try {
-        const result = await fn(observation)
-        observation.update({
+        const result = await fn(mergedObservation)
+        mergedObservation.update({
           metadata: {
-            ...attributes.metadata,
-            outcome: "success",
-            durationMs: Math.round(performance.now() - startedAt),
+            operationOutcome: "success",
+            operationDurationMs: Math.round(performance.now() - startedAt),
           },
         })
         return result
       } catch (error) {
-        observation.update({
+        mergedObservation.update({
           level: "ERROR",
           statusMessage: "operation failed",
           metadata: {
-            ...attributes.metadata,
             ...safeErrorMetadata(error),
-            outcome: "error",
-            durationMs: Math.round(performance.now() - startedAt),
+            operationOutcome: "error",
+            operationDurationMs: Math.round(performance.now() - startedAt),
           },
         })
         throw error
