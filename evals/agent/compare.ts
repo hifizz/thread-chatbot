@@ -1,4 +1,5 @@
 import type { AgentRunSnapshot } from "@/evals/agent/baseline"
+import { createEvaluationCaseManifest } from "@/evals/agent/manifest"
 
 type CaseDelta = {
   caseId: string
@@ -24,10 +25,70 @@ function numericDelta(
   )
 }
 
+function validateSnapshot(snapshot: AgentRunSnapshot, label: string): void {
+  if (snapshot.schemaVersion !== "agent-run-snapshot-v2") {
+    throw new Error(`${label} snapshot schema is incompatible`)
+  }
+  const caseIds = snapshot.cases.map((item) => item.caseId)
+  if (caseIds.length === 0) throw new Error(`${label} snapshot has no cases`)
+  const unique = new Set(caseIds)
+  if (unique.size !== caseIds.length) {
+    throw new Error(`${label} snapshot contains duplicate case IDs`)
+  }
+  if (snapshot.aggregate.cases !== caseIds.length) {
+    throw new Error(`${label} snapshot aggregate case count is incompatible`)
+  }
+  if (JSON.stringify(snapshot.manifest.caseIds) !== JSON.stringify(caseIds)) {
+    throw new Error(`${label} snapshot cases do not match its manifest`)
+  }
+  const expected = createEvaluationCaseManifest({
+    mode: snapshot.mode,
+    profile: snapshot.manifest.profile,
+    caseIds,
+  })
+  if (
+    snapshot.manifest.schemaVersion !== expected.schemaVersion ||
+    snapshot.manifest.mode !== snapshot.mode ||
+    snapshot.manifest.fingerprint !== expected.fingerprint
+  ) {
+    throw new Error(`${label} snapshot manifest fingerprint is invalid`)
+  }
+}
+
+function assertComparableSnapshots(
+  baseline: AgentRunSnapshot,
+  candidate: AgentRunSnapshot
+): void {
+  validateSnapshot(baseline, "Baseline")
+  validateSnapshot(candidate, "Candidate")
+  if (baseline.kind !== candidate.kind) {
+    throw new Error(
+      `Snapshot kind mismatch: ${baseline.kind} cannot be compared with ${candidate.kind}`
+    )
+  }
+  if (baseline.mode !== candidate.mode) {
+    throw new Error(
+      `Evaluation mode mismatch: ${baseline.mode} cannot be compared with ${candidate.mode}`
+    )
+  }
+  if (baseline.datasetRevision !== candidate.datasetRevision) {
+    throw new Error(
+      "Dataset revision mismatch; regenerate the baseline explicitly"
+    )
+  }
+  if (
+    baseline.manifest.profile !== candidate.manifest.profile ||
+    baseline.manifest.fingerprint !== candidate.manifest.fingerprint
+  ) {
+    throw new Error("Case manifest mismatch; snapshots are not comparable")
+  }
+}
+
 export function compareAgentRuns(
   baseline: AgentRunSnapshot,
   candidate: AgentRunSnapshot
 ) {
+  assertComparableSnapshots(baseline, candidate)
   const baselineById = new Map(
     baseline.cases.map((item) => [item.caseId, item])
   )
@@ -97,8 +158,7 @@ export function compareAgentRuns(
     schemaVersion: "agent-comparison-v1" as const,
     baselineFingerprint: baseline.candidateFingerprint,
     candidateFingerprint: candidate.candidateFingerprint,
-    datasetRevisionChanged:
-      baseline.datasetRevision !== candidate.datasetRevision,
+    datasetRevisionChanged: false,
     configurationDelta,
     aggregateDelta: {
       hardFailures:

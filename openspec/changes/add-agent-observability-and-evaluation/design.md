@@ -183,12 +183,13 @@ evals/agent/
 │   ├── multimodal.*
 │   └── reliability.*
 ├── fixtures/              # 合成、可提交的图片/PDF/文本
+├── manifests/             # smoke/ci/scheduled/release 的精确 case ID 清单
 ├── scorers/               # 确定性 scorer；judge 单独目录
 ├── runner/                # config、执行、Langfuse experiment adapter
 └── README.md              # 数据分级、运行和更新规则
 ```
 
-仓库 case 包含稳定 ID、suite、tags、输入、fixture 引用、expected/rubric、敏感等级和 case schema version。Langfuse Dataset 使用同一 case ID 同步，用来可视化 experiments；Hosted Dataset 的当前版本行为不取代 Git revision。生产问题只能经人工脱敏后进入仓库；敏感附件用合成 fixture 或受保护外部 fixture，不能直接提交。
+仓库 case 包含稳定 ID、suite、tags、输入、fixture 引用、expected/rubric、敏感等级和 case schema version。每个运行模式由版本化 manifest 明确列出 case ID；默认运行不再通过易漂移的 tag 推断集合。快照保存 mode、manifest fingerprint 和精确 case IDs，baseline 比较在空集合、重复/遗漏 ID、manifest、snapshot kind 或 dataset revision 不一致时直接拒绝。Langfuse Dataset 使用同一 case ID 同步，用来可视化 experiments；Hosted Dataset 的当前版本行为不取代 Git revision。生产问题只能经人工脱敏后进入仓库；敏感附件用合成 fixture 或受保护外部 fixture，不能直接提交。
 
 runner 使用现有 Node.js + `tsx`。内容质量 case 尽量调用与应用共用的 route/prompt/context/tool execution core；Thread Chat 状态机 case 在隔离测试数据库创建 Project/Thread/Message 后运行真实 `runGeneration` 并读取终态。runner 不通过公开生产 HTTP endpoint，也不写生产数据库。
 
@@ -212,9 +213,9 @@ runner 使用现有 Node.js + `tsx`。内容质量 case 尽量调用与应用共
 
 命令与数据选择保持同一 runner：
 
-- `smoke/local`：少量稳定、低成本 case，开发者手动运行。
-- `ci`：在有基线后启用，优先阻断确定性 contract regression；不依赖高波动 live Web 作为硬门禁。
-- `scheduled/release`：完整 Search、记忆、多模态、judge 和 live-provider 套件，产出 Langfuse experiment 链接及历史报告。
+- `smoke/local`：少量稳定、低成本 case，开发者手动运行；case IDs 固定在 smoke manifest。
+- `ci`：在有同模式 fixture baseline 后启用，优先阻断确定性 contract regression；不依赖高波动 live Web 作为硬门禁。
+- `scheduled/release`：各自使用完整且显式的 manifest，覆盖 Search、记忆、多模态、judge 和 live-provider 套件，产出 Langfuse experiment 链接及历史报告。
 
 第一阶段只要求 local runner、Langfuse experiment 和保存基线；第二阶段接官方 experiment CI action。阈值保存在仓库配置中，按 suite 分开，必须有原因、基线日期和 owner。外部故障可人工 override，但必须留下报告和回滚说明。
 

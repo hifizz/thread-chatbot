@@ -11,6 +11,12 @@ import {
 } from "@/evals/agent/fingerprint"
 import { datasetRevision, evaluationTraceId } from "@/evals/agent/identity"
 import {
+  createAdHocEvaluationManifest,
+  resolveDefaultEvaluationManifest,
+  type EvaluationCaseManifest,
+  type EvaluationRunMode,
+} from "@/evals/agent/manifest"
+import {
   selectAgentCases,
   type EvaluationSelection,
 } from "@/evals/agent/selection"
@@ -22,7 +28,7 @@ import {
   withProviderAttemptEventCollection,
 } from "@/lib/observability/provider-attempt"
 
-export type EvaluationRunMode = "smoke" | "ci" | "scheduled" | "release"
+export type { EvaluationRunMode } from "@/evals/agent/manifest"
 
 const MODE_BUDGETS: Record<
   EvaluationRunMode,
@@ -98,22 +104,23 @@ export async function runAgentEvaluation(
   options: RunAgentEvaluationOptions
 ): Promise<{
   runId: string
+  mode: EvaluationRunMode
+  manifest: EvaluationCaseManifest
   datasetRevision: string
   candidateFingerprint: string
   candidate: EvaluationCandidateConfig
   results: AgentExperimentResult[]
 }> {
-  const modeCases =
-    options.selection ||
-    options.mode === "scheduled" ||
-    options.mode === "release"
-      ? cases
-      : cases.filter((item) =>
-          options.mode === "smoke"
-            ? item.tags.includes("smoke")
-            : item.tags.includes("smoke") || item.tags.includes("ci")
-        )
-  const selected = selectAgentCases(modeCases, options.selection)
+  const resolved = options.selection
+    ? (() => {
+        const selected = selectAgentCases(cases, options.selection)
+        return {
+          cases: selected,
+          manifest: createAdHocEvaluationManifest(selected, options.mode),
+        }
+      })()
+    : resolveDefaultEvaluationManifest(cases, options.mode)
+  const selected = resolved.cases
   const runId = options.runId ?? crypto.randomUUID()
   const revision = datasetRevision(cases)
   const candidate = publicEvaluationConfig(options.candidate)
@@ -208,6 +215,8 @@ export async function runAgentEvaluation(
   )
   return {
     runId,
+    mode: options.mode,
+    manifest: resolved.manifest,
     datasetRevision: revision,
     candidateFingerprint: fingerprint,
     candidate,

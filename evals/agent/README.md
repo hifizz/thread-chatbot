@@ -1,6 +1,6 @@
 # Thread Chat Agent evals
 
-仓库 case 是可复现事实源；Langfuse Dataset 是带稳定 item ID 的远端镜像，不以其“最新版本”替代 Git revision。每次 run 都记录完整 candidate fingerprint、dataset revision、case-level Trace ID、输出、usage、attempt、终态和分项 score。
+仓库 case 是可复现事实源；Langfuse Dataset 是带稳定 item ID 的远端镜像，不以其“最新版本”替代 Git revision。`manifests/v1.json` 明确固定 smoke、CI、scheduled、release 的默认 case IDs。每次 run 都记录 mode、manifest fingerprint、完整 candidate fingerprint、dataset revision、case-level Trace ID、输出、usage、attempt、终态和分项 score。
 
 ## 本地使用
 
@@ -12,14 +12,14 @@ pnpm eval:agent:ci -- --suite=search-routing --tag=smoke
 pnpm eval:agent -- --case=foundation-local-answer
 ```
 
-执行 case 声明的 production content/lifecycle adapter 必须显式加 `--executor=declared`。content adapter 复用 production `prepareGeneration`（路由、prompt、工具与 streamText）；lifecycle adapter 在隔离数据库创建 Project/Thread/Message，运行真实 `runGeneration`，读取终态后级联清理测试用户。
+执行 case 声明的 production content/lifecycle adapter 必须显式加 `--executor=declared`。两类 adapter 都会在隔离数据库种入 Project/Thread/Message/附件，调用真实 `runGeneration`；content case 因而复用 production `compileModelContext`、附件解析、路由、prompt、工具和 stream，lifecycle case 只替换受控模型 stream。完成后读取持久化终态并级联清理测试用户。
 
 ```bash
 AI_OBSERVABILITY_ENVIRONMENT=evaluation \
   pnpm eval:agent -- --executor=declared --suite=core-answer
 ```
 
-lifecycle 还要求 database 名匹配 `thread_chat_eval[_suffix]`、与规范化后的 `DATABASE_URL` 不同，并显式设置 `EVAL_ALLOW_DATABASE_WRITES=true`。运行前需在 Evaluation PostgreSQL 库执行 `ALTER DATABASE thread_chat_eval SET thread_chat.evaluation_guard = '<24+字符随机值>';`，重连后将同一值配置为 `EVAL_DATABASE_GUARD_TOKEN`。应在全新进程运行 lifecycle suite；URL 别名、严格命名和库内 guard 任一不通过都会在首次写入前终止。
+所有 declared content/lifecycle case 都要求 database 名匹配 `thread_chat_eval[_suffix]`、与规范化后的 `DATABASE_URL` 不同，并显式设置 `EVAL_ALLOW_DATABASE_WRITES=true`。运行前需在 Evaluation PostgreSQL 库执行 `ALTER DATABASE thread_chat_eval SET thread_chat.evaluation_guard = '<24+字符随机值>';`，重连后将同一值配置为 `EVAL_DATABASE_GUARD_TOKEN`。应在全新进程运行 declared suite；URL 别名、严格命名和库内 guard 任一不通过都会在首次写入前终止。
 
 ## Langfuse
 
@@ -37,6 +37,8 @@ AI_OBSERVABILITY_ENVIRONMENT=evaluation pnpm eval:agent:sync -- --execute
 ## Case 约定
 
 - `id` 一旦进入 baseline 不得复用为不同问题；内容语义大改应创建新 ID。
+- 新增、删除或改名 case 时必须同步审阅 `manifests/v1.json` 和受影响的同模式 baseline；比较器不会对集合交集静默打分。
+- 显式 `--case/--suite/--tag` 产生 `ad-hoc` manifest，只能与精确相同的 ad-hoc snapshot 比较，不能冒充默认 CI/release 证据。
 - `sensitivity` 必须为 synthetic、public 或 authorized-private。
 - fixture path 被限制在 `evals/agent/fixtures/`。
 - 不把多个维度压成单一总分；确定性安全/状态失败优先显示。

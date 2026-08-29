@@ -30,6 +30,10 @@ import {
 import { runProviderAttempt } from "../../lib/observability/provider-attempt.ts"
 import { setAgentTraceBackendForTests } from "../../lib/observability/trace.ts"
 import { buildProductionEvaluationSeed } from "../../evals/agent/executors/production-harness.ts"
+import {
+  createEvaluationCaseManifest,
+  resolveDefaultEvaluationManifest,
+} from "../../evals/agent/manifest.ts"
 
 const candidate = {
   candidate: "test",
@@ -67,6 +71,42 @@ test("case schema, selection, revision, and fingerprint are stable", async () =>
   assert.ok(
     !canonicalEvaluationJson({ apiKey: "secret-a", value: 1 }).includes(
       "secret-a"
+    )
+  )
+})
+
+test("mode manifests are explicit, non-empty, unique, and dataset-compatible", async () => {
+  const cases = await loadAgentCases()
+  const smoke = resolveDefaultEvaluationManifest(cases, "smoke")
+  const release = resolveDefaultEvaluationManifest(cases, "release")
+  assert.equal(smoke.manifest.profile, "default")
+  assert.equal(smoke.cases.length, 9)
+  assert.equal(release.cases.length, cases.length)
+  assert.deepEqual(
+    release.manifest.caseIds,
+    release.cases.map((item) => item.id)
+  )
+  assert.throws(() =>
+    createEvaluationCaseManifest({
+      mode: "ci",
+      profile: "ad-hoc",
+      caseIds: [],
+    })
+  )
+  assert.throws(() =>
+    createEvaluationCaseManifest({
+      mode: "ci",
+      profile: "ad-hoc",
+      caseIds: [cases[0].id, cases[0].id],
+    })
+  )
+  assert.throws(() =>
+    resolveDefaultEvaluationManifest(cases.slice(1), "release")
+  )
+  assert.throws(() =>
+    resolveDefaultEvaluationManifest(
+      [{ ...cases[0], id: "unmanifested-release-case" }, ...cases],
+      "release"
     )
   )
 })
@@ -199,6 +239,7 @@ test("runner collects provider attempts without leaking across concurrent cases"
       runId: "provider-collector-run",
       mode: "release",
       candidate,
+      selection: { caseIds: cases.map((item) => item.id) },
       concurrency: 2,
       executor: async ({ evaluationCase }) => {
         await new Promise((resolve) => setImmediate(resolve))
@@ -254,8 +295,7 @@ test("lifecycle database safety rejects production-shaped targets", () => {
       AI_OBSERVABILITY_ENVIRONMENT: "evaluation",
       EVAL_ALLOW_DATABASE_WRITES: "true",
       DATABASE_URL: "postgres://user@localhost:5432/thread_chat_eval",
-      EVAL_DATABASE_URL:
-        "postgres://other@127.0.0.1:6543/thread_chat_eval",
+      EVAL_DATABASE_URL: "postgres://other@127.0.0.1:6543/thread_chat_eval",
     })
   )
   assert.deepEqual(
@@ -403,6 +443,7 @@ test("Langfuse experiment flushes on success and remote failure", async () => {
     runId: "single-execution-run",
     mode: "release",
     candidate,
+    selection: { caseIds: experimentCases.map((item) => item.id) },
     executor: async ({ evaluationCase }) => {
       executions += 1
       return {

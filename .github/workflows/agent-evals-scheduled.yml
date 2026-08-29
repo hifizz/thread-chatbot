@@ -49,7 +49,7 @@ jobs:
       - name: Compare fixture baseline
         run: >-
           pnpm eval:agent:compare --
-          --baseline=evals/agent/baselines/fixture-v1.json
+          --baseline=evals/agent/baselines/fixture-scheduled-v1.json
           --candidate=evals/agent/results/local/scheduled.json
           --output=evals/agent/results/local/comparison.md
       - uses: actions/upload-artifact@v4
