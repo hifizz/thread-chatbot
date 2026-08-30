@@ -1,4 +1,4 @@
-import { and, asc, eq, isNull } from "drizzle-orm"
+import { and, asc, eq, inArray, isNull } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { skills, skillVersions } from "@/lib/db/schema"
 
@@ -42,6 +42,19 @@ export async function listCurrentSkillCatalog(
     .innerJoin(skills, eq(skillVersions.skillId, skills.id))
     .where(and(...conditions))
     .orderBy(asc(skills.slug))
+}
+
+export async function listSkillVersionsByIds(
+  executor: SkillExecutor,
+  skillVersionIds: readonly string[]
+) {
+  const ids = [...new Set(skillVersionIds)]
+  if (ids.length === 0) return []
+  return executor
+    .select(skillVersionSelection)
+    .from(skillVersions)
+    .innerJoin(skills, eq(skillVersions.skillId, skills.id))
+    .where(inArray(skillVersions.id, ids))
 }
 
 export async function findSkillBySlug(
