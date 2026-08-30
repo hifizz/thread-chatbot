@@ -18,7 +18,12 @@ import {
   researchPlanExecutionPrompt,
   resolveResearchRoute,
 } from "@/lib/chat/research-router"
+import {
+  buildProjectContractContext,
+  type ProjectContractContextInput,
+} from "@/lib/chat/project-contract"
 import { buildThreadChatSystem } from "@/lib/chat/thread-chat-prompt"
+import type { ProjectFileContextStats } from "@/lib/chat/resolve-attachments"
 import type { ThreadChatUIMessageChunk } from "@/lib/thread-chat/contracts/ui-message"
 import { buildGenerationTools } from "@/lib/thread-chat/streaming/generation-tools"
 import { throwIfGenerationCancelled } from "@/lib/ai/generation-cancellation"
@@ -36,6 +41,8 @@ export interface PrepareGenerationInput {
   latestUserText: string
   recentConversation: string
   anchorText: string | null
+  projectContract: ProjectContractContextInput
+  projectFileStats: ProjectFileContextStats
   modelMessages: ModelMessage[]
   abortSignal: AbortSignal
 }
@@ -48,6 +55,16 @@ export async function prepareGeneration(input: PrepareGenerationInput) {
     requestId: crypto.randomUUID(),
     ...input.observabilityContext,
   }
+  const contextMetadata = {
+    projectContractVersion: input.projectContract.version,
+    hasProjectTarget: Boolean(input.projectContract.target),
+    hasProjectInstructions: Boolean(input.projectContract.instructions),
+    projectFileCount: input.projectFileStats.totalCount,
+    readyProjectFileCount: input.projectFileStats.readyCount,
+    selectedProjectFileCount: input.projectFileStats.selectedCount,
+    projectFileContextChars: input.projectFileStats.contextChars,
+    projectFileContextMode: input.projectFileStats.mode,
+  }
   const searchReady = isSearchConfigured()
   const researchRoute = await observeAppOperation(
     OBSERVATION_NAMES.researchRoute,
@@ -55,6 +72,7 @@ export async function prepareGeneration(input: PrepareGenerationInput) {
       metadata: {
         searchReady,
         assistantMessageId: input.messageId,
+        ...contextMetadata,
       },
     },
     async (observation) => {
@@ -85,6 +103,7 @@ export async function prepareGeneration(input: PrepareGenerationInput) {
             metadata: {
               assistantMessageId: input.messageId,
               routeMode: researchRoute.mode,
+              ...contextMetadata,
             },
           },
           async (observation) => {
@@ -125,10 +144,12 @@ export async function prepareGeneration(input: PrepareGenerationInput) {
         : artifactRequested
           ? "createMarkdownArtifact"
           : null
+  const projectContract = buildProjectContractContext(input.projectContract)
   const system = [
     buildThreadChatSystem(input.anchorText, {
       enableMarkdownArtifact: artifactRequested,
     }),
+    projectContract,
     researchRoute.mode === "fetch" ? DIRECT_FETCH_SYSTEM_PROMPT : null,
     researchRoute.mode === "search" || researchRoute.mode === "research"
       ? WEB_ACCESS_SYSTEM_PROMPT
@@ -190,5 +211,6 @@ export async function prepareGeneration(input: PrepareGenerationInput) {
     tools: tools as ToolSet,
     leadingChunks,
     usage: result.usage,
+    contextMetadata,
   }
 }
