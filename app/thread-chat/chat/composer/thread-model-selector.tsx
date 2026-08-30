@@ -10,7 +10,10 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { THREAD_CHAT_MODELS } from "@/constants/model"
+import {
+  CHAT_MODEL_PROVIDER_LABELS,
+  THREAD_CHAT_MODELS,
+} from "@/constants/model"
 import { Bot } from "lucide-react"
 
 /** 模型 selector 的产品展示顺序；同一品牌内沿用模型注册表顺序。 */
@@ -61,6 +64,9 @@ const THREAD_CHAT_MODEL_OPTIONS: readonly ModelOption[] =
     .map(({ model }) => ({
       id: model.id,
       name: model.name,
+      description: model.description,
+      providerId: model.provider,
+      providerName: CHAT_MODEL_PROVIDER_LABELS[model.provider],
     }))
 
 export interface ThreadModelSelectorProps {
@@ -131,7 +137,7 @@ export function ThreadModelSelector({
       )}
       <ModelSelector.Content
         side="top"
-        className="thread-model-selector-content w-96 max-w-[calc(100vw-2rem)]"
+        className="thread-model-selector-content w-[34rem] max-w-[calc(100vw-2rem)]"
       />
     </ModelSelector.Root>
   )
