@@ -16,6 +16,10 @@ on:
       - "package.json"
       - "pnpm-lock.yaml"
 
+permissions:
+  contents: write
+  pull-requests: read
+
 jobs:
   inspect-and-baseline:
     runs-on: ubuntu-latest
@@ -47,18 +51,33 @@ jobs:
           pnpm test:thread-chat:gate2-pipeline
           pnpm test:thread-chat:gate3-client
 
-  generate-schema-artifact:
+  generate-and-commit-schema:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+      - name: Skip when generated migration is already committed
+        id: generated
+        run: |
+          if test -f drizzle/0007_runtime_skills.sql; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
       - uses: pnpm/action-setup@v4
+        if: steps.generated.outputs.skip != 'true'
       - uses: actions/setup-node@v4
+        if: steps.generated.outputs.skip != 'true'
         with:
           node-version: 24
           cache: pnpm
       - name: Install dependencies
+        if: steps.generated.outputs.skip != 'true'
         run: pnpm install --frozen-lockfile
       - name: Wire Skill catalog references into conversation schema
+        if: steps.generated.outputs.skip != 'true'
         run: |
           python <<'PY'
           from pathlib import Path
@@ -106,18 +125,16 @@ jobs:
           path.write_text(source)
           PY
       - name: Generate Drizzle migration and snapshot
+        if: steps.generated.outputs.skip != 'true'
         env:
           DATABASE_URL: postgres://user:password@localhost:5432/thread_chat_generate
         run: pnpm exec drizzle-kit generate --name runtime_skills
-      - name: Verify generated diff
+      - name: Verify and commit generated schema
+        if: steps.generated.outputs.skip != 'true'
         run: |
           git diff --check
-          git status --short
-      - uses: actions/upload-artifact@v4
-        with:
-          name: thread-chat-skill-schema
-          path: |
-            lib/db/schema.ts
-            drizzle/
-          if-no-files-found: error
-          retention-days: 3
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add lib/db/schema.ts drizzle/
+          git commit -m "feat(skills): add catalog database migration"
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
