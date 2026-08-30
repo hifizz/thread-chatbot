@@ -32,23 +32,17 @@ jobs:
         run: pnpm exec openspec status --change add-thread-chat-skills --json
       - name: OpenSpec apply instructions
         run: pnpm exec openspec instructions apply --change add-thread-chat-skills --json
-      - name: Apply checks
-        shell: bash
+      - name: Skill package contracts
         run: |
-          set +e
-          run_check() {
-            local name="$1"
-            shift
-            echo "::group::${name}"
-            "$@"
-            local status=$?
-            echo "CHECK_RESULT ${name} ${status}"
-            echo "::endgroup::"
-          }
-          run_check skill-foundation node --import tsx e2e/thread-chat/runtime-skill-foundation.test.mjs
-          run_check typecheck pnpm typecheck
-          run_check build pnpm build
-          run_check agent-eval-smoke pnpm eval:agent
-          run_check thread-chat-gate2-pipeline pnpm test:thread-chat:gate2-pipeline
-          run_check thread-chat-gate3-client pnpm test:thread-chat:gate3-client
-          exit 0
+          node --import tsx e2e/thread-chat/runtime-skill-foundation.test.mjs
+          node --import tsx e2e/thread-chat/runtime-skill-package.test.mjs
+          node --import tsx scripts/skills/validate.ts --path runtime-skills/research
+      - name: Typecheck
+        run: pnpm typecheck
+      - name: Build
+        run: pnpm build
+      - name: Existing smoke regressions
+        run: |
+          pnpm eval:agent
+          pnpm test:thread-chat:gate2-pipeline
+          pnpm test:thread-chat:gate3-client
