@@ -1,0 +1,74 @@
+name: Project Workspace Compatibility Patch
+
+on:
+  push:
+    branches:
+      - codex/research-project-workspace-design
+    paths:
+      - .github/workflows/project-workspace-compat-patch.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: codex/research-project-workspace-design
+
+      - name: Patch legacy Gate 3 fixtures
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('app/thread-chat/gate-3-harness/mock-v1-runtime.ts')
+          text = path.read_text()
+
+          text = text.replace(
+              '    customTitle: null,\n    archivedAt: null,',
+              '    customTitle: null,\n    target: null,\n    instructions: null,\n    contractVersion: 0,\n    archivedAt: null,',
+          )
+          text = text.replace(
+              '          customTitle: null,\n          archivedAt: null,',
+              '          customTitle: null,\n          target: null,\n          instructions: null,\n          contractVersion: 0,\n          archivedAt: null,',
+          )
+          text = text.replace(
+              '    projectId,\n    sourceMessageId: ROOT_ASSISTANT_ID,',
+              '    projectId,\n    threadId: ROOT_THREAD_ID,\n    sourceMessageId: ROOT_ASSISTANT_ID,\n    sourceThreadTitle: "规范化会话验收",\n    sourceThreadFootnote: null,\n    sourceMessageStatus: "completed",',
+          )
+          text = text.replace(
+              '        projectId,\n        sourceMessageId: messageId,',
+              '        projectId,\n        threadId: current.threadId,\n        sourceMessageId: messageId,\n        sourceThreadTitle: threads.get(current.threadId)?.customTitle ?? threads.get(current.threadId)?.autoTitle ?? null,\n        sourceThreadFootnote: threads.get(current.threadId)?.footnote ?? null,\n        sourceMessageStatus: "completed",',
+          )
+          text = text.replace(
+              '    project,\n    threads: [root, child, nested],',
+              '    project,\n    files: [],\n    threads: [root, child, nested],',
+          )
+          text = text.replace(
+              '    project: clone(project),\n    threads:',
+              '    project: clone(project),\n    files: [],\n    threads:',
+          )
+          text = text.replace(
+              '  const client: ThreadChatClient = {',
+              '  const client = {',
+          )
+          text = text.replace(
+              '    async deleteProject() {\n      project = null\n      threads.clear()\n      messages.clear()\n      artifacts.clear()\n      return commandResponse({ projectId, deleted: true as const })\n    },\n  }\n\n  const fetchStream',
+              '    async deleteProject() {\n      project = null\n      threads.clear()\n      messages.clear()\n      artifacts.clear()\n      return commandResponse({ projectId, deleted: true as const })\n    },\n  } as ThreadChatClient\n\n  const fetchStream',
+          )
+
+          path.write_text(text)
+          PY
+
+      - name: Commit fixture update
+        run: |
+          if git diff --quiet; then
+            exit 0
+          fi
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add app/thread-chat/gate-3-harness/mock-v1-runtime.ts
+          git commit -m "test(project): update legacy workspace fixtures [skip ci]"
+          git push origin HEAD:codex/research-project-workspace-design
