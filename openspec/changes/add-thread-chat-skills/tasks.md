@@ -1,19 +1,19 @@
 ## 1. 固定基线、OpenSpec 与 Feature 边界
 
 - [ ] 1.1 以 `48483101ad11bc84b611b615f423577633fedacb` 为实施基线，重新运行 `pnpm typecheck`、`pnpm build`、现有 Thread Chat Gate、Agent eval smoke 与 `pnpm openspec:validate`
-- [ ] 1.2 创建 `add-thread-chat-skills` OpenSpec change，提交 proposal、design、`thread-chat-skills` capability delta、`domain` 术语 delta 和本任务清单
-- [ ] 1.3 在常量中定义 Skill activation mode、source type、version status、Capability Profile ID、错误代码、包大小限制、Prompt/cache policy version
-- [ ] 1.4 明确 `.agents/.claude/.codex` Skill 是开发代理配置，增加文档和代码保护，禁止运行时扫描这些目录
-- [ ] 1.5 增加 server-only Feature 配置：Catalog discovery/UI 可关闭，但已固定的历史 SkillVersion 数据不得被回滚删除
+- [x] 1.2 创建 `add-thread-chat-skills` OpenSpec change，提交 proposal、design、`thread-chat-skills` capability delta、`domain` 术语 delta 和本任务清单
+- [x] 1.3 在常量中定义 Skill activation mode、source type、version status、Capability Profile ID、错误代码、包大小限制、Prompt/cache policy version
+- [x] 1.4 明确 `.agents/.claude/.codex` Skill 是开发代理配置，增加文档和代码保护，禁止运行时扫描这些目录
+- [x] 1.5 增加 server-only Feature 配置：Catalog discovery/UI 可关闭，但已固定的历史 SkillVersion 数据不得被回滚删除
 
 ## 2. Skill 包验证、Catalog 与管理员 CLI
 
-- [ ] 2.1 新建 `runtime-skills/research/`，为用户确认的 Research 内容增加规范 frontmatter，并把输出模板、质量清单等拆入 `references/`
-- [ ] 2.2 实现 Skill package canonicalizer：UTF-8/BOM/LF 规范化、路径排序、frontmatter 解析、资源索引和 SHA-256 digest
-- [ ] 2.3 实现包安全验证：slug、允许文件类型、symlink/path traversal、重复路径、单文件/总包大小、reference 数量和未知 Capability Profile
-- [ ] 2.4 明确拒绝 `scripts/`、可执行文件、二进制和依赖描述；测试不能以“忽略但继续安装”绕过
+- [x] 2.1 新建 `runtime-skills/research/`，为用户确认的 Research 内容增加规范 frontmatter，并把输出模板、质量清单等拆入 `references/`
+- [x] 2.2 实现 Skill package canonicalizer：UTF-8/BOM/LF 规范化、路径排序、frontmatter 解析、资源索引和 SHA-256 digest
+- [x] 2.3 实现包安全验证：slug、允许文件类型、symlink/path traversal、重复路径、单文件/总包大小、reference 数量和未知 Capability Profile
+- [x] 2.4 明确拒绝 `scripts/`、可执行文件、二进制和依赖描述；测试不能以“忽略但继续安装”绕过
 - [ ] 2.5 实现 Skill repository/service，支持按 current catalog、version ID、digest 和 resource path 查询
-- [ ] 2.6 实现 `pnpm skills:validate -- --path`，只校验并输出规范摘要/digest，不写数据库
+- [x] 2.6 实现 `pnpm skills:validate -- --path`，只校验并输出规范摘要/digest，不写数据库
 - [ ] 2.7 实现 `pnpm skills:sync`，幂等导入所有内置 Skill；相同 digest 复用，变化时创建新版本并原子切 current
 - [ ] 2.8 实现 `pnpm skills:install -- --path` 与 `skills:disable -- --slug` 的管理员本地操作；不增加公开安装 API
 - [ ] 2.9 增加 importer 合同测试，覆盖合法 Research、重复同步、版本升级、无 version fallback、非法 YAML、路径攻击、超限、脚本、未知 Profile 和事务回滚
