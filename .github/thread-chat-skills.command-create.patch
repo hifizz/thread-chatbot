@@ -1,0 +1,186 @@
+diff --git a/lib/thread-chat/application/fork-thread.ts b/lib/thread-chat/application/fork-thread.ts
+index 407279b..6623a76 100644
+--- a/lib/thread-chat/application/fork-thread.ts
++++ b/lib/thread-chat/application/fork-thread.ts
+@@ -12,6 +12,10 @@ import {
+   touchProjectAndThread,
+ } from "@/lib/thread-chat/application/command-utils"
+ import { notFound, stateConflict } from "@/lib/thread-chat/application/errors"
++import {
++  loadSkillVersionSummary,
++  resolveAvailableSkillVersion,
++} from "@/lib/thread-chat/application/skill-resolution"
+ import { executeIdempotentCommand } from "@/lib/thread-chat/persistence/command-repository"
+ import {
+   toConversationMessage,
+@@ -73,6 +77,16 @@ export function forkThread(
+           parentMessages: parentMessages.map(toConversationMessage),
+           sourceMessageId: source.id,
+         })
++        const activeSkill = await loadSkillVersionSummary(
++          tx,
++          parent.activeSkillVersionId
++        )
++        const firstTurnSkill = command.firstTurn
++          ? await resolveAvailableSkillVersion(
++              tx,
++              parent.activeSkillVersionId
++            )
++          : null
+         const footnote = await allocateProjectFootnote(tx, project.id)
+         const [child] = await tx
+           .insert(threads)
+@@ -87,11 +101,12 @@ export function forkThread(
+             footnote,
+             depth: parent.depth + 1,
+             modelId: command.modelId,
++            activeSkillVersionId: parent.activeSkillVersionId,
+           })
+           .returning()
+         if (!command.firstTurn) {
+           await touchProjectAndThread(tx, project.id, child.id)
+-          return { thread: toThreadDTO(child), generation: null }
++          return { thread: toThreadDTO(child, activeSkill), generation: null }
+         }
+         await assertOwnedReadyAttachments(tx, userId, command.firstTurn.files)
+         const [userSequence, assistantSequence] = await allocateThreadSequences(
+@@ -125,6 +140,7 @@ export function forkThread(
+               parts: [],
+               status: "generating",
+               modelId: command.modelId,
++              skillVersionId: firstTurnSkill?.skillVersionId ?? null,
+               startedAt: now,
+             },
+           ])
+@@ -132,13 +148,17 @@ export function forkThread(
+         await touchProjectAndThread(tx, project.id, child.id, command.modelId)
+         const rootThreadId = await findRootThreadId(tx, project.id)
+         if (!rootThreadId) stateConflict("Project 缺少根 Thread")
++        const childDTO = toThreadDTO(child, activeSkill)
+         return {
+-          thread: toThreadDTO(child),
++          thread: childDTO,
+           generation: {
+             project: toProjectDTO(project, rootThreadId),
+-            thread: toThreadDTO(child),
++            thread: childDTO,
+             userMessage: toMessageDTO(userMessage),
+-            assistantMessage: toMessageDTO(assistantMessage),
++            assistantMessage: toMessageDTO(
++              assistantMessage,
++              firstTurnSkill?.summary ?? null
++            ),
+             streamUrl: `/api/thread-chat/v1/messages/${assistantMessage.id}/stream`,
+           },
+         }
+diff --git a/lib/thread-chat/application/send-message.ts b/lib/thread-chat/application/send-message.ts
+index 5f351ff..49e8830 100644
+--- a/lib/thread-chat/application/send-message.ts
++++ b/lib/thread-chat/application/send-message.ts
+@@ -9,6 +9,7 @@ import {
+   touchProjectAndThread,
+ } from "@/lib/thread-chat/application/command-utils"
+ import { notFound, stateConflict } from "@/lib/thread-chat/application/errors"
++import { resolveEffectiveSkillForTurn } from "@/lib/thread-chat/application/skill-resolution"
+ import { executeIdempotentCommand } from "@/lib/thread-chat/persistence/command-repository"
+ import {
+   toMessageDTO,
+@@ -47,6 +48,11 @@ export function sendMessage(
+         if (project.archivedAt) stateConflict("已归档 Project 不可发送消息")
+         await assertThreadReadyForTurn(tx, project.id, thread.id)
+         await assertOwnedReadyAttachments(tx, userId, command.files)
++        const skill = await resolveEffectiveSkillForTurn({
++          executor: tx,
++          currentActiveSkillVersionId: thread.activeSkillVersionId,
++          selectedSkillVersionId: command.skillVersionId,
++        })
+         const [userSequence, assistantSequence] = await allocateThreadSequences(
+           tx,
+           thread.id,
+@@ -75,18 +81,32 @@ export function sendMessage(
+               parts: [],
+               status: "generating",
+               modelId: command.modelId,
++              skillVersionId: skill.pinnedSkillVersionId,
+               startedAt: now,
+             },
+           ])
+           .returning()
+-        await touchProjectAndThread(tx, project.id, thread.id, command.modelId)
++        await touchProjectAndThread(
++          tx,
++          project.id,
++          thread.id,
++          command.modelId,
++          skill.activeSkillVersionId
++        )
+         const rootThreadId = await findRootThreadId(tx, project.id)
+         if (!rootThreadId) stateConflict("Project 缺少根 Thread")
+         return {
+           project: toProjectDTO(project, rootThreadId),
+-          thread: toThreadDTO({ ...thread, modelId: command.modelId }),
++          thread: toThreadDTO(
++            {
++              ...thread,
++              modelId: command.modelId,
++              activeSkillVersionId: skill.activeSkillVersionId,
++            },
++            skill.activeSkill
++          ),
+           userMessage: toMessageDTO(userMessage),
+-          assistantMessage: toMessageDTO(assistantMessage),
++          assistantMessage: toMessageDTO(assistantMessage, skill.pinnedSkill),
+           streamUrl: `/api/thread-chat/v1/messages/${assistantMessage.id}/stream`,
+         }
+       },
+diff --git a/lib/thread-chat/application/start-project.ts b/lib/thread-chat/application/start-project.ts
+index 4c4c334..b38c1c5 100644
+--- a/lib/thread-chat/application/start-project.ts
++++ b/lib/thread-chat/application/start-project.ts
+@@ -8,6 +8,7 @@ import {
+   buildUserParts,
+ } from "@/lib/thread-chat/application/command-utils"
+ import { notFound, stateConflict } from "@/lib/thread-chat/application/errors"
++import { resolveEffectiveSkillForTurn } from "@/lib/thread-chat/application/skill-resolution"
+ import { executeIdempotentCommand } from "@/lib/thread-chat/persistence/command-repository"
+ import {
+   toMessageDTO,
+@@ -40,6 +41,11 @@ export function startProject(userId: string, command: StartProjectCommand) {
+           stateConflict("Project 已存在")
+         }
+         await assertOwnedReadyAttachments(tx, userId, command.files)
++        const skill = await resolveEffectiveSkillForTurn({
++          executor: tx,
++          currentActiveSkillVersionId: null,
++          selectedSkillVersionId: command.skillVersionId,
++        })
+         const now = new Date()
+         const [project] = await tx
+           .insert(projects)
+@@ -52,6 +58,7 @@ export function startProject(userId: string, command: StartProjectCommand) {
+             projectId: project.id,
+             depth: 0,
+             modelId: command.modelId,
++            activeSkillVersionId: skill.activeSkillVersionId,
+           })
+           .returning()
+         const [userSequence, assistantSequence] = await allocateThreadSequences(
+@@ -81,15 +88,16 @@ export function startProject(userId: string, command: StartProjectCommand) {
+               parts: [],
+               status: "generating",
+               modelId: command.modelId,
++              skillVersionId: skill.pinnedSkillVersionId,
+               startedAt: now,
+             },
+           ])
+           .returning()
+         return {
+           project: toProjectDTO(project, thread.id),
+-          thread: toThreadDTO(thread),
++          thread: toThreadDTO(thread, skill.activeSkill),
+           userMessage: toMessageDTO(userMessage),
+-          assistantMessage: toMessageDTO(assistantMessage),
++          assistantMessage: toMessageDTO(assistantMessage, skill.pinnedSkill),
+           streamUrl: `/api/thread-chat/v1/messages/${assistantMessage.id}/stream`,
+         }
+       },
