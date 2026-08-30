@@ -36,7 +36,7 @@ jobs:
         run: |
           node --import tsx e2e/thread-chat/runtime-skill-foundation.test.mjs
           node --import tsx e2e/thread-chat/runtime-skill-package.test.mjs
-          node --import tsx scripts/skills/validate.ts --path runtime-skills/research
+          pnpm skills:validate -- --path runtime-skills/research
       - name: Typecheck
         run: pnpm typecheck
       - name: Build
@@ -46,3 +46,78 @@ jobs:
           pnpm eval:agent
           pnpm test:thread-chat:gate2-pipeline
           pnpm test:thread-chat:gate3-client
+
+  generate-schema-artifact:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Wire Skill catalog references into conversation schema
+        run: |
+          python <<'PY'
+          from pathlib import Path
+
+          path = Path("lib/db/schema.ts")
+          source = path.read_text()
+
+          replacements = [
+              (
+                  'import type { ConversationMessageStatus } from "@/lib/thread-chat/domain/conversation"\n',
+                  'import type { ConversationMessageStatus } from "@/lib/thread-chat/domain/conversation"\nimport { skillVersions } from "./skill-schema"\n',
+              ),
+              (
+                  'export * from "./payment-schema"\n',
+                  'export * from "./payment-schema"\nexport * from "./skill-schema"\n',
+              ),
+              (
+                  '    modelId: text("model_id").notNull(),\n    autoTitle: text("auto_title"),\n',
+                  '    modelId: text("model_id").notNull(),\n    activeSkillVersionId: text("active_skill_version_id").references(\n      () => skillVersions.id,\n      { onDelete: "restrict" }\n    ),\n    autoTitle: text("auto_title"),\n',
+              ),
+              (
+                  '    modelId: text("model_id"),\n    replacesMessageId: text("replaces_message_id").references(\n',
+                  '    modelId: text("model_id"),\n    skillVersionId: text("skill_version_id").references(\n      () => skillVersions.id,\n      { onDelete: "restrict" }\n    ),\n    replacesMessageId: text("replaces_message_id").references(\n',
+              ),
+              (
+                  "        (${table.role} = 'user' and ${table.status} = 'completed' and ${table.modelId} is null)\n",
+                  "        (${table.role} = 'user' and ${table.status} = 'completed' and\n          ${table.modelId} is null and ${table.skillVersionId} is null)\n",
+              ),
+              (
+                  '  messages: many(messages),\n}))\n\nexport const messagesRelations',
+                  '  messages: many(messages),\n  activeSkillVersion: one(skillVersions, {\n    fields: [threads.activeSkillVersionId],\n    references: [skillVersions.id],\n    relationName: "threadActiveSkillVersion",\n  }),\n}))\n\nexport const messagesRelations',
+              ),
+              (
+                  '  thread: one(threads, {\n    fields: [messages.threadId],\n    references: [threads.id],\n  }),\n  replacedMessage:',
+                  '  thread: one(threads, {\n    fields: [messages.threadId],\n    references: [threads.id],\n  }),\n  skillVersion: one(skillVersions, {\n    fields: [messages.skillVersionId],\n    references: [skillVersions.id],\n    relationName: "messageSkillVersion",\n  }),\n  replacedMessage:',
+              ),
+          ]
+
+          for old, new in replacements:
+              count = source.count(old)
+              if count != 1:
+                  raise SystemExit(f"schema replacement expected once, found {count}: {old[:80]!r}")
+              source = source.replace(old, new)
+
+          path.write_text(source)
+          PY
+      - name: Generate Drizzle migration and snapshot
+        env:
+          DATABASE_URL: postgres://user:password@localhost:5432/thread_chat_generate
+        run: pnpm exec drizzle-kit generate --name runtime_skills
+      - name: Verify generated diff
+        run: |
+          git diff --check
+          git status --short
+      - uses: actions/upload-artifact@v4
+        with:
+          name: thread-chat-skill-schema
+          path: |
+            lib/db/schema.ts
+            drizzle/
+          if-no-files-found: error
+          retention-days: 3
