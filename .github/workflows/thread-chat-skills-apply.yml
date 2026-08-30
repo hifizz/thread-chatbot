@@ -1,0 +1,53 @@
+name: Thread Chat Skills Apply Inspection
+
+on:
+  pull_request:
+    paths:
+      - "openspec/changes/add-thread-chat-skills/**"
+      - ".github/workflows/thread-chat-skills-apply.yml"
+      - "app/**"
+      - "constants/**"
+      - "lib/**"
+      - "runtime-skills/**"
+      - "scripts/**"
+      - "e2e/**"
+      - "evals/**"
+      - "drizzle/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+
+jobs:
+  inspect-and-baseline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: OpenSpec status
+        run: pnpm exec openspec status --change add-thread-chat-skills --json
+      - name: OpenSpec apply instructions
+        run: pnpm exec openspec instructions apply --change add-thread-chat-skills --json
+      - name: Baseline checks
+        shell: bash
+        run: |
+          set +e
+          run_check() {
+            local name="$1"
+            shift
+            echo "::group::${name}"
+            "$@"
+            local status=$?
+            echo "CHECK_RESULT ${name} ${status}"
+            echo "::endgroup::"
+          }
+          run_check typecheck pnpm typecheck
+          run_check build pnpm build
+          run_check agent-eval-smoke pnpm eval:agent
+          run_check thread-chat-gate2-pipeline pnpm test:thread-chat:gate2-pipeline
+          run_check thread-chat-gate3-client pnpm test:thread-chat:gate3-client
+          exit 0
