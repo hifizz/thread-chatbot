@@ -5,6 +5,11 @@ import type {
   ProjectBootstrapDTO,
   ProjectDTO,
 } from "@/lib/thread-chat/contracts/dto"
+import { toSkillVersionSummaryDTO } from "@/lib/skills/dto"
+import {
+  findSkillVersionById,
+  listSkillVersionsByIds,
+} from "@/lib/skills/repository"
 import {
   findOwnedArtifact,
   listProjectArtifactRows,
@@ -61,10 +66,41 @@ export async function getProjectBootstrap(
   ])
   const root = threadRows.find((thread) => thread.parentId === null)
   if (!root) throw new Error("PROJECT_WITHOUT_ROOT_THREAD")
+
+  const referencedSkillVersionIds = [
+    ...threadRows.flatMap((thread) =>
+      thread.activeSkillVersionId ? [thread.activeSkillVersionId] : []
+    ),
+    ...messageRows.flatMap((message) =>
+      message.skillVersionId ? [message.skillVersionId] : []
+    ),
+  ]
+  const skillRows = await listSkillVersionsByIds(db, referencedSkillVersionIds)
+  const skillByVersionId = new Map(
+    skillRows.map((row) => [
+      row.skillVersionId,
+      toSkillVersionSummaryDTO(row),
+    ])
+  )
+
   return {
     project: toProjectDTO(project, root.id),
-    threads: threadRows.map(toThreadDTO),
-    messages: messageRows.map(toMessageDTO),
+    threads: threadRows.map((thread) =>
+      toThreadDTO(
+        thread,
+        thread.activeSkillVersionId
+          ? (skillByVersionId.get(thread.activeSkillVersionId) ?? null)
+          : null
+      )
+    ),
+    messages: messageRows.map((message) =>
+      toMessageDTO(
+        message,
+        message.skillVersionId
+          ? (skillByVersionId.get(message.skillVersionId) ?? null)
+          : null
+      )
+    ),
     artifacts: artifactRows.map(toArtifactDTO),
     activeGenerationIds: messageRows
       .filter((message) => message.status === "generating")
@@ -77,7 +113,14 @@ export async function getMessage(
   messageId: string
 ): Promise<MessageDTO | null> {
   const row = await findOwnedMessage(db, userId, messageId)
-  return row ? toMessageDTO(row) : null
+  if (!row) return null
+  const skillRow = row.skillVersionId
+    ? await findSkillVersionById(db, row.skillVersionId)
+    : null
+  return toMessageDTO(
+    row,
+    skillRow ? toSkillVersionSummaryDTO(skillRow) : null
+  )
 }
 
 export async function getArtifact(
