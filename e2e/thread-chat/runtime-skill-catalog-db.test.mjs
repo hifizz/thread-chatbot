@@ -370,6 +370,7 @@ try {
 } finally {
   await rm(temporaryRoot, { recursive: true, force: true })
   await db.delete(schema.user).where(eq(schema.user.email, `${prefix}@example.test`))
+  await globalThis.__dbClient?.end()
 }
 
 console.log("runtime Skill catalog database tests passed")
