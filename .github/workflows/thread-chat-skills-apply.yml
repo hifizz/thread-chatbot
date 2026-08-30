@@ -163,6 +163,8 @@ jobs:
     env:
       DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
       DIRECT_URL: postgres://postgres:postgres@localhost:5432/postgres
+      BETTER_AUTH_SECRET: thread-chat-skills-ci-secret-at-least-32-characters
+      BETTER_AUTH_URL: http://localhost:4040
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
