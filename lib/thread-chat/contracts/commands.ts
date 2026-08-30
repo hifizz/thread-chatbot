@@ -1,4 +1,8 @@
 import { z } from "zod"
+import {
+  PROJECT_INSTRUCTIONS_MAX_CHARS,
+  PROJECT_TARGET_MAX_CHARS,
+} from "@/constants/project-workspace"
 
 const entityIdSchema = z.uuid()
 const commandIdSchema = z.uuid()
@@ -119,6 +123,29 @@ export const renameProjectCommandSchema = z
   })
   .strict()
 
+export const updateProjectContractCommandSchema = z
+  .object({
+    commandId: commandIdSchema,
+    expectedContractVersion: z.number().int().min(0),
+    target: z.string().max(PROJECT_TARGET_MAX_CHARS),
+    instructions: z.string().max(PROJECT_INSTRUCTIONS_MAX_CHARS),
+  })
+  .strict()
+
+export const addProjectFileCommandSchema = z
+  .object({
+    commandId: commandIdSchema,
+    attachmentId: entityIdSchema,
+  })
+  .strict()
+
+export const removeProjectFileCommandSchema = z
+  .object({
+    commandId: commandIdSchema,
+    attachmentId: entityIdSchema,
+  })
+  .strict()
+
 export const setProjectArchivedCommandSchema = z
   .object({
     commandId: commandIdSchema,
@@ -153,6 +180,13 @@ export type RetryMessageCommand = z.infer<typeof retryMessageCommandSchema>
 export type StopMessageCommand = z.infer<typeof stopMessageCommandSchema>
 export type SetFeedbackCommand = z.infer<typeof setFeedbackCommandSchema>
 export type RenameProjectCommand = z.infer<typeof renameProjectCommandSchema>
+export type UpdateProjectContractCommand = z.infer<
+  typeof updateProjectContractCommandSchema
+>
+export type AddProjectFileCommand = z.infer<typeof addProjectFileCommandSchema>
+export type RemoveProjectFileCommand = z.infer<
+  typeof removeProjectFileCommandSchema
+>
 export type SetProjectArchivedCommand = z.infer<
   typeof setProjectArchivedCommandSchema
 >
