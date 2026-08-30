@@ -32,7 +32,7 @@ jobs:
         run: pnpm exec openspec status --change add-thread-chat-skills --json
       - name: OpenSpec apply instructions
         run: pnpm exec openspec instructions apply --change add-thread-chat-skills --json
-      - name: Baseline checks
+      - name: Apply checks
         shell: bash
         run: |
           set +e
@@ -45,6 +45,7 @@ jobs:
             echo "CHECK_RESULT ${name} ${status}"
             echo "::endgroup::"
           }
+          run_check skill-foundation node --import tsx e2e/thread-chat/runtime-skill-foundation.test.mjs
           run_check typecheck pnpm typecheck
           run_check build pnpm build
           run_check agent-eval-smoke pnpm eval:agent
