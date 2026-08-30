@@ -20,6 +20,10 @@ permissions:
   contents: write
   pull-requests: read
 
+concurrency:
+  group: thread-chat-skills-apply-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   inspect-and-baseline:
     runs-on: ubuntu-latest
