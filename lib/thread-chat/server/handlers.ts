@@ -1,8 +1,10 @@
 import { z } from "zod"
 import {
+  addProjectFileCommandSchema,
   deleteProjectCommandSchema,
   editLatestTurnCommandSchema,
   forkThreadCommandSchema,
+  removeProjectFileCommandSchema,
   renameProjectCommandSchema,
   retryMessageCommandSchema,
   sendMessageCommandSchema,
@@ -10,9 +12,11 @@ import {
   setProjectArchivedCommandSchema,
   startProjectCommandSchema,
   stopMessageCommandSchema,
+  updateProjectContractCommandSchema,
   updateThreadCommandSchema,
 } from "@/lib/thread-chat/contracts/commands"
 import {
+  addProjectFile,
   deleteProject,
   editLatestTurn,
   forkThread,
@@ -20,6 +24,7 @@ import {
   getMessage,
   getProjectBootstrap,
   listProjects,
+  removeProjectFile,
   renameProject,
   requestMessageStop,
   retryMessage,
@@ -28,6 +33,7 @@ import {
   setProjectArchived,
   generateAndSaveThreadTitle,
   startProject,
+  updateProjectContract,
   updateThread,
 } from "@/lib/thread-chat/application"
 import { ConversationApplicationError } from "@/lib/thread-chat/application/errors"
@@ -103,13 +109,50 @@ export function handlePatchProject(
     const id = parseId(projectId)
     const command = await parseJson(
       request,
-      z.union([renameProjectCommandSchema, setProjectArchivedCommandSchema])
+      z.union([
+        renameProjectCommandSchema,
+        setProjectArchivedCommandSchema,
+        updateProjectContractCommandSchema,
+      ])
     )
     const result =
-      "customTitle" in command
-        ? await renameProject(userId, id, command)
-        : await setProjectArchived(userId, id, command)
+      "expectedContractVersion" in command
+        ? await updateProjectContract(userId, id, command)
+        : "customTitle" in command
+          ? await renameProject(userId, id, command)
+          : await setProjectArchived(userId, id, command)
     return commandResponse(result)
+  })
+}
+
+export function handleAddProjectFile(
+  request: Request,
+  projectId: string
+): Promise<Response> {
+  return withThreadChatRoute(request, async (userId) =>
+    commandResponse(
+      await addProjectFile(
+        userId,
+        parseId(projectId),
+        await parseJson(request, addProjectFileCommandSchema)
+      )
+    )
+  )
+}
+
+export function handleRemoveProjectFile(
+  request: Request,
+  projectId: string,
+  attachmentId: string
+): Promise<Response> {
+  return withThreadChatRoute(request, async (userId) => {
+    const id = parseId(attachmentId)
+    const command = await parseJson(request, removeProjectFileCommandSchema)
+    if (command.attachmentId !== id)
+      validation("path attachmentId 与请求体不一致")
+    return commandResponse(
+      await removeProjectFile(userId, parseId(projectId), command)
+    )
   })
 }
 
