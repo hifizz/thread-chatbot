@@ -12,7 +12,10 @@ import {
 } from "@/components/ui/tooltip"
 import {
   CHAT_MODEL_PROVIDER_LABELS,
+<<<<<<< HEAD
   THREAD_CHAT_MODEL_GROUP_LABELS,
+=======
+>>>>>>> a30b2c9 (feat(chat): group model selector by provider)
   THREAD_CHAT_MODELS,
 } from "@/constants/model"
 import { Bot } from "lucide-react"
@@ -64,12 +67,19 @@ const THREAD_CHAT_MODEL_OPTIONS: readonly ModelOption[] =
     )
     .map(({ model }) => ({
       id: model.id,
+<<<<<<< HEAD
       name: model.name.replace(
         `${CHAT_MODEL_PROVIDER_LABELS[model.provider]} · `,
         ""
       ),
       providerId: model.provider,
       providerName: THREAD_CHAT_MODEL_GROUP_LABELS[model.provider],
+=======
+      name: model.name,
+      description: model.description,
+      providerId: model.provider,
+      providerName: CHAT_MODEL_PROVIDER_LABELS[model.provider],
+>>>>>>> a30b2c9 (feat(chat): group model selector by provider)
     }))
 
 export interface ThreadModelSelectorProps {
@@ -140,7 +150,11 @@ export function ThreadModelSelector({
       )}
       <ModelSelector.Content
         side="top"
+<<<<<<< HEAD
         className="thread-model-selector-content w-[28rem] max-w-[calc(100vw-1rem)]"
+=======
+        className="thread-model-selector-content w-[34rem] max-w-[calc(100vw-2rem)]"
+>>>>>>> a30b2c9 (feat(chat): group model selector by provider)
       />
     </ModelSelector.Root>
   )

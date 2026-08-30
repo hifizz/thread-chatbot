@@ -487,9 +487,15 @@ function ModelSelectorList({
     >
       {children ??
         (grouped ? (
+<<<<<<< HEAD
           <div className="grid h-64 grid-cols-[7.25rem_minmax(0,1fr)]">
             <div
               className="flex flex-col gap-0.5 border-e bg-muted/35 p-1"
+=======
+          <div className="grid min-h-72 grid-cols-[9rem_minmax(0,1fr)]">
+            <div
+              className="flex flex-col gap-1 border-e bg-muted/35 p-2"
+>>>>>>> a30b2c9 (feat(chat): group model selector by provider)
               role="tablist"
               aria-label="模型供应商"
             >
@@ -500,7 +506,11 @@ function ModelSelectorList({
                   role="tab"
                   aria-selected={activeProviderId === provider.id}
                   className={cn(
+<<<<<<< HEAD
                     "rounded-md px-2 py-1.5 text-start text-xs leading-4 transition-colors outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring/50",
+=======
+                    "rounded-lg px-2.5 py-2 text-start text-sm transition-colors outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring/50",
+>>>>>>> a30b2c9 (feat(chat): group model selector by provider)
                     activeProviderId === provider.id &&
                       "bg-accent font-medium text-accent-foreground"
                   )}
@@ -510,10 +520,14 @@ function ModelSelectorList({
                 </button>
               ))}
             </div>
+<<<<<<< HEAD
             <div
               className="no-scrollbar min-w-0 overflow-y-auto p-0.5"
               role="tabpanel"
             >
+=======
+            <div className="min-w-0 p-1.5" role="tabpanel">
+>>>>>>> a30b2c9 (feat(chat): group model selector by provider)
               <CommandGroup
                 heading={
                   providers.find((provider) => provider.id === activeProviderId)
