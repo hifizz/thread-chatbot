@@ -1,9 +1,12 @@
 import type {
+  AddProjectFileCommand,
   EditLatestTurnCommand,
   ForkThreadCommand,
+  RemoveProjectFileCommand,
   RetryMessageCommand,
   SendMessageCommand,
   StartProjectCommand,
+  UpdateProjectContractCommand,
 } from "@/lib/thread-chat/contracts/commands"
 import type {
   MessageDTO,
@@ -131,6 +134,11 @@ function supersede(
   return message ? { ...message, supersededAt: at, updatedAt: at } : undefined
 }
 
+function normalized(value: string): string | null {
+  const trimmed = value.trim()
+  return trimmed.length > 0 ? trimmed : null
+}
+
 export function createConversationCommands(
   options: ConversationCommandOptions
 ) {
@@ -153,6 +161,17 @@ export function createConversationCommands(
     throw lastError
   }
 
+  async function refreshProjectArtifacts(projectId: string) {
+    try {
+      const bootstrap = await client.getProject(projectId)
+      if (bootstrap.project) store.getState().upsertProject(bootstrap.project)
+      for (const artifact of bootstrap.artifacts)
+        store.getState().upsertArtifact(artifact)
+    } catch {
+      // Artifact 资源区刷新是非阻塞增强；历史消息仍保留工具结果。
+    }
+  }
+
   function follow(
     accepted: Parameters<typeof followAcceptedGeneration>[0]["accepted"],
     afterFinish?: (threadId: string) => void | Promise<void>
@@ -162,9 +181,10 @@ export function createConversationCommands(
       store,
       client,
       accepted,
-      onFinishMessage: afterFinish
-        ? (message) => afterFinish(message.threadId)
-        : undefined,
+      onFinishMessage: async (message) => {
+        if (afterFinish) await afterFinish(message.threadId)
+        await refreshProjectArtifacts(message.projectId)
+      },
       fetch: options.fetch,
       pollDelays: options.pollDelays,
       wait: options.wait,
@@ -212,6 +232,9 @@ export function createConversationCommands(
       rootThreadId: command.rootThreadId,
       autoTitle: null,
       customTitle: null,
+      target: null,
+      instructions: null,
+      contractVersion: 0,
       archivedAt: null,
       createdAt: now,
       updatedAt: now,
@@ -252,6 +275,8 @@ export function createConversationCommands(
     })
     store.getState().beginOptimisticCommand(command.commandId, () => ({
       project,
+      projectFilesById: {},
+      projectFileOrder: [],
       threadsById: { [thread.id]: thread },
       messagesById: { [user.id]: user, [assistant.id]: assistant },
       messageIdsByThread: { [thread.id]: [user.id, assistant.id] },
@@ -588,6 +613,73 @@ export function createConversationCommands(
     return { command, response }
   }
 
+  async function updateProjectContract(input: {
+    projectId: string
+    target: string
+    instructions: string
+    expectedContractVersion?: number
+  }) {
+    const current = store.getState().project
+    if (!current || current.id !== input.projectId)
+      throw new Error("Project 尚未加载")
+    const command: UpdateProjectContractCommand = Object.freeze({
+      commandId: createId(),
+      expectedContractVersion:
+        input.expectedContractVersion ?? current.contractVersion,
+      target: input.target,
+      instructions: input.instructions,
+    })
+    const optimistic: ProjectDTO = {
+      ...current,
+      target: normalized(input.target),
+      instructions: normalized(input.instructions),
+      contractVersion: current.contractVersion + 1,
+      updatedAt: new Date().toISOString(),
+    }
+    store.getState().beginOptimisticCommand(command.commandId, () => ({
+      project: optimistic,
+    }))
+    try {
+      const response = await execute(() =>
+        client.updateProjectContract(input.projectId, command)
+      )
+      store.getState().commitOptimisticCommand(command.commandId)
+      store.getState().upsertProject(response.data)
+      return { command, response }
+    } catch (error) {
+      store.getState().rollbackOptimisticCommand(command.commandId)
+      throw error
+    }
+  }
+
+  async function addProjectFile(attachmentId: string) {
+    const project = store.getState().project
+    if (!project) throw new Error("Project 尚未加载")
+    const command: AddProjectFileCommand = Object.freeze({
+      commandId: createId(),
+      attachmentId,
+    })
+    const response = await execute(() =>
+      client.addProjectFile(project.id, command)
+    )
+    store.getState().upsertProjectFile(response.data)
+    return { command, response }
+  }
+
+  async function removeProjectFile(attachmentId: string) {
+    const project = store.getState().project
+    if (!project) throw new Error("Project 尚未加载")
+    const command: RemoveProjectFileCommand = Object.freeze({
+      commandId: createId(),
+      attachmentId,
+    })
+    const response = await execute(() =>
+      client.removeProjectFile(project.id, attachmentId, command)
+    )
+    store.getState().removeProjectFile(attachmentId)
+    return { command, response }
+  }
+
   async function setProjectArchived(projectId: string, archived: boolean) {
     const command = Object.freeze({ commandId: createId(), archived })
     const response = await execute(() =>
@@ -618,6 +710,9 @@ export function createConversationCommands(
     setFeedback,
     updateThread,
     renameProject,
+    updateProjectContract,
+    addProjectFile,
+    removeProjectFile,
     setProjectArchived,
     deleteProject,
     dispose() {

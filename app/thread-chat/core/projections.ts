@@ -53,10 +53,6 @@ function projectMessageState(
   }
 }
 
-/**
- * 现有工作台组件以 `main` 作为根列的展示标识；规范化模型的根 Thread 则使用 UUID。
- * 这个别名只存在于只读 UI facade，任何 v1 command/DTO 都继续使用真实 Thread ID。
- */
 export function toConversationViewThreadId(
   state: NormalizedThreadChatState,
   threadId: string
@@ -184,15 +180,11 @@ export function projectArtifactDTO(
     kind: artifact.kind,
     ...(artifact.language ? { lang: artifact.language } : {}),
     content: artifact.content,
-    sourceThreadId: toConversationViewThreadId(
-      state,
-      state.messagesById[artifact.sourceMessageId]?.threadId ?? ""
-    ),
+    sourceThreadId: toConversationViewThreadId(state, artifact.threadId),
     sourceMessageId: artifact.sourceMessageId,
   }
 }
 
-/** Gate 3 兼容 facade：既有组件不再读取整树持久化，只消费规范化 selector 投影。 */
 export function projectConversationTree(
   state: NormalizedThreadChatState
 ): ThreadTreeState {

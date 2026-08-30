@@ -11,17 +11,21 @@ import type {
   MessageDTO,
   ProjectBootstrapDTO,
   ProjectDTO,
+  ProjectFileDTO,
   ThreadDTO,
 } from "@/lib/thread-chat/contracts/dto"
 import type { ThreadChatUIMessage } from "@/lib/thread-chat/contracts/ui-message"
 
-/** 现有组件消费的兼容投影；uiParts 保留完整 AI SDK v7 协议。 */
+/** 现有组件消费的兼容结构；uiParts 保留完整 AI SDK v7 协议。 */
 export interface ConversationViewMessage extends LegacyMessage {
   uiParts?: ThreadChatUIMessage["parts"]
 }
 
 export type ConversationStreamPhase =
-  "connecting" | "live" | "background" | "terminal"
+  | "connecting"
+  | "live"
+  | "background"
+  | "terminal"
 
 export interface ConversationStreamState {
   phase: ConversationStreamPhase
@@ -38,6 +42,7 @@ export interface WorkspaceCanvasSnapshot {
 export interface WorkspacePanelSizes {
   columns?: number[]
   artifactDrawer?: number
+  projectPanel?: number
 }
 
 export interface WorkspaceUiState {
@@ -56,6 +61,8 @@ export interface WorkspaceUiState {
 
 export interface ConversationEntitySnapshot {
   project: ProjectDTO | null
+  projectFilesById: Record<string, ProjectFileDTO>
+  projectFileOrder: string[]
   threadsById: Record<string, ThreadDTO>
   messagesById: Record<string, MessageDTO>
   messageIdsByThread: Record<string, string[]>
@@ -78,6 +85,8 @@ export interface NormalizedThreadChatState extends ConversationEntityState {
   workspace: WorkspaceUiState
   hydrateProject(bootstrap: ProjectBootstrapDTO): void
   upsertProject(project: ProjectDTO): void
+  upsertProjectFile(file: ProjectFileDTO): void
+  removeProjectFile(attachmentId: string): void
   upsertThread(thread: ThreadDTO): void
   upsertMessage(message: MessageDTO): void
   upsertArtifact(artifact: ArtifactDTO): void
