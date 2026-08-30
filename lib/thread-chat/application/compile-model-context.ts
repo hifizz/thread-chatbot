@@ -139,20 +139,21 @@ export async function compileModelContextWithProject({
       : []),
     ...resolved.messages,
   ]
+  const modelMessages = await convertToModelMessages(withProjectContext, {
+    ignoreIncompleteToolCalls: true,
+    convertDataPart: (part) => {
+      if (part.type !== "data-quote") return undefined
+      const data = part.data
+      return typeof data === "object" &&
+        data !== null &&
+        "text" in data &&
+        typeof data.text === "string"
+        ? { type: "text", text: data.text }
+        : undefined
+    },
+  })
   return {
-    messages: convertToModelMessages(withProjectContext, {
-      ignoreIncompleteToolCalls: true,
-      convertDataPart: (part) => {
-        if (part.type !== "data-quote") return undefined
-        const data = part.data
-        return typeof data === "object" &&
-          data !== null &&
-          "text" in data &&
-          typeof data.text === "string"
-          ? { type: "text", text: data.text }
-          : undefined
-      },
-    }),
+    messages: modelMessages,
     projectFileIds: resolved.projectFileIds,
     projectFileStats: resolved.stats,
   }
