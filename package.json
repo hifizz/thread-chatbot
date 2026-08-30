@@ -54,6 +54,7 @@
     "test:thread-chat:gate2-api-db": "node --import tsx e2e/thread-chat/normalized-v1-api-db.test.mjs",
     "test:thread-chat:gate3-client": "node --import tsx e2e/thread-chat/normalized-client-store.test.mjs",
     "test:thread-chat:gate4-cutover": "node scripts/check-thread-chat-cutover.mjs && node --import tsx e2e/thread-chat/normalized-cutover-db.test.mjs",
+    "test:thread-chat:skills-db": "node --import tsx e2e/thread-chat/runtime-skill-catalog-db.test.mjs",
     "db:studio": "drizzle-kit studio",
     "openspec:validate": "openspec validate --all --strict"
   },

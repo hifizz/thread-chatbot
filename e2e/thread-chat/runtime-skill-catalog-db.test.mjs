@@ -1,0 +1,375 @@
+import assert from "node:assert/strict"
+import { cp, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
+import os from "node:os"
+import path from "node:path"
+import { config } from "dotenv"
+
+config({ path: ".env.local" })
+
+const source = process.env.DIRECT_URL || process.env.DATABASE_URL
+assert.ok(source, "测试需要 DIRECT_URL 或 DATABASE_URL")
+const testUrl = new URL(source.trim().replace(/^(['"])(.*)\1$/, "$2"))
+testUrl.pathname = "/thread-chat-normalized-test"
+testUrl.searchParams.set(
+  "options",
+  "-c search_path=thread_chat,public,extensions"
+)
+process.env.DATABASE_URL = testUrl.toString()
+process.env.DIRECT_URL = testUrl.toString()
+
+const [
+  { and, eq },
+  { db },
+  schema,
+  service,
+  repository,
+  skillDto,
+  queries,
+  constants,
+  modelConstants,
+] = await Promise.all([
+  import("drizzle-orm"),
+  import("../../lib/db/index.ts"),
+  import("../../lib/db/schema.ts"),
+  import("../../lib/skills/service.ts"),
+  import("../../lib/skills/repository.ts"),
+  import("../../lib/skills/dto.ts"),
+  import("../../lib/thread-chat/application/queries.ts"),
+  import("../../constants/skill.ts"),
+  import("../../constants/model.ts"),
+])
+
+const projectRoot = process.cwd()
+const id = () => crypto.randomUUID()
+const prefix = `runtime-skills-${id()}`
+const temporaryRoot = await mkdtemp(path.join(os.tmpdir(), "thread-chat-skill-db-"))
+
+async function createAdminPackage({
+  directory,
+  version,
+  instructions,
+}) {
+  const packageRoot = path.join(temporaryRoot, directory)
+  await cp(path.join(projectRoot, "runtime-skills/research"), packageRoot, {
+    recursive: true,
+  })
+  const skillFile = path.join(packageRoot, "SKILL.md")
+  await writeFile(
+    skillFile,
+    [
+      "---",
+      `name: ${directory}`,
+      `description: ${directory} catalog database test`,
+      "metadata:",
+      "  threadchat:",
+      `    version: ${version}`,
+      "    activation-mode: sticky",
+      "    capability-profile: skill-core-v1",
+      "---",
+      "",
+      `# ${directory}`,
+      "",
+      instructions,
+      "",
+    ].join("\n")
+  )
+  return packageRoot
+}
+
+async function createUser(userId) {
+  await db.insert(schema.user).values({
+    id: userId,
+    name: "Runtime Skill DB Gate",
+    email: `${prefix}@example.test`,
+    emailVerified: true,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  })
+}
+
+try {
+  const firstSync = await service.syncBuiltInSkills(projectRoot)
+  assert.equal(firstSync.length, 1)
+  assert.equal(firstSync[0].slug, "research")
+  assert.equal(firstSync[0].createdVersion, true)
+
+  const secondSync = await service.syncBuiltInSkills(projectRoot)
+  assert.equal(secondSync.length, 1)
+  assert.equal(secondSync[0].skillVersionId, firstSync[0].skillVersionId)
+  assert.equal(secondSync[0].createdVersion, false)
+
+  const catalog = await repository.listCurrentSkillCatalog(db)
+  assert.equal(catalog.length, 1)
+  assert.equal(catalog[0].slug, "research")
+  assert.equal(catalog[0].activationMode, "sticky")
+  assert.equal(catalog[0].capabilityProfileId, "research-v1")
+  assert.deepEqual(
+    skillDto.toSkillCatalogDTO(catalog[0]).currentVersion,
+    skillDto.toSkillVersionSummaryDTO(catalog[0])
+  )
+
+  const researchVersion = await repository.findSkillVersionById(
+    db,
+    firstSync[0].skillVersionId
+  )
+  assert.ok(researchVersion)
+  assert.equal(researchVersion.digest, firstSync[0].digest)
+  assert.equal(
+    (
+      await repository.findSkillVersionByDigest(
+        db,
+        firstSync[0].skillId,
+        firstSync[0].digest
+      )
+    )?.id,
+    firstSync[0].skillVersionId
+  )
+  const resource = await repository.findSkillResource(
+    db,
+    firstSync[0].skillVersionId,
+    "references/output-template.md"
+  )
+  assert.ok(resource)
+  assert.equal(resource.resource.mediaType, "text/markdown")
+  assert.match(resource.resource.digest, /^[a-f0-9]{64}$/)
+  assert.equal(
+    await repository.findSkillResource(
+      db,
+      firstSync[0].skillVersionId,
+      "references/missing.md"
+    ),
+    null
+  )
+
+  const adminPackage = await createAdminPackage({
+    directory: "catalog-admin",
+    version: "1.0.0",
+    instructions: "Initial immutable instructions.",
+  })
+  const installed = await service.installSkillDirectory({
+    packagePath: adminPackage,
+    sourceType: constants.SKILL_SOURCE_TYPES.admin,
+    projectRoot,
+  })
+  assert.equal(installed.createdVersion, true)
+  const installedAgain = await service.installSkillDirectory({
+    packagePath: adminPackage,
+    sourceType: constants.SKILL_SOURCE_TYPES.admin,
+    projectRoot,
+  })
+  assert.equal(installedAgain.skillVersionId, installed.skillVersionId)
+  assert.equal(installedAgain.createdVersion, false)
+
+  const upgradedSkillFile = path.join(adminPackage, "SKILL.md")
+  await writeFile(
+    upgradedSkillFile,
+    (await readFile(upgradedSkillFile, "utf8"))
+      .replace("version: 1.0.0", "version: 1.1.0")
+      .replace("Initial immutable instructions.", "Upgraded immutable instructions.")
+  )
+  const upgraded = await service.installSkillDirectory({
+    packagePath: adminPackage,
+    sourceType: constants.SKILL_SOURCE_TYPES.admin,
+    projectRoot,
+  })
+  assert.notEqual(upgraded.skillVersionId, installed.skillVersionId)
+  assert.equal(upgraded.createdVersion, true)
+  assert.equal(upgraded.changedCurrentVersion, true)
+
+  const versionsBeforeConflict = await db
+    .select()
+    .from(schema.skillVersions)
+    .where(eq(schema.skillVersions.skillId, installed.skillId))
+  await writeFile(
+    upgradedSkillFile,
+    (await readFile(upgradedSkillFile, "utf8")).replace(
+      "Upgraded immutable instructions.",
+      "Conflicting content without a version bump."
+    )
+  )
+  await assert.rejects(
+    () =>
+      service.installSkillDirectory({
+        packagePath: adminPackage,
+        sourceType: constants.SKILL_SOURCE_TYPES.admin,
+        projectRoot,
+      }),
+    /请提升版本号/
+  )
+  await assert.rejects(
+    () =>
+      service.installSkillDirectory({
+        packagePath: adminPackage,
+        sourceType: constants.SKILL_SOURCE_TYPES.builtin,
+        projectRoot,
+      }),
+    /已由 admin 来源管理/
+  )
+  const versionsAfterConflict = await db
+    .select()
+    .from(schema.skillVersions)
+    .where(eq(schema.skillVersions.skillId, installed.skillId))
+  assert.equal(versionsAfterConflict.length, versionsBeforeConflict.length)
+  assert.equal(
+    versionsAfterConflict.find((row) => row.isCurrent)?.id,
+    upgraded.skillVersionId
+  )
+
+  assert.equal(await service.disableSkill("catalog-admin"), true)
+  assert.equal(
+    (await repository.listCurrentSkillCatalog(db)).some(
+      (row) => row.slug === "catalog-admin"
+    ),
+    false
+  )
+  assert.equal(
+    (
+      await repository.listCurrentSkillCatalog(db, { includeDisabled: true })
+    ).find((row) => row.slug === "catalog-admin")?.enabled,
+    false
+  )
+
+  await assert.rejects(() =>
+    db.insert(schema.skillVersions).values({
+      id: id(),
+      skillId: firstSync[0].skillId,
+      version: "9.9.9",
+      digest: "a".repeat(64),
+      name: "duplicate current",
+      description: "must fail",
+      manifest: {},
+      instructions: "must fail",
+      resources: [],
+      activationMode: constants.SKILL_ACTIVATION_MODES.sticky,
+      capabilityProfileId: constants.SKILL_CAPABILITY_PROFILE_IDS.core,
+      sourceRevision: `test:${"a".repeat(64)}`,
+      isCurrent: true,
+    })
+  )
+
+  const userId = `${prefix}-user`
+  const projectId = id()
+  const threadId = id()
+  const userMessageId = id()
+  const assistantMessageId = id()
+  await createUser(userId)
+  await db.insert(schema.projects).values({ id: projectId, userId })
+  await db.insert(schema.threads).values({
+    id: threadId,
+    projectId,
+    depth: 0,
+    modelId: modelConstants.DEFAULT_THREAD_CHAT_MODEL_ID,
+    activeSkillVersionId: firstSync[0].skillVersionId,
+  })
+  await db.insert(schema.messages).values([
+    {
+      id: userMessageId,
+      projectId,
+      threadId,
+      sequence: 1,
+      role: "user",
+      parts: [{ type: "text", text: "无 Skill 字段的用户原文" }],
+      status: "completed",
+      finishedAt: new Date(),
+    },
+    {
+      id: assistantMessageId,
+      projectId,
+      threadId,
+      sequence: 2,
+      role: "assistant",
+      parts: [{ type: "text", text: "Research reply" }],
+      status: "completed",
+      modelId: modelConstants.DEFAULT_THREAD_CHAT_MODEL_ID,
+      skillVersionId: firstSync[0].skillVersionId,
+      startedAt: new Date(),
+      finishedAt: new Date(),
+    },
+  ])
+
+  await assert.rejects(() =>
+    db.insert(schema.messages).values({
+      id: id(),
+      projectId,
+      threadId,
+      sequence: 3,
+      role: "user",
+      parts: [{ type: "text", text: "非法 pin" }],
+      status: "completed",
+      skillVersionId: firstSync[0].skillVersionId,
+      finishedAt: new Date(),
+    })
+  )
+
+  const bootstrap = await queries.getProjectBootstrap(userId, projectId)
+  assert.equal(
+    bootstrap.threads.find((thread) => thread.id === threadId)?.activeSkill
+      ?.skillVersionId,
+    firstSync[0].skillVersionId
+  )
+  assert.equal(
+    bootstrap.messages.find((message) => message.id === userMessageId)?.skill,
+    null
+  )
+  assert.equal(
+    bootstrap.messages.find((message) => message.id === assistantMessageId)
+      ?.skill?.digest,
+    firstSync[0].digest
+  )
+  assert.equal(
+    (await queries.getMessage(userId, assistantMessageId))?.skill
+      ?.skillVersionId,
+    firstSync[0].skillVersionId
+  )
+
+  await assert.rejects(() =>
+    db
+      .delete(schema.skillVersions)
+      .where(eq(schema.skillVersions.id, firstSync[0].skillVersionId))
+  )
+
+  const legacyProjectId = id()
+  const legacyThreadId = id()
+  await db.insert(schema.projects).values({ id: legacyProjectId, userId })
+  await db.insert(schema.threads).values({
+    id: legacyThreadId,
+    projectId: legacyProjectId,
+    depth: 0,
+    modelId: modelConstants.DEFAULT_THREAD_CHAT_MODEL_ID,
+  })
+  const legacy = await queries.getProjectBootstrap(userId, legacyProjectId)
+  assert.equal(legacy.threads[0].activeSkill, null)
+
+  await db
+    .update(schema.skillVersions)
+    .set({ revokedAt: new Date() })
+    .where(eq(schema.skillVersions.id, firstSync[0].skillVersionId))
+  assert.equal(
+    (await repository.listCurrentSkillCatalog(db)).some(
+      (row) => row.slug === "research"
+    ),
+    false
+  )
+  const historical = await queries.getProjectBootstrap(userId, projectId)
+  assert.equal(
+    historical.messages.find((message) => message.id === assistantMessageId)
+      ?.skill?.skillVersionId,
+    firstSync[0].skillVersionId
+  )
+
+  const rows = await db
+    .select({ id: schema.skillVersions.id })
+    .from(schema.skillVersions)
+    .where(
+      and(
+        eq(schema.skillVersions.skillId, firstSync[0].skillId),
+        eq(schema.skillVersions.isCurrent, true)
+      )
+    )
+  assert.equal(rows.length, 1)
+} finally {
+  await rm(temporaryRoot, { recursive: true, force: true })
+  await db.delete(schema.user).where(eq(schema.user.email, `${prefix}@example.test`))
+}
+
+console.log("runtime Skill catalog database tests passed")
