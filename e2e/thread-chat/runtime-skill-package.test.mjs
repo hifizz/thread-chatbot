@@ -27,18 +27,25 @@ assert.deepEqual(
 assert.match(research.digest, /^[a-f0-9]{64}$/)
 assert.equal(research.instructions.includes("检查点 A"), true)
 
-assert.throws(() => normalizeSkillResourcePath("../secret.md"),
-  SkillPackageValidationError)
-assert.throws(() => normalizeSkillResourcePath("/secret.md"),
-  SkillPackageValidationError)
-assert.throws(() => normalizeSkillResourcePath("references\\secret.md"),
-  SkillPackageValidationError)
+assert.throws(
+  () => normalizeSkillResourcePath("../secret.md"),
+  SkillPackageValidationError
+)
+assert.throws(
+  () => normalizeSkillResourcePath("/secret.md"),
+  SkillPackageValidationError
+)
+assert.throws(
+  () => normalizeSkillResourcePath("references\\secret.md"),
+  SkillPackageValidationError
+)
 
 const temporaryRoot = await mkdtemp(path.join(os.tmpdir(), "thread-chat-skills-"))
 
 async function createPackage(
-  name,
+  directoryName,
   {
+    slug = directoryName,
     versionLine = "    version: 1.0.0\n",
     activation = "sticky",
     profile = "skill-core-v1",
@@ -46,12 +53,12 @@ async function createPackage(
     bom = false,
   } = {}
 ) {
-  const root = path.join(temporaryRoot, name)
+  const root = path.join(temporaryRoot, directoryName)
   await mkdir(path.join(root, "references"), { recursive: true })
   const source = [
     "---",
-    `name: ${name}`,
-    `description: ${name} description`,
+    `name: ${slug}`,
+    `description: ${slug} description`,
     "metadata:",
     "  threadchat:",
     versionLine.trimEnd(),
@@ -59,13 +66,16 @@ async function createPackage(
     `    capability-profile: ${profile}`,
     "---",
     "",
-    `# ${name}`,
+    `# ${slug}`,
     "",
     "Instructions",
     "",
   ].join("\n")
   const normalized = source.replaceAll("\n", lineEnding)
-  await writeFile(path.join(root, "SKILL.md"), `${bom ? "\uFEFF" : ""}${normalized}`)
+  await writeFile(
+    path.join(root, "SKILL.md"),
+    `${bom ? "\uFEFF" : ""}${normalized}`
+  )
   await writeFile(
     path.join(root, "references/example.md"),
     `# Example${lineEnding}`
@@ -74,8 +84,9 @@ async function createPackage(
 }
 
 try {
-  const lfRoot = await createPackage("normal-lf")
+  const lfRoot = await createPackage("normal-lf", { slug: "normal" })
   const crlfRoot = await createPackage("normal-crlf", {
+    slug: "normal",
     lineEnding: "\r\n",
     bom: true,
   })
