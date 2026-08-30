@@ -43,7 +43,6 @@
     "db:migrate": "drizzle-kit migrate",
     "db:reset-schema": "node scripts/reset-thread-chat-schema.mjs",
     "db:push": "drizzle-kit push",
-    "db:studio": "drizzle-kit studio",
     "db:test:setup": "node scripts/setup-thread-chat-test-database.mjs",
     "db:test:reset": "node scripts/setup-thread-chat-test-database.mjs --reset-schema",
     "db:test:migrate": "drizzle-kit migrate --config drizzle.test.config.ts",
@@ -55,6 +54,7 @@
     "test:thread-chat:gate2-api-db": "node --import tsx e2e/thread-chat/normalized-v1-api-db.test.mjs",
     "test:thread-chat:gate3-client": "node --import tsx e2e/thread-chat/normalized-client-store.test.mjs",
     "test:thread-chat:gate4-cutover": "node scripts/check-thread-chat-cutover.mjs && node --import tsx e2e/thread-chat/normalized-cutover-db.test.mjs",
+    "db:studio": "drizzle-kit studio",
     "openspec:validate": "openspec validate --all --strict"
   },
   "dependencies": {
@@ -101,7 +101,7 @@
     "lucide-react": "^1.23.0",
     "next": "16.3.1",
     "next-themes": "^0.4.6",
-    "parse-diff": "^12.0.0",
+    "parse-diff": "^0.12.0",
     "postgres": "^3.4.9",
     "radix-ui": "^1.6.1",
     "react": "19.2.8",
