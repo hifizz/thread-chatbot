@@ -13,9 +13,9 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.ref }}
       - name: Create source archive
-        run: tar --exclude=.git --exclude=node_modules -czf thread-chat-skills-source.tgz .
+        run: git archive --format=tar.gz --output=/tmp/thread-chat-skills-source.tgz HEAD
       - uses: actions/upload-artifact@v4
         with:
           name: thread-chat-skills-source
-          path: thread-chat-skills-source.tgz
+          path: /tmp/thread-chat-skills-source.tgz
           retention-days: 1
