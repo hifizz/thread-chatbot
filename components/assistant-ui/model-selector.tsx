@@ -49,6 +49,9 @@ export type ModelOption = {
   description?: string
   icon?: ReactNode
   disabled?: boolean
+  /** 二级选择面板使用的供应商标识与展示名。 */
+  providerId?: string
+  providerName?: string
   /** Extra terms matched by ModelSelector.Search, in addition to id and name. */
   keywords?: readonly string[]
   /**
@@ -443,7 +446,34 @@ function ModelSelectorList({
   children,
   ...props
 }: ModelSelectorListProps) {
-  const { models } = useModelSelectorContext()
+  const { models, selectedModel } = useModelSelectorContext()
+  const providers = useMemo(
+    () =>
+      Array.from(
+        new Map(
+          models
+            .filter((model) => model.providerId)
+            .map((model) => [
+              model.providerId!,
+              model.providerName ?? model.providerId!,
+            ])
+        ),
+        ([id, name]) => ({ id, name })
+      ),
+    [models]
+  )
+  const [activeProviderId, setActiveProviderId] = useState(
+    selectedModel?.providerId ?? providers[0]?.id
+  )
+
+  useEffect(() => {
+    if (selectedModel?.providerId) setActiveProviderId(selectedModel.providerId)
+  }, [selectedModel?.providerId])
+
+  const grouped = providers.length > 0
+  const visibleModels = grouped
+    ? models.filter((model) => model.providerId === activeProviderId)
+    : models
 
   return (
     <CommandList
@@ -454,16 +484,54 @@ function ModelSelectorList({
       )}
       {...props}
     >
-      {children ?? (
-        <>
-          <ModelSelectorEmpty />
-          <CommandGroup>
-            {models.map((model) => (
-              <ModelSelectorItem key={model.id} model={model} />
-            ))}
-          </CommandGroup>
-        </>
-      )}
+      {children ??
+        (grouped ? (
+          <div className="grid min-h-72 grid-cols-[9rem_minmax(0,1fr)]">
+            <div
+              className="flex flex-col gap-1 border-e bg-muted/35 p-2"
+              role="tablist"
+              aria-label="模型供应商"
+            >
+              {providers.map((provider) => (
+                <button
+                  key={provider.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={activeProviderId === provider.id}
+                  className={cn(
+                    "rounded-lg px-2.5 py-2 text-start text-sm transition-colors outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring/50",
+                    activeProviderId === provider.id &&
+                      "bg-accent font-medium text-accent-foreground"
+                  )}
+                  onClick={() => setActiveProviderId(provider.id)}
+                >
+                  {provider.name}
+                </button>
+              ))}
+            </div>
+            <div className="min-w-0 p-1.5" role="tabpanel">
+              <CommandGroup
+                heading={
+                  providers.find((provider) => provider.id === activeProviderId)
+                    ?.name
+                }
+              >
+                {visibleModels.map((model) => (
+                  <ModelSelectorItem key={model.id} model={model} />
+                ))}
+              </CommandGroup>
+            </div>
+          </div>
+        ) : (
+          <>
+            <ModelSelectorEmpty />
+            <CommandGroup>
+              {models.map((model) => (
+                <ModelSelectorItem key={model.id} model={model} />
+              ))}
+            </CommandGroup>
+          </>
+        ))}
     </CommandList>
   )
 }
