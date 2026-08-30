@@ -1,11 +1,12 @@
 import type { LanguageModelUsage, TextStreamPart, ToolSet } from "ai"
 import { db } from "@/lib/db"
 import type { ThreadChatUIMessageChunk } from "@/lib/thread-chat/contracts/ui-message"
-import { compileModelContext } from "@/lib/thread-chat/application/compile-model-context"
+import { compileModelContextWithProject } from "@/lib/thread-chat/application/compile-model-context"
 import {
   findOwnedMessage,
   listThreadMessageRows,
 } from "@/lib/thread-chat/persistence/message-repository"
+import { findOwnedProject } from "@/lib/thread-chat/persistence/project-repository"
 import { findOwnedThread } from "@/lib/thread-chat/persistence/thread-repository"
 import { MessageCheckpointer } from "@/lib/thread-chat/streaming/checkpoint"
 import { finalizeGeneration } from "@/lib/thread-chat/streaming/finalize"
@@ -26,6 +27,7 @@ export interface PreparedGeneration {
   tools?: ToolSet
   leadingChunks?: ThreadChatUIMessageChunk[]
   usage?: PromiseLike<LanguageModelUsage>
+  contextMetadata?: Record<string, unknown>
 }
 
 export interface RunGenerationDependencies {
@@ -40,6 +42,7 @@ type GenerationIdentity = {
     modelId: string
   }
   thread: NonNullable<Awaited<ReturnType<typeof findOwnedThread>>>
+  project: NonNullable<Awaited<ReturnType<typeof findOwnedProject>>>
 }
 
 type GenerationRunResult = {
@@ -47,6 +50,7 @@ type GenerationRunResult = {
   finishReason: string
   partCount: number
   providerUsage?: Record<string, unknown>
+  contextMetadata?: Record<string, unknown>
   checkpoint: ReturnType<MessageCheckpointer["getSummary"]>
   error?: ReturnType<typeof safeErrorMetadata>
 }
@@ -86,10 +90,18 @@ async function loadGenerationIdentity({
   ) {
     throw new Error("GENERATION_MESSAGE_NOT_READY")
   }
-  const thread = await findOwnedThread(db, userId, message.threadId)
-  if (!thread || thread.projectId !== message.projectId)
-    throw new Error("GENERATION_THREAD_NOT_FOUND")
-  return { message: { ...message, modelId: message.modelId }, thread }
+  const [thread, project] = await Promise.all([
+    findOwnedThread(db, userId, message.threadId),
+    findOwnedProject(db, userId, message.projectId),
+  ])
+  if (
+    !thread ||
+    !project ||
+    thread.projectId !== message.projectId ||
+    project.id !== message.projectId
+  )
+    throw new Error("GENERATION_CONTEXT_NOT_FOUND")
+  return { message: { ...message, modelId: message.modelId }, thread, project }
 }
 
 async function runGenerationCore({
@@ -105,7 +117,7 @@ async function runGenerationCore({
   observabilityContext: ObservabilityContext
   dependencies?: RunGenerationDependencies
 }): Promise<GenerationRunResult> {
-  const { message, thread } = identity
+  const { message, thread, project } = identity
   const rows = await listThreadMessageRows(
     db,
     message.projectId,
@@ -118,7 +130,7 @@ async function runGenerationCore({
     .reverse()
     .find((row) => row.role === "user")
   if (!latestUser) throw new Error("GENERATION_USER_MESSAGE_NOT_FOUND")
-  const modelMessages = await compileModelContext({
+  const compiledContext = await compileModelContextWithProject({
     userId,
     threadId: thread.id,
     excludeAssistantMessageId: message.id,
@@ -145,7 +157,13 @@ async function runGenerationCore({
         .map((row) => `${row.role}: ${textFromParts(row.parts)}`)
         .join("\n"),
       anchorText: thread.anchorText,
-      modelMessages,
+      projectContract: {
+        target: project.target,
+        instructions: project.instructions,
+        version: project.contractVersion,
+      },
+      projectFileStats: compiledContext.projectFileStats,
+      modelMessages: compiledContext.messages,
       abortSignal: session.signal,
     })
     pipelineEnd = await consumeUIMessagePipeline({
@@ -201,6 +219,7 @@ async function runGenerationCore({
       metadata: {
         assistantMessageId: message.id,
         requestedStatus: outcome.status,
+        ...(prepared?.contextMetadata ?? {}),
       },
     },
     async (observation) => {
@@ -238,6 +257,9 @@ async function runGenerationCore({
     finishReason: resolvedFinishReason ?? "unknown",
     partCount: terminal.parts.length,
     ...(providerUsage ? { providerUsage } : {}),
+    ...(prepared?.contextMetadata
+      ? { contextMetadata: prepared.contextMetadata }
+      : {}),
     checkpoint: checkpointer.getSummary(),
     ...(outcome.failed && (thrown || protocolError)
       ? { error: safeErrorMetadata(thrown ?? protocolError) }
@@ -278,6 +300,7 @@ export async function runGeneration(input: {
         },
         metadata: {
           ...result.checkpoint,
+          ...(result.contextMetadata ?? {}),
           ...(result.error ?? {}),
           hasProviderUsage: Boolean(result.providerUsage),
         },
