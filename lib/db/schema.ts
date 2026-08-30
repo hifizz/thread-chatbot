@@ -22,11 +22,13 @@ import type {
   MessageFeedback as ConversationMessageFeedback,
 } from "@/lib/thread-chat/contracts/dto"
 import type { ConversationMessageStatus } from "@/lib/thread-chat/domain/conversation"
+import { skillVersions } from "./skill-schema"
 
 // 认证与计费表在独立文件中定义，这里统一 re-export，使 drizzle 客户端与迁移能感知它们。
 export * from "./auth-schema"
 export * from "./billing-schema"
 export * from "./payment-schema"
+export * from "./skill-schema"
 
 export const attachments = dbSchema.table(
   "attachments",
@@ -107,6 +109,10 @@ export const threads = dbSchema.table(
     footnote: integer("footnote"),
     depth: integer("depth").notNull(),
     modelId: text("model_id").notNull(),
+    activeSkillVersionId: text("active_skill_version_id").references(
+      () => skillVersions.id,
+      { onDelete: "restrict" }
+    ),
     autoTitle: text("auto_title"),
     customTitle: text("custom_title"),
     titleGenerationAttempted: boolean("title_generation_attempted")
@@ -170,6 +176,10 @@ export const messages = dbSchema.table(
     parts: jsonb("parts").$type<ThreadChatUIMessage["parts"]>().notNull(),
     status: text("status").$type<ConversationMessageStatus>().notNull(),
     modelId: text("model_id"),
+    skillVersionId: text("skill_version_id").references(
+      () => skillVersions.id,
+      { onDelete: "restrict" }
+    ),
     replacesMessageId: text("replaces_message_id").references(
       (): AnyPgColumn => messages.id
     ),
@@ -222,7 +232,8 @@ export const messages = dbSchema.table(
     check(
       "messages_role_status_shape",
       sql`(
-        (${table.role} = 'user' and ${table.status} = 'completed' and ${table.modelId} is null)
+        (${table.role} = 'user' and ${table.status} = 'completed' and
+          ${table.modelId} is null and ${table.skillVersionId} is null)
         or
         (${table.role} = 'assistant' and ${table.modelId} is not null)
       )`
@@ -370,6 +381,11 @@ export const threadsRelations = relations(threads, ({ one, many }) => ({
   }),
   children: many(threads, { relationName: "threadChildren" }),
   messages: many(messages),
+  activeSkillVersion: one(skillVersions, {
+    fields: [threads.activeSkillVersionId],
+    references: [skillVersions.id],
+    relationName: "threadActiveSkillVersion",
+  }),
 }))
 
 export const messagesRelations = relations(messages, ({ one, many }) => ({
@@ -380,6 +396,11 @@ export const messagesRelations = relations(messages, ({ one, many }) => ({
   thread: one(threads, {
     fields: [messages.threadId],
     references: [threads.id],
+  }),
+  skillVersion: one(skillVersions, {
+    fields: [messages.skillVersionId],
+    references: [skillVersions.id],
+    relationName: "messageSkillVersion",
   }),
   replacedMessage: one(messages, {
     fields: [messages.replacesMessageId],
