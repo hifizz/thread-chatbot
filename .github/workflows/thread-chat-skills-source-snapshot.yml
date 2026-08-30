@@ -1,0 +1,21 @@
+name: Thread Chat Skills Source Snapshot
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/thread-chat-skills-source-snapshot.yml"
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+      - name: Create source archive
+        run: tar --exclude=.git --exclude=node_modules -czf thread-chat-skills-source.tgz .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: thread-chat-skills-source
+          path: thread-chat-skills-source.tgz
+          retention-days: 1
