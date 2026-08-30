@@ -47,7 +47,13 @@ export const UMAPIS_MODEL_IDS = [
 export type UMAPISModelId = (typeof UMAPIS_MODEL_IDS)[number]
 export type UMAPISCredentialGroup = "claude" | "gpt"
 export type ChatModelProvider =
-  "minimax" | "deepseek" | "openai" | "ark" | "openrouter" | "umapis"
+  | "minimax"
+  | "deepseek"
+  | "openai"
+  | "ark"
+  | "openrouter"
+  | "umapis"
+  | "private-relay"
 export type ReasoningTransport = "think-tags" | "native"
 export type ChatModelSurface = "linear" | "thread"
 
@@ -246,6 +252,41 @@ const CHAT_MODEL_REGISTRY = [
     umapisCredentialGroup: "gpt",
     unbilledPreview: true,
     surfaces: ["thread"],
+    creator: "openai",
+  },
+  // 私有模型中继使用订阅额度，折算策略确认前只注册路由，不暴露到产品入口；
+  // unbilledPreview 明确阻止计费模块把缺失价格误当成 ¥0 的公开计费模型。
+  {
+    id: "private-relay-gpt-5.6-luna",
+    name: "Private Relay · GPT-5.6 Luna",
+    description: "私有模型中继内部预览（暂未开放）",
+    provider: "private-relay",
+    upstreamModel: "gpt-5.6-luna",
+    reasoningTransport: "native",
+    unbilledPreview: true,
+    surfaces: [],
+    creator: "openai",
+  },
+  {
+    id: "private-relay-gpt-5.6-terra",
+    name: "Private Relay · GPT-5.6 Terra",
+    description: "私有模型中继内部预览（暂未开放）",
+    provider: "private-relay",
+    upstreamModel: "gpt-5.6-terra",
+    reasoningTransport: "native",
+    unbilledPreview: true,
+    surfaces: [],
+    creator: "openai",
+  },
+  {
+    id: "private-relay-gpt-5.6-sol",
+    name: "Private Relay · GPT-5.6 Sol",
+    description: "私有模型中继内部预览（暂未开放）",
+    provider: "private-relay",
+    upstreamModel: "gpt-5.6-sol",
+    reasoningTransport: "native",
+    unbilledPreview: true,
+    surfaces: [],
     creator: "openai",
   },
   {
