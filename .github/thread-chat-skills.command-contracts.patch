@@ -1,0 +1,115 @@
+diff --git a/lib/thread-chat/application/command-utils.ts b/lib/thread-chat/application/command-utils.ts
+index c2d51d5..4c5e37d 100644
+--- a/lib/thread-chat/application/command-utils.ts
++++ b/lib/thread-chat/application/command-utils.ts
+@@ -105,7 +105,8 @@ export async function touchProjectAndThread(
+   tx: ConversationTransaction,
+   projectId: string,
+   threadId: string,
+-  modelId?: string
++  modelId?: string,
++  activeSkillVersionId?: string | null
+ ): Promise<void> {
+   const now = new Date()
+   await tx
+@@ -114,6 +115,12 @@ export async function touchProjectAndThread(
+     .where(eq(projects.id, projectId))
+   await tx
+     .update(threads)
+-    .set({ updatedAt: now, ...(modelId ? { modelId } : {}) })
++    .set({
++      updatedAt: now,
++      ...(modelId ? { modelId } : {}),
++      ...(activeSkillVersionId !== undefined
++        ? { activeSkillVersionId }
++        : {}),
++    })
+     .where(eq(threads.id, threadId))
+ }
+diff --git a/lib/thread-chat/application/index.ts b/lib/thread-chat/application/index.ts
+index 2680a3e..e966235 100644
+--- a/lib/thread-chat/application/index.ts
++++ b/lib/thread-chat/application/index.ts
+@@ -9,6 +9,7 @@ export * from "@/lib/thread-chat/application/project-mutations"
+ export * from "@/lib/thread-chat/application/queries"
+ export * from "@/lib/thread-chat/application/retry-message"
+ export * from "@/lib/thread-chat/application/send-message"
++export * from "@/lib/thread-chat/application/skill-resolution"
+ export * from "@/lib/thread-chat/application/set-feedback"
+ export * from "@/lib/thread-chat/application/start-project"
+ export * from "@/lib/thread-chat/application/stop-message"
+diff --git a/lib/thread-chat/contracts/commands.ts b/lib/thread-chat/contracts/commands.ts
+index b288776..b872cbf 100644
+--- a/lib/thread-chat/contracts/commands.ts
++++ b/lib/thread-chat/contracts/commands.ts
+@@ -48,6 +48,7 @@ export const startProjectCommandSchema = z
+     userMessageId: entityIdSchema,
+     assistantMessageId: entityIdSchema,
+     modelId: modelIdSchema,
++    skillVersionId: entityIdSchema.optional(),
+     ...messageContentFields,
+   })
+   .strict()
+@@ -58,6 +59,7 @@ export const sendMessageCommandSchema = z
+     userMessageId: entityIdSchema,
+     assistantMessageId: entityIdSchema,
+     modelId: modelIdSchema,
++    skillVersionId: entityIdSchema.nullable().optional(),
+     ...messageContentFields,
+   })
+   .strict()
+@@ -135,12 +137,15 @@ export const updateThreadCommandSchema = z
+     commandId: commandIdSchema,
+     modelId: modelIdSchema.optional(),
+     customTitle: z.string().trim().min(1).max(60).nullable().optional(),
++    activeSkillVersionId: entityIdSchema.nullable().optional(),
+   })
+   .strict()
+   .refine(
+     (command) =>
+-      command.modelId !== undefined || command.customTitle !== undefined,
+-    { message: "至少提供 modelId 或 customTitle" }
++      command.modelId !== undefined ||
++      command.customTitle !== undefined ||
++      command.activeSkillVersionId !== undefined,
++    { message: "至少提供 modelId、customTitle 或 activeSkillVersionId" }
+   )
+ 
+ export type StartProjectCommand = z.infer<typeof startProjectCommandSchema>
+diff --git a/lib/thread-chat/contracts/errors.ts b/lib/thread-chat/contracts/errors.ts
+index 4980fdb..2744f9e 100644
+--- a/lib/thread-chat/contracts/errors.ts
++++ b/lib/thread-chat/contracts/errors.ts
+@@ -8,6 +8,12 @@ export const apiErrorCodeSchema = z.enum([
+   "MODEL_NOT_ALLOWED",
+   "SESSION_NOT_AVAILABLE",
+   "GENERATION_FAILED",
++  "SKILL_NOT_FOUND",
++  "SKILL_DISABLED",
++  "SKILL_VERSION_REVOKED",
++  "SKILL_CAPABILITY_UNAVAILABLE",
++  "SKILL_RESOURCE_NOT_FOUND",
++  "SKILL_PACKAGE_INVALID",
+ ])
+ 
+ export const apiErrorSchema = z
+diff --git a/lib/thread-chat/server/route-utils.ts b/lib/thread-chat/server/route-utils.ts
+index ff9c1bf..5dfab2e 100644
+--- a/lib/thread-chat/server/route-utils.ts
++++ b/lib/thread-chat/server/route-utils.ts
+@@ -85,10 +85,13 @@ export function mapRouteError(error: unknown): Response {
+     return errorResponse(409, error.code, error.message)
+   if (error instanceof ConversationApplicationError) {
+     const status =
+-      error.code === "NOT_FOUND"
++      error.code === "NOT_FOUND" ||
++      error.code === "SKILL_NOT_FOUND" ||
++      error.code === "SKILL_RESOURCE_NOT_FOUND"
+         ? 404
+         : error.code === "VALIDATION_ERROR" ||
+-            error.code === "MODEL_NOT_ALLOWED"
++            error.code === "MODEL_NOT_ALLOWED" ||
++            error.code === "SKILL_PACKAGE_INVALID"
+           ? 400
+           : 409
+     return errorResponse(status, error.code, error.message)
