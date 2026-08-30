@@ -378,6 +378,7 @@ export function createGate3MockRuntime(
     threadId: string
     sequence: number
     modelId: string
+    skill?: MessageDTO["skill"]
     replacesMessageId?: string | null
   }): MessageDTO => {
     const stamp = now()
@@ -390,7 +391,7 @@ export function createGate3MockRuntime(
       parts: [],
       status: "generating",
       modelId: input.modelId,
-      skill: null,
+      skill: input.skill ?? null,
       replacesMessageId: input.replacesMessageId ?? null,
       supersededAt: null,
       feedback: null,
