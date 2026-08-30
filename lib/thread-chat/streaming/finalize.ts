@@ -71,6 +71,7 @@ export async function finalizeGeneration({
         finalArtifacts.map((artifact) => ({
           ...artifact,
           projectId: updated.projectId,
+          threadId: updated.threadId,
           sourceMessageId: updated.id,
         }))
       )
