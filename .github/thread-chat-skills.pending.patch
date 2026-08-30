@@ -1,0 +1,19 @@
+--- a/app/thread-chat/gate-3-harness/mock-v1-runtime.ts
++++ b/app/thread-chat/gate-3-harness/mock-v1-runtime.ts
+@@ -378,6 +378,7 @@
+     threadId: string
+     sequence: number
+     modelId: string
++    skill?: MessageDTO["skill"]
+     replacesMessageId?: string | null
+   }): MessageDTO => {
+     const stamp = now()
+@@ -390,7 +391,7 @@
+       parts: [],
+       status: "generating",
+       modelId: input.modelId,
+-      skill: null,
++      skill: input.skill ?? null,
+       replacesMessageId: input.replacesMessageId ?? null,
+       supersededAt: null,
+       feedback: null,
