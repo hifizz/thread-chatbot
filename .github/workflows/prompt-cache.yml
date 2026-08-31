@@ -45,6 +45,8 @@ jobs:
         run: pnpm test:thread-chat:prompt-cache-eval
       - name: Quote composer contracts
         run: pnpm test:thread-chat:composer-quotes
+      - name: Quote resolver authorization contracts
+        run: node --import tsx e2e/thread-chat/quote-resolver-contract.test.mjs
       - name: Fake Claude cache cost probe
         run: pnpm prompt-cache:probe
       - name: Existing API contracts
