@@ -7,6 +7,7 @@ export const apiErrorCodeSchema = z.enum([
   "STATE_CONFLICT",
   "MODEL_NOT_ALLOWED",
   "SESSION_NOT_AVAILABLE",
+  "INPUT_BUDGET_EXCEEDED",
   "GENERATION_FAILED",
 ])
 
