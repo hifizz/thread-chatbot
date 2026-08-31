@@ -306,14 +306,29 @@ Archived Project SHALL 允许读取 Contract、Files、Artifacts 和历史 Threa
 - **WHEN** 用户尝试在 Archived Project 上传、添加或移除 Project File
 - **THEN** 系统拒绝该操作，现有资源保持不变
 
-### Requirement: Project resource isolation
+### Requirement: Project bootstrap shell and resource isolation
 
-所有 Contract、Project File、Artifact 和 Project Context 操作 MUST 以当前用户拥有的 Project 为边界，并 MUST NOT 泄露其他用户或其他 Project 的资源存在性。
+Project Bootstrap GET SHALL 同时承担“读取已存在 Workspace”和“进入尚未物化的随机 Project URL”两种职责。对于当前用户无法读取的 Project id，Bootstrap MUST 返回同一种不含资源信息的空壳结果，从而既支持首条消息再原子创建 Project，也不泄露某个 id 是否已经属于其他用户。所有会读取具体资源或产生 mutation 的 API MUST 继续严格按 owner + project 隔离，并对非法资源返回统一 Not Found。
 
-#### Scenario: Read another user's Project
+#### Scenario: Open an unmaterialized Project URL
 
-- **WHEN** 用户请求不属于自己的 Project Workspace
-- **THEN** 系统返回统一 Not Found，不返回 Contract、Files、Artifacts 或数量信息
+- **WHEN** 当前用户打开一个尚未在数据库中创建的合法 Project id
+- **THEN** Bootstrap 返回 `200`，其中 `project=null`、Files/Threads/Messages/Artifacts/activeGenerationIds 均为空；客户端可继续展示空 Workspace，并在首条消息时通过 start command 原子创建 Project
+
+#### Scenario: Read another user's Project through Bootstrap
+
+- **WHEN** 用户请求一个实际属于其他用户的 Project id
+- **THEN** Bootstrap 返回与“尚未物化 Project”完全相同的 `200 + project=null` 空壳，不返回 Contract、Files、Artifacts、Threads、Messages、数量或任何可区分存在性的字段
+
+#### Scenario: Mutate another user's Project
+
+- **WHEN** 用户对不属于自己的 Project 发起 Contract、归档、删除或 Project File mutation
+- **THEN** 系统返回统一 Not Found，并且不暴露该 Project 是否存在
+
+#### Scenario: Read a foreign Project resource
+
+- **WHEN** 用户读取不属于自己的 Artifact、Message、Thread 或寻址到错误 Project 下的 Project File
+- **THEN** 系统返回统一 Not Found，不返回资源元信息
 
 #### Scenario: Add another user's Attachment
 
