@@ -29,6 +29,7 @@ export type PromptCacheProbeSample = {
 
 export type PromptCacheProbeDecision = {
   enable: boolean
+  qualityPassed: boolean
   reason:
     | "lower-cost-no-regression"
     | "quality-regression"
@@ -42,6 +43,21 @@ export type PromptCacheProbeDecision = {
   candidateCostUsd?: number
   savingsUsd?: number
   savingsRatio?: number
+}
+
+type PromptCacheProbeInput = {
+  baseline: PromptCacheProbeSample
+  candidate: PromptCacheProbeSample
+  price: PromptCachePriceCard
+}
+
+/** Compatibility shape used by the first fake-probe script and stored fixtures. */
+type LegacyPromptCacheProbeInput = {
+  routeId?: string
+  qualityPassed: boolean
+  warmup: PromptCacheProbeSample
+  reuse: PromptCacheProbeSample
+  priceCard: PromptCachePriceCard
 }
 
 function validRate(value: number): number {
@@ -109,17 +125,37 @@ function qualityRegression(
   return null
 }
 
-export function evaluatePromptCacheProbe(input: {
-  baseline: PromptCacheProbeSample
-  candidate: PromptCacheProbeSample
-  price: PromptCachePriceCard
-}): PromptCacheProbeDecision {
-  if (input.candidate.routeDrifted) return { enable: false, reason: "route-drift" }
+function normalizeProbeInput(
+  input: PromptCacheProbeInput | LegacyPromptCacheProbeInput
+): PromptCacheProbeInput & { forcedQualityFailure: boolean } {
+  if ("baseline" in input) {
+    return { ...input, forcedQualityFailure: false }
+  }
+  return {
+    baseline: input.warmup,
+    candidate: input.reuse,
+    price: input.priceCard,
+    forcedQualityFailure: !input.qualityPassed,
+  }
+}
+
+export function evaluatePromptCacheProbe(
+  rawInput: PromptCacheProbeInput | LegacyPromptCacheProbeInput
+): PromptCacheProbeDecision {
+  const input = normalizeProbeInput(rawInput)
+  if (input.candidate.routeDrifted) {
+    return { enable: false, qualityPassed: true, reason: "route-drift" }
+  }
+  if (input.forcedQualityFailure) {
+    return { enable: false, qualityPassed: false, reason: "quality-regression" }
+  }
   const regression = qualityRegression(
     input.baseline.quality,
     input.candidate.quality
   )
-  if (regression) return { enable: false, reason: regression }
+  if (regression) {
+    return { enable: false, qualityPassed: false, reason: regression }
+  }
   const baselineCostUsd = calculatePromptCacheCostUsd({
     usage: input.baseline.usage,
     price: input.price,
@@ -133,6 +169,7 @@ export function evaluatePromptCacheProbe(input: {
   if (baselineCostUsd === undefined || candidateCostUsd === undefined) {
     return {
       enable: false,
+      qualityPassed: true,
       reason: "cost-not-proven",
       ...(baselineCostUsd !== undefined ? { baselineCostUsd } : {}),
       ...(candidateCostUsd !== undefined ? { candidateCostUsd } : {}),
@@ -142,6 +179,7 @@ export function evaluatePromptCacheProbe(input: {
   if (savingsUsd <= 0) {
     return {
       enable: false,
+      qualityPassed: true,
       reason: "not-cheaper",
       baselineCostUsd,
       candidateCostUsd,
@@ -151,6 +189,7 @@ export function evaluatePromptCacheProbe(input: {
   }
   return {
     enable: true,
+    qualityPassed: true,
     reason: "lower-cost-no-regression",
     baselineCostUsd,
     candidateCostUsd,
@@ -169,6 +208,9 @@ export const DEFAULT_FAKE_CLAUDE_PRICE_CARD: PromptCachePriceCard = {
 export function fakeClaudeCacheProbe(): {
   baseline: PromptCacheProbeSample
   candidate: PromptCacheProbeSample
+  /** Compatibility aliases retained for existing scripts and fixtures. */
+  warmup: PromptCacheProbeSample
+  reuse: PromptCacheProbeSample
   decision: PromptCacheProbeDecision
 } {
   const quality: PromptCacheQualitySignals = {
@@ -213,6 +255,8 @@ export function fakeClaudeCacheProbe(): {
   return {
     baseline,
     candidate,
+    warmup: baseline,
+    reuse: candidate,
     decision: evaluatePromptCacheProbe({
       baseline,
       candidate,
