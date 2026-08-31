@@ -24,6 +24,8 @@ export type AgentCacheSummary = {
   requestPrefixHash?: string
   toolProfileId?: string
   routeId?: string
+  quoteCount?: number
+  metadataExcluded?: boolean
 }
 
 export type AgentExperimentResult = {
