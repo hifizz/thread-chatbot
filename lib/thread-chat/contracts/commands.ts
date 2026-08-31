@@ -75,16 +75,16 @@ export const sendMessageCommandSchema = z
     }
   )
 
+/**
+ * Fork 直接带问只包含必填问题和附件。父 Thread 的 branch-origin Quote 由
+ * 服务端从已验证 Fork 字段生成；v1 不允许借 firstTurn 夹带任意跨 Thread Quote。
+ */
 const firstForkTurnSchema = z
   .object({
     userMessageId: entityIdSchema,
     assistantMessageId: entityIdSchema,
     text: requiredMessageTextSchema,
     files: filesSchema,
-    additionalQuotes: z
-      .array(quoteSelectionInputSchema)
-      .max(THREAD_QUOTE_MAX_COUNT - 1)
-      .default([]),
   })
   .strict()
 
@@ -170,14 +170,7 @@ export type SendMessageCommand = Omit<
   /** 兼容尚未接入 Quote Composer 的客户端；服务端 Schema 会补空数组。 */
   quotes?: ParsedSendMessageCommand["quotes"]
 }
-type ParsedForkThreadCommand = z.infer<typeof forkThreadCommandSchema>
-type ParsedFirstForkTurn = NonNullable<ParsedForkThreadCommand["firstTurn"]>
-export type ForkThreadCommand = Omit<ParsedForkThreadCommand, "firstTurn"> & {
-  firstTurn?: Omit<ParsedFirstForkTurn, "additionalQuotes"> & {
-    /** v1 前端可暂不暴露；服务端 Schema 会补空数组。 */
-    additionalQuotes?: ParsedFirstForkTurn["additionalQuotes"]
-  }
-}
+export type ForkThreadCommand = z.infer<typeof forkThreadCommandSchema>
 export type EditLatestTurnCommand = z.infer<
   typeof editLatestTurnCommandSchema
 >
