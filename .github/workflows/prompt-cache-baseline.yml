@@ -63,6 +63,8 @@ jobs:
           psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 \
             -c "ALTER DATABASE thread_chat_base_eval_test SET thread_chat.evaluation_guard TO 'prompt-cache-base-guard-token-2026'"
           pnpm db:migrate
+          pnpm db:test:setup
+          pnpm db:test:migrate
           DATABASE_URL="$EVAL_DATABASE_URL" DIRECT_URL="$EVAL_DATABASE_URL" pnpm db:migrate
       - name: Record baseline checks
         id: baseline
