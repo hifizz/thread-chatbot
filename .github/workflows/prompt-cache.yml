@@ -10,6 +10,7 @@ on:
       - "app/thread-chat/**"
       - "e2e/thread-chat/**"
       - "evals/agent/**"
+      - "scripts/check-prompt-cache-architecture.mjs"
       - "scripts/probe-prompt-cache.ts"
       - "package.json"
       - "pnpm-lock.yaml"
@@ -39,6 +40,8 @@ jobs:
         run: pnpm typecheck
       - name: Lint
         run: pnpm lint
+      - name: Prompt cache architecture guard
+        run: node scripts/check-prompt-cache-architecture.mjs
       - name: Prompt cache contracts
         run: >-
           pnpm test:thread-chat:prompt-cache &&
