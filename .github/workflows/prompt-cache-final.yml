@@ -67,9 +67,13 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Prepare evaluation database
-        run: createdb -h localhost -U postgres thread_chat_eval_test || true
         env:
           PGPASSWORD: postgres
+        run: |
+          createdb -h localhost -U postgres thread_chat_eval_test || true
+          psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 \
+            -c "ALTER DATABASE thread_chat_eval_test SET thread_chat.evaluation_guard TO 'prompt-cache-ci-guard-token-2026'"
+          DATABASE_URL="$EVAL_DATABASE_URL" DIRECT_URL="$EVAL_DATABASE_URL" pnpm db:migrate
       - name: Apply application migrations
         run: pnpm db:migrate
       - name: Prepare normalized Thread Chat test database
