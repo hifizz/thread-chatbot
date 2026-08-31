@@ -1,6 +1,7 @@
 import {
   convertToModelMessages,
   type ModelMessage,
+  type SystemModelMessage,
   type ToolSet,
 } from "ai"
 import { db } from "@/lib/db"
@@ -12,7 +13,11 @@ import {
   THREAD_PROMPT_COMPILER_VERSION,
 } from "@/constants/thread-chat"
 import { resolveAttachmentParts } from "@/lib/chat/resolve-attachments"
-import type { PromptProviderOptions } from "@/lib/ai/prompt-cache"
+import {
+  mergePromptProviderOptions,
+  type PromptProviderOptions,
+} from "@/lib/ai/prompt-cache"
+import type { PromptCacheMarker } from "@/lib/ai/prompt-cache-adapter"
 import type { ThreadChatUIMessage } from "@/lib/thread-chat/contracts/ui-message"
 import {
   applyInheritedBudget,
@@ -112,6 +117,46 @@ function withLegacyBranchOrigin(input: {
   }
 }
 
+function markerOptions(
+  markers: readonly PromptCacheMarker[] | undefined,
+  boundary: PromptCacheMarker["boundary"]
+): PromptProviderOptions | undefined {
+  return markers?.find((marker) => marker.boundary === boundary)
+    ?.providerOptions
+}
+
+function markLastMessage(
+  messages: readonly ModelMessage[],
+  providerOptions: PromptProviderOptions | undefined
+): ModelMessage[] {
+  if (!providerOptions || messages.length === 0) return [...messages]
+  const marked = [...messages]
+  const index = marked.length - 1
+  const current = marked[index] as ModelMessage & {
+    providerOptions?: PromptProviderOptions
+  }
+  marked[index] = {
+    ...current,
+    providerOptions: mergePromptProviderOptions(
+      current.providerOptions,
+      providerOptions
+    ),
+  } as ModelMessage
+  return marked
+}
+
+function systemForRequest(
+  content: string,
+  providerOptions: PromptProviderOptions | undefined
+): string | SystemModelMessage {
+  if (!providerOptions) return content
+  return {
+    role: "system",
+    content,
+    providerOptions,
+  } as SystemModelMessage
+}
+
 export type PromptBase = {
   system: string
   inheritedMessages: ModelMessage[]
@@ -188,8 +233,6 @@ export async function compilePromptBase(input: {
     hasPriorUser: branchHistoryUi.some((message) => message.role === "user"),
   })
 
-  // Stable segments never use the current question for RAG. Their attachment text
-  // must be byte-for-byte deterministic for sibling and continuation reuse.
   const [resolvedInherited, resolvedBranchHistory, resolvedCurrentUser] =
     await Promise.all([
       resolveAttachmentParts(inheritedWithNotice, input.userId, {
@@ -261,7 +304,7 @@ export async function compilePromptBase(input: {
 }
 
 export type CompiledGenerationPrompt = {
-  system: string
+  system: string | SystemModelMessage | SystemModelMessage[]
   messages: ModelMessage[]
   tools: ToolSet
   providerOptions?: PromptProviderOptions
@@ -287,6 +330,7 @@ export function finalizeGenerationPrompt(input: {
   runtimeControl?: unknown
   providerOptions?: PromptProviderOptions
   headers?: Record<string, string>
+  cacheMarkers?: readonly PromptCacheMarker[]
   contextWindowTokens?: number
   minimumCachePrefixTokens?: number
 }): CompiledGenerationPrompt {
@@ -294,10 +338,19 @@ export function finalizeGenerationPrompt(input: {
   const runtimeMessages: ModelMessage[] = runtimeText
     ? [{ role: "user", content: runtimeText }]
     : []
-  const stableMessages = [
-    ...input.base.inheritedMessages,
-    ...input.base.branchHistoryMessages,
-  ]
+  const inheritedMessages = markLastMessage(
+    input.base.inheritedMessages,
+    markerOptions(input.cacheMarkers, "inherited-end")
+  )
+  const branchHistoryMessages = markLastMessage(
+    input.base.branchHistoryMessages,
+    markerOptions(input.cacheMarkers, "branch-history-end")
+  )
+  const system = systemForRequest(
+    input.base.system,
+    markerOptions(input.cacheMarkers, "kernel-end")
+  )
+  const stableMessages = [...inheritedMessages, ...branchHistoryMessages]
   const messages = [
     ...stableMessages,
     ...runtimeMessages,
@@ -332,7 +385,7 @@ export function finalizeGenerationPrompt(input: {
   const minimumCachePrefixTokens = input.minimumCachePrefixTokens ?? 0
   const eligible = stablePrefixTokenEstimate >= minimumCachePrefixTokens
   const inputCharacters = stableStringify({
-    system: input.base.system,
+    system,
     messages,
     tools: input.tools,
   }).length
@@ -356,9 +409,9 @@ export function finalizeGenerationPrompt(input: {
     stableRequestPrefixHash: stablePrefixHash({
       toolProfileId: input.toolProfileId,
       toolProfileHash: input.toolProfileHash,
-      system: input.base.system,
-      inheritedMessages: input.base.inheritedMessages,
-      branchHistoryMessages: input.base.branchHistoryMessages,
+      system,
+      inheritedMessages,
+      branchHistoryMessages,
     }),
     stablePrefixCharacters,
     stablePrefixTokenEstimate,
@@ -390,7 +443,7 @@ export function finalizeGenerationPrompt(input: {
     },
   }
   return {
-    system: input.base.system,
+    system,
     messages,
     tools: input.tools,
     ...(input.providerOptions ? { providerOptions: input.providerOptions } : {}),
