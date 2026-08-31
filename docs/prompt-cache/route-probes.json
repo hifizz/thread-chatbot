@@ -1,0 +1,99 @@
+{
+  "schemaVersion": "prompt-cache-route-probes-v1",
+  "updatedAt": "2026-09-01",
+  "productionPolicy": {
+    "goal": "lowest-verified-total-cost-without-quality-regression",
+    "defaultMode": "off",
+    "defaultTtl": "provider-default-short",
+    "extendedTtlEnabled": false,
+    "liveProviderClaimsAllowed": false
+  },
+  "packageBaseline": {
+    "ai": "7.0.83",
+    "anthropicAdapter": "4.0.44",
+    "openrouterAdapter": "3.0.0"
+  },
+  "routes": [
+    {
+      "routeFamily": "umapis-claude",
+      "adapter": "anthropic",
+      "gateway": "umapis",
+      "status": "fake-probe-passed-live-probe-required",
+      "productionEnabled": false,
+      "ttlVerified": ["fake-5m"],
+      "usageFieldsVerified": [
+        "fake-cache-read-input-tokens",
+        "fake-cache-creation-input-tokens",
+        "fake-provider-cost"
+      ],
+      "knownLimitations": [
+        "No live credentials were used",
+        "Cache-control passthrough and real UMAPIS usage remain unproven",
+        "Keep strategy probe-required until a controlled live run proves net savings"
+      ]
+    },
+    {
+      "routeFamily": "anthropic-direct-reference",
+      "adapter": "anthropic",
+      "gateway": null,
+      "status": "optional-reference-not-run",
+      "productionEnabled": false,
+      "ttlVerified": [],
+      "usageFieldsVerified": [],
+      "knownLimitations": [
+        "No direct Anthropic credential was supplied",
+        "Reference route is not required for production rollout"
+      ]
+    },
+    {
+      "routeFamily": "vercel-ai-gateway",
+      "adapter": "gateway",
+      "gateway": "vercel",
+      "status": "typed-auto-caching-live-usage-required",
+      "productionEnabled": false,
+      "ttlVerified": [],
+      "usageFieldsVerified": [],
+      "knownLimitations": [
+        "Gateway option shape is implemented",
+        "Actual upstream provider, cache usage and total cost need a live probe"
+      ]
+    },
+    {
+      "routeFamily": "openrouter",
+      "adapter": "openrouter",
+      "gateway": "openrouter",
+      "status": "probe-required",
+      "productionEnabled": false,
+      "ttlVerified": [],
+      "usageFieldsVerified": [],
+      "knownLimitations": [
+        "Affinity HMAC contract is implemented",
+        "Provider endpoint stickiness, explicit marker conversion and real cost remain unproven"
+      ]
+    },
+    {
+      "routeFamily": "private-relay",
+      "adapter": "private-relay",
+      "gateway": null,
+      "status": "probe-required",
+      "productionEnabled": false,
+      "ttlVerified": [],
+      "usageFieldsVerified": [],
+      "knownLimitations": [
+        "OpenAI-compatible transport does not prove Claude cache-control passthrough"
+      ]
+    },
+    {
+      "routeFamily": "ark-minimax-cloudflare-compatible",
+      "adapter": "openai-compatible",
+      "gateway": "mixed",
+      "status": "probe-required",
+      "productionEnabled": false,
+      "ttlVerified": [],
+      "usageFieldsVerified": [],
+      "knownLimitations": [
+        "No provider-specific cache fields are sent before verification"
+      ]
+    }
+  ]
+}
