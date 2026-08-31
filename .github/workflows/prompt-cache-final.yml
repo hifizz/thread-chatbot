@@ -80,6 +80,8 @@ jobs:
         run: pnpm lint
       - name: Production build
         run: pnpm build
+      - name: Prompt cache architecture guard
+        run: node scripts/check-prompt-cache-architecture.mjs
       - name: Prompt cache and Quote contracts
         run: >-
           pnpm test:thread-chat:prompt-cache &&
