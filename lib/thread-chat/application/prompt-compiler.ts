@@ -185,22 +185,30 @@ export async function compilePromptBase(input: {
     hasPriorUser: branchHistoryUi.some((message) => message.role === "user"),
   })
 
-  const allUi = [
-    ...inheritedWithNotice,
-    ...branchHistoryUi,
-    currentUserUi,
-  ]
-  const resolved = (await resolveAttachmentParts(
-    allUi,
-    input.userId
-  )) as ThreadChatUIMessage[]
-  const inheritedEnd = inheritedWithNotice.length
-  const historyEnd = inheritedEnd + branchHistoryUi.length
-  const inheritedMessages = convertUiMessages(resolved.slice(0, inheritedEnd))
-  const branchHistoryMessages = convertUiMessages(
-    resolved.slice(inheritedEnd, historyEnd)
+  // Stable segments never use the current question for RAG. Their attachment text
+  // must be byte-for-byte deterministic for sibling and continuation reuse.
+  const [resolvedInherited, resolvedBranchHistory, resolvedCurrentUser] =
+    await Promise.all([
+      resolveAttachmentParts(inheritedWithNotice, input.userId, {
+        allowRetrieval: false,
+      }),
+      resolveAttachmentParts(branchHistoryUi, input.userId, {
+        allowRetrieval: false,
+      }),
+      resolveAttachmentParts([currentUserUi], input.userId, {
+        allowRetrieval: true,
+        query: messageText(currentUserUi),
+      }),
+    ])
+  const inheritedMessages = convertUiMessages(
+    resolvedInherited as ThreadChatUIMessage[]
   )
-  const currentUserMessages = convertUiMessages(resolved.slice(historyEnd))
+  const branchHistoryMessages = convertUiMessages(
+    resolvedBranchHistory as ThreadChatUIMessage[]
+  )
+  const currentUserMessages = convertUiMessages(
+    resolvedCurrentUser as ThreadChatUIMessage[]
+  )
   if (currentUserMessages.length !== 1) {
     stateConflict("当前用户消息编译结果不唯一")
   }
@@ -242,7 +250,8 @@ export async function compilePromptBase(input: {
     currentUserQuoteCount: currentQuotes.length,
     currentUserQuoteCharacters: currentQuotes.reduce(
       (total, quote) =>
-        total + quote.text.length +
+        total +
+        quote.text.length +
         (quote.schemaVersion === "legacy" ? 0 : (quote.comment?.length ?? 0)),
       0
     ),
@@ -313,7 +322,10 @@ export function finalizeGenerationPrompt(input: {
   const inheritedCharacters = input.base.baseSegments[1].characters
   const branchHistoryCharacters = input.base.baseSegments[2].characters
   const stablePrefixCharacters =
-    toolCharacters + kernelCharacters + inheritedCharacters + branchHistoryCharacters
+    toolCharacters +
+    kernelCharacters +
+    inheritedCharacters +
+    branchHistoryCharacters
   const stablePrefixTokenEstimate = Math.ceil(
     stablePrefixCharacters / THREAD_PROMPT_CHARACTERS_PER_TOKEN_ESTIMATE
   )
