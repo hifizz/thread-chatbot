@@ -162,8 +162,22 @@ export const updateThreadCommandSchema = z
   )
 
 export type StartProjectCommand = z.infer<typeof startProjectCommandSchema>
-export type SendMessageCommand = z.infer<typeof sendMessageCommandSchema>
-export type ForkThreadCommand = z.infer<typeof forkThreadCommandSchema>
+type ParsedSendMessageCommand = z.infer<typeof sendMessageCommandSchema>
+export type SendMessageCommand = Omit<
+  ParsedSendMessageCommand,
+  "quotes"
+> & {
+  /** 兼容尚未接入 Quote Composer 的客户端；服务端 Schema 会补空数组。 */
+  quotes?: ParsedSendMessageCommand["quotes"]
+}
+type ParsedForkThreadCommand = z.infer<typeof forkThreadCommandSchema>
+type ParsedFirstForkTurn = NonNullable<ParsedForkThreadCommand["firstTurn"]>
+export type ForkThreadCommand = Omit<ParsedForkThreadCommand, "firstTurn"> & {
+  firstTurn?: Omit<ParsedFirstForkTurn, "additionalQuotes"> & {
+    /** v1 前端可暂不暴露；服务端 Schema 会补空数组。 */
+    additionalQuotes?: ParsedFirstForkTurn["additionalQuotes"]
+  }
+}
 export type EditLatestTurnCommand = z.infer<
   typeof editLatestTurnCommandSchema
 >
