@@ -12,6 +12,23 @@ permissions:
 jobs:
   validate:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
+      DIRECT_URL: postgres://postgres:postgres@localhost:5432/postgres
     steps:
       - uses: actions/checkout@v4
 
@@ -28,10 +45,20 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
+      - name: Pure project context policies
+        run: node --import tsx e2e/thread-chat/project-workspace-context.test.mjs
+
       - name: Project panel workspace isolation
         run: node --import tsx e2e/thread-chat/project-panel-workspace-state.test.mjs
 
+      - name: Prepare normalized test database
+        run: pnpm db:test:reset && pnpm db:test:migrate
+
+      - name: Project workspace schema and repository acceptance
+        run: node --import tsx e2e/thread-chat/project-workspace-db.test.mjs
+
+      - name: Project contract generation boundary
+        run: node --import tsx e2e/thread-chat/project-contract-generation-boundary.test.mjs
+
       - name: Validate OpenSpec
         run: pnpm openspec:validate
-
-# trigger: project-panel-state-check
