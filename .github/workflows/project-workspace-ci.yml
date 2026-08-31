@@ -49,8 +49,14 @@ jobs:
       - name: Pure project context policies
         run: node --import tsx e2e/thread-chat/project-workspace-context.test.mjs
 
+      - name: Project panel UI contract
+        run: node e2e/thread-chat/project-panel-ui-contract.test.mjs
+
       - name: Project panel workspace isolation
         run: node --import tsx e2e/thread-chat/project-panel-workspace-state.test.mjs
+
+      - name: Project workspace eval harness
+        run: node --import tsx e2e/observability/project-workspace-eval-harness.test.mjs
 
       - name: Prepare normalized test database
         run: pnpm db:test:reset && pnpm db:test:migrate
@@ -63,6 +69,15 @@ jobs:
 
       - name: Project contract generation boundary
         run: node --import tsx e2e/thread-chat/project-contract-generation-boundary.test.mjs
+
+      - name: Project workspace history stability
+        run: node --import tsx e2e/thread-chat/project-workspace-history-stability.test.mjs
+
+      - name: Project artifact context isolation
+        run: node --import tsx e2e/thread-chat/project-artifact-context-isolation.test.mjs
+
+      - name: Agent eval fixture smoke
+        run: pnpm eval:ci
 
       - name: Validate OpenSpec
         run: pnpm openspec:validate
