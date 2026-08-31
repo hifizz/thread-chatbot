@@ -46,6 +46,12 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
+      - name: Verify generated migration is in sync
+        run: pnpm db:generate && git diff --exit-code -- drizzle
+
+      - name: Legacy data migration compatibility
+        run: node --import tsx e2e/thread-chat/project-workspace-migration-compatibility.test.mjs
+
       - name: Pure project context policies
         run: node --import tsx e2e/thread-chat/project-workspace-context.test.mjs
 
