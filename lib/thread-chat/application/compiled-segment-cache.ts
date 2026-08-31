@@ -1,4 +1,4 @@
-import { createHmac } from "node:crypto"
+import { createHash, createHmac } from "node:crypto"
 import type { PromptSegmentKind } from "@/lib/thread-chat/application/prompt-cache"
 
 export type CompiledSegmentCacheKeyInput = {
@@ -10,6 +10,17 @@ export type CompiledSegmentCacheKeyInput = {
   sourceContentHash: string
   modelFamily: string
   attachmentStrategyVersion: string
+  toolProfileId?: string
+}
+
+/** Compatibility shape retained for early fixtures and local measurement tools. */
+export type LegacyCompiledSegmentCacheKeyInput = {
+  tenantHmac: string
+  compilerVersion: string
+  segmentKind: PromptSegmentKind
+  sourceHash: string
+  modelFamily: string
+  attachmentStrategyVersion?: string
   toolProfileId?: string
 }
 
@@ -37,8 +48,23 @@ export interface CompiledSegmentCache {
 }
 
 export function compiledSegmentCacheKey(
-  input: CompiledSegmentCacheKeyInput
+  input: CompiledSegmentCacheKeyInput | LegacyCompiledSegmentCacheKeyInput
 ): CompiledSegmentCacheKey {
+  if ("tenantHmac" in input) {
+    const material = [
+      input.tenantHmac,
+      input.compilerVersion,
+      input.segmentKind,
+      input.sourceHash,
+      input.modelFamily,
+      input.attachmentStrategyVersion ?? "default",
+      input.toolProfileId ?? "none",
+    ].join("\u001f")
+    return createHash("sha256")
+      .update(material, "utf8")
+      .digest("hex") as CompiledSegmentCacheKey
+  }
+
   const tenant = createHmac("sha256", input.tenantSalt)
     .update(`${input.userId}\u001f${input.projectId}`, "utf8")
     .digest("hex")
@@ -56,12 +82,27 @@ export function compiledSegmentCacheKey(
     .digest("hex") as CompiledSegmentCacheKey
 }
 
+type CacheGetInput = CompiledSegmentCacheKey | { key: CompiledSegmentCacheKey }
+type CacheSetInput = {
+  key: CompiledSegmentCacheKey
+  value: CompiledPromptSegment
+  ttlMs: number
+}
+
+function cacheKey(input: CacheGetInput): CompiledSegmentCacheKey {
+  return typeof input === "string" ? input : input.key
+}
+
 export class NoopCompiledSegmentCache implements CompiledSegmentCache {
-  async get(): Promise<null> {
+  async get(_key: CacheGetInput): Promise<null> {
     return null
   }
-  async set(): Promise<void> {}
-  async delete(): Promise<void> {}
+  async set(
+    _keyOrInput: CompiledSegmentCacheKey | CacheSetInput,
+    _value?: CompiledPromptSegment,
+    _ttlMs?: number
+  ): Promise<void> {}
+  async delete(_key: CompiledSegmentCacheKey): Promise<void> {}
   async clear(): Promise<void> {}
 }
 
@@ -76,14 +117,18 @@ type LruEntry = {
  */
 export class InMemoryCompiledSegmentCache implements CompiledSegmentCache {
   private readonly values = new Map<CompiledSegmentCacheKey, LruEntry>()
+  private readonly maximumEntries: number
 
-  constructor(private readonly maximumEntries = 100) {
-    if (!Number.isInteger(maximumEntries) || maximumEntries < 1) {
+  constructor(options: number | { maxEntries: number } = 100) {
+    this.maximumEntries =
+      typeof options === "number" ? options : options.maxEntries
+    if (!Number.isInteger(this.maximumEntries) || this.maximumEntries < 1) {
       throw new Error("INVALID_COMPILED_SEGMENT_CACHE_CAPACITY")
     }
   }
 
-  async get(key: CompiledSegmentCacheKey): Promise<CompiledPromptSegment | null> {
+  async get(input: CacheGetInput): Promise<CompiledPromptSegment | null> {
+    const key = cacheKey(input)
     const entry = this.values.get(key)
     if (!entry) return null
     if (entry.expiresAt <= Date.now()) {
@@ -96,17 +141,22 @@ export class InMemoryCompiledSegmentCache implements CompiledSegmentCache {
   }
 
   async set(
-    key: CompiledSegmentCacheKey,
-    value: CompiledPromptSegment,
-    ttlMs: number
+    keyOrInput: CompiledSegmentCacheKey | CacheSetInput,
+    value?: CompiledPromptSegment,
+    ttlMs?: number
   ): Promise<void> {
-    if (!Number.isFinite(ttlMs) || ttlMs <= 0) {
+    const input =
+      typeof keyOrInput === "string"
+        ? { key: keyOrInput, value, ttlMs }
+        : keyOrInput
+    if (!input.value) throw new Error("INVALID_COMPILED_SEGMENT_CACHE_VALUE")
+    if (!Number.isFinite(input.ttlMs) || (input.ttlMs ?? 0) <= 0) {
       throw new Error("INVALID_COMPILED_SEGMENT_CACHE_TTL")
     }
-    this.values.delete(key)
-    this.values.set(key, {
-      value: structuredClone(value),
-      expiresAt: Date.now() + ttlMs,
+    this.values.delete(input.key)
+    this.values.set(input.key, {
+      value: structuredClone(input.value),
+      expiresAt: Date.now() + input.ttlMs!,
     })
     while (this.values.size > this.maximumEntries) {
       const oldest = this.values.keys().next().value as
