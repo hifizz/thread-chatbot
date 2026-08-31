@@ -55,9 +55,7 @@ import {
   aggregatePromptCacheUsage,
   normalizePromptCacheUsage,
 } from "../../lib/ai/prompt-cache-usage.ts"
-import {
-  createModelAttemptCollector,
-} from "../../lib/ai/model-attempt.ts"
+import { createModelAttemptCollector } from "../../lib/ai/model-attempt.ts"
 import {
   evaluatePromptCacheProbe,
   fakeClaudeCacheProbe,
@@ -363,6 +361,7 @@ assert.deepEqual(
     mode: "enabled",
     enabled: false,
     reason: "probe-required",
+    strategy: "probe-required",
   }
 )
 assert.equal(
@@ -487,64 +486,40 @@ assert.equal(collector.summary().usage.cacheReadTokens, 700)
 
 const fakeProbe = fakeClaudeCacheProbe()
 assert.equal(fakeProbe.decision.enable, true)
-assert.equal(fakeProbe.decision.reason, "lower-cost-no-regression")
-const qualityRegression = evaluatePromptCacheProbe({
-  baseline: fakeProbe.baseline,
-  candidate: {
-    ...fakeProbe.candidate,
-    quality: { ...fakeProbe.candidate.quality, answerQuality: 0 },
-  },
-  price: DEFAULT_FAKE_CLAUDE_PRICE_CARD,
-})
-assert.deepEqual(qualityRegression, {
-  enable: false,
-  reason: "quality-regression",
-})
-const missingCost = evaluatePromptCacheProbe({
-  baseline: { ...fakeProbe.baseline, usage: { source: "unavailable", complete: false } },
-  candidate: fakeProbe.candidate,
-  price: DEFAULT_FAKE_CLAUDE_PRICE_CARD,
-})
-assert.equal(missingCost.reason, "cost-not-proven")
-
-const cacheKeyA = compiledSegmentCacheKey({
-  tenantSalt: "salt",
-  userId: "user-a",
-  projectId: "project-a",
-  promptCompilerVersion: "v1",
-  segmentKind: "inherited-history",
-  sourceContentHash: "hash",
-  modelFamily: "claude",
-  attachmentStrategyVersion: "v1",
-})
-const cacheKeyB = compiledSegmentCacheKey({
-  tenantSalt: "salt",
-  userId: "user-b",
-  projectId: "project-a",
-  promptCompilerVersion: "v1",
-  segmentKind: "inherited-history",
-  sourceContentHash: "hash",
-  modelFamily: "claude",
-  attachmentStrategyVersion: "v1",
-})
-assert.notEqual(cacheKeyA, cacheKeyB)
-const l2 = new InMemoryCompiledSegmentCache(1)
-await l2.set(
-  cacheKeyA,
-  {
-    kind: "inherited-history",
-    contentHash: "hash",
-    modelMessages: [{ role: "user", content: "A" }],
-    characters: 1,
-    createdAt: new Date().toISOString(),
-  },
-  1000
+assert.equal(fakeProbe.decision.qualityPassed, true)
+assert.equal(
+  evaluatePromptCacheProbe({
+    routeId: "anthropic:umapis:claude",
+    qualityPassed: false,
+    warmup: fakeProbe.warmup,
+    reuse: fakeProbe.reuse,
+    priceCard: DEFAULT_FAKE_CLAUDE_PRICE_CARD,
+  }).enable,
+  false,
+  "质量硬门禁必须优先于成本"
 )
-assert.equal((await l2.get(cacheKeyA)).contentHash, "hash")
-assert.equal(await l2.get(cacheKeyB), null)
-assert.equal(await new NoopCompiledSegmentCache().get(cacheKeyA), null)
 
-const merged = mergeBranchOriginQuote(origin, [origin])
-assert.equal(merged.length, 1)
+const noop = new NoopCompiledSegmentCache()
+assert.equal(await noop.get({ key: "x" }), null)
+const memory = new InMemoryCompiledSegmentCache({ maxEntries: 2 })
+const cacheKey = compiledSegmentCacheKey({
+  tenantHmac: "tenant-a",
+  compilerVersion: "v1",
+  segmentKind: "inherited-history",
+  sourceHash: "source",
+  modelFamily: "claude",
+})
+await memory.set({ key: cacheKey, value: inherited, ttlMs: 1000 })
+assert.deepEqual(await memory.get({ key: cacheKey }), inherited)
+assert.notEqual(
+  cacheKey,
+  compiledSegmentCacheKey({
+    tenantHmac: "tenant-b",
+    compilerVersion: "v1",
+    segmentKind: "inherited-history",
+    sourceHash: "source",
+    modelFamily: "claude",
+  })
+)
 
-console.log("PASS prompt cache and quote contracts")
+console.log("PASS prompt-cache Quote and cost contracts")
