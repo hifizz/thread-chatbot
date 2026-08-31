@@ -35,6 +35,12 @@ type SeedMessage = {
   finishedAt: Date | null
 }
 
+type SeedProjectFile = {
+  projectId: string
+  attachmentId: string
+  addedAt: Date
+}
+
 export type ProductionEvaluationSeed = {
   user: {
     id: string
@@ -44,7 +50,14 @@ export type ProductionEvaluationSeed = {
     createdAt: Date
     updatedAt: Date
   }
-  project: { id: string; userId: string }
+  project: {
+    id: string
+    userId: string
+    target: string | null
+    instructions: string | null
+    contractVersion: number
+  }
+  foreignProject: { id: string; userId: string } | null
   thread: {
     id: string
     projectId: string
@@ -55,6 +68,8 @@ export type ProductionEvaluationSeed = {
     nextSequence: number
   }
   attachments: SeedAttachment[]
+  projectFiles: SeedProjectFile[]
+  foreignProjectFiles: SeedProjectFile[]
   messages: SeedMessage[]
   assistantMessageId: string
 }
@@ -74,10 +89,32 @@ function pdfPages(bytes: Buffer): string[] | null {
   return pages.length > 0 ? pages : null
 }
 
-function numericUsage(
-  value: unknown,
-  prefix = ""
-): Record<string, number> {
+async function seedAttachment(input: {
+  fixture: string
+  mediaType: string
+  filename?: string
+  userId: string
+  caseId: string
+  id: () => string
+}): Promise<SeedAttachment> {
+  const attachmentId = input.id()
+  const bytes = await readFile(resolveFixturePath(input.fixture))
+  const pages = input.mediaType === "application/pdf" ? pdfPages(bytes) : null
+  return {
+    id: attachmentId,
+    userId: input.userId,
+    key: `evaluations/${input.caseId}/${attachmentId}`,
+    filename: input.filename ?? input.fixture,
+    mimeType: input.mediaType,
+    size: bytes.byteLength,
+    kind: attachmentKind(input.mediaType),
+    status: "ready",
+    pageCount: pages?.length ?? null,
+    pages,
+  }
+}
+
+function numericUsage(value: unknown, prefix = ""): Record<string, number> {
   if (!value || typeof value !== "object") return {}
   return Object.fromEntries(
     Object.entries(value as Record<string, unknown>).flatMap(([key, nested]) => {
@@ -98,26 +135,53 @@ export async function buildProductionEvaluationSeed(input: {
   const userId = `eval-user-${id()}`
   const projectId = id()
   const threadId = id()
-  const attachmentRows = await Promise.all(
-    input.evaluationCase.input.attachments.map(async (attachment) => {
-      const attachmentId = id()
-      const bytes = await readFile(resolveFixturePath(attachment.fixture))
-      const pages =
-        attachment.mediaType === "application/pdf" ? pdfPages(bytes) : null
-      return {
-        id: attachmentId,
+  const projectContext = input.evaluationCase.input.projectContext
+
+  const messageAttachmentRows = await Promise.all(
+    input.evaluationCase.input.attachments.map((attachment) =>
+      seedAttachment({
+        ...attachment,
         userId,
-        key: `evaluations/${input.evaluationCase.id}/${attachmentId}`,
-        filename: attachment.filename ?? attachment.fixture,
-        mimeType: attachment.mediaType,
-        size: bytes.byteLength,
-        kind: attachmentKind(attachment.mediaType),
-        status: "ready" as const,
-        pageCount: pages?.length ?? null,
-        pages,
-      }
-    })
+        caseId: input.evaluationCase.id,
+        id,
+      })
+    )
   )
+  const projectAttachmentRows = await Promise.all(
+    (projectContext?.files ?? []).map((attachment) =>
+      seedAttachment({
+        ...attachment,
+        userId,
+        caseId: input.evaluationCase.id,
+        id,
+      })
+    )
+  )
+  const foreignAttachmentRows = await Promise.all(
+    (projectContext?.foreignFiles ?? []).map((attachment) =>
+      seedAttachment({
+        ...attachment,
+        userId,
+        caseId: input.evaluationCase.id,
+        id,
+      })
+    )
+  )
+  const foreignProject =
+    foreignAttachmentRows.length > 0 ? { id: id(), userId } : null
+  const projectFiles = projectAttachmentRows.map((attachment) => ({
+    projectId,
+    attachmentId: attachment.id,
+    addedAt: now,
+  }))
+  const foreignProjectFiles = foreignProject
+    ? foreignAttachmentRows.map((attachment) => ({
+        projectId: foreignProject.id,
+        attachmentId: attachment.id,
+        addedAt: now,
+      }))
+    : []
+
   const lastUserIndex = input.evaluationCase.input.messages.findLastIndex(
     (message) => message.role === "user"
   )
@@ -132,7 +196,7 @@ export async function buildProductionEvaluationSeed(input: {
       parts: [
         { type: "text", text: message.text },
         ...(index === lastUserIndex
-          ? attachmentRows.map((attachment) => ({
+          ? messageAttachmentRows.map((attachment) => ({
               type: "file",
               url: `${ATTACHMENT_URL_PREFIX}${attachment.id}`,
               mediaType: attachment.mimeType,
@@ -168,7 +232,14 @@ export async function buildProductionEvaluationSeed(input: {
       createdAt: now,
       updatedAt: now,
     },
-    project: { id: projectId, userId },
+    project: {
+      id: projectId,
+      userId,
+      target: projectContext?.target ?? null,
+      instructions: projectContext?.instructions ?? null,
+      contractVersion: projectContext ? 1 : 0,
+    },
+    foreignProject,
     thread: {
       id: threadId,
       projectId,
@@ -178,7 +249,13 @@ export async function buildProductionEvaluationSeed(input: {
       modelId: input.modelId,
       nextSequence: messages.length + 1,
     },
-    attachments: attachmentRows,
+    attachments: [
+      ...messageAttachmentRows,
+      ...projectAttachmentRows,
+      ...foreignAttachmentRows,
+    ],
+    projectFiles,
+    foreignProjectFiles,
     messages,
     assistantMessageId,
   }
@@ -229,10 +306,19 @@ export async function executeProductionGeneration(input: {
   try {
     await db.transaction(async (tx) => {
       await tx.insert(schema.user).values(seed.user)
-      await tx.insert(schema.projects).values(seed.project)
+      await tx.insert(schema.projects).values([
+        seed.project,
+        ...(seed.foreignProject ? [seed.foreignProject] : []),
+      ])
       await tx.insert(schema.threads).values(seed.thread)
       if (seed.attachments.length > 0) {
         await tx.insert(schema.attachments).values(seed.attachments)
+      }
+      if (seed.projectFiles.length > 0) {
+        await tx.insert(schema.projectFiles).values(seed.projectFiles)
+      }
+      if (seed.foreignProjectFiles.length > 0) {
+        await tx.insert(schema.projectFiles).values(seed.foreignProjectFiles)
       }
       await tx.insert(schema.messages).values(seed.messages)
     })
