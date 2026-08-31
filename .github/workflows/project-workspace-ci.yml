@@ -77,7 +77,7 @@ jobs:
         run: node --import tsx e2e/thread-chat/project-artifact-context-isolation.test.mjs
 
       - name: Agent eval fixture smoke
-        run: pnpm eval:ci
+        run: pnpm eval:agent:ci
 
       - name: Validate OpenSpec
         run: pnpm openspec:validate
