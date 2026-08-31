@@ -1,4 +1,10 @@
-import { isStepCount, streamText, type ToolSet } from "ai"
+import {
+  isStepCount,
+  streamText,
+  type LanguageModelUsage,
+  type TextStreamPart,
+  type ToolSet,
+} from "ai"
 import {
   DIRECT_FETCH_SYSTEM_PROMPT,
   RESEARCH_MAX_STEPS,
@@ -12,8 +18,16 @@ import { isSearchConfigured } from "@/lib/ai/search"
 import { resolveChatModelRoute } from "@/lib/ai/provider"
 import {
   buildPromptCacheControls,
+  looksLikePromptCacheControlRejection,
+  mergePromptProviderOptions,
+  parsePromptCacheRouteModes,
   resolvePromptCacheMode,
+  resolvePromptCacheModeForRoute,
+  selectPromptCacheTtl,
+  type PromptCacheControls,
 } from "@/lib/ai/prompt-cache"
+import { buildPromptCacheAdapterPlan } from "@/lib/ai/prompt-cache-adapter"
+import { createPromptCacheFallbackStream } from "@/lib/ai/prompt-cache-fallback-stream"
 import { createModelAttemptCollector } from "@/lib/ai/model-attempt"
 import { withModelCallLogging } from "@/lib/ai/model-call-logger"
 import { isExplicitMarkdownArtifactRequest } from "@/lib/chat/markdown-artifact"
@@ -35,6 +49,7 @@ import { observeAppOperation } from "@/lib/observability/trace"
 import type { ObservabilityContext } from "@/lib/observability/types"
 import {
   finalizeGenerationPrompt,
+  type CompiledGenerationPrompt,
   type PromptBase,
 } from "@/lib/thread-chat/application/prompt-compiler"
 import type { PromptManifest } from "@/lib/thread-chat/application/prompt-cache"
@@ -71,6 +86,28 @@ function runtimeInstructions(input: {
     ].filter((value): value is string => value !== null),
     artifactRequested: input.artifactRequested,
   }
+}
+
+function enabledEnv(value: string | undefined): boolean {
+  return value?.trim().toLowerCase() === "true"
+}
+
+function optionalPercent(value: string | undefined): number | undefined {
+  if (!value?.trim()) return undefined
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : undefined
+}
+
+function hasCacheControls(input: {
+  providerOptions: CompiledGenerationPrompt["providerOptions"]
+  headers: CompiledGenerationPrompt["headers"]
+  markerCount: number
+}): boolean {
+  return Boolean(
+    input.markerCount > 0 ||
+      (input.providerOptions && Object.keys(input.providerOptions).length > 0) ||
+      (input.headers && Object.keys(input.headers).length > 0)
+  )
 }
 
 export async function prepareGeneration(input: PrepareGenerationInput) {
@@ -159,29 +196,122 @@ export async function prepareGeneration(input: PrepareGenerationInput) {
         : artifactRequested
           ? "createMarkdownArtifact"
           : null
-  const cacheControls = buildPromptCacheControls({
+  const runtimeControl = runtimeInstructions({
+    researchMode: researchRoute.mode,
+    researchPlan,
+    artifactRequested,
+  })
+
+  // Compile once without controls to obtain route-neutral candidate boundaries.
+  const preview = finalizeGenerationPrompt({
+    base: input.promptBase,
+    tools: built.tools,
+    toolProfileId: built.profile.id,
+    toolProfileHash: built.profile.hash,
+    routeId: resolved.route.routeId,
+    runtimeControl,
+    contextWindowTokens: resolved.contextWindowTokens,
+    minimumCachePrefixTokens: resolved.cache.minimumPrefixTokens,
+  })
+  const candidates = preview.manifest.candidateBoundaries
+    .filter((boundary) => {
+      if (boundary.kind === "inherited-end") {
+        return input.promptBase.inheritedMessages.length > 0
+      }
+      if (boundary.kind === "branch-history-end") {
+        return input.promptBase.branchHistoryMessages.length > 0
+      }
+      return true
+    })
+    .map((boundary) => ({
+      kind: boundary.kind,
+      tokenEstimate: boundary.tokenEstimate,
+    }))
+
+  const affinitySalt = process.env.THREAD_PROMPT_CACHE_AFFINITY_SALT
+  const cacheMode = resolvePromptCacheModeForRoute({
+    routeId: resolved.route.routeId,
+    userId: input.userId,
+    projectId: input.projectId,
+    globalMode: resolvePromptCacheMode(),
+    routeModes: parsePromptCacheRouteModes(),
+    cohortPercent: optionalPercent(
+      process.env.THREAD_PROMPT_CACHE_COHORT_PERCENT
+    ),
+    cohortSalt: affinitySalt,
+  })
+  const ttlClass = selectPromptCacheTtl({
+    supportedTtls: resolved.cache.supportedTtls,
+    extendedEnabled: enabledEnv(
+      process.env.THREAD_PROMPT_CACHE_EXTENDED_TTL_ENABLED
+    ),
+    retentionAllowsExtended: enabledEnv(
+      process.env.THREAD_PROMPT_CACHE_RETENTION_APPROVED
+    ),
+  })
+  const adapterPlan = buildPromptCacheAdapterPlan({
+    strategy: resolved.cache.strategy,
+    candidates,
+    minimumPrefixTokens: resolved.cache.minimumPrefixTokens ?? 0,
+    maximumBreakpoints: resolved.cache.maxBreakpoints,
+    ttlClass,
+  })
+  const baseControls = buildPromptCacheControls({
     resolved,
     userId: input.userId,
     projectId: input.projectId,
-    mode: resolvePromptCacheMode(),
-    affinitySalt: process.env.THREAD_PROMPT_CACHE_AFFINITY_SALT,
+    mode: cacheMode,
+    affinitySalt,
   })
+  const controlsEnabled = baseControls.enabled && adapterPlan.enabled
+  const providerOptions = controlsEnabled
+    ? mergePromptProviderOptions(
+        baseControls.providerOptions,
+        adapterPlan.providerOptions
+      )
+    : undefined
+  const headers = controlsEnabled ? baseControls.headers : undefined
+  const markers = controlsEnabled ? adapterPlan.markers : []
+  const cacheControls: PromptCacheControls = {
+    mode: cacheMode,
+    enabled: controlsEnabled,
+    reason:
+      cacheMode !== "enabled" ? baseControls.reason : adapterPlan.reason,
+    strategy: resolved.cache.strategy,
+    ttlClass,
+    markerCount: markers.length,
+    ...(providerOptions ? { providerOptions } : {}),
+    ...(headers ? { headers } : {}),
+    ...(controlsEnabled && baseControls.affinityHash
+      ? { affinityHash: baseControls.affinityHash }
+      : {}),
+  }
+
   const compiled = finalizeGenerationPrompt({
     base: input.promptBase,
     tools: built.tools,
     toolProfileId: built.profile.id,
     toolProfileHash: built.profile.hash,
     routeId: resolved.route.routeId,
-    runtimeControl: runtimeInstructions({
-      researchMode: researchRoute.mode,
-      researchPlan,
-      artifactRequested,
-    }),
-    providerOptions: cacheControls.providerOptions,
-    headers: cacheControls.headers,
+    runtimeControl,
+    providerOptions,
+    headers,
+    cacheMarkers: markers,
     contextWindowTokens: resolved.contextWindowTokens,
     minimumCachePrefixTokens: resolved.cache.minimumPrefixTokens,
   })
+  const fallbackCompiled = controlsEnabled
+    ? finalizeGenerationPrompt({
+        base: input.promptBase,
+        tools: built.tools,
+        toolProfileId: built.profile.id,
+        toolProfileHash: built.profile.hash,
+        routeId: resolved.route.routeId,
+        runtimeControl,
+        contextWindowTokens: resolved.contextWindowTokens,
+        minimumCachePrefixTokens: resolved.cache.minimumPrefixTokens,
+      })
+    : compiled
   const attemptCollector = createModelAttemptCollector({
     purpose: MODEL_CALL_PURPOSE.chatAnswer,
     routeId: resolved.route.routeId,
@@ -194,43 +324,73 @@ export async function prepareGeneration(input: PrepareGenerationInput) {
     cacheEligibility: compiled.manifest.cacheEligibility.reason,
   })
 
+  const startStream = (
+    prompt: CompiledGenerationPrompt
+  ): {
+    stream: ReadableStream<TextStreamPart<ToolSet>>
+    usage: PromiseLike<LanguageModelUsage>
+  } => {
+    const result = streamText({
+      ...buildAiTelemetryConfig(MODEL_CALL_PURPOSE.chatAnswer, {
+        ...trace,
+        modelId: input.modelId,
+        providerRouteId: resolved.route.routeId,
+        toolProfileId: built.profile.id,
+        stableRequestPrefixHash: prompt.manifest.stableRequestPrefixHash,
+        cacheEligibility: prompt.manifest.cacheEligibility.reason,
+      }),
+      model: withModelCallLogging(model, MODEL_CALL_PURPOSE.chatAnswer, trace),
+      abortSignal: input.abortSignal,
+      reasoning: reasoningForResearchRoute(researchRoute.mode, registeredModel),
+      system: prompt.system,
+      messages: prompt.messages,
+      tools: built.tools,
+      ...(prompt.providerOptions
+        ? { providerOptions: prompt.providerOptions }
+        : {}),
+      ...(prompt.headers ? { headers: prompt.headers } : {}),
+      onStepFinish: (step) => {
+        attemptCollector.recordStep(step)
+      },
+      ...(activeTools.length > 0
+        ? {
+            prepareStep: ({ stepNumber }: { stepNumber: number }) => ({
+              activeTools,
+              ...(stepNumber === 0 && firstTool
+                ? { toolChoice: { type: "tool" as const, toolName: firstTool } }
+                : {}),
+            }),
+          }
+        : {}),
+      maxOutputTokens: MAX_OUTPUT_TOKENS,
+      stopWhen: isStepCount(
+        researchRoute.mode === "answer" ? 5 : RESEARCH_MAX_STEPS
+      ),
+    })
+    return {
+      stream: result.stream as ReadableStream<TextStreamPart<ToolSet>>,
+      usage: result.usage,
+    }
+  }
+
   throwIfGenerationCancelled(input.abortSignal)
-  const result = streamText({
-    ...buildAiTelemetryConfig(MODEL_CALL_PURPOSE.chatAnswer, {
-      ...trace,
-      modelId: input.modelId,
-      providerRouteId: resolved.route.routeId,
-      toolProfileId: built.profile.id,
-      stableRequestPrefixHash: compiled.manifest.stableRequestPrefixHash,
-      cacheEligibility: compiled.manifest.cacheEligibility.reason,
-    }),
-    model: withModelCallLogging(model, MODEL_CALL_PURPOSE.chatAnswer, trace),
-    abortSignal: input.abortSignal,
-    reasoning: reasoningForResearchRoute(researchRoute.mode, registeredModel),
-    system: compiled.system,
-    messages: compiled.messages,
-    tools: built.tools,
-    ...(compiled.providerOptions
-      ? { providerOptions: compiled.providerOptions }
-      : {}),
-    ...(compiled.headers ? { headers: compiled.headers } : {}),
-    onStepFinish: (step) => {
-      attemptCollector.recordStep(step)
+  const fallbackEnabled =
+    controlsEnabled &&
+    hasCacheControls({
+      providerOptions: compiled.providerOptions,
+      headers: compiled.headers,
+      markerCount: markers.length,
+    })
+  const wrapped = createPromptCacheFallbackStream({
+    primary: () => startStream(compiled),
+    fallback: () => startStream(fallbackCompiled),
+    isCacheControlRejection: looksLikePromptCacheControlRejection,
+    enabled: fallbackEnabled,
+    onFallback: () => {
+      console.warn(
+        `[prompt-cache] route ${resolved.route.routeId} rejected cache controls; retried without cache controls`
+      )
     },
-    ...(activeTools.length > 0
-      ? {
-          prepareStep: ({ stepNumber }: { stepNumber: number }) => ({
-            activeTools,
-            ...(stepNumber === 0 && firstTool
-              ? { toolChoice: { type: "tool" as const, toolName: firstTool } }
-              : {}),
-          }),
-        }
-      : {}),
-    maxOutputTokens: MAX_OUTPUT_TOKENS,
-    stopWhen: isStepCount(
-      researchRoute.mode === "answer" ? 5 : RESEARCH_MAX_STEPS
-    ),
   })
 
   const leadingChunks: ThreadChatUIMessageChunk[] = [
@@ -249,18 +409,25 @@ export async function prepareGeneration(input: PrepareGenerationInput) {
         ]
       : []),
   ]
+  const syncTtft = () => attemptCollector.setTtftMs(wrapped.ttftMs())
   return {
-    textStream: result.stream as ReadableStream<
-      import("ai").TextStreamPart<ToolSet>
-    >,
+    textStream: wrapped.stream,
     tools: built.tools as ToolSet,
     leadingChunks,
-    usage: result.usage,
+    usage: wrapped.usage,
     manifest: compiled.manifest,
     cacheControls,
     route: resolved.route,
-    modelAttempts: () => attemptCollector.snapshot(),
-    cacheSummary: () => attemptCollector.summary(),
+    modelAttempts: () => {
+      syncTtft()
+      return attemptCollector.snapshot()
+    },
+    cacheSummary: () => {
+      syncTtft()
+      return attemptCollector.summary()
+    },
+    cacheFallbackUsed: wrapped.usedFallback,
+    ttftMs: wrapped.ttftMs,
   }
 }
 
