@@ -124,7 +124,8 @@ export const agentCaseSchema = z
             z.record(z.string(), z.union([z.string(), z.number(), z.boolean()]))
           )
           .default([]),
-        modelAttempts: z.array(modelAttemptFixtureSchema).default([]),
+        /** Optional so existing cases keep byte-identical dataset revisions. */
+        modelAttempts: z.array(modelAttemptFixtureSchema).optional(),
         cache: cacheFixtureSchema.optional(),
       })
       .strict()
