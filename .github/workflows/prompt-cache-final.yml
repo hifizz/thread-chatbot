@@ -1,0 +1,105 @@
+name: Prompt Cache Final Verification
+
+on:
+  pull_request:
+    paths:
+      - "constants/**"
+      - "lib/ai/**"
+      - "lib/chat/**"
+      - "lib/thread-chat/**"
+      - "app/thread-chat/**"
+      - "app/api/thread-chat/**"
+      - "e2e/**"
+      - "evals/**"
+      - "scripts/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/prompt-cache-final.yml"
+      - "openspec/changes/optimize-thread-chat-prompt-cache/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  full-verification:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: thread_chat_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d thread_chat_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/thread_chat_test
+      DIRECT_URL: postgres://postgres:postgres@localhost:5432/thread_chat_test
+      TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/thread_chat_test
+      EVAL_DATABASE_URL: postgres://postgres:postgres@localhost:5432/thread_chat_eval_test
+      EVAL_ALLOW_DATABASE_WRITES: "true"
+      EVAL_DATABASE_GUARD_TOKEN: prompt-cache-ci-guard-token-2026
+      BETTER_AUTH_SECRET: prompt-cache-ci-better-auth-secret-2026
+      BETTER_AUTH_URL: http://localhost:4040
+      MINIMAX_API_KEY: fake-ci-key
+      AI_TELEMETRY_ENABLED: "false"
+      AI_DEVTOOLS_ENABLED: "false"
+      AI_LANGFUSE_ENABLED: "false"
+      THREAD_PROMPT_CACHE_MODE: observe
+      THREAD_PROMPT_CACHE_EXTENDED_TTL_ENABLED: "false"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.32.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Prepare evaluation database
+        run: createdb -h localhost -U postgres thread_chat_eval_test || true
+        env:
+          PGPASSWORD: postgres
+      - name: Apply application migrations
+        run: pnpm db:migrate
+      - name: Typecheck
+        run: pnpm typecheck
+      - name: Lint
+        run: pnpm lint
+      - name: Production build
+        run: pnpm build
+      - name: Prompt cache and Quote contracts
+        run: >-
+          pnpm test:thread-chat:prompt-cache &&
+          pnpm test:thread-chat:prompt-cache-eval &&
+          pnpm test:thread-chat:composer-quotes &&
+          node --import tsx e2e/thread-chat/quote-resolver-contract.test.mjs &&
+          node --import tsx e2e/thread-chat/prompt-cache-rollout.test.mjs &&
+          node --import tsx e2e/thread-chat/prompt-cache-state.test.mjs &&
+          pnpm prompt-cache:probe
+      - name: Thread Chat database and protocol gates
+        run: >-
+          pnpm test:thread-chat:gate1-db &&
+          pnpm test:thread-chat:gate2-session &&
+          pnpm test:thread-chat:gate2-pipeline &&
+          pnpm test:thread-chat:gate2-db &&
+          pnpm test:thread-chat:gate2-api &&
+          pnpm test:thread-chat:gate2-api-db &&
+          pnpm test:thread-chat:gate3-client &&
+          pnpm test:thread-chat:gate4-cutover
+      - name: Observability suite
+        run: pnpm test:observability
+      - name: Agent evaluation suite
+        run: pnpm test:agent-evals
+      - name: OpenSpec strict validation
+        run: pnpm openspec:validate
