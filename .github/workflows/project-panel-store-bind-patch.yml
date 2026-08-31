@@ -60,3 +60,5 @@ jobs:
           git add app/thread-chat/thread-chat-demo.tsx
           git commit -m "refactor(project): share project panel conversation store [skip ci]"
           git push origin HEAD:codex/research-project-workspace-design
+
+# trigger: 2
