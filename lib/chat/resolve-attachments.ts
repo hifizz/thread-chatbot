@@ -10,6 +10,10 @@ import {
   type AttachmentRenderMode,
   type AttachmentTextPart,
 } from "@/lib/chat/attachment-content-resolver"
+import {
+  attachmentBudgetAllocation,
+  planAttachmentCandidates,
+} from "@/lib/chat/attachment-context-policy"
 import type { ProjectFileRow } from "@/lib/thread-chat/persistence/mappers"
 
 export { attachmentIdFromUrl } from "@/lib/chat/attachment-content-resolver"
@@ -86,26 +90,11 @@ export async function resolveAttachmentContext({
     ...projectIds,
   ])
   const query = latestUserQuery(messages)
-
-  const readableExplicit = explicitIds.flatMap((id) => {
-    const row = rowById.get(id)
-    return row?.status === "ready" &&
-      row.mimeType === "application/pdf" &&
-      row.pages?.length
-      ? [row]
-      : []
-  })
-  const readableProject = projectFiles.flatMap((membership) => {
-    const row = rowById.get(membership.attachment.id)
-    return row &&
-      !seenExplicit.has(row.id) &&
-      row.status === "ready" &&
-      row.mimeType === "application/pdf" &&
-      row.pages?.length
-      ? [row]
-      : []
-  })
-  const candidates = [...readableExplicit, ...readableProject]
+  const candidates = planAttachmentCandidates({
+    explicitIds,
+    projectIds,
+    rowById,
+  }).ordered
   const rendered = new Map<
     string,
     { text: string; mode: AttachmentRenderMode }
@@ -113,8 +102,10 @@ export async function resolveAttachmentContext({
   let remainingBudget = PROJECT_FILE_CONTEXT_CHAR_BUDGET
   for (let index = 0; index < candidates.length; index += 1) {
     if (remainingBudget <= 0) break
-    const remainingFiles = candidates.length - index
-    const allocation = Math.max(1, Math.floor(remainingBudget / remainingFiles))
+    const allocation = attachmentBudgetAllocation(
+      remainingBudget,
+      candidates.length - index
+    )
     const result = await renderPdfAttachment(candidates[index], allocation, query)
     rendered.set(candidates[index].id, result)
     remainingBudget = Math.max(0, remainingBudget - result.text.length)
