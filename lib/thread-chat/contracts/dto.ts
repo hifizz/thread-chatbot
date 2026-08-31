@@ -1,9 +1,33 @@
+import type {
+  SkillActivationMode,
+  SkillCapabilityProfileId,
+  SkillSourceType,
+} from "@/constants/skill"
 import type { TextAnchor } from "@/lib/thread-chat/domain/text-anchor"
 import type { ConversationMessageStatus } from "@/lib/thread-chat/domain/conversation"
 import type { ThreadChatUIMessage } from "@/lib/thread-chat/contracts/ui-message"
 
 export type MessageFeedback = "up" | "down"
 export type ArtifactKind = "markdown" | "code" | "note"
+
+export interface SkillVersionSummaryDTO {
+  skillId: string
+  skillVersionId: string
+  slug: string
+  name: string
+  description: string
+  version: string
+  digest: string
+  activationMode: SkillActivationMode
+  capabilityProfileId: SkillCapabilityProfileId
+}
+
+export interface SkillCatalogDTO {
+  id: string
+  slug: string
+  sourceType: SkillSourceType
+  currentVersion: SkillVersionSummaryDTO
+}
 
 export interface ProjectDTO {
   id: string
@@ -26,6 +50,7 @@ export interface ThreadDTO {
   footnote: number | null
   depth: number
   modelId: string
+  activeSkill: SkillVersionSummaryDTO | null
   autoTitle: string | null
   customTitle: string | null
   titleGenerationAttempted: boolean
@@ -43,6 +68,7 @@ export interface MessageDTO {
   parts: ThreadChatUIMessage["parts"]
   status: ConversationMessageStatus
   modelId: string | null
+  skill: SkillVersionSummaryDTO | null
   replacesMessageId: string | null
   supersededAt: string | null
   feedback: MessageFeedback | null

@@ -3,6 +3,7 @@ import type {
   ArtifactDTO,
   MessageDTO,
   ProjectDTO,
+  SkillVersionSummaryDTO,
   ThreadDTO,
 } from "@/lib/thread-chat/contracts/dto"
 import type { ConversationMessage } from "@/lib/thread-chat/domain/conversation"
@@ -29,7 +30,10 @@ export function toProjectDTO(
   }
 }
 
-export function toThreadDTO(row: ThreadRow): ThreadDTO {
+export function toThreadDTO(
+  row: ThreadRow,
+  activeSkill: SkillVersionSummaryDTO | null = null
+): ThreadDTO {
   return {
     id: row.id,
     projectId: row.projectId,
@@ -41,6 +45,7 @@ export function toThreadDTO(row: ThreadRow): ThreadDTO {
     footnote: row.footnote,
     depth: row.depth,
     modelId: row.modelId,
+    activeSkill,
     autoTitle: row.autoTitle,
     customTitle: row.customTitle,
     titleGenerationAttempted: row.titleGenerationAttempted,
@@ -50,7 +55,10 @@ export function toThreadDTO(row: ThreadRow): ThreadDTO {
   }
 }
 
-export function toMessageDTO(row: MessageRow): MessageDTO {
+export function toMessageDTO(
+  row: MessageRow,
+  skill: SkillVersionSummaryDTO | null = null
+): MessageDTO {
   return {
     id: row.id,
     projectId: row.projectId,
@@ -60,6 +68,7 @@ export function toMessageDTO(row: MessageRow): MessageDTO {
     parts: row.parts,
     status: row.status,
     modelId: row.modelId,
+    skill: row.role === "assistant" ? skill : null,
     replacesMessageId: row.replacesMessageId,
     supersededAt: iso(row.supersededAt),
     feedback: row.feedback,

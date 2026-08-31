@@ -32,6 +32,10 @@
     "eval:agent:release": "node --import tsx evals/agent/cli.ts --mode=release",
     "eval:agent:sync": "node --import tsx evals/agent/cli.ts --sync-dataset",
     "eval:agent:compare": "node --import tsx evals/agent/compare-cli.ts",
+    "skills:validate": "node --import tsx scripts/skills/validate.ts",
+    "skills:sync": "node --import tsx scripts/skills/sync.ts",
+    "skills:install": "node --import tsx scripts/skills/install.ts",
+    "skills:disable": "node --import tsx scripts/skills/disable.ts",
     "lint": "eslint",
     "format": "prettier --write \"**/*.{ts,tsx}\"",
     "typecheck": "tsc --noEmit",
@@ -50,6 +54,7 @@
     "test:thread-chat:gate2-api-db": "node --import tsx e2e/thread-chat/normalized-v1-api-db.test.mjs",
     "test:thread-chat:gate3-client": "node --import tsx e2e/thread-chat/normalized-client-store.test.mjs",
     "test:thread-chat:gate4-cutover": "node scripts/check-thread-chat-cutover.mjs && node --import tsx e2e/thread-chat/normalized-cutover-db.test.mjs",
+    "test:thread-chat:skills-db": "node --import tsx e2e/thread-chat/runtime-skill-catalog-db.test.mjs",
     "db:studio": "drizzle-kit studio",
     "openspec:validate": "openspec validate --all --strict"
   },

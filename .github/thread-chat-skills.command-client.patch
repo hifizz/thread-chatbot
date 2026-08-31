@@ -1,0 +1,164 @@
+diff --git a/app/thread-chat/net/commands/conversation-commands.ts b/app/thread-chat/net/commands/conversation-commands.ts
+index e76b67f..924bf00 100644
+--- a/app/thread-chat/net/commands/conversation-commands.ts
++++ b/app/thread-chat/net/commands/conversation-commands.ts
+@@ -8,6 +8,7 @@ import type {
+ import type {
+   MessageDTO,
+   ProjectDTO,
++  SkillVersionSummaryDTO,
+   ThreadDTO,
+ } from "@/lib/thread-chat/contracts/dto"
+ import type { TextAnchor } from "@/lib/thread-chat/domain/text-anchor"
+@@ -68,6 +69,7 @@ function temporaryMessage(input: {
+   role: "user" | "assistant"
+   modelId?: string
+   parts?: MessageDTO["parts"]
++  skill?: SkillVersionSummaryDTO | null
+   replacesMessageId?: string | null
+ }): MessageDTO {
+   const now = new Date().toISOString()
+@@ -80,7 +82,7 @@ function temporaryMessage(input: {
+     parts: input.parts ?? [],
+     status: input.role === "assistant" ? "generating" : "completed",
+     modelId: input.modelId ?? null,
+-    skill: null,
++    skill: input.role === "assistant" ? (input.skill ?? null) : null,
+     replacesMessageId: input.replacesMessageId ?? null,
+     supersededAt: null,
+     feedback: null,
+@@ -195,6 +197,7 @@ export function createConversationCommands(
+     modelId: string
+     text: string
+     files?: CommandFileReference[]
++    skill?: SkillVersionSummaryDTO | null
+   }) {
+     const files = input.files ?? []
+     const command: StartProjectCommand = Object.freeze({
+@@ -204,6 +207,7 @@ export function createConversationCommands(
+       userMessageId: createId(),
+       assistantMessageId: createId(),
+       modelId: input.modelId,
++      ...(input.skill ? { skillVersionId: input.skill.skillVersionId } : {}),
+       text: input.text,
+       files,
+     })
+@@ -228,7 +232,8 @@ export function createConversationCommands(
+       footnote: null,
+       depth: 0,
+       modelId: command.modelId,
+-      activeSkill: null,
++      activeSkill:
++        input.skill?.activationMode === "sticky" ? input.skill : null,
+       autoTitle: null,
+       customTitle: null,
+       titleGenerationAttempted: false,
+@@ -251,6 +256,7 @@ export function createConversationCommands(
+       sequence: 2,
+       role: "assistant",
+       modelId: command.modelId,
++      skill: input.skill ?? null,
+     })
+     store.getState().beginOptimisticCommand(command.commandId, () => ({
+       project,
+@@ -280,6 +286,7 @@ export function createConversationCommands(
+     modelId: string
+     text: string
+     files?: CommandFileReference[]
++    skill?: SkillVersionSummaryDTO | null
+   }) {
+     const state = store.getState()
+     const project = state.project
+@@ -290,12 +297,20 @@ export function createConversationCommands(
+       userMessageId: createId(),
+       assistantMessageId: createId(),
+       modelId: input.modelId,
++      ...(input.skill === undefined
++        ? {}
++        : { skillVersionId: input.skill?.skillVersionId ?? null }),
+       text: input.text,
+       files,
+     })
+     store.getState().beginOptimisticCommand(command.commandId, (snapshot) => {
+       const sequence = nextSequence(snapshot, input.threadId)
+-      return withMessages(snapshot, [
++      const currentThread = snapshot.threadsById[input.threadId]
++      const effectiveSkill =
++        input.skill === undefined ? (currentThread?.activeSkill ?? null) : input.skill
++      const activeSkill =
++        effectiveSkill?.activationMode === "sticky" ? effectiveSkill : null
++      const partial = withMessages(snapshot, [
+         temporaryMessage({
+           id: command.userMessageId,
+           projectId: project.id,
+@@ -311,8 +326,20 @@ export function createConversationCommands(
+           sequence: sequence + 1,
+           role: "assistant",
+           modelId: command.modelId,
++          skill: effectiveSkill,
+         }),
+       ])
++      return {
++        ...partial,
++        ...(currentThread
++          ? {
++              threadsById: {
++                ...snapshot.threadsById,
++                [input.threadId]: { ...currentThread, activeSkill },
++              },
++            }
++          : {}),
++      }
+     })
+     try {
+       const response = await execute(() =>
+@@ -403,6 +430,7 @@ export function createConversationCommands(
+             sequence: 2,
+             role: "assistant",
+             modelId: command.modelId,
++            skill: parent.activeSkill,
+           }),
+         ]),
+       }
+@@ -444,6 +472,7 @@ export function createConversationCommands(
+         sequence: nextSequence(snapshot, source.threadId),
+         role: "assistant",
+         modelId: command.modelId,
++        skill: source.skill,
+         replacesMessageId: source.id,
+       })
+       const partial = withMessages(snapshot, [replacement])
+@@ -513,6 +542,10 @@ export function createConversationCommands(
+           sequence: sequence + 1,
+           role: "assistant",
+           modelId: command.modelId,
++          skill:
++            (input.assistantMessageId
++              ? snapshot.messagesById[input.assistantMessageId]?.skill
++              : snapshot.threadsById[source.threadId]?.activeSkill) ?? null,
+           replacesMessageId: input.assistantMessageId ?? null,
+         }),
+       ])
+@@ -572,9 +605,20 @@ export function createConversationCommands(
+ 
+   async function updateThread(
+     threadId: string,
+-    update: { modelId?: string; customTitle?: string | null }
++    update: {
++      modelId?: string
++      customTitle?: string | null
++      activeSkill?: SkillVersionSummaryDTO | null
++    }
+   ) {
+-    const command = Object.freeze({ commandId: createId(), ...update })
++    const { activeSkill, ...threadUpdate } = update
++    const command = Object.freeze({
++      commandId: createId(),
++      ...threadUpdate,
++      ...(activeSkill === undefined
++        ? {}
++        : { activeSkillVersionId: activeSkill?.skillVersionId ?? null }),
++    })
+     const response = await execute(() => client.updateThread(threadId, command))
+     store.getState().upsertThread(response.data)
+     return { command, response }

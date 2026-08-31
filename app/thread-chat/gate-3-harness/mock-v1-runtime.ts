@@ -70,6 +70,7 @@ function initialBootstrap(
     footnote: null,
     depth: 0,
     modelId: MODEL_ID,
+    activeSkill: null,
     autoTitle: "规范化会话验收",
     customTitle: null,
     titleGenerationAttempted: true,
@@ -94,6 +95,7 @@ function initialBootstrap(
     footnote: 1,
     depth: 1,
     modelId: MODEL_ID,
+    activeSkill: null,
     autoTitle: "断流恢复",
     customTitle: null,
     titleGenerationAttempted: true,
@@ -123,6 +125,7 @@ function initialBootstrap(
     footnote: 2,
     depth: 2,
     modelId: MODEL_ID,
+    activeSkill: null,
     autoTitle: "后台轮询",
     customTitle: null,
     titleGenerationAttempted: true,
@@ -140,6 +143,7 @@ function initialBootstrap(
       parts: [{ type: "text", text: "说明新会话架构为什么能应对断流。" }],
       status: "completed",
       modelId: null,
+      skill: null,
       replacesMessageId: null,
       supersededAt: null,
       feedback: null,
@@ -185,6 +189,7 @@ function initialBootstrap(
       ],
       status: "completed",
       modelId: MODEL_ID,
+      skill: null,
       replacesMessageId: null,
       supersededAt: null,
       feedback: null,
@@ -202,6 +207,7 @@ function initialBootstrap(
       parts: [{ type: "text", text: "刷新后具体怎么处理？" }],
       status: "completed",
       modelId: null,
+      skill: null,
       replacesMessageId: null,
       supersededAt: null,
       feedback: null,
@@ -225,6 +231,7 @@ function initialBootstrap(
       ],
       status: "completed",
       modelId: MODEL_ID,
+      skill: null,
       replacesMessageId: null,
       supersededAt: null,
       feedback: null,
@@ -245,6 +252,7 @@ function initialBootstrap(
         parts: [{ type: "text", text: "刷新后恢复后台生成" }],
         status: "completed",
         modelId: null,
+        skill: null,
         replacesMessageId: null,
         supersededAt: null,
         feedback: null,
@@ -264,6 +272,7 @@ function initialBootstrap(
         ],
         status: "generating",
         modelId: MODEL_ID,
+        skill: null,
         replacesMessageId: null,
         supersededAt: null,
         feedback: null,
@@ -353,6 +362,7 @@ export function createGate3MockRuntime(
       parts: [{ type: "text", text: input.text }],
       status: "completed",
       modelId: null,
+      skill: null,
       replacesMessageId: null,
       supersededAt: null,
       feedback: null,
@@ -368,6 +378,7 @@ export function createGate3MockRuntime(
     threadId: string
     sequence: number
     modelId: string
+    skill?: MessageDTO["skill"]
     replacesMessageId?: string | null
   }): MessageDTO => {
     const stamp = now()
@@ -380,6 +391,7 @@ export function createGate3MockRuntime(
       parts: [],
       status: "generating",
       modelId: input.modelId,
+      skill: input.skill ?? null,
       replacesMessageId: input.replacesMessageId ?? null,
       supersededAt: null,
       feedback: null,
@@ -617,6 +629,7 @@ export function createGate3MockRuntime(
           ) + 1,
         depth: parent.depth + 1,
         modelId: input.modelId,
+        activeSkill: null,
         autoTitle: input.anchorText.slice(0, 13),
         customTitle: null,
         titleGenerationAttempted: false,
@@ -678,6 +691,7 @@ export function createGate3MockRuntime(
         threadId: source.threadId,
         sequence: user.sequence + 1,
         modelId: input.modelId,
+        skill: null,
         replacesMessageId: oldAssistant?.id ?? null,
       })
       messages.set(user.id, user)
@@ -700,6 +714,7 @@ export function createGate3MockRuntime(
         threadId: source.threadId,
         sequence: nextSequence(source.threadId),
         modelId: input.modelId,
+        skill: null,
         replacesMessageId: source.id,
       })
       messages.set(assistant.id, assistant)
