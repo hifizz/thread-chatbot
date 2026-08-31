@@ -11,6 +11,11 @@ import {
   buildUserParts,
   touchProjectAndThread,
 } from "@/lib/thread-chat/application/command-utils"
+import {
+  buildBranchOriginQuote,
+  mergeBranchOriginQuote,
+  resolveQuoteSelections,
+} from "@/lib/thread-chat/application/quote-resolver"
 import { notFound, stateConflict } from "@/lib/thread-chat/application/errors"
 import { executeIdempotentCommand } from "@/lib/thread-chat/persistence/command-repository"
 import {
@@ -63,8 +68,12 @@ export function forkThread(
         const source = parentMessages.find(
           (message) => message.id === command.sourceMessageId
         )
-        if (!source || source.supersededAt)
+        if (!source || source.supersededAt) {
           stateConflict("分支来源不在当前时间线")
+        }
+        if (source.role !== "assistant" || source.status !== "completed") {
+          stateConflict("只能从已完成的 AI 回复创建分支")
+        }
         if (command.anchor.quote.exact !== command.anchorText) {
           stateConflict("选区锚点与来源文本不一致")
         }
@@ -94,6 +103,20 @@ export function forkThread(
           return { thread: toThreadDTO(child), generation: null }
         }
         await assertOwnedReadyAttachments(tx, userId, command.firstTurn.files)
+        const additionalQuotes = await resolveQuoteSelections({
+          tx,
+          destinationProjectId: project.id,
+          destinationThreadId: child.id,
+          selections: command.firstTurn.additionalQuotes,
+        })
+        const origin = buildBranchOriginQuote({
+          projectId: project.id,
+          parentThreadId: parent.id,
+          sourceMessageId: source.id,
+          anchor: command.anchor,
+          anchorText: command.anchorText,
+        })
+        const quotes = mergeBranchOriginQuote(origin, additionalQuotes)
         const [userSequence, assistantSequence] = await allocateThreadSequences(
           tx,
           child.id,
@@ -109,10 +132,11 @@ export function forkThread(
               threadId: child.id,
               sequence: userSequence,
               role: "user",
-              parts: buildUserParts(
-                command.firstTurn.text,
-                command.firstTurn.files
-              ),
+              parts: buildUserParts({
+                text: command.firstTurn.text,
+                files: command.firstTurn.files,
+                quotes,
+              }),
               status: "completed",
               finishedAt: now,
             },
