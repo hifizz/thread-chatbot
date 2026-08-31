@@ -1,9 +1,25 @@
 import { z } from "zod"
+import {
+  THREAD_MESSAGE_MAX_FILES,
+  THREAD_MESSAGE_MAX_TEXT_CHARS,
+  THREAD_QUOTE_MAX_COUNT,
+} from "@/constants/thread-chat"
+import {
+  quoteSelectionInputSchema,
+  textAnchorSchema,
+} from "@/lib/thread-chat/domain/thread-quote"
 
 const entityIdSchema = z.uuid()
 const commandIdSchema = z.uuid()
 const modelIdSchema = z.string().trim().min(1).max(160)
-const messageTextSchema = z.string().trim().min(1).max(200_000)
+const requiredMessageTextSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(THREAD_MESSAGE_MAX_TEXT_CHARS)
+const editableMessageTextSchema = z
+  .string()
+  .max(THREAD_MESSAGE_MAX_TEXT_CHARS)
 
 const fileReferenceSchema = z
   .object({
@@ -13,31 +29,14 @@ const fileReferenceSchema = z
   })
   .strict()
 
-const textAnchorSchema = z
-  .object({
-    quote: z
-      .object({
-        exact: z.string().min(1),
-        prefix: z.string(),
-        suffix: z.string(),
-      })
-      .strict(),
-    position: z
-      .object({
-        start: z.number().int().min(0),
-        end: z.number().int().min(0),
-      })
-      .strict()
-      .refine((position) => position.end > position.start, {
-        message: "position.end 必须大于 position.start",
-      })
-      .optional(),
-  })
-  .strict()
+const filesSchema = z
+  .array(fileReferenceSchema)
+  .max(THREAD_MESSAGE_MAX_FILES)
+  .default([])
 
-const messageContentFields = {
-  text: messageTextSchema,
-  files: z.array(fileReferenceSchema).max(20).default([]),
+const requiredMessageContentFields = {
+  text: requiredMessageTextSchema,
+  files: filesSchema,
 } as const
 
 export const startProjectCommandSchema = z
@@ -48,7 +47,7 @@ export const startProjectCommandSchema = z
     userMessageId: entityIdSchema,
     assistantMessageId: entityIdSchema,
     modelId: modelIdSchema,
-    ...messageContentFields,
+    ...requiredMessageContentFields,
   })
   .strict()
 
@@ -58,16 +57,34 @@ export const sendMessageCommandSchema = z
     userMessageId: entityIdSchema,
     assistantMessageId: entityIdSchema,
     modelId: modelIdSchema,
-    ...messageContentFields,
+    text: editableMessageTextSchema.default(""),
+    files: filesSchema,
+    quotes: z
+      .array(quoteSelectionInputSchema)
+      .max(THREAD_QUOTE_MAX_COUNT)
+      .default([]),
   })
   .strict()
+  .refine(
+    (command) =>
+      command.text.trim().length > 0 ||
+      command.quotes.some((quote) => Boolean(quote.comment?.trim())),
+    {
+      message: "请输入问题，或至少为一份引用添加评论",
+      path: ["text"],
+    }
+  )
 
 const firstForkTurnSchema = z
   .object({
     userMessageId: entityIdSchema,
     assistantMessageId: entityIdSchema,
-    text: messageTextSchema,
-    files: z.array(fileReferenceSchema).max(20).default([]),
+    text: requiredMessageTextSchema,
+    files: filesSchema,
+    additionalQuotes: z
+      .array(quoteSelectionInputSchema)
+      .max(THREAD_QUOTE_MAX_COUNT - 1)
+      .default([]),
   })
   .strict()
 
@@ -89,7 +106,8 @@ export const editLatestTurnCommandSchema = z
     userMessageId: entityIdSchema,
     assistantMessageId: entityIdSchema,
     modelId: modelIdSchema,
-    ...messageContentFields,
+    text: editableMessageTextSchema,
+    files: filesSchema,
   })
   .strict()
 
