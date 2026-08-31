@@ -28,7 +28,10 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
+      - name: Project panel workspace isolation
+        run: node --import tsx e2e/thread-chat/project-panel-workspace-state.test.mjs
+
       - name: Validate OpenSpec
         run: pnpm openspec:validate
 
-# trigger: client-contract-check-2
+# trigger: project-panel-state-check
