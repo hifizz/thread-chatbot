@@ -42,6 +42,8 @@ export interface PreparedGeneration {
   }
   modelAttempts?: () => ModelAttemptRecord[]
   cacheSummary?: () => ModelAttemptSummary
+  cacheFallbackUsed?: () => boolean
+  ttftMs?: () => number | undefined
 }
 
 export interface RunGenerationDependencies {
@@ -68,6 +70,8 @@ type GenerationRunResult = {
   routeId?: string
   modelAttempts: ModelAttemptRecord[]
   cacheSummary?: ModelAttemptSummary
+  cacheFallbackUsed: boolean
+  ttftMs?: number
   checkpoint: ReturnType<MessageCheckpointer["getSummary"]>
   error?: ReturnType<typeof safeErrorMetadata>
 }
@@ -205,6 +209,8 @@ async function runGenerationCore({
     : undefined
   const modelAttempts = prepared?.modelAttempts?.() ?? []
   const cacheSummary = prepared?.cacheSummary?.()
+  const cacheFallbackUsed = prepared?.cacheFallbackUsed?.() ?? false
+  const ttftMs = prepared?.ttftMs?.() ?? cacheSummary?.ttftMs
   const outcome = resolveGenerationTerminalOutcome({
     signal: session.signal,
     pipelineAborted: pipelineEnd?.isAborted === true,
@@ -225,6 +231,8 @@ async function runGenerationCore({
         assistantMessageId: message.id,
         requestedStatus: outcome.status,
         modelAttemptCount: modelAttempts.length,
+        cacheFallbackUsed,
+        ...(ttftMs !== undefined ? { ttftMs } : {}),
         ...(cacheSummary
           ? {
               cacheOutcome: cacheSummary.cacheOutcome,
@@ -244,6 +252,15 @@ async function runGenerationCore({
               providerRouteId: prepared.manifest.routeId,
               currentUserQuoteCount:
                 prepared.manifest.currentUserQuoteCount,
+            }
+          : {}),
+        ...(prepared?.cacheControls
+          ? {
+              promptCacheMode: prepared.cacheControls.mode,
+              promptCacheReason: prepared.cacheControls.reason,
+              promptCacheStrategy: prepared.cacheControls.strategy,
+              promptCacheTtlClass: prepared.cacheControls.ttlClass,
+              promptCacheMarkerCount: prepared.cacheControls.markerCount,
             }
           : {}),
       },
@@ -290,6 +307,8 @@ async function runGenerationCore({
     ...(prepared?.route?.routeId ? { routeId: prepared.route.routeId } : {}),
     modelAttempts,
     ...(cacheSummary ? { cacheSummary } : {}),
+    cacheFallbackUsed,
+    ...(ttftMs !== undefined ? { ttftMs } : {}),
     checkpoint: checkpointer.getSummary(),
     ...(outcome.failed && (thrown || protocolError)
       ? { error: safeErrorMetadata(thrown ?? protocolError) }
@@ -333,6 +352,8 @@ export async function runGeneration(input: {
           ...(result.error ?? {}),
           hasProviderUsage: Boolean(result.providerUsage),
           modelAttemptCount: result.modelAttempts.length,
+          cacheFallbackUsed: result.cacheFallbackUsed,
+          ...(result.ttftMs !== undefined ? { ttftMs: result.ttftMs } : {}),
           ...(result.cacheSummary
             ? {
                 cacheOutcome: result.cacheSummary.cacheOutcome,
@@ -362,6 +383,9 @@ export async function runGeneration(input: {
                 promptCacheMode: result.cacheControls.mode,
                 promptCacheEnabled: result.cacheControls.enabled,
                 promptCacheReason: result.cacheControls.reason,
+                promptCacheStrategy: result.cacheControls.strategy,
+                promptCacheTtlClass: result.cacheControls.ttlClass,
+                promptCacheMarkerCount: result.cacheControls.markerCount,
               }
             : {}),
           ...(result.routeId ? { providerRouteId: result.routeId } : {}),
