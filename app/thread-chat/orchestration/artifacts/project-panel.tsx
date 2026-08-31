@@ -103,31 +103,28 @@ export function ProjectPanel({
   const [instructionsDraft, setInstructionsDraft] = useState("")
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
-  const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [artifactQuery, setArtifactQuery] = useState("")
   const archived = Boolean(project?.archivedAt)
+  const loading = open && !project
+  const displayedSection: ProjectPanelSection = activeId ? "artifacts" : section
 
   useEffect(() => {
     if (!open) return
-    setLoading(true)
+    let cancelled = false
     void onRefresh()
-      .then(() => setError(null))
-      .catch((cause) =>
-        setError(cause instanceof Error ? cause.message : "Project 加载失败")
-      )
-      .finally(() => setLoading(false))
+      .then(() => {
+        if (!cancelled) setError(null)
+      })
+      .catch((cause) => {
+        if (!cancelled) {
+          setError(cause instanceof Error ? cause.message : "Project 加载失败")
+        }
+      })
+    return () => {
+      cancelled = true
+    }
   }, [onRefresh, open])
-
-  useEffect(() => {
-    if (!project || editing) return
-    setTargetDraft(project.target ?? "")
-    setInstructionsDraft(project.instructions ?? "")
-  }, [editing, project])
-
-  useEffect(() => {
-    if (activeId && open) setSection("artifacts")
-  }, [activeId, open])
 
   useEffect(() => {
     if (open) {
@@ -170,6 +167,19 @@ export function ProjectPanel({
     () => [...files].sort((left, right) => right.addedAt.localeCompare(left.addedAt)),
     [files]
   )
+
+  const selectSection = (next: ProjectPanelSection) => {
+    if (next !== "artifacts" && activeId) onSelect("")
+    setSection(next)
+  }
+
+  const beginEdit = () => {
+    if (!project) return
+    setTargetDraft(project.target ?? "")
+    setInstructionsDraft(project.instructions ?? "")
+    setError(null)
+    setEditing(true)
+  }
 
   const cancelEdit = () => {
     setTargetDraft(project?.target ?? "")
@@ -264,13 +274,22 @@ export function ProjectPanel({
       </div>
 
       <div className="project-sections" role="tablist" aria-label="Project workspace">
-        <button className={section === "overview" ? "on" : ""} onClick={() => setSection("overview")}>
+        <button
+          className={displayedSection === "overview" ? "on" : ""}
+          onClick={() => selectSection("overview")}
+        >
           Overview
         </button>
-        <button className={section === "files" ? "on" : ""} onClick={() => setSection("files")}>
+        <button
+          className={displayedSection === "files" ? "on" : ""}
+          onClick={() => selectSection("files")}
+        >
           Files <span>{files.length}</span>
         </button>
-        <button className={section === "artifacts" ? "on" : ""} onClick={() => setSection("artifacts")}>
+        <button
+          className={displayedSection === "artifacts" ? "on" : ""}
+          onClick={() => selectSection("artifacts")}
+        >
           Artifacts <span>{artifacts.length}</span>
         </button>
       </div>
@@ -283,11 +302,9 @@ export function ProjectPanel({
       )}
 
       <div className="art-body project-panel-body">
-        {loading && !project ? (
-          <div className="project-empty">Project 加载中…</div>
-        ) : null}
+        {loading ? <div className="project-empty">Project 加载中…</div> : null}
 
-        {section === "overview" && !loading && (
+        {displayedSection === "overview" && !loading && (
           <section className="project-overview">
             <div className="project-section-heading">
               <div>
@@ -296,7 +313,7 @@ export function ProjectPanel({
                 <p>保存后只影响之后启动的生成，不改写历史消息、Artifact 或 Fork Context。</p>
               </div>
               {!archived && !editing && project && (
-                <button className="project-secondary" onClick={() => setEditing(true)}>
+                <button className="project-secondary" onClick={beginEdit}>
                   <Pencil size={12} /> 编辑
                 </button>
               )}
@@ -318,7 +335,9 @@ export function ProjectPanel({
                 </div>
               )}
               {editing && (
-                <small>{targetDraft.length}/{PROJECT_TARGET_MAX_CHARS}</small>
+                <small>
+                  {targetDraft.length}/{PROJECT_TARGET_MAX_CHARS}
+                </small>
               )}
             </label>
 
@@ -346,8 +365,18 @@ export function ProjectPanel({
 
             {editing && (
               <div className="project-actions">
-                <button className="project-secondary" disabled={saving} onClick={cancelEdit}>取消</button>
-                <button className="project-primary" disabled={saving} onClick={() => void saveContract()}>
+                <button
+                  className="project-secondary"
+                  disabled={saving}
+                  onClick={cancelEdit}
+                >
+                  取消
+                </button>
+                <button
+                  className="project-primary"
+                  disabled={saving}
+                  onClick={() => void saveContract()}
+                >
                   {saving ? "保存中…" : "保存 Contract"}
                 </button>
               </div>
@@ -355,7 +384,7 @@ export function ProjectPanel({
           </section>
         )}
 
-        {section === "files" && (
+        {displayedSection === "files" && (
           <section className="project-files">
             <div className="project-section-heading">
               <div>
@@ -395,12 +424,19 @@ export function ProjectPanel({
             ) : (
               <div className="project-resource-list">
                 {sortedFiles.map((file) => (
-                  <article className="project-resource-card" key={file.attachmentId}>
-                    <div className="project-resource-icon"><Paperclip size={15} /></div>
+                  <article
+                    className="project-resource-card"
+                    key={file.attachmentId}
+                  >
+                    <div className="project-resource-icon">
+                      <Paperclip size={15} />
+                    </div>
                     <div className="project-resource-main">
                       <div className="project-resource-title-row">
                         <strong title={file.filename}>{file.filename}</strong>
-                        <span className={`project-status ${file.status}`}>{fileStatusLabel(file)}</span>
+                        <span className={`project-status ${file.status}`}>
+                          {fileStatusLabel(file)}
+                        </span>
                       </div>
                       <div className="project-resource-meta">
                         {file.mimeType} · {formatBytes(file.size)}
@@ -408,14 +444,26 @@ export function ProjectPanel({
                         {` · 加入于 ${formatDate(file.addedAt)}`}
                       </div>
                       {file.summary && <p>{file.summary}</p>}
-                      {file.error && <p className="project-file-error">{file.error}</p>}
+                      {file.error && (
+                        <p className="project-file-error">{file.error}</p>
+                      )}
                     </div>
                     <div className="project-resource-actions">
-                      <a className="project-icon-button" href={file.url} target="_blank" rel="noreferrer" title="打开文件">
+                      <a
+                        className="project-icon-button"
+                        href={file.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        title="打开文件"
+                      >
                         <ExternalLink size={13} />
                       </a>
                       {!archived && (
-                        <button className="project-icon-button danger" title="从 Project 移除" onClick={() => void remove(file)}>
+                        <button
+                          className="project-icon-button danger"
+                          title="从 Project 移除"
+                          onClick={() => void remove(file)}
+                        >
                           <Trash2 size={13} />
                         </button>
                       )}
@@ -427,32 +475,49 @@ export function ProjectPanel({
           </section>
         )}
 
-        {section === "artifacts" && (
+        {displayedSection === "artifacts" && (
           <section className="project-artifacts">
             {selectedArtifact ? (
               <div className="project-artifact-detail">
-                <button className="project-back" onClick={() => onSelect("")}>← 全部 Artifacts</button>
+                <button className="project-back" onClick={() => onSelect("")}>
+                  ← 全部 Artifacts
+                </button>
                 <div className="project-section-heading artifact-detail-heading">
                   <div>
-                    <div className="project-eyebrow">{artifactKindLabel(selectedArtifact.kind)}</div>
+                    <div className="project-eyebrow">
+                      {artifactKindLabel(selectedArtifact.kind)}
+                    </div>
                     <h4>{selectedArtifact.title}</h4>
                     <p>
                       来源：{selectedArtifact.sourceThreadTitle ?? "未命名 Thread"}
-                      {selectedArtifact.sourceThreadFootnote !== null ? ` · 脚注 ${selectedArtifact.sourceThreadFootnote}` : ""}
+                      {selectedArtifact.sourceThreadFootnote !== null
+                        ? ` · 脚注 ${selectedArtifact.sourceThreadFootnote}`
+                        : ""}
                       {` · ${sourceStatusLabel(selectedArtifact.sourceMessageStatus)}`}
                       {` · ${formatDate(selectedArtifact.createdAt)}`}
                     </p>
                   </div>
-                  <button className="project-secondary" onClick={() => locateArtifact(selectedArtifact)}>
+                  <button
+                    className="project-secondary"
+                    onClick={() => locateArtifact(selectedArtifact)}
+                  >
                     <LocateFixed size={12} /> 定位来源
                   </button>
                 </div>
                 <div className="project-artifact-content">
-                  {selectedArtifact.kind === "markdown" && <MarkdownBody source={selectedArtifact.content} />}
-                  {selectedArtifact.kind === "code" && <pre className="art-code">{selectedArtifact.content}</pre>}
+                  {selectedArtifact.kind === "markdown" && (
+                    <MarkdownBody source={selectedArtifact.content} />
+                  )}
+                  {selectedArtifact.kind === "code" && (
+                    <pre className="art-code">{selectedArtifact.content}</pre>
+                  )}
                   {selectedArtifact.kind === "note" && (
                     <div className="art-note">
-                      {selectedArtifact.content.split("\n\n").map((paragraph, index) => <p key={index}>{paragraph}</p>)}
+                      {selectedArtifact.content
+                        .split("\n\n")
+                        .map((paragraph, index) => (
+                          <p key={index}>{paragraph}</p>
+                        ))}
                     </div>
                   )}
                 </div>
@@ -463,7 +528,9 @@ export function ProjectPanel({
                   <div>
                     <div className="project-eyebrow">PROJECT ARTIFACTS</div>
                     <h4>整个 Project 的持久化成果</h4>
-                    <p>包含根 Thread 和所有 Fork 产生的 Artifact；仅发现与查看，不会自动注入无关 Thread。</p>
+                    <p>
+                      包含根 Thread 和所有 Fork 产生的 Artifact；仅发现与查看，不会自动注入无关 Thread。
+                    </p>
                   </div>
                 </div>
                 <label className="project-search">
@@ -478,7 +545,9 @@ export function ProjectPanel({
                   <div className="project-empty">
                     <FileText size={18} />
                     <strong>还没有 Artifact</strong>
-                    <span>在任意 Thread 中生成 Markdown、Code 或 Note 后会出现在这里。</span>
+                    <span>
+                      在任意 Thread 中生成 Markdown、Code 或 Note 后会出现在这里。
+                    </span>
                   </div>
                 ) : (
                   <div className="project-resource-list">
@@ -488,15 +557,21 @@ export function ProjectPanel({
                         className="project-resource-card project-artifact-row"
                         onClick={() => onSelect(artifact.id)}
                       >
-                        <div className="project-resource-icon"><FileText size={15} /></div>
+                        <div className="project-resource-icon">
+                          <FileText size={15} />
+                        </div>
                         <div className="project-resource-main">
                           <div className="project-resource-title-row">
                             <strong>{artifact.title}</strong>
-                            <span className="project-kind">{artifactKindLabel(artifact.kind)}</span>
+                            <span className="project-kind">
+                              {artifactKindLabel(artifact.kind)}
+                            </span>
                           </div>
                           <div className="project-resource-meta">
                             {artifact.sourceThreadTitle ?? "未命名 Thread"}
-                            {artifact.sourceThreadFootnote !== null ? ` · 脚注 ${artifact.sourceThreadFootnote}` : ""}
+                            {artifact.sourceThreadFootnote !== null
+                              ? ` · 脚注 ${artifact.sourceThreadFootnote}`
+                              : ""}
                             {` · ${sourceStatusLabel(artifact.sourceMessageStatus)}`}
                             {` · ${formatDate(artifact.createdAt)}`}
                           </div>
