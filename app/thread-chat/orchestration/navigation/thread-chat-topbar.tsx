@@ -3,7 +3,7 @@
 import {
   CircleHelp,
   Columns3,
-  FileText,
+  FolderKanban,
   ListTodo,
   Network,
   Waypoints,
@@ -40,6 +40,7 @@ export function ThreadChatTopbar({
   forceCols: number | null
   placementMode: PlacementMode
   branchCount: number
+  /** Project 资源总数。保留旧 prop 名，避免对 Topbar 消费方制造无关 API churn。 */
   markdownCount: number
   onNewConversation(): void
   onToggleTreeList(): void
@@ -161,11 +162,11 @@ export function ThreadChatTopbar({
       </button>
       <button
         className="tbtn"
-        title="打开 / 收起 Markdown 面板"
+        title="打开 / 收起 Project Workspace"
         onClick={onToggleMarkdown}
       >
-        <FileText size={13} />
-        Markdown
+        <FolderKanban size={13} />
+        Project
         <span className="cnt">{markdownCount}</span>
       </button>
       <AccountButton />
