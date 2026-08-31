@@ -40,7 +40,12 @@ jobs:
       - name: Lint
         run: pnpm lint
       - name: Prompt cache contracts
-        run: pnpm test:thread-chat:prompt-cache
+        run: >-
+          pnpm test:thread-chat:prompt-cache &&
+          node --import tsx e2e/thread-chat/prompt-cache-adapter.test.mjs &&
+          node --import tsx e2e/thread-chat/prompt-cache-compiler-boundaries.test.mjs &&
+          node --import tsx e2e/thread-chat/prompt-cache-rollout.test.mjs &&
+          node --import tsx e2e/thread-chat/prompt-cache-state.test.mjs
       - name: Prompt cache Agent Eval
         run: pnpm test:thread-chat:prompt-cache-eval
       - name: Quote composer contracts
