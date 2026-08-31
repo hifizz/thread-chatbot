@@ -4,6 +4,10 @@ import type { ThreadChatUIMessageChunk } from "@/lib/thread-chat/contracts/ui-me
 import { compilePromptBase } from "@/lib/thread-chat/application/prompt-compiler"
 import type { PromptManifest } from "@/lib/thread-chat/application/prompt-cache"
 import type { PromptCacheControls } from "@/lib/ai/prompt-cache"
+import type {
+  ModelAttemptRecord,
+  ModelAttemptSummary,
+} from "@/lib/ai/model-attempt"
 import {
   findOwnedMessage,
   listThreadMessageRows,
@@ -36,6 +40,8 @@ export interface PreparedGeneration {
     adapter: string
     gateway: string | null
   }
+  modelAttempts?: () => ModelAttemptRecord[]
+  cacheSummary?: () => ModelAttemptSummary
 }
 
 export interface RunGenerationDependencies {
@@ -60,6 +66,8 @@ type GenerationRunResult = {
   manifest?: PromptManifest
   cacheControls?: PromptCacheControls
   routeId?: string
+  modelAttempts: ModelAttemptRecord[]
+  cacheSummary?: ModelAttemptSummary
   checkpoint: ReturnType<MessageCheckpointer["getSummary"]>
   error?: ReturnType<typeof safeErrorMetadata>
 }
@@ -195,6 +203,8 @@ async function runGenerationCore({
   const usage = prepared?.usage
     ? await Promise.resolve(prepared.usage).catch(() => undefined)
     : undefined
+  const modelAttempts = prepared?.modelAttempts?.() ?? []
+  const cacheSummary = prepared?.cacheSummary?.()
   const outcome = resolveGenerationTerminalOutcome({
     signal: session.signal,
     pipelineAborted: pipelineEnd?.isAborted === true,
@@ -214,6 +224,16 @@ async function runGenerationCore({
       metadata: {
         assistantMessageId: message.id,
         requestedStatus: outcome.status,
+        modelAttemptCount: modelAttempts.length,
+        ...(cacheSummary
+          ? {
+              cacheOutcome: cacheSummary.cacheOutcome,
+              cacheReadTokens: cacheSummary.usage.cacheReadTokens,
+              cacheWriteTokens: cacheSummary.usage.cacheWriteTokens,
+              uncachedInputTokens: cacheSummary.usage.uncachedInputTokens,
+              modelCostUsd: cacheSummary.usage.costUsd,
+            }
+          : {}),
         ...(prepared?.manifest
           ? {
               stableRequestPrefixHash:
@@ -268,6 +288,8 @@ async function runGenerationCore({
       ? { cacheControls: prepared.cacheControls }
       : {}),
     ...(prepared?.route?.routeId ? { routeId: prepared.route.routeId } : {}),
+    modelAttempts,
+    ...(cacheSummary ? { cacheSummary } : {}),
     checkpoint: checkpointer.getSummary(),
     ...(outcome.failed && (thrown || protocolError)
       ? { error: safeErrorMetadata(thrown ?? protocolError) }
@@ -310,6 +332,18 @@ export async function runGeneration(input: {
           ...result.checkpoint,
           ...(result.error ?? {}),
           hasProviderUsage: Boolean(result.providerUsage),
+          modelAttemptCount: result.modelAttempts.length,
+          ...(result.cacheSummary
+            ? {
+                cacheOutcome: result.cacheSummary.cacheOutcome,
+                cacheReadTokens: result.cacheSummary.usage.cacheReadTokens,
+                cacheWriteTokens: result.cacheSummary.usage.cacheWriteTokens,
+                uncachedInputTokens:
+                  result.cacheSummary.usage.uncachedInputTokens,
+                modelCostUsd: result.cacheSummary.usage.costUsd,
+                cacheUsageComplete: result.cacheSummary.usage.complete,
+              }
+            : {}),
           ...(result.manifest
             ? {
                 promptCompilerVersion:
