@@ -6,9 +6,14 @@ import type { ThreadChatUIMessage } from "@/lib/thread-chat/contracts/ui-message
 import type { ConversationTransaction } from "@/lib/thread-chat/persistence/transaction"
 import { persistentMessageParts } from "@/lib/thread-chat/persistence/message-parts"
 import {
+  parseThreadQuoteData,
+  type ThreadQuoteDataV1,
+} from "@/lib/thread-chat/domain/thread-quote"
+import {
   ConversationApplicationError,
   stateConflict,
 } from "@/lib/thread-chat/application/errors"
+import { assertQuoteBudget } from "@/lib/thread-chat/application/quote-budget"
 
 export interface FileReference {
   url: string
@@ -59,13 +64,81 @@ export async function assertOwnedReadyAttachments(
   }
 }
 
-export function buildUserParts(
-  text: string,
+export function buildUserParts(input: {
+  text: string
   files: readonly FileReference[]
-): ThreadChatUIMessage["parts"] {
+  quotes?: readonly ThreadQuoteDataV1[]
+}): ThreadChatUIMessage["parts"] {
+  const quotes = [...(input.quotes ?? [])]
+  assertQuoteBudget(quotes)
+  const text = input.text.trim()
+  const parts: ThreadChatUIMessage["parts"] = [
+    ...quotes.map((quote) => ({
+      type: "data-quote" as const,
+      data: quote,
+    })),
+    ...(text ? [{ type: "text" as const, text }] : []),
+    ...input.files.map((file) => ({
+      type: "file" as const,
+      url: file.url,
+      mediaType: file.mediaType,
+      ...(file.filename ? { filename: file.filename } : {}),
+    })),
+  ]
+  if (
+    !text &&
+    !quotes.some((quote) => Boolean(quote.comment?.trim()))
+  ) {
+    throw new ConversationApplicationError(
+      "VALIDATION_ERROR",
+      "请输入问题，或至少为一份引用添加评论"
+    )
+  }
+  return parts
+}
+
+export function persistentQuoteParts(
+  parts: ThreadChatUIMessage["parts"]
+): Array<Extract<ThreadChatUIMessage["parts"][number], { type: "data-quote" }>> {
+  return persistentMessageParts(parts)
+    .filter(
+      (
+        part
+      ): part is Extract<
+        ThreadChatUIMessage["parts"][number],
+        { type: "data-quote" }
+      > => part.type === "data-quote"
+    )
+    .map((part) => {
+      const parsed = parseThreadQuoteData(part.data)
+      if (parsed.schemaVersion === "legacy") return part
+      return { type: "data-quote" as const, data: parsed }
+    })
+}
+
+export function replaceUserEditableParts(input: {
+  sourceParts: ThreadChatUIMessage["parts"]
+  text: string
+  files: readonly FileReference[]
+}): ThreadChatUIMessage["parts"] {
+  const quoteParts = persistentQuoteParts(input.sourceParts)
+  const text = input.text.trim()
+  if (
+    !text &&
+    !quoteParts.some((part) => {
+      const quote = parseThreadQuoteData(part.data)
+      return quote.schemaVersion !== "legacy" && Boolean(quote.comment?.trim())
+    })
+  ) {
+    throw new ConversationApplicationError(
+      "VALIDATION_ERROR",
+      "请输入问题，或保留至少一份带评论的引用"
+    )
+  }
   return [
-    { type: "text", text },
-    ...files.map((file) => ({
+    ...quoteParts,
+    ...(text ? [{ type: "text" as const, text }] : []),
+    ...input.files.map((file) => ({
       type: "file" as const,
       url: file.url,
       mediaType: file.mediaType,
