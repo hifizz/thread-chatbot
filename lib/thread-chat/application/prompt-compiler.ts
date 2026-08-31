@@ -12,6 +12,7 @@ import {
   THREAD_PROMPT_COMPILER_VERSION,
 } from "@/constants/thread-chat"
 import { resolveAttachmentParts } from "@/lib/chat/resolve-attachments"
+import type { PromptProviderOptions } from "@/lib/ai/prompt-cache"
 import type { ThreadChatUIMessage } from "@/lib/thread-chat/contracts/ui-message"
 import {
   applyInheritedBudget,
@@ -66,7 +67,9 @@ function asUiMessage(row: {
   }
 }
 
-function convertUiMessages(messages: ThreadChatUIMessage[]): ModelMessage[] {
+async function convertUiMessages(
+  messages: ThreadChatUIMessage[]
+): Promise<ModelMessage[]> {
   return convertToModelMessages(messages, {
     ignoreIncompleteToolCalls: true,
     convertDataPart: (part) => {
@@ -200,15 +203,12 @@ export async function compilePromptBase(input: {
         query: messageText(currentUserUi),
       }),
     ])
-  const inheritedMessages = convertUiMessages(
-    resolvedInherited as ThreadChatUIMessage[]
-  )
-  const branchHistoryMessages = convertUiMessages(
-    resolvedBranchHistory as ThreadChatUIMessage[]
-  )
-  const currentUserMessages = convertUiMessages(
-    resolvedCurrentUser as ThreadChatUIMessage[]
-  )
+  const [inheritedMessages, branchHistoryMessages, currentUserMessages] =
+    await Promise.all([
+      convertUiMessages(resolvedInherited as ThreadChatUIMessage[]),
+      convertUiMessages(resolvedBranchHistory as ThreadChatUIMessage[]),
+      convertUiMessages(resolvedCurrentUser as ThreadChatUIMessage[]),
+    ])
   if (currentUserMessages.length !== 1) {
     stateConflict("当前用户消息编译结果不唯一")
   }
@@ -264,7 +264,7 @@ export type CompiledGenerationPrompt = {
   system: string
   messages: ModelMessage[]
   tools: ToolSet
-  providerOptions?: Record<string, Record<string, unknown>>
+  providerOptions?: PromptProviderOptions
   headers?: Record<string, string>
   manifest: PromptManifest
 }
@@ -285,7 +285,7 @@ export function finalizeGenerationPrompt(input: {
   toolProfileHash: string
   routeId: string
   runtimeControl?: unknown
-  providerOptions?: Record<string, Record<string, unknown>>
+  providerOptions?: PromptProviderOptions
   headers?: Record<string, string>
   contextWindowTokens?: number
   minimumCachePrefixTokens?: number
