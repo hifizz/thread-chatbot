@@ -31,6 +31,9 @@ export type PromptCacheControls = {
   affinityHash?: string
   enabled: boolean
   reason: string
+  strategy?: ResolvedChatModel["cache"]["strategy"]
+  ttlClass?: PromptCacheTtlClass
+  markerCount?: number
 }
 
 export type PromptCacheBoundaryCandidate = {
@@ -162,7 +165,6 @@ export function selectPromptCacheTtl(input: {
   }
   if (supported.has("5m")) return "5m"
   if (supported.has("provider-default")) return "provider-default"
-  // Defensive fallback for a malformed capability declaration.
   return input.supportedTtls[0] ?? "provider-default"
 }
 
@@ -183,6 +185,25 @@ export function promptCacheAffinityKey(input: {
       "utf8"
     )
     .digest("hex")
+}
+
+/** Merge provider namespaces without mutating either input. */
+export function mergePromptProviderOptions(
+  left: PromptProviderOptions | undefined,
+  right: PromptProviderOptions | undefined
+): PromptProviderOptions | undefined {
+  if (!left && !right) return undefined
+  const merged: PromptProviderOptions = {}
+  for (const source of [left, right]) {
+    if (!source) continue
+    for (const [provider, options] of Object.entries(source)) {
+      merged[provider] = {
+        ...(merged[provider] ?? {}),
+        ...options,
+      }
+    }
+  }
+  return Object.keys(merged).length > 0 ? merged : undefined
 }
 
 /**
@@ -227,6 +248,7 @@ export function buildPromptCacheControls(input: {
       mode,
       enabled: false,
       reason: mode === "observe" ? "observe-only" : "disabled",
+      strategy: input.resolved.cache.strategy,
     }
   }
   if (
@@ -237,6 +259,7 @@ export function buildPromptCacheControls(input: {
       mode,
       enabled: false,
       reason: input.resolved.cache.strategy,
+      strategy: input.resolved.cache.strategy,
     }
   }
 
@@ -261,6 +284,7 @@ export function buildPromptCacheControls(input: {
     mode,
     enabled: true,
     reason: input.resolved.cache.strategy,
+    strategy: input.resolved.cache.strategy,
     ...(Object.keys(providerOptions).length ? { providerOptions } : {}),
     ...(Object.keys(headers).length ? { headers } : {}),
     ...(affinityHash ? { affinityHash } : {}),
