@@ -22,11 +22,11 @@
 - [x] 3.2 在 Generation 初始化阶段 owner-scoped 加载 Project Contract，将 `contractVersion` 作为本次 Generation 快照固定，不从客户端 Message 获取 Contract
 - [x] 3.3 扩展 `prepareGeneration`/system 组装：在全局 Agent 规则之后、Conversation Messages 之前注入非空 Project Contract，并明确 Target、Instructions、当前请求和非指令资料的优先级
 - [x] 3.4 记录安全的 observability metadata：Contract Version 与是否存在 Target/Instructions，不记录完整 Contract 正文
-- [ ] 3.5 增加并发验收：生成启动后修改 Contract 不影响运行中请求，下一次请求使用新版本；旧 Fork 使用当前 Contract 但冻结历史不变
+- [x] 3.5 增加并发验收：生成启动后修改 Contract 不影响运行中请求，下一次请求使用新版本；旧 Fork 使用当前 Contract 但冻结历史不变
 
 ## 4. Project File 内容选择与模型注入
 
-- [ ] 4.1 从 `resolve-attachments.ts` 抽取可复用 Attachment Content Resolver：批量查 owner-owned rows、PDF 全文/检索/截断、manifest、页码引用和错误降级
+- [x] 4.1 从 `resolve-attachments.ts` 抽取可复用 Attachment Content Resolver：批量查 owner-owned rows、PDF 全文/检索/截断、manifest、页码引用和错误降级
 - [x] 4.2 定义一次 Generation 的文件快照：加载当前 Project File ids/status，并与有效 Message Attachments 按 Attachment id 去重
 - [x] 4.3 实现确定性预算策略：显式 Message Attachments 优先，Project File manifest 始终轻量可见，Ready PDF 使用剩余预算检索或按页截断
 - [x] 4.4 对 uploading/failed/不支持内容理解的类型输出准确 metadata 或跳过正文，禁止把未解析内容描述为已读取
