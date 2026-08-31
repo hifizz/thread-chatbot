@@ -122,6 +122,7 @@ while (true) {
 }
 assert.deepEqual(chunks, ["fallback-output"])
 assert.deepEqual(await fallback.usage, { inputTokens: 10 })
+assert.equal(fallbackCalls, 1)
 assert.equal(fallback.usedFallback(), true)
 assert.equal(typeof fallback.ttftMs(), "number")
 
@@ -151,6 +152,7 @@ const partialThenError = createPromptCacheFallbackStream({
 const unsafeReader = partialThenError.stream.getReader()
 assert.deepEqual(await unsafeReader.read(), { value: "partial", done: false })
 await assert.rejects(unsafeReader.read(), /cache_control/)
+await assert.rejects(partialThenError.usage, /cache_control/)
 assert.equal(unsafeFallbackCalls, 0, "never retry after any protocol output")
 assert.equal(partialThenError.usedFallback(), false)
 
