@@ -29,6 +29,20 @@ export type PromptCacheControls = {
   reason: string
 }
 
+export type PromptCacheBoundaryCandidate = {
+  kind: "kernel-end" | "inherited-end" | "branch-history-end"
+  tokenEstimate?: number
+}
+
+export type SelectedPromptCacheBreakpoint = {
+  kind: PromptCacheBoundaryCandidate["kind"]
+  tokenEstimate: number
+}
+
+const BREAKPOINT_PRIORITY: ReadonlyArray<
+  PromptCacheBoundaryCandidate["kind"]
+> = ["inherited-end", "branch-history-end", "kernel-end"]
+
 export function resolvePromptCacheMode(
   value: string | undefined = process.env.THREAD_PROMPT_CACHE_MODE
 ): ThreadPromptCacheMode {
@@ -54,6 +68,35 @@ export function promptCacheAffinityKey(input: {
       "utf8"
     )
     .digest("hex")
+}
+
+/**
+ * Explicit-cache routes have limited marker counts. Selection is deterministic:
+ * sibling reuse first, continuation reuse second, kernel reuse last.
+ */
+export function selectPromptCacheBreakpoints(input: {
+  candidates: readonly PromptCacheBoundaryCandidate[]
+  minimumPrefixTokens: number
+  maximumBreakpoints: number
+}): SelectedPromptCacheBreakpoint[] {
+  if (
+    !Number.isFinite(input.minimumPrefixTokens) ||
+    input.minimumPrefixTokens < 0 ||
+    !Number.isInteger(input.maximumBreakpoints) ||
+    input.maximumBreakpoints < 0
+  ) {
+    throw new Error("INVALID_PROMPT_CACHE_BREAKPOINT_POLICY")
+  }
+  const byKind = new Map(input.candidates.map((candidate) => [candidate.kind, candidate]))
+  return BREAKPOINT_PRIORITY.flatMap((kind) => {
+    const candidate = byKind.get(kind)
+    const tokenEstimate = candidate?.tokenEstimate
+    return typeof tokenEstimate === "number" &&
+      Number.isFinite(tokenEstimate) &&
+      tokenEstimate >= input.minimumPrefixTokens
+      ? [{ kind, tokenEstimate }]
+      : []
+  }).slice(0, input.maximumBreakpoints)
 }
 
 export function buildPromptCacheControls(input: {
@@ -107,6 +150,45 @@ export function buildPromptCacheControls(input: {
     ...(Object.keys(headers).length ? { headers } : {}),
     ...(affinityHash ? { affinityHash } : {}),
   }
+}
+
+export function withoutPromptCacheControls<T extends {
+  providerOptions?: PromptProviderOptions
+  headers?: Record<string, string>
+}>(value: T): Omit<T, "providerOptions" | "headers"> {
+  const { providerOptions: _providerOptions, headers: _headers, ...fallback } = value
+  return fallback
+}
+
+/**
+ * Contains cache-option rejection without changing ordinary model behavior.
+ * The caller decides which provider errors are cache-control rejections; all
+ * other failures are rethrown unchanged.
+ */
+export async function executeWithPromptCacheFallback<TOptions, TResult>(input: {
+  primary: TOptions
+  fallback: TOptions
+  execute: (options: TOptions) => TResult | Promise<TResult>
+  isCacheControlRejection: (error: unknown) => boolean
+  onFallback?: (error: unknown) => void
+}): Promise<{ result: TResult; usedFallback: boolean }> {
+  try {
+    return { result: await input.execute(input.primary), usedFallback: false }
+  } catch (error) {
+    if (!input.isCacheControlRejection(error)) throw error
+    input.onFallback?.(error)
+    return {
+      result: await input.execute(input.fallback),
+      usedFallback: true,
+    }
+  }
+}
+
+export function looksLikePromptCacheControlRejection(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error)
+  return /(?:cache[_ -]?(?:control|key|ttl)|provideroptions|x-session-id).*(?:unsupported|invalid|unknown|reject|400)/i.test(
+    message
+  )
 }
 
 export const PROMPT_CACHE_ROUTE_PROBES = [
