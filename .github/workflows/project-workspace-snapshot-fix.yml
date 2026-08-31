@@ -1,0 +1,62 @@
+name: Project Workspace Snapshot Repair
+
+on:
+  push:
+    branches:
+      - codex/research-project-workspace-design
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
+      DIRECT_URL: postgres://postgres:postgres@localhost:5432/postgres
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: codex/research-project-workspace-design
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Generate current schema snapshot
+        run: pnpm db:generate
+
+      - name: Promote generated snapshot to migration 0007
+        run: |
+          test -f drizzle/meta/0008_snapshot.json
+          cp drizzle/meta/0008_snapshot.json drizzle/meta/0007_snapshot.json
+          rm -f drizzle/0008_*.sql drizzle/meta/0008_snapshot.json
+          git checkout -- drizzle/meta/_journal.json
+
+      - name: Commit snapshot repair
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add drizzle/meta/0007_snapshot.json
+          git commit -m "fix(db): add project workspace drizzle snapshot"
+          git push origin HEAD:codex/research-project-workspace-design
