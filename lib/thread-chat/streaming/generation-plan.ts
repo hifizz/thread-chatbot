@@ -14,6 +14,7 @@ import {
   buildPromptCacheControls,
   resolvePromptCacheMode,
 } from "@/lib/ai/prompt-cache"
+import { createModelAttemptCollector } from "@/lib/ai/model-attempt"
 import { withModelCallLogging } from "@/lib/ai/model-call-logger"
 import { isExplicitMarkdownArtifactRequest } from "@/lib/chat/markdown-artifact"
 import {
@@ -181,6 +182,17 @@ export async function prepareGeneration(input: PrepareGenerationInput) {
     contextWindowTokens: resolved.contextWindowTokens,
     minimumCachePrefixTokens: resolved.cache.minimumPrefixTokens,
   })
+  const attemptCollector = createModelAttemptCollector({
+    purpose: MODEL_CALL_PURPOSE.chatAnswer,
+    routeId: resolved.route.routeId,
+    upstreamModelId: resolved.route.upstreamModelId,
+    adapter: resolved.route.adapter,
+    gateway: resolved.route.gateway,
+    toolProfileId: built.profile.id,
+    stableRequestPrefixHash: compiled.manifest.stableRequestPrefixHash,
+    cacheStrategy: resolved.cache.strategy,
+    cacheEligibility: compiled.manifest.cacheEligibility.reason,
+  })
 
   throwIfGenerationCancelled(input.abortSignal)
   const result = streamText({
@@ -202,6 +214,9 @@ export async function prepareGeneration(input: PrepareGenerationInput) {
       ? { providerOptions: compiled.providerOptions }
       : {}),
     ...(compiled.headers ? { headers: compiled.headers } : {}),
+    onStepFinish: (step) => {
+      attemptCollector.recordStep(step)
+    },
     ...(activeTools.length > 0
       ? {
           prepareStep: ({ stepNumber }: { stepNumber: number }) => ({
@@ -244,6 +259,8 @@ export async function prepareGeneration(input: PrepareGenerationInput) {
     manifest: compiled.manifest,
     cacheControls,
     route: resolved.route,
+    modelAttempts: () => attemptCollector.snapshot(),
+    cacheSummary: () => attemptCollector.summary(),
   }
 }
 
