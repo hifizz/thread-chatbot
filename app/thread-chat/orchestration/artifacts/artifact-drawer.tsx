@@ -21,29 +21,29 @@ import {
 } from "@/constants/project-workspace"
 import type {
   ArtifactDTO,
-  ProjectDTO,
+  ProjectBootstrapDTO,
   ProjectFileDTO,
 } from "@/lib/thread-chat/contracts/dto"
+import type { ThreadTreeState } from "../../core/types"
 import { MarkdownBody } from "../../chat/message/markdown-body"
-
-export type ProjectPanelSection = "overview" | "files" | "artifacts"
+import { createThreadChatClient, ThreadChatApiError } from "../../net/client"
+import { uploadProjectFile } from "../../net/project-file-upload"
 
 export interface ArtifactDrawerProps {
-  project: ProjectDTO | null
-  files: ProjectFileDTO[]
-  artifacts: ArtifactDTO[]
+  state: ThreadTreeState
   open: boolean
   activeId: string | null
   onClose: () => void
   onSelect: (id: string) => void
   onLocate: (threadId: string, sourceMessageId: string) => void
-  onSaveContract(input: {
-    target: string
-    instructions: string
-    expectedContractVersion: number
-  }): Promise<void>
-  onUploadFile(file: File): Promise<void>
-  onRemoveFile(attachmentId: string): Promise<void>
+}
+
+type ProjectPanelSection = "overview" | "files" | "artifacts"
+
+function currentProjectId(): string | null {
+  if (typeof window === "undefined") return null
+  const match = window.location.pathname.match(/\/thread-chat\/([^/?#]+)/)
+  return match?.[1] ? decodeURIComponent(match[1]) : null
 }
 
 function formatBytes(size: number) {
@@ -80,58 +80,61 @@ function fileStatusLabel(file: ProjectFileDTO) {
   return "处理中"
 }
 
+function errorMessage(error: unknown, fallback: string) {
+  if (error instanceof ThreadChatApiError) return error.detail.message
+  return error instanceof Error ? error.message : fallback
+}
+
 export function ArtifactDrawer({
-  project,
-  files,
-  artifacts,
+  state: _state,
   open,
   activeId,
   onClose,
   onSelect,
   onLocate,
-  onSaveContract,
-  onUploadFile,
-  onRemoveFile,
 }: ArtifactDrawerProps) {
   const titleId = useId()
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const closeButtonRef = useRef<HTMLButtonElement | null>(null)
   const returnFocusRef = useRef<HTMLElement | null>(null)
   const wasOpenRef = useRef(false)
+  const client = useMemo(() => createThreadChatClient(), [])
+  const [bootstrap, setBootstrap] = useState<ProjectBootstrapDTO | null>(null)
   const [section, setSection] = useState<ProjectPanelSection>("overview")
   const [editing, setEditing] = useState(false)
-  const [targetDraft, setTargetDraft] = useState(project?.target ?? "")
-  const [instructionsDraft, setInstructionsDraft] = useState(
-    project?.instructions ?? ""
-  )
+  const [targetDraft, setTargetDraft] = useState("")
+  const [instructionsDraft, setInstructionsDraft] = useState("")
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [artifactQuery, setArtifactQuery] = useState("")
 
+  const project = bootstrap?.project ?? null
+  const files = bootstrap?.files ?? []
+  const artifacts = bootstrap?.artifacts ?? []
   const archived = Boolean(project?.archivedAt)
-  const selectedArtifact = useMemo(
-    () => artifacts.find((artifact) => artifact.id === activeId) ?? null,
-    [activeId, artifacts]
-  )
-  const sortedArtifacts = useMemo(
-    () =>
-      [...artifacts]
-        .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
-        .filter((artifact) => {
-          const query = artifactQuery.trim().toLowerCase()
-          if (!query) return true
-          return [artifact.title, artifact.kind, artifact.sourceThreadTitle ?? ""]
-            .join(" ")
-            .toLowerCase()
-            .includes(query)
-        }),
-    [artifactQuery, artifacts]
-  )
-  const sortedFiles = useMemo(
-    () => [...files].sort((left, right) => right.addedAt.localeCompare(left.addedAt)),
-    [files]
-  )
+
+  const refresh = async () => {
+    const projectId = currentProjectId()
+    if (!projectId) return
+    setLoading(true)
+    try {
+      const next = await client.getProject(projectId)
+      setBootstrap(next)
+      setError(null)
+    } catch (cause) {
+      setError(errorMessage(cause, "Project 加载失败"))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (!open) return
+    void refresh()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open])
 
   useEffect(() => {
     if (!project || editing) return
@@ -162,6 +165,29 @@ export function ArtifactDrawer({
     }
   }, [open])
 
+  const selectedArtifact = useMemo(
+    () => artifacts.find((artifact) => artifact.id === activeId) ?? null,
+    [activeId, artifacts]
+  )
+  const sortedArtifacts = useMemo(
+    () =>
+      [...artifacts]
+        .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
+        .filter((artifact) => {
+          const query = artifactQuery.trim().toLowerCase()
+          if (!query) return true
+          return [artifact.title, artifact.kind, artifact.sourceThreadTitle ?? ""]
+            .join(" ")
+            .toLowerCase()
+            .includes(query)
+        }),
+    [artifactQuery, artifacts]
+  )
+  const sortedFiles = useMemo(
+    () => [...files].sort((left, right) => right.addedAt.localeCompare(left.addedAt)),
+    [files]
+  )
+
   const cancelEdit = () => {
     setTargetDraft(project?.target ?? "")
     setInstructionsDraft(project?.instructions ?? "")
@@ -174,27 +200,53 @@ export function ArtifactDrawer({
     setSaving(true)
     setError(null)
     try {
-      await onSaveContract({
+      const response = await client.updateProjectContract(project.id, {
+        commandId: crypto.randomUUID(),
+        expectedContractVersion: project.contractVersion,
         target: targetDraft,
         instructions: instructionsDraft,
-        expectedContractVersion: project.contractVersion,
       })
+      setBootstrap((current) =>
+        current ? { ...current, project: response.data } : current
+      )
       setEditing(false)
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : PROJECT_WORKSPACE_COPY.contractConflict)
+      setError(errorMessage(cause, PROJECT_WORKSPACE_COPY.contractConflict))
     } finally {
       setSaving(false)
     }
   }
 
   const upload = async (file: File) => {
-    if (archived) return
+    if (!project || archived) return
     setUploading(true)
     setError(null)
     try {
-      await onUploadFile(file)
+      await uploadProjectFile(file, {
+        onAttachmentCreated: async (attachmentId) => {
+          const response = await client.addProjectFile(project.id, {
+            commandId: crypto.randomUUID(),
+            attachmentId,
+          })
+          setBootstrap((current) =>
+            current
+              ? {
+                  ...current,
+                  files: [
+                    response.data,
+                    ...current.files.filter(
+                      (item) => item.attachmentId !== response.data.attachmentId
+                    ),
+                  ],
+                }
+              : current
+          )
+        },
+      })
+      await refresh()
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "文件上传失败")
+      setError(errorMessage(cause, "文件上传失败"))
+      await refresh()
     } finally {
       setUploading(false)
       if (fileInputRef.current) fileInputRef.current.value = ""
@@ -202,15 +254,36 @@ export function ArtifactDrawer({
   }
 
   const remove = async (file: ProjectFileDTO) => {
-    if (archived) return
-    const confirmed = window.confirm(`从 Project 中移除「${file.filename}」？历史消息中的附件不会被删除。`)
+    if (!project || archived) return
+    const confirmed = window.confirm(
+      `从 Project 中移除「${file.filename}」？历史消息中的附件不会被删除。`
+    )
     if (!confirmed) return
     setError(null)
     try {
-      await onRemoveFile(file.attachmentId)
+      await client.removeProjectFile(project.id, file.attachmentId, {
+        commandId: crypto.randomUUID(),
+        attachmentId: file.attachmentId,
+      })
+      setBootstrap((current) =>
+        current
+          ? {
+              ...current,
+              files: current.files.filter(
+                (item) => item.attachmentId !== file.attachmentId
+              ),
+            }
+          : current
+      )
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "移除文件失败")
+      setError(errorMessage(cause, "移除文件失败"))
     }
+  }
+
+  const locateArtifact = (artifact: ArtifactDTO) => {
+    const viewThreadId =
+      project?.rootThreadId === artifact.threadId ? "main" : artifact.threadId
+    onLocate(viewThreadId, artifact.sourceMessageId)
   }
 
   return (
@@ -241,22 +314,13 @@ export function ArtifactDrawer({
       </div>
 
       <div className="project-sections" role="tablist" aria-label="Project workspace">
-        <button
-          className={section === "overview" ? "on" : ""}
-          onClick={() => setSection("overview")}
-        >
+        <button className={section === "overview" ? "on" : ""} onClick={() => setSection("overview")}>
           Overview
         </button>
-        <button
-          className={section === "files" ? "on" : ""}
-          onClick={() => setSection("files")}
-        >
+        <button className={section === "files" ? "on" : ""} onClick={() => setSection("files")}>
           Files <span>{files.length}</span>
         </button>
-        <button
-          className={section === "artifacts" ? "on" : ""}
-          onClick={() => setSection("artifacts")}
-        >
+        <button className={section === "artifacts" ? "on" : ""} onClick={() => setSection("artifacts")}>
           Artifacts <span>{artifacts.length}</span>
         </button>
       </div>
@@ -267,7 +331,9 @@ export function ArtifactDrawer({
       )}
 
       <div className="art-body project-panel-body">
-        {section === "overview" && (
+        {loading && !bootstrap ? <div className="project-empty">Project 加载中…</div> : null}
+
+        {section === "overview" && !loading && (
           <section className="project-overview">
             <div className="project-section-heading">
               <div>
@@ -293,13 +359,9 @@ export function ArtifactDrawer({
                   rows={5}
                 />
               ) : (
-                <div className="project-read-value">
-                  {project?.target || "尚未设置 Target。"}
-                </div>
+                <div className="project-read-value">{project?.target || "尚未设置 Target。"}</div>
               )}
-              {editing && (
-                <small>{targetDraft.length}/{PROJECT_TARGET_MAX_CHARS}</small>
-              )}
+              {editing && <small>{targetDraft.length}/{PROJECT_TARGET_MAX_CHARS}</small>}
             </label>
 
             <label className="project-field">
@@ -317,16 +379,12 @@ export function ArtifactDrawer({
                   {project?.instructions || "尚未设置 Instructions。"}
                 </div>
               )}
-              {editing && (
-                <small>{instructionsDraft.length}/{PROJECT_INSTRUCTIONS_MAX_CHARS}</small>
-              )}
+              {editing && <small>{instructionsDraft.length}/{PROJECT_INSTRUCTIONS_MAX_CHARS}</small>}
             </label>
 
             {editing && (
               <div className="project-actions">
-                <button className="project-secondary" disabled={saving} onClick={cancelEdit}>
-                  取消
-                </button>
+                <button className="project-secondary" disabled={saving} onClick={cancelEdit}>取消</button>
                 <button className="project-primary" disabled={saving} onClick={() => void saveContract()}>
                   {saving ? "保存中…" : "保存 Contract"}
                 </button>
@@ -343,7 +401,7 @@ export function ArtifactDrawer({
                 <h4>跨 Thread 可用的原始资料</h4>
                 <p>Ready 文件会在统一预算内参与未来生成；移除只解除 Project 成员关系。</p>
               </div>
-              {!archived && (
+              {!archived && project && (
                 <>
                   <input
                     ref={fileInputRef}
@@ -411,43 +469,28 @@ export function ArtifactDrawer({
           <section className="project-artifacts">
             {selectedArtifact ? (
               <div className="project-artifact-detail">
-                <button className="project-back" onClick={() => onSelect("")}>
-                  ← 全部 Artifacts
-                </button>
+                <button className="project-back" onClick={() => onSelect("")}>← 全部 Artifacts</button>
                 <div className="project-section-heading artifact-detail-heading">
                   <div>
                     <div className="project-eyebrow">{artifactKindLabel(selectedArtifact.kind)}</div>
                     <h4>{selectedArtifact.title}</h4>
                     <p>
                       来源：{selectedArtifact.sourceThreadTitle ?? "未命名 Thread"}
-                      {selectedArtifact.sourceThreadFootnote !== null
-                        ? ` · 脚注 ${selectedArtifact.sourceThreadFootnote}`
-                        : ""}
+                      {selectedArtifact.sourceThreadFootnote !== null ? ` · 脚注 ${selectedArtifact.sourceThreadFootnote}` : ""}
                       {` · ${sourceStatusLabel(selectedArtifact.sourceMessageStatus)}`}
                       {` · ${formatDate(selectedArtifact.createdAt)}`}
                     </p>
                   </div>
-                  <button
-                    className="project-secondary"
-                    onClick={() =>
-                      onLocate(selectedArtifact.threadId, selectedArtifact.sourceMessageId)
-                    }
-                  >
+                  <button className="project-secondary" onClick={() => locateArtifact(selectedArtifact)}>
                     <LocateFixed size={12} /> 定位来源
                   </button>
                 </div>
                 <div className="project-artifact-content">
-                  {selectedArtifact.kind === "markdown" && (
-                    <MarkdownBody source={selectedArtifact.content} />
-                  )}
-                  {selectedArtifact.kind === "code" && (
-                    <pre className="art-code">{selectedArtifact.content}</pre>
-                  )}
+                  {selectedArtifact.kind === "markdown" && <MarkdownBody source={selectedArtifact.content} />}
+                  {selectedArtifact.kind === "code" && <pre className="art-code">{selectedArtifact.content}</pre>}
                   {selectedArtifact.kind === "note" && (
                     <div className="art-note">
-                      {selectedArtifact.content.split("\n\n").map((paragraph, index) => (
-                        <p key={index}>{paragraph}</p>
-                      ))}
+                      {selectedArtifact.content.split("\n\n").map((paragraph, index) => <p key={index}>{paragraph}</p>)}
                     </div>
                   )}
                 </div>
@@ -491,9 +534,7 @@ export function ArtifactDrawer({
                           </div>
                           <div className="project-resource-meta">
                             {artifact.sourceThreadTitle ?? "未命名 Thread"}
-                            {artifact.sourceThreadFootnote !== null
-                              ? ` · 脚注 ${artifact.sourceThreadFootnote}`
-                              : ""}
+                            {artifact.sourceThreadFootnote !== null ? ` · 脚注 ${artifact.sourceThreadFootnote}` : ""}
                             {` · ${sourceStatusLabel(artifact.sourceMessageStatus)}`}
                             {` · ${formatDate(artifact.createdAt)}`}
                           </div>
