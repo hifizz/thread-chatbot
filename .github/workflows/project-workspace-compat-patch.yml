@@ -56,7 +56,11 @@ jobs:
           )
           text = text.replace(
               '    async deleteProject() {\n      project = null\n      threads.clear()\n      messages.clear()\n      artifacts.clear()\n      return commandResponse({ projectId, deleted: true as const })\n    },\n  }\n\n  const fetchStream',
-              '    async deleteProject() {\n      project = null\n      threads.clear()\n      messages.clear()\n      artifacts.clear()\n      return commandResponse({ projectId, deleted: true as const })\n    },\n  } as ThreadChatClient\n\n  const fetchStream',
+              '    async deleteProject() {\n      project = null\n      threads.clear()\n      messages.clear()\n      artifacts.clear()\n      return commandResponse({ projectId, deleted: true as const })\n    },\n  } as unknown as ThreadChatClient\n\n  const fetchStream',
+          )
+          text = text.replace(
+              '  } as ThreadChatClient\n\n  const fetchStream',
+              '  } as unknown as ThreadChatClient\n\n  const fetchStream',
           )
 
           path.write_text(text)
