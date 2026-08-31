@@ -14,6 +14,7 @@ import {
 import { MAX_OUTPUT_TOKENS } from "@/constants/model"
 import { MODEL_CALL_PURPOSE } from "@/constants/model-call"
 import { getChatModel } from "@/constants/model"
+import { THREAD_PROMPT_PREFLIGHT_DYNAMIC_RESERVE_CHARS } from "@/constants/thread-chat"
 import { isSearchConfigured } from "@/lib/ai/search"
 import { resolveChatModelRoute } from "@/lib/ai/provider"
 import {
@@ -49,9 +50,11 @@ import { observeAppOperation } from "@/lib/observability/trace"
 import type { ObservabilityContext } from "@/lib/observability/types"
 import {
   finalizeGenerationPrompt,
+  promptBaseCharacters,
   type CompiledGenerationPrompt,
   type PromptBase,
 } from "@/lib/thread-chat/application/prompt-compiler"
+import { assertPromptWindowBudget } from "@/lib/thread-chat/application/quote-budget"
 import type { PromptManifest } from "@/lib/thread-chat/application/prompt-cache"
 
 export interface PrepareGenerationInput {
@@ -115,6 +118,17 @@ export async function prepareGeneration(input: PrepareGenerationInput) {
   if (!registeredModel) throw new Error("MODEL_NOT_ALLOWED")
   const resolved = resolveChatModelRoute(input.modelId)
   const model = resolved.model
+
+  // Reject oversized Quote/history input before research routing or planning can
+  // consume paid model calls. The final compiler performs a second exact check
+  // after Tool Profile and runtime control are known.
+  assertPromptWindowBudget({
+    inputCharacters:
+      promptBaseCharacters(input.promptBase) +
+      THREAD_PROMPT_PREFLIGHT_DYNAMIC_RESERVE_CHARS,
+    contextWindowTokens: resolved.contextWindowTokens,
+  })
+
   const trace = {
     requestId: crypto.randomUUID(),
     ...input.observabilityContext,
@@ -202,7 +216,6 @@ export async function prepareGeneration(input: PrepareGenerationInput) {
     artifactRequested,
   })
 
-  // Compile once without controls to obtain route-neutral candidate boundaries.
   const preview = finalizeGenerationPrompt({
     base: input.promptBase,
     tools: built.tools,
