@@ -60,6 +60,7 @@ jobs:
           app/thread-chat/net/client.ts
           app/thread-chat/net/commands/conversation-commands.ts
           app/thread-chat/net/project-file-upload.ts
+          app/thread-chat/orchestration/artifacts/artifact-drawer.tsx
           app/thread-chat/orchestration/artifacts/project-panel.tsx
           app/thread-chat/orchestration/artifacts/store-bound-project-panel.tsx
           app/thread-chat/orchestration/navigation/thread-chat-topbar.tsx
