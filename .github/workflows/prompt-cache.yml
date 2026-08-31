@@ -10,13 +10,11 @@ on:
       - "app/thread-chat/**"
       - "e2e/thread-chat/**"
       - "evals/agent/**"
+      - "scripts/probe-prompt-cache.ts"
       - "package.json"
       - "pnpm-lock.yaml"
       - ".github/workflows/prompt-cache.yml"
       - "openspec/changes/optimize-thread-chat-prompt-cache/**"
-  push:
-    branches:
-      - codex/design-thread-chat-prompt-cache
   workflow_dispatch:
 
 permissions:
@@ -25,7 +23,7 @@ permissions:
 jobs:
   contracts:
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -43,9 +41,13 @@ jobs:
         run: pnpm lint
       - name: Prompt cache contracts
         run: pnpm test:thread-chat:prompt-cache
+      - name: Fake Claude cache cost probe
+        run: pnpm prompt-cache:probe
       - name: Existing API contracts
         run: pnpm test:thread-chat:gate2-api
       - name: Observability foundation
         run: pnpm test:observability:foundation
+      - name: Evaluation foundation
+        run: pnpm test:observability:eval-foundation
       - name: OpenSpec strict validation
         run: pnpm openspec:validate
