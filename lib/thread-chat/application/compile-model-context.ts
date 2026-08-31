@@ -137,7 +137,10 @@ export async function compileModelContextWithProject({
           },
         ]
       : []),
-    ...resolved.messages,
+    // resolveAttachmentContext only rewrites message parts and preserves the
+    // original UI message identity/metadata. Its shared attachment API remains
+    // generic UIMessage-shaped, so restore the narrower ThreadChat type here.
+    ...(resolved.messages as ThreadChatUIMessage[]),
   ]
   const modelMessages = await convertToModelMessages(withProjectContext, {
     ignoreIncompleteToolCalls: true,
