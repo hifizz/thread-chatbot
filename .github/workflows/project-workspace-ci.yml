@@ -30,6 +30,9 @@ jobs:
       DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
       DIRECT_URL: postgres://postgres:postgres@localhost:5432/postgres
       BETTER_AUTH_SECRET: project-workspace-ci-secret-at-least-32-characters
+      MINIMAX_API_KEY: project-workspace-build-placeholder
+      MINIMAX_BASE_URL: https://example.invalid/v1
+      LLM_MODEL_ID: project-workspace-build-model
     steps:
       - uses: actions/checkout@v4
 
@@ -45,6 +48,43 @@ jobs:
 
       - name: Typecheck
         run: pnpm typecheck
+
+      - name: Targeted ESLint
+        run: >-
+          pnpm exec eslint
+          app/thread-chat/chat/chat-view.tsx
+          app/thread-chat/core/projections.ts
+          app/thread-chat/core/store.ts
+          app/thread-chat/core/types.ts
+          app/thread-chat/gate-3-harness/mock-v1-runtime.ts
+          app/thread-chat/net/client.ts
+          app/thread-chat/net/commands/conversation-commands.ts
+          app/thread-chat/net/project-file-upload.ts
+          app/thread-chat/orchestration/artifacts/artifact-drawer.tsx
+          app/thread-chat/orchestration/artifacts/project-panel.tsx
+          app/thread-chat/orchestration/artifacts/store-bound-project-panel.tsx
+          app/thread-chat/orchestration/navigation/thread-chat-topbar.tsx
+          app/thread-chat/thread-chat-demo.tsx
+          constants/project-workspace.ts
+          evals/agent/executors/production-harness.ts
+          evals/agent/schema.ts
+          lib/chat/attachment-content-resolver.ts
+          lib/chat/attachment-context-policy.ts
+          lib/chat/project-contract.ts
+          lib/chat/resolve-attachments.ts
+          lib/db/schema.ts
+          lib/thread-chat/application/compile-model-context.ts
+          lib/thread-chat/application/project-mutations.ts
+          lib/thread-chat/application/queries.ts
+          lib/thread-chat/contracts/commands.ts
+          lib/thread-chat/contracts/dto.ts
+          lib/thread-chat/persistence/artifact-repository.ts
+          lib/thread-chat/persistence/mappers.ts
+          lib/thread-chat/persistence/project-file-repository.ts
+          lib/thread-chat/server/handlers.ts
+          lib/thread-chat/streaming/finalize.ts
+          lib/thread-chat/streaming/generation-plan.ts
+          lib/thread-chat/streaming/run-generation.ts
 
       - name: Verify generated migration is in sync
         run: pnpm db:generate && git diff --exit-code -- drizzle
@@ -82,8 +122,14 @@ jobs:
       - name: Project artifact context isolation
         run: node --import tsx e2e/thread-chat/project-artifact-context-isolation.test.mjs
 
-      - name: Agent eval fixture smoke
+      - name: Agent eval smoke
+        run: pnpm eval:agent
+
+      - name: Agent eval CI
         run: pnpm eval:agent:ci
+
+      - name: Production build
+        run: pnpm build
 
       - name: Validate OpenSpec
         run: pnpm openspec:validate
