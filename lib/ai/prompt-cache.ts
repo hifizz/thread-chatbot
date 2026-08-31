@@ -43,6 +43,8 @@ export type SelectedPromptCacheBreakpoint = {
   tokenEstimate: number
 }
 
+export type PromptCacheRouteModes = Record<string, ThreadPromptCacheMode>
+
 const BREAKPOINT_PRIORITY: ReadonlyArray<
   PromptCacheBoundaryCandidate["kind"]
 > = ["inherited-end", "branch-history-end", "kernel-end"]
@@ -53,6 +55,115 @@ export function resolvePromptCacheMode(
   return THREAD_PROMPT_CACHE_MODES.includes(value as ThreadPromptCacheMode)
     ? (value as ThreadPromptCacheMode)
     : "off"
+}
+
+/**
+ * Parses server-only per-route rollout overrides. Unknown modes and malformed
+ * JSON are ignored instead of changing model behavior.
+ */
+export function parsePromptCacheRouteModes(
+  value: string | undefined = process.env.THREAD_PROMPT_CACHE_ROUTE_MODES
+): PromptCacheRouteModes {
+  if (!value?.trim()) return {}
+  try {
+    const parsed: unknown = JSON.parse(value)
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+      return {}
+    }
+    return Object.fromEntries(
+      Object.entries(parsed).flatMap(([routeId, mode]) =>
+        routeId.trim() &&
+        typeof mode === "string" &&
+        THREAD_PROMPT_CACHE_MODES.includes(mode as ThreadPromptCacheMode)
+          ? [[routeId, mode as ThreadPromptCacheMode]]
+          : []
+      )
+    )
+  } catch {
+    return {}
+  }
+}
+
+function normalizedCohortPercent(value: number | undefined): number {
+  if (value === undefined || !Number.isFinite(value)) return 100
+  return Math.max(0, Math.min(100, value))
+}
+
+function promptCacheCohortBucket(input: {
+  salt: string
+  userId: string
+  projectId: string
+  routeId: string
+}): number {
+  const digest = createHmac("sha256", input.salt)
+    .update(
+      [
+        input.userId,
+        input.projectId,
+        input.routeId,
+        THREAD_PROMPT_CACHE_PROFILE_VERSION,
+      ].join("\u001f"),
+      "utf8"
+    )
+    .digest()
+  return digest.readUInt32BE(0) % 100
+}
+
+/**
+ * Route overrides are evaluated first. An enabled route outside the stable
+ * cohort is downgraded to observe, never silently turned fully off.
+ */
+export function resolvePromptCacheModeForRoute(input: {
+  routeId: string
+  userId: string
+  projectId: string
+  globalMode?: ThreadPromptCacheMode
+  routeModes?: PromptCacheRouteModes
+  cohortPercent?: number
+  cohortSalt?: string
+}): ThreadPromptCacheMode {
+  const selected =
+    input.routeModes?.[input.routeId] ??
+    input.globalMode ??
+    resolvePromptCacheMode()
+  if (selected !== "enabled") return selected
+
+  const cohortPercent = normalizedCohortPercent(input.cohortPercent)
+  if (cohortPercent >= 100) return "enabled"
+  if (cohortPercent <= 0) return "observe"
+  const salt = input.cohortSalt?.trim()
+  if (!salt) return "observe"
+  return promptCacheCohortBucket({
+    salt,
+    userId: input.userId,
+    projectId: input.projectId,
+    routeId: input.routeId,
+  }) < cohortPercent
+    ? "enabled"
+    : "observe"
+}
+
+/**
+ * Uses the cheapest short-lived supported option by default. Extended 1h
+ * retention requires both an explicit feature flag and retention approval.
+ */
+export function selectPromptCacheTtl(input: {
+  supportedTtls: readonly PromptCacheTtlClass[]
+  extendedEnabled?: boolean
+  retentionAllowsExtended?: boolean
+}): PromptCacheTtlClass {
+  const supported = new Set(input.supportedTtls)
+  if (
+    input.extendedEnabled === true &&
+    input.retentionAllowsExtended === true &&
+    supported.has("1h")
+  ) {
+    return "1h"
+  }
+  if (supported.has("5m")) return "5m"
+  if (supported.has("provider-default")) return "provider-default"
+  // Defensive fallback for a malformed capability declaration.
+  return input.supportedTtls[0] ?? "provider-default"
 }
 
 export function promptCacheAffinityKey(input: {
@@ -160,8 +271,10 @@ export function withoutPromptCacheControls<T extends {
   providerOptions?: PromptProviderOptions
   headers?: Record<string, string>
 }>(value: T): Omit<T, "providerOptions" | "headers"> {
-  const { providerOptions: _providerOptions, headers: _headers, ...fallback } = value
-  return fallback
+  const entries = Object.entries(value).filter(
+    ([key]) => key !== "providerOptions" && key !== "headers"
+  )
+  return Object.fromEntries(entries) as Omit<T, "providerOptions" | "headers">
 }
 
 /**
