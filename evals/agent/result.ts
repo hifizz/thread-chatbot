@@ -1,4 +1,5 @@
 import type { AgentSuite } from "@/evals/agent/schema"
+import type { ModelAttemptRecord } from "@/lib/ai/model-attempt"
 
 export type EvaluationScore = {
   name: string
@@ -9,6 +10,20 @@ export type EvaluationScore = {
   passed?: boolean
   comment?: string
   evaluatorVersion: string
+}
+
+export type AgentCacheSummary = {
+  eligible: boolean
+  reason: string
+  inputTokens?: number
+  cacheReadTokens?: number
+  cacheWriteTokens?: number
+  uncachedInputTokens?: number
+  cacheReadRatio?: number
+  costUsd?: number
+  requestPrefixHash?: string
+  toolProfileId?: string
+  routeId?: string
 }
 
 export type AgentExperimentResult = {
@@ -33,6 +48,8 @@ export type AgentExperimentResult = {
   }
   usage: Record<string, number>
   providerAttempts: Array<Record<string, string | number | boolean>>
+  modelAttempts: ModelAttemptRecord[]
+  cache?: AgentCacheSummary
   scores: EvaluationScore[]
   error?: {
     category: string
@@ -48,4 +65,6 @@ export type AgentExecutionOutput = {
   terminalState?: AgentExperimentResult["output"]["terminalState"]
   usage?: Record<string, number>
   providerAttempts?: AgentExperimentResult["providerAttempts"]
+  modelAttempts?: ModelAttemptRecord[]
+  cache?: AgentCacheSummary
 }
