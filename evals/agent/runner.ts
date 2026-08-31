@@ -199,6 +199,8 @@ export async function runAgentEvaluation(
           collectedProviderAttempts.length > 0
             ? collectedProviderAttempts
             : (output.providerAttempts ?? []),
+        modelAttempts: output.modelAttempts ?? [],
+        ...(output.cache ? { cache: output.cache } : {}),
         scores: [],
         ...(error ? { error } : {}),
       }
