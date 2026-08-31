@@ -1,0 +1,51 @@
+name: Prompt Cache
+
+on:
+  pull_request:
+    paths:
+      - "constants/**"
+      - "lib/ai/**"
+      - "lib/chat/**"
+      - "lib/thread-chat/**"
+      - "app/thread-chat/**"
+      - "e2e/thread-chat/**"
+      - "evals/agent/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/prompt-cache.yml"
+      - "openspec/changes/optimize-thread-chat-prompt-cache/**"
+  push:
+    branches:
+      - codex/design-thread-chat-prompt-cache
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.32.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Typecheck
+        run: pnpm typecheck
+      - name: Lint
+        run: pnpm lint
+      - name: Prompt cache contracts
+        run: pnpm test:thread-chat:prompt-cache
+      - name: Existing API contracts
+        run: pnpm test:thread-chat:gate2-api
+      - name: Observability foundation
+        run: pnpm test:observability:foundation
+      - name: OpenSpec strict validation
+        run: pnpm openspec:validate
