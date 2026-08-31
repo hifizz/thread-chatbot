@@ -39,7 +39,7 @@
 - [x] 5.2 扩展 HTTP client 与 runtime commands：读取/保存 Contract、添加/移除 Project File，并在 command 成功后以服务端 DTO 原子更新 store
 - [x] 5.3 为 Contract 编辑实现本地 draft、Save/Cancel、saving/error/stale-conflict 状态；取消不得写库，冲突不得丢失草稿
 - [x] 5.4 为 Project File uploader 复用现有 Attachment presign/R2/ingest 客户端链路，在成员关系建立后显示 uploading/ready/failed 状态和可恢复错误
-- [ ] 5.5 确保 Project Panel 状态与列/画布 workspace 状态解耦但共享同一 store；刷新 Bootstrap 后恢复 Contract、Files 和 Artifacts
+- [x] 5.5 确保 Project Panel 状态与列/画布 workspace 状态解耦但共享同一 store；刷新 Bootstrap 后恢复 Contract、Files 和 Artifacts
 
 ## 6. 统一 Project Panel 与资源体验
 
@@ -48,8 +48,8 @@
 - [x] 6.3 实现 Files 区域：上传入口、文件名/type/size/status/summary/error/时间、打开/下载和移除确认；同名文件保持独立条目
 - [x] 6.4 实现 Artifacts 区域：使用全 Project Artifact 集合、按创建时间倒序、显示 kind/来源 Thread/来源状态/时间，并支持基础搜索或类型过滤
 - [x] 6.5 抽取现有 Artifact Drawer 的共享 detail view；消息卡与 Project 列表打开同一 Project Panel Artifact detail，避免两个右侧 drawer 状态竞争
-- [ ] 6.6 实现 Artifact 来源定位：打开来源 Thread，在可行时滚动或短暂高亮 source Message；深层 Fork 和非 active path Artifact 同样可定位
-- [ ] 6.7 验证列视图、画布、窄屏/移动端和生成进行中打开 Project Panel 时，路由、列宽、画布视口、composer 与 SSE 状态不被重置
+- [x] 6.6 实现 Artifact 来源定位：打开来源 Thread，在可行时滚动或短暂高亮 source Message；深层 Fork 和非 active path Artifact 同样可定位
+- [x] 6.7 验证列视图、画布、窄屏/移动端和生成进行中打开 Project Panel 时，路由、列宽、画布视口、composer 与 SSE 状态不被重置
 
 ## 7. 自动化测试与 Agent Evaluation
 
