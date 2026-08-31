@@ -84,6 +84,8 @@ jobs:
           pnpm test:thread-chat:prompt-cache-eval &&
           pnpm test:thread-chat:composer-quotes &&
           node --import tsx e2e/thread-chat/quote-resolver-contract.test.mjs &&
+          node --import tsx e2e/thread-chat/prompt-cache-adapter.test.mjs &&
+          node --import tsx e2e/thread-chat/prompt-cache-compiler-boundaries.test.mjs &&
           node --import tsx e2e/thread-chat/prompt-cache-rollout.test.mjs &&
           node --import tsx e2e/thread-chat/prompt-cache-state.test.mjs &&
           pnpm prompt-cache:probe
