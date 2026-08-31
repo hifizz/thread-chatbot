@@ -189,14 +189,35 @@ try {
   assert.equal(bootstrap.artifacts[0].sourceMessageId, sourceMessageId)
   assert.ok("sourceMessageStatus" in bootstrap.artifacts[0])
 
-  // Cross-user Project/Artifact resources share the same 404 boundary.
-  await json(
+  const emptyProjectId = id()
+  const emptyBootstrap = await json(
+    await projectRoute.GET(
+      request(`/api/thread-chat/v1/projects/${emptyProjectId}`, { cookie: otherCookie }),
+      context({ projectId: emptyProjectId })
+    )
+  )
+  const foreignBootstrap = await json(
     await projectRoute.GET(
       request(`/api/thread-chat/v1/projects/${projectId}`, { cookie: otherCookie }),
       context({ projectId })
-    ),
-    404
+    )
   )
+  const expectedEmptyBootstrap = {
+    project: null,
+    files: [],
+    threads: [],
+    messages: [],
+    artifacts: [],
+    activeGenerationIds: [],
+  }
+  assert.deepEqual(emptyBootstrap, expectedEmptyBootstrap)
+  assert.deepEqual(
+    foreignBootstrap,
+    expectedEmptyBootstrap,
+    "foreign Project bootstrap 必须与未物化 Project 完全不可区分"
+  )
+
+  // 具体资源读取/写入仍统一走 404 边界。
   await json(
     await artifactRoute.GET(
       request(`/api/thread-chat/v1/artifacts/${artifactId}`, { cookie: otherCookie }),
@@ -216,7 +237,6 @@ try {
     404
   )
 
-  // A Project File addressed under the wrong Project is hidden as Not Found.
   const secondProjectId = id()
   await createProject(ownerId, secondProjectId, id())
   await json(
@@ -231,7 +251,6 @@ try {
     404
   )
 
-  // Invalid foreign Thread must fail before any paid generation/session starts.
   const foreignProjectId = id()
   const foreignThreadId = id()
   await createProject(otherId, foreignProjectId, foreignThreadId)
