@@ -51,17 +51,17 @@ jobs:
               '    project: clone(project),\n    files: [],\n    threads:',
           )
           text = text.replace(
-              '  const client: ThreadChatClient = {',
               '  const client = {',
+              '  const client: ThreadChatClient = {',
           )
           text = text.replace(
-              '    async deleteProject() {\n      project = null\n      threads.clear()\n      messages.clear()\n      artifacts.clear()\n      return commandResponse({ projectId, deleted: true as const })\n    },\n  }\n\n  const fetchStream',
-              '    async deleteProject() {\n      project = null\n      threads.clear()\n      messages.clear()\n      artifacts.clear()\n      return commandResponse({ projectId, deleted: true as const })\n    },\n  } as unknown as ThreadChatClient\n\n  const fetchStream',
-          )
-          text = text.replace(
-              '  } as ThreadChatClient\n\n  const fetchStream',
               '  } as unknown as ThreadChatClient\n\n  const fetchStream',
+              '  }\n\n  const fetchStream',
           )
+          marker = '''    async setProjectArchived(_targetProjectId, input) {\n'''
+          methods = '''    async updateProjectContract(_targetProjectId, input) {\n      if (!project) throw new Error("PROJECT_NOT_FOUND")\n      if (project.contractVersion !== input.expectedContractVersion)\n        throw new Error("PROJECT_CONTRACT_VERSION_CONFLICT")\n      project = {\n        ...project,\n        target: input.target.trim() || null,\n        instructions: input.instructions.trim() || null,\n        contractVersion: project.contractVersion + 1,\n        updatedAt: now(),\n      }\n      return commandResponse(clone(project))\n    },\n    async addProjectFile() {\n      throw new Error("PROJECT_FILE_UPLOAD_NOT_AVAILABLE_IN_GATE3_HARNESS")\n    },\n    async removeProjectFile(_targetProjectId, attachmentId) {\n      return commandResponse({\n        projectId,\n        attachmentId,\n        removed: true as const,\n      })\n    },\n'''
+          if methods not in text and marker in text:
+              text = text.replace(marker, methods + marker)
 
           path.write_text(text)
           PY
@@ -74,5 +74,5 @@ jobs:
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git add app/thread-chat/gate-3-harness/mock-v1-runtime.ts
-          git commit -m "test(project): update legacy workspace fixtures [skip ci]"
+          git commit -m "test(project): complete workspace client fixture [skip ci]"
           git push origin HEAD:codex/research-project-workspace-design
