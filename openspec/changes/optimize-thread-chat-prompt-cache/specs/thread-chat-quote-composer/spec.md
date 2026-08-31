@@ -1,6 +1,6 @@
 ## Purpose
 
-定义 Thread Chat 输入框中的 Quote Draft 行为，使划选后开分支、当前 Thread 引用、跨分栏引用和 Markdown Artifact 批量批注共用同一套 Draft 模型，并在用户确认发送前不创建 Message、不触发模型调用。
+定义 Thread Chat 输入框中的 Quote Draft 行为，使划选后开分支、当前 Thread 内引用和当前 Thread Markdown Artifact 批量批注共用同一套 Draft 模型，并在用户确认发送前不创建 Message、不触发模型调用。本能力明确不支持任意跨 Thread、跨分栏或 `@Thread` 引用。
 
 ## ADDED Requirements
 
@@ -8,8 +8,8 @@
 
 系统 MUST 允许每个 Thread Composer Draft 保存零到 50 个有序 Quote Block、一段可选总文本和附件。Draft Quote MUST 包含本地 Draft ID、来源选择、预览正文、可选 comment、来源类型和是否为第一轮必需引用。Draft 本身 MUST NOT 被当作已发送 Message。
 
-#### Scenario: User adds several quotes before sending
-- **WHEN** 用户连续从多个合法来源选择内容并添加到同一个 Composer
+#### Scenario: User adds several current-thread quotes before sending
+- **WHEN** 用户连续从当前 Thread 的合法来源添加多份 Quote
 - **THEN** Composer 按添加顺序展示多个 Quote Block，用户只在最终发送时产生一条 User Message
 
 #### Scenario: User reaches fifty quotes
@@ -20,9 +20,13 @@
 - **WHEN** 用户重复添加相同来源和 Anchor
 - **THEN** Composer 聚焦已有 Quote Block，而不是创建重复项
 
+#### Scenario: Draft is edited before sending
+- **WHEN** 用户修改总问题、Quote comment、顺序或删除非必需 Quote
+- **THEN** 这些操作只改变 Draft，不创建 Message、不调用模型，也不影响已经存在的 Prompt Cache
+
 ### Requirement: Empty selection-popup submission creates a branch draft without a model call
 
-当用户在来源 Thread 划选文本并打开分支弹窗，但没有输入问题时，系统 MUST 只创建新的 ForkedThread。新 Thread Composer MUST 显示由 Fork 来源派生的 branch-origin Quote Block。此操作 MUST NOT 创建 User Message、Assistant Message 或模型调用。
+当用户在来源 Thread 划选文本并打开分支弹窗，但没有输入问题时，系统 MUST 只创建新的 ForkedThread。新 Thread Composer MUST 显示由 Fork 来源派生的 branch-origin Quote Block。此操作 MUST NOT 创建 User Message、Assistant Message、Trace 或模型调用。
 
 #### Scenario: User leaves the popup question empty
 - **WHEN** 用户提交空问题的分支弹窗
@@ -38,67 +42,75 @@
 
 ### Requirement: Branch-origin quote is required and server-derived for the first turn
 
-ForkedThread 第一轮 Composer 中的 branch-origin Quote MUST 位于第一项并标记为 required。客户端 Draft MAY 展示它，但持久化 Quote MUST 由服务端根据 Thread Fork 字段生成。v1 中用户不得从第一轮 Draft 删除 branch-origin Quote。
+ForkedThread 第一轮 Composer 中的 branch-origin Quote MUST 位于第一项并标记为 required。客户端 Draft MAY 展示它，但持久化 Quote MUST 由服务端根据 Thread Fork 字段生成。v1 中用户不得从第一轮 Draft 删除或替换 branch-origin Quote。
 
-#### Scenario: User adds more quotes to an empty branch
-- **WHEN** branch-origin 已存在，用户再添加其他 Quote
-- **THEN** origin 保持第一项，其他 Quote 按用户顺序排在后面
+#### Scenario: User adds current-thread content after the empty branch has activity
+- **WHEN** 新 Thread 已产生自己的 completed assistant Message，用户随后将其选区加入该 Thread Composer
+- **THEN** 该 Quote 作为普通当前 Thread Quote 添加，不改变历史 branch-origin
 
 #### Scenario: Client resubmits origin as an ordinary selection
-- **WHEN** Command 中的 Quote Selection 与 branch-origin 相同
-- **THEN** 服务端保留自动 origin，并去除重复 Selection
+- **WHEN** Command 中伪造或重复提交父 Thread 来源
+- **THEN** 服务端只使用自动 origin，并拒绝不属于目标 Thread 的普通 Quote Selection
 
 #### Scenario: First message is sent
 - **WHEN** 用户提交含总问题或 Quote comment 的第一轮 Draft
-- **THEN** 服务端把 origin 与其他 Quote 统一物化到 B1 Parts，并只创建一次 assistant attempt
+- **THEN** 服务端把 origin 与其他合法当前 Thread Quote 物化到 B1 Parts，并只创建一次 assistant attempt
 
-### Requirement: Selection can be routed to a new thread or the current composer
+### Requirement: Selection can open a new branch or return to the same thread composer
 
-用户从 completed assistant Message 或合法 Artifact 划选后，产品 MUST 支持至少两个语义动作：创建新 ForkedThread，或添加到当前 Thread Composer。添加到当前 Composer MUST NOT 创建新 Thread 或自动发送。
+用户从当前 Thread 的 `completed` assistant Message 划选后，产品 MUST 支持两个语义动作：创建新 ForkedThread，或把选区添加到当前 Thread Composer。添加到当前 Composer MUST NOT 创建新 Thread 或自动发送。
 
 #### Scenario: User adds a quote to the current thread
-- **WHEN** 用户选择“引用到当前 Thread”
-- **THEN** 当前 Composer 新增 Quote Block，当前 Thread 消息列表和模型状态不变化
+- **WHEN** 用户选择“引用到当前输入框”
+- **THEN** 当前 Thread Composer 新增 Quote Block，当前 Thread 消息列表和模型状态不变化
 
 #### Scenario: User opens a new thread
 - **WHEN** 用户选择“开新分支”
-- **THEN** 系统按 Fork 语义创建新 Thread，并根据是否有问题决定直接发送或进入带 Quote 的空 Draft
+- **THEN** 系统按 Fork 语义创建新 Thread，并根据弹窗是否有问题决定直接发送或进入带 Quote 的空 Draft
 
 #### Scenario: Source is not completed
 - **WHEN** 来源 assistant Message 为 generating、stopped 或 failed
 - **THEN** 两种动作都不可创建可发送 Quote，并显示来源不可引用
 
-### Requirement: Cross-column quotes use the same draft contract
+### Requirement: Arbitrary cross-thread and cross-column quoting is not supported in v1
 
-同 Project 其他分栏中的 completed assistant Message 或 Artifact 可以作为当前 Composer 的 Quote 来源。跨分栏引用 MUST 使用与当前 Thread 引用相同的 `QuoteSourceInput` 和 Draft Item，不得建立另一套 `@` 专用消息协议。
+系统 MUST NOT 允许用户选择另一个 Thread、另一个分栏或一个 Thread 标题/ID，把其内容加入当前 Composer。Composer Draft 与 Command 输入 MUST NOT 暴露目标 Thread 选择器、`sourceThreadId` 或 `@Thread` 语义。
 
-#### Scenario: User references another visible column
-- **WHEN** 用户把 B Thread 中的合法选区添加到 A Thread Composer
-- **THEN** A 的 Draft 新增普通 Quote Block，来源保留 B 的真实 Thread/Message 或 Artifact ID
+#### Scenario: User selects text in another visible column
+- **WHEN** 用户当前编辑 Thread A，但划选发生在 Thread B
+- **THEN** 产品不得提供“引用到 A”的动作；用户只能在 B 内引用或从 B 开新分支
 
-#### Scenario: Source column later closes
-- **WHEN** 来源分栏在工作区中被收起
-- **THEN** Draft Quote 仍有效，因为其身份依赖数据库 ID 和 Anchor，而不是当前列位置
+#### Scenario: Client submits another thread message ID
+- **WHEN** 客户端绕过 UI，向 Thread A 的发送接口提交 Thread B 的 Message ID
+- **THEN** 服务端拒绝命令，不创建 User Message 或模型调用
 
-### Requirement: Markdown batch annotations aggregate into one composer draft
+#### Scenario: Product later needs cross-thread references
+- **WHEN** 未来需要 `@Thread`、跨 Thread 聚合或多分栏合并
+- **THEN** 必须通过独立 Research/OpenSpec change 设计权限、上下文去重、预算、嵌套引用和缓存顺序
 
-Markdown Artifact 的批量批注 MUST 转换为多份 Artifact Quote Draft Item。每份 Item MUST 保存自己的选区和 comment。批量确认后，这些 Item MUST 一次性加入目标 Thread Composer，而不是逐条发送或逐条触发 AI 回复。
+### Requirement: Markdown batch annotations return to the artifact source thread composer
+
+Markdown Artifact 的批量批注 MUST 转换为多份 Artifact Quote Draft Item。每份 Item MUST 保存自己的选区和 comment。批量确认后，这些 Item MUST 一次性加入该 Artifact 来源 Message 所属 Thread 的 Composer，不得选择其他 Thread 作为目标。
 
 #### Scenario: User annotates several paragraphs
 - **WHEN** 用户对多个 Artifact 选区分别填写 comment 并确认批量批注
-- **THEN** 目标 Composer 按批注顺序新增多个 Quote Block，每个 Block 保持自己的 comment
+- **THEN** Artifact 来源 Thread 的 Composer 按批注顺序新增多个 Quote Block，每个 Block 保持自己的 comment
 
 #### Scenario: User reviews annotations before sending
 - **WHEN** 批注已经进入 Composer 但尚未发送
-- **THEN** 用户可以继续修改总文本、删除非 required Quote 或调整顺序；不会产生模型调用
+- **THEN** 用户可以继续修改总文本、comment、删除非 required Quote 或调整顺序；不会产生模型调用
 
 #### Scenario: User sends the batch
 - **WHEN** 用户最终发送包含多份批注 Quote 的 Draft
 - **THEN** 系统创建一条 User Message 和一次 assistant attempt，而不是每条批注一轮
 
+#### Scenario: Artifact belongs to another thread
+- **WHEN** 当前 Composer 不属于 Artifact 来源 Message 所在 Thread
+- **THEN** 批量批注不能回填当前 Composer，产品应导航到来源 Thread 或提示该限制
+
 ### Requirement: Draft submission uses one canonical command conversion
 
-前端 MUST 通过单一纯函数把 Composer Draft 转换为后端 Command 输入。该转换 MUST 保留非 required Quote 顺序、来源、Anchor 和 comment；branch-origin MUST 标记为服务端派生，不得伪造持久化 Quote ID 或正文。
+前端 MUST 通过单一纯函数把 Composer Draft 转换为后端 Command 输入。转换 MUST 保留非 required Quote 顺序、来源、Anchor 和 comment；branch-origin MUST 标记为服务端派生，不得伪造持久化 Quote ID、正文或父 Thread 来源。
 
 ```ts
 export interface ComposerSubmission {
@@ -112,42 +124,38 @@ export function composerDraftToSubmission(
 ): ComposerSubmission
 ```
 
-#### Scenario: Ordinary multi-quote question is submitted
-- **WHEN** Draft 含两个普通 Quote 和一段总问题
-- **THEN** Submission 含两个有序 QuoteSelectionInput 和总文本
+#### Scenario: Ordinary current-thread multi-quote question is submitted
+- **WHEN** Draft 含两个当前 Thread Quote 和一段总问题
+- **THEN** Submission 含两个有序 QuoteSelectionInput 和总文本，不包含 `sourceThreadId`
 
 #### Scenario: Empty branch first turn is submitted
-- **WHEN** Draft 第一项是 required branch-origin，后面有两个普通 Quote
-- **THEN** Submission 只提交两个普通 Quote；服务端根据 Thread 自动加入 origin
+- **WHEN** Draft 第一项是 required branch-origin
+- **THEN** Submission 不把 origin 作为普通 Quote 伪造；服务端根据目标 ForkedThread 自动生成它
 
-#### Scenario: Annotation-only draft is submitted
-- **WHEN** Draft 没有总文本，但至少一个 Quote comment 非空
-- **THEN** Submission 仍可发送；服务端按 comment 验证有效用户意图
+#### Scenario: Batch annotations have no total text
+- **WHEN** Draft 总文本为空，但至少一个 Quote comment 非空
+- **THEN** Draft 仍可发送并形成一条 User Message
 
 #### Scenario: Quote-only draft has no question or comment
-- **WHEN** Draft 只有引用正文，没有总文本和 comment
-- **THEN** 发送被阻止，Draft 保持不变，避免模型猜测用户意图
+- **WHEN** Draft 只有无 comment 的 Quote，且总文本为空
+- **THEN** 发送保持禁用，避免向模型提交没有用户意图的请求
 
-### Requirement: Composer quote changes affect only the current dynamic tail before sending
+### Requirement: Quote draft submission is subject to count and input budget checks
 
-在 Draft 尚未发送时，添加、删除、排序或修改 Quote comment MUST 只改变本轮待发送内容，不改变此前已完成 Message、冻结祖先历史或稳定前缀。发送后，该 Message 才成为下一轮的稳定 Branch History。
+Composer 的 50 个 Quote 上限 MUST 与后端模型输入预算分开处理。前端可以提供预计大小提示，但后端 MUST 重新校验，并在付费模型调用前拒绝超出当前模型 Route 输入预算的 Draft。
 
-#### Scenario: User reorders quotes before sending
-- **WHEN** 用户在 Composer 中调整 Quote 顺序
-- **THEN** 只有当前用户尾部顺序变化，`inherited-end` 和 `branch-history-end` 以前的 Hash 不变化
+#### Scenario: Fifty short quotes fit the budget
+- **WHEN** Draft 达到 50 个短 Quote 且完整模型输入仍在预算内
+- **THEN** 系统允许一次发送
 
-#### Scenario: User cancels all draft quotes
-- **WHEN** 用户删除全部非 required Quote 并清空文本
-- **THEN** 不产生模型调用，现有缓存和历史不变化
+#### Scenario: Fewer long quotes exceed the budget
+- **WHEN** Draft 只有少量 Quote，但完整输入预计超出模型窗口或安全预算
+- **THEN** 系统拒绝发送或在模型调用前终止，并明确要求用户删减，不静默截断
 
-#### Scenario: Sent quote message becomes history
-- **WHEN** 一条多 Quote Message 已完成对应 assistant 回复，用户继续下一轮
-- **THEN** 该 Message 的 Quote/comment/Text 按原 Parts 顺序进入稳定 Branch History，并可参与同 Thread 后续缓存
+### Requirement: Frontend component selection remains a later research decision
 
-### Requirement: Frontend component design remains a follow-up decision
-
-本能力只规定 Draft、提交和产品行为，不规定具体 React 组件树、富文本框技术、拖拽库、Quote Block 视觉样式、移动端布局、来源跳转动画或 Draft 持久化实现。后续前端调研 MUST 复用本 Spec，而不得改变后端 Quote Parts 语义。
+本能力只定义 Draft 状态、行为和后端提交合同，不规定 textarea、Lexical、ProseMirror、ContentEditable、Quote Pill 视觉、拖拽库、移动端布局、Draft 持久化或来源跳转实现。
 
 #### Scenario: Frontend research begins
-- **WHEN** 下一阶段比较 textarea、Lexical、ProseMirror 或自定义 block composer
-- **THEN** 所有候选都必须能表达本 Spec 的 0..50 Quote Draft、required origin、comment、排序、删除和一次性提交
+- **WHEN** 下一阶段评估 Composer 实现
+- **THEN** 候选方案必须消费本规范的当前 Thread-only Draft、50 Quote、required origin 和 canonical submission 合同，不得重新发明 Message 协议
