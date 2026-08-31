@@ -79,6 +79,12 @@ export async function executeFixtureCase(
               ? { toolProfileId: cache.toolProfileId }
               : {}),
             ...(cache.routeId ? { routeId: cache.routeId } : {}),
+            ...(cache.quoteCount !== undefined
+              ? { quoteCount: cache.quoteCount }
+              : {}),
+            ...(cache.metadataExcluded !== undefined
+              ? { metadataExcluded: cache.metadataExcluded }
+              : {}),
           },
         }
       : {}),
