@@ -33,6 +33,12 @@ export type ModelAttemptRecord = {
   usage: PromptCacheUsage
 }
 
+export type ModelAttemptSummary = {
+  attemptCount: number
+  usage: PromptCacheUsage
+  cacheOutcome: "provider-hit" | "provider-miss" | "usage-unavailable"
+}
+
 function record(value: unknown): Record<string, unknown> | null {
   return typeof value === "object" && value !== null
     ? (value as Record<string, unknown>)
@@ -78,6 +84,7 @@ export function createModelAttemptCollector(input: {
           usage: object?.usage,
           providerMetadata: object?.providerMetadata,
         })
+        const finishReason = stringField(step, "finishReason")
         attempts.push({
           stepIndex: attempts.length,
           purpose: input.purpose,
@@ -85,9 +92,7 @@ export function createModelAttemptCollector(input: {
           upstreamModelId: input.upstreamModelId,
           adapter: input.adapter,
           gateway: input.gateway,
-          ...(stringField(step, "finishReason")
-            ? { finishReason: stringField(step, "finishReason") }
-            : {}),
+          ...(finishReason ? { finishReason } : {}),
           durationMs: Math.max(0, Date.now() - startedAt),
           toolProfileId: input.toolProfileId,
           stableRequestPrefixHash: input.stableRequestPrefixHash,
@@ -123,7 +128,7 @@ export function createModelAttemptCollector(input: {
         usage: { ...attempt.usage },
       }))
     },
-    summary() {
+    summary(): ModelAttemptSummary {
       const usage = aggregatePromptCacheUsage(
         attempts.map((attempt) => attempt.usage)
       )
@@ -133,12 +138,12 @@ export function createModelAttemptCollector(input: {
         cacheOutcome: attempts.some(
           (attempt) => attempt.cacheOutcome === "provider-hit"
         )
-          ? ("provider-hit" as const)
+          ? "provider-hit"
           : attempts.some(
                 (attempt) => attempt.cacheOutcome === "provider-miss"
               )
-            ? ("provider-miss" as const)
-            : ("usage-unavailable" as const),
+            ? "provider-miss"
+            : "usage-unavailable",
       }
     },
   }
