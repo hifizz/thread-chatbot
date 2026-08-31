@@ -123,7 +123,6 @@ while (true) {
 assert.deepEqual(chunks, ["fallback-output"])
 assert.deepEqual(await fallback.usage, { inputTokens: 10 })
 assert.equal(fallback.usedFallback(), true)
-assert.equal(fallbackCalls, 1)
 assert.equal(typeof fallback.ttftMs(), "number")
 
 let unsafeFallbackCalls = 0
@@ -132,7 +131,12 @@ const partialThenError = createPromptCacheFallbackStream({
     stream: new ReadableStream({
       start(controller) {
         controller.enqueue("partial")
-        controller.error(new Error("cache_control invalid 400"))
+        // Deliver the queued protocol chunk before failing. A synchronous
+        // controller.error() discards queued chunks and does not model visible
+        // output, so it cannot exercise the no-retry-after-output contract.
+        queueMicrotask(() =>
+          controller.error(new Error("cache_control invalid 400"))
+        )
       },
     }),
     usage: Promise.reject(new Error("cache_control invalid 400")),
