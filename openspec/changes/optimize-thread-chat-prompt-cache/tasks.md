@@ -1,155 +1,155 @@
-## 1. 最新基线与实施前校准
+## 1. 实施基线与已确认产品决定
 
-- [ ] 1.1 以 `codex/feat-agent-observability-evaluation@2f3024747ddb72e1e69aa916cb45addb7140f6ab` 记录 `typecheck`、`build`、Thread Chat Gate、observability tests、agent eval CI 和 OpenSpec strict validation 基线
-- [ ] 1.2 冻结 Quote Protocol、Quote Model Format、Prompt Compiler、Agent Kernel、Tool Profile、Cache Profile 和 Provider Routing Policy 的初始版本常量
-- [ ] 1.3 核对锁定版本 `ai@7.0.83`、`@ai-sdk/anthropic@4.0.44`、`@openrouter/ai-sdk-provider@3.0.0` 和 Vercel AI Gateway 的缓存类型与官方文档
-- [ ] 1.4 为 Vercel Gateway、OpenRouter implicit/explicit、UMAPIS Anthropic、Private Relay、OpenAI/DeepSeek compatible、Ark、MiniMax 和 Cloudflare compatible 建立 route probe 表
-- [ ] 1.5 Probe 表至少记录 marker 透传、affinity、cache read/write Usage、TTL、minimum prefix、breakpoint 上限、错误降级和 retention/ZDR
-- [ ] 1.6 选择一条真实 Claude route 作为首批候选；未验证 route 保持 `probe-required`
-- [ ] 1.7 增加 server-only 缓存发布配置，覆盖 `off/observe/enabled`、route override、affinity HMAC salt、TTL/retention 和受控 cohort
+- [ ] 1.1 记录最新 Base 的 `typecheck`、`build`、Thread Chat Gate、observability tests、agent eval CI 和 OpenSpec strict validation 基线
+- [ ] 1.2 将以下产品决定写入常量、Spec 和测试，禁止在实施时重新解释：
+  - [ ] Quote 来源只允许 `completed` assistant Message；`generating / stopped / failed` 一律拒绝
+  - [ ] 每条用户 Message 最多 50 个 Quote
+  - [ ] 空问题开分支只创建 Thread，不创建 B1/BA1，不调用模型
+  - [ ] branch-origin Quote 在第一轮 Composer 中必需并由服务端持久化
+  - [ ] Markdown 批量批注聚合到 Composer，一次发送只产生一次 assistant attempt
+  - [ ] Claude 首条 Probe 使用当前 UMAPIS Claude 路线
+  - [ ] 首阶段仅使用短时缓存；1 小时 Extended TTL 关闭
+- [ ] 1.3 在 `constants/` 定义 Quote Protocol、Quote Model Format、Quote Budget Policy、Prompt Compiler、Agent Kernel、Tool Profile、Cache Profile 与 Routing Policy 版本
+- [ ] 1.4 在实施当日重新核对锁定版本 AI SDK、Anthropic Adapter、OpenRouter Provider、Vercel Gateway 和 UMAPIS 的类型与官方文档
 
-## 2. Quote V1 类型、Parts 协议与兼容解析
+## 2. Quote 类型、来源与 Parts 协议
 
-- [ ] 2.1 定义 `THREAD_QUOTE_SCHEMA_VERSION`、`ThreadQuoteKind`、`ThreadQuoteSourceV1`、`ThreadQuoteDataV1`、`LegacyThreadQuoteData` 和 `ThreadQuoteData`
-- [ ] 2.2 将 `ThreadChatDataParts.quote` 从 `{ text }` 扩展为 `ThreadQuoteData`
-- [ ] 2.3 保持 `MessageDTO.parts` 为唯一 Quote DTO 入口，不增加顶层 `quotes`
-- [ ] 2.4 实现 Zod/runtime `parseThreadQuoteData()`，把 V1 与 legacy 转成统一 `NormalizedThreadQuote`
-- [ ] 2.5 所有数据库、UI 投影和模型编译读取 Quote 时先经过 parser，禁止未经验证的类型断言
-- [ ] 2.6 在 `constants/thread-chat.ts` 定义 Quote 数量、单份字符、总字符和 Part 顺序限制
-- [ ] 2.7 实现 source Message + TextAnchor 的保序去重 helper
-- [ ] 2.8 增加 0、1、2、8 份 Quote、legacy、非法 schema、非法 anchor、重复、单份超长和总预算超限测试
+- [ ] 2.1 定义 `MessageSelectionSourceInput`、`ArtifactSelectionSourceInput` 和 `QuoteSourceInput` 联合类型
+- [ ] 2.2 定义 `MessageQuoteSourceV1`、`ArtifactQuoteSourceV1`、`ThreadQuoteDataV1`、Legacy 类型和 `NormalizedThreadQuote`
+- [ ] 2.3 在 Quote V1 中加入可选 `comment`，用于保持 Markdown 批量批注的 quote ↔ comment 对应关系
+- [ ] 2.4 将 `ThreadChatDataParts.quote` 更新为 `ThreadQuoteData`，保持历史 `{ text }` 读取兼容，新写入只产生 V1
+- [ ] 2.5 定义新写入 Parts 合同：`data-quote 0..50 -> text 0..1 -> file 0..20`
+- [ ] 2.6 定义有效用户意图：非空总文本，或至少一个非空 Quote comment；只有无 comment 的 Quote Draft 不允许发送
+- [ ] 2.7 实现 `parseThreadQuoteData()`，所有 JSONB 读取路径必须经过 Parser，不得直接类型断言
+- [ ] 2.8 增加类型和 Parser 测试，覆盖 message/artifact source、comment、legacy、缺失字段、非法 Anchor 与未知版本
 
-## 3. Command DTO 与服务端 Quote 来源解析
+## 3. Composer Draft 领域合同
 
-- [ ] 3.1 定义 `QuoteSelectionInput { sourceThreadId, sourceMessageId, anchor }` 及 Zod schema
-- [ ] 3.2 为 `SendMessageCommand` 增加 `quotes: QuoteSelectionInput[]`，默认空数组
-- [ ] 3.3 为 `ForkThreadCommand.firstTurn` 增加 `additionalQuotes`，自动 branch-origin 不占客户端输入
-- [ ] 3.4 明确 `StartProjectCommand` 不接受 Quote；`EditLatestTurnCommand` v1 不接受 Quote 增删
-- [ ] 3.5 实现批量 `resolveQuoteSelections()`，验证 owner、同 Project、Thread/Message 关系、来源状态、Anchor、数量和总字符，避免 N+1
-- [ ] 3.6 在实施校准中决定 stopped assistant Message 是否允许引用，并用常量/策略表达
-- [ ] 3.7 实现 `buildBranchOriginQuote()`，只从已锁定验证的 Fork 数据生成
-- [ ] 3.8 服务端生成 `quoteId/projectId/kind/text`；客户端不得直接写入这些字段
-- [ ] 3.9 验证 `quote.text === quote.source.anchor.quote.exact`
-- [ ] 3.10 增加跨用户、跨 Project、Message 不属于 Thread、superseded/generating/failed、非法 position 和重复 selection 测试
+- [ ] 3.1 定义 `ComposerQuoteDraftItem` 与 `ThreadComposerDraft`，支持 0..50 Quote、总文本、附件、comment、required origin 和有序列表
+- [ ] 3.2 定义 Draft 去重键：来源类型 + 来源实体 + TextAnchor；重复添加聚焦已有 Block
+- [ ] 3.3 定义 `composerDraftToSubmission()` 纯函数，保留普通 Quote 的顺序、来源、Anchor 和 comment
+- [ ] 3.4 明确 branch-origin 只在 Draft 展示，Submission 不伪造持久化 origin；服务端首轮自动注入
+- [ ] 3.5 定义空问题 Fork 的状态流：创建 Thread → 打开 Thread → 从 Fork 字段重建 required Quote Block → 不调用模型
+- [ ] 3.6 定义“开新分支”和“引用到当前 Thread”两种选择动作，共用 Quote Draft Item
+- [ ] 3.7 定义跨分栏引用仍使用同一 `QuoteSourceInput`，不得建立另一套 `@` 消息协议
+- [ ] 3.8 定义 Markdown 批量批注转换：每条选区/comment → Artifact Quote Draft Item，批量进入目标 Composer，一次发送
+- [ ] 3.9 增加 Draft 纯函数测试：0/1/2/50 Quote、重复、排序、删除、required origin、annotation-only、无意图禁止发送
+- [ ] 3.10 本阶段只完成 Draft 合同和测试；具体 React Composer 技术选型另做前端 Research/Spec
 
-## 4. 数据库职责与 Message Parts 写入
+## 4. Command DTO 与服务端 Quote Resolver
 
-- [ ] 4.1 保持 `threads` Fork 字段和 `messages.parts` JSONB 表结构不变，不生成数据库迁移
-- [ ] 4.2 在代码注释和架构文档中固定：Thread Fork 是拓扑事实，Message Quote 是消息快照
-- [ ] 4.3 将 `buildUserParts(text, files)` 改为对象参数并接收已验证 `quotes`
-- [ ] 4.4 固定输出顺序为 `data-quote* -> text -> file*`
-- [ ] 4.5 在 `forkThread(firstTurn)` 同一事务内创建 branch-origin Quote、额外 Quotes、B1 和 assistant placeholder
-- [ ] 4.6 在 `sendMessage()` 检测 ForkedThread 是否尚无有效 user Message；如果是，自动注入 branch-origin Quote
-- [ ] 4.7 对自动 origin 与 additional/command Quotes 统一去重，自动 origin 始终第一
-- [ ] 4.8 验证“弹窗直接带问”和“空分支后首问”的 B1 Parts、DTO 和模型视图等价
-- [ ] 4.9 增加 Project bootstrap、JSONB round-trip 和幂等 command replay 测试
-- [ ] 4.10 记录未来反向引用索引表的触发条件，不在本 change 新增 `message_quote_refs`
+- [ ] 4.1 新增 `QuoteSelectionInput { source, comment? }` 与严格 Zod Schema
+- [ ] 4.2 `SendMessageCommand` 增加 `quotes[]`，最大 50；总文本允许为空，但必须满足有效用户意图
+- [ ] 4.3 `ForkThreadCommand.firstTurn` 增加 `additionalQuotes[]`，最大 49；自动 origin 占第一项
+- [ ] 4.4 `StartProjectCommand` 不支持 Quote；跨 Project 引用留待独立权限设计
+- [ ] 4.5 `EditLatestTurnCommand` 第一阶段不允许增删、换源、重排或修改 Quote comment，只编辑总文本与附件
+- [ ] 4.6 实现 `resolveQuoteSelections()`，批量加载来源并避免 N+1
+- [ ] 4.7 验证来源归属、同 Project、Thread/Message/Artifact 关系与 owner 权限
+- [ ] 4.8 强制来源为 `completed` assistant Message；为 generating/stopped/failed 建立拒绝测试
+- [ ] 4.9 Artifact Quote 必须验证 Artifact 属于目标 Project，且 source Message 为 completed
+- [ ] 4.10 服务端生成 quoteId、kind、冻结正文与完整 source；客户端预览正文不可信
+- [ ] 4.11 对相同来源 + Anchor 保序去重；合并自动 origin 后重新校验 50 上限
+- [ ] 4.12 在创建 User/Assistant Message 与正式模型调用前完成全部验证和预算预检
 
-## 5. Edit、Retry 与历史兼容
+## 5. 数据库、B1 两条路径与编辑语义
 
-- [ ] 5.1 修改 `editLatestTurn()`，原顺序保留来源 User Message 的所有合法 persistent Quote Parts，只替换 Text/File
-- [ ] 5.2 Quote ID、正文、来源和 Anchor 在普通文本编辑中保持不变
-- [ ] 5.3 遇到非法持久化 Quote 时报告数据冲突，不得静默删除
-- [ ] 5.4 验证 `retryMessage()` 继续使用同一 User Message，不复制或重建 Quote
-- [ ] 5.5 历史 `{ text }` Quote 继续展示和送模，但来源导航不可用
-- [ ] 5.6 对历史 ForkedThread 的第一条 User Message 缺少 Quote 的情况生成 deterministic model-only branch-origin Quote
-- [ ] 5.7 新写入一律使用 V1，不继续产生 legacy payload
+- [ ] 5.1 保持 `threads` Fork 字段为拓扑事实，`messages.parts` JSONB 为 Message Quote Snapshot 事实；不新增 Quote 表和顶层 DTO 字段
+- [ ] 5.2 更新 `buildUserParts({ text?, files, quotes? })`，只接受服务端已解析 Quote
+- [ ] 5.3 直接带问 Fork：同一事务创建 Thread、origin Quote、额外 Quote、B1 与 BA1
+- [ ] 5.4 空 Fork：不创建 Message；第一次 `sendMessage` 时从 Thread Fork 字段自动构造 origin Quote
+- [ ] 5.5 增加两条 B1 路径模型等价测试，相同输入产生相同有序 Parts 与模型文本
+- [ ] 5.6 后续分支轮次不重复注入 origin
+- [ ] 5.7 Edit 替代 User Message 时保留全部 Quote ID、kind、text、comment、source 与顺序
+- [ ] 5.8 Retry 只创建新 assistant Message，继续读取同一 User Message
+- [ ] 5.9 历史 Fork B1 无 Quote 时生成 model-only origin 兼容视图，不立即回写
+- [ ] 5.10 记录未来 `message_quote_refs` 只作为派生索引的触发条件，不提前建表
 
-## 6. Quote-to-model 工具函数与稳定 Kernel
+## 6. Quote Budget 与钱包保护
 
-- [ ] 6.1 定义 `THREAD_QUOTE_MODEL_FORMAT_VERSION`
-- [ ] 6.2 实现 `quoteTextToModelText(text)`，类型上只接受正文，禁止整个 Quote 对象被序列化
-- [ ] 6.3 使用确定性可逆编码支持换行、引号、代码和 `</thread_quote>` 等 delimiter-like 正文
-- [ ] 6.4 实现 `threadQuotePartToModelText(data)`，先 parser，再只序列化 `text`
-- [ ] 6.5 修改模型上下文编译，按 Message Parts 顺序转换全部 Quote，随后转换 Text/File
-- [ ] 6.6 增加测试证明 quoteId、kind、Project/Thread/Message ID、TextAnchor、标题、脚注和 UI/Trace 元信息永不进入模型文本
-- [ ] 6.7 把稳定 Quote 规则写入 Agent Kernel，删除具体 `anchorText` 的 system 拼装
-- [ ] 6.8 增加 Quote 中命令式文本、单 Quote 指代、多 Quote 比较、冲突和显式转移话题的质量测试
+- [ ] 6.1 定义 `QuotePromptBudgetPolicy`：`maxQuoteCount=50`、单份字符上限、当前 Quote Token 上限、总输入 Token 上限和版本
+- [ ] 6.2 Quote 数量和 Token 成本分开校验；数量未超 50 不代表允许无上限全文
+- [ ] 6.3 使用所选 Route 对应 Token 估算/保守预算，在付费回答调用前执行 Preflight
+- [ ] 6.4 超预算返回稳定错误码与可读提示，不静默截断、删除、重排或自动摘要
+- [ ] 6.5 Tokenizer/估算失败采用安全失败或保守上限，不绕过预算
+- [ ] 6.6 增加 50 个短批注通过、少量超长 Quote 拒绝、模型切换重新预算的测试
+- [ ] 6.7 下一阶段 Composer Research 需要设计数量、预计 Token/成本和超预算反馈，但本阶段不实现视觉组件
 
-## 7. Cache Stability Registry、Segment 与 Hash
+## 7. Quote-to-model 与稳定 Agent Kernel
 
-- [ ] 7.1 定义每个 Prompt 元素必须声明的 `modelVisible/stability/segment/cacheImpact` 合同
-- [ ] 7.2 Prompt Segment 固定为 `agent-kernel/project-contract/inherited-history/branch-history/runtime-control/current-user`
-- [ ] 7.3 删除原 Branch Genesis Segment；具体 Quote 只存在于 User Message
-- [ ] 7.4 实现稳定序列化与 SHA-256 helper，保留模型可见 role、Part 顺序和空白，排除内部元信息
-- [ ] 7.5 实现 `segmentContentHash`、`forkContextHash`、`toolProfileHash`、`stableRequestPrefixHash` 和可选 `fullRequestShapeHash`
-- [ ] 7.6 定义 `PromptManifest`，包含 Compiler/Kernel/Quote Protocol/Quote Format/Profile/Route 版本、边界、长度、Token 估计、当前 Quote 数量和资格 reason
-- [ ] 7.7 证明 B1 不进入 `inherited-end` Hash；到 B2 时历史 B1 Quote/Text 正确进入 `branch-history-end`
-- [ ] 7.8 对属性顺序、对象重建、Message/Part 顺序、空白、Quote metadata、Quote text、Tool Schema 和版本变化增加合同测试
-- [ ] 7.9 对 `INHERITED_CHAR_BUDGET` 和 omitted notice 建立确定性测试；改变算法或文案必须升级版本
-- [ ] 7.10 为当前附件、签名 URL、不可变附件快照定义稳定性分类
+- [ ] 7.1 实现 `quoteContentToModelText({ quote, comment? })`、`quoteTextToModelText(text)` 和 `threadQuotePartToModelText(data)`
+- [ ] 7.2 使用版本化 `<thread_quote>` + JSON 编码，保证换行、引号、代码和标签样式正文确定性安全
+- [ ] 7.3 多 Quote 按 Parts 顺序逐份转换，comment 与对应 Quote 在同一模型 Block 内
+- [ ] 7.4 类型和测试证明 quoteId/kind/source IDs/TextAnchor/UI/Trace 信息永远不进入模型文本
+- [ ] 7.5 将 Agent Kernel 改为稳定规则：Quote 是数据、comment 是用户意见、总文本是总请求、多 Quote 按顺序综合
+- [ ] 7.6 删除具体 `anchorText` 的前置 System 拼接；具体 origin 只作为 B1 Quote
+- [ ] 7.7 Quote Model Format 变化必须升级版本，并视为预期冷启动
 
-## 8. 两阶段 Prompt Compiler
+## 8. 两阶段 Prompt Compiler 与系统性缓存分类
 
-- [ ] 8.1 将 `compileModelContext()` 拆为 `compilePromptBase()` 与 `finalizeGenerationPrompt()`
-- [ ] 8.2 `compilePromptBase()` 分离 Frozen Inherited History、Stable Branch History 和 Current User
-- [ ] 8.3 保留 owner、Project、Thread、Quote、附件和冻结上下文完整性校验
-- [ ] 8.4 Agent Kernel 改为稳定 server-owned `SystemModelMessage[]`
-- [ ] 8.5 Research mode/plan、动态记忆和当前运行控制进入 Runtime Control，位于稳定历史之后
-- [ ] 8.6 调整 `runGeneration/prepareGeneration` 顺序：Base -> route/plan/profile -> finalize -> streamText
-- [ ] 8.7 正式 `streamText()` 只能消费编译结果，不再自行拼 system/messages/tools/cache 参数
-- [ ] 8.8 增加兄弟分支请求结构测试：相同 `forkContext`、不同 Quote/问题得到相同 `inherited-end` Hash
-- [ ] 8.9 增加同分支续聊测试：B1/BA1 进入 `branch-history-end`，B2 位于尾部
-- [ ] 8.10 保持 Main Thread、Fork、Edit/Retry/Stop、附件和终态语义不变
+- [ ] 8.1 定义 `CacheStability` 四类与缓存稳定性矩阵
+- [ ] 8.2 把 `compileModelContext()` 拆为 `compilePromptBase()` 与 `finalizeGenerationPrompt()`
+- [ ] 8.3 Segment 固定为 Agent Kernel、Project Contract、Inherited History、Branch History、Runtime Control、Current User
+- [ ] 8.4 明确排除 Branch Genesis；branch-origin 已进入 Current User Quote
+- [ ] 8.5 Current User 排除在稳定历史之外；未发送 Composer Draft 完全不进入 Prompt
+- [ ] 8.6 Research mode/plan、动态记忆和本轮控制进入 Runtime Control，不进入前置 System
+- [ ] 8.7 当前 Quote/comment/Text/File 只在 Current User 尾部出现
+- [ ] 8.8 定义 `kernel-end / inherited-end / branch-history-end` 候选边界
+- [ ] 8.9 实现稳定序列化、Segment Hash、Fork Hash、Tool Hash、Stable Prefix Hash 和 Full Shape Hash
+- [ ] 8.10 Prompt Manifest 增加 Quote Protocol/Format/Budget 版本、Quote 数量/长度/Token 估算
+- [ ] 8.11 增加 sibling fork、空 Draft、Quote 排序、B2 续聊和父消息 supersede 的 Hash 测试
 
-## 9. Tool Profile 与 Step Policy
+## 9. Tool Profile 与实际模型路线
 
-- [ ] 9.1 定义 `thread-answer-v1`、`thread-artifact-v1`、`thread-web-v1`、`thread-web-artifact-v1` 或 observe 后确认的最小集合
-- [ ] 9.2 让每个 Profile 的工具名、描述、Schema 和顺序固定
-- [ ] 9.3 Message ID、route reason、query 和当前实体 ID 只进入 execute closure，不进 Provider-visible Schema
-- [ ] 9.4 同一 Profile 的全部模型 Step 保持工具定义一致；`toolChoice` policy 单独版本化
-- [ ] 9.5 Tool 描述、Schema、顺序或权限变化必须升级 Profile version
-- [ ] 9.6 使用 core-answer、search-routing 和 Artifact cases 验证误调用、漏调用和工具循环
+- [ ] 9.1 定义最小 Tool Profile 集合，固定工具名、描述、Schema 与顺序
+- [ ] 9.2 动态 Message ID、route reason、query 和当前 Project/Thread 只存在于 execute closure
+- [ ] 9.3 Tool Profile 变化记录为有意缓存分区，不扩大工具权限
+- [ ] 9.4 将 `resolveChatModel()` 扩展为 `ResolvedChatModel`，包含实际 Adapter、Gateway、upstream、routeId、routing policy 和 cache capability
+- [ ] 9.5 能力注册表以 Adapter + Gateway + Upstream Model Family 为键
+- [ ] 9.6 未验证 compatible endpoint 保持 `probe-required`，不得盲发专属字段
+- [ ] 9.7 Provider 拒绝缓存选项时安全降级到普通模型请求
 
-## 10. Resolved Model Route 与 Provider Cache Capability
+## 10. Claude Probe 与短 TTL 发布
 
-- [ ] 10.1 将 `resolveChatModel()` 扩展为 `ResolvedChatModel`
-- [ ] 10.2 `ResolvedChatModel.route.adapter` 支持 Gateway、OpenRouter、Anthropic、OpenAI-compatible、Private Relay、Ark 和 MiniMax
-- [ ] 10.3 能力注册表支持 `implicit/explicit-breakpoint/gateway-auto/unsupported/probe-required`
-- [ ] 10.4 能力记录 affinity、read/write Usage、TTL、minimum prefix、max breakpoints 和 retention class
-- [ ] 10.5 同一 app model 经不同 Gateway/代理时必须得到不同 route ID 和能力
-- [ ] 10.6 Vercel Gateway 接入类型验证后的自动缓存 option
-- [ ] 10.7 OpenRouter 接入服务端 HMAC affinity；同 Project/模型兄弟相同，跨用户/Project/模型不同
-- [ ] 10.8 对已验证 Claude route 在 `inherited-end/branch-history-end` 应用 explicit cache control
-- [ ] 10.9 UMAPIS 与 Private Relay 即使上游为 Claude，也必须分别 probe marker、Usage、TTL 和降级
-- [ ] 10.10 Ark、MiniMax、Cloudflare compatible 和其他 proxy 未验证时不发送专属缓存字段
-- [ ] 10.11 Provider 拒绝缓存参数时降级普通请求，不改变 Message 终态
-- [ ] 10.12 ZDR、region、Provider allowlist 和 retention 纳入能力选择，extended TTL 默认关闭
+- [ ] 10.1 从当前模型注册表选择一条实际 UMAPIS Claude Route 作为首条 Probe
+- [ ] 10.2 验证 cache marker/option 是否透传、cache creation/read Usage 是否返回、字段是否稳定
+- [ ] 10.3 验证最小前缀、Breakpoint、错误降级、Route Drift 与真实成本
+- [ ] 10.4 若 UMAPIS 无法证明缓存，保持 `probe-required`，不得宣传已启用
+- [ ] 10.5 使用直接 Anthropic 参考 Route 运行同 Prompt Probe，区分 Prompt 架构与代理能力问题
+- [ ] 10.6 Private Relay、Ark、MiniMax、Cloudflare compatible 和其他代理分别 Probe，不继承 UMAPIS/Anthropic 结论
+- [ ] 10.7 首阶段只启用 Provider 默认短时缓存；支持时按约 5 分钟验证
+- [ ] 10.8 1 小时 Extended TTL 保持关闭；只有会话停顿、成本摊销、ZDR/region/retention 审查通过后另行启用
+- [ ] 10.9 OpenRouter/Gateway affinity 使用服务端 HMAC，隔离用户、Project、模型和 Cache Profile
 
-## 11. Breakpoint、冷启动、Usage 与成本
+## 11. Model Attempt、Trace 与 Agent Eval
 
-- [ ] 11.1 Manifest 生成 `kernel-end/inherited-end/branch-history-end` 边界和长度/Token 估计
-- [ ] 11.2 实现 deterministic breakpoint selection，优先 inherited 和 branch history
-- [ ] 11.3 服从 minimum prefix、max breakpoints、TTL 和 retention
-- [ ] 11.4 Implicit/Gateway auto route 保留边界与 Hash，但不伪造 marker
-- [ ] 11.5 定义 eligibility/outcome reason：eligible、below-minimum、cold-start、partial-warm、prefix-changed、tool-profile-changed、route-changed、ttl-expired/unknown、retention-disabled、unsupported、usage-unavailable
-- [ ] 11.6 对“最新 assistant 立即分叉”和“warm-up 后兄弟分支”建立对照测试
-- [ ] 11.7 实现 `PromptCacheUsage`，按 AI SDK、Provider metadata、Gateway metadata 顺序取证
-- [ ] 11.8 缺失值保持 `undefined`；多来源冲突标记 `complete=false`
-- [ ] 11.9 每个模型 Step 产生 `ModelAttemptEvent`，覆盖多步工具循环
-- [ ] 11.10 优先使用真实 Provider/Gateway cost metadata 计算 Claude 成本变化；无真实价格只报告 Token
+- [ ] 11.1 扩展 observability allowlist，加入 Compiler/Kernel/Quote/Budget/Cache/Tool/Route 版本和稳定 Prefix Hash
+- [ ] 11.2 实现每个模型 Step 的 `PromptCacheUsage` 归一化，缺失保持 `undefined`
+- [ ] 11.3 新增 Model Attempt Collector，记录 Route、Token、cache read/write、finish reason、TTFT、Profile、资格与 outcome
+- [ ] 11.4 生产 metadata-only：禁止导出 Prompt、Quote、comment、source IDs、TextAnchor、网页、附件正文和隐藏推理
+- [ ] 11.5 扩展 Agent Eval Result 与 fingerprint，加入 Quote Protocol/Format/Budget、Prompt Compiler、Tool Profile 和 Route
+- [ ] 11.6 增加 Quote/Composer Fixture：空分支无调用、当前 Thread 引用无调用、50 批注一次发送一次 attempt
+- [ ] 11.7 增加 completed-only 来源测试和越权/关系不匹配测试
+- [ ] 11.8 增加 Prompt Cache Fixture：sibling prefix、B2 续聊、Tool/Route/TTL 分区、cold/partial-warm/usage-unavailable
+- [ ] 11.9 Scheduled/Release 执行 UMAPIS/直接 Anthropic warm-up + reuse Probe；CI 不依赖外部缓存
+- [ ] 11.10 任何安全、隔离、工具、终态或回答质量 hard regression 阻断缓存启用
 
-## 12. Observability、Agent Eval 与渐进发布
+## 12. 渐进发布与前端下一阶段
 
-- [ ] 12.1 扩展 observability allowlist：Compiler、Kernel、Quote Protocol/Format、Cache/Profile、Tool Profile、Prefix/Fork Hash、route、资格和 Quote count
-- [ ] 12.2 保持 production metadata-only，禁止 Prompt、Quote text/source/Anchor、Message、query、附件、网页正文和隐藏推理
-- [ ] 12.3 扩展 Agent case/result/fingerprint，增加 Quote-aware prompt-cache cases、modelAttempts 和 run-level cache summary
-- [ ] 12.4 建立 deterministic fixtures：多 Quote、metadata exclusion、两条 B1 路径、Edit 保留、legacy fallback、siblings、续聊、Tool/route/TTL 变化
-- [ ] 12.5 Scheduled/release 对批准 Claude route 执行 warm-up + sibling/continuation live probe
-- [ ] 12.6 比较 cache read/write、TTFT、真实成本和回答质量；安全、隔离、工具、正确性或终态 hard regression 一律阻断
-- [ ] 12.7 实现 server-only `off/observe/enabled`；observe 不改变实际请求
-- [ ] 12.8 staging 统计动态 system、Tool Profile、Prefix 长度、Quote 数量、eligible 比例和 route drift
-- [ ] 12.9 首先只对一条已验证 Claude route 小 cohort 启用
-- [ ] 12.10 建立 route 级一键回到 `off` 的步骤；版本升级记录预期冷启动
+- [ ] 12.1 实现 server-only `off / observe / enabled`；observe 只影子计算新 Prompt、Quote Budget、Manifest 和资格
+- [ ] 12.2 staging 先观察 Quote 数量、预算、Prefix 长度、Tool Profile 和 Route 分布
+- [ ] 12.3 只对通过 Probe 的 Claude Route 小范围启用短时 L1 Cache
+- [ ] 12.4 建立按 Route 一键回到 off 的回滚步骤
+- [ ] 12.5 定义 Noop/Fake `CompiledSegmentCache`，L2 默认关闭
+- [ ] 12.6 只有数据库读取或编译 CPU 形成实测瓶颈后才实现进程 LRU；分布式 L2 另做数据安全审查
+- [ ] 12.7 明确禁止普通聊天 Exact Response Cache
+- [ ] 12.8 下一阶段发起前端 Composer Research，比较 textarea + Quote Rail、Lexical/ProseMirror、自定义 Block Composer 等实现
+- [ ] 12.9 前端方案必须消费本 change 的 `ThreadComposerDraft`、`QuoteSelectionInput[]`、required origin、comment、50 上限和一次提交合同
+- [ ] 12.10 前端调研覆盖：Quote Block 显示、删除/排序、批量批注导入、当前/新 Thread 动作、来源导航、Draft 跨刷新和移动端交互
 
-## 13. L2 边界、最终验收与前端交接
+## 13. 最终验证
 
-- [ ] 13.1 定义 `CompiledSegmentCache`、tenant HMAC Key、TTL、容量和安全合同，默认 noop
-- [ ] 13.2 只有观测证明应用编译/DB 成为瓶颈后才实现有界进程 LRU
-- [ ] 13.3 跨实例收益和 TLS/鉴权/租户隔离/删除策略完成后才评估分布式 KV
-- [ ] 13.4 明确禁止普通聊天 Exact Response Cache；长期摘要与反向 Quote 索引另立 change
-- [ ] 13.5 运行 `pnpm typecheck`、`pnpm lint`、`pnpm build`、全部 Thread Chat Gate、`pnpm test:observability`、`pnpm test:agent-evals` 和 `pnpm openspec:validate`
-- [ ] 13.6 保存不含正文的 staging 验收证据：B1 Parts、模型文本结构、Prefix Hash、marker、Provider Usage、TTFT、成本、质量和 fallback
-- [ ] 13.7 输出前端合同：Composer Draft 使用 `QuoteSelectionInput[]`，DTO 读取重复 `data-quote`，Quote ID/source/Anchor 的稳定语义
-- [ ] 13.8 记录下一阶段前端调研模块：多引用 Composer、Quote Pill、排序/删除、来源选择、点击打开 Thread、Message 定位、Anchor 高亮和失败降级
-- [ ] 13.9 后端合同评审通过前不实现新 Composer，避免 UI 与数据协议并行漂移
+- [ ] 13.1 运行 `pnpm typecheck`、`pnpm lint`、`pnpm build`
+- [ ] 13.2 运行全部 Thread Chat Gate、observability tests 与 agent eval CI
+- [ ] 13.3 运行 `pnpm openspec:validate`
+- [ ] 13.4 保存 metadata-only 验收证据：Quote 路径、Message Parts、Prefix Hash、Provider Usage、TTFT、成本和回滚
+- [ ] 13.5 文档明确：50 是数量上限，不是无限 Token；短 TTL 是默认；UMAPIS 必须 Probe；Prefix Hash 相同不等于 Provider 命中
