@@ -43,21 +43,62 @@ import {
 } from "../../lib/thread-chat/streaming/generation-tools.ts"
 import {
   buildPromptCacheControls,
+  executeWithPromptCacheFallback,
   promptCacheAffinityKey,
+  selectPromptCacheBreakpoints,
 } from "../../lib/ai/prompt-cache.ts"
 import {
   canonicalHash,
   stablePrefixHash,
 } from "../../lib/thread-chat/application/prompt-cache.ts"
+import {
+  aggregatePromptCacheUsage,
+  normalizePromptCacheUsage,
+} from "../../lib/ai/prompt-cache-usage.ts"
+import {
+  createModelAttemptCollector,
+} from "../../lib/ai/model-attempt.ts"
+import {
+  evaluatePromptCacheProbe,
+  fakeClaudeCacheProbe,
+  DEFAULT_FAKE_CLAUDE_PRICE_CARD,
+} from "../../lib/ai/prompt-cache-probe.ts"
+import {
+  compiledSegmentCacheKey,
+  InMemoryCompiledSegmentCache,
+  NoopCompiledSegmentCache,
+} from "../../lib/thread-chat/application/compiled-segment-cache.ts"
 
 const id = () => crypto.randomUUID()
-const anchor = (exact = "相同前缀") => ({
+const anchor = (exact = "相同前缀", index = 4) => ({
   quote: { exact, prefix: "缓存需要", suffix: "才能复用" },
-  position: { start: 4, end: 4 + exact.length },
+  position: { start: index, end: index + exact.length },
 })
 const sourceMessageId = id()
 const projectId = id()
 const parentThreadId = id()
+
+function selection(exact, comment = "解释", index = 4) {
+  return {
+    source: {
+      type: "message-selection",
+      sourceMessageId: id(),
+      anchor: anchor(exact, index),
+    },
+    ...(comment ? { comment } : {}),
+  }
+}
+
+function versionedQuote(exact, index = 0) {
+  return buildBranchOriginQuote({
+    projectId,
+    parentThreadId,
+    sourceMessageId: id(),
+    anchor: anchor(exact, index),
+    anchorText: exact,
+    quoteId: id(),
+  })
+}
 
 const origin = buildBranchOriginQuote({
   projectId,
@@ -87,12 +128,28 @@ assert.throws(() =>
     text: "不匹配",
   })
 )
+assert.throws(() =>
+  parseThreadQuoteData({
+    ...origin,
+    schemaVersion: "thread-quote-v999",
+  })
+)
 
 const serialized = threadQuotePartToModelText(origin)
 assert.match(serialized, new RegExp(THREAD_QUOTE_MODEL_FORMAT_VERSION))
 assert.match(serialized, /相同前缀/)
 assert.doesNotMatch(serialized, new RegExp(origin.quoteId))
 assert.doesNotMatch(serialized, new RegExp(parentThreadId))
+const sameTextDifferentMetadata = {
+  ...origin,
+  quoteId: id(),
+  source: { ...origin.source, projectId: id(), threadId: id(), messageId: id() },
+}
+assert.equal(
+  threadQuotePartToModelText(origin),
+  threadQuotePartToModelText(sameTextDifferentMetadata),
+  "导航元信息不能改变模型文本"
+)
 const delimiterText = quoteContentToModelText({
   text: '代码：\n```ts\nconst x = "</thread_quote>"\n```',
   comment: "逐行解释",
@@ -100,7 +157,7 @@ const delimiterText = quoteContentToModelText({
 assert.match(delimiterText, /\\n/)
 assert.match(delimiterText, /逐行解释/)
 
-const selection = {
+const oneSelection = {
   source: {
     type: "message-selection",
     sourceMessageId,
@@ -108,7 +165,7 @@ const selection = {
   },
   comment: "解释",
 }
-assert.equal(quoteSelectionKey(selection), quoteSelectionKey(selection))
+assert.equal(quoteSelectionKey(oneSelection), quoteSelectionKey(oneSelection))
 
 const validSend = {
   commandId: id(),
@@ -117,20 +174,21 @@ const validSend = {
   modelId: "test/model",
   text: "",
   files: [],
-  quotes: [selection],
+  quotes: [oneSelection],
 }
 assert.equal(sendMessageCommandSchema.parse(validSend).quotes.length, 1)
+const fiftySelections = Array.from({ length: THREAD_QUOTE_MAX_COUNT }, (_, index) =>
+  selection(`quote-${index}`, "x", index * 20)
+)
+assert.equal(
+  sendMessageCommandSchema.parse({ ...validSend, quotes: fiftySelections }).quotes
+    .length,
+  THREAD_QUOTE_MAX_COUNT
+)
 assert.throws(() =>
   sendMessageCommandSchema.parse({
     ...validSend,
-    quotes: Array.from({ length: THREAD_QUOTE_MAX_COUNT + 1 }, (_, index) => ({
-      source: {
-        type: "message-selection",
-        sourceMessageId: id(),
-        anchor: anchor(`quote-${index}`),
-      },
-      comment: "x",
-    })),
+    quotes: [...fiftySelections, selection("too-many")],
   })
 )
 assert.throws(() =>
@@ -163,12 +221,39 @@ const validFork = {
 }
 assert.equal(forkThreadCommandSchema.parse(validFork).firstTurn, undefined)
 
+assert.deepEqual(
+  buildUserParts({ text: "普通问题", files: [], quotes: [] }).map(
+    (part) => part.type
+  ),
+  ["text"]
+)
 const userParts = buildUserParts({
   text: "为什么？",
   files: [],
   quotes: [origin],
 })
 assert.deepEqual(userParts.map((part) => part.type), ["data-quote", "text"])
+const twoQuoteParts = buildUserParts({
+  text: "比较",
+  files: [],
+  quotes: [origin, versionedQuote("第二段", 50)],
+})
+assert.deepEqual(twoQuoteParts.map((part) => part.type), [
+  "data-quote",
+  "data-quote",
+  "text",
+])
+const fiftyQuoteParts = buildUserParts({
+  text: "逐条处理",
+  files: [],
+  quotes: Array.from({ length: THREAD_QUOTE_MAX_COUNT }, (_, index) =>
+    versionedQuote(`短引用-${index}`, index * 20)
+  ),
+})
+assert.equal(
+  fiftyQuoteParts.filter((part) => part.type === "data-quote").length,
+  THREAD_QUOTE_MAX_COUNT
+)
 const editedParts = replaceUserEditableParts({
   sourceParts: userParts,
   text: "请举例",
@@ -179,7 +264,10 @@ assert.deepEqual(editedParts[0], userParts[0])
 
 assert.equal(assertQuoteBudget([origin]).quoteCount, 1)
 assert.throws(() =>
-  assertPromptWindowBudget({ inputCharacters: 10_000_000, contextWindowTokens: 1000 })
+  assertPromptWindowBudget({
+    inputCharacters: 10_000_000,
+    contextWindowTokens: 1000,
+  })
 )
 
 const required = branchOriginDraftQuote({
@@ -209,6 +297,10 @@ assert.equal(submission.quotes.length, 1, "required origin 由服务端生成")
 assert.equal(submission.quotes[0].comment, "比较")
 assert.throws(() => removeComposerQuote(draft, "origin"))
 assert.equal(moveComposerQuote(draft, "normal", 0).quotes[0].draftId, "origin")
+assert.equal(
+  isComposerDraftSendable({ text: "", quotes: [{ ...normal, comment: "" }], files: [] }),
+  false
+)
 
 assert.equal(
   selectGenerationToolProfile({
@@ -225,6 +317,10 @@ assert.deepEqual(generationToolProfile("thread-web-v1").toolNames, [
 assert.equal(
   generationToolProfile("thread-web-v1").hash,
   generationToolProfile("thread-web-v1").hash
+)
+assert.notEqual(
+  generationToolProfile("thread-web-v1").hash,
+  generationToolProfile("thread-answer-v1").hash
 )
 
 const affinityA = promptCacheAffinityKey({
@@ -269,6 +365,42 @@ assert.deepEqual(
     reason: "probe-required",
   }
 )
+assert.equal(
+  buildPromptCacheControls({
+    resolved: fakeResolved,
+    userId: "u",
+    projectId: "p",
+    mode: "observe",
+  }).reason,
+  "observe-only"
+)
+
+assert.deepEqual(
+  selectPromptCacheBreakpoints({
+    candidates: [
+      { kind: "kernel-end", tokenEstimate: 1200 },
+      { kind: "inherited-end", tokenEstimate: 5000 },
+      { kind: "branch-history-end", tokenEstimate: 6000 },
+    ],
+    minimumPrefixTokens: 1000,
+    maximumBreakpoints: 2,
+  }).map((item) => item.kind),
+  ["inherited-end", "branch-history-end"]
+)
+
+let fallbackCalls = 0
+const fallbackResult = await executeWithPromptCacheFallback({
+  primary: { cache: true },
+  fallback: { cache: false },
+  execute: async (options) => {
+    fallbackCalls += 1
+    if (options.cache) throw new Error("cache_control invalid 400")
+    return "ok"
+  },
+  isCacheControlRejection: (error) => /cache_control/.test(String(error)),
+})
+assert.deepEqual(fallbackResult, { result: "ok", usedFallback: true })
+assert.equal(fallbackCalls, 2)
 
 const sharedSystem = "kernel"
 const inherited = [{ role: "user", content: "A" }]
@@ -291,6 +423,126 @@ assert.notEqual(
   siblingA,
   canonicalHash({ sharedSystem, inherited, changedToolProfile: true })
 )
+
+const standardUsage = normalizePromptCacheUsage({
+  usage: {
+    inputTokens: 1000,
+    outputTokens: 100,
+    inputTokenDetails: { cacheReadTokens: 700, cacheWriteTokens: 100 },
+  },
+})
+assert.deepEqual(
+  {
+    read: standardUsage.cacheReadTokens,
+    write: standardUsage.cacheWriteTokens,
+    uncached: standardUsage.uncachedInputTokens,
+  },
+  { read: 700, write: 100, uncached: 200 }
+)
+const providerUsage = normalizePromptCacheUsage({
+  providerMetadata: {
+    anthropic: {
+      usage: {
+        inputTokens: 1000,
+        outputTokens: 100,
+        cache_read_input_tokens: 800,
+        cache_creation_input_tokens: 100,
+        cost: 0.1,
+      },
+    },
+  },
+})
+assert.equal(providerUsage.cacheReadTokens, 800)
+assert.equal(providerUsage.costUsd, 0.1)
+assert.equal(
+  aggregatePromptCacheUsage([standardUsage, standardUsage]).cacheReadTokens,
+  1400
+)
+assert.deepEqual(normalizePromptCacheUsage({}), {
+  source: "unavailable",
+  complete: false,
+})
+
+const collector = createModelAttemptCollector({
+  purpose: "chat-answer",
+  routeId: "anthropic:umapis:claude",
+  upstreamModelId: "claude",
+  adapter: "anthropic",
+  gateway: "umapis",
+  toolProfileId: "thread-answer-v1",
+  stableRequestPrefixHash: siblingA,
+  cacheStrategy: "explicit-breakpoint",
+  cacheEligibility: "eligible",
+})
+collector.recordStep({
+  finishReason: "stop",
+  usage: {
+    inputTokens: 1000,
+    outputTokens: 100,
+    inputTokenDetails: { cacheReadTokens: 700, cacheWriteTokens: 100 },
+  },
+})
+assert.equal(collector.snapshot()[0].cacheOutcome, "provider-hit")
+assert.equal(collector.summary().usage.cacheReadTokens, 700)
+
+const fakeProbe = fakeClaudeCacheProbe()
+assert.equal(fakeProbe.decision.enable, true)
+assert.equal(fakeProbe.decision.reason, "lower-cost-no-regression")
+const qualityRegression = evaluatePromptCacheProbe({
+  baseline: fakeProbe.baseline,
+  candidate: {
+    ...fakeProbe.candidate,
+    quality: { ...fakeProbe.candidate.quality, answerQuality: 0 },
+  },
+  price: DEFAULT_FAKE_CLAUDE_PRICE_CARD,
+})
+assert.deepEqual(qualityRegression, {
+  enable: false,
+  reason: "quality-regression",
+})
+const missingCost = evaluatePromptCacheProbe({
+  baseline: { ...fakeProbe.baseline, usage: { source: "unavailable", complete: false } },
+  candidate: fakeProbe.candidate,
+  price: DEFAULT_FAKE_CLAUDE_PRICE_CARD,
+})
+assert.equal(missingCost.reason, "cost-not-proven")
+
+const cacheKeyA = compiledSegmentCacheKey({
+  tenantSalt: "salt",
+  userId: "user-a",
+  projectId: "project-a",
+  promptCompilerVersion: "v1",
+  segmentKind: "inherited-history",
+  sourceContentHash: "hash",
+  modelFamily: "claude",
+  attachmentStrategyVersion: "v1",
+})
+const cacheKeyB = compiledSegmentCacheKey({
+  tenantSalt: "salt",
+  userId: "user-b",
+  projectId: "project-a",
+  promptCompilerVersion: "v1",
+  segmentKind: "inherited-history",
+  sourceContentHash: "hash",
+  modelFamily: "claude",
+  attachmentStrategyVersion: "v1",
+})
+assert.notEqual(cacheKeyA, cacheKeyB)
+const l2 = new InMemoryCompiledSegmentCache(1)
+await l2.set(
+  cacheKeyA,
+  {
+    kind: "inherited-history",
+    contentHash: "hash",
+    modelMessages: [{ role: "user", content: "A" }],
+    characters: 1,
+    createdAt: new Date().toISOString(),
+  },
+  1000
+)
+assert.equal((await l2.get(cacheKeyA)).contentHash, "hash")
+assert.equal(await l2.get(cacheKeyB), null)
+assert.equal(await new NoopCompiledSegmentCache().get(cacheKeyA), null)
 
 const merged = mergeBranchOriginQuote(origin, [origin])
 assert.equal(merged.length, 1)
