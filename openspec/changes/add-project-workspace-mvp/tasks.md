@@ -63,7 +63,7 @@
 
 ## 8. 校验、迁移与文档
 
-- [ ] 8.1 运行 `pnpm db:generate` 并人工复核 migration；在干净数据库与现有数据副本上运行 `pnpm db:migrate`
+- [x] 8.1 运行 `pnpm db:generate` 并人工复核 migration；在干净数据库与现有数据副本上运行 `pnpm db:migrate`
 - [ ] 8.2 运行 `pnpm typecheck`、目标 ESLint、相关测试、Agent eval smoke/CI、`pnpm build` 和 `pnpm openspec:validate`
 - [ ] 8.3 更新 `CLAUDE.md`/相关开发文档：Project Contract 注入边界、Project File membership、统一预算、Project Panel 与明确 Non-Goals
 - [ ] 8.4 保存上线验收记录：旧 Project 兼容、R2 未配置错误、Embedding 不可用降级、Archived Project、跨用户隔离和应用回滚行为
