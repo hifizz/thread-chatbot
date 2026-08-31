@@ -8,6 +8,11 @@ import {
   buildUserParts,
   touchProjectAndThread,
 } from "@/lib/thread-chat/application/command-utils"
+import {
+  buildBranchOriginQuote,
+  mergeBranchOriginQuote,
+  resolveQuoteSelections,
+} from "@/lib/thread-chat/application/quote-resolver"
 import { notFound, stateConflict } from "@/lib/thread-chat/application/errors"
 import { executeIdempotentCommand } from "@/lib/thread-chat/persistence/command-repository"
 import {
@@ -15,6 +20,7 @@ import {
   toProjectDTO,
   toThreadDTO,
 } from "@/lib/thread-chat/persistence/mappers"
+import { listThreadMessageRows } from "@/lib/thread-chat/persistence/message-repository"
 import {
   findRootThreadId,
   lockOwnedProject,
@@ -47,6 +53,35 @@ export function sendMessage(
         if (project.archivedAt) stateConflict("已归档 Project 不可发送消息")
         await assertThreadReadyForTurn(tx, project.id, thread.id)
         await assertOwnedReadyAttachments(tx, userId, command.files)
+
+        const selections = await resolveQuoteSelections({
+          tx,
+          destinationProjectId: project.id,
+          destinationThreadId: thread.id,
+          selections: command.quotes,
+        })
+        const timeline = await listThreadMessageRows(tx, project.id, thread.id)
+        const hasActiveUserMessage = timeline.some(
+          (row) => row.role === "user" && row.supersededAt === null
+        )
+        const origin =
+          !hasActiveUserMessage &&
+          thread.parentId &&
+          thread.forkMessageId &&
+          thread.forkAnchor &&
+          thread.anchorText
+            ? buildBranchOriginQuote({
+                projectId: project.id,
+                parentThreadId: thread.parentId,
+                sourceMessageId: thread.forkMessageId,
+                anchor: thread.forkAnchor,
+                anchorText: thread.anchorText,
+              })
+            : null
+        const quotes = origin
+          ? mergeBranchOriginQuote(origin, selections)
+          : selections
+
         const [userSequence, assistantSequence] = await allocateThreadSequences(
           tx,
           thread.id,
@@ -62,7 +97,11 @@ export function sendMessage(
               threadId: thread.id,
               sequence: userSequence,
               role: "user",
-              parts: buildUserParts(command.text, command.files),
+              parts: buildUserParts({
+                text: command.text,
+                files: command.files,
+                quotes,
+              }),
               status: "completed",
               finishedAt: now,
             },
