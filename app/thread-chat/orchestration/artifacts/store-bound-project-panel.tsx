@@ -7,6 +7,29 @@ import type { ThreadChatClient } from "../../net/client"
 import type { ConversationCommands } from "../../net/commands/conversation-commands"
 import { ProjectPanel } from "./project-panel"
 
+function findMessageElement(messageId: string): HTMLElement | null {
+  return [...document.querySelectorAll<HTMLElement>("[data-thread-chat-message-id]")].find(
+    (element) => element.dataset.threadChatMessageId === messageId
+  ) ?? null
+}
+
+function revealMessage(messageId: string, attempt = 0) {
+  const element = findMessageElement(messageId)
+  if (!element) {
+    if (attempt < 8) window.setTimeout(() => revealMessage(messageId, attempt + 1), 60)
+    return
+  }
+  element.scrollIntoView({ behavior: "smooth", block: "center" })
+  element.animate(
+    [
+      { backgroundColor: "transparent" },
+      { backgroundColor: "color-mix(in srgb, currentColor 8%, transparent)" },
+      { backgroundColor: "transparent" },
+    ],
+    { duration: 1600, easing: "ease-out" }
+  )
+}
+
 export function StoreBoundProjectPanel({
   projectId,
   store,
@@ -73,6 +96,13 @@ export function StoreBoundProjectPanel({
     },
     [commands]
   )
+  const locate = useCallback(
+    (threadId: string, sourceMessageId: string) => {
+      onLocate(threadId, sourceMessageId)
+      revealMessage(sourceMessageId)
+    },
+    [onLocate]
+  )
 
   return (
     <ProjectPanel
@@ -83,7 +113,7 @@ export function StoreBoundProjectPanel({
       activeId={activeId}
       onClose={onClose}
       onSelect={onSelect}
-      onLocate={onLocate}
+      onLocate={locate}
       onRefresh={refresh}
       onSaveContract={saveContract}
       onAddProjectFile={addProjectFile}
