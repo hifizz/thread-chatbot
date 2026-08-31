@@ -499,7 +499,7 @@ export function createGate3MockRuntime(
     return clone(terminal)
   }
 
-  const client = {
+  const client: ThreadChatClient = {
     async listProjects(archived = false) {
       return project && Boolean(project.archivedAt) === archived
         ? [clone(project)]
@@ -762,6 +762,29 @@ export function createGate3MockRuntime(
       project = { ...project, customTitle: input.customTitle, updatedAt: now() }
       return commandResponse(clone(project))
     },
+    async updateProjectContract(_targetProjectId, input) {
+      if (!project) throw new Error("PROJECT_NOT_FOUND")
+      if (project.contractVersion !== input.expectedContractVersion)
+        throw new Error("PROJECT_CONTRACT_VERSION_CONFLICT")
+      project = {
+        ...project,
+        target: input.target.trim() || null,
+        instructions: input.instructions.trim() || null,
+        contractVersion: project.contractVersion + 1,
+        updatedAt: now(),
+      }
+      return commandResponse(clone(project))
+    },
+    async addProjectFile() {
+      throw new Error("PROJECT_FILE_UPLOAD_NOT_AVAILABLE_IN_GATE3_HARNESS")
+    },
+    async removeProjectFile(_targetProjectId, attachmentId) {
+      return commandResponse({
+        projectId,
+        attachmentId,
+        removed: true as const,
+      })
+    },
     async setProjectArchived(_targetProjectId, input) {
       if (!project) throw new Error("PROJECT_NOT_FOUND")
       project = {
@@ -778,7 +801,7 @@ export function createGate3MockRuntime(
       artifacts.clear()
       return commandResponse({ projectId, deleted: true as const })
     },
-  } as unknown as ThreadChatClient
+  }
 
   const fetchStream: typeof globalThis.fetch = async (input) => {
     const messageId = String(input).split("/").at(-1) ?? ""
