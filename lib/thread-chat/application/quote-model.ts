@@ -1,9 +1,6 @@
 import { THREAD_QUOTE_MODEL_FORMAT_VERSION } from "@/constants/thread-chat"
 import type { ThreadChatUIMessage } from "@/lib/thread-chat/contracts/ui-message"
-import {
-  parseThreadQuoteData,
-  type ThreadQuoteData,
-} from "@/lib/thread-chat/domain/thread-quote"
+import { parseThreadQuoteData } from "@/lib/thread-chat/domain/thread-quote"
 
 export type QuoteModelContent = {
   text: string
@@ -28,7 +25,8 @@ export function quoteTextToModelText(text: string): string {
   return quoteContentToModelText({ text })
 }
 
-export function threadQuotePartToModelText(data: ThreadQuoteData): string {
+/** JSONB/UI Part payloads are untrusted until parsed. */
+export function threadQuotePartToModelText(data: unknown): string {
   const quote = parseThreadQuoteData(data)
   return quoteContentToModelText({
     text: quote.text,
