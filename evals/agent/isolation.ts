@@ -1,5 +1,31 @@
 type EnvironmentSource = Record<string, string | undefined>
 
+const EVALUATION_DATABASE_NAME = /^thread_chat_eval(?:_[a-z0-9-]+)?$/
+const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]", "::1"])
+
+export type EvaluationDatabaseIdentity = {
+  host: string
+  database: string
+}
+
+export function canonicalEvaluationDatabaseIdentity(
+  value: string
+): EvaluationDatabaseIdentity {
+  const url = new URL(value)
+  if (url.protocol !== "postgres:" && url.protocol !== "postgresql:") {
+    throw new Error("Evaluation database URL must use postgres or postgresql")
+  }
+  const database = decodeURIComponent(url.pathname.replace(/^\/+/, ""))
+    .trim()
+    .toLowerCase()
+  if (!database) throw new Error("Evaluation database name is required")
+  const hostname = url.hostname.toLowerCase()
+  return {
+    host: LOOPBACK_HOSTS.has(hostname) ? "loopback" : hostname,
+    database,
+  }
+}
+
 export function assertEvaluationEnvironment(
   source: EnvironmentSource = process.env
 ): void {
@@ -19,13 +45,74 @@ export function evaluationDatabaseUrl(
   }
   const value = source.EVAL_DATABASE_URL?.trim()
   if (!value) throw new Error("Lifecycle evals require EVAL_DATABASE_URL")
-  if (value === source.DATABASE_URL?.trim()) {
-    throw new Error("EVAL_DATABASE_URL must differ from DATABASE_URL")
+  const evaluation = canonicalEvaluationDatabaseIdentity(value)
+  const productionValue = source.DATABASE_URL?.trim()
+  if (productionValue) {
+    const production = canonicalEvaluationDatabaseIdentity(productionValue)
+    if (
+      evaluation.host === production.host &&
+      evaluation.database === production.database
+    ) {
+      throw new Error("EVAL_DATABASE_URL resolves to the production database")
+    }
   }
-  const url = new URL(value)
-  const databaseName = url.pathname.slice(1).toLowerCase()
-  if (!/(?:eval|test)/.test(databaseName)) {
-    throw new Error("Evaluation database name must contain eval or test")
+  if (!EVALUATION_DATABASE_NAME.test(evaluation.database)) {
+    throw new Error(
+      "Evaluation database name must match thread_chat_eval[_suffix]"
+    )
   }
   return value
+}
+
+export async function assertEvaluationDatabaseGuard(input: {
+  readGuard: () => Promise<string | null | undefined>
+  source?: EnvironmentSource
+}): Promise<void> {
+  const source = input.source ?? process.env
+  const expected = source.EVAL_DATABASE_GUARD_TOKEN?.trim()
+  if (!expected || expected.length < 24) {
+    throw new Error(
+      "Lifecycle evals require a 24+ character EVAL_DATABASE_GUARD_TOKEN"
+    )
+  }
+  const actual = (await input.readGuard())?.trim()
+  if (!actual || actual !== expected) {
+    throw new Error("Evaluation database guard does not match")
+  }
+}
+
+/**
+ * Validate the isolated evaluation database before importing the application
+ * database singleton. Live content and lifecycle evals must run in a fresh
+ * process so every production code path observes the same guarded database.
+ */
+export async function prepareEvaluationDatabase(): Promise<string> {
+  const evalUrl = evaluationDatabaseUrl()
+  const runtime = globalThis as typeof globalThis & {
+    __dbClient?: unknown
+  }
+  if (runtime.__dbClient && process.env.DATABASE_URL !== evalUrl) {
+    throw new Error(
+      "Database client already initialized; run declared evals in a fresh process"
+    )
+  }
+  const { default: postgres } = await import("postgres")
+  const guardClient = postgres(evalUrl, { max: 1, prepare: false })
+  try {
+    await assertEvaluationDatabaseGuard({
+      readGuard: async () => {
+        const rows = await guardClient<
+          [{ evaluation_guard: string | null }]
+        >`
+          select current_setting('thread_chat.evaluation_guard', true)
+            as evaluation_guard
+        `
+        return rows[0]?.evaluation_guard
+      },
+    })
+  } finally {
+    await guardClient.end()
+  }
+  process.env.DATABASE_URL = evalUrl
+  return evalUrl
 }

@@ -34,7 +34,7 @@ export const FEEDBACK_SCORE_VALUES = {
 } as const
 
 export const FEEDBACK_SCORE_SOURCE = "thread-chat.product-db"
-export const FEEDBACK_SCORE_SCHEMA_VERSION = "feedback-score-v1"
+export const FEEDBACK_SCORE_SCHEMA_VERSION = "feedback-score-v2"
 
 export const OBSERVABILITY_ERROR_CATEGORIES = {
   abort: "abort",

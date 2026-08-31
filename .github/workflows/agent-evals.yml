@@ -46,7 +46,7 @@ jobs:
       - name: Baseline comparison and deterministic gate
         run: >-
           pnpm eval:agent:compare --
-          --baseline=evals/agent/baselines/fixture-v1.json
+          --baseline=evals/agent/baselines/fixture-ci-v1.json
           --candidate=evals/agent/results/local/ci.json
           --output=evals/agent/results/local/comparison.md
       - uses: actions/upload-artifact@v4

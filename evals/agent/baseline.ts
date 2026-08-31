@@ -1,10 +1,16 @@
 import type { EvaluationCandidateConfig } from "@/evals/agent/fingerprint"
+import type {
+  EvaluationCaseManifest,
+  EvaluationRunMode,
+} from "@/evals/agent/manifest"
 import type { AgentExperimentResult } from "@/evals/agent/result"
 import { aggregateEvaluationResults } from "@/evals/agent/scorers/aggregate"
 
 export type AgentRunSnapshot = {
-  schemaVersion: "agent-run-snapshot-v1"
+  schemaVersion: "agent-run-snapshot-v2"
   runId: string
+  mode: EvaluationRunMode
+  manifest: EvaluationCaseManifest
   kind: "fixture" | "live"
   createdAt: string
   datasetRevision: string
@@ -27,6 +33,8 @@ export type AgentRunSnapshot = {
 
 export function createAgentRunSnapshot(input: {
   runId: string
+  mode: EvaluationRunMode
+  manifest: EvaluationCaseManifest
   datasetRevision: string
   candidateFingerprint: string
   candidate: EvaluationCandidateConfig
@@ -36,8 +44,10 @@ export function createAgentRunSnapshot(input: {
   createdAt?: string
 }): AgentRunSnapshot {
   return {
-    schemaVersion: "agent-run-snapshot-v1",
+    schemaVersion: "agent-run-snapshot-v2",
     runId: input.runId,
+    mode: input.mode,
+    manifest: input.manifest,
     kind: input.kind,
     createdAt: input.createdAt ?? new Date().toISOString(),
     datasetRevision: input.datasetRevision,

@@ -242,6 +242,58 @@ export const messages = dbSchema.table(
   ]
 )
 
+/** Durable delivery state for the current product feedback Score. */
+export const feedbackScoreOutbox = dbSchema.table(
+  "feedback_score_outbox",
+  {
+    messageId: text("message_id")
+      .primaryKey()
+      .references(() => messages.id, { onDelete: "cascade" }),
+    value: text("value", { enum: ["up", "down", "cleared"] }).notNull(),
+    sourceUpdatedAt: timestamp("source_updated_at", {
+      withTimezone: true,
+    }).notNull(),
+    version: integer("version").notNull().default(1),
+    deliveredVersion: integer("delivered_version").notNull().default(0),
+    attempts: integer("attempts").notNull().default(0),
+    nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    lockedUntil: timestamp("locked_until", { withTimezone: true }),
+    lockToken: text("lock_token"),
+    lastErrorCategory: text("last_error_category"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("feedback_score_outbox_due_idx").on(
+      table.nextAttemptAt,
+      table.lockedUntil
+    ),
+    check(
+      "feedback_score_outbox_value_allowed",
+      sql`${table.value} in ('up', 'down', 'cleared')`
+    ),
+    check("feedback_score_outbox_version_positive", sql`${table.version} >= 1`),
+    check(
+      "feedback_score_outbox_delivered_version_valid",
+      sql`${table.deliveredVersion} >= 0 and ${table.deliveredVersion} <= ${table.version}`
+    ),
+    check(
+      "feedback_score_outbox_attempts_nonnegative",
+      sql`${table.attempts} >= 0`
+    ),
+    check(
+      "feedback_score_outbox_lock_shape",
+      sql`(${table.lockedUntil} is null) = (${table.lockToken} is null)`
+    ),
+  ]
+)
+
 /** Message 产生的长期产物；通过 Project + source Message 做所有权与溯源。 */
 export const artifacts = dbSchema.table(
   "artifacts",

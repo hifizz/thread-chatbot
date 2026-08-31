@@ -9,7 +9,11 @@ import {
   datasetRevision,
   stableDatasetItemId,
 } from "../../evals/agent/identity.ts"
-import { evaluationDatabaseUrl } from "../../evals/agent/isolation.ts"
+import {
+  assertEvaluationDatabaseGuard,
+  canonicalEvaluationDatabaseIdentity,
+  evaluationDatabaseUrl,
+} from "../../evals/agent/isolation.ts"
 import {
   runLangfuseAgentExperiment,
   syncAgentCasesToLangfuse,
@@ -25,6 +29,11 @@ import {
 } from "../../evals/agent/remote-policy.ts"
 import { runProviderAttempt } from "../../lib/observability/provider-attempt.ts"
 import { setAgentTraceBackendForTests } from "../../lib/observability/trace.ts"
+import { buildProductionEvaluationSeed } from "../../evals/agent/executors/production-harness.ts"
+import {
+  createEvaluationCaseManifest,
+  resolveDefaultEvaluationManifest,
+} from "../../evals/agent/manifest.ts"
 
 const candidate = {
   candidate: "test",
@@ -64,6 +73,75 @@ test("case schema, selection, revision, and fingerprint are stable", async () =>
       "secret-a"
     )
   )
+})
+
+test("mode manifests are explicit, non-empty, unique, and dataset-compatible", async () => {
+  const cases = await loadAgentCases()
+  const smoke = resolveDefaultEvaluationManifest(cases, "smoke")
+  const release = resolveDefaultEvaluationManifest(cases, "release")
+  assert.equal(smoke.manifest.profile, "default")
+  assert.equal(smoke.cases.length, 9)
+  assert.equal(release.cases.length, cases.length)
+  assert.deepEqual(
+    release.manifest.caseIds,
+    release.cases.map((item) => item.id)
+  )
+  assert.throws(() =>
+    createEvaluationCaseManifest({
+      mode: "ci",
+      profile: "ad-hoc",
+      caseIds: [],
+    })
+  )
+  assert.throws(() =>
+    createEvaluationCaseManifest({
+      mode: "ci",
+      profile: "ad-hoc",
+      caseIds: [cases[0].id, cases[0].id],
+    })
+  )
+  assert.throws(() =>
+    resolveDefaultEvaluationManifest(cases.slice(1), "release")
+  )
+  assert.throws(() =>
+    resolveDefaultEvaluationManifest(
+      [{ ...cases[0], id: "unmanifested-release-case" }, ...cases],
+      "release"
+    )
+  )
+})
+
+test("declared eval seed preserves production memory and attachment context", async () => {
+  const cases = await loadAgentCases()
+  const memoryCase = cases.find((item) => item.id === "memory-same-thread-fact")
+  const pdfCase = cases.find(
+    (item) => item.id === "multimodal-synthetic-pdf-page"
+  )
+  assert.ok(memoryCase)
+  assert.ok(pdfCase)
+
+  const memory = await buildProductionEvaluationSeed({
+    evaluationCase: memoryCase,
+    modelId: "test/model",
+  })
+  assert.deepEqual(
+    memory.messages.slice(0, -1).map((message) => message.role),
+    ["user", "assistant", "user"]
+  )
+  assert.equal(memory.messages.at(-1).status, "generating")
+  assert.equal(memory.thread.nextSequence, memory.messages.length + 1)
+
+  const pdf = await buildProductionEvaluationSeed({
+    evaluationCase: pdfCase,
+    modelId: "test/model",
+  })
+  assert.deepEqual(pdf.attachments[0].pages, [
+    "Project Aurora status: GREEN. Synthetic page 1.",
+  ])
+  const latestUser = pdf.messages.at(-2)
+  assert.equal(latestUser.role, "user")
+  assert.equal(latestUser.parts[1].type, "file")
+  assert.match(latestUser.parts[1].url, /^\/api\/attachments\//)
 })
 
 test("runner preserves order, selection, envelope, timeout, and mode budgets", async () => {
@@ -112,13 +190,30 @@ test("runner preserves order, selection, envelope, timeout, and mode budgets", a
     "相同 case/candidate 的不同 run 必须生成不同 Trace"
   )
 
+  let timeoutSignal
+  let cleanupObserved = false
   const timeout = await runAgentEvaluation(cases, {
     mode: "smoke",
     candidate,
     selection: { caseIds: [cases[0].id] },
     timeoutMs: 5,
-    executor: () => new Promise(() => {}),
+    cleanupGraceMs: 50,
+    executor: ({ signal }) =>
+      new Promise((resolve) => {
+        timeoutSignal = signal
+        signal.addEventListener(
+          "abort",
+          () => {
+            cleanupObserved = true
+            resolve({ text: "cancelled after deadline", tools: [] })
+          },
+          { once: true }
+        )
+      }),
   })
+  assert.equal(timeoutSignal.aborted, true)
+  assert.equal(timeoutSignal.reason.name, "TimeoutError")
+  assert.equal(cleanupObserved, true)
   assert.equal(timeout.results[0].error.category, "timeout")
   assert.equal(timeout.results[0].output.terminalState, "failed")
 })
@@ -144,6 +239,7 @@ test("runner collects provider attempts without leaking across concurrent cases"
       runId: "provider-collector-run",
       mode: "release",
       candidate,
+      selection: { caseIds: cases.map((item) => item.id) },
       concurrency: 2,
       executor: async ({ evaluationCase }) => {
         await new Promise((resolve) => setImmediate(resolve))
@@ -192,6 +288,51 @@ test("lifecycle database safety rejects production-shaped targets", () => {
       AI_OBSERVABILITY_ENVIRONMENT: "evaluation",
       EVAL_ALLOW_DATABASE_WRITES: "true",
       EVAL_DATABASE_URL: "postgres://db/customer-production",
+    })
+  )
+  assert.throws(() =>
+    evaluationDatabaseUrl({
+      AI_OBSERVABILITY_ENVIRONMENT: "evaluation",
+      EVAL_ALLOW_DATABASE_WRITES: "true",
+      DATABASE_URL: "postgres://user@localhost:5432/thread_chat_eval",
+      EVAL_DATABASE_URL: "postgres://other@127.0.0.1:6543/thread_chat_eval",
+    })
+  )
+  assert.deepEqual(
+    canonicalEvaluationDatabaseIdentity(
+      "postgres://user:secret@LOCALHOST:5432/thread_chat_eval_ci?ssl=true"
+    ),
+    { host: "loopback", database: "thread_chat_eval_ci" }
+  )
+  assert.equal(
+    evaluationDatabaseUrl({
+      AI_OBSERVABILITY_ENVIRONMENT: "evaluation",
+      EVAL_ALLOW_DATABASE_WRITES: "true",
+      DATABASE_URL: "postgres://db/thread_chat_prod",
+      EVAL_DATABASE_URL: "postgres://db/thread_chat_eval_ci",
+    }),
+    "postgres://db/thread_chat_eval_ci"
+  )
+})
+
+test("lifecycle database guard must match before writes", async () => {
+  const token = "evaluation-guard-token-123456789"
+  await assert.rejects(() =>
+    assertEvaluationDatabaseGuard({
+      source: { EVAL_DATABASE_GUARD_TOKEN: token },
+      readGuard: async () => "different-evaluation-guard-token",
+    })
+  )
+  await assert.rejects(() =>
+    assertEvaluationDatabaseGuard({
+      source: {},
+      readGuard: async () => token,
+    })
+  )
+  await assert.doesNotReject(() =>
+    assertEvaluationDatabaseGuard({
+      source: { EVAL_DATABASE_GUARD_TOKEN: token },
+      readGuard: async () => token,
     })
   )
 })
@@ -302,6 +443,7 @@ test("Langfuse experiment flushes on success and remote failure", async () => {
     runId: "single-execution-run",
     mode: "release",
     candidate,
+    selection: { caseIds: experimentCases.map((item) => item.id) },
     executor: async ({ evaluationCase }) => {
       executions += 1
       return {

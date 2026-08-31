@@ -78,15 +78,21 @@ The system SHALL prioritize deterministic and programmatic scores for success, s
 
 ### Requirement: Baseline and candidate experiments are comparable
 
-An experiment SHALL run baseline and candidate configurations against the same selected case IDs and SHALL report per-suite deltas, failures, p50 and p95 latency, available usage or estimated cost, and case-level evidence. Nondeterministic network or model failures MUST be identified separately from quality failures. Any configured release threshold SHALL be suite-specific and reviewable.
+An experiment SHALL run baseline and candidate configurations against the same selected case IDs and SHALL report per-suite deltas, failures, p50 and p95 latency, available usage or estimated cost, and case-level evidence. Each standard run mode SHALL use a versioned, explicit, non-empty case manifest. Baseline comparison MUST reject empty, duplicate, missing, differently ordered, differently versioned, or otherwise incompatible case sets instead of comparing only their intersection. Nondeterministic network or model failures MUST be identified separately from quality failures. Any configured release threshold SHALL be suite-specific and reviewable.
 
 #### Scenario: Candidate improves quality but increases cost
 - **WHEN** the candidate raises quality scores while also raising latency, tool calls, usage, or estimated cost
 - **THEN** the experiment report exposes both effects instead of reporting only the quality improvement
 
 #### Scenario: External provider is temporarily unavailable
+
 - **WHEN** a case fails due to a classified provider outage or rate limit
 - **THEN** the report distinguishes infrastructure reliability from an answer-quality regression while still counting the operational failure in the appropriate reliability metric
+
+#### Scenario: Candidate run silently omits a baseline case
+
+- **WHEN** a candidate snapshot is empty, duplicates a case, omits a manifest case, or uses another dataset revision or run mode
+- **THEN** comparison fails as incompatible before calculating case or aggregate deltas
 
 ### Requirement: Production failures can become sanitized regression cases
 

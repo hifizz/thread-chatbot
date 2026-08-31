@@ -15,6 +15,7 @@ export const ACTIVE_GENERATION_STATUSES = [
 /** 应用主动终止生成时使用的稳定原因；不得把任意字符串直接传给 AbortController。 */
 export const GENERATION_CANCEL_REASONS = {
   userStop: "user-stop",
+  evaluationTimeout: "evaluation-timeout",
   supersededByEdit: "superseded-by-edit",
   discarded: "discarded",
 } as const

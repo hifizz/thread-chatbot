@@ -58,7 +58,10 @@ const candidate: EvaluationCandidateConfig = {
   searchPolicyVersion: OBSERVABILITY_POLICY_VERSIONS.search,
   searchProvider: process.env.EVAL_SEARCH_PROVIDER ?? "anysearch",
   memoryPolicyVersion: OBSERVABILITY_POLICY_VERSIONS.memory,
-  contextPolicy: "production-compile-model-context-v1",
+  contextPolicy:
+    executorMode === "declared"
+      ? "production-compile-model-context-v1"
+      : "fixture-context-v1",
   toolsetVersion: OBSERVABILITY_POLICY_VERSIONS.toolset,
   multimodalParserVersion: OBSERVABILITY_POLICY_VERSIONS.multimodalParser,
   release: process.env.AI_OBSERVABILITY_RELEASE ?? "local",
@@ -85,11 +88,13 @@ const declaredExecutor: AgentCaseExecutor = async (input) => {
         modelId: input.candidate.model,
         traceId: input.traceId,
         candidate: input.candidate.candidate,
+        abortSignal: input.signal,
       })
     case "lifecycle":
       return executeLifecycleCase({
         evaluationCase: input.evaluationCase,
         modelId: input.candidate.model,
+        abortSignal: input.signal,
       })
   }
 }

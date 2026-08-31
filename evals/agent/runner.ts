@@ -11,6 +11,12 @@ import {
 } from "@/evals/agent/fingerprint"
 import { datasetRevision, evaluationTraceId } from "@/evals/agent/identity"
 import {
+  createAdHocEvaluationManifest,
+  resolveDefaultEvaluationManifest,
+  type EvaluationCaseManifest,
+  type EvaluationRunMode,
+} from "@/evals/agent/manifest"
+import {
   selectAgentCases,
   type EvaluationSelection,
 } from "@/evals/agent/selection"
@@ -22,7 +28,7 @@ import {
   withProviderAttemptEventCollection,
 } from "@/lib/observability/provider-attempt"
 
-export type EvaluationRunMode = "smoke" | "ci" | "scheduled" | "release"
+export type { EvaluationRunMode } from "@/evals/agent/manifest"
 
 const MODE_BUDGETS: Record<
   EvaluationRunMode,
@@ -38,6 +44,7 @@ export type AgentCaseExecutor = (input: {
   evaluationCase: AgentCase
   traceId: string
   candidate: EvaluationCandidateConfig
+  signal: AbortSignal
 }) => Promise<AgentExecutionOutput>
 
 export type RunAgentEvaluationOptions = {
@@ -48,22 +55,45 @@ export type RunAgentEvaluationOptions = {
   executor: AgentCaseExecutor
   concurrency?: number
   timeoutMs?: number
+  cleanupGraceMs?: number
   scorers?: AgentScorer[]
 }
 
-async function withTimeout<T>(operation: Promise<T>, timeoutMs: number) {
+async function withTimeout<T>(
+  execute: (signal: AbortSignal) => Promise<T>,
+  timeoutMs: number,
+  cleanupGraceMs: number
+) {
+  const controller = new AbortController()
+  const timeoutError = new Error(`Evaluation case exceeded ${timeoutMs}ms`)
+  timeoutError.name = "TimeoutError"
   let timeout: ReturnType<typeof setTimeout> | undefined
+  const operation = Promise.resolve().then(() => execute(controller.signal))
   try {
     return await Promise.race([
       operation,
       new Promise<never>((_, reject) => {
         timeout = setTimeout(() => {
-          const error = new Error(`Evaluation case exceeded ${timeoutMs}ms`)
-          error.name = "TimeoutError"
-          reject(error)
+          reject(timeoutError)
+          controller.abort(timeoutError)
         }, timeoutMs)
       }),
     ])
+  } catch (error) {
+    if (error === timeoutError) {
+      let cleanupTimer: ReturnType<typeof setTimeout> | undefined
+      await Promise.race([
+        operation.then(
+          () => undefined,
+          () => undefined
+        ),
+        new Promise<void>((resolve) => {
+          cleanupTimer = setTimeout(resolve, cleanupGraceMs)
+        }),
+      ])
+      if (cleanupTimer) clearTimeout(cleanupTimer)
+    }
+    throw error
   } finally {
     if (timeout) clearTimeout(timeout)
   }
@@ -74,22 +104,23 @@ export async function runAgentEvaluation(
   options: RunAgentEvaluationOptions
 ): Promise<{
   runId: string
+  mode: EvaluationRunMode
+  manifest: EvaluationCaseManifest
   datasetRevision: string
   candidateFingerprint: string
   candidate: EvaluationCandidateConfig
   results: AgentExperimentResult[]
 }> {
-  const modeCases =
-    options.selection ||
-    options.mode === "scheduled" ||
-    options.mode === "release"
-      ? cases
-      : cases.filter((item) =>
-          options.mode === "smoke"
-            ? item.tags.includes("smoke")
-            : item.tags.includes("smoke") || item.tags.includes("ci")
-        )
-  const selected = selectAgentCases(modeCases, options.selection)
+  const resolved = options.selection
+    ? (() => {
+        const selected = selectAgentCases(cases, options.selection)
+        return {
+          cases: selected,
+          manifest: createAdHocEvaluationManifest(selected, options.mode),
+        }
+      })()
+    : resolveDefaultEvaluationManifest(cases, options.mode)
+  const selected = resolved.cases
   const runId = options.runId ?? crypto.randomUUID()
   const revision = datasetRevision(cases)
   const candidate = publicEvaluationConfig(options.candidate)
@@ -100,6 +131,7 @@ export async function runAgentEvaluation(
     Math.floor(options.concurrency ?? budget.concurrency)
   )
   const timeoutMs = options.timeoutMs ?? budget.timeoutMs
+  const cleanupGraceMs = options.cleanupGraceMs ?? Math.min(5_000, timeoutMs)
   const results = new Array<AgentExperimentResult>(selected.length)
   let cursor = 0
 
@@ -120,10 +152,17 @@ export async function runAgentEvaluation(
       const providerEvents: ProviderAttemptEvent[] = []
       try {
         output = await withTimeout(
-          withProviderAttemptEventCollection(providerEvents, () =>
-            options.executor({ evaluationCase, traceId, candidate })
-          ),
-          timeoutMs
+          (signal) =>
+            withProviderAttemptEventCollection(providerEvents, () =>
+              options.executor({
+                evaluationCase,
+                traceId,
+                candidate,
+                signal,
+              })
+            ),
+          timeoutMs,
+          cleanupGraceMs
         )
       } catch (cause) {
         output = { text: "", tools: [], terminalState: "failed" }
@@ -176,6 +215,8 @@ export async function runAgentEvaluation(
   )
   return {
     runId,
+    mode: options.mode,
+    manifest: resolved.manifest,
     datasetRevision: revision,
     candidateFingerprint: fingerprint,
     candidate,

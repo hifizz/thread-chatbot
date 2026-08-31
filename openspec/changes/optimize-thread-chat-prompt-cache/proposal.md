@@ -1,6 +1,6 @@
 ## Why
 
-本 change 以 `codex/feat-agent-observability-evaluation@30a540a315841f78a816adc761fb6bde37fedf7a` 为基准。该分支已经建立 assistant Message、根 Trace、模型调用、Search provider attempt、反馈 Score 与 Agent eval run 的统一身份和观测链路，但 Thread Chat 的最终模型请求仍然以动态 system 字符串、动态工具集合和扁平消息数组拼装，应用无法稳定保护分叉前的共同上下文，也无法解释一次缓存为什么命中或失效。
+本 change 以 `codex/feat-agent-observability-evaluation@2f3024747ddb72e1e69aa916cb45addb7140f6ab` 为基准。该分支已经建立 assistant Message、根 Trace、模型调用、Search provider attempt、反馈 Score/Outbox 与 Agent eval run 的统一身份和观测链路，并新增私有模型中继路由；但 Thread Chat 的最终模型请求仍然以动态 system 字符串、动态工具集合和扁平消息数组拼装，应用无法稳定保护分叉前的共同上下文，也无法解释一次缓存为什么命中或失效。
 
 当前分叉流程把用户选中的 `anchorText` 保存到 Thread，把用户问题单独保存为 B1；生成时又把具体 `anchorText` 拼入最前面的 system prompt。这样两个兄弟分支在进入共同祖先对话之前就已经不同，即使它们继承同一段 A Thread 历史，也无法充分复用这段历史的 Provider Prompt Cache。
 
@@ -28,7 +28,7 @@
 - 重构 Thread Chat Prompt Compiler。Provider-visible 请求固定为 Tool Profile、Agent Kernel、可选 Project Contract、冻结祖先历史、已完成分支历史、本轮运行控制和当前用户消息；B1 Quote 与问题位于冻结祖先历史之后。
 - 建立缓存稳定性分类和 Manifest，系统性记录 Tool/Profile、Kernel、Project Contract、冻结历史、分支历史、Runtime、当前用户、附件、模型路由和保留策略的变化会保护、局部破坏还是完全分区缓存。
 - 将模型解析结果从裸 `LanguageModel` 扩展为包含实际 Adapter、Gateway、上游模型、路由身份、缓存策略、TTL、cache marker、会话亲和与 Usage 支持能力的 `ResolvedChatModel`。
-- 对已验证路由采用 Provider 专属策略，优先验证高成本 Claude 路由：Vercel AI Gateway 使用自动缓存能力；OpenRouter 使用稳定且脱敏的 Project/模型级路由亲和，并按模型能力启用 implicit 或 explicit caching；UMAPIS 等代理路径必须先验证 marker 透传和 Usage。
+- 对已验证路由采用 Provider 专属策略，优先验证高成本 Claude 路由：Vercel AI Gateway 使用自动缓存能力；OpenRouter 使用稳定且脱敏的 Project/模型级路由亲和，并按模型能力启用 implicit 或 explicit caching；UMAPIS、Private Relay 等代理路径必须分别验证 marker 透传和 Usage。
 - 规范化每个模型 Step 的 cache read、cache write、uncached input、实际 Provider/Endpoint 和缓存策略，直接扩展现有 Trace 与 Agent eval result，不新增第二套生成事实源。
 - 通过 server-only `off`、`observe`、`enabled` 三态渐进发布。缓存配置、Quote 解析、Hash 或遥测失败不得改变 Agent 正确性、流式生命周期或 Message 终态。
 - 前端多引用 Composer、Quote Pill、点击来源导航和高亮交互不在本次后端方案实施范围；本 change 只把 DTO、数据库语义、命令、服务端构造、模型转换和缓存边界定义清楚，为下一阶段前端设计提供稳定合同。
@@ -48,9 +48,9 @@
 
 - 消息协议：影响 `lib/thread-chat/contracts/ui-message.ts`，新增 Quote V1 类型、兼容解析器和多 Quote Parts 约束；现有 `MessageDTO.parts` 不增加第二个 Quotes 字段。
 - 命令与应用层：影响 `contracts/commands.ts`、`command-utils.ts`、`fork-thread.ts`、`send-message.ts` 和 `edit-turn.ts`。`SendMessageCommand` 增加可选 Quote Selection，Fork first turn 增加可选额外引用，服务端负责 branch-origin Quote；旧客户端不传 Quotes 时仍兼容。
-- 数据库：`threads` 的 Fork 字段和 `messages.parts` JSONB 结构继续使用，第一阶段不迁移表、不增加 Quote 表。Quote V1 形状通过 TypeScript/Zod 和应用事务校验；未来反向引用索引另立 change。
+- 数据库：`threads` 的 Fork 字段和 `messages.parts` JSONB 结构继续使用；基准分支新增的 `feedback_score_outbox` 与本能力正交。第一阶段不迁移表、不增加 Quote 表。Quote V1 形状通过 TypeScript/Zod 和应用事务校验；未来反向引用索引另立 change。
 - Prompt 编译：主要影响 `lib/chat/thread-chat-prompt.ts`、`compile-model-context.ts`、`serialize-message-for-model.ts` 和 `generation-plan.ts`。删除具体 Anchor 的 system 拼装，新增 Quote-to-model serializer、版本化 Prompt Segment、Manifest 和两阶段编译。
-- 模型路由：影响 `lib/ai/provider.ts`、OpenRouter/UMAPIS/Ark/MiniMax adapter 和 Vercel Gateway 调用边界；未经验证的 compatible endpoint 保持无显式缓存控制。
+- 模型路由：主要影响 `lib/ai/provider.ts`、OpenRouter/UMAPIS/Private Relay/Ark/MiniMax adapter 和 Vercel/Cloudflare Gateway 调用边界；所有未经验证的 compatible endpoint 继续安全回退为无显式缓存控制。
 - 工具：影响 `generation-tools.ts` 和 step policy；工具行为与权限不扩大，只把动态组合收敛为少量稳定 Profile。
 - 可观测性与评测：扩展现有 Trace、Model Attempt、eval case/result/fingerprint/scorer；生产默认只记录版本、Hash、数量、Token 和枚举，不记录 Quote 正文或来源 ID。
 - 兼容性：历史 `{ text }` Quote 可继续读取和送模；历史 ForkedThread 缺少 B1 Quote 时，Prompt Compiler 根据 Thread Fork 字段确定性生成仅用于模型的兼容 Quote，不要求立即回填数据库。
