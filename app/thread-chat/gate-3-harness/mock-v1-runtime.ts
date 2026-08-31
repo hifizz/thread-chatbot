@@ -778,7 +778,7 @@ export function createGate3MockRuntime(
       artifacts.clear()
       return commandResponse({ projectId, deleted: true as const })
     },
-  } as ThreadChatClient
+  } as unknown as ThreadChatClient
 
   const fetchStream: typeof globalThis.fetch = async (input) => {
     const messageId = String(input).split("/").at(-1) ?? ""
