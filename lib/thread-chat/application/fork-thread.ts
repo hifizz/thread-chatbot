@@ -107,7 +107,7 @@ export function forkThread(
           tx,
           destinationProjectId: project.id,
           destinationThreadId: child.id,
-          selections: command.firstTurn.additionalQuotes,
+          selections: command.firstTurn.additionalQuotes ?? [],
         })
         const origin = buildBranchOriginQuote({
           projectId: project.id,
