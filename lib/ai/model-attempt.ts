@@ -37,6 +37,7 @@ export type ModelAttemptSummary = {
   attemptCount: number
   usage: PromptCacheUsage
   cacheOutcome: "provider-hit" | "provider-miss" | "usage-unavailable"
+  ttftMs?: number
 }
 
 function record(value: unknown): Record<string, unknown> | null {
@@ -75,8 +76,23 @@ export function createModelAttemptCollector(input: {
 }) {
   const attempts: ModelAttemptRecord[] = []
   const startedAt = Date.now()
+  let firstChunkTtftMs: number | undefined
+
+  const snapshot = (): ModelAttemptRecord[] =>
+    attempts.map((attempt, index) => ({
+      ...attempt,
+      ...(index === 0 && firstChunkTtftMs !== undefined
+        ? { ttftMs: firstChunkTtftMs }
+        : {}),
+      usage: { ...attempt.usage },
+    }))
 
   return {
+    setTtftMs(value: number | undefined) {
+      if (typeof value === "number" && Number.isFinite(value) && value >= 0) {
+        firstChunkTtftMs = value
+      }
+    },
     recordStep(step: unknown) {
       try {
         const object = record(step)
@@ -122,28 +138,25 @@ export function createModelAttemptCollector(input: {
         })
       }
     },
-    snapshot(): ModelAttemptRecord[] {
-      return attempts.map((attempt) => ({
-        ...attempt,
-        usage: { ...attempt.usage },
-      }))
-    },
+    snapshot,
     summary(): ModelAttemptSummary {
+      const current = snapshot()
       const usage = aggregatePromptCacheUsage(
-        attempts.map((attempt) => attempt.usage)
+        current.map((attempt) => attempt.usage)
       )
       return {
-        attemptCount: attempts.length,
+        attemptCount: current.length,
         usage,
-        cacheOutcome: attempts.some(
+        cacheOutcome: current.some(
           (attempt) => attempt.cacheOutcome === "provider-hit"
         )
           ? "provider-hit"
-          : attempts.some(
+          : current.some(
                 (attempt) => attempt.cacheOutcome === "provider-miss"
               )
             ? "provider-miss"
             : "usage-unavailable",
+        ...(firstChunkTtftMs !== undefined ? { ttftMs: firstChunkTtftMs } : {}),
       }
     },
   }
