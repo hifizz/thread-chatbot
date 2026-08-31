@@ -18,6 +18,21 @@ export type AttachmentFilePart = {
 
 export type AttachmentTextPart = { type: "text"; text: string }
 
+export interface PdfRenderDependencies {
+  embeddingsConfigured(): boolean
+  hasChunks(attachmentId: string): Promise<boolean>
+  retrieveChunks(
+    attachmentId: string,
+    query: string
+  ): Promise<Array<{ page: number; content: string }>>
+}
+
+const DEFAULT_PDF_RENDER_DEPENDENCIES: PdfRenderDependencies = {
+  embeddingsConfigured: isEmbeddingsConfigured,
+  hasChunks,
+  retrieveChunks,
+}
+
 export function attachmentIdFromUrl(url: string): string | null {
   if (!url.startsWith(ATTACHMENT_URL_PREFIX)) return null
   const id = url.slice(ATTACHMENT_URL_PREFIX.length)
@@ -82,14 +97,15 @@ function renderPdfPages(row: AttachmentRow, charBudget: number): string {
 export async function renderPdfAttachment(
   row: AttachmentRow,
   charBudget: number,
-  query: string
+  query: string,
+  dependencies: PdfRenderDependencies = DEFAULT_PDF_RENDER_DEPENDENCIES
 ): Promise<{ text: string; mode: AttachmentRenderMode }> {
   const pages = row.pages ?? []
   const fullLength = pages.reduce((sum, page) => sum + page.length, 0)
-  if (fullLength > charBudget && query && isEmbeddingsConfigured()) {
+  if (fullLength > charBudget && query && dependencies.embeddingsConfigured()) {
     try {
-      if (await hasChunks(row.id)) {
-        const excerpts = await retrieveChunks(row.id, query)
+      if (await dependencies.hasChunks(row.id)) {
+        const excerpts = await dependencies.retrieveChunks(row.id, query)
         if (excerpts.length > 0) {
           const body = excerpts
             .map((excerpt) => `[第 ${excerpt.page} 页]\n${excerpt.content}`)
