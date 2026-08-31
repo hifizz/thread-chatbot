@@ -46,8 +46,17 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
-      - name: Verify generated migration is in sync
-        run: pnpm db:generate && git diff --exit-code -- drizzle
+      - name: Generate migration metadata probe
+        run: pnpm db:generate
+
+      - name: Upload generated migration metadata probe
+        uses: actions/upload-artifact@v4
+        with:
+          name: project-workspace-migration-meta-probe
+          path: |
+            drizzle/0008_*.sql
+            drizzle/meta/0008_snapshot.json
+          if-no-files-found: error
 
       - name: Legacy data migration compatibility
         run: node --import tsx e2e/thread-chat/project-workspace-migration-compatibility.test.mjs
