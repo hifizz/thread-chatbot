@@ -41,6 +41,8 @@ const cacheFixtureSchema = z
     cacheReadTokens: z.number().min(0).optional(),
     cacheWriteTokens: z.number().min(0).optional(),
     costUsd: z.number().min(0).optional(),
+    quoteCount: z.number().int().min(0).max(50).optional(),
+    metadataExcluded: z.boolean().optional(),
   })
   .strict()
 
