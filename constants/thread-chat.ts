@@ -31,6 +31,8 @@ export const THREAD_PROMPT_CHARACTERS_PER_TOKEN_ESTIMATE = 3
 export const THREAD_PROMPT_INPUT_WINDOW_RATIO = 0.8
 export const THREAD_PROMPT_DEFAULT_CONTEXT_TOKENS = 128_000
 export const THREAD_PROMPT_DEFAULT_OUTPUT_RESERVE_TOKENS = 8_192
+/** 为 Research plan、Tool Schema 和本轮运行控制预留，确保先预算后付费路由。 */
+export const THREAD_PROMPT_PREFLIGHT_DYNAMIC_RESERVE_CHARS = 40_000
 
 /** Prompt Cache 发布模式。 */
 export const THREAD_PROMPT_CACHE_MODES = [
