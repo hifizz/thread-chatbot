@@ -46,7 +46,7 @@ Agent Kernel MUST 只定义 Quote 的稳定解释规则。具体 `anchorText`、
 
 ### Requirement: Current-thread quote restrictions cannot be bypassed for cache or convenience
 
-普通 Quote MUST 只引用目标 Composer 所属当前 Thread 的 completed assistant Message 或其 Markdown Artifact。缓存优化、Prompt Compiler 或 Composer MUST NOT 通过隐式加载其他 Thread 内容扩大来源范围。Fork 的自动 branch-origin 是唯一服务端派生的父 Thread来源例外。
+普通 Quote MUST 只引用目标 Composer 所属当前 Thread 的 completed assistant Message 或其 Markdown Artifact。缓存优化、Prompt Compiler 或 Composer MUST NOT 通过隐式加载其他 Thread 内容扩大来源范围。Fork 的自动 branch-origin 是唯一服务端派生的父 Thread 来源例外。
 
 #### Scenario: Another thread message is submitted as a quote
 - **WHEN** Thread A 的 Command 提交 Thread B 的 Message ID
@@ -54,7 +54,7 @@ Agent Kernel MUST 只定义 Quote 的稳定解释规则。具体 `anchorText`、
 
 #### Scenario: A branch-origin quote is generated
 - **WHEN** ForkedThread 发送第一条 User Message
-- **THEN** 服务端根据 Fork 字段生成父 Thread 来源 Quote，并且不开放任意跨 Thread选择
+- **THEN** 服务端根据 Fork 字段生成父 Thread 来源 Quote，并且不开放任意跨 Thread 选择
 
 ### Requirement: Multiple quotes remain in the current user tail
 
@@ -236,21 +236,25 @@ CI MUST 使用 fake Provider/fixture 验证 Segment、Hash、Quote metadata 排�
 - **WHEN** Cache metrics 改善但质量 hard score 回归
 - **THEN** candidate 不得通过启用门禁
 
-### Requirement: Cache rollout is reversible and route-scoped
+### Requirement: Cache rollout is reversible and route-scoped without changing prompt semantics
 
-系统 MUST 提供 server-only `off`、`observe` 和 `enabled` 模式，并允许按环境和 Route 覆盖。`observe` MUST 发送旧 Prompt，只影子生成新 Manifest、Hash、资格与成本基线；`enabled` 只对已验证 Route 发送新 Prompt和缓存控制。
+系统 MUST 提供 server-only `off`、`observe` 和 `enabled` 模式，并允许按环境、Route 和稳定 cohort 覆盖。三种模式 MUST 使用同一套 Quote-safe、确定性的 Prompt Compiler 和消息顺序；模式切换 MUST NOT 把具体 Anchor、Quote 或 Research plan 重新移到 System 或稳定历史之前。`off` MUST 不发送 Provider 缓存控制；`observe` MUST 发送与 `off` 相同的语义 Prompt、记录 Manifest/Route/资格/成本诊断，但不发送 cache marker、affinity、TTL 或 Gateway cache option；`enabled` MUST 只对已验证 Route 在同一语义 Prompt 上增加缓存传输控制。
+
+#### Scenario: Off mode is enabled
+- **WHEN** 某 Route 配置为 off
+- **THEN** 请求仍使用 Quote-safe Prompt Compiler，但不发送 Provider 缓存参数，并可作为无缓存成本基线
 
 #### Scenario: Observe mode is enabled
-- **WHEN** staging 使用 observe
-- **THEN** 用户继续收到旧路径结果，系统收集候选前缀、Route、Usage 和成本证据
+- **WHEN** staging 或生产小范围使用 observe
+- **THEN** 用户收到与 off 相同的语义 Prompt 结果，系统收集候选边界、Prefix Hash、Route、Usage 和成本证据，且 Provider 看不到缓存控制字段
 
 #### Scenario: One Claude route is enabled
 - **WHEN** 只有 UMAPIS 某 Claude Route 通过质量与成本 Probe
-- **THEN** 只有该 Route 使用新缓存控制，其他 Route 保持普通请求
+- **THEN** 只有该 Route 在相同语义 Prompt 上增加已验证的缓存控制，其他 Route 继续使用 off 或 observe
 
 #### Scenario: Regression is detected
 - **WHEN** 质量、工具、Provider 兼容或成本证据出现问题
-- **THEN** 操作员可以将受影响 Route 切回 off，无需迁移 Message
+- **THEN** 操作员可以将受影响 Route 切回 off，无需迁移 Message，且不会回退到旧的动态 System Prompt
 
 ### Requirement: Application-level compiled segment caching is optional
 
