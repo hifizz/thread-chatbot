@@ -7,6 +7,8 @@ export type PromptCacheFallbackStream<TChunk, TUsage> = {
   stream: ReadableStream<TChunk>
   usage: Promise<TUsage>
   usedFallback: () => boolean
+  /** Milliseconds from wrapper creation to the first emitted protocol chunk. */
+  ttftMs: () => number | undefined
 }
 
 function deferred<T>() {
@@ -32,6 +34,8 @@ export function createPromptCacheFallbackStream<TChunk, TUsage>(input: {
   onFallback?: (error: unknown) => void
 }): PromptCacheFallbackStream<TChunk, TUsage> {
   const usage = deferred<TUsage>()
+  const startedAt = performance.now()
+  let firstChunkAt: number | undefined
   let fallbackUsed = false
   let activeReader: ReadableStreamDefaultReader<TChunk> | null = null
   let cancelled = false
@@ -49,6 +53,7 @@ export function createPromptCacheFallbackStream<TChunk, TUsage>(input: {
         const next = await activeReader.read()
         if (next.done) break
         emitted = true
+        firstChunkAt ??= performance.now()
         controller.enqueue(next.value)
       }
       usage.resolve(await result.usage)
@@ -109,5 +114,7 @@ export function createPromptCacheFallbackStream<TChunk, TUsage>(input: {
     stream,
     usage: usage.promise,
     usedFallback: () => fallbackUsed,
+    ttftMs: () =>
+      firstChunkAt === undefined ? undefined : firstChunkAt - startedAt,
   }
 }
