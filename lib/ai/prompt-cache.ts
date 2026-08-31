@@ -6,9 +6,23 @@ import {
 } from "@/constants/thread-chat"
 import type { ResolvedChatModel } from "@/lib/ai/provider"
 
+export type PromptProviderJsonValue =
+  | string
+  | number
+  | boolean
+  | null
+  | PromptProviderJsonValue[]
+  | { [key: string]: PromptProviderJsonValue | undefined }
+
+/** Structurally compatible with AI SDK SharedV4ProviderOptions. */
+export type PromptProviderOptions = Record<
+  string,
+  { [key: string]: PromptProviderJsonValue | undefined }
+>
+
 export type PromptCacheControls = {
   mode: ThreadPromptCacheMode
-  providerOptions?: Record<string, Record<string, unknown>>
+  providerOptions?: PromptProviderOptions
   headers?: Record<string, string>
   affinityHash?: string
   enabled: boolean
@@ -68,7 +82,7 @@ export function buildPromptCacheControls(input: {
     }
   }
 
-  const providerOptions: Record<string, Record<string, unknown>> = {}
+  const providerOptions: PromptProviderOptions = {}
   if (input.resolved.cache.strategy === "gateway-auto") {
     providerOptions.gateway = { caching: "auto" }
   }
