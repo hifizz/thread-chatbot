@@ -20,6 +20,10 @@ export type PromptProviderOptions = Record<
   { [key: string]: PromptProviderJsonValue | undefined }
 >
 
+/** Route-declared prompt-cache retention option. */
+export type PromptCacheTtlClass =
+  ResolvedChatModel["cache"]["supportedTtls"][number]
+
 export type PromptCacheControls = {
   mode: ThreadPromptCacheMode
   providerOptions?: PromptProviderOptions
