@@ -47,6 +47,11 @@ export function createPromptCacheFallbackStream<TChunk, TUsage>(input: {
     mayFallback: boolean
   ): Promise<void> {
     let emitted = false
+    // Attach a rejection handler immediately. A cache-control request can fail
+    // both its protocol stream and its separate usage promise; when we safely
+    // fall back, the rejected primary usage must not become an unhandled error.
+    const resultUsage = Promise.resolve(result.usage)
+    void resultUsage.catch(() => undefined)
     activeReader = result.stream.getReader()
     try {
       while (true) {
@@ -56,7 +61,7 @@ export function createPromptCacheFallbackStream<TChunk, TUsage>(input: {
         firstChunkAt ??= performance.now()
         controller.enqueue(next.value)
       }
-      usage.resolve(await result.usage)
+      usage.resolve(await resultUsage)
       controller.close()
     } catch (error) {
       if (
