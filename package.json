@@ -98,12 +98,12 @@
     "input-otp": "^1.4.2",
     "lucide-react": "^1.23.0",
     "next": "16.3.1",
-    "next-themes": "^4.4.0",
-    "parse-diff": "^9.0.0",
+    "next-themes": "^0.4.6",
+    "parse-diff": "^0.12.0",
     "postgres": "^3.4.9",
     "radix-ui": "^1.6.1",
     "react": "19.2.8",
-    "react-day-picker": "^10.1.0",
+    "react-day-picker": "^10.0.1",
     "react-dom": "19.2.8",
     "react-markdown": "^10.1.0",
     "react-resizable-panels": "^4.12.0",
@@ -142,7 +142,7 @@
   "pnpm": {
     "overrides": {
       "@types/react": "19.2.18",
-      "@types/react-dom": "19.2.18"
+      "@types/react-dom": "19.2.4"
     }
   }
 }
