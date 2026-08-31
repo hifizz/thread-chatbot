@@ -124,17 +124,10 @@ try {
   })
   assert.equal(project.result.contractVersion, 1)
 
-  const rootTurn = await application.sendMessage(userId, rootThreadId, {
-    commandId: id(),
-    userMessageId: id(),
-    assistantMessageId: id(),
-    modelId,
-    text: "第一轮",
-    files: [],
-  })
-
+  // startProject 已创建首个 generating assistant；直接用它验证运行中 Contract 快照，
+  // 避免在同一 Thread 的首轮尚未完成时人为发起第二轮。
   const firstSnapshot = await runAndCapture({
-    messageId: rootTurn.result.assistantMessage.id,
+    messageId: startedProject.result.assistantMessage.id,
     threadId: rootThreadId,
     beforeRelease: async (captured) => {
       assert.deepEqual(captured, {
