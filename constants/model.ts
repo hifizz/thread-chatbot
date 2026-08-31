@@ -67,6 +67,19 @@ export const CHAT_MODEL_PROVIDER_LABELS: Readonly<
   umapis: "UMAPIS",
   "private-relay": "Private Relay",
 }
+
+/** Thread Chat 对外展示的中性模型组名称，不暴露实际服务供应商。 */
+export const THREAD_CHAT_MODEL_GROUP_LABELS: Readonly<
+  Record<ChatModelProvider, string>
+> = {
+  minimax: "海南岛",
+  deepseek: "崇明岛",
+  openai: "马略卡",
+  ark: "济州岛",
+  openrouter: "巴厘岛",
+  umapis: "冰岛",
+  "private-relay": "塞班岛",
+}
 export type ReasoningTransport = "think-tags" | "native"
 export type ChatModelSurface = "linear" | "thread"
 
