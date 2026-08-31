@@ -53,11 +53,11 @@
 
 ## 7. 自动化测试与 Agent Evaluation
 
-- [ ] 7.1 增加 schema/command/repository 测试：Contract 长度与空值、乐观冲突、幂等 replay、Attachment 单 Project 归属、Archived Project 拒绝和 remove 保留 Attachment
-- [ ] 7.2 增加 context 纯函数测试：Contract 结构、客户端伪造隔离、Attachment 去重、显式附件优先、统一预算、PDF retrieval/fallback、unsupported manifest
-- [ ] 7.3 增加 API integration：Bootstrap 返回完整 Workspace；跨用户/跨 Project Contract/File/Artifact 统一 Not Found；非法资源在付费模型调用前被拒绝
-- [ ] 7.4 增加 UI/e2e：Contract 保存/取消/冲突、Project File upload 状态与移除、全 Project Artifact 发现、Artifact detail 和来源定位、Archived 只读
-- [ ] 7.5 扩展 Agent eval fixtures/harness 以表达 Project Contract 与 Project Files，覆盖 Target/Instructions 遵循、PDF grounding、引用页码、更新边界和跨 Project 不泄漏
+- [x] 7.1 增加 schema/command/repository 测试：Contract 长度与空值、乐观冲突、幂等 replay、Attachment 单 Project 归属、Archived Project 拒绝和 remove 保留 Attachment
+- [x] 7.2 增加 context 纯函数测试：Contract 结构、客户端伪造隔离、Attachment 去重、显式附件优先、统一预算、PDF retrieval/fallback、unsupported manifest
+- [ ] 7.3 增加 API integration：Bootstrap 返回完整 Workspace；对未物化的随机 Project id 保持 `200 + project:null` 以支持先进入 Workspace、首条消息再原子创建 Project；对已存在但不属于当前用户的 Project，GET 同样返回不含任何资源信息的空 Bootstrap，避免泄露存在性；所有 Project mutation、Project File、Artifact、Thread/Message 等资源型 API 对跨用户/跨 Project 非法资源统一 Not Found，并在付费模型调用前拒绝
+- [x] 7.4 增加 UI/e2e：Contract 保存/取消/冲突、Project File upload 状态与移除、全 Project Artifact 发现、Artifact detail 和来源定位、Archived 只读
+- [x] 7.5 扩展 Agent eval fixtures/harness 以表达 Project Contract 与 Project Files，覆盖 Target/Instructions 遵循、PDF grounding、引用页码、更新边界和跨 Project 不泄漏
 - [ ] 7.6 增加历史稳定性验收：Contract/File 更新不改变已完成 Message、已有 Artifact、Fork Context 或运行中的 Generation
 - [ ] 7.7 验证 Artifact 不会因进入 Project 列表自动注入无关 Thread；当前/继承历史中的 Artifact 仍沿用现有序列化
 
