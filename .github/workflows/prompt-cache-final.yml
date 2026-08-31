@@ -91,6 +91,7 @@ jobs:
           pnpm test:thread-chat:prompt-cache &&
           pnpm test:thread-chat:prompt-cache-eval &&
           pnpm test:thread-chat:composer-quotes &&
+          node --import tsx e2e/thread-chat/fork-origin-contract.test.mjs &&
           node --import tsx e2e/thread-chat/quote-resolver-contract.test.mjs &&
           node --import tsx e2e/thread-chat/prompt-cache-adapter.test.mjs &&
           node --import tsx e2e/thread-chat/prompt-cache-compiler-boundaries.test.mjs &&
