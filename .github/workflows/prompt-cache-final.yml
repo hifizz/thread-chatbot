@@ -72,6 +72,8 @@ jobs:
           PGPASSWORD: postgres
       - name: Apply application migrations
         run: pnpm db:migrate
+      - name: Prepare normalized Thread Chat test database
+        run: pnpm db:test:setup && pnpm db:test:migrate
       - name: Typecheck
         run: pnpm typecheck
       - name: Lint
