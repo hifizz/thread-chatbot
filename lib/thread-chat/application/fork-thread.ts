@@ -11,11 +11,7 @@ import {
   buildUserParts,
   touchProjectAndThread,
 } from "@/lib/thread-chat/application/command-utils"
-import {
-  buildBranchOriginQuote,
-  mergeBranchOriginQuote,
-  resolveQuoteSelections,
-} from "@/lib/thread-chat/application/quote-resolver"
+import { buildBranchOriginQuote } from "@/lib/thread-chat/application/quote-resolver"
 import { notFound, stateConflict } from "@/lib/thread-chat/application/errors"
 import { executeIdempotentCommand } from "@/lib/thread-chat/persistence/command-repository"
 import {
@@ -103,12 +99,6 @@ export function forkThread(
           return { thread: toThreadDTO(child), generation: null }
         }
         await assertOwnedReadyAttachments(tx, userId, command.firstTurn.files)
-        const additionalQuotes = await resolveQuoteSelections({
-          tx,
-          destinationProjectId: project.id,
-          destinationThreadId: child.id,
-          selections: command.firstTurn.additionalQuotes ?? [],
-        })
         const origin = buildBranchOriginQuote({
           projectId: project.id,
           parentThreadId: parent.id,
@@ -116,7 +106,6 @@ export function forkThread(
           anchor: command.anchor,
           anchorText: command.anchorText,
         })
-        const quotes = mergeBranchOriginQuote(origin, additionalQuotes)
         const [userSequence, assistantSequence] = await allocateThreadSequences(
           tx,
           child.id,
@@ -135,7 +124,7 @@ export function forkThread(
               parts: buildUserParts({
                 text: command.firstTurn.text,
                 files: command.firstTurn.files,
-                quotes,
+                quotes: [origin],
               }),
               status: "completed",
               finishedAt: now,
