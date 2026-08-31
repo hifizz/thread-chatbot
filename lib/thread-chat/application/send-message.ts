@@ -58,7 +58,7 @@ export function sendMessage(
           tx,
           destinationProjectId: project.id,
           destinationThreadId: thread.id,
-          selections: command.quotes,
+          selections: command.quotes ?? [],
         })
         const timeline = await listThreadMessageRows(tx, project.id, thread.id)
         const hasActiveUserMessage = timeline.some(
