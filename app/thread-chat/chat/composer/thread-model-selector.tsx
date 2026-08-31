@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/tooltip"
 import {
   CHAT_MODEL_PROVIDER_LABELS,
+  THREAD_CHAT_MODEL_GROUP_LABELS,
   THREAD_CHAT_MODELS,
 } from "@/constants/model"
 import { Bot } from "lucide-react"
@@ -31,7 +32,7 @@ const MODEL_FAMILY_ORDER = [
   "doubao",
 ] as const
 
-/** UMAPIS 优先展示，OpenRouter 收在列表末尾，其余 provider 保持中间层。 */
+/** 服务端供应商只用于排序和路由；用户界面统一展示为中性模型组。 */
 function modelProviderIndex(provider: string): number {
   if (provider === "umapis") return 0
   if (provider === "openrouter") return 2
@@ -63,10 +64,12 @@ const THREAD_CHAT_MODEL_OPTIONS: readonly ModelOption[] =
     )
     .map(({ model }) => ({
       id: model.id,
-      name: model.name,
-      description: model.description,
+      name: model.name.replace(
+        `${CHAT_MODEL_PROVIDER_LABELS[model.provider]} · `,
+        ""
+      ),
       providerId: model.provider,
-      providerName: CHAT_MODEL_PROVIDER_LABELS[model.provider],
+      providerName: THREAD_CHAT_MODEL_GROUP_LABELS[model.provider],
     }))
 
 export interface ThreadModelSelectorProps {
@@ -137,7 +140,7 @@ export function ThreadModelSelector({
       )}
       <ModelSelector.Content
         side="top"
-        className="thread-model-selector-content w-[34rem] max-w-[calc(100vw-2rem)]"
+        className="thread-model-selector-content w-[28rem] max-w-[calc(100vw-1rem)]"
       />
     </ModelSelector.Root>
   )
