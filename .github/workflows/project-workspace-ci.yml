@@ -29,6 +29,7 @@ jobs:
     env:
       DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
       DIRECT_URL: postgres://postgres:postgres@localhost:5432/postgres
+      BETTER_AUTH_SECRET: project-workspace-ci-secret-at-least-32-characters
     steps:
       - uses: actions/checkout@v4
 
@@ -56,6 +57,9 @@ jobs:
 
       - name: Project workspace schema and repository acceptance
         run: node --import tsx e2e/thread-chat/project-workspace-db.test.mjs
+
+      - name: Project workspace API integration
+        run: node --import tsx e2e/thread-chat/project-workspace-api-db.test.mjs
 
       - name: Project contract generation boundary
         run: node --import tsx e2e/thread-chat/project-contract-generation-boundary.test.mjs
