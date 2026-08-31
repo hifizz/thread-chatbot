@@ -81,16 +81,13 @@ const fallback = finalizeGenerationPrompt({
   routeId: "anthropic:direct:test",
 })
 
+const expectedAnthropicMarker = {
+  anthropic: { cacheControl: { type: "ephemeral", ttl: "5m" } },
+}
 assert.equal(typeof compiled.system, "object")
-assert.deepEqual(compiled.system.providerOptions, {
-  anthropic: { cacheControl: { type: "ephemeral" } },
-})
-assert.deepEqual(compiled.messages[1].providerOptions, {
-  anthropic: { cacheControl: { type: "ephemeral" } },
-})
-assert.deepEqual(compiled.messages[3].providerOptions, {
-  anthropic: { cacheControl: { type: "ephemeral" } },
-})
+assert.deepEqual(compiled.system.providerOptions, expectedAnthropicMarker)
+assert.deepEqual(compiled.messages[1].providerOptions, expectedAnthropicMarker)
+assert.deepEqual(compiled.messages[3].providerOptions, expectedAnthropicMarker)
 assert.equal(
   "providerOptions" in compiled.messages.at(-1),
   false,
