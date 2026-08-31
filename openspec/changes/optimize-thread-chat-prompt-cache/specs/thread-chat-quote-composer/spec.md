@@ -154,7 +154,7 @@ Composer 的 50 个 Quote 上限 MUST 与后端模型输入预算分开处理。
 
 ### Requirement: Frontend component selection remains a later research decision
 
-本能力只定义 Draft 状态、行为和后端提交合同，不规定 textarea、Lexical、ProseMirror、ContentEditable、Quote Pill 视觉、拖拽库、移动端布局、Draft 持久化或来源跳转实现。
+本能力 MUST 只定义 Draft 状态、行为和后端提交合同，MUST NOT 规定 textarea、Lexical、ProseMirror、ContentEditable、Quote Block 视觉、拖拽库、移动端布局、Draft 持久化或来源跳转实现。
 
 #### Scenario: Frontend research begins
 - **WHEN** 下一阶段评估 Composer 实现
