@@ -1,7 +1,9 @@
 import type { LanguageModelUsage, TextStreamPart, ToolSet } from "ai"
 import { db } from "@/lib/db"
 import type { ThreadChatUIMessageChunk } from "@/lib/thread-chat/contracts/ui-message"
-import { compileModelContext } from "@/lib/thread-chat/application/compile-model-context"
+import { compilePromptBase } from "@/lib/thread-chat/application/prompt-compiler"
+import type { PromptManifest } from "@/lib/thread-chat/application/prompt-cache"
+import type { PromptCacheControls } from "@/lib/ai/prompt-cache"
 import {
   findOwnedMessage,
   listThreadMessageRows,
@@ -26,6 +28,14 @@ export interface PreparedGeneration {
   tools?: ToolSet
   leadingChunks?: ThreadChatUIMessageChunk[]
   usage?: PromiseLike<LanguageModelUsage>
+  manifest?: PromptManifest
+  cacheControls?: PromptCacheControls
+  route?: {
+    routeId: string
+    upstreamModelId: string
+    adapter: string
+    gateway: string | null
+  }
 }
 
 export interface RunGenerationDependencies {
@@ -47,6 +57,9 @@ type GenerationRunResult = {
   finishReason: string
   partCount: number
   providerUsage?: Record<string, unknown>
+  manifest?: PromptManifest
+  cacheControls?: PromptCacheControls
+  routeId?: string
   checkpoint: ReturnType<MessageCheckpointer["getSummary"]>
   error?: ReturnType<typeof safeErrorMetadata>
 }
@@ -118,7 +131,7 @@ async function runGenerationCore({
     .reverse()
     .find((row) => row.role === "user")
   if (!latestUser) throw new Error("GENERATION_USER_MESSAGE_NOT_FOUND")
-  const modelMessages = await compileModelContext({
+  const promptBase = await compilePromptBase({
     userId,
     threadId: thread.id,
     excludeAssistantMessageId: message.id,
@@ -134,6 +147,7 @@ async function runGenerationCore({
 
   try {
     prepared = await prepare({
+      userId,
       messageId: message.id,
       projectId: message.projectId,
       threadId: thread.id,
@@ -144,8 +158,7 @@ async function runGenerationCore({
         .slice(-6)
         .map((row) => `${row.role}: ${textFromParts(row.parts)}`)
         .join("\n"),
-      anchorText: thread.anchorText,
-      modelMessages,
+      promptBase,
       abortSignal: session.signal,
     })
     pipelineEnd = await consumeUIMessagePipeline({
@@ -201,6 +214,18 @@ async function runGenerationCore({
       metadata: {
         assistantMessageId: message.id,
         requestedStatus: outcome.status,
+        ...(prepared?.manifest
+          ? {
+              stableRequestPrefixHash:
+                prepared.manifest.stableRequestPrefixHash,
+              cacheEligibility:
+                prepared.manifest.cacheEligibility.reason,
+              toolProfileId: prepared.manifest.toolProfileId,
+              providerRouteId: prepared.manifest.routeId,
+              currentUserQuoteCount:
+                prepared.manifest.currentUserQuoteCount,
+            }
+          : {}),
       },
     },
     async (observation) => {
@@ -238,6 +263,11 @@ async function runGenerationCore({
     finishReason: resolvedFinishReason ?? "unknown",
     partCount: terminal.parts.length,
     ...(providerUsage ? { providerUsage } : {}),
+    ...(prepared?.manifest ? { manifest: prepared.manifest } : {}),
+    ...(prepared?.cacheControls
+      ? { cacheControls: prepared.cacheControls }
+      : {}),
+    ...(prepared?.route?.routeId ? { routeId: prepared.route.routeId } : {}),
     checkpoint: checkpointer.getSummary(),
     ...(outcome.failed && (thrown || protocolError)
       ? { error: safeErrorMetadata(thrown ?? protocolError) }
@@ -280,6 +310,27 @@ export async function runGeneration(input: {
           ...result.checkpoint,
           ...(result.error ?? {}),
           hasProviderUsage: Boolean(result.providerUsage),
+          ...(result.manifest
+            ? {
+                promptCompilerVersion:
+                  result.manifest.promptCompilerVersion,
+                stableRequestPrefixHash:
+                  result.manifest.stableRequestPrefixHash,
+                cacheEligibility:
+                  result.manifest.cacheEligibility.reason,
+                toolProfileId: result.manifest.toolProfileId,
+                currentUserQuoteCount:
+                  result.manifest.currentUserQuoteCount,
+              }
+            : {}),
+          ...(result.cacheControls
+            ? {
+                promptCacheMode: result.cacheControls.mode,
+                promptCacheEnabled: result.cacheControls.enabled,
+                promptCacheReason: result.cacheControls.reason,
+              }
+            : {}),
+          ...(result.routeId ? { providerRouteId: result.routeId } : {}),
         },
       })
     })
