@@ -1,0 +1,32 @@
+name: Prompt Cache Probe
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 4 * * 3"
+
+permissions:
+  contents: read
+
+jobs:
+  fake-contract-probe:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Warm and reuse the fake provider prefix
+        run: >-
+          node --import tsx scripts/probe-thread-chat-prompt-cache.ts
+          --mode=fake
+          --output=evals/agent/results/local/prompt-cache-probe.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: prompt-cache-fake-probe
+          path: evals/agent/results/local/prompt-cache-probe.json
+          if-no-files-found: error
+          retention-days: 14
