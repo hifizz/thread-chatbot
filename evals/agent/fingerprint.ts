@@ -13,6 +13,16 @@ export type EvaluationCandidateConfig = {
   contextPolicy: string
   toolsetVersion: string
   multimodalParserVersion: string
+  promptCompilerVersion: string
+  agentKernelVersion: string
+  quoteProtocolVersion: string
+  quoteModelFormatVersion: string
+  quoteBudgetPolicyVersion: string
+  promptCacheProfileVersion: string
+  promptCacheMode: "off" | "observe" | "enabled"
+  toolProfilePolicy: string
+  providerRoutePolicy: string
+  providerRoutingPolicyVersion: string
   release: string
   commit: string
   environment: "evaluation"

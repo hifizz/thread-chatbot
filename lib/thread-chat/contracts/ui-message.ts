@@ -8,6 +8,7 @@ import type {
   ResearchPlan,
   ResearchRoute,
 } from "@/lib/chat/research-contract"
+import type { ThreadQuoteData } from "@/lib/thread-chat/domain/thread-quote"
 
 export interface ThreadChatMessageMetadata {
   messageId: string
@@ -16,7 +17,7 @@ export interface ThreadChatMessageMetadata {
 }
 
 export type ThreadChatDataParts = {
-  quote: { text: string }
+  quote: ThreadQuoteData
   "research-activity": WebResearchActivity
   "research-route": ResearchRoute
   "research-plan": ResearchPlan
@@ -53,9 +54,6 @@ export type ThreadChatTools = {
  * - `streamText(...).stream` 产生 TextStreamPart；
  * - 独立 `toUIMessageStream({ stream })` 产生 UIMessageChunk；
  * - `readUIMessageStream({ stream })` 归并成这里的 UIMessage.parts[]。
- *
- * 安装版依据：node_modules/ai/dist/index.d.ts。不要使用已废弃的
- * StreamTextResult 实例 `toUIMessageStream()`，也不要退化为 textStream。
  */
 export type ThreadChatUIMessage = UIMessage<
   ThreadChatMessageMetadata,

@@ -1,0 +1,68 @@
+name: Prompt Cache
+
+on:
+  pull_request:
+    paths:
+      - "constants/**"
+      - "lib/ai/**"
+      - "lib/chat/**"
+      - "lib/thread-chat/**"
+      - "app/thread-chat/**"
+      - "e2e/thread-chat/**"
+      - "evals/agent/**"
+      - "scripts/check-prompt-cache-architecture.mjs"
+      - "scripts/probe-prompt-cache.ts"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/prompt-cache.yml"
+      - "openspec/changes/optimize-thread-chat-prompt-cache/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.32.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Typecheck
+        run: pnpm typecheck
+      - name: Lint
+        run: pnpm lint
+      - name: Prompt cache architecture guard
+        run: node scripts/check-prompt-cache-architecture.mjs
+      - name: Prompt cache contracts
+        run: >-
+          pnpm test:thread-chat:prompt-cache &&
+          node --import tsx e2e/thread-chat/fork-origin-contract.test.mjs &&
+          node --import tsx e2e/thread-chat/prompt-cache-adapter.test.mjs &&
+          node --import tsx e2e/thread-chat/prompt-cache-compiler-boundaries.test.mjs &&
+          node --import tsx e2e/thread-chat/prompt-cache-rollout.test.mjs &&
+          node --import tsx e2e/thread-chat/prompt-cache-state.test.mjs
+      - name: Prompt cache Agent Eval
+        run: pnpm test:thread-chat:prompt-cache-eval
+      - name: Quote composer contracts
+        run: pnpm test:thread-chat:composer-quotes
+      - name: Quote resolver authorization contracts
+        run: node --import tsx e2e/thread-chat/quote-resolver-contract.test.mjs
+      - name: Fake Claude cache cost probe
+        run: pnpm prompt-cache:probe
+      - name: Existing API contracts
+        run: pnpm test:thread-chat:gate2-api
+      - name: Observability foundation
+        run: pnpm test:observability:foundation
+      - name: Evaluation foundation
+        run: pnpm test:observability:eval-foundation
+      - name: OpenSpec strict validation
+        run: pnpm openspec:validate

@@ -1,7 +1,13 @@
 import type { LanguageModelUsage, TextStreamPart, ToolSet } from "ai"
 import { db } from "@/lib/db"
 import type { ThreadChatUIMessageChunk } from "@/lib/thread-chat/contracts/ui-message"
-import { compileModelContext } from "@/lib/thread-chat/application/compile-model-context"
+import { compilePromptBase } from "@/lib/thread-chat/application/prompt-compiler"
+import type { PromptManifest } from "@/lib/thread-chat/application/prompt-cache"
+import type { PromptCacheControls } from "@/lib/ai/prompt-cache"
+import type {
+  ModelAttemptRecord,
+  ModelAttemptSummary,
+} from "@/lib/ai/model-attempt"
 import {
   findOwnedMessage,
   listThreadMessageRows,
@@ -26,6 +32,18 @@ export interface PreparedGeneration {
   tools?: ToolSet
   leadingChunks?: ThreadChatUIMessageChunk[]
   usage?: PromiseLike<LanguageModelUsage>
+  manifest?: PromptManifest
+  cacheControls?: PromptCacheControls
+  route?: {
+    routeId: string
+    upstreamModelId: string
+    adapter: string
+    gateway: string | null
+  }
+  modelAttempts?: () => ModelAttemptRecord[]
+  cacheSummary?: () => ModelAttemptSummary
+  cacheFallbackUsed?: () => boolean
+  ttftMs?: () => number | undefined
 }
 
 export interface RunGenerationDependencies {
@@ -47,6 +65,13 @@ type GenerationRunResult = {
   finishReason: string
   partCount: number
   providerUsage?: Record<string, unknown>
+  manifest?: PromptManifest
+  cacheControls?: PromptCacheControls
+  routeId?: string
+  modelAttempts: ModelAttemptRecord[]
+  cacheSummary?: ModelAttemptSummary
+  cacheFallbackUsed: boolean
+  ttftMs?: number
   checkpoint: ReturnType<MessageCheckpointer["getSummary"]>
   error?: ReturnType<typeof safeErrorMetadata>
 }
@@ -118,7 +143,7 @@ async function runGenerationCore({
     .reverse()
     .find((row) => row.role === "user")
   if (!latestUser) throw new Error("GENERATION_USER_MESSAGE_NOT_FOUND")
-  const modelMessages = await compileModelContext({
+  const promptBase = await compilePromptBase({
     userId,
     threadId: thread.id,
     excludeAssistantMessageId: message.id,
@@ -134,6 +159,7 @@ async function runGenerationCore({
 
   try {
     prepared = await prepare({
+      userId,
       messageId: message.id,
       projectId: message.projectId,
       threadId: thread.id,
@@ -144,8 +170,7 @@ async function runGenerationCore({
         .slice(-6)
         .map((row) => `${row.role}: ${textFromParts(row.parts)}`)
         .join("\n"),
-      anchorText: thread.anchorText,
-      modelMessages,
+      promptBase,
       abortSignal: session.signal,
     })
     pipelineEnd = await consumeUIMessagePipeline({
@@ -182,6 +207,10 @@ async function runGenerationCore({
   const usage = prepared?.usage
     ? await Promise.resolve(prepared.usage).catch(() => undefined)
     : undefined
+  const modelAttempts = prepared?.modelAttempts?.() ?? []
+  const cacheSummary = prepared?.cacheSummary?.()
+  const cacheFallbackUsed = prepared?.cacheFallbackUsed?.() ?? false
+  const ttftMs = prepared?.ttftMs?.() ?? cacheSummary?.ttftMs
   const outcome = resolveGenerationTerminalOutcome({
     signal: session.signal,
     pipelineAborted: pipelineEnd?.isAborted === true,
@@ -201,6 +230,39 @@ async function runGenerationCore({
       metadata: {
         assistantMessageId: message.id,
         requestedStatus: outcome.status,
+        modelAttemptCount: modelAttempts.length,
+        cacheFallbackUsed,
+        ...(ttftMs !== undefined ? { ttftMs } : {}),
+        ...(cacheSummary
+          ? {
+              cacheOutcome: cacheSummary.cacheOutcome,
+              cacheReadTokens: cacheSummary.usage.cacheReadTokens,
+              cacheWriteTokens: cacheSummary.usage.cacheWriteTokens,
+              uncachedInputTokens: cacheSummary.usage.uncachedInputTokens,
+              modelCostUsd: cacheSummary.usage.costUsd,
+            }
+          : {}),
+        ...(prepared?.manifest
+          ? {
+              stableRequestPrefixHash:
+                prepared.manifest.stableRequestPrefixHash,
+              cacheEligibility:
+                prepared.manifest.cacheEligibility.reason,
+              toolProfileId: prepared.manifest.toolProfileId,
+              providerRouteId: prepared.manifest.routeId,
+              currentUserQuoteCount:
+                prepared.manifest.currentUserQuoteCount,
+            }
+          : {}),
+        ...(prepared?.cacheControls
+          ? {
+              promptCacheMode: prepared.cacheControls.mode,
+              promptCacheReason: prepared.cacheControls.reason,
+              promptCacheStrategy: prepared.cacheControls.strategy,
+              promptCacheTtlClass: prepared.cacheControls.ttlClass,
+              promptCacheMarkerCount: prepared.cacheControls.markerCount,
+            }
+          : {}),
       },
     },
     async (observation) => {
@@ -238,6 +300,15 @@ async function runGenerationCore({
     finishReason: resolvedFinishReason ?? "unknown",
     partCount: terminal.parts.length,
     ...(providerUsage ? { providerUsage } : {}),
+    ...(prepared?.manifest ? { manifest: prepared.manifest } : {}),
+    ...(prepared?.cacheControls
+      ? { cacheControls: prepared.cacheControls }
+      : {}),
+    ...(prepared?.route?.routeId ? { routeId: prepared.route.routeId } : {}),
+    modelAttempts,
+    ...(cacheSummary ? { cacheSummary } : {}),
+    cacheFallbackUsed,
+    ...(ttftMs !== undefined ? { ttftMs } : {}),
     checkpoint: checkpointer.getSummary(),
     ...(outcome.failed && (thrown || protocolError)
       ? { error: safeErrorMetadata(thrown ?? protocolError) }
@@ -280,6 +351,44 @@ export async function runGeneration(input: {
           ...result.checkpoint,
           ...(result.error ?? {}),
           hasProviderUsage: Boolean(result.providerUsage),
+          modelAttemptCount: result.modelAttempts.length,
+          cacheFallbackUsed: result.cacheFallbackUsed,
+          ...(result.ttftMs !== undefined ? { ttftMs: result.ttftMs } : {}),
+          ...(result.cacheSummary
+            ? {
+                cacheOutcome: result.cacheSummary.cacheOutcome,
+                cacheReadTokens: result.cacheSummary.usage.cacheReadTokens,
+                cacheWriteTokens: result.cacheSummary.usage.cacheWriteTokens,
+                uncachedInputTokens:
+                  result.cacheSummary.usage.uncachedInputTokens,
+                modelCostUsd: result.cacheSummary.usage.costUsd,
+                cacheUsageComplete: result.cacheSummary.usage.complete,
+              }
+            : {}),
+          ...(result.manifest
+            ? {
+                promptCompilerVersion:
+                  result.manifest.promptCompilerVersion,
+                stableRequestPrefixHash:
+                  result.manifest.stableRequestPrefixHash,
+                cacheEligibility:
+                  result.manifest.cacheEligibility.reason,
+                toolProfileId: result.manifest.toolProfileId,
+                currentUserQuoteCount:
+                  result.manifest.currentUserQuoteCount,
+              }
+            : {}),
+          ...(result.cacheControls
+            ? {
+                promptCacheMode: result.cacheControls.mode,
+                promptCacheEnabled: result.cacheControls.enabled,
+                promptCacheReason: result.cacheControls.reason,
+                promptCacheStrategy: result.cacheControls.strategy,
+                promptCacheTtlClass: result.cacheControls.ttlClass,
+                promptCacheMarkerCount: result.cacheControls.markerCount,
+              }
+            : {}),
+          ...(result.routeId ? { providerRouteId: result.routeId } : {}),
         },
       })
     })

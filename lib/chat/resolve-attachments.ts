@@ -9,15 +9,9 @@ import {
 import { isEmbeddingsConfigured } from "@/constants/rag"
 import { hasChunks, retrieveChunks } from "@/lib/chat/retrieve"
 
-// MiniMax 的 OpenAI 兼容端点只接受 text/image_url/video_url，不接受任何 file content part；
-// 且 @ai-sdk/openai-compatible 对「PDF file part + URL」直接抛 UnsupportedFunctionalityError。
-// 因此在 convertToModelMessages 之前，把所有 file part 兜底转换为模型可消费的 text part：
-//   - PDF（已解析入库）→ 注入正文
-//       · 全文能装进预算 → 直接全文注入（带页码标记）
-//       · 全文超预算 且 已建向量索引 → RAG：只注入与问题最相关的片段（带页码）
-//       · 否则 → 全文按页截断注入（降级）
-//   - 图片 → 占位说明（MiniMax-M2 无视觉能力；换视觉模型时改这一个分支即可）
-//   - 其他类型 / 解析失败 / 查不到 → 附件元信息占位，绝不让附件打断对话
+// 在 convertToModelMessages 之前，把 file part 转成模型可消费的稳定文本。
+// Prompt Cache 的稳定历史必须禁止使用“当前问题驱动的 RAG”，否则同一历史会在
+// 不同轮次得到不同正文。只有 Current User 动态尾部可以显式 allowRetrieval。
 
 type FilePart = {
   type: "file"
@@ -27,6 +21,13 @@ type FilePart = {
 }
 type TextPart = { type: "text"; text: string }
 type AttachmentRow = typeof attachments.$inferSelect
+
+export type ResolveAttachmentOptions = {
+  /** 当前用户动态尾部可开启；冻结历史和 Branch History 必须为 false。 */
+  allowRetrieval?: boolean
+  /** 可选显式 query；缺省时从传入 messages 的最后一条 user 文本派生。 */
+  query?: string
+}
 
 function isFilePart(part: { type: string }): part is FilePart {
   return part.type === "file"
@@ -46,11 +47,6 @@ function placeholder(part: FilePart, note: string): TextPart {
   }
 }
 
-/**
- * 引用要求：让模型引用文档内容时用可点击的 markdown 链接标注来源页码。
- * 用普通的相对路径（而非自定义协议 attachment://）——react-markdown 出于 XSS
- * 防护会清空非白名单协议（http/https/mailto 等）的 href，导致链接点击无效。
- */
 function citeHint(attachmentId: string): string {
   return (
     `\n\n【引用要求】回答中凡是引用了本文档的内容，都要在句末用如下格式标注来源页码，` +
@@ -58,7 +54,6 @@ function citeHint(attachmentId: string): string {
   )
 }
 
-/** 全文注入：按页拼接，超出 charBudget 时按页截断并显式告知模型 */
 function renderPdfFull(row: AttachmentRow, charBudget: number): TextPart {
   const pages = row.pages ?? []
   const chunks: string[] = []
@@ -88,13 +83,12 @@ function renderPdfFull(row: AttachmentRow, charBudget: number): TextPart {
   }
 }
 
-/** RAG 注入：只放检索到的相关片段（带页码），大幅压缩超大文档的上下文占用 */
 function renderPdfRetrieved(
   row: AttachmentRow,
   excerpts: { page: number; content: string }[]
 ): TextPart {
   const body = excerpts
-    .map((e) => `[第 ${e.page} 页]\n${e.content}`)
+    .map((excerpt) => `[第 ${excerpt.page} 页]\n${excerpt.content}`)
     .join("\n\n")
   return {
     type: "text",
@@ -104,13 +98,12 @@ function renderPdfRetrieved(
   }
 }
 
-/** 取最后一条用户消息的文本作为检索 query */
 function latestUserQuery(messages: UIMessage[]): string {
   for (let i = messages.length - 1; i >= 0; i--) {
     if (messages[i].role !== "user") continue
     const text = messages[i].parts
-      .filter((p): p is TextPart => p.type === "text")
-      .map((p) => p.text)
+      .filter((part): part is TextPart => part.type === "text")
+      .map((part) => part.text)
       .join(" ")
       .trim()
     if (text) return text
@@ -120,9 +113,9 @@ function latestUserQuery(messages: UIMessage[]): string {
 
 export async function resolveAttachmentParts(
   messages: UIMessage[],
-  userId: string
+  userId: string,
+  options: ResolveAttachmentOptions = {}
 ): Promise<UIMessage[]> {
-  // 1) 收集本次请求引用的全部附件 id，一次批量查库
   const ids = new Set<string>()
   for (const message of messages) {
     for (const part of message.parts) {
@@ -142,7 +135,6 @@ export async function resolveAttachmentParts(
     : []
   const rowById = new Map(rows.map((row) => [row.id, row]))
 
-  // 2) 字符预算在所有可注入的 PDF 之间平摊
   const readyPdfCount = rows.filter(
     (row) =>
       row.mimeType === "application/pdf" &&
@@ -152,9 +144,10 @@ export async function resolveAttachmentParts(
   const perPdfBudget = readyPdfCount
     ? Math.floor(ATTACHMENT_CONTEXT_CHAR_BUDGET / readyPdfCount)
     : 0
-  const query = latestUserQuery(messages)
+  const query = options.allowRetrieval
+    ? (options.query?.trim() ?? latestUserQuery(messages))
+    : ""
 
-  // 3) 逐 part 转换（含可能的向量检索，故为异步）
   const resolveFilePart = async (
     part: FilePart
   ): Promise<FilePart | TextPart> => {
@@ -163,16 +156,20 @@ export async function resolveAttachmentParts(
 
     if (part.mediaType === "application/pdf") {
       if (row?.status === "ready" && row.pages?.length) {
-        const fullLength = row.pages.reduce((n, p) => n + p.length, 0)
-        // 全文超预算 且 已建索引 且 有 query → 走 RAG，只注入相关片段
-        if (fullLength > perPdfBudget && query && isEmbeddingsConfigured()) {
+        const fullLength = row.pages.reduce((count, page) => count + page.length, 0)
+        if (
+          options.allowRetrieval &&
+          fullLength > perPdfBudget &&
+          query &&
+          isEmbeddingsConfigured()
+        ) {
           try {
             if (await hasChunks(row.id)) {
               const excerpts = await retrieveChunks(row.id, query)
               if (excerpts.length > 0) return renderPdfRetrieved(row, excerpts)
             }
           } catch {
-            // 检索失败回退到全文（截断）注入
+            // 检索失败回退到确定性的全文截断。
           }
         }
         return renderPdfFull(row, perPdfBudget)

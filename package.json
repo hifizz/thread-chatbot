@@ -32,6 +32,7 @@
     "eval:agent:release": "node --import tsx evals/agent/cli.ts --mode=release",
     "eval:agent:sync": "node --import tsx evals/agent/cli.ts --sync-dataset",
     "eval:agent:compare": "node --import tsx evals/agent/compare-cli.ts",
+    "prompt-cache:probe": "node --import tsx scripts/probe-prompt-cache.ts",
     "lint": "eslint",
     "format": "prettier --write \"**/*.{ts,tsx}\"",
     "typecheck": "tsc --noEmit",
@@ -50,6 +51,10 @@
     "test:thread-chat:gate2-api-db": "node --import tsx e2e/thread-chat/normalized-v1-api-db.test.mjs",
     "test:thread-chat:gate3-client": "node --import tsx e2e/thread-chat/normalized-client-store.test.mjs",
     "test:thread-chat:gate4-cutover": "node scripts/check-thread-chat-cutover.mjs && node --import tsx e2e/thread-chat/normalized-cutover-db.test.mjs",
+    "test:thread-chat:prompt-cache": "node --import tsx e2e/thread-chat/prompt-cache-contract.test.mjs",
+    "test:thread-chat:prompt-cache-eval": "node --import tsx e2e/thread-chat/prompt-cache-eval.test.mjs",
+    "test:thread-chat:composer-quotes": "node --import tsx e2e/thread-chat/composer-quote-draft.test.mjs",
+    "test:thread-chat:prompt-cache:full": "pnpm typecheck && pnpm lint && pnpm test:thread-chat:prompt-cache && pnpm test:thread-chat:prompt-cache-eval && pnpm test:thread-chat:composer-quotes && pnpm prompt-cache:probe && pnpm test:thread-chat:gate2-api && pnpm test:observability:foundation && pnpm test:observability:eval-foundation && pnpm openspec:validate",
     "db:studio": "drizzle-kit studio",
     "openspec:validate": "openspec validate --all --strict"
   },

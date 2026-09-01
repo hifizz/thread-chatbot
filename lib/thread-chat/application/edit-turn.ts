@@ -6,7 +6,7 @@ import { latestTurn } from "@/lib/thread-chat/domain/timeline"
 import {
   assertAllowedModel,
   assertOwnedReadyAttachments,
-  buildUserParts,
+  replaceUserEditableParts,
   touchProjectAndThread,
 } from "@/lib/thread-chat/application/command-utils"
 import { notFound, stateConflict } from "@/lib/thread-chat/application/errors"
@@ -68,6 +68,11 @@ export function editLatestTurn(
           stateConflict("只能编辑最新一轮用户消息")
         }
         await assertOwnedReadyAttachments(tx, userId, command.files)
+        const replacementParts = replaceUserEditableParts({
+          sourceParts: source.parts,
+          text: command.text,
+          files: command.files,
+        })
         const [userSequence, assistantSequence] = await allocateThreadSequences(
           tx,
           thread.id,
@@ -96,7 +101,7 @@ export function editLatestTurn(
               threadId: source.threadId,
               sequence: userSequence,
               role: "user",
-              parts: buildUserParts(command.text, command.files),
+              parts: replacementParts,
               status: "completed",
               replacesMessageId: source.id,
               finishedAt: now,

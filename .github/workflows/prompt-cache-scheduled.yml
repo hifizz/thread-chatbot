@@ -1,0 +1,32 @@
+name: Prompt Cache Scheduled Probe
+
+on:
+  schedule:
+    - cron: "37 5 * * 1"
+  workflow_dispatch:
+
+jobs:
+  fake-cache-probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.32.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Warm-up and reuse probe
+        run: node --import tsx scripts/probe-prompt-cache.ts > prompt-cache-probe.json
+      - name: Quality and cache eval gate
+        run: node --import tsx e2e/observability/prompt-cache-eval.test.mjs
+      - name: Upload reproducible probe evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: prompt-cache-fake-probe-${{ github.sha }}
+          path: prompt-cache-probe.json
+          if-no-files-found: error
+          retention-days: 30

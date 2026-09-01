@@ -1,0 +1,106 @@
+name: Prompt Cache Base Baseline
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/prompt-cache-baseline.yml"
+      - "openspec/changes/optimize-thread-chat-prompt-cache/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  record-baseline:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: thread_chat_base_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d thread_chat_base_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/thread_chat_base_test
+      DIRECT_URL: postgres://postgres:postgres@localhost:5432/thread_chat_base_test
+      TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/thread_chat_base_test
+      EVAL_DATABASE_URL: postgres://postgres:postgres@localhost:5432/thread_chat_base_eval_test
+      EVAL_ALLOW_DATABASE_WRITES: "true"
+      EVAL_DATABASE_GUARD_TOKEN: prompt-cache-base-guard-token-2026
+      BETTER_AUTH_SECRET: prompt-cache-base-better-auth-secret-2026
+      BETTER_AUTH_URL: http://localhost:4040
+      MINIMAX_API_KEY: fake-ci-key
+      AI_TELEMETRY_ENABLED: "false"
+      AI_DEVTOOLS_ENABLED: "false"
+      AI_LANGFUSE_ENABLED: "false"
+    steps:
+      - name: Checkout Base branch
+        uses: actions/checkout@v4
+        with:
+          ref: codex/feat-agent-observability-evaluation
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.32.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Prepare databases
+        env:
+          PGPASSWORD: postgres
+        run: |
+          createdb -h localhost -U postgres thread_chat_base_eval_test || true
+          psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 \
+            -c "ALTER DATABASE thread_chat_base_eval_test SET thread_chat.evaluation_guard TO 'prompt-cache-base-guard-token-2026'"
+          pnpm db:migrate
+          pnpm db:test:setup
+          pnpm db:test:migrate
+          DATABASE_URL="$EVAL_DATABASE_URL" DIRECT_URL="$EVAL_DATABASE_URL" pnpm db:migrate
+      - name: Record baseline checks
+        id: baseline
+        shell: bash
+        run: |
+          set +e
+          : > baseline-results.tsv
+          run_check() {
+            name="$1"
+            shift
+            echo "::group::$name"
+            "$@"
+            code=$?
+            echo "::endgroup::"
+            printf '%s\t%s\n' "$name" "$code" >> baseline-results.tsv
+          }
+          run_check typecheck pnpm typecheck
+          run_check build env NODE_ENV=production pnpm build
+          run_check thread-chat-gate1-db pnpm test:thread-chat:gate1-db
+          run_check thread-chat-gate2-api pnpm test:thread-chat:gate2-api
+          run_check observability pnpm test:observability
+          run_check agent-evals pnpm test:agent-evals
+          run_check openspec pnpm openspec:validate
+          {
+            echo '## Prompt Cache Base Baseline'
+            echo
+            echo '| Check | Exit code |'
+            echo '|---|---:|'
+            while IFS=$'\t' read -r name code; do
+              echo "| $name | $code |"
+            done < baseline-results.tsv
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit 0
+      - name: Upload baseline record
+        uses: actions/upload-artifact@v4
+        with:
+          name: prompt-cache-base-baseline
+          path: baseline-results.tsv
+          retention-days: 30

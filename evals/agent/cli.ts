@@ -1,5 +1,16 @@
 import { DEFAULT_THREAD_CHAT_MODEL_ID } from "@/constants/model"
 import { OBSERVABILITY_POLICY_VERSIONS } from "@/constants/observability"
+import {
+  THREAD_AGENT_KERNEL_VERSION,
+  THREAD_PROMPT_CACHE_PROFILE_VERSION,
+  THREAD_PROMPT_COMPILER_VERSION,
+  THREAD_PROVIDER_ROUTING_POLICY_VERSION,
+  THREAD_QUOTE_BUDGET_POLICY_VERSION,
+  THREAD_QUOTE_MODEL_FORMAT_VERSION,
+  THREAD_QUOTE_SCHEMA_VERSION,
+  THREAD_TOOL_PROFILE_VERSION,
+} from "@/constants/thread-chat"
+import { resolvePromptCacheMode } from "@/lib/ai/prompt-cache"
 import { mkdir, writeFile } from "node:fs/promises"
 import path from "node:path"
 import { createAgentRunSnapshot } from "@/evals/agent/baseline"
@@ -60,14 +71,24 @@ const candidate: EvaluationCandidateConfig = {
   memoryPolicyVersion: OBSERVABILITY_POLICY_VERSIONS.memory,
   contextPolicy:
     executorMode === "declared"
-      ? "production-compile-model-context-v1"
+      ? "production-prompt-compiler-v1"
       : "fixture-context-v1",
   toolsetVersion: OBSERVABILITY_POLICY_VERSIONS.toolset,
   multimodalParserVersion: OBSERVABILITY_POLICY_VERSIONS.multimodalParser,
+  promptCompilerVersion: THREAD_PROMPT_COMPILER_VERSION,
+  agentKernelVersion: THREAD_AGENT_KERNEL_VERSION,
+  quoteProtocolVersion: THREAD_QUOTE_SCHEMA_VERSION,
+  quoteModelFormatVersion: THREAD_QUOTE_MODEL_FORMAT_VERSION,
+  quoteBudgetPolicyVersion: THREAD_QUOTE_BUDGET_POLICY_VERSION,
+  promptCacheProfileVersion: THREAD_PROMPT_CACHE_PROFILE_VERSION,
+  promptCacheMode: resolvePromptCacheMode(),
+  toolProfilePolicy: THREAD_TOOL_PROFILE_VERSION,
+  providerRoutePolicy: "resolved-chat-model-v1",
+  providerRoutingPolicyVersion: THREAD_PROVIDER_ROUTING_POLICY_VERSION,
   release: process.env.AI_OBSERVABILITY_RELEASE ?? "local",
   commit: process.env.GIT_COMMIT_SHA ?? "working-tree",
   environment: "evaluation",
-  evaluatorVersion: "deterministic-v1",
+  evaluatorVersion: "deterministic-v2",
 }
 const runId =
   argument("run-id") ?? process.env.EVAL_RUN_ID ?? crypto.randomUUID()

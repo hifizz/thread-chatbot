@@ -18,6 +18,7 @@ export const OBSERVATION_NAMES = {
   researchRoute: "research.route",
   researchPlan: "research.plan",
   chatAnswer: "model.chat-answer",
+  modelAttempt: "model.attempt",
   persistenceCheckpoint: "persistence.checkpoint",
   generationFinalize: "generation.finalize",
   searchProviderAttempt: "search.provider-attempt",
@@ -68,6 +69,20 @@ export const OBSERVABILITY_ATTRIBUTE_KEYS = [
   "memoryPolicyVersion",
   "toolsetVersion",
   "multimodalParserVersion",
+  "promptCompilerVersion",
+  "agentKernelVersion",
+  "quoteProtocolVersion",
+  "quoteModelFormatVersion",
+  "quoteBudgetPolicyVersion",
+  "promptCacheProfileVersion",
+  "promptCacheStrategy",
+  "toolProfileId",
+  "stableRequestPrefixHash",
+  "forkContextHash",
+  "cacheEligibility",
+  "providerRouteId",
+  "providerRoutingPolicyVersion",
+  "currentUserQuoteCount",
   "entrypoint",
   "experiment",
   "caseId",
@@ -80,10 +95,10 @@ export type ObservabilityAttributeKey =
 export const DEFAULT_OBSERVABILITY_RELEASE = "local"
 
 export const OBSERVABILITY_POLICY_VERSIONS = {
-  prompt: "thread-chat-prompt-v1",
+  prompt: "thread-chat-prompt-v2",
   search: "anysearch-v1",
   memory: "thread-context-v1",
-  toolset: "thread-chat-tools-v1",
+  toolset: "thread-chat-tools-v2",
   multimodalParser: "attachment-parser-v1",
 } as const
 

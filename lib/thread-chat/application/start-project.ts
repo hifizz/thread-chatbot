@@ -68,7 +68,10 @@ export function startProject(userId: string, command: StartProjectCommand) {
               threadId: thread.id,
               sequence: userSequence,
               role: "user",
-              parts: buildUserParts(command.text, command.files),
+              parts: buildUserParts({
+                text: command.text,
+                files: command.files,
+              }),
               status: "completed",
               finishedAt: now,
             },

@@ -88,7 +88,8 @@ export function mapRouteError(error: unknown): Response {
       error.code === "NOT_FOUND"
         ? 404
         : error.code === "VALIDATION_ERROR" ||
-            error.code === "MODEL_NOT_ALLOWED"
+            error.code === "MODEL_NOT_ALLOWED" ||
+            error.code === "INPUT_BUDGET_EXCEEDED"
           ? 400
           : 409
     return errorResponse(status, error.code, error.message)
