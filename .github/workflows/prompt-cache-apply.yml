@@ -1,0 +1,34 @@
+name: Prompt Cache Apply
+
+on:
+  pull_request:
+    paths:
+      - "constants/thread-chat-quote.ts"
+      - "lib/thread-chat/**"
+      - "lib/chat/thread-chat-prompt.ts"
+      - "app/thread-chat/chat/composer/quote-draft.ts"
+      - "e2e/thread-chat/prompt-cache-*.test.mjs"
+      - ".github/workflows/prompt-cache-apply.yml"
+      - "openspec/changes/optimize-thread-chat-prompt-cache/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Typecheck
+        run: pnpm typecheck
+      - name: Quote and cache contracts
+        run: node --import tsx e2e/thread-chat/prompt-cache-quote-contract.test.mjs
+      - name: OpenSpec strict validation
+        run: pnpm exec openspec validate --all --strict
