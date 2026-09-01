@@ -17,15 +17,24 @@ export interface SelectionInfo {
   anchor: TextAnchor
 }
 
-/** assistant Markdown 划选的唯一 document 观察器与锚点采集边界。 */
+/** assistant Markdown 划选的唯一 document 观察器与锚点采集边界。
+ *  hasDraft：气泡输入框里有草稿时不允许「轻松取消」——外部点击 / 空选 /
+ *  滚动都不关闭气泡，新划选也一律忽略（保留 DOM 选区供复制粘贴进输入框）。
+ *  关闭/换锚入口只剩：提交、Esc 确认清空。 */
 export function useAssistantTextSelection({
   state,
   selection,
   onSelectionChange,
+  hasDraft = false,
+  onIgnoredSelection,
 }: {
   state: ThreadTreeState
   selection: SelectionInfo | null
   onSelectionChange: (selection: SelectionInfo | null) => void
+  hasDraft?: boolean
+  /** 有草稿时新划选被忽略（不替换不关闭，方便用户划选别处复制粘贴进输入框），
+      每次真正拖出一段新选区都会回调一次，组件用它弹轻提示解释「为什么气泡没跟过来」 */
+  onIgnoredSelection?: () => void
 }) {
   useEffect(() => {
     let settleTimer: ReturnType<typeof setTimeout> | null = null
@@ -35,10 +44,20 @@ export function useAssistantTextSelection({
       if (settleTimer) clearTimeout(settleTimer)
       // 等浏览器把 Selection 结算完再读（与拖选结束存在竞态）。
       settleTimer = setTimeout(() => {
+        // 有草稿时外部点击（会清空 DOM 选区）不关气泡，内容只能显式提交或确认清空
+        const closeIfUnguarded = () => {
+          if (!hasDraft) onSelectionChange(null)
+        }
         const domSelection = window.getSelection()
         const text = domSelection?.toString().trim() ?? ""
         if (!domSelection || !text || text.length < 2) {
-          onSelectionChange(null)
+          closeIfUnguarded()
+          return
+        }
+        // 有草稿时拖出的新选区一律忽略（DOM 选区保留，用户正要复制它）：
+        // 既不清空草稿换锚，也不关气泡 —— 复制粘贴流的关键一路径
+        if (hasDraft) {
+          onIgnoredSelection?.()
           return
         }
         const node = domSelection.anchorNode
@@ -49,7 +68,7 @@ export function useAssistantTextSelection({
             : (node as HTMLElement)
         const markdownRoot = base?.closest?.(".md-body") as HTMLElement | null
         if (!markdownRoot) {
-          onSelectionChange(null)
+          closeIfUnguarded()
           return
         }
         const list = markdownRoot.closest(".msg-list") as HTMLElement | null
@@ -64,13 +83,13 @@ export function useAssistantTextSelection({
             (message) => message.id === msgId
           )
         ) {
-          onSelectionChange(null)
+          closeIfUnguarded()
           return
         }
 
         const anchor = describeRange(markdownRoot, domSelection.getRangeAt(0))
         if (!anchor || anchor.quote.exact.trim().length < 2) {
-          onSelectionChange(null)
+          closeIfUnguarded()
           return
         }
         const rect = domSelection.getRangeAt(0).getBoundingClientRect()
@@ -90,10 +109,12 @@ export function useAssistantTextSelection({
       }, 10)
     }
     const onMouseDown = (event: MouseEvent) => {
-      if (!(event.target as HTMLElement).closest?.(".sel-bubble"))
+      if (!(event.target as HTMLElement).closest?.(".sel-bubble") && !hasDraft)
         onSelectionChange(null)
     }
-    const onResize = () => onSelectionChange(null)
+    const onResize = () => {
+      if (!hasDraft) onSelectionChange(null)
+    }
     document.addEventListener("mouseup", onMouseUp)
     document.addEventListener("mousedown", onMouseDown)
     window.addEventListener("resize", onResize)
@@ -103,7 +124,7 @@ export function useAssistantTextSelection({
       document.removeEventListener("mousedown", onMouseDown)
       window.removeEventListener("resize", onResize)
     }
-  }, [state, onSelectionChange])
+  }, [state, onSelectionChange, hasDraft, onIgnoredSelection])
 
   useEffect(() => {
     if (!selection) return
@@ -114,9 +135,12 @@ export function useAssistantTextSelection({
         const list = target.closest<HTMLElement>(".msg-list[data-list]")
         if (list && list.dataset.list !== selection.threadId) return
       }
+      // 有草稿时滚动也不关气泡（尾巴会暂时离开选区，但内容不丢；
+      // 提交 / 确认清空才关）
+      if (hasDraft) return
       onSelectionChange(null)
     }
     document.addEventListener("scroll", onScroll, true)
     return () => document.removeEventListener("scroll", onScroll, true)
-  }, [selection, onSelectionChange])
+  }, [selection, onSelectionChange, hasDraft])
 }
