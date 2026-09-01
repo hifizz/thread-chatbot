@@ -130,6 +130,7 @@ export function SelectionBubble({
     setQuestion("")
     setConfirming(false)
     setShaking(false)
+    setEntering(Boolean(sel)) // 每次新划选都重放一次 tc-pop；关闭态保持 false
     setDraftHint(false)
     setMeasuredH(0) // 换一段划选：高度作废，等重新测量再定位（先隐藏，避免旧位闪现）
   }
@@ -148,14 +149,16 @@ export function SelectionBubble({
     return () => ro.disconnect()
   }, [sel])
 
-  /* 气泡弹出即聚焦输入框（preventScroll：气泡定位刚结算完，不能再引发滚动）；
-     顺手清掉上一次自增高留下的行内高度（textarea 跨划选不重挂载） */
+  /* 气泡测量完成、真正 visible 后再聚焦输入框：首帧 measuredH=0 时根节点
+     visibility:hidden，Chromium 会拒绝聚焦其后代；只依赖 sel 会错过后续 visible 帧。
+     focusReady 只发生 false → true，不会在 textarea 自增高时反复抢焦点。 */
+  const focusReady = Boolean(sel && measuredH > 0)
   useEffect(() => {
     const ta = taRef.current
-    if (!sel || !ta) return
+    if (!focusReady || !ta) return
     ta.style.height = ""
     ta.focus({ preventScroll: true })
-  }, [sel])
+  }, [sel, focusReady])
 
   /* 气泡打开期间跟踪 ⌘/Ctrl 起落（keydown/keyup 都带 metaKey/ctrlKey 快照） */
   useEffect(() => {
@@ -337,6 +340,7 @@ export function SelectionBubble({
             <textarea
               ref={taRef}
               rows={1}
+              className="scroll-slim"
               value={question}
               style={
                 {
@@ -348,11 +352,16 @@ export function SelectionBubble({
               onChange={(e) => {
                 setQuestion(e.target.value)
                 // 自增高：到达同一尺寸源定义的上限后转为内部滚动。
+                // border-box 下 scrollHeight（不含边框）直接当 height 会被边框
+                // 吃掉 2px → 永远差 2px 溢出 → 只有一行也亮滚动条，补上边框厚度
                 const ta = e.currentTarget
+                const borderY = ta.offsetHeight - ta.clientHeight
                 ta.style.height = "auto"
                 ta.style.height =
-                  Math.min(ta.scrollHeight, SELECTION_QUESTION_MAX_HEIGHT) +
-                  "px"
+                  Math.min(
+                    ta.scrollHeight + borderY,
+                    SELECTION_QUESTION_MAX_HEIGHT
+                  ) + "px"
               }}
               onKeyDown={(e) => {
                 if (e.key !== "Enter") return
