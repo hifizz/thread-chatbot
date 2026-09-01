@@ -119,7 +119,7 @@
 }
 /* 代码块：语言标签 + 复制按钮 + 代码体 */
 .tc .md-body .md-code {
-  margin: 0 0 12px;
+  margin: 10px 0;
   border: 1px solid var(--rule);
   border-radius: 8px;
   overflow: hidden;
@@ -129,7 +129,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 5px 10px;
+  padding: 4px 4px 4px 12px;
   /*background: var(--paper-2);*/
   /*border-bottom: 1px solid var(--rule);*/
   font-family: var(--font-mono);
@@ -149,6 +149,12 @@
   cursor: pointer;
   padding: 4px;
   border-radius: 4px;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+.tc .md-body .md-code:hover .md-code-head .copy,
+.tc .md-body .md-code-head .copy:focus-visible {
+  opacity: 1;
 }
 .tc .md-body .md-code-head .copy:hover {
   color: var(--ink);
@@ -156,7 +162,7 @@
 }
 .tc .md-body .md-code pre {
   margin: 0;
-  padding: 11px 13px;
+  padding: 0px  12px 10px;
   overflow-x: auto;
 }
 .tc .md-body .md-code pre.shiki {
