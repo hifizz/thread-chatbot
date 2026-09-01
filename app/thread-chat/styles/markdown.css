@@ -62,14 +62,17 @@
 .tc .md-body li {
   margin: 3px 0;
 }
-.tc .md-body li::marker {
+/* .tc .md-body li::marker {
   color: var(--ink-faint);
-}
+} */
 .tc .md-body blockquote {
   margin: 0 0 12px;
-  padding: 2px 0 2px 13px;
-  border-left: 3px solid var(--rule-strong);
+  padding: 4px 0 4px 12px;
+  border-left: 1.5px solid var(--rule-strong);
   color: var(--ink-soft);
+}
+.tc .md-body blockquote p:last-child {
+  margin-bottom: 0;
 }
 .tc .md-body a {
   color: var(--d1);
