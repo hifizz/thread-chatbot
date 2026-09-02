@@ -1,6 +1,11 @@
 /* ── @/thread-chat/styles ── 滚动条 / 动效降级 */
 
 /* ---------------- 滚动条 / 动效降级 ---------------- */
+/* Firefox 全局滚动条配色（继承到所有后代）：thumb 用 rule-strong，轨道透明。
+   之前只有 WebKit 规则，Firefox 下一直是原生默认滚动条。 */
+.tc {
+  scrollbar-color: var(--rule-strong) transparent;
+}
 .tc ::-webkit-scrollbar {
   width: 9px;
   height: 9px;
@@ -8,6 +13,20 @@
 .tc ::-webkit-scrollbar-thumb {
   background: var(--rule-strong);
   border-radius: 6px;
+}
+/* 细滚动条工具类：小空间深底滚动区（如划选气泡输入框）用 4px 半透明细条，
+   不套上面给大面积列表设计的 9px。浅底区域若需复用，注意 thumb 是为深底定的。 */
+.tc .scroll-slim {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.35) transparent;
+}
+.tc .scroll-slim::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+.tc .scroll-slim::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.35);
+  border-radius: 4px;
 }
 @media (prefers-reduced-motion: reduce) {
   .tc *,

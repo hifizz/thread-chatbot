@@ -1,0 +1,109 @@
+/* ── branching/selection ── 划选气泡「草稿保护」样式
+   与 selection-bubble.tsx 同目录共置（不进 styles/ 桶文件）：只服务本组件的
+   草稿保护交互 —— 输入后不可轻松取消、Esc 确认清空 + 抖动、新划选忽略轻提示。
+   气泡本体样式仍在 @/thread-chat/styles/selection.css；关键帧（tc-pop /
+   tc-shake-x / tc-fade-in）在 @/thread-chat/styles/keyframes.css。 */
+
+/* 入场淡入：只在挂载后的短暂窗口挂 .entering 类，tc-pop 播完即拆类，
+   稳态 animation 为 none —— 否则后续 .shaking 拆除时 animation 回退到 tc-pop
+   会被浏览器当成新动画重放，气泡从 opacity:0 闪一下露出纸底。 */
+.tc .sel-bubble.entering {
+  animation: tc-pop 0.14s ease;
+}
+
+/* 有草稿时按 Esc：气泡先左右抖动一下（内容会丢的体感提醒），
+   同时弹出 sb-confirm 确认弹窗。 */
+.tc .sel-bubble.shaking {
+  animation: tc-shake-x 0.85s ease-in-out;
+}
+
+/* 有草稿时新划选被忽略的轻提示：悬挂在面板外（尾巴朝下时改挂上方避开尾巴），
+   绝对定位不占文档流 —— 不会改变被 ResizeObserver 测量的面板高度，气泡不重定位 */
+.tc .sel-bubble .draft-hint {
+  position: absolute;
+  top: calc(100% + 7px);
+  left: 0;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1;
+  color: #e8e2d4;
+  text-shadow:
+    0 1px 2px rgba(30, 26, 20, 0.7),
+    0 0 6px rgba(30, 26, 20, 0.5);
+  white-space: nowrap;
+  pointer-events: none;
+  animation: tc-fade-in 0.12s ease;
+}
+.tc .sel-bubble[data-dir="down"] .draft-hint {
+  top: auto;
+  bottom: calc(100% + 7px);
+}
+
+/* —— Esc 确认弹窗：纸底居中小对话框，盖在气泡（z-60）之上 —— */
+.tc .sb-confirm-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  background: rgba(30, 26, 20, 0.32);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: tc-fade-in 0.12s ease;
+}
+.tc .sb-confirm {
+  width: min(340px, calc(100vw - 48px));
+  background: var(--paper);
+  color: var(--ink);
+  border: 1px solid color-mix(in srgb, var(--ink) 18%, transparent);
+  border-radius: 12px;
+  padding: 18px 18px 16px;
+  box-shadow: 0 12px 32px rgba(30, 26, 20, 0.28);
+  animation: tc-pop 0.14s ease;
+}
+.tc .sb-confirm-title {
+  font-family: var(--font-ui);
+  font-size: 15px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+.tc .sb-confirm-body {
+  font-family: var(--font-read);
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--ink-soft);
+  margin-bottom: 16px;
+}
+.tc .sb-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.tc .sb-confirm-actions button {
+  border: none;
+  cursor: pointer;
+  border-radius: 8px;
+  padding: 7px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--font-ui);
+}
+.tc .sb-confirm-actions button:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 1px;
+}
+.tc .sb-confirm-actions button.ghost {
+  background: transparent;
+  color: var(--ink-soft);
+  border: 1px solid color-mix(in srgb, var(--ink) 25%, transparent);
+}
+.tc .sb-confirm-actions button.ghost:hover {
+  background: var(--paper-2);
+  color: var(--ink);
+}
+.tc .sb-confirm-actions button.danger {
+  background: var(--d3);
+  color: #fff;
+}
+.tc .sb-confirm-actions button.danger:hover {
+  filter: brightness(1.08);
+}

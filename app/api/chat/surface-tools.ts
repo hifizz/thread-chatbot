@@ -1,11 +1,5 @@
 import { tool } from "ai"
 import { z } from "zod"
-import {
-  MARKDOWN_ARTIFACT_TOOL_DESCRIPTION,
-  MARKDOWN_ARTIFACT_TOOL_NAME,
-  markdownArtifactInputSchema,
-  type MarkdownArtifactToolResult,
-} from "@/lib/chat/markdown-artifact"
 
 const getWeather = tool({
   description: "Get the current weather for a city.",
@@ -52,19 +46,7 @@ const compareTable = tool({
   execute: async (input) => input,
 })
 
-const createMarkdownArtifact = tool({
-  description: MARKDOWN_ARTIFACT_TOOL_DESCRIPTION,
-  inputSchema: markdownArtifactInputSchema,
-  execute: async (): Promise<MarkdownArtifactToolResult> => ({ created: true }),
-})
-
-/** 产品 surface 对应的基础工具；联网与前端工具由 route 在其上继续组合。 */
-export function surfaceTools(input: {
-  threadChat: boolean
-  markdownArtifactRequested: boolean
-}) {
-  if (!input.threadChat) return { getWeather, compareTable }
-  return input.markdownArtifactRequested
-    ? { [MARKDOWN_ARTIFACT_TOOL_NAME]: createMarkdownArtifact }
-    : {}
+/** 线性聊天 surface 的基础工具；联网与前端工具由 route 在其上继续组合。 */
+export function surfaceTools() {
+  return { getWeather, compareTable }
 }

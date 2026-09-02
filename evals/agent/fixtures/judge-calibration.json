@@ -1,0 +1,32 @@
+[
+  {
+    "dimension": "correctness",
+    "caseId": "calibration-good",
+    "human": 1.0,
+    "judge": 0.9
+  },
+  {
+    "dimension": "faithfulness",
+    "caseId": "calibration-grounded",
+    "human": 0.8,
+    "judge": 0.75
+  },
+  {
+    "dimension": "helpfulness",
+    "caseId": "calibration-partial",
+    "human": 0.5,
+    "judge": 0.6
+  },
+  {
+    "dimension": "completeness",
+    "caseId": "calibration-missing",
+    "human": 0.2,
+    "judge": 0.35
+  },
+  {
+    "dimension": "citationSupport",
+    "caseId": "calibration-unsupported",
+    "human": 0.0,
+    "judge": 0.3
+  }
+]

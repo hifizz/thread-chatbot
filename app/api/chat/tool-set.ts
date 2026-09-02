@@ -1,19 +1,13 @@
 import type { ToolSet } from "ai"
-import { readUrlTool, webSearchTool } from "@/lib/chat/research-tools"
+import { createResearchTools } from "@/lib/chat/research-tools"
 import type { ResearchRoute } from "@/lib/chat/research-router"
 import { surfaceTools } from "@/app/api/chat/surface-tools"
 import { researchToolNames } from "@/app/api/chat/research-tool-capabilities"
 
-const RESEARCH_TOOLS = {
-  readUrl: readUrlTool,
-  webSearch: webSearchTool,
-}
-
 type ChatToolSetInput = {
   researchMode: ResearchRoute["mode"]
+  routeReason?: ResearchRoute["reasonCode"]
   searchReady: boolean
-  threadChat: boolean
-  markdownArtifactRequested: boolean
   /** assistant-ui 使用其内嵌 AI SDK 类型；只在最终组合出口统一适配。 */
   frontendToolSet?: Record<string, unknown>
 }
@@ -21,20 +15,20 @@ type ChatToolSetInput = {
 /** 将各能力的私有工具集合组合成一次模型调用唯一可见的 ToolSet。 */
 export function buildChatToolSet({
   researchMode,
+  routeReason,
   searchReady,
-  threadChat,
-  markdownArtifactRequested,
   frontendToolSet,
 }: ChatToolSetInput): { tools: ToolSet; webToolsEnabled: boolean } {
   const webToolsEnabled = searchReady && researchMode !== "answer"
+  const researchTools = createResearchTools({ routeReason })
   const routedWebTools = Object.fromEntries(
-    researchToolNames(researchMode).map((name) => [name, RESEARCH_TOOLS[name]])
+    researchToolNames(researchMode).map((name) => [name, researchTools[name]])
   ) as ToolSet
 
   return {
     webToolsEnabled,
     tools: {
-      ...surfaceTools({ threadChat, markdownArtifactRequested }),
+      ...surfaceTools(),
       ...(webToolsEnabled ? routedWebTools : {}),
       ...(frontendToolSet ?? {}),
     } as ToolSet,

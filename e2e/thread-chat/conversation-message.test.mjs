@@ -47,6 +47,22 @@ assert.deepEqual(
 
 assert.deepEqual(
   assistantMessagePresentation(
+    assistant({
+      status: "streaming",
+      uiParts: [{ type: "reasoning", text: "推理中", state: "streaming" }],
+    })
+  ),
+  {
+    hasVisibleText: false,
+    hasVisibleContent: true,
+    isWaitingForVisibleOutput: false,
+    showBubble: true,
+    showCaret: false,
+  }
+)
+
+assert.deepEqual(
+  assistantMessagePresentation(
     assistant({ status: "pending", artifactIds: ["artifact-1"] })
   ),
   {

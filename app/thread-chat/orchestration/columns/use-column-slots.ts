@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import type { ThreadStore } from "../../core/store"
+import type { ThreadTreeState } from "../../core/types"
 import {
   normalizeForReplace,
   place,
@@ -13,7 +13,10 @@ import {
 } from "./placement"
 
 export interface UseColumnSlotsArgs {
-  store: ThreadStore
+  store: {
+    getState(): ThreadTreeState
+    touch(threadId: string): void
+  }
   /** 展开列上限（= 总列数 - 主线一列） */
   maxExpanded: number
   /** 列满策略：替换⑥ / 细条⑤ */

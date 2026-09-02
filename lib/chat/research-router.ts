@@ -23,6 +23,8 @@ import {
   type ResearchRoute,
   type ResearchRouteMode,
 } from "@/lib/chat/research-contract"
+import { throwIfGenerationCancelled } from "@/lib/ai/generation-cancellation"
+import { buildAiTelemetryConfig } from "@/lib/observability/ai-sdk"
 
 export {
   researchPlanSchema,
@@ -39,6 +41,7 @@ export interface ResolveResearchRouteInput {
   recentConversation: string
   searchReady: boolean
   modelCallTrace?: ModelCallTrace
+  abortSignal?: AbortSignal
 }
 
 function errorSummary(error: unknown): string {
@@ -90,8 +93,7 @@ function normalizePlannerCandidate(value: unknown): unknown {
                 ? raw.id.slice(0, 40)
                 : `q${index + 1}`,
             question: question.slice(0, 300),
-            queries:
-              queries.length > 0 ? queries : [question.slice(0, 200)],
+            queries: queries.length > 0 ? queries : [question.slice(0, 200)],
             preferredSourceTypes: strings(raw.preferredSourceTypes, [
               "official",
               "primary-source",
@@ -182,14 +184,11 @@ function route(
 }
 
 /** 高置信快速路由；返回 null 表示需要模型做结构化分类。 */
-export function deterministicResearchRoute(
-  text: string
-): ResearchRoute | null {
+export function deterministicResearchRoute(text: string): ResearchRoute | null {
   const normalized = text.trim()
   if (!normalized) return route("answer", "no_web_needed")
 
-  if (explicitlyDisablesWeb(normalized))
-    return route("answer", "no_web_needed")
+  if (explicitlyDisablesWeb(normalized)) return route("answer", "no_web_needed")
 
   const urls = extractHttpUrls(normalized)
   const complexResearch =
@@ -242,7 +241,9 @@ export async function resolveResearchRoute({
   recentConversation,
   searchReady,
   modelCallTrace,
+  abortSignal,
 }: ResolveResearchRouteInput): Promise<ResearchRoute> {
+  throwIfGenerationCancelled(abortSignal)
   const contextualFollowUp = contextualUrlFollowUpRoute(
     latestUserText,
     recentConversation
@@ -250,12 +251,15 @@ export async function resolveResearchRoute({
   if (contextualFollowUp)
     return normalizeModelRoute(contextualFollowUp, searchReady)
   const deterministic = deterministicResearchRoute(latestUserText)
-  if (deterministic)
-    return normalizeModelRoute(deterministic, searchReady)
+  if (deterministic) return normalizeModelRoute(deterministic, searchReady)
   if (!searchReady) return route("answer", "search_unavailable")
 
   try {
     const result = await generateText({
+      ...buildAiTelemetryConfig(
+        MODEL_CALL_PURPOSE.researchRoute,
+        modelCallTrace
+      ),
       model: withModelCallLogging(
         model,
         MODEL_CALL_PURPOSE.researchRoute,
@@ -275,9 +279,12 @@ export async function resolveResearchRoute({
       ].join("\n"),
       output: Output.object({ schema: researchRouteSchema }),
       maxOutputTokens: RESEARCH_ROUTER_MAX_OUTPUT_TOKENS,
+      abortSignal,
     })
+    throwIfGenerationCancelled(abortSignal)
     return normalizeModelRoute(result.output, searchReady)
   } catch (error) {
+    throwIfGenerationCancelled(abortSignal)
     const recovered = researchRouteSchema.safeParse(
       jsonObjectFromFailedStructuredOutput(error)
     )
@@ -295,14 +302,21 @@ export async function createResearchPlan({
   userRequest,
   route: resolvedRoute,
   modelCallTrace,
+  abortSignal,
 }: {
   model: LanguageModel
   userRequest: string
   route: ResearchRoute
   modelCallTrace?: ModelCallTrace
+  abortSignal?: AbortSignal
 }): Promise<ResearchPlan> {
+  throwIfGenerationCancelled(abortSignal)
   try {
     const result = await generateText({
+      ...buildAiTelemetryConfig(
+        MODEL_CALL_PURPOSE.researchPlan,
+        modelCallTrace
+      ),
       model: withModelCallLogging(
         model,
         MODEL_CALL_PURPOSE.researchPlan,
@@ -325,9 +339,12 @@ export async function createResearchPlan({
       ].join("\n"),
       output: Output.object({ schema: researchPlanSchema }),
       maxOutputTokens: RESEARCH_PLANNER_MAX_OUTPUT_TOKENS,
+      abortSignal,
     })
+    throwIfGenerationCancelled(abortSignal)
     return result.output
   } catch (error) {
+    throwIfGenerationCancelled(abortSignal)
     const recovered = researchPlanSchema.safeParse(
       normalizePlannerCandidate(jsonObjectFromFailedStructuredOutput(error))
     )

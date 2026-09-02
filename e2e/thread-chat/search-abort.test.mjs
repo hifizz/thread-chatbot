@@ -9,11 +9,9 @@ let receivedSignal
 globalThis.fetch = async (_url, init) => {
   receivedSignal = init.signal
   return new Promise((_resolve, reject) => {
-    init.signal.addEventListener(
-      "abort",
-      () => reject(init.signal.reason),
-      { once: true }
-    )
+    init.signal.addEventListener("abort", () => reject(init.signal.reason), {
+      once: true,
+    })
   })
 }
 
@@ -32,6 +30,6 @@ const tools = await readFile(
 )
 assert.equal(tools.match(/\{ abortSignal \}/g)?.length, 2)
 assert.match(tools, /webSearch\([\s\S]*abortSignal/)
-assert.match(tools, /extractUrl\(url, abortSignal\)/)
+assert.match(tools, /extractUrl\(url, abortSignal/)
 
 console.log("PASS  stopping generation aborts in-flight AnySearch operations")

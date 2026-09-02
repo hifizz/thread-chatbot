@@ -69,10 +69,6 @@ assert.deepEqual(view.activePathByThreadId.get("main"), [
 assert.deepEqual(view.presentationByThreadId.get("main"), {
   latestUserMessageId: "user-1",
   latestAssistantMessageId: "assistant-b",
-  alternatives: [
-    { assistantMessageId: "assistant-a", derivedThreadCount: 1 },
-    { assistantMessageId: "assistant-b", derivedThreadCount: 1 },
-  ],
   sourceProvenance: null,
 })
 assert.deepEqual(view.presentationByThreadId.get("child-a").sourceProvenance, {
@@ -84,5 +80,5 @@ assert.deepEqual(view.presentationByThreadId.get("child-a").sourceProvenance, {
 })
 
 console.log(
-  "PASS  message action presentation derives active paths, latest turn, variants, counts, and provenance"
+  "PASS  message action presentation derives active paths, latest turn, and provenance without variant UI state"
 )

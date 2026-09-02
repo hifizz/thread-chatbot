@@ -1,8 +1,9 @@
-import { eq } from "drizzle-orm"
+import { and, eq } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { attachments } from "@/lib/db/schema"
 import { generateInsights } from "@/lib/attachments/insights"
 import { isMinimaxConfigured } from "@/lib/ai/minimax"
+import { getCurrentUserId } from "@/lib/auth/server"
 
 type RouteContext = { params: Promise<{ id: string }> }
 
@@ -11,11 +12,13 @@ type RouteContext = { params: Promise<{ id: string }> }
  * 首次调用时按需生成并缓存进 DB，后续直接返回缓存。
  */
 export async function POST(_req: Request, { params }: RouteContext) {
+  const userId = await getCurrentUserId()
+  if (!userId) return Response.json({ error: "未登录" }, { status: 401 })
   const { id } = await params
   const [row] = await db
     .select()
     .from(attachments)
-    .where(eq(attachments.id, id))
+    .where(and(eq(attachments.id, id), eq(attachments.userId, userId)))
     .limit(1)
   if (!row) return Response.json({ error: "附件不存在" }, { status: 404 })
 
@@ -53,7 +56,7 @@ export async function POST(_req: Request, { params }: RouteContext) {
       summary: insights.summary,
       suggestedQuestions: insights.suggestedQuestions,
     })
-    .where(eq(attachments.id, id))
+    .where(and(eq(attachments.id, id), eq(attachments.userId, userId)))
 
   return Response.json(insights)
 }

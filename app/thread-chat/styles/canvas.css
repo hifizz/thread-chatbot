@@ -238,7 +238,8 @@
 .tc .canvas-expand .md-body h4 {
   font-size: 13px;
 }
-.tc .canvas-expand .msg-error {
+.tc .canvas-expand .msg-error,
+.tc .canvas-expand .msg-stopped {
   font-size: 11.5px;
 }
 /* mini composer：语义同列模式（busy 时发送变停止），尺寸随面板收敛 */

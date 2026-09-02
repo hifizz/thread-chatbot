@@ -7,7 +7,6 @@ import {
 } from "ai"
 import { minimaxChatModel, isMinimaxConfigured } from "@/lib/ai/minimax"
 import { arkCodingChatModel, isArkCodingConfigured } from "@/lib/ai/ark"
-import { isVercelGatewayConfigured } from "@/lib/payments/vercel-gateway"
 import {
   getChatModel,
   type ChatModel,
@@ -19,8 +18,12 @@ import {
   openRouterChatModel,
 } from "@/lib/ai/openrouter"
 import { isUMAPISConfigured, umapisChatModel } from "@/lib/ai/umapis"
+import {
+  isPrivateRelayConfigured,
+  privateRelayChatModel,
+} from "@/lib/ai/private-relay"
 
-// 统一的对话模型解析层。Ark、OpenRouter 与 UMAPIS 固定走各自专用端点；其余非 MiniMax 模型按优先级路由：
+// 统一的对话模型解析层。Ark、OpenRouter、UMAPIS 与私有模型中继固定走各自专用端点；其余非 MiniMax 模型按优先级路由：
 //   1) Vercel AI 网关（配 AI_GATEWAY_API_KEY）—— 会回传 generationId，供真实成本对账；
 //   2) Cloudflare AI 网关 compat 端点（配 CF_AI_GATEWAY_*）；
 //   3) 供应商直连。
@@ -29,6 +32,11 @@ import { isUMAPISConfigured, umapisChatModel } from "@/lib/ai/umapis"
 const CF_ACCOUNT = process.env.CF_AI_GATEWAY_ACCOUNT_ID
 const CF_GATEWAY = process.env.CF_AI_GATEWAY_ID
 const CF_TOKEN = process.env.CF_AI_GATEWAY_TOKEN
+
+/** 模型路由只关心网关凭据是否存在，不依赖计费模块。 */
+function isVercelGatewayConfigured(): boolean {
+  return Boolean(process.env.AI_GATEWAY_API_KEY)
+}
 
 /** CF AI 网关 compat 端点是否已配置。 */
 export function isGatewayConfigured(): boolean {
@@ -41,7 +49,10 @@ function gatewayCompatBaseURL(): string {
 
 // 各供应商的 API key 与直连 baseURL（网关未配置时的回退）。
 const PROVIDER_ENV: Record<
-  Exclude<ChatModel["provider"], "minimax" | "ark" | "openrouter" | "umapis">,
+  Exclude<
+    ChatModel["provider"],
+    "minimax" | "ark" | "openrouter" | "umapis" | "private-relay"
+  >,
   { key: string | undefined; directBaseURL: string }
 > = {
   deepseek: {
@@ -60,6 +71,7 @@ export function isModelConfigured(model: ChatModel): boolean {
   if (model.provider === "minimax") return isMinimaxConfigured()
   if (model.provider === "ark") return isArkCodingConfigured()
   if (model.provider === "openrouter") return isOpenRouterConfigured()
+  if (model.provider === "private-relay") return isPrivateRelayConfigured()
   if (model.provider === "umapis") {
     return (
       model.umapisCredentialGroup !== undefined &&
@@ -87,6 +99,9 @@ export function resolveChatModel(modelId: string): LanguageModel {
   }
   if (model.provider === "openrouter") {
     return openRouterChatModel(model.upstreamModel as OpenRouterModelId)
+  }
+  if (model.provider === "private-relay") {
+    return privateRelayChatModel(model.upstreamModel)
   }
   if (model.provider === "umapis") {
     if (!model.umapisCredentialGroup) {

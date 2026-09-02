@@ -5,14 +5,6 @@ import { prepareChatRequestContext } from "../../app/api/chat/request-context.ts
 const messages = [
   { id: "u1", role: "user", parts: [{ type: "text", text: "hello" }] },
 ]
-const threadIdentity = {
-  treeId: "11111111-1111-4111-8111-111111111111",
-  threadId: "main",
-  userMessageId: "u1",
-  assistantMessageId: "a1",
-  generationId: "22222222-2222-4222-8222-222222222222",
-  intent: { kind: "persisted-turn" },
-}
 function request(body) {
   return new Request("http://localhost/api/chat", {
     method: "POST",
@@ -29,7 +21,6 @@ function dependencies(overrides = {}) {
         ? { id, name: `Model ${id}`, provider: "ark" }
         : undefined,
     linearModelAllowed: () => true,
-    threadModelAllowed: () => true,
     modelConfigured: () => true,
     unbilledPreview: () => false,
     positiveBalance: async () => true,
@@ -122,48 +113,20 @@ assert.match(
 assert.equal(threadOnlyConfigurationChecks, 0)
 assert.equal(threadOnlyBalanceChecks, 0)
 
-let invalidThreadBalanceChecks = 0
-const invalidThreadIdentity = await prepareChatRequestContext(
-  request({ messages, modelId: "known", threadChat: { treeId: "invalid" } }),
+let retiredThreadBalanceChecks = 0
+const retiredThreadMode = await prepareChatRequestContext(
+  request({ messages, modelId: "known", threadChat: {} }),
   dependencies({
     positiveBalance: async () => {
-      invalidThreadBalanceChecks++
+      retiredThreadBalanceChecks++
       return false
     },
   })
 )
-assert.equal(invalidThreadIdentity.kind, "response")
-assert.equal(invalidThreadIdentity.response.status, 400)
-assert.equal(
-  (await invalidThreadIdentity.response.json()).error.code,
-  "invalid_generation_identity"
-)
-assert.equal(invalidThreadBalanceChecks, 0)
-
-let invalidSurfaceConfigurationChecks = 0
-let invalidSurfaceBalanceChecks = 0
-const invalidThreadSurface = await prepareChatRequestContext(
-  request({ messages, modelId: "known", threadChat: threadIdentity }),
-  dependencies({
-    threadModelAllowed: () => false,
-    modelConfigured: () => {
-      invalidSurfaceConfigurationChecks++
-      return true
-    },
-    positiveBalance: async () => {
-      invalidSurfaceBalanceChecks++
-      return true
-    },
-  })
-)
-assert.equal(invalidThreadSurface.kind, "response")
-assert.equal(invalidThreadSurface.response.status, 400)
-assert.equal(
-  (await invalidThreadSurface.response.json()).error.code,
-  "invalid_thread_model"
-)
-assert.equal(invalidSurfaceConfigurationChecks, 0)
-assert.equal(invalidSurfaceBalanceChecks, 0)
+assert.equal(retiredThreadMode.kind, "response")
+assert.equal(retiredThreadMode.response.status, 400)
+assert.match((await retiredThreadMode.response.json()).error, /已迁移/)
+assert.equal(retiredThreadBalanceChecks, 0)
 
 const insufficient = await prepareChatRequestContext(
   request({ messages, modelId: "known" }),
@@ -178,7 +141,6 @@ const preview = await prepareChatRequestContext(
     messages,
     modelId: "known",
     deepResearch: true,
-    threadChat: threadIdentity,
     id: "linear-1",
     tools: { clientTool: {} },
   }),
@@ -197,7 +159,7 @@ assert.equal(preview.modelId, "known")
 assert.equal(preview.isUnbilledPreview, true)
 assert.deepEqual(preview.messages, messages)
 assert.equal(preview.deepResearch, true)
-assert.deepEqual(preview.threadChat, threadIdentity)
+assert.equal("threadChat" in preview, false)
 assert.equal(preview.linearThreadId, "linear-1")
 assert.deepEqual(Object.keys(preview.tools), ["clientTool"])
 

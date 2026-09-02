@@ -22,12 +22,15 @@ export function AnchoredMarkdown({
   state,
   msg,
   onOpenThread,
+  source,
   insertAt,
   insert,
 }: {
   state: ThreadTreeState
   msg: Message
   onOpenThread: (targetId: string, opts?: { keepSource?: boolean }) => void
+  /** default 渲染完整消息正文；parts 渲染器可传入单个 text part 的内容。 */
+  source?: string
   /** 在流事件记录的正文字符偏移处插入工具活动；缺省时渲染普通单段 Markdown。 */
   insertAt?: number
   insert?: React.ReactNode
@@ -38,8 +41,9 @@ export function AnchoredMarkdown({
     .map((fork) => `${fork.threadId}:${fork.num}`)
     .join("|")
   const active = msg.status === "streaming" || msg.status === "pending"
-  const display = useSmoothText(msg.text, active)
-  const renderedSource = active ? display : msg.text
+  const markdownSource = source ?? msg.text
+  const display = useSmoothText(markdownSource, active)
+  const renderedSource = active ? display : markdownSource
   const [settledRevision, bumpSettledRevision] = useReducer(
     (revision: number) => revision + 1,
     0
@@ -123,7 +127,9 @@ export function AnchoredMarkdown({
   }
 
   const normalizedInsertAt =
-    insertAt == null ? null : Math.max(0, Math.min(insertAt, msg.text.length))
+    insertAt == null
+      ? null
+      : Math.max(0, Math.min(insertAt, markdownSource.length))
   const insertIsVisible =
     insert != null &&
     normalizedInsertAt != null &&

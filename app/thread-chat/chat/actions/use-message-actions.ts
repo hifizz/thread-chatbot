@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo, useState } from "react"
 import type { MessageFeedbackSummary, ThreadTreeState } from "../../core/types"
-import type { RecoverableTurn } from "../../generation/types"
+import type { RecoverableTurn } from "./message-action-types"
 import type { ThreadMessageActionCommands } from "./message-action-commands"
 import { buildMessageActionViewState } from "./message-action-presentation"
 import {
@@ -68,7 +68,6 @@ export function useMessageActions({
           )
         return result
       },
-      switchTurnVariant: commands.switchTurnVariant,
       async submitFeedback(threadId, messageId, feedback) {
         const previous = feedbackByMessageId.get(messageId) ?? null
         setFeedbackByMessageId((current) =>

@@ -1,91 +1,31 @@
 import assert from "node:assert/strict"
 import { createStreamLifecycle } from "../../app/api/chat/stream-lifecycle.ts"
 
-const model = { id: "glm-5.3", provider: "ark" }
 const base = {
   userId: "user-1",
   modelId: "glm-5.3",
-  model,
-  persistentGeneration: true,
+  model: { id: "glm-5.3", provider: "ark" },
   unbilledPreview: false,
+  linearThreadId: "linear-1",
 }
 
 const originalError = console.error
 console.error = () => {}
 try {
+  const charges = []
   const lifecycle = createStreamLifecycle(base, {
-    async charge() {
-      assert.fail("persistent generation must not charge outside finalization")
+    async charge(input) {
+      charges.push(input)
     },
   })
   lifecycle.onError({ error: new Error("stream broke") })
-  lifecycle.onAbort({
-    steps: [
-      {
-        usage: { inputTokens: 3, outputTokens: 5 },
-        providerMetadata: { gateway: { generationId: "gateway-1" } },
-      },
-      { usage: { inputTokens: 7, outputTokens: 11 } },
-    ],
-  })
+  lifecycle.onAbort({ steps: [{ usage: { inputTokens: 99 } }] })
   assert.deepEqual(lifecycle.snapshot(), {
-    capturedUsage: {
-      inputTokens: 10,
-      outputTokens: 16,
-      costEvidence: { source: "estimate" },
-    },
     modelStreamError: "生成失败，请重试。",
-    abortedUsageUnavailable: true,
   })
-
-  const emptyAbort = createStreamLifecycle(base)
-  emptyAbort.onAbort({ steps: [] })
-  assert.deepEqual(emptyAbort.snapshot(), {
-    capturedUsage: undefined,
-    modelStreamError: undefined,
-    abortedUsageUnavailable: true,
-  })
-
-  const unknownError = createStreamLifecycle(base)
-  unknownError.onError({ error: { upstream: "opaque" } })
-  assert.equal(unknownError.snapshot().modelStreamError, "生成失败，请重试。")
-
   await lifecycle.onEnd({
-    usage: { inputTokens: 13, outputTokens: 17 },
-    providerMetadata: { gateway: { generationId: "gateway-2" } },
-    steps: [],
-  })
-  assert.deepEqual(lifecycle.snapshot().capturedUsage, {
-    inputTokens: 13,
-    outputTokens: 17,
-    costEvidence: {
-      source: "vercel-gateway",
-      generationId: "gateway-2",
-    },
-  })
-
-  const charges = []
-  const linear = createStreamLifecycle(
-    {
-      ...base,
-      persistentGeneration: false,
-      linearThreadId: "linear-1",
-    },
-    {
-      async charge(input) {
-        charges.push(input)
-      },
-    }
-  )
-  linear.onAbort({ steps: [{ usage: { inputTokens: 99 } }] })
-  await linear.onEnd({
     usage: { inputTokens: 2, outputTokens: 4 },
     steps: [],
-  })
-  assert.deepEqual(linear.snapshot(), {
-    capturedUsage: undefined,
-    modelStreamError: undefined,
-    abortedUsageUnavailable: false,
   })
   assert.deepEqual(charges, [
     {
@@ -110,11 +50,10 @@ try {
     usage: { inputTokens: 100, outputTokens: 200 },
     steps: [],
   })
-  assert.equal(preview.snapshot().capturedUsage, undefined)
 } finally {
   console.error = originalError
 }
 
 console.log(
-  "PASS  stream lifecycle isolates errors, abort usage, persistent capture, linear charge, and preview bypass"
+  "PASS  linear chat stream lifecycle isolates errors, charges once, and bypasses preview billing"
 )

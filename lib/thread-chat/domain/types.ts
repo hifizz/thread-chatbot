@@ -52,7 +52,12 @@ export interface Fork {
 }
 
 /** 消息的流式生命周期状态；undefined 视为 "done"（历史消息 / 非流式消息） */
-export type MessageStatus = "pending" | "streaming" | "done" | "error"
+export type MessageStatus =
+  | "pending"
+  | "streaming"
+  | "done"
+  | "stopped"
+  | "error"
 
 /**
  * Markdown 工具输入的临时生成态。它只服务当前页面的进度反馈，不能持久化；
@@ -80,7 +85,7 @@ export interface Message {
   /** 本页是通过刷新恢复到该活跃 generation；只用于向用户解释后台仍在继续。 */
   backgroundGeneration?: boolean
   artifactIds?: string[]
-  /** 流式状态：pending（已建消息未收到首个 delta）/ streaming / done / error */
+  /** UI 状态：pending（未收到首个 delta）/ streaming / done / stopped（用户主动停止）/ error */
   /** 划选引用（方向 C，用户定稿）：带问开分支时，首条 user 消息结构化携带
       「我在问哪段话」——消息记录自足（导出/搜索/其他消费者拿到即用），UI 渲染
       引用条，发送线据此拼 grounding。可选；无该字段 = 普通消息。 */

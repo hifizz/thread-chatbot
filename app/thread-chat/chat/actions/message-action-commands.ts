@@ -14,15 +14,6 @@ export type GenerationActionResult =
     }
   | { ok: false; code: MessageActionFailureCode; message: string }
 
-export type VariantSwitchResult =
-  | {
-      ok: true
-      threadId: string
-      assistantMessageId: string
-      revision: number
-    }
-  | { ok: false; code: MessageActionFailureCode; message: string }
-
 /** 消息视图消费的动作能力；网络 controller 只是其中一种实现。 */
 export interface ThreadMessageActionCommands {
   retryAssistant(
@@ -38,10 +29,6 @@ export interface ThreadMessageActionCommands {
     userMessageId: string,
     text: string
   ): Promise<GenerationActionResult>
-  switchTurnVariant(
-    threadId: string,
-    assistantMessageId: string
-  ): Promise<VariantSwitchResult>
   submitFeedback(
     threadId: string,
     messageId: string,

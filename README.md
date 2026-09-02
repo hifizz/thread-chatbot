@@ -60,7 +60,7 @@ Current directions include strengthening automated coverage, improving deploymen
 
 ### Prerequisites
 
-- Node.js `>=20.9.0` and [pnpm](https://pnpm.io/) (this repository declares `pnpm@10.32.1`)
+- Node.js `>=22`（开发、CI 与 VPS 推荐固定 Node.js 24）and [pnpm](https://pnpm.io/) (this repository declares `pnpm@10.32.1`)
 - A PostgreSQL database
 - Credentials for at least one supported model provider; the default model uses MiniMax
 
@@ -102,9 +102,20 @@ The following features are opt-in and are not required for the quick start:
 - Attachments and PDF processing: Cloudflare R2 variables (`R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`)
 - Large-document vector retrieval: `EMBEDDINGS_BASE_URL`, `EMBEDDINGS_API_KEY`, and `EMBEDDINGS_MODEL`, plus PostgreSQL `pgvector`
 - Additional model providers and gateways: provider keys, Cloudflare AI Gateway, or Vercel AI Gateway variables documented in `.env.example`
+- Agent observability: local AI SDK DevTools and optional Langfuse Cloud tracing use the server-only variables documented in `.env.example`
 - Email verification, Turnstile, Google sign-in, billing, and Creem payments: their feature-specific variables in `.env.example`
 
 Do not commit `.env.local` or credentials.
+
+### Agent observability and evaluation
+
+The observability stack is opt-in and keeps production prompt/output content off by default. For the complete local DevTools, Langfuse Cloud, evaluation, acceptance, and incident-to-regression workflow, see [Agent observability operations](./docs/observability/08-operations-and-acceptance.md). The shortest safe checks are:
+
+```bash
+pnpm test:observability
+pnpm test:agent-evals
+pnpm observability:check-release
+```
 
 ## OpenRouter models
 

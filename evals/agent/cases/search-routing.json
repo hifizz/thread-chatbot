@@ -1,0 +1,249 @@
+[
+  {
+    "schemaVersion": "agent-case-v1",
+    "id": "search-routing-no-web-answer",
+    "suite": "search-routing",
+    "tags": ["smoke", "answer", "no-web"],
+    "sensitivity": "synthetic",
+    "execution": "content",
+    "input": {
+      "messages": [{ "role": "user", "text": "不要联网，请解释数据库事务。" }],
+      "attachments": []
+    },
+    "expected": {
+      "route": "answer",
+      "tools": [],
+      "terminalState": "completed",
+      "maxToolCount": 0
+    },
+    "fixtureResult": {
+      "text": "数据库事务把一组操作作为一个原子工作单元。",
+      "route": "answer",
+      "tools": [],
+      "terminalState": "completed",
+      "providerAttempts": []
+    }
+  },
+  {
+    "schemaVersion": "agent-case-v1",
+    "id": "search-explicit-url-fetch",
+    "suite": "search-routing",
+    "tags": ["smoke", "fetch", "citation"],
+    "sensitivity": "public",
+    "execution": "content",
+    "input": {
+      "messages": [
+        { "role": "user", "text": "总结 https://example.com/release-notes" }
+      ],
+      "attachments": []
+    },
+    "expected": {
+      "route": "fetch",
+      "tools": ["readUrl"],
+      "terminalState": "completed",
+      "citationsRequired": true,
+      "sourceDomains": ["example.com"],
+      "maxToolCount": 1
+    },
+    "fixtureResult": {
+      "text": "发布说明摘要。[来源](https://example.com/release-notes)",
+      "route": "fetch",
+      "tools": ["readUrl"],
+      "terminalState": "completed",
+      "providerAttempts": [
+        {
+          "provider": "anysearch",
+          "operation": "extract",
+          "outcome": "success",
+          "fallbackCount": 0
+        }
+      ]
+    }
+  },
+  {
+    "schemaVersion": "agent-case-v1",
+    "id": "search-explicit-web-search",
+    "suite": "search-routing",
+    "tags": ["smoke", "search"],
+    "sensitivity": "synthetic",
+    "execution": "content",
+    "input": {
+      "messages": [
+        {
+          "role": "user",
+          "text": "请联网搜索 PostgreSQL 官方文档中的事务隔离级别。"
+        }
+      ],
+      "attachments": []
+    },
+    "expected": {
+      "route": "search",
+      "tools": ["webSearch", "readUrl"],
+      "terminalState": "completed",
+      "citationsRequired": true,
+      "sourceDomains": ["postgresql.org"],
+      "groundingFacts": ["Serializable"],
+      "maxToolCount": 4
+    },
+    "fixtureResult": {
+      "text": "PostgreSQL 支持 Serializable 隔离级别。[官方文档](https://www.postgresql.org/docs/current/transaction-iso.html)",
+      "route": "search",
+      "tools": ["webSearch", "readUrl"],
+      "terminalState": "completed",
+      "providerAttempts": [
+        {
+          "provider": "anysearch",
+          "operation": "search",
+          "outcome": "success",
+          "fallbackCount": 0
+        }
+      ]
+    }
+  },
+  {
+    "schemaVersion": "agent-case-v1",
+    "id": "search-multi-source-research",
+    "suite": "search-routing",
+    "tags": ["scheduled", "research", "multi-source"],
+    "sensitivity": "synthetic",
+    "execution": "content",
+    "input": {
+      "messages": [
+        {
+          "role": "user",
+          "text": "请做一次深入多来源研究，对比两种开源 Agent 可观测方案。"
+        }
+      ],
+      "attachments": []
+    },
+    "expected": {
+      "route": "research",
+      "tools": ["webSearch", "readUrl"],
+      "terminalState": "completed",
+      "citationsRequired": true,
+      "maxToolCount": 10
+    },
+    "fixtureResult": {
+      "text": "对比结论。[来源一](https://example.com/a) [来源二](https://example.org/b)",
+      "route": "research",
+      "tools": ["webSearch", "readUrl"],
+      "terminalState": "completed",
+      "providerAttempts": [
+        {
+          "provider": "anysearch",
+          "operation": "search",
+          "outcome": "success",
+          "fallbackCount": 0
+        }
+      ]
+    }
+  },
+  {
+    "schemaVersion": "agent-case-v1",
+    "id": "search-current-freshness",
+    "suite": "search-routing",
+    "tags": ["scheduled", "live-web", "freshness"],
+    "sensitivity": "public",
+    "execution": "content",
+    "input": {
+      "messages": [
+        {
+          "role": "user",
+          "text": "查询今天最新发布的 PostgreSQL 版本，并给官方来源。"
+        }
+      ],
+      "attachments": []
+    },
+    "expected": {
+      "route": "search",
+      "tools": ["webSearch", "readUrl"],
+      "terminalState": "completed",
+      "citationsRequired": true,
+      "sourceDomains": ["postgresql.org"]
+    },
+    "fixtureResult": {
+      "text": "版本信息需实时核对。[官方来源](https://www.postgresql.org/support/versioning/)",
+      "route": "search",
+      "tools": ["webSearch", "readUrl"],
+      "terminalState": "completed",
+      "providerAttempts": [
+        {
+          "provider": "anysearch",
+          "operation": "search",
+          "outcome": "success",
+          "fallbackCount": 0
+        }
+      ]
+    }
+  },
+  {
+    "schemaVersion": "agent-case-v1",
+    "id": "search-provider-fallback-429",
+    "suite": "search-routing",
+    "tags": ["ci", "fallback", "429"],
+    "sensitivity": "synthetic",
+    "execution": "fixture",
+    "input": {
+      "messages": [{ "role": "user", "text": "搜索一项合成测试事实。" }],
+      "attachments": []
+    },
+    "expected": {
+      "route": "search",
+      "terminalState": "completed",
+      "fallbackExpected": true,
+      "citationsRequired": true
+    },
+    "fixtureResult": {
+      "text": "备用 provider 找到结果。[来源](https://example.org/fallback)",
+      "route": "search",
+      "tools": ["webSearch"],
+      "terminalState": "completed",
+      "providerAttempts": [
+        {
+          "provider": "primary",
+          "operation": "search",
+          "outcome": "rate_limit",
+          "fallbackCount": 0
+        },
+        {
+          "provider": "fallback",
+          "operation": "search",
+          "outcome": "success",
+          "fallbackCount": 1
+        }
+      ]
+    }
+  },
+  {
+    "schemaVersion": "agent-case-v1",
+    "id": "search-empty-timeout",
+    "suite": "search-routing",
+    "tags": ["ci", "empty", "timeout"],
+    "sensitivity": "synthetic",
+    "execution": "fixture",
+    "input": {
+      "messages": [{ "role": "user", "text": "搜索不存在的合成实体。" }],
+      "attachments": []
+    },
+    "expected": {
+      "route": "search",
+      "terminalState": "completed",
+      "contains": ["未找到"],
+      "citationsRequired": false
+    },
+    "fixtureResult": {
+      "text": "未找到可验证来源；请调整查询后重试。",
+      "route": "search",
+      "tools": ["webSearch"],
+      "terminalState": "completed",
+      "providerAttempts": [
+        {
+          "provider": "anysearch",
+          "operation": "search",
+          "outcome": "timeout",
+          "fallbackCount": 0
+        }
+      ]
+    }
+  }
+]

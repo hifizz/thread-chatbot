@@ -12,7 +12,7 @@
 
 import React from "react"
 import { MessageScroller } from "@shadcn/react/message-scroller"
-import type { Message } from "../core/types"
+import type { ConversationViewMessage } from "../core/types"
 import { ConversationComposer } from "./composer/conversation-composer"
 import { ConversationMessage } from "./message/conversation-message"
 import type { MessageActionViewState } from "./actions/message-action-types"
@@ -21,7 +21,7 @@ import type { ThreadMessageActionCommands } from "./actions/message-action-comma
 export interface ChatViewProps {
   /** 会话 id：写到 .msg-list 的 data-list 上（划选气泡靠它反查消息） */
   threadId: string
-  messages: Message[]
+  messages: ConversationViewMessage[]
   isMain?: boolean
   /** 列头区（面包屑 / 标题行），由上层（branching）组装 */
   header?: React.ReactNode
@@ -30,13 +30,13 @@ export interface ChatViewProps {
   /** 消息列表顶部的插卡（主线的 hint 提示） */
   intro?: React.ReactNode
   /** 注入 assistant 正文渲染（锚点高亮 + 脚注上标） */
-  renderAssistantBody?: (msg: Message) => React.ReactNode
+  renderAssistantBody?: (msg: ConversationViewMessage) => React.ReactNode
   /** 注入 assistant 消息气泡之后的附加内容（artifact 卡片） */
-  renderAfterMessage?: (msg: Message) => React.ReactNode
+  renderAfterMessage?: (msg: ConversationViewMessage) => React.ReactNode
   /** 流式生成中：发送键变「停止」（textarea 仍可输入，Enter 提交被拦） */
   busy?: boolean
   /** 错误消息下的「重试」按钮回调 */
-  onRetry?: (msg: Message) => void
+  onRetry?: (msg: ConversationViewMessage) => void
   /** busy 时点「停止」的回调（中止本会话在飞的流式请求） */
   onStop?: () => void
   /** composer 预填文案（新开分支的代拟首问）：仅在输入框为空时写入，待用户改写或回车确认 */
@@ -53,10 +53,6 @@ export interface ChatViewProps {
   messageCommands?: ThreadMessageActionCommands
   editableUserMessageId?: string
   regeneratableAssistantMessageId?: string
-  turnAlternatives?: readonly {
-    assistantMessageId: string
-    derivedThreadCount: number
-  }[]
 }
 
 export function ChatView({
@@ -81,7 +77,6 @@ export function ChatView({
   messageCommands,
   editableUserMessageId,
   regeneratableAssistantMessageId,
-  turnAlternatives = [],
 }: ChatViewProps) {
   return (
     <>
@@ -97,24 +92,25 @@ export function ChatView({
               <div className="lane">
                 {intro}
                 {messages.map((msg) => (
-                  <MessageScroller.Item key={msg.id} messageId={msg.id}>
-                    <ConversationMessage
-                      threadId={threadId}
-                      message={msg}
-                      showRoleLabel
-                      assistantBubbleClassName="bubble mt-3 mb-1"
-                      renderAssistantBody={renderAssistantBody}
-                      renderAfterMessage={renderAfterMessage}
-                      onRetry={onRetry}
-                      messageActionState={messageActionState}
-                      messageCommands={messageCommands}
-                      editableUserMessageId={editableUserMessageId}
-                      regeneratableAssistantMessageId={
-                        regeneratableAssistantMessageId
-                      }
-                      turnAlternatives={turnAlternatives}
-                    />
-                  </MessageScroller.Item>
+                  <div key={msg.id} data-thread-chat-message-id={msg.id}>
+                    <MessageScroller.Item messageId={msg.id}>
+                      <ConversationMessage
+                        threadId={threadId}
+                        message={msg}
+                        showRoleLabel
+                        assistantBubbleClassName="bubble mt-3 mb-1"
+                        renderAssistantBody={renderAssistantBody}
+                        renderAfterMessage={renderAfterMessage}
+                        onRetry={onRetry}
+                        messageActionState={messageActionState}
+                        messageCommands={messageCommands}
+                        editableUserMessageId={editableUserMessageId}
+                        regeneratableAssistantMessageId={
+                          regeneratableAssistantMessageId
+                        }
+                      />
+                    </MessageScroller.Item>
+                  </div>
                 ))}
               </div>
             </MessageScroller.Content>

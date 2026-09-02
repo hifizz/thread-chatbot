@@ -1,4 +1,4 @@
-import type { Message } from "../../core/types"
+import type { ConversationViewMessage } from "../../core/types"
 
 export interface AssistantMessagePresentation {
   hasVisibleText: boolean
@@ -9,11 +9,15 @@ export interface AssistantMessagePresentation {
 }
 
 export function assistantMessagePresentation(
-  message: Message
+  message: ConversationViewMessage
 ): AssistantMessagePresentation {
   const hasVisibleText = message.text.trim().length > 0
+  const hasVisibleReasoning =
+    message.uiParts?.some(
+      (part) => part.type === "reasoning" && part.text.trim().length > 0
+    ) ?? false
   const hasVisibleContent =
-    hasVisibleText || Boolean(message.webResearch?.length)
+    hasVisibleText || hasVisibleReasoning || Boolean(message.webResearch?.length)
   const isWaitingForVisibleOutput =
     message.role === "assistant" &&
     (message.status === "pending" || message.status === "streaming") &&

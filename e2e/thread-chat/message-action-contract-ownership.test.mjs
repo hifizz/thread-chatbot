@@ -9,7 +9,7 @@ const contract = await readFile(
 
 assert.match(contract, /export interface ThreadMessageActionCommands/)
 assert.match(contract, /export type GenerationActionResult/)
-assert.match(contract, /export type VariantSwitchResult/)
+assert.doesNotMatch(contract, /VariantSwitchResult|switchTurnVariant/)
 
 for (const path of [
   "chat/actions/message-action-types.ts",
@@ -27,13 +27,15 @@ for (const path of [
   )
 }
 
-const controller = await readFile(
-  new URL("net/chat-controller.ts", root),
+const production = await readFile(new URL("thread-chat-demo.tsx", root), "utf8")
+const commands = await readFile(
+  new URL("net/commands/conversation-commands.ts", root),
   "utf8"
 )
-assert.match(controller, /chat\/actions\/message-action-commands/)
-assert.doesNotMatch(controller, /export interface ThreadMessageActionCommands/)
+assert.match(production, /ThreadMessageActionCommands/)
+assert.match(commands, /createConversationCommands/)
+assert.doesNotMatch(production, /net\/chat-controller|switchTurnVariant/)
 
 console.log(
-  "PASS  message action capability contract belongs to chat and net only implements it"
+  "PASS  message action contract belongs to chat, omits variant switching, and normalized commands implement it"
 )
