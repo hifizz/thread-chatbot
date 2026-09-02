@@ -16,6 +16,7 @@ export const OPENROUTER_MODEL_IDS = [
   "qwen/qwen3.8-max",
   "x-ai/grok-4.5",
   "x-ai/grok-4.6",
+  "stealth/ox-alpha",
 ] as const
 
 export type OpenRouterModelId = (typeof OPENROUTER_MODEL_IDS)[number]
@@ -108,7 +109,14 @@ export type ChatModel = {
   /** 模型可见的产品入口。 */
   surfaces: readonly ChatModelSurface[]
   /** 仅用于展示分组，不参与鉴权和路由。 */
-  creator?: "anthropic" | "openai" | "moonshotai" | "deepseek" | "qwen" | "x-ai"
+  creator?:
+    | "anthropic"
+    | "openai"
+    | "moonshotai"
+    | "deepseek"
+    | "qwen"
+    | "x-ai"
+    | "stealth"
 }
 
 /** 用统一的 Claude 组配置注册 UMAPIS 未计费预览模型。 */
@@ -457,6 +465,17 @@ const CHAT_MODEL_REGISTRY = [
     reasoningTransport: "native",
     surfaces: ["thread"],
     creator: "x-ai",
+  },
+  {
+    id: "openrouter-ox-alpha",
+    name: "OpenRouter · Ox Alpha",
+    description: "面向编程与长时 Agent 任务的免费预览模型",
+    provider: "openrouter",
+    upstreamModel: "stealth/ox-alpha",
+    reasoningTransport: "native",
+    unbilledPreview: true,
+    surfaces: ["thread"],
+    creator: "stealth",
   },
 ] as const satisfies readonly ChatModel[]
 

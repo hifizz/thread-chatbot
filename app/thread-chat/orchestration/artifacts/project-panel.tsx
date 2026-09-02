@@ -2,6 +2,8 @@
 
 import React, { useEffect, useId, useMemo, useRef, useState } from "react"
 import {
+  Check,
+  Copy,
   ExternalLink,
   FileText,
   FolderKanban,
@@ -25,6 +27,7 @@ import type {
   ProjectFileDTO,
 } from "@/lib/thread-chat/contracts/dto"
 import { MarkdownBody } from "../../chat/message/markdown-body"
+import { useCopyMarkdown } from "../../chat/actions/use-copy-markdown"
 import { uploadProjectFile } from "../../net/project-file-upload"
 
 export interface ProjectPanelProps {
@@ -105,6 +108,7 @@ export function ProjectPanel({
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [artifactQuery, setArtifactQuery] = useState("")
+  const { copied, copy } = useCopyMarkdown(setError)
   const archived = Boolean(project?.archivedAt)
   const loading = open && !project
   const displayedSection: ProjectPanelSection = activeId ? "artifacts" : section
@@ -497,12 +501,31 @@ export function ProjectPanel({
                       {` · ${formatDate(selectedArtifact.createdAt)}`}
                     </p>
                   </div>
-                  <button
-                    className="project-secondary"
-                    onClick={() => locateArtifact(selectedArtifact)}
-                  >
-                    <LocateFixed size={12} /> 定位来源
-                  </button>
+                  <div className="project-actions">
+                    {selectedArtifact.kind === "markdown" && (
+                      <button
+                        type="button"
+                        className="project-secondary"
+                        title={
+                          copied
+                            ? "Markdown raw 内容已复制"
+                            : "复制 Markdown raw 内容"
+                        }
+                        onClick={() => void copy(selectedArtifact.content)}
+                      >
+                        {copied ? <Check size={12} /> : <Copy size={12} />}
+                        <span aria-live="polite">
+                          {copied ? "已复制" : "复制"}
+                        </span>
+                      </button>
+                    )}
+                    <button
+                      className="project-secondary"
+                      onClick={() => locateArtifact(selectedArtifact)}
+                    >
+                      <LocateFixed size={12} /> 定位来源
+                    </button>
+                  </div>
                 </div>
                 <div className="project-artifact-content">
                   {selectedArtifact.kind === "markdown" && (
