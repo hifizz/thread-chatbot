@@ -92,23 +92,25 @@ export function ChatView({
               <div className="lane">
                 {intro}
                 {messages.map((msg) => (
-                  <MessageScroller.Item key={msg.id} messageId={msg.id}>
-                    <ConversationMessage
-                      threadId={threadId}
-                      message={msg}
-                      showRoleLabel
-                      assistantBubbleClassName="bubble mt-3 mb-1"
-                      renderAssistantBody={renderAssistantBody}
-                      renderAfterMessage={renderAfterMessage}
-                      onRetry={onRetry}
-                      messageActionState={messageActionState}
-                      messageCommands={messageCommands}
-                      editableUserMessageId={editableUserMessageId}
-                      regeneratableAssistantMessageId={
-                        regeneratableAssistantMessageId
-                      }
-                    />
-                  </MessageScroller.Item>
+                  <div key={msg.id} data-thread-chat-message-id={msg.id}>
+                    <MessageScroller.Item messageId={msg.id}>
+                      <ConversationMessage
+                        threadId={threadId}
+                        message={msg}
+                        showRoleLabel
+                        assistantBubbleClassName="bubble mt-3 mb-1"
+                        renderAssistantBody={renderAssistantBody}
+                        renderAfterMessage={renderAfterMessage}
+                        onRetry={onRetry}
+                        messageActionState={messageActionState}
+                        messageCommands={messageCommands}
+                        editableUserMessageId={editableUserMessageId}
+                        regeneratableAssistantMessageId={
+                          regeneratableAssistantMessageId
+                        }
+                      />
+                    </MessageScroller.Item>
+                  </div>
                 ))}
               </div>
             </MessageScroller.Content>

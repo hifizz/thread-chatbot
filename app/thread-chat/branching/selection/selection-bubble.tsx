@@ -22,7 +22,14 @@
  *   Esc 交由壳层关闭链关气泡；Enter 有 IME 守卫（isComposing / keyCode 229）。
  */
 
-import React, { useEffect, useLayoutEffect, useRef, useState } from "react"
+import React, {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react"
+import "./selection-draft-guard.css"
 import { GitMerge } from "lucide-react"
 import type { ThreadTreeState } from "../../core/types"
 import { threadTitle } from "../../core/selectors"
@@ -74,17 +81,41 @@ export function SelectionBubble({
   maxExpanded,
   lastActiveOf,
 }: SelectionBubbleProps) {
+  /** 可选首问（受控 textarea）：留空提交 = 现有预填流；非空提交 = 带问开分支 */
+  const [question, setQuestion] = useState("")
+  const hasQuestion = question.trim().length > 0
+  /** 有草稿时新划选被忽略的轻提示（悬挂在气泡外，不扰动面板高度/定位） */
+  const [draftHint, setDraftHint] = useState(false)
+  /** 轻提示自动消失计时器（再次忽略新划选时重置） */
+  const draftHintTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const showDraftHint = useCallback(() => {
+    setDraftHint(true)
+    if (draftHintTimer.current) clearTimeout(draftHintTimer.current)
+    draftHintTimer.current = setTimeout(() => setDraftHint(false), 2500)
+  }, [])
+  useEffect(
+    () => () => {
+      if (draftHintTimer.current) clearTimeout(draftHintTimer.current)
+    },
+    []
+  )
   useAssistantTextSelection({
     state,
     selection: sel,
     onSelectionChange: onSelChange,
+    hasDraft: hasQuestion,
+    onIgnoredSelection: showDraftHint,
   })
+  /** Esc 确认弹窗（有草稿时 Esc 不直接关，先确认清空） */
+  const [confirming, setConfirming] = useState(false)
+  /** 气泡左右抖动中（确认弹窗弹出时触发一次，animationend 归位） */
+  const [shaking, setShaking] = useState(false)
+  /** 入场淡入窗口：tc-pop 播完即拆 .entering 类，让稳态 animation 为 none（见 selection.css） */
+  const [entering, setEntering] = useState(true)
   /** 迷你列条点选的让位列（override）；气泡隐藏 / 换一段划选时清空 */
   const [override, setOverride] = useState<string | null>(null)
   /** ⌘/Ctrl 是否按住（实时跟踪，目标与按钮文案随之切换） */
   const [metaHeld, setMetaHeld] = useState(false)
-  /** 可选首问（受控 textarea）：留空提交 = 现有预填流；非空提交 = 带问开分支 */
-  const [question, setQuestion] = useState("")
   const taRef = useRef<HTMLTextAreaElement | null>(null)
   /** 气泡内容层（面板本体）：测其高度 H 喂定位模型与轮廓 path */
   const contentRef = useRef<HTMLDivElement | null>(null)
@@ -97,6 +128,10 @@ export function SelectionBubble({
     setOverride(null)
     setMetaHeld(sel?.meta ?? false)
     setQuestion("")
+    setConfirming(false)
+    setShaking(false)
+    setEntering(Boolean(sel)) // 每次新划选都重放一次 tc-pop；关闭态保持 false
+    setDraftHint(false)
     setMeasuredH(0) // 换一段划选：高度作废，等重新测量再定位（先隐藏，避免旧位闪现）
   }
 
@@ -114,14 +149,16 @@ export function SelectionBubble({
     return () => ro.disconnect()
   }, [sel])
 
-  /* 气泡弹出即聚焦输入框（preventScroll：气泡定位刚结算完，不能再引发滚动）；
-     顺手清掉上一次自增高留下的行内高度（textarea 跨划选不重挂载） */
+  /* 气泡测量完成、真正 visible 后再聚焦输入框：首帧 measuredH=0 时根节点
+     visibility:hidden，Chromium 会拒绝聚焦其后代；只依赖 sel 会错过后续 visible 帧。
+     focusReady 只发生 false → true，不会在 textarea 自增高时反复抢焦点。 */
+  const focusReady = Boolean(sel && measuredH > 0)
   useEffect(() => {
     const ta = taRef.current
-    if (!sel || !ta) return
+    if (!focusReady || !ta) return
     ta.style.height = ""
     ta.focus({ preventScroll: true })
-  }, [sel])
+  }, [sel, focusReady])
 
   /* 气泡打开期间跟踪 ⌘/Ctrl 起落（keydown/keyup 都带 metaKey/ctrlKey 快照） */
   useEffect(() => {
@@ -137,6 +174,29 @@ export function SelectionBubble({
       window.removeEventListener("blur", onBlur)
     }
   }, [sel])
+
+  /* 有草稿时拦截 Esc（capture：先于壳层 use-workspace-overlays 的关闭链）：
+     · 确认弹窗已开 → 再按 Esc 只关确认弹窗（回到编辑，内容保留）；
+     · 未开 → 弹出「清空并关闭」确认，同时气泡左右抖动提醒内容会丢；
+     · 无草稿 → 不拦截，Esc 照旧直接关气泡。IME 组合态的 Esc 不拦截。 */
+  useEffect(() => {
+    if (!sel) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.isComposing) return
+      if (!question.trim()) return
+      e.preventDefault()
+      e.stopPropagation()
+      if (confirming) {
+        setConfirming(false)
+        return
+      }
+      setConfirming(true)
+      setShaking(true)
+      setEntering(false)
+    }
+    document.addEventListener("keydown", onKey, true)
+    return () => document.removeEventListener("keydown", onKey, true)
+  }, [sel, question, confirming])
 
   if (!sel) return null
 
@@ -192,7 +252,6 @@ export function SelectionBubble({
     : null
 
   /* —— 按钮文案四态（优先级）：列条 override > ⌘ 按住 > 有输入 > 默认 —— */
-  const hasQuestion = question.trim().length > 0
   // 按钮只表达「动作」（两态、长度稳定）；「放置后果」下沉到列条下的提示行——
   // 变长的列标题在提示行里可单行省略，按钮宽度不再被撑爆（用户定的通用方案）
   const btnLabel = hasQuestion ? "带着问题开分支" : "开启分支讨论"
@@ -224,93 +283,168 @@ export function SelectionBubble({
     onFork(sel, h, q || undefined)
   }
 
+  /** 确认清空：关气泡并丢弃草稿（唯一能丢弃草稿的路径） */
+  const discardDraft = () => {
+    setConfirming(false)
+    setQuestion("")
+    window.getSelection()?.removeAllRanges()
+    onSelChange(null)
+  }
+
   return (
-    <div
-      className="sel-bubble"
-      data-dir={dir}
-      style={{
-        left: pos ? pos.left : -9999,
-        top: pos ? pos.top : -9999,
-        width: BUBBLE_W,
-        visibility: pos ? "visible" : "hidden",
-      }}
-    >
-      {/* 平滑曲线轮廓（背景层）：面板 + 指向选区的尾巴，一条 path。尾巴朝上时
-          整层上移 ah 让顶点探出面板上沿；朝下时留在原位向下探出。 */}
+    <>
       <div
-        className="sb-shape"
-        aria-hidden="true"
-        style={{ top: dir === "up" ? -BUBBLE_TAIL.ah : 0 }}
+        className={
+          shaking
+            ? "sel-bubble shaking"
+            : entering
+              ? "sel-bubble entering"
+              : "sel-bubble"
+        }
+        data-dir={dir}
+        onAnimationEnd={(e) => {
+          // animationend 会冒泡，只认气泡自身画布上的两个动画
+          if (e.target !== e.currentTarget) return
+          if (e.animationName === "tc-shake-x") setShaking(false)
+          else if (e.animationName === "tc-pop") setEntering(false)
+        }}
+        style={{
+          left: pos ? pos.left : -9999,
+          top: pos ? pos.top : -9999,
+          width: BUBBLE_W,
+          visibility: pos ? "visible" : "hidden",
+        }}
       >
-        {ready && (
-          <BubbleShape
-            W={BUBBLE_W}
-            H={measuredH}
-            cx={cx}
-            geo={BUBBLE_TAIL}
-            dir={dir}
-            shadow={false}
-          />
-        )}
-      </div>
-      <div className="sb-content" ref={contentRef}>
-        <div className="lbl">在新分支中讨论这段</div>
-        <div className="quote">{sel.text}</div>
-        <div className="ask">
-          <textarea
-            ref={taRef}
-            rows={1}
-            value={question}
-            style={
-              {
-                "--selection-question-max-height": `${SELECTION_QUESTION_MAX_HEIGHT}px`,
-              } as React.CSSProperties
-            }
-            placeholder="就这段问点什么…（可留空）"
-            aria-label="就这段划选文字提出你的问题（可留空，留空则预填代拟问题待确认）"
-            onChange={(e) => {
-              setQuestion(e.target.value)
-              // 自增高：到达同一尺寸源定义的上限后转为内部滚动。
-              const ta = e.currentTarget
-              ta.style.height = "auto"
-              ta.style.height =
-                Math.min(ta.scrollHeight, SELECTION_QUESTION_MAX_HEIGHT) + "px"
-            }}
-            onKeyDown={(e) => {
-              if (e.key !== "Enter") return
-              // IME 守卫（同 chat-view composer）：输入法组合态按 Enter 只做「上屏」，
-              // 不提交、也不 preventDefault。isComposing 覆盖 Chrome/Firefox；
-              // keyCode 229 兜底 Safari（compositionend 后才派发的 Enter keydown）。
-              const ne = e.nativeEvent
-              if (ne.isComposing || ne.keyCode === 229) return
-              if (e.shiftKey) return // Shift+Enter = 换行（浏览器默认行为）
-              e.preventDefault()
-              submit(e.metaKey || e.ctrlKey)
-            }}
-          />
+        {/* 平滑曲线轮廓（背景层）：面板 + 指向选区的尾巴，一条 path。尾巴朝上时
+          整层上移 ah 让顶点探出面板上沿；朝下时留在原位向下探出。 */}
+        <div
+          className="sb-shape"
+          aria-hidden="true"
+          style={{ top: dir === "up" ? -BUBBLE_TAIL.ah : 0 }}
+        >
+          {ready && (
+            <BubbleShape
+              W={BUBBLE_W}
+              H={measuredH}
+              cx={cx}
+              geo={BUBBLE_TAIL}
+              dir={dir}
+              shadow={false}
+            />
+          )}
         </div>
-        {preview && (
-          <SelectionPlacementMap
-            sourceThreadId={sel.threadId}
-            slots={slots}
-            preview={preview}
-            override={ov}
-            titleOf={(threadId) => threadTitle(state, threadId)}
-            onToggleOverride={(threadId) =>
-              setOverride((current) => (current === threadId ? null : threadId))
-            }
-          />
-        )}
-        {placeHint && (
-          <div className="place-hint" aria-live="polite">
-            {placeHint}
+        <div className="sb-content" ref={contentRef}>
+          <div className="lbl">在新分支中讨论这段</div>
+          <div className="quote">{sel.text}</div>
+          <div className="ask">
+            <textarea
+              ref={taRef}
+              rows={1}
+              className="scroll-slim"
+              value={question}
+              style={
+                {
+                  "--selection-question-max-height": `${SELECTION_QUESTION_MAX_HEIGHT}px`,
+                } as React.CSSProperties
+              }
+              placeholder="就这段问点什么…（可留空）"
+              aria-label="就这段划选文字提出你的问题（可留空，留空则预填代拟问题待确认）"
+              onChange={(e) => {
+                setQuestion(e.target.value)
+                // 自增高：到达同一尺寸源定义的上限后转为内部滚动。
+                // border-box 下 scrollHeight（不含边框）直接当 height 会被边框
+                // 吃掉 2px → 永远差 2px 溢出 → 只有一行也亮滚动条，补上边框厚度
+                const ta = e.currentTarget
+                const borderY = ta.offsetHeight - ta.clientHeight
+                ta.style.height = "auto"
+                ta.style.height =
+                  Math.min(
+                    ta.scrollHeight + borderY,
+                    SELECTION_QUESTION_MAX_HEIGHT
+                  ) + "px"
+              }}
+              onKeyDown={(e) => {
+                if (e.key !== "Enter") return
+                // IME 守卫（同 chat-view composer）：输入法组合态按 Enter 只做「上屏」，
+                // 不提交、也不 preventDefault。isComposing 覆盖 Chrome/Firefox；
+                // keyCode 229 兜底 Safari（compositionend 后才派发的 Enter keydown）。
+                const ne = e.nativeEvent
+                if (ne.isComposing || ne.keyCode === 229) return
+                if (e.shiftKey) return // Shift+Enter = 换行（浏览器默认行为）
+                e.preventDefault()
+                submit(e.metaKey || e.ctrlKey)
+              }}
+            />
+          </div>
+          {preview && (
+            <SelectionPlacementMap
+              sourceThreadId={sel.threadId}
+              slots={slots}
+              preview={preview}
+              override={ov}
+              titleOf={(threadId) => threadTitle(state, threadId)}
+              onToggleOverride={(threadId) =>
+                setOverride((current) =>
+                  current === threadId ? null : threadId
+                )
+              }
+            />
+          )}
+          {placeHint && (
+            <div className="place-hint" aria-live="polite">
+              {placeHint}
+            </div>
+          )}
+          <button onClick={(e) => submit(e.metaKey || e.ctrlKey)}>
+            <GitMerge size={14} />
+            {btnLabel}
+          </button>
+        </div>
+        {/* 有草稿时新划选被忽略的轻提示：绝对定位悬挂在面板外，不改变面板高度/定位 */}
+        {draftHint && (
+          <div className="draft-hint" role="status">
+            已有草稿 · 提交或清空后才能换划选
           </div>
         )}
-        <button onClick={(e) => submit(e.metaKey || e.ctrlKey)}>
-          <GitMerge size={14} />
-          {btnLabel}
-        </button>
       </div>
-    </div>
+      {/* Esc 确认弹窗：提示会清空已输入内容；点遮罩 / 再按 Esc = 继续编辑（保留内容） */}
+      {confirming && (
+        <div
+          className="sb-confirm-mask"
+          onMouseDown={(e) => {
+            e.stopPropagation()
+            setConfirming(false)
+          }}
+        >
+          <div
+            className="sb-confirm"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="sb-confirm-title"
+            aria-describedby="sb-confirm-desc"
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <div className="sb-confirm-title" id="sb-confirm-title">
+              清空输入内容？
+            </div>
+            <div className="sb-confirm-body" id="sb-confirm-desc">
+              气泡里已输入的内容将被清空，划选分支也会关闭，此操作不可撤销。
+            </div>
+            <div className="sb-confirm-actions">
+              <button
+                className="ghost"
+                autoFocus
+                onClick={() => setConfirming(false)}
+              >
+                继续编辑
+              </button>
+              <button className="danger" onClick={discardDraft}>
+                清空并关闭
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   )
 }

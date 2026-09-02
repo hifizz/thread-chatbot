@@ -5,6 +5,7 @@ import type {
   MessageDTO,
   ProjectBootstrapDTO,
   ProjectDTO,
+  ProjectFileDTO,
   ThreadDTO,
 } from "@/lib/thread-chat/contracts/dto"
 import type {
@@ -57,6 +58,10 @@ function entitiesFromBootstrap(
   const active = new Set(bootstrap.activeGenerationIds)
   return {
     project: bootstrap.project,
+    projectFilesById: Object.fromEntries(
+      bootstrap.files.map((file) => [file.attachmentId, file])
+    ),
+    projectFileOrder: bootstrap.files.map((file) => file.attachmentId),
     threadsById: Object.fromEntries(
       bootstrap.threads.map((thread) => [thread.id, thread])
     ),
@@ -79,6 +84,7 @@ function entitiesFromBootstrap(
 function emptyEntities(): ConversationEntitySnapshot {
   return entitiesFromBootstrap({
     project: null,
+    files: [],
     threads: [],
     messages: [],
     artifacts: [],
@@ -91,6 +97,8 @@ function entitySnapshot(
 ): ConversationEntitySnapshot {
   return structuredClone({
     project: state.project,
+    projectFilesById: state.projectFilesById,
+    projectFileOrder: state.projectFileOrder,
     threadsById: state.threadsById,
     messagesById: state.messagesById,
     messageIdsByThread: state.messageIdsByThread,
@@ -157,6 +165,30 @@ export function createConversationStore(input?: {
     upsertProject(project: ProjectDTO) {
       set({ project })
     },
+    upsertProjectFile(file: ProjectFileDTO) {
+      set((state) => ({
+        projectFilesById: {
+          ...state.projectFilesById,
+          [file.attachmentId]: file,
+        },
+        projectFileOrder: state.projectFileOrder.includes(file.attachmentId)
+          ? state.projectFileOrder
+          : [file.attachmentId, ...state.projectFileOrder],
+      }))
+    },
+    removeProjectFile(attachmentId: string) {
+      set((state) => {
+        if (!state.projectFilesById[attachmentId]) return state
+        const projectFilesById = { ...state.projectFilesById }
+        delete projectFilesById[attachmentId]
+        return {
+          projectFilesById,
+          projectFileOrder: state.projectFileOrder.filter(
+            (id) => id !== attachmentId
+          ),
+        }
+      })
+    },
     upsertThread(thread: ThreadDTO) {
       set((state) => ({
         threadsById: { ...state.threadsById, [thread.id]: thread },
@@ -183,7 +215,7 @@ export function createConversationStore(input?: {
         artifactsById: { ...state.artifactsById, [artifact.id]: artifact },
         artifactOrder: state.artifactOrder.includes(artifact.id)
           ? state.artifactOrder
-          : [...state.artifactOrder, artifact.id],
+          : [artifact.id, ...state.artifactOrder],
       }))
     },
     applyStreamSnapshot(messageId, message, throughSeq) {
@@ -340,6 +372,19 @@ export function createConversationStore(input?: {
             sameValue(current.project, patch.after.project)
               ? structuredClone(patch.before.project)
               : current.project,
+          projectFilesById: rollbackRecord(
+            current.projectFilesById,
+            patch.before.projectFilesById,
+            patch.after.projectFilesById
+          ),
+          projectFileOrder:
+            !sameValue(
+              patch.before.projectFileOrder,
+              patch.after.projectFileOrder
+            ) &&
+            sameValue(current.projectFileOrder, patch.after.projectFileOrder)
+              ? structuredClone(patch.before.projectFileOrder)
+              : current.projectFileOrder,
           threadsById: rollbackRecord(
             current.threadsById,
             patch.before.threadsById,

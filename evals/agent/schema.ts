@@ -5,6 +5,24 @@ export const AGENT_CASE_SCHEMA_VERSION = "agent-case-v1" as const
 const routeModeSchema = z.enum(["answer", "fetch", "search", "research"])
 const terminalStateSchema = z.enum(["completed", "stopped", "failed"])
 
+const attachmentFixtureSchema = z
+  .object({
+    fixture: z.string().min(1),
+    mediaType: z.string().min(1),
+    filename: z.string().min(1).optional(),
+  })
+  .strict()
+
+const projectContextSchema = z
+  .object({
+    target: z.string().max(4_000).nullable().default(null),
+    instructions: z.string().max(20_000).nullable().default(null),
+    files: z.array(attachmentFixtureSchema).default([]),
+    /** 同一 eval user 的另一个 Project；用于验证 Project File 不跨 Project 泄漏。 */
+    foreignFiles: z.array(attachmentFixtureSchema).default([]),
+  })
+  .strict()
+
 export const agentCaseSchema = z
   .object({
     schemaVersion: z.literal(AGENT_CASE_SCHEMA_VERSION),
@@ -34,17 +52,8 @@ export const agentCaseSchema = z
               .strict()
           )
           .min(1),
-        attachments: z
-          .array(
-            z
-              .object({
-                fixture: z.string().min(1),
-                mediaType: z.string().min(1),
-                filename: z.string().min(1).optional(),
-              })
-              .strict()
-          )
-          .default([]),
+        attachments: z.array(attachmentFixtureSchema).default([]),
+        projectContext: projectContextSchema.optional(),
         lifecycleScenario: z.enum(["complete", "stop", "fail"]).optional(),
       })
       .strict(),

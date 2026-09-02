@@ -13,12 +13,14 @@ import {
   toArtifactDTO,
   toMessageDTO,
   toProjectDTO,
+  toProjectFileDTO,
   toThreadDTO,
 } from "@/lib/thread-chat/persistence/mappers"
 import {
   findOwnedMessage,
   listProjectMessageRows,
 } from "@/lib/thread-chat/persistence/message-repository"
+import { listProjectFileRows } from "@/lib/thread-chat/persistence/project-file-repository"
 import {
   findOwnedProject,
   findRootThreadId,
@@ -48,21 +50,25 @@ export async function getProjectBootstrap(
   if (!project) {
     return {
       project: null,
+      files: [],
       threads: [],
       messages: [],
       artifacts: [],
       activeGenerationIds: [],
     }
   }
-  const [threadRows, messageRows, artifactRows] = await Promise.all([
-    listProjectThreadRows(db, project.id),
-    listProjectMessageRows(db, project.id),
-    listProjectArtifactRows(db, project.id),
-  ])
+  const [threadRows, messageRows, artifactRows, projectFileRows] =
+    await Promise.all([
+      listProjectThreadRows(db, project.id),
+      listProjectMessageRows(db, project.id),
+      listProjectArtifactRows(db, project.id),
+      listProjectFileRows(db, project.id),
+    ])
   const root = threadRows.find((thread) => thread.parentId === null)
   if (!root) throw new Error("PROJECT_WITHOUT_ROOT_THREAD")
   return {
     project: toProjectDTO(project, root.id),
+    files: projectFileRows.map(toProjectFileDTO),
     threads: threadRows.map(toThreadDTO),
     messages: messageRows.map(toMessageDTO),
     artifacts: artifactRows.map(toArtifactDTO),

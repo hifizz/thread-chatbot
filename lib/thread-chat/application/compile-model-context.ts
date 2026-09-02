@@ -1,7 +1,10 @@
 import { convertToModelMessages, type ModelMessage } from "ai"
 import { db } from "@/lib/db"
 import { INHERITED_CHAR_BUDGET } from "@/constants/thread-chat"
-import { resolveAttachmentParts } from "@/lib/chat/resolve-attachments"
+import {
+  resolveAttachmentContext,
+  type ProjectFileContextStats,
+} from "@/lib/chat/resolve-attachments"
 import type { ThreadChatUIMessage } from "@/lib/thread-chat/contracts/ui-message"
 import {
   applyInheritedBudget,
@@ -13,6 +16,7 @@ import {
   loadProjectMessagesByIds,
   listThreadMessageRows,
 } from "@/lib/thread-chat/persistence/message-repository"
+import { listProjectFileRows } from "@/lib/thread-chat/persistence/project-file-repository"
 import { findOwnedThread } from "@/lib/thread-chat/persistence/thread-repository"
 
 function messageText(message: ThreadChatUIMessage): string {
@@ -40,8 +44,14 @@ function asUiMessage(row: {
   }
 }
 
-/** 返回纯模型消息；system prompt 由生成服务单独注入，不进入持久化上下文。 */
-export async function compileModelContext({
+export interface CompiledModelContext {
+  messages: ModelMessage[]
+  projectFileIds: string[]
+  projectFileStats: ProjectFileContextStats
+}
+
+/** 返回模型消息与本轮固定的 Project File 快照。 */
+export async function compileModelContextWithProject({
   userId,
   threadId,
   excludeAssistantMessageId,
@@ -49,7 +59,7 @@ export async function compileModelContext({
   userId: string
   threadId: string
   excludeAssistantMessageId?: string
-}): Promise<ModelMessage[]> {
+}): Promise<CompiledModelContext> {
   const thread = await findOwnedThread(db, userId, threadId)
   if (!thread) notFound()
   const inheritedRows = await loadProjectMessagesByIds(
@@ -102,8 +112,37 @@ export async function compileModelContext({
     ...budgeted.kept,
     ...currentMessages,
   ]
-  const resolvedMessages = await resolveAttachmentParts(uiMessages, userId)
-  return convertToModelMessages(resolvedMessages, {
+  const projectFiles = await listProjectFileRows(db, thread.projectId)
+  const resolved = await resolveAttachmentContext({
+    messages: uiMessages,
+    userId,
+    projectFiles,
+  })
+  const withProjectContext: ThreadChatUIMessage[] = [
+    ...(resolved.projectContext
+      ? [
+          {
+            id: "project-files-context",
+            role: "user" as const,
+            parts: [
+              {
+                type: "text" as const,
+                text: resolved.projectContext,
+              },
+            ],
+            metadata: {
+              messageId: "project-files-context",
+              threadId: thread.id,
+            },
+          },
+        ]
+      : []),
+    // resolveAttachmentContext only rewrites message parts and preserves the
+    // original UI message identity/metadata. Its shared attachment API remains
+    // generic UIMessage-shaped, so restore the narrower ThreadChat type here.
+    ...(resolved.messages as ThreadChatUIMessage[]),
+  ]
+  const modelMessages = await convertToModelMessages(withProjectContext, {
     ignoreIncompleteToolCalls: true,
     convertDataPart: (part) => {
       if (part.type !== "data-quote") return undefined
@@ -116,4 +155,18 @@ export async function compileModelContext({
         : undefined
     },
   })
+  return {
+    messages: modelMessages,
+    projectFileIds: resolved.projectFileIds,
+    projectFileStats: resolved.stats,
+  }
+}
+
+/** 兼容现有调用方：只返回纯模型消息。 */
+export async function compileModelContext(input: {
+  userId: string
+  threadId: string
+  excludeAssistantMessageId?: string
+}): Promise<ModelMessage[]> {
+  return (await compileModelContextWithProject(input)).messages
 }

@@ -49,7 +49,7 @@ import {
   TreeList,
   type TreeListItem,
 } from "./orchestration/navigation/tree-list"
-import { ArtifactDrawer } from "./orchestration/artifacts/artifact-drawer"
+import { StoreBoundProjectPanel } from "./orchestration/artifacts/store-bound-project-panel"
 import type { CanvasChatActions } from "./orchestration/canvas/canvas-actions"
 import { HelpPanel, UsageHint } from "./orchestration/overlays/help-panel"
 import { useWorkspaceOverlays } from "./orchestration/overlays/use-workspace-overlays"
@@ -719,8 +719,11 @@ function NormalizedThreadChat({
         />
       )}
 
-      <ArtifactDrawer
-        state={tree}
+      <StoreBoundProjectPanel
+        projectId={treeId}
+        store={runtime.store}
+        client={runtime.client}
+        commands={runtime.commands}
         open={drawerOpen}
         activeId={activeArtifactId}
         onClose={closeDrawer}

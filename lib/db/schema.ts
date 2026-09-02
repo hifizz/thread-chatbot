@@ -14,6 +14,10 @@ import {
 import { relations, sql } from "drizzle-orm"
 import { dbSchema } from "./pg-schema"
 import { EMBEDDING_DIMENSIONS } from "@/constants/rag"
+import {
+  PROJECT_INSTRUCTIONS_MAX_CHARS,
+  PROJECT_TARGET_MAX_CHARS,
+} from "@/constants/project-workspace"
 import { user } from "./auth-schema"
 import type { TextAnchor } from "@/lib/thread-chat/domain/text-anchor"
 import type { ThreadChatUIMessage } from "@/lib/thread-chat/contracts/ui-message"
@@ -31,25 +35,25 @@ export * from "./payment-schema"
 export const attachments = dbSchema.table(
   "attachments",
   {
-    id: text("id").primaryKey(), // crypto.randomUUID()；同时是应用内 URL /api/attachments/{id} 的路径段
+    id: text("id").primaryKey(),
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
-    key: text("key").notNull().unique(), // R2 对象 key：attachments/{uuid}.{白名单扩展名}，不含用户文件名
-    filename: text("filename").notNull(), // 原始文件名，仅展示用
+    key: text("key").notNull().unique(),
+    filename: text("filename").notNull(),
     mimeType: text("mime_type").notNull(),
-    size: integer("size").notNull(), // 字节；ingest 时与 R2 实际大小复验
+    size: integer("size").notNull(),
     kind: text("kind", {
       enum: ["document", "image", "archive", "video"],
     }).notNull(),
     status: text("status", { enum: ["uploading", "ready", "failed"] })
       .notNull()
       .default("uploading"),
-    pageCount: integer("page_count"), // PDF 专用
-    pages: jsonb("pages").$type<string[]>(), // PDF 专用：pages[i] = 第 i+1 页文本，按页存储为二期 RAG/引用跳转铺路
-    summary: text("summary"), // PDF 专用：上传后生成的内容摘要（冷启动引导）
-    suggestedQuestions: jsonb("suggested_questions").$type<string[]>(), // PDF 专用：建议问题
-    error: text("error"), // 失败原因（用户可见）
+    pageCount: integer("page_count"),
+    pages: jsonb("pages").$type<string[]>(),
+    summary: text("summary"),
+    suggestedQuestions: jsonb("suggested_questions").$type<string[]>(),
+    error: text("error"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -67,6 +71,9 @@ export const projects = dbSchema.table(
       .references(() => user.id, { onDelete: "cascade" }),
     autoTitle: text("auto_title"),
     customTitle: text("custom_title"),
+    target: text("target"),
+    instructions: text("instructions"),
+    contractVersion: integer("contract_version").notNull().default(0),
     nextFootnote: integer("next_footnote").notNull().default(1),
     archivedAt: timestamp("archived_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
@@ -84,6 +91,42 @@ export const projects = dbSchema.table(
       table.updatedAt
     ),
     check("projects_next_footnote_positive", sql`${table.nextFootnote} >= 1`),
+    check(
+      "projects_contract_version_nonnegative",
+      sql`${table.contractVersion} >= 0`
+    ),
+    check(
+      "projects_target_length",
+      sql`${table.target} is null or char_length(${table.target}) <= ${sql.raw(String(PROJECT_TARGET_MAX_CHARS))}`
+    ),
+    check(
+      "projects_instructions_length",
+      sql`${table.instructions} is null or char_length(${table.instructions}) <= ${sql.raw(String(PROJECT_INSTRUCTIONS_MAX_CHARS))}`
+    ),
+  ]
+)
+
+/** Attachment 的 Project 资料区成员关系；底层文件仍由 attachments 作为唯一来源。 */
+export const projectFiles = dbSchema.table(
+  "project_files",
+  {
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    attachmentId: text("attachment_id")
+      .notNull()
+      .references(() => attachments.id, { onDelete: "cascade" }),
+    addedAt: timestamp("added_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    primaryKey({
+      name: "project_files_pk",
+      columns: [table.projectId, table.attachmentId],
+    }),
+    uniqueIndex("project_files_attachment_uq").on(table.attachmentId),
+    index("project_files_project_added_idx").on(table.projectId, table.addedAt),
   ]
 )
 
@@ -294,7 +337,7 @@ export const feedbackScoreOutbox = dbSchema.table(
   ]
 )
 
-/** Message 产生的长期产物；通过 Project + source Message 做所有权与溯源。 */
+/** Message 产生的长期产物；Project、Thread 与 source Message 都持久化用于溯源。 */
 export const artifacts = dbSchema.table(
   "artifacts",
   {
@@ -302,6 +345,9 @@ export const artifacts = dbSchema.table(
     projectId: text("project_id")
       .notNull()
       .references(() => projects.id, { onDelete: "cascade" }),
+    threadId: text("thread_id")
+      .notNull()
+      .references(() => threads.id),
     sourceMessageId: text("source_message_id")
       .notNull()
       .references(() => messages.id),
@@ -322,6 +368,7 @@ export const artifacts = dbSchema.table(
   },
   (table) => [
     index("artifacts_project_created_idx").on(table.projectId, table.createdAt),
+    index("artifacts_thread_created_idx").on(table.threadId, table.createdAt),
     index("artifacts_source_message_idx").on(table.sourceMessageId),
   ]
 )
@@ -351,11 +398,27 @@ export const conversationCommands = dbSchema.table(
   ]
 )
 
+export const attachmentsRelations = relations(attachments, ({ many }) => ({
+  projectMemberships: many(projectFiles),
+}))
+
 export const projectsRelations = relations(projects, ({ one, many }) => ({
   owner: one(user, { fields: [projects.userId], references: [user.id] }),
+  files: many(projectFiles),
   threads: many(threads),
   messages: many(messages),
   artifacts: many(artifacts),
+}))
+
+export const projectFilesRelations = relations(projectFiles, ({ one }) => ({
+  project: one(projects, {
+    fields: [projectFiles.projectId],
+    references: [projects.id],
+  }),
+  attachment: one(attachments, {
+    fields: [projectFiles.attachmentId],
+    references: [attachments.id],
+  }),
 }))
 
 export const threadsRelations = relations(threads, ({ one, many }) => ({
@@ -370,6 +433,7 @@ export const threadsRelations = relations(threads, ({ one, many }) => ({
   }),
   children: many(threads, { relationName: "threadChildren" }),
   messages: many(messages),
+  artifacts: many(artifacts),
 }))
 
 export const messagesRelations = relations(messages, ({ one, many }) => ({
@@ -395,6 +459,10 @@ export const artifactsRelations = relations(artifacts, ({ one }) => ({
     fields: [artifacts.projectId],
     references: [projects.id],
   }),
+  thread: one(threads, {
+    fields: [artifacts.threadId],
+    references: [threads.id],
+  }),
   sourceMessage: one(messages, {
     fields: [artifacts.sourceMessageId],
     references: [messages.id],
@@ -405,11 +473,11 @@ export const artifactsRelations = relations(artifacts, ({ one }) => ({
 export const attachmentChunks = dbSchema.table(
   "attachment_chunks",
   {
-    id: text("id").primaryKey(), // crypto.randomUUID()
+    id: text("id").primaryKey(),
     attachmentId: text("attachment_id")
       .notNull()
       .references(() => attachments.id, { onDelete: "cascade" }),
-    page: integer("page").notNull(), // 1-based 页码，支持带页码的引用溯源
+    page: integer("page").notNull(),
     content: text("content").notNull(),
     embedding: vector("embedding", {
       dimensions: EMBEDDING_DIMENSIONS,
@@ -417,7 +485,6 @@ export const attachmentChunks = dbSchema.table(
   },
   (table) => [
     index("attachment_chunks_attachment_id_idx").on(table.attachmentId),
-    // HNSW + cosine 距离，用于近似最近邻检索
     index("attachment_chunks_embedding_idx").using(
       "hnsw",
       table.embedding.op("vector_cosine_ops")

@@ -1,3 +1,7 @@
+import type {
+  AttachmentKind,
+  AttachmentStatus,
+} from "@/constants/attachment"
 import type { TextAnchor } from "@/lib/thread-chat/domain/text-anchor"
 import type { ConversationMessageStatus } from "@/lib/thread-chat/domain/conversation"
 import type { ThreadChatUIMessage } from "@/lib/thread-chat/contracts/ui-message"
@@ -10,9 +14,29 @@ export interface ProjectDTO {
   rootThreadId: string
   autoTitle: string | null
   customTitle: string | null
+  target: string | null
+  instructions: string | null
+  contractVersion: number
   archivedAt: string | null
   createdAt: string
   updatedAt: string
+}
+
+export interface ProjectFileDTO {
+  projectId: string
+  attachmentId: string
+  filename: string
+  mimeType: string
+  size: number
+  kind: AttachmentKind
+  status: AttachmentStatus
+  pageCount: number | null
+  summary: string | null
+  suggestedQuestions: string[] | null
+  error: string | null
+  url: string
+  addedAt: string
+  createdAt: string
 }
 
 export interface ThreadDTO {
@@ -55,7 +79,11 @@ export interface MessageDTO {
 export interface ArtifactDTO {
   id: string
   projectId: string
+  threadId: string
   sourceMessageId: string
+  sourceThreadTitle: string | null
+  sourceThreadFootnote: number | null
+  sourceMessageStatus: ConversationMessageStatus
   kind: ArtifactKind
   title: string
   content: string
@@ -67,6 +95,7 @@ export interface ArtifactDTO {
 
 export interface ProjectBootstrapDTO {
   project: ProjectDTO | null
+  files: ProjectFileDTO[]
   threads: ThreadDTO[]
   messages: MessageDTO[]
   artifacts: ArtifactDTO[]

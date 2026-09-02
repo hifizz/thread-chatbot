@@ -85,14 +85,22 @@ function CodeBlock({
       () => {}
     )
   }
+  const copyButton = (
+    <button className="copy" onClick={onCopy} title="复制代码">
+      {copied ? <Check size={13} /> : <Copy size={13} />}
+    </button>
+  )
+
   return (
-    <div className="md-code">
-      <div className="md-code-head">
-        <span className="lang">{lang || "code"}</span>
-        <button className="copy" onClick={onCopy} title="复制代码">
-          {copied ? <Check size={13} /> : <Copy size={13} />}
-        </button>
-      </div>
+    <div className={`md-code${lang ? "" : " no-lang"}`}>
+      {lang ? (
+        <div className="md-code-head">
+          <span className="lang">{lang}</span>
+          {copyButton}
+        </div>
+      ) : (
+        copyButton
+      )}
       <ShikiCode
         code={code}
         language={lang}
