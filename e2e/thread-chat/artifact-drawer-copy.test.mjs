@@ -3,14 +3,14 @@ import { readFile } from "node:fs/promises"
 
 const source = await readFile(
   new URL(
-    "../../app/thread-chat/orchestration/artifacts/artifact-drawer.tsx",
+    "../../app/thread-chat/orchestration/artifacts/project-panel.tsx",
     import.meta.url
   ),
   "utf8"
 )
 
-assert.match(source, /a\?\.kind === "markdown"/)
-assert.match(source, /copy\(a\.content\)/)
+assert.match(source, /selectedArtifact\.kind === "markdown"/)
+assert.match(source, /copy\(selectedArtifact\.content\)/)
 assert.match(source, /copied \? "已复制" : "复制"/)
 assert.doesNotMatch(source, /copy\([^)]*(innerHTML|textContent)/)
 

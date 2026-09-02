@@ -48,7 +48,39 @@ export const UMAPIS_MODEL_IDS = [
 export type UMAPISModelId = (typeof UMAPIS_MODEL_IDS)[number]
 export type UMAPISCredentialGroup = "claude" | "gpt"
 export type ChatModelProvider =
-  "minimax" | "deepseek" | "openai" | "ark" | "openrouter" | "umapis"
+  | "minimax"
+  | "deepseek"
+  | "openai"
+  | "ark"
+  | "openrouter"
+  | "umapis"
+  | "private-relay"
+
+/** 模型选择器使用的供应商展示名。 */
+export const CHAT_MODEL_PROVIDER_LABELS: Readonly<
+  Record<ChatModelProvider, string>
+> = {
+  minimax: "MiniMax",
+  deepseek: "DeepSeek",
+  openai: "OpenAI",
+  ark: "火山方舟",
+  openrouter: "OpenRouter",
+  umapis: "UMAPIS",
+  "private-relay": "Private Relay",
+}
+
+/** Thread Chat 对外展示的中性模型组名称，不暴露实际服务供应商。 */
+export const THREAD_CHAT_MODEL_GROUP_LABELS: Readonly<
+  Record<ChatModelProvider, string>
+> = {
+  minimax: "海南岛",
+  deepseek: "崇明岛",
+  openai: "马略卡",
+  ark: "济州岛",
+  openrouter: "巴厘岛",
+  umapis: "冰岛",
+  "private-relay": "塞班岛",
+}
 export type ReasoningTransport = "think-tags" | "native"
 export type ChatModelSurface = "linear" | "thread"
 
@@ -103,6 +135,24 @@ function createUmapisClaudeModel<const TModelId extends UMAPISClaudeModelId>(
     unbilledPreview: true,
     surfaces: ["thread"],
     creator: "anthropic",
+  } as const satisfies ChatModel
+}
+
+/** 注册仅供 Thread Chat 使用的私有中继聊天模型。 */
+function createPrivateRelayModel<
+  const TId extends string,
+  const TUpstreamModel extends string,
+>(id: TId, upstreamModel: TUpstreamModel, name: string, description: string) {
+  return {
+    id,
+    name,
+    description,
+    provider: "private-relay",
+    upstreamModel,
+    reasoningTransport: "native",
+    unbilledPreview: true,
+    surfaces: ["thread"],
+    creator: "openai",
   } as const satisfies ChatModel
 }
 
@@ -256,6 +306,49 @@ const CHAT_MODEL_REGISTRY = [
     surfaces: ["thread"],
     creator: "openai",
   },
+  // 订阅额度尚未完成成本折算，先沿用明确的预览标记，避免缺失价格被误记为 ¥0 计费。
+  createPrivateRelayModel(
+    "private-relay-gpt-5.6-sol",
+    "gpt-5.6-sol",
+    "GPT-5.6 Sol",
+    "质量优先，适合复杂推理、复杂编码和专业工作。"
+  ),
+  createPrivateRelayModel(
+    "private-relay-gpt-5.6-terra",
+    "gpt-5.6-terra",
+    "GPT-5.6 Terra",
+    "能力、延迟和配额消耗均衡，推荐用于日常复杂任务。"
+  ),
+  createPrivateRelayModel(
+    "private-relay-gpt-5.6-luna",
+    "gpt-5.6-luna",
+    "GPT-5.6 Luna",
+    "面向高吞吐和低消耗任务的快速模型。"
+  ),
+  createPrivateRelayModel(
+    "private-relay-gpt-5.5",
+    "gpt-5.5",
+    "GPT-5.5",
+    "高能力通用模型，适合作为复杂工具型 Agent 的回退。"
+  ),
+  createPrivateRelayModel(
+    "private-relay-gpt-5.4",
+    "gpt-5.4",
+    "GPT-5.4",
+    "成熟的通用编码与专业工作模型，适合作为稳定回退。"
+  ),
+  createPrivateRelayModel(
+    "private-relay-gpt-5.4-mini",
+    "gpt-5.4-mini",
+    "GPT-5.4 Mini",
+    "面向高吞吐的快速模型，适合编码和子 Agent。"
+  ),
+  createPrivateRelayModel(
+    "private-relay-gpt-5.3-codex-spark",
+    "gpt-5.3-codex-spark",
+    "GPT-5.3 Codex Spark",
+    "快速 Codex 编码模型；兼容性验证中。"
+  ),
   {
     id: "openrouter-gpt-5.6-luna",
     name: "OpenRouter · GPT-5.6 Luna",

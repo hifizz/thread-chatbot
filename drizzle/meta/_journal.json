@@ -43,6 +43,13 @@
       "when": 1787765717722,
       "tag": "0005_legacy_thread_chat_backup",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1787986928379,
+      "tag": "0006_ambitious_silk_fever",
+      "breakpoints": true
     }
   ]
 }

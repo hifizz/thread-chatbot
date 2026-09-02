@@ -55,6 +55,9 @@ function initialBootstrap(
     rootThreadId: ROOT_THREAD_ID,
     autoTitle: "规范化会话验收",
     customTitle: null,
+    target: null,
+    instructions: null,
+    contractVersion: 0,
     archivedAt: null,
     createdAt: stamp,
     updatedAt: stamp,
@@ -277,7 +280,11 @@ function initialBootstrap(
   const artifact: ArtifactDTO = {
     id: INITIAL_ARTIFACT_ID,
     projectId,
+    threadId: ROOT_THREAD_ID,
     sourceMessageId: ROOT_ASSISTANT_ID,
+    sourceThreadTitle: "规范化会话验收",
+    sourceThreadFootnote: null,
+    sourceMessageStatus: "completed",
     kind: "markdown",
     title: "断流恢复验收清单",
     content:
@@ -289,6 +296,7 @@ function initialBootstrap(
   }
   return {
     project,
+    files: [],
     threads: [root, child, nested],
     messages,
     artifacts: [artifact],
@@ -321,6 +329,7 @@ export function createGate3MockRuntime(
 
   const bootstrap = (): ProjectBootstrapDTO => ({
     project: clone(project),
+    files: [],
     threads: [...threads.values()].map(clone),
     messages: [...messages.values()].map(clone),
     artifacts: [...artifacts.values()].map(clone),
@@ -426,7 +435,11 @@ export function createGate3MockRuntime(
       artifacts.set(artifactId, {
         id: artifactId,
         projectId,
+        threadId: current.threadId,
         sourceMessageId: messageId,
+        sourceThreadTitle: threads.get(current.threadId)?.customTitle ?? threads.get(current.threadId)?.autoTitle ?? null,
+        sourceThreadFootnote: threads.get(current.threadId)?.footnote ?? null,
+        sourceMessageStatus: "completed",
         kind: "markdown",
         title: "Gate 3 生成报告",
         content:
@@ -521,6 +534,9 @@ export function createGate3MockRuntime(
           rootThreadId: input.rootThreadId,
           autoTitle: null,
           customTitle: null,
+          target: null,
+          instructions: null,
+          contractVersion: 0,
           archivedAt: null,
           createdAt: stamp,
           updatedAt: stamp,
@@ -745,6 +761,29 @@ export function createGate3MockRuntime(
       if (!project) throw new Error("PROJECT_NOT_FOUND")
       project = { ...project, customTitle: input.customTitle, updatedAt: now() }
       return commandResponse(clone(project))
+    },
+    async updateProjectContract(_targetProjectId, input) {
+      if (!project) throw new Error("PROJECT_NOT_FOUND")
+      if (project.contractVersion !== input.expectedContractVersion)
+        throw new Error("PROJECT_CONTRACT_VERSION_CONFLICT")
+      project = {
+        ...project,
+        target: input.target.trim() || null,
+        instructions: input.instructions.trim() || null,
+        contractVersion: project.contractVersion + 1,
+        updatedAt: now(),
+      }
+      return commandResponse(clone(project))
+    },
+    async addProjectFile() {
+      throw new Error("PROJECT_FILE_UPLOAD_NOT_AVAILABLE_IN_GATE3_HARNESS")
+    },
+    async removeProjectFile(_targetProjectId, attachmentId) {
+      return commandResponse({
+        projectId,
+        attachmentId,
+        removed: true as const,
+      })
     },
     async setProjectArchived(_targetProjectId, input) {
       if (!project) throw new Error("PROJECT_NOT_FOUND")

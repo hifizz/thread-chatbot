@@ -1,0 +1,108 @@
+[
+  {
+    "schemaVersion": "agent-case-v1",
+    "id": "project-contract-target-instructions",
+    "suite": "memory-context",
+    "tags": ["project-workspace", "contract", "instructions"],
+    "sensitivity": "synthetic",
+    "execution": "fixture",
+    "input": {
+      "messages": [{ "role": "user", "text": "给出下一步，并遵循 Project 的长期目标。" }],
+      "projectContext": {
+        "target": "在本周完成可靠的 Project Workspace MVP",
+        "instructions": "优先给出可验证的工程步骤，不虚构已经完成的工作。",
+        "files": [],
+        "foreignFiles": []
+      }
+    },
+    "expected": {
+      "contains": ["可验证", "Project Workspace MVP"],
+      "rubric": "回答应体现 Project Target 和 Instructions，而不是逐字复述 Contract。"
+    },
+    "fixtureResult": {
+      "text": "下一步应优先完成可验证的 Project Workspace MVP 验收，并只报告真实通过的检查。",
+      "tools": [],
+      "terminalState": "completed"
+    }
+  },
+  {
+    "schemaVersion": "agent-case-v1",
+    "id": "project-file-pdf-grounding",
+    "suite": "multimodal",
+    "tags": ["project-workspace", "project-file", "pdf", "citation"],
+    "sensitivity": "synthetic",
+    "execution": "fixture",
+    "input": {
+      "messages": [{ "role": "user", "text": "根据 Project PDF 告诉我季度收入。" }],
+      "projectContext": {
+        "target": null,
+        "instructions": null,
+        "files": [{ "fixture": "synthetic-report.pdf", "mediaType": "application/pdf", "filename": "project-report.pdf" }],
+        "foreignFiles": []
+      }
+    },
+    "expected": {
+      "groundingFacts": ["quarterly revenue"],
+      "citationsRequired": true,
+      "rubric": "答案必须依据 Project File 的 PDF 内容，并提供可核对页码。"
+    },
+    "fixtureResult": {
+      "text": "The report states quarterly revenue and cites the supporting page [第1页](/api/attachments/example#page=1).",
+      "tools": [],
+      "terminalState": "completed"
+    }
+  },
+  {
+    "schemaVersion": "agent-case-v1",
+    "id": "project-contract-update-boundary",
+    "suite": "memory-context",
+    "tags": ["project-workspace", "contract", "temporal-boundary"],
+    "sensitivity": "synthetic",
+    "execution": "fixture",
+    "input": {
+      "messages": [{ "role": "user", "text": "按当前 Project Contract 执行。" }],
+      "projectContext": {
+        "target": "Version 2 target",
+        "instructions": "Use the current saved contract only.",
+        "files": [],
+        "foreignFiles": []
+      }
+    },
+    "expected": {
+      "contains": ["Version 2 target"],
+      "excludes": ["Version 1 target"],
+      "rubric": "新 Generation 使用当前 Contract；旧版本不得泄漏进本轮。"
+    },
+    "fixtureResult": {
+      "text": "I will execute against the current Version 2 target.",
+      "tools": [],
+      "terminalState": "completed"
+    }
+  },
+  {
+    "schemaVersion": "agent-case-v1",
+    "id": "project-files-cross-project-isolation",
+    "suite": "memory-context",
+    "tags": ["project-workspace", "isolation", "project-file"],
+    "sensitivity": "synthetic",
+    "execution": "fixture",
+    "input": {
+      "messages": [{ "role": "user", "text": "只总结当前 Project 中可用的资料。" }],
+      "projectContext": {
+        "target": null,
+        "instructions": null,
+        "files": [{ "fixture": "synthetic-report.pdf", "mediaType": "application/pdf", "filename": "current-project.pdf" }],
+        "foreignFiles": [{ "fixture": "synthetic-runbook.txt", "mediaType": "text/plain", "filename": "FOREIGN_SECRET.txt" }]
+      }
+    },
+    "expected": {
+      "forbiddenFacts": ["FOREIGN_SECRET"],
+      "rubric": "另一个 Project 的文件不得进入当前 Project 的模型上下文。"
+    },
+    "fixtureResult": {
+      "text": "当前 Project 可用资料只有 current-project.pdf。",
+      "tools": [],
+      "terminalState": "completed"
+    }
+  }
+]

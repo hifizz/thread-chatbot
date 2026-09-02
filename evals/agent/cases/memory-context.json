@@ -1,0 +1,176 @@
+[
+  {
+    "schemaVersion": "agent-case-v1",
+    "id": "memory-same-thread-fact",
+    "suite": "memory-context",
+    "tags": ["smoke", "same-thread"],
+    "sensitivity": "synthetic",
+    "execution": "content",
+    "input": {
+      "messages": [
+        { "role": "user", "text": "项目代号是 Aurora。" },
+        { "role": "assistant", "text": "已记住。" },
+        { "role": "user", "text": "项目代号是什么？" }
+      ],
+      "attachments": []
+    },
+    "expected": {
+      "route": "answer",
+      "terminalState": "completed",
+      "memoryFacts": ["Aurora"]
+    },
+    "fixtureResult": {
+      "text": "项目代号是 Aurora。",
+      "route": "answer",
+      "tools": [],
+      "terminalState": "completed",
+      "providerAttempts": []
+    }
+  },
+  {
+    "schemaVersion": "agent-case-v1",
+    "id": "memory-conflicting-update",
+    "suite": "memory-context",
+    "tags": ["ci", "conflict"],
+    "sensitivity": "synthetic",
+    "execution": "content",
+    "input": {
+      "messages": [
+        { "role": "user", "text": "发布日是周二。" },
+        { "role": "assistant", "text": "收到。" },
+        { "role": "user", "text": "更正：发布日改为周四。现在是哪天？" }
+      ],
+      "attachments": []
+    },
+    "expected": {
+      "route": "answer",
+      "terminalState": "completed",
+      "memoryFacts": ["周四"],
+      "excludes": ["仍是周二"]
+    },
+    "fixtureResult": {
+      "text": "以最新更正为准，发布日是周四。",
+      "route": "answer",
+      "tools": [],
+      "terminalState": "completed",
+      "providerAttempts": []
+    }
+  },
+  {
+    "schemaVersion": "agent-case-v1",
+    "id": "memory-long-context-retrieval",
+    "suite": "memory-context",
+    "tags": ["scheduled", "long-context", "retrieval"],
+    "sensitivity": "synthetic",
+    "execution": "content",
+    "input": {
+      "messages": [
+        {
+          "role": "user",
+          "text": "关键部署端口是 4040。后续讨论中请保留这个事实。"
+        },
+        { "role": "assistant", "text": "已记录。" },
+        { "role": "user", "text": "经过一段很长的讨论后，部署端口是多少？" }
+      ],
+      "attachments": []
+    },
+    "expected": {
+      "route": "answer",
+      "terminalState": "completed",
+      "memoryFacts": ["4040"]
+    },
+    "fixtureResult": {
+      "text": "部署端口是 4040。",
+      "route": "answer",
+      "tools": [],
+      "terminalState": "completed",
+      "providerAttempts": []
+    }
+  },
+  {
+    "schemaVersion": "agent-case-v1",
+    "id": "memory-embedding-retrieval-fact",
+    "suite": "memory-context",
+    "tags": ["scheduled", "embedding", "retrieval"],
+    "sensitivity": "synthetic",
+    "execution": "fixture",
+    "input": {
+      "messages": [
+        {
+          "role": "user",
+          "text": "从合成长文档向量检索中找出事故编号。"
+        }
+      ],
+      "attachments": []
+    },
+    "expected": {
+      "terminalState": "completed",
+      "memoryFacts": ["INC-4242"]
+    },
+    "fixtureResult": {
+      "text": "检索到的事故编号是 INC-4242。",
+      "route": "answer",
+      "tools": [],
+      "terminalState": "completed",
+      "providerAttempts": []
+    }
+  },
+  {
+    "schemaVersion": "agent-case-v1",
+    "id": "memory-frozen-branch-context",
+    "suite": "memory-context",
+    "tags": ["scheduled", "branch", "frozen-context"],
+    "sensitivity": "synthetic",
+    "execution": "fixture",
+    "input": {
+      "messages": [
+        {
+          "role": "user",
+          "text": "分支创建时颜色是蓝色，主线后来改成红色；冻结分支应回答什么？"
+        }
+      ],
+      "attachments": []
+    },
+    "expected": {
+      "terminalState": "completed",
+      "memoryFacts": ["蓝色"],
+      "excludes": ["冻结分支是红色"]
+    },
+    "fixtureResult": {
+      "text": "冻结分支保留创建时上下文，因此颜色是蓝色。",
+      "route": "answer",
+      "tools": [],
+      "terminalState": "completed",
+      "providerAttempts": []
+    }
+  },
+  {
+    "schemaVersion": "agent-case-v1",
+    "id": "memory-cross-project-no-leak",
+    "suite": "memory-context",
+    "tags": ["smoke", "privacy", "hard-failure"],
+    "sensitivity": "synthetic",
+    "execution": "fixture",
+    "input": {
+      "messages": [
+        {
+          "role": "user",
+          "text": "当前 Project 没有客户代号。请回答你知道的客户代号。"
+        }
+      ],
+      "attachments": []
+    },
+    "expected": {
+      "terminalState": "completed",
+      "contains": ["不知道"],
+      "forbiddenFacts": ["SECRET-CUSTOMER-OMEGA"]
+    },
+    "fixtureResult": {
+      "text": "当前 Project 没有提供客户代号，所以我不知道。",
+      "route": "answer",
+      "tools": [],
+      "terminalState": "completed",
+      "providerAttempts": []
+    }
+  }
+]

@@ -7,6 +7,7 @@ export const MODEL_CALL_PURPOSE = {
   embeddingQuery: "embedding-query",
   researchPlan: "research-plan",
   researchRoute: "research-route",
+  evaluationJudge: "evaluation-judge",
 } as const
 
 export type ModelCallPurpose =

@@ -1,7 +1,9 @@
 import type {
+  AddProjectFileCommand,
   DeleteProjectCommand,
   EditLatestTurnCommand,
   ForkThreadCommand,
+  RemoveProjectFileCommand,
   RenameProjectCommand,
   RetryMessageCommand,
   SendMessageCommand,
@@ -9,6 +11,7 @@ import type {
   SetProjectArchivedCommand,
   StartProjectCommand,
   StopMessageCommand,
+  UpdateProjectContractCommand,
   UpdateThreadCommand,
 } from "@/lib/thread-chat/contracts/commands"
 import type {
@@ -17,6 +20,7 @@ import type {
   MessageDTO,
   ProjectBootstrapDTO,
   ProjectDTO,
+  ProjectFileDTO,
   ThreadTitleDTO,
   ThreadDTO,
 } from "@/lib/thread-chat/contracts/dto"
@@ -57,6 +61,12 @@ export interface DeleteAcceptedDTO {
   deleted: true
 }
 
+export interface RemoveProjectFileAcceptedDTO {
+  projectId: string
+  attachmentId: string
+  removed: true
+}
+
 function apiUrl(baseUrl: string, path: string): string {
   return `${baseUrl.replace(/\/$/, "")}${path}`
 }
@@ -88,10 +98,13 @@ async function requestJson<T>(
   const body = await decodeJson(response)
   if (!response.ok) {
     const error = (body as { error?: ApiErrorDTO }).error
-    throw new ThreadChatApiError(response.status, error ?? {
-      code: "GENERATION_FAILED",
-      message: "请求失败，请稍后重试",
-    })
+    throw new ThreadChatApiError(
+      response.status,
+      error ?? {
+        code: "GENERATION_FAILED",
+        message: "请求失败，请稍后重试",
+      }
+    )
   }
   return body as T
 }
@@ -216,6 +229,39 @@ export function createThreadChatClient(options: ThreadChatClientOptions = {}) {
         fetcher,
         url(`/api/thread-chat/v1/projects/${projectId}`),
         "PATCH",
+        input
+      )
+    },
+    updateProjectContract(
+      projectId: string,
+      input: UpdateProjectContractCommand
+    ) {
+      return command<ProjectDTO>(
+        fetcher,
+        url(`/api/thread-chat/v1/projects/${projectId}`),
+        "PATCH",
+        input
+      )
+    },
+    addProjectFile(projectId: string, input: AddProjectFileCommand) {
+      return command<ProjectFileDTO>(
+        fetcher,
+        url(`/api/thread-chat/v1/projects/${projectId}/files`),
+        "POST",
+        input
+      )
+    },
+    removeProjectFile(
+      projectId: string,
+      attachmentId: string,
+      input: RemoveProjectFileCommand
+    ) {
+      return command<RemoveProjectFileAcceptedDTO>(
+        fetcher,
+        url(
+          `/api/thread-chat/v1/projects/${projectId}/files/${attachmentId}`
+        ),
+        "DELETE",
         input
       )
     },

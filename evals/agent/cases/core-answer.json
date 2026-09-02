@@ -1,0 +1,94 @@
+[
+  {
+    "schemaVersion": "agent-case-v1",
+    "id": "core-english-instruction-following",
+    "suite": "core-answer",
+    "tags": ["smoke", "english", "instruction"],
+    "sensitivity": "synthetic",
+    "execution": "content",
+    "input": {
+      "messages": [
+        {
+          "role": "user",
+          "text": "Explain idempotency in exactly one sentence and do not use a list."
+        }
+      ],
+      "attachments": []
+    },
+    "expected": {
+      "route": "answer",
+      "tools": [],
+      "terminalState": "completed",
+      "contains": ["repeat"],
+      "excludes": ["1."],
+      "maxToolCount": 0
+    },
+    "fixtureResult": {
+      "text": "Idempotency means repeated execution has the same externally observable result as one execution.",
+      "route": "answer",
+      "tools": [],
+      "terminalState": "completed",
+      "providerAttempts": []
+    }
+  },
+  {
+    "schemaVersion": "agent-case-v1",
+    "id": "core-structured-json",
+    "suite": "core-answer",
+    "tags": ["ci", "structured"],
+    "sensitivity": "synthetic",
+    "execution": "content",
+    "input": {
+      "messages": [
+        {
+          "role": "user",
+          "text": "只输出 JSON，包含 status 和 nextStep 两个字段。"
+        }
+      ],
+      "attachments": []
+    },
+    "expected": {
+      "route": "answer",
+      "tools": [],
+      "terminalState": "completed",
+      "jsonKeys": ["status", "nextStep"]
+    },
+    "fixtureResult": {
+      "text": "{\"status\":\"ok\",\"nextStep\":\"验证\"}",
+      "route": "answer",
+      "tools": [],
+      "terminalState": "completed",
+      "providerAttempts": []
+    }
+  },
+  {
+    "schemaVersion": "agent-case-v1",
+    "id": "core-markdown-artifact",
+    "suite": "core-answer",
+    "tags": ["ci", "artifact", "tool"],
+    "sensitivity": "synthetic",
+    "execution": "content",
+    "input": {
+      "messages": [
+        {
+          "role": "user",
+          "text": "请创建一份独立 Markdown 文档，总结发布检查项。"
+        }
+      ],
+      "attachments": []
+    },
+    "expected": {
+      "route": "answer",
+      "tools": ["createMarkdownArtifact"],
+      "terminalState": "completed",
+      "maxToolCount": 1
+    },
+    "fixtureResult": {
+      "text": "文档已创建。",
+      "route": "answer",
+      "tools": ["createMarkdownArtifact"],
+      "terminalState": "completed",
+      "providerAttempts": []
+    }
+  }
+]
