@@ -2,7 +2,7 @@
  * lib/chat/tree-id —— 分支树 treeId 的形状校验（UUID）。
  *
  * treeId 由客户端 crypto.randomUUID() 生成、URL 路径段承载（/thread-chat/{treeId}）。
- * 路由（[treeId]/page.tsx）与 API（/api/branch-trees/[treeId]）共用同一校验作为安全阀，
+ * `/thread-chat/[treeId]` 路由继续使用 UUID 形状的 Project ID，作为路径安全阀，
  * 避免任意字符串打到 DB 主键——放 lib/ 供服务端与客户端两侧复用。
  */
 

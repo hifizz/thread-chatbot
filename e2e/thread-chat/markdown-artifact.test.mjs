@@ -1,18 +1,21 @@
 /**
  * Markdown Artifact 共享契约纯函数测试：
- *   node --experimental-strip-types e2e/thread-chat/markdown-artifact.test.mjs
+ *   node --import tsx e2e/thread-chat/markdown-artifact.test.mjs
  */
 import {
   MARKDOWN_ARTIFACT_CONTENT_MAX_CHARS,
   MARKDOWN_ARTIFACT_TOOL_DESCRIPTION,
   MARKDOWN_ARTIFACT_TOOL_NAME,
-  isExplicitMarkdownDeliverableRequest,
+  isExplicitMarkdownArtifactRequest,
   markdownArtifactProgressFromPartialInput,
   isMarkdownArtifactStreamEvent,
   markdownArtifactInputSchema,
   normalizeMarkdownArtifactInput,
 } from "../../lib/chat/markdown-artifact.ts"
-import { THREAD_CHAT_SYSTEM } from "../../constants/thread-chat.ts"
+import {
+  THREAD_CHAT_MARKDOWN_ARTIFACT_SYSTEM,
+  THREAD_CHAT_SYSTEM,
+} from "../../constants/thread-chat.ts"
 
 let failed = 0
 const ok = (label, condition) => {
@@ -60,8 +63,9 @@ ok(
 )
 ok(
   "Thread Chat system 不再限制单份 Markdown 文件",
-  THREAD_CHAT_SYSTEM.includes("多份独立文档") &&
-    !THREAD_CHAT_SYSTEM.includes("每次回复最多创建一份")
+  THREAD_CHAT_MARKDOWN_ARTIFACT_SYSTEM.includes("多份独立文档") &&
+    !THREAD_CHAT_MARKDOWN_ARTIFACT_SYSTEM.includes("每次回复最多创建一份") &&
+    !THREAD_CHAT_SYSTEM.includes("createMarkdownArtifact")
 )
 
 const positive = [
@@ -70,9 +74,10 @@ const positive = [
   "用 Markdown 输出这份发布计划",
   "Create a Markdown document for the release notes",
   "Summarize this discussion into an .md file",
+  "把这次讨论总结成 .md 文件",
 ]
 for (const text of positive)
-  ok(`高置信交付正例：${text}`, isExplicitMarkdownDeliverableRequest(text))
+  ok(`高置信交付正例：${text}`, isExplicitMarkdownArtifactRequest(text))
 
 const negative = [
   "Markdown 是什么？",
@@ -82,7 +87,7 @@ const negative = [
   "请用小标题总结这次讨论",
 ]
 for (const text of negative)
-  ok(`概念/普通回答反例：${text}`, !isExplicitMarkdownDeliverableRequest(text))
+  ok(`概念/普通回答反例：${text}`, !isExplicitMarkdownArtifactRequest(text))
 
 const event = {
   type: "tool-input-available",

@@ -1,0 +1,158 @@
+[
+  {
+    "schemaVersion": "agent-case-v1",
+    "id": "multimodal-synthetic-chart",
+    "suite": "multimodal",
+    "tags": ["smoke", "image", "capability-boundary"],
+    "sensitivity": "synthetic",
+    "execution": "content",
+    "input": {
+      "messages": [{ "role": "user", "text": "图片中的发布状态是什么？" }],
+      "attachments": [
+        {
+          "fixture": "synthetic-status.svg",
+          "mediaType": "image/svg+xml",
+          "filename": "synthetic-status.svg"
+        }
+      ]
+    },
+    "expected": {
+      "route": "answer",
+      "terminalState": "completed",
+      "contains": ["不支持"],
+      "excludes": ["GREEN"]
+    },
+    "fixtureResult": {
+      "text": "当前模型不支持查看图片，因此无法确认发布状态。",
+      "route": "answer",
+      "tools": [],
+      "terminalState": "completed",
+      "providerAttempts": []
+    }
+  },
+  {
+    "schemaVersion": "agent-case-v1",
+    "id": "multimodal-synthetic-pdf-page",
+    "suite": "multimodal",
+    "tags": ["scheduled", "pdf", "page-grounding"],
+    "sensitivity": "synthetic",
+    "execution": "content",
+    "input": {
+      "messages": [
+        { "role": "user", "text": "PDF 中项目 Aurora 的状态是什么？" }
+      ],
+      "attachments": [
+        {
+          "fixture": "synthetic-report.pdf",
+          "mediaType": "application/pdf",
+          "filename": "synthetic-report.pdf"
+        }
+      ]
+    },
+    "expected": {
+      "route": "answer",
+      "terminalState": "completed",
+      "contains": ["GREEN", "Aurora"]
+    },
+    "fixtureResult": {
+      "text": "PDF 说明项目 Aurora 的状态为 GREEN。",
+      "route": "answer",
+      "tools": [],
+      "terminalState": "completed",
+      "providerAttempts": []
+    }
+  },
+  {
+    "schemaVersion": "agent-case-v1",
+    "id": "multimodal-text-attachment",
+    "suite": "multimodal",
+    "tags": ["ci", "text", "capability-boundary"],
+    "sensitivity": "synthetic",
+    "execution": "content",
+    "input": {
+      "messages": [{ "role": "user", "text": "附件中的回滚命令是什么？" }],
+      "attachments": [
+        {
+          "fixture": "synthetic-runbook.txt",
+          "mediaType": "text/plain",
+          "filename": "synthetic-runbook.txt"
+        }
+      ]
+    },
+    "expected": {
+      "route": "answer",
+      "terminalState": "completed",
+      "contains": ["不支持"],
+      "excludes": ["AI_TELEMETRY_ENABLED=false"]
+    },
+    "fixtureResult": {
+      "text": "当前附件类型不支持内容解读，因此无法读取回滚命令。",
+      "route": "answer",
+      "tools": [],
+      "terminalState": "completed",
+      "providerAttempts": []
+    }
+  },
+  {
+    "schemaVersion": "agent-case-v1",
+    "id": "multimodal-corrupt-file",
+    "suite": "multimodal",
+    "tags": ["ci", "corrupt", "error"],
+    "sensitivity": "synthetic",
+    "execution": "fixture",
+    "input": {
+      "messages": [{ "role": "user", "text": "读取这个损坏的 PDF。" }],
+      "attachments": [
+        {
+          "fixture": "corrupt.pdf",
+          "mediaType": "application/pdf",
+          "filename": "corrupt.pdf"
+        }
+      ]
+    },
+    "expected": {
+      "terminalState": "completed",
+      "contains": ["无法读取"],
+      "excludes": ["API key"]
+    },
+    "fixtureResult": {
+      "text": "该文件损坏，无法读取；请重新上传。",
+      "route": "answer",
+      "tools": [],
+      "terminalState": "completed",
+      "providerAttempts": []
+    }
+  },
+  {
+    "schemaVersion": "agent-case-v1",
+    "id": "multimodal-unsupported-and-size-boundary",
+    "suite": "multimodal",
+    "tags": ["scheduled", "unsupported", "size-boundary"],
+    "sensitivity": "synthetic",
+    "execution": "fixture",
+    "input": {
+      "messages": [
+        { "role": "user", "text": "处理这个超出限制的未知格式附件。" }
+      ],
+      "attachments": [
+        {
+          "fixture": "unsupported.bin",
+          "mediaType": "application/octet-stream",
+          "filename": "unsupported.bin"
+        }
+      ]
+    },
+    "expected": {
+      "terminalState": "completed",
+      "contains": ["不支持"],
+      "excludes": ["原始二进制"]
+    },
+    "fixtureResult": {
+      "text": "该附件格式或大小不支持，请转换为受支持且符合限制的文件。",
+      "route": "answer",
+      "tools": [],
+      "terminalState": "completed",
+      "providerAttempts": []
+    }
+  }
+]

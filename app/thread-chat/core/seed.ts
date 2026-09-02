@@ -5,9 +5,11 @@
 
 import type { ThreadTreeState } from "./types"
 import { DEFAULT_THREAD_CHAT_MODEL_ID } from "@/constants/model"
+import { THREAD_TREE_SCHEMA_VERSION } from "@/constants/thread-chat"
 
 export function emptySeedState(): ThreadTreeState {
   return {
+    schemaVersion: THREAD_TREE_SCHEMA_VERSION,
     threads: {
       main: {
         id: "main",
@@ -20,6 +22,7 @@ export function emptySeedState(): ThreadTreeState {
         footnote: null,
         children: [],
         messages: [],
+        activeLeafMessageId: null,
         lastActive: 1,
       },
     },

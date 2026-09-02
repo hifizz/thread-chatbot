@@ -33,12 +33,12 @@
 - [x] 5.1 `proxy.ts`（Next 16 中间件更名）：`getSessionCookie` 乐观检查，`publicPages` 白名单（sign-in/sign-up/forgot-password/reset-password/terms/privacy/refund），未登录访问受保护页跳 `/sign-in?redirect=`；`matcher` 排除 `api`/静态资源
 - [x] 5.2 修复死循环：`proxy.ts` 不再因「有 cookie」反向拦截 `/sign-in`/`/sign-up`；`AuthForm` 改用 `useSession()`（真查会话）判定「确属已登录」才 `router.replace(redirect)`
 - [x] 5.3 新增 `lib/auth/session-recovery.ts`：`handleUnauthorized()`（进程内加锁只跳一次，best-effort `signOut()` + 硬跳 `/sign-in?redirect=`）与 `fetchWithAuth()`（包装 fetch，命中 401 触发自救、响应原样透传）
-- [x] 5.4 让业务 API 的前端出口都具备 401 自愈：`lib/chat/thread-list-adapter.ts`、`lib/chat/use-thread-history-adapter.ts`、`app/page.tsx`（`AssistantChatTransport` 的 `fetch`）、`app/thread-chat/net/persist.ts` 全部走 `fetchWithAuth`（含整树 GET/PUT、树列表/重命名/删除全部写路径）；`app/thread-chat/net/chat-controller.ts` 因需拿到流式 `Response` 并给出自定义错误文案，改为**手写** `if (res.status === 401) void handleUnauthorized()`（与包装器等价的自愈）；确认 better-auth 自身 `/api/auth/*` 请求未被这层覆盖（密码错误的 401 不应误触发登出跳转）
+- [x] 5.4 让业务 API 的前端出口都具备 401 自愈：`lib/chat/thread-list-adapter.ts`、`lib/chat/use-thread-history-adapter.ts`、`app/page.tsx`（`AssistantChatTransport` 的 `fetch`）、`app/thread-chat/net/persistence/persist.ts` 全部走 `fetchWithAuth`（含整树 GET/PUT、树列表/重命名/删除全部写路径）；`app/thread-chat/net/chat-controller.ts` 因需拿到流式 `Response` 并给出自定义错误文案，改为**手写** `if (res.status === 401) void handleUnauthorized()`（与包装器等价的自愈）；确认 better-auth 自身 `/api/auth/*` 请求未被这层覆盖（密码错误的 401 不应误触发登出跳转）
 
 ## 6. 账户入口与法务页
 
 - [x] 6.1 `components/auth/user-menu.tsx`：主页侧栏账户入口，未登录不渲染、已登录显示头像/昵称（→ `/account`）+ 登出
-- [x] 6.2 `app/thread-chat/orchestration/account-button.tsx`：`thread-chat` 顶栏账户入口，未登录显示「登录」按钮（带 `redirect` 回跳），已登录显示账户 + 登出
+- [x] 6.2 `app/thread-chat/orchestration/navigation/account-button.tsx`：`thread-chat` 顶栏账户入口，未登录显示「登录」按钮（带 `redirect` 回跳），已登录显示账户 + 登出
 - [x] 6.3 `constants/legal.ts`（占位文案单一事实来源，注明需律师审阅）+ `components/legal/legal-article.tsx` + `/terms`、`/privacy`、`/refund` 页面
 - [x] 6.4 `AuthForm` 注册表单加「已阅读并同意服务条款与隐私政策」勾选，未勾选阻止提交
 

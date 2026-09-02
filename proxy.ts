@@ -20,7 +20,11 @@ export function proxy(request: NextRequest) {
     "/privacy",
     "/refund",
   ])
-  const isAuthPage = publicPages.has(pathname)
+  const isLocalGate3Harness =
+    process.env.NODE_ENV === "development" &&
+    pathname.startsWith("/thread-chat-gate-3-harness/") &&
+    ["localhost", "127.0.0.1"].includes(request.nextUrl.hostname)
+  const isAuthPage = publicPages.has(pathname) || isLocalGate3Harness
 
   // 注意：这里「不」再因为「有 cookie」就把用户从登录/注册页弹回首页。
   // 中间件只做乐观 cookie 检查（不查库），而 cookie 可能是失效的「幽灵」（过期/被撤销/

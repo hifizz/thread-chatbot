@@ -8,7 +8,7 @@ import {
   fuzzySubstring,
   locateOffsets,
   normalizeWhitespace,
-} from "../../app/thread-chat/branching/text-anchor.ts"
+} from "../../app/thread-chat/branching/selection/text-anchor.ts"
 
 let failed = 0
 const ok = (label, cond) => {

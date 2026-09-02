@@ -7,20 +7,25 @@
 
 @import "./styles/keyframes.css";
 @import "./styles/tokens.css";
+@import "./styles/boot-loading.css";
 @import "./styles/topbar.css";
 @import "./styles/columns.css";
+@import "./styles/columns-collapse.css";
 @import "./styles/messages.css";
+@import "./styles/artifact-card.css";
+@import "./styles/message-actions.css";
+@import "./styles/branch-source.css";
 @import "./styles/composer.css";
 @import "./styles/selection.css";
+/* 划选气泡的草稿保护样式与组件共置在
+   branching/selection/selection-draft-guard.css（由 selection-bubble.tsx 自行引入） */
 @import "./styles/switcher.css";
+@import "./styles/switcher-subtree.css";
+@import "./styles/help-panel.css";
 @import "./styles/drawer.css";
 @import "./styles/toast.css";
-@import "./styles/columns-collapse.css";
-@import "./styles/switcher-subtree.css";
 @import "./styles/canvas.css";
 @import "./styles/scrollbar.css";
 @import "./styles/messages-stream.css";
 @import "./styles/markdown.css";
 @import "./styles/tree-list.css";
-@import "./styles/topbar-help.css";
-@import "./styles/selection-extras.css";

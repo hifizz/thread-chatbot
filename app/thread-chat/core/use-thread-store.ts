@@ -8,12 +8,29 @@
  */
 
 import { useSyncExternalStore } from "react"
-import type { ThreadStore } from "./store"
+import { useStore } from "zustand"
+import type { ConversationStore } from "./store"
+import type { NormalizedThreadChatState } from "./types"
+import type { ThreadTreeState } from "./types"
 
-export function useThreadStore(store: ThreadStore): number {
+export interface ThreadTreeReadableStore {
+  subscribe(listener: () => void): () => void
+  getVersion(): number
+  getState(): ThreadTreeState
+  setThreadModel(threadId: string, modelId: string): void
+}
+
+export function useThreadStore(store: ThreadTreeReadableStore): number {
   return useSyncExternalStore(
     store.subscribe,
     store.getVersion,
     store.getVersion
   )
+}
+
+export function useConversationStore<T>(
+  store: ConversationStore,
+  selector: (state: NormalizedThreadChatState) => T
+): T {
+  return useStore(store, selector)
 }

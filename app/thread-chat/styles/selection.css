@@ -4,12 +4,13 @@
    落点走 floating-popup 定位模型（branching/bubble-position.ts），
    外轮廓 + 指向选区的尾巴是一条平滑 path（branching/bubble-shape.tsx，移植自
    smooth-tooltip），取代过去 ::after 的 CSS 旋转小方块。宽度 / left / top / visibility
-   由组件内联 style 给出（宽度 = BUBBLE_W）。 */
+   由组件内联 style 给出（宽度 = BUBBLE_W）。
+   草稿保护相关样式（入场窗口 / 抖动 / 轻提示 / Esc 确认弹窗）与本组件共置在
+   branching/selection/selection-draft-guard.css，不进本桶。 */
 .tc .sel-bubble {
   position: fixed;
   z-index: 60;
   color: #fff;
-  animation: tc-pop 0.14s ease;
 }
 /* 平滑曲线轮廓背景层：铺满面板宽度，尾巴靠 svg overflow 溢出面板上/下沿；
    阴影用 CSS drop-shadow（屏幕坐标，永远朝下，不随尾巴上下翻转而反向）。
@@ -50,7 +51,7 @@
   color: #f3efe6;
 }
 /* 可选首问输入框（Phase A 气泡输入框）：深底提亮，单行起步自增高，
-   max-height 68px 与 selection-bubble.tsx 的 JS clamp 同步，超出转内滚 */
+   上限由组件尺寸源发布，超出后转为内部滚动。 */
 .tc .sel-bubble .ask {
   margin: 0 0 9px;
   position: relative;
@@ -69,7 +70,7 @@
   font-family: var(--font-ui);
   font-size: 12.5px;
   line-height: 1.45;
-  max-height: 68px;
+  max-height: var(--selection-question-max-height);
   min-height: 30px;
 }
 .tc .sel-bubble .ask textarea::placeholder {
@@ -194,4 +195,15 @@
 }
 .tc .sel-bubble .smcell.will-fold .cap {
   color: color-mix(in srgb, var(--d2) 55%, #fff);
+}
+
+/* 划选气泡的放置后果提示行：按钮只表达动作，后果在这里单行说明（超长省略） */
+.tc .sel-bubble .place-hint {
+  margin: 6px 2px 0;
+  font-size: 10px;
+  line-height: 1.4;
+  color: #d8d2c4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }

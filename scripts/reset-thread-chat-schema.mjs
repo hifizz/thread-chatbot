@@ -39,8 +39,9 @@ const sql = postgres(databaseUrl, { max: 1 })
 try {
   console.log(`[db:reset-schema] 正在删除 ${target} 中的 ${SCHEMA} schema…`)
   await sql`DROP SCHEMA IF EXISTS ${sql(SCHEMA)} CASCADE`
+  await sql`CREATE SCHEMA ${sql(SCHEMA)}`
   console.log(
-    `[db:reset-schema] ${SCHEMA} 已删除；其他 schema 与 Drizzle 迁移账本未改动。`
+    `[db:reset-schema] ${SCHEMA} 已清空并重建；其他 schema 与 Drizzle 迁移账本未改动。`
   )
 } finally {
   await sql.end()

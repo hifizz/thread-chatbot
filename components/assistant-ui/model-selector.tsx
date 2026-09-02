@@ -49,6 +49,9 @@ export type ModelOption = {
   description?: string
   icon?: ReactNode
   disabled?: boolean
+  /** 二级选择面板使用的供应商标识与展示名。 */
+  providerId?: string
+  providerName?: string
   /** Extra terms matched by ModelSelector.Search, in addition to id and name. */
   keywords?: readonly string[]
   /**
@@ -379,7 +382,7 @@ function ModelSelectorFocusAnchor() {
 function ModelSelectorContent({
   className,
   align = "start",
-  sideOffset = 6,
+  sideOffset = 4,
   searchable,
   children,
   ...props
@@ -394,13 +397,13 @@ function ModelSelectorContent({
       align={align}
       sideOffset={sideOffset}
       className={cn(
-        "w-72 min-w-(--radix-popover-trigger-width) overflow-hidden rounded-xl bg-popover/95 p-0 shadow-lg backdrop-blur-sm",
+        "w-64 min-w-(--radix-popover-trigger-width) overflow-hidden rounded-lg bg-popover/95 p-0 shadow-md backdrop-blur-sm",
         className
       )}
       {...props}
     >
       <Command
-        className="bg-transparent"
+        className="rounded-lg bg-transparent p-0"
         shouldFilter={!unfiltered}
         {...(value !== undefined ? { defaultValue: value } : {})}
       >
@@ -443,27 +446,96 @@ function ModelSelectorList({
   children,
   ...props
 }: ModelSelectorListProps) {
-  const { models } = useModelSelectorContext()
+  const { models, selectedModel } = useModelSelectorContext()
+  const providers = useMemo(
+    () =>
+      Array.from(
+        new Map(
+          models
+            .filter((model) => model.providerId)
+            .map((model) => [
+              model.providerId!,
+              model.providerName ?? model.providerId!,
+            ])
+        ),
+        ([id, name]) => ({ id, name })
+      ),
+    [models]
+  )
+  const [activeProviderId, setActiveProviderId] = useState(
+    selectedModel?.providerId ?? providers[0]?.id
+  )
+
+  useEffect(() => {
+    if (selectedModel?.providerId) setActiveProviderId(selectedModel.providerId)
+  }, [selectedModel?.providerId])
+
+  const grouped = providers.length > 0
+  const visibleModels = grouped
+    ? models.filter((model) => model.providerId === activeProviderId)
+    : models
 
   return (
     <CommandList
       data-slot="model-selector-list"
       className={cn(
         "[scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden",
+        grouped && "max-h-none overflow-hidden",
         className
       )}
       {...props}
     >
-      {children ?? (
-        <>
-          <ModelSelectorEmpty />
-          <CommandGroup>
-            {models.map((model) => (
-              <ModelSelectorItem key={model.id} model={model} />
-            ))}
-          </CommandGroup>
-        </>
-      )}
+      {children ??
+        (grouped ? (
+          <div className="grid h-64 grid-cols-[7.25rem_minmax(0,1fr)]">
+            <div
+              className="flex flex-col gap-0.5 border-e bg-muted/35 p-1"
+              role="tablist"
+              aria-label="模型供应商"
+            >
+              {providers.map((provider) => (
+                <button
+                  key={provider.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={activeProviderId === provider.id}
+                  className={cn(
+                    "rounded-md px-2 py-1.5 text-start text-xs leading-4 transition-colors outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring/50",
+                    activeProviderId === provider.id &&
+                      "bg-accent font-medium text-accent-foreground"
+                  )}
+                  onClick={() => setActiveProviderId(provider.id)}
+                >
+                  {provider.name}
+                </button>
+              ))}
+            </div>
+            <div
+              className="no-scrollbar min-w-0 overflow-y-auto p-0.5"
+              role="tabpanel"
+            >
+              <CommandGroup
+                heading={
+                  providers.find((provider) => provider.id === activeProviderId)
+                    ?.name
+                }
+              >
+                {visibleModels.map((model) => (
+                  <ModelSelectorItem key={model.id} model={model} />
+                ))}
+              </CommandGroup>
+            </div>
+          </div>
+        ) : (
+          <>
+            <ModelSelectorEmpty />
+            <CommandGroup>
+              {models.map((model) => (
+                <ModelSelectorItem key={model.id} model={model} />
+              ))}
+            </CommandGroup>
+          </>
+        ))}
     </CommandList>
   )
 }
@@ -524,27 +596,23 @@ function ModelSelectorItem({
         setOpen(false)
         onSelect?.(selectedValue)
       }}
-      className={cn("relative gap-2 rounded-lg py-2 ps-3 pe-9", className)}
+      className={cn(
+        "relative my-px min-h-7 gap-1.5 rounded-md px-2.5 py-1.5 text-xs leading-4 pe-7",
+        className
+      )}
       {...props}
     >
       {children ?? (
         <>
           {model.icon && <ModelIcon>{model.icon}</ModelIcon>}
-          <span className="flex min-w-0 flex-col">
-            <span className="font-medium break-words whitespace-normal">
-              {model.name}
-            </span>
-            {model.description && (
-              <span className="truncate text-xs text-muted-foreground">
-                {model.description}
-              </span>
-            )}
+          <span className="min-w-0 font-medium break-words whitespace-normal">
+            {model.name}
           </span>
         </>
       )}
       {isSelected && (
-        <span className="absolute end-3 flex size-4 items-center justify-center">
-          <CheckIcon className="size-4" />
+        <span className="absolute end-2 flex size-3.5 items-center justify-center">
+          <CheckIcon className="size-3.5" />
         </span>
       )}
     </CommandItem>

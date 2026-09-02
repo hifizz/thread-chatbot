@@ -7,11 +7,7 @@ import { user, session, account, verification } from "@/lib/db/schema"
 import { ensureUserCredits } from "@/lib/billing/credits"
 import { isEmailConfigured, sendEmail } from "@/lib/email/client"
 import { verificationEmail, resetPasswordEmail } from "@/lib/email/templates"
-import {
-  GOOGLE_CLIENT_ID,
-  GOOGLE_CLIENT_SECRET,
-  googleAuthEnabled,
-} from "@/lib/auth/social"
+import { getGoogleAuthConfig } from "@/lib/auth/social"
 
 // 邮箱验证是否可用：需已配置邮件服务。未配置时（如本地开发）优雅降级为「注册即用」，
 // 避免用户因收不到验证邮件而被锁死。
@@ -22,15 +18,10 @@ const TURNSTILE_SECRET = process.env.TURNSTILE_SECRET_KEY
 
 // Google 社交登录：同时配齐 client id/secret 才启用（判定来自 lib/auth/social，
 // 登录页据同一来源决定是否显示按钮，无需额外的 NEXT_PUBLIC 开关）。
-const socialProviders =
-  googleAuthEnabled && GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET
-    ? {
-        google: {
-          clientId: GOOGLE_CLIENT_ID,
-          clientSecret: GOOGLE_CLIENT_SECRET,
-        },
-      }
-    : undefined
+const googleAuthConfig = getGoogleAuthConfig()
+const socialProviders = googleAuthConfig
+  ? { google: googleAuthConfig }
+  : undefined
 
 const plugins: BetterAuthPlugin[] = []
 if (TURNSTILE_SECRET) {

@@ -10,6 +10,9 @@
 
 # testing
 /coverage
+/.devtools/
+/evals/agent/.tmp/
+/evals/agent/results/local/
 
 # next.js
 /.next/
@@ -40,3 +43,5 @@ next-env.d.ts
 # thread-chat e2e 验收脚本的截图输出
 e2e/thread-chat/shots/
 .vercel
+
+.local-backups

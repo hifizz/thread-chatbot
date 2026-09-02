@@ -1,273 +1,217 @@
 import {
   convertToModelMessages,
+  consumeStream,
+  createUIMessageStream,
+  createUIMessageStreamResponse,
   isStepCount,
   streamText,
-  tool,
-  type ToolSet,
-  type UIMessage,
 } from "ai"
 import { after } from "next/server"
 import { frontendTools } from "@assistant-ui/react-ai-sdk"
-import type { ToolJSONSchema } from "assistant-stream"
-import { z } from "zod"
 import { resolveAttachmentParts } from "@/lib/chat/resolve-attachments"
-import { researchTools } from "@/lib/chat/research-tools"
 import { isSearchConfigured } from "@/lib/ai/search"
+import { RESEARCH_MAX_STEPS } from "@/constants/research"
+import { MAX_OUTPUT_TOKENS } from "@/constants/model"
+import { MODEL_CALL_PURPOSE } from "@/constants/model-call"
+import { resolveChatModel } from "@/lib/ai/provider"
 import {
-  RESEARCH_MAX_STEPS,
-  RESEARCH_SYSTEM_PROMPT,
-} from "@/constants/research"
-import { buildThreadChatSystem } from "@/lib/chat/thread-chat-prompt"
-import { getCurrentUserId } from "@/lib/auth/server"
-import {
-  DEFAULT_MODEL_ID,
-  getChatModel,
-  isUnbilledPreviewModel,
-  MAX_OUTPUT_TOKENS,
-} from "@/constants/model"
-import { resolveChatModel, isModelConfigured } from "@/lib/ai/provider"
-import { openRouterCostUsdFromSteps } from "@/lib/ai/openrouter"
-import { hasPositiveBalance, chargeUsage } from "@/lib/billing/credits"
+  withModelCallLogging,
+  type ModelCallTrace,
+} from "@/lib/ai/model-call-logger"
 import { buildUsageMetadata } from "@/lib/billing/usage-meta"
-import {
-  isExplicitMarkdownDeliverableRequest,
-  MARKDOWN_ARTIFACT_TOOL_DESCRIPTION,
-  MARKDOWN_ARTIFACT_TOOL_NAME,
-  markdownArtifactInputSchema,
-  type MarkdownArtifactToolResult,
-} from "@/lib/chat/markdown-artifact"
+import { reasoningForResearchRoute } from "@/lib/chat/research-router"
+import { createToolStepPolicy } from "@/app/api/chat/tool-step-policy"
+import { buildChatSystemPrompt } from "@/app/api/chat/system-prompt"
+import { resolveResearchContext } from "@/app/api/chat/research-context"
+import { buildChatToolSet } from "@/app/api/chat/tool-set"
+import { createStreamLifecycle } from "@/app/api/chat/stream-lifecycle"
+import { prepareChatRequestContext } from "@/app/api/chat/request-context"
+import { buildAiTelemetryConfig } from "@/lib/observability/ai-sdk"
+import { buildLegacyChatTraceInput } from "@/lib/observability/context"
+import { safeErrorMetadata } from "@/lib/observability/error"
+import { runDetachedAgentTrace } from "@/lib/observability/trace"
 
-// 深度研究可能多步循环，耗时较长，放宽单次请求时长上限
-export const maxDuration = 120
-
-const getWeather = tool({
-  description: "Get the current weather for a city.",
-  inputSchema: z.object({
-    location: z.string().describe("City name, e.g. 'San Francisco'"),
-  }),
-  execute: async ({ location }) => {
-    // Deterministic mock reading (hashed from the city name) - no real weather API/key involved.
-    const conditions = [
-      "Sunny",
-      "Partly Cloudy",
-      "Cloudy",
-      "Light Rain",
-      "Clear",
-    ]
-    const seed = [...location].reduce((acc, c) => acc + c.charCodeAt(0), 0)
-    return {
-      location,
-      temperatureF: 55 + (seed % 35),
-      condition: conditions[seed % conditions.length],
-      humidity: 30 + (seed % 50),
-      asOf: new Date().toISOString(),
-    }
-  },
-})
-
-const compareTable = tool({
-  description:
-    "Render a comparison table for two or more items across one or more numeric metrics. Use whenever the user asks to compare things 'in a table' with real numeric data.",
-  inputSchema: z.object({
-    title: z.string(),
-    unit: z.string().optional(),
-    columns: z
-      .array(z.string())
-      .describe("Category labels, e.g. country names"),
-    series: z.array(
-      z.object({
-        name: z.string(),
-        values: z
-          .array(z.number())
-          .describe("One value per column, same order as columns"),
-      })
-    ),
-  }),
-  execute: async (input) => input,
-})
-
-const createMarkdownArtifact = tool({
-  description: MARKDOWN_ARTIFACT_TOOL_DESCRIPTION,
-  inputSchema: markdownArtifactInputSchema,
-  execute: async (): Promise<MarkdownArtifactToolResult> => ({ created: true }),
-})
-
-/** 只看最后一条 user 消息的文本 part，供高置信首步强制路由。 */
-function latestUserText(messages: UIMessage[]): string {
-  for (let i = messages.length - 1; i >= 0; i--) {
-    const message = messages[i]
-    if (message.role !== "user") continue
-    return message.parts
-      .flatMap((part) => (part.type === "text" ? [part.text] : []))
-      .join("\n")
-  }
-  return ""
-}
+// AnySearch 搜索与网页深读可能形成多步循环，放宽单次请求时长上限。
+export const maxDuration = 300
 
 export async function POST(req: Request) {
-  // 1) 鉴权：未登录直接拒绝
-  const userId = await getCurrentUserId()
-  if (!userId) {
-    return Response.json(
-      { error: "请先登录后再使用对话功能。" },
-      { status: 401 }
-    )
-  }
-
+  const requestContext = await prepareChatRequestContext(req)
+  if (requestContext.kind === "response") return requestContext.response
   const {
+    userId,
     messages,
     tools,
     deepResearch,
-    threadChat,
-    modelId: rawModelId,
-    id: threadId,
-  }: {
-    messages: UIMessage[]
-    tools?: Record<string, ToolJSONSchema>
-    deepResearch?: boolean
-    /** thread-chat 分支对话页的模式标记：system 由服务端按锚点原文构造 */
-    threadChat?: { anchorText?: string | null }
-    modelId?: unknown
-    id?: string
-  } = await req.json()
+    linearThreadId,
+    modelId,
+    model,
+    isUnbilledPreview,
+  } = requestContext
 
-  // 2) 解析并校验所选模型
-  if (
-    rawModelId !== undefined &&
-    (typeof rawModelId !== "string" || !getChatModel(rawModelId))
-  ) {
-    return Response.json({ error: "未知或无效的模型。" }, { status: 400 })
-  }
-  const modelId = typeof rawModelId === "string" ? rawModelId : DEFAULT_MODEL_ID
-  const model = getChatModel(modelId)!
-  if (!isModelConfigured(model)) {
-    return Response.json(
-      {
-        error: `模型「${model.name}」未配置，请联系管理员在服务端配置对应 API Key 或可用网关。`,
-      },
-      { status: 400 }
-    )
-  }
-
-  const isUnbilledPreview = isUnbilledPreviewModel(model)
-
-  // 3) 计费拦截：未计费预览模型不依赖用户余额。
-  if (!isUnbilledPreview && !(await hasPositiveBalance(userId))) {
-    return Response.json({ error: "额度不足，请充值后再试。" }, { status: 402 })
-  }
-
-  // 研究模式：加入联网检索/深读工具、放宽步数、注入研究系统提示
-  const research = deepResearch === true
-  const searchReady = isSearchConfigured()
-  // thread-chat 模式：结构化风格 system + 不挂后端工具（研究模式优先级更高）
-  const isThreadChat = !research && threadChat != null
-  const forceMarkdownArtifact =
-    isThreadChat &&
-    isExplicitMarkdownDeliverableRequest(latestUserText(messages))
-
-  const allTools: ToolSet = {
-    // ThreadChat 只挂 Markdown 交付工具；线性聊天继续使用原有演示工具。
-    ...(isThreadChat
-      ? { [MARKDOWN_ARTIFACT_TOOL_NAME]: createMarkdownArtifact }
-      : { getWeather, compareTable }),
-    ...(research && searchReady ? researchTools : {}),
-    ...frontendTools(tools ?? {}),
-  }
-
-  // MiniMax 不接受 file part：先把附件（PDF→提取文本，其余→占位说明）转换为 text part
-  const resolvedMessages = await resolveAttachmentParts(messages)
-
-  const system = research
-    ? searchReady
-      ? RESEARCH_SYSTEM_PROMPT
-      : "用户开启了深度研究，但服务端未配置搜索服务（SEARCH_API_KEY），请如实告知该功能暂不可用，并基于已有知识尽力回答。"
-    : isThreadChat
-      ? buildThreadChatSystem(threadChat.anchorText)
-      : undefined
-
-  const result = streamText({
-    model: resolveChatModel(modelId),
-    system,
-    messages: await convertToModelMessages(resolvedMessages, {
-      tools: allTools,
-    }),
-    tools: allTools,
-    // 高置信 Markdown 交付请求只强制第 0 步启动工具调用；后续步骤仍保留工具，
-    // 让模型在用户要求多份独立文档时，为每份文档分别创建一个 Artifact。
-    prepareStep: isThreadChat
-      ? ({ stepNumber }) =>
-          stepNumber === 0
-            ? forceMarkdownArtifact
-              ? {
-                  activeTools: [MARKDOWN_ARTIFACT_TOOL_NAME],
-                  toolChoice: {
-                    type: "tool",
-                    toolName: MARKDOWN_ARTIFACT_TOOL_NAME,
-                  },
-                }
-              : { activeTools: [MARKDOWN_ARTIFACT_TOOL_NAME] }
-            : { activeTools: [MARKDOWN_ARTIFACT_TOOL_NAME] }
-      : undefined,
-    // 单请求输出封顶：收敛并发竞态下的最大超支敞口，并防异常长输出打爆供应商账单
-    maxOutputTokens: MAX_OUTPUT_TOKENS,
-    // Thread Chat 最多允许 5 步工具交互，既支持一次交付多份 Markdown 文件，
-    // 也限制异常循环；其它模式继续沿用既有步数上限。
-    stopWhen: isThreadChat
-      ? isStepCount(5)
-      : isStepCount(research && searchReady ? RESEARCH_MAX_STEPS : 5),
-    // 4) 已计费模型在生成结束后按 token 用量即时扣费并写入流水。
-    //    UMAPIS 预览尚未有经确认的价格，不扣余额也不写流水。
-    onEnd: async ({ usage, providerMetadata, steps }) => {
-      if (isUnbilledPreview) return
-      const generationId =
-        typeof providerMetadata?.gateway?.generationId === "string"
-          ? providerMetadata.gateway.generationId
-          : null
-      const openRouterCostUsd =
-        model.provider === "openrouter"
-          ? openRouterCostUsdFromSteps(steps)
-          : null
-      if (model.provider === "openrouter" && openRouterCostUsd == null) {
-        console.warn(
-          `[chat] OpenRouter 成本元数据不完整，使用静态估值：${model.id}`
-        )
-      }
-      await chargeUsage({
-        userId,
-        model: modelId,
-        inputTokens: usage.inputTokens ?? 0,
-        outputTokens: usage.outputTokens ?? 0,
-        threadId: threadId ?? null,
-        costEvidence:
-          openRouterCostUsd != null
-            ? { source: "openrouter", costUsd: openRouterCostUsd }
-            : generationId
-              ? { source: "vercel-gateway", generationId }
-              : { source: "estimate" },
-      })
-    },
-  })
-
-  // 即使客户端中途断连，也在服务端把整条流消费完，保证 onEnd（计费）必然触发，
-  // 避免「已产生供应商成本却漏计费」。after 让 Serverless 保活到消费结束。
-  after(async () => {
-    try {
-      await result.consumeStream()
-    } catch {
-      // 生成出错时不计费（onEnd 不触发），忽略消费错误即可
+  try {
+    // AnySearch 是当前统一联网层：所有模型都获得相同的搜索与网页深读工具。
+    // deepResearch 只控制研究提示强度，不再决定工具是否存在。
+    const research = deepResearch === true
+    const searchReady = isSearchConfigured()
+    const chatModel = resolveChatModel(modelId)
+    const modelCallTrace: ModelCallTrace = {
+      requestId: crypto.randomUUID(),
+      ...(linearThreadId ? { threadId: linearThreadId } : {}),
     }
-  })
+    const legacyTraceInput = await buildLegacyChatTraceInput({
+      userId,
+      requestId: modelCallTrace.requestId!,
+      ...(linearThreadId ? { linearThreadId } : {}),
+      modelId,
+    })
+    return await runDetachedAgentTrace(
+      legacyTraceInput,
+      async (legacyObservation) => {
+        try {
+          const { researchRoute, researchPlan } = await resolveResearchContext({
+            model: chatModel,
+            messages,
+            deepResearchRequested: research,
+            searchReady,
+            modelCallTrace,
+          })
+          const { tools: allTools, webToolsEnabled } = buildChatToolSet({
+            researchMode: researchRoute.mode,
+            routeReason: researchRoute.reasonCode,
+            searchReady,
+            frontendToolSet: frontendTools(tools ?? {}),
+          })
 
-  return result.toUIMessageStreamResponse({
-    // 流内错误在服务端留日志便于排查；返回值仍是发给客户端的掩码文案（默认行为不变）
-    onError: (error) => {
-      console.error("[chat] 流内错误:", error)
-      return "An error occurred."
-    },
-    // 把本次用量与费用附到 assistant 消息 metadata，随消息持久化，供输入框下方 token 统计展示
-    messageMetadata: ({ part }) =>
-      part.type === "finish"
-        ? buildUsageMetadata(modelId, part.totalUsage)
-        : undefined,
-  })
+          // MiniMax 不接受 file part：先把附件（PDF→提取文本，其余→占位说明）转换为 text part
+          const resolvedMessages = await resolveAttachmentParts(
+            messages,
+            userId
+          )
+
+          const system = buildChatSystemPrompt({
+            researchMode: researchRoute.mode,
+            researchPlan,
+            deepResearchRequested: research,
+            searchReady,
+          })
+
+          const streamLifecycle = createStreamLifecycle({
+            userId,
+            modelId,
+            model,
+            unbilledPreview: isUnbilledPreview,
+            linearThreadId,
+          })
+
+          const result = streamText({
+            ...buildAiTelemetryConfig(MODEL_CALL_PURPOSE.chatAnswer, {
+              ...modelCallTrace,
+              modelId,
+              entrypoint: "legacy-chat",
+            }),
+            model: withModelCallLogging(
+              chatModel,
+              MODEL_CALL_PURPOSE.chatAnswer,
+              modelCallTrace
+            ),
+            reasoning: reasoningForResearchRoute(researchRoute.mode, model),
+            system,
+            messages: await convertToModelMessages(resolvedMessages, {
+              tools: allTools,
+            }),
+            tools: allTools,
+            // 明确 Markdown 交付请求只强制第 0 步启动工具调用；后续步骤仍保留工具，
+            // 让模型在用户要求多份独立文档时，为每份文档分别创建一个 Artifact。
+            prepareStep: createToolStepPolicy({
+              isThreadChat: false,
+              markdownArtifactRequested: false,
+              researchMode: researchRoute.mode,
+            }),
+            maxOutputTokens: MAX_OUTPUT_TOKENS,
+            stopWhen: isStepCount(webToolsEnabled ? RESEARCH_MAX_STEPS : 5),
+            onError: streamLifecycle.onError,
+            onAbort: streamLifecycle.onAbort,
+            onEnd: streamLifecycle.onEnd,
+          })
+
+          const uiStream = createUIMessageStream({
+            execute: ({ writer }) => {
+              writer.write({
+                type: "data-research-route",
+                id: "research-route",
+                data: researchRoute,
+              })
+              if (researchPlan) {
+                writer.write({
+                  type: "data-research-plan",
+                  id: "research-plan",
+                  data: researchPlan,
+                })
+              }
+              writer.merge(
+                result.toUIMessageStream({
+                  onError: (error) => {
+                    console.error("[chat] 流内错误:", error)
+                    return "An error occurred."
+                  },
+                  messageMetadata: ({ part }) =>
+                    part.type === "finish"
+                      ? buildUsageMetadata(modelId, part.totalUsage)
+                      : undefined,
+                })
+              )
+            },
+          })
+
+          const response = createUIMessageStreamResponse({
+            stream: uiStream,
+            consumeSseStream: ({ stream }) => {
+              after(async () => {
+                let streamFailed = false
+                try {
+                  await consumeStream({
+                    stream,
+                    onError: (error) => {
+                      streamFailed = true
+                      console.error("[chat] 服务端 UI stream 消费失败", error)
+                    },
+                  })
+                  legacyObservation.update({
+                    level: streamFailed ? "ERROR" : "DEFAULT",
+                    statusMessage: streamFailed
+                      ? "legacy stream failed"
+                      : "legacy stream completed",
+                    output: {
+                      status: streamFailed ? "failed" : "completed",
+                      researchMode: researchRoute.mode,
+                    },
+                  })
+                } catch (error) {
+                  legacyObservation.update({
+                    level: "ERROR",
+                    statusMessage: "legacy stream consumer failed",
+                    metadata: safeErrorMetadata(error),
+                  })
+                } finally {
+                  legacyObservation.end()
+                }
+              })
+            },
+          })
+          return response
+        } catch (error) {
+          legacyObservation.update({
+            level: "ERROR",
+            statusMessage: "legacy request initialization failed",
+            metadata: safeErrorMetadata(error),
+          })
+          legacyObservation.end()
+          throw error
+        }
+      }
+    )
+  } catch (error) {
+    console.error("[chat] 请求初始化失败", error)
+    return Response.json({ error: "生成初始化失败，请重试。" }, { status: 500 })
+  }
 }

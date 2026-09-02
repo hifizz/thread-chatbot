@@ -8,7 +8,9 @@
 .tc .cols {
   flex: 1;
   display: flex;
+  min-height: 0;
   overflow-x: auto;
+  overflow-y: hidden;
 }
 .tc .column {
   flex: 1 1 0;
@@ -197,6 +199,17 @@
   border-color: var(--accent, var(--d1));
   color: var(--accent, var(--d1));
 }
+.tc .cbtn.tree {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.tc .cbtn.tree .n {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+}
 
 .tc .focus-banner {
   margin: 12px 0 0;
@@ -266,6 +279,9 @@
 .tc .inherited-body {
   padding: 2px 12px 12px;
   border-top: 1px dashed var(--rule);
+}
+.tc .reasoning-body {
+  white-space: pre-wrap;
 }
 .tc .inh-msg {
   font-size: 12.5px;

@@ -1,0 +1,11 @@
+/* ── @/thread-chat/styles ── 首屏加载与 tree redirect 占位 */
+
+.tc .boot-loading {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink-faint);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}

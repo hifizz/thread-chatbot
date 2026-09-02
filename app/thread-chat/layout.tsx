@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation"
 import { getSession } from "@/lib/auth/server"
 import { ROUTES, signInWithRedirect } from "@/constants/routes"
+import "./thread-chat.css"
 
 // 旗舰访问门禁：一处服务端 layout 同时包住 /thread-chat 跳板与 /thread-chat/[treeId]，
 // 用「真会话」判定（getSession），未登录即 302 到带回跳的登录页。

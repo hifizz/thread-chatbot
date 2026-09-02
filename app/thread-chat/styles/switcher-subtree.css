@@ -1,9 +1,9 @@
-/* ── @/thread-chat/styles ── 子树弹层（复用 swx 体系，保持原位置） */
+/* ── @/thread-chat/styles ── 子树弹层（组合 swx 基础能力） */
 
 /* ---------------- 子树弹层（复用 .swx 体系） ---------------- */
 .tc .swx.subtree {
-  width: min(340px, 92vw);
-  max-height: 400px;
+  width: min(var(--swx-panel-width), 92vw);
+  max-height: var(--swx-panel-height);
 }
 .tc .swx-title {
   flex: none;

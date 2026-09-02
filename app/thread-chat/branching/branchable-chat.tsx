@@ -10,20 +10,21 @@
  * 本层只发出意图回调（打开会话 / 回退 / 收起…），列槽的增删换由 orchestration 决定。
  */
 
-import React, { useCallback, useEffect, useReducer, useRef } from "react"
+import React from "react"
 import { ListTree } from "lucide-react"
 import type { Message, ThreadTreeState } from "../core/types"
-import { collectInherited, lineage, threadTitle } from "../core/selectors"
-import { dc } from "../theme"
-import { ChatView } from "../chat/chat-view"
-import { MarkdownBody } from "../chat/markdown-body"
-import { useSmoothText } from "../chat/smooth-text"
 import {
-  MarkdownArtifactCard,
-  MarkdownArtifactProgressCard,
-} from "../orchestration/markdown-artifact-card"
-// 锚点在「渲染后的 Markdown DOM」上模糊恢复定位（position→exact→fuzzy），与纯文本解耦
-import { clearHighlights, locateAnchor, paintRange } from "./text-anchor"
+  activeMessagePath,
+  collectInherited,
+  lineage,
+  messagesByIdOrder,
+  threadTitle,
+} from "../core/selectors"
+import { ChatView } from "../chat/chat-view"
+import { MessageArtifacts } from "../orchestration/artifacts/message-artifacts"
+import { AnchoredAssistantBody } from "./assistant/anchored-assistant-body"
+import type { MessageActionViewState } from "../chat/actions/message-action-types"
+import type { ThreadMessageActionCommands } from "../chat/actions/message-action-commands"
 
 export interface BranchableChatProps {
   state: ThreadTreeState
@@ -54,6 +55,8 @@ export interface BranchableChatProps {
   /** 根 Thread 模型切换意图；分支 selector 仍由本层锁定。 */
   onModelChange: (modelId: string) => void
   onSend: (text: string) => void
+  messageActionState?: MessageActionViewState
+  messageCommands?: ThreadMessageActionCommands
 }
 
 export function BranchableChat({
@@ -73,6 +76,8 @@ export function BranchableChat({
   composerPrefill,
   onModelChange,
   onSend,
+  messageActionState,
+  messageCommands,
 }: BranchableChatProps) {
   const thread = state.threads[threadId]
   if (!thread) return null
@@ -80,37 +85,35 @@ export function BranchableChat({
   const chain = isMain ? [] : lineage(state, threadId)
   const inherited = isMain ? [] : collectInherited(state, thread)
   const childCount = thread.children.length
+  const presentation = messageActionState?.presentationByThreadId.get(threadId)
+  const sourceProvenance = presentation?.sourceProvenance ?? null
+  const visibleMessages = messageActionState
+    ? messagesByIdOrder(
+        thread.messages,
+        messageActionState.activePathByThreadId.get(threadId) ?? []
+      )
+    : activeMessagePath(thread)
 
   /* ---------- 注入：assistant 正文（Markdown 渲染 + 渲染后手绘锚点高亮/脚注） ---------- */
-  const renderAssistantBody = (msg: Message) => (
-    <AnchoredMarkdown state={state} msg={msg} onOpenThread={onOpenThread} />
-  )
+  const renderAssistantBody = (msg: Message) => {
+    return (
+      <AnchoredAssistantBody
+        state={state}
+        message={msg}
+        onOpenThread={onOpenThread}
+      />
+    )
+  }
 
   /* ---------- 注入：消息下方的 artifact 卡片 ---------- */
   const renderAfterMessage = (msg: Message) => {
-    const artifacts = (msg.artifactIds ?? []).flatMap((aid) => {
-      const a = state.artifacts[aid]
-      if (!a) return []
-      return [
-        <MarkdownArtifactCard
-          key={aid}
-          artifact={a}
-          sourceDepth={state.threads[a.sourceThreadId]?.depth ?? null}
-          onOpen={onOpenArtifact}
-        />,
-      ]
-    })
-    if (!msg.markdownGeneration && artifacts.length === 0) return null
     return (
-      <>
-        {msg.markdownGeneration ? (
-          <MarkdownArtifactProgressCard
-            progress={msg.markdownGeneration}
-            sourceDepth={thread.depth}
-          />
-        ) : null}
-        {artifacts}
-      </>
+      <MessageArtifacts
+        state={state}
+        message={msg}
+        sourceDepth={thread.depth}
+        onOpen={onOpenArtifact}
+      />
     )
   }
 
@@ -196,6 +199,11 @@ export function BranchableChat({
           </span>
           <q>{thread.anchorText}</q>
         </div>
+        {sourceProvenance && !sourceProvenance.isOnActivePath && (
+          <div className="inactive-source">
+            <span>基于历史回复 · 当前时间线不展示该回复</span>
+          </div>
+        )}
       </div>
       <details className="inherited">
         <summary>
@@ -216,7 +224,7 @@ export function BranchableChat({
   return (
     <ChatView
       threadId={threadId}
-      messages={thread.messages}
+      messages={visibleMessages}
       isMain={isMain}
       header={header}
       banner={banner}
@@ -234,128 +242,10 @@ export function BranchableChat({
       }
       onModelChange={onModelChange}
       onSend={onSend}
+      messageActionState={messageActionState}
+      messageCommands={messageCommands}
+      editableUserMessageId={presentation?.latestUserMessageId}
+      regeneratableAssistantMessageId={presentation?.latestAssistantMessageId}
     />
   )
-}
-
-/* -------------------------------------------------------------------------- */
-/* assistant 正文：Markdown 渲染 + 渲染后手绘锚点高亮 / 脚注上标                  */
-/* -------------------------------------------------------------------------- */
-/**
- * 为什么「手绘」而非 React 渲染高亮：锚点定位发生在**渲染后的真实 DOM**上
- * （locateAnchor 三层降级），坐标系 = .md-body 的 textContent，对 Markdown 结构免疫。
- *
- * 导出供画布模式复用（openspec: add-canvas-conversations D2）：节点外挂面板的
- * assistant 正文必须与列模式同一套渲染（.md-body 容器 + 锚点 effect + SmoothText），
- * 否则划选反查（以 .md-body 为坐标系）在画布内直接失效。
- *
- * React 与手绘 DOM 的冲突规避：
- * · MarkdownBody 按 source / streaming 用 memo；代码高亮 batch 结算后才允许手绘，
- *   避免 Shiki 的异步 React commit 与 paintRange 同时改 token 子树；
- * · source 变化只发生在流式增量时，而流式中的消息尚无 fork（fork 只在已完成消息上创建），
- *   故无高亮与 React 更新的冲突；
- * · 只在 commit 后的 effect 里绘制，绝不在 render / setState 里绘。
- * · 定位失败（locateAnchor 返回 null 或 fuzzy 低于阈值）静默跳过该 fork——不高亮，
- *   但分支本体 / 脚注列表 / ⌘K 不受影响。
- *
- * 平滑打字（useSmoothText）与锚点 effect 的不变式：
- * · active 时渲染 display 追赶态且不恢复锚点；
- * · active=false 的首个 render 不能假设 useSmoothText 的 effect 已经完成 snap，因此
- *   稳定态直接渲染 msg.text；待 MarkdownBody 报告当前 DOM settled 后再恢复锚点。
- */
-export function AnchoredMarkdown({
-  state,
-  msg,
-  onOpenThread,
-}: {
-  state: ThreadTreeState
-  msg: Message
-  onOpenThread: (targetId: string, opts?: { keepSource?: boolean }) => void
-}) {
-  const hostRef = useRef<HTMLDivElement | null>(null)
-  // forksKey 只随 fork 的增删与编号变化——source 未变、仅新增 fork 时也能触发重绘
-  const forksKey = msg.forks.map((f) => `${f.threadId}:${f.num}`).join("|")
-  const active = msg.status === "streaming" || msg.status === "pending"
-  const display = useSmoothText(msg.text, active)
-  const renderedSource = active ? display : msg.text
-  const [settledRevision, bumpSettledRevision] = useReducer(
-    (revision: number) => revision + 1,
-    0
-  )
-  const onContentSettled = useCallback(() => {
-    bumpSettledRevision()
-  }, [])
-
-  useEffect(() => {
-    const host = hostRef.current
-    if (!host) return
-    const md = host.querySelector<HTMLElement>(".md-body")
-    if (!md) return
-
-    const wipe = () => {
-      clearHighlights(md)
-      md.querySelectorAll("sup.fn-mark").forEach((n) => n.remove())
-    }
-    wipe()
-
-    // 高亮仍在飞或当前是流式 plaintext 时，绝不手改 React 即将 reconcile 的代码 DOM。
-    if (active || md.dataset.contentSettled !== "true") return wipe
-
-    for (const fork of msg.forks) {
-      if (!fork.anchor) continue
-      const located = locateAnchor(md, fork.anchor)
-      if (!located) continue // 定位失败：静默跳过（fuzzy 默认阈值 0.7）
-      const color = `color-mix(in srgb, var(--d${dc(fork.depth)}) 20%, transparent)`
-      paintRange(located.range, fork.threadId, color)
-      // 高亮 span 补上 data-fork-id + 深度色类，使点击高亮亦能打开分支
-      const marks = md.querySelectorAll<HTMLElement>(
-        `[data-text-anchor-mark="${cssEscape(fork.threadId)}"]`
-      )
-      marks.forEach((m) => {
-        m.setAttribute("data-fork-id", fork.threadId)
-        m.classList.add("anchored-mark", `fc-${dc(fork.depth)}`)
-        m.title = `分支「${threadTitle(state, fork.threadId)}」· 点击打开 · ⌘点击保留本列在右侧打开`
-      })
-      // range 末尾插入脚注上标（同样带 data-fork-id）
-      const last = marks[marks.length - 1]
-      if (last) {
-        const sup = document.createElement("sup")
-        sup.className = `fn-mark fc-${dc(fork.depth)}`
-        sup.setAttribute("data-fork-id", fork.threadId)
-        sup.textContent = String(fork.num)
-        last.after(sup)
-      }
-    }
-
-    return wipe
-    // state 仅用于 title 文案，不参与重绘时机；有意省略以免每次 version 变动都重绘
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active, msg.text, forksKey, settledRevision])
-
-  // 点击冒泡到稳定容器：命中高亮 / 脚注（data-fork-id）即打开对应分支。
-  // 高亮与脚注是手绘 DOM，但事件冒泡到此 React onClick，重绘不丢 handler。
-  const onClick = (e: React.MouseEvent) => {
-    const el = (e.target as HTMLElement).closest?.("[data-fork-id]")
-    if (!el) return
-    const id = el.getAttribute("data-fork-id")
-    if (!id) return
-    onOpenThread(id, { keepSource: e.metaKey || e.ctrlKey })
-  }
-
-  return (
-    <div ref={hostRef} onClick={onClick}>
-      <MarkdownBody
-        source={renderedSource}
-        streaming={active}
-        onContentSettled={onContentSettled}
-      />
-    </div>
-  )
-}
-
-/** querySelector 属性值转义（thread id 形如 b1，仍走标准转义以防特殊字符） */
-function cssEscape(value: string): string {
-  if (typeof CSS !== "undefined" && typeof CSS.escape === "function")
-    return CSS.escape(value)
-  return value.replace(/"/g, '\\"')
 }

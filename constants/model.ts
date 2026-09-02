@@ -16,12 +16,31 @@ export const OPENROUTER_MODEL_IDS = [
   "qwen/qwen3.8-max",
   "x-ai/grok-4.5",
   "x-ai/grok-4.6",
+  "stealth/ox-alpha",
 ] as const
 
 export type OpenRouterModelId = (typeof OPENROUTER_MODEL_IDS)[number]
-export const UMAPIS_MODEL_IDS = [
+export const UMAPIS_CLAUDE_MODEL_IDS = [
   "claude-opus-4-6",
+  "claude-opus-4-6-thinking",
+  "claude-sonnet-4-6",
+  "claude-sonnet-4-6-thinking",
+  "claude-opus-4-7",
+  "claude-opus-4-7-thinking",
+  "claude-fable-5",
+  "claude-opus-5",
   "claude-sonnet-5",
+  "claude-opus-4-8",
+  "claude-opus-4-8-thinking",
+  "claude-haiku-4-5",
+  "gemini-3.7-flash",
+  "grok-4.6",
+] as const
+
+export type UMAPISClaudeModelId = (typeof UMAPIS_CLAUDE_MODEL_IDS)[number]
+
+export const UMAPIS_MODEL_IDS = [
+  ...UMAPIS_CLAUDE_MODEL_IDS,
   "gpt-5.6-sol",
   "gpt-5.6-terra",
 ] as const
@@ -29,7 +48,39 @@ export const UMAPIS_MODEL_IDS = [
 export type UMAPISModelId = (typeof UMAPIS_MODEL_IDS)[number]
 export type UMAPISCredentialGroup = "claude" | "gpt"
 export type ChatModelProvider =
-  "minimax" | "deepseek" | "openai" | "ark" | "openrouter" | "umapis"
+  | "minimax"
+  | "deepseek"
+  | "openai"
+  | "ark"
+  | "openrouter"
+  | "umapis"
+  | "private-relay"
+
+/** 模型选择器使用的供应商展示名。 */
+export const CHAT_MODEL_PROVIDER_LABELS: Readonly<
+  Record<ChatModelProvider, string>
+> = {
+  minimax: "MiniMax",
+  deepseek: "DeepSeek",
+  openai: "OpenAI",
+  ark: "火山方舟",
+  openrouter: "OpenRouter",
+  umapis: "UMAPIS",
+  "private-relay": "Private Relay",
+}
+
+/** Thread Chat 对外展示的中性模型组名称，不暴露实际服务供应商。 */
+export const THREAD_CHAT_MODEL_GROUP_LABELS: Readonly<
+  Record<ChatModelProvider, string>
+> = {
+  minimax: "海南岛",
+  deepseek: "崇明岛",
+  openai: "马略卡",
+  ark: "济州岛",
+  openrouter: "巴厘岛",
+  umapis: "冰岛",
+  "private-relay": "塞班岛",
+}
 export type ReasoningTransport = "think-tags" | "native"
 export type ChatModelSurface = "linear" | "thread"
 
@@ -58,10 +109,54 @@ export type ChatModel = {
   /** 模型可见的产品入口。 */
   surfaces: readonly ChatModelSurface[]
   /** 仅用于展示分组，不参与鉴权和路由。 */
-  creator?: "anthropic" | "openai" | "moonshotai" | "deepseek" | "qwen" | "x-ai"
+  creator?:
+    | "anthropic"
+    | "openai"
+    | "moonshotai"
+    | "deepseek"
+    | "qwen"
+    | "x-ai"
+    | "stealth"
 }
 
-export const CHAT_MODELS: readonly ChatModel[] = [
+/** 用统一的 Claude 组配置注册 UMAPIS 未计费预览模型。 */
+function createUmapisClaudeModel<const TModelId extends UMAPISClaudeModelId>(
+  upstreamModel: TModelId,
+  name: string
+) {
+  return {
+    id: `umapis-${upstreamModel}` as const,
+    name: `UMAPIS · ${name}`,
+    description: "UMAPIS 预览（Claude 组）",
+    provider: "umapis",
+    upstreamModel,
+    reasoningTransport: "native",
+    umapisCredentialGroup: "claude",
+    unbilledPreview: true,
+    surfaces: ["thread"],
+    creator: "anthropic",
+  } as const satisfies ChatModel
+}
+
+/** 注册仅供 Thread Chat 使用的私有中继聊天模型。 */
+function createPrivateRelayModel<
+  const TId extends string,
+  const TUpstreamModel extends string,
+>(id: TId, upstreamModel: TUpstreamModel, name: string, description: string) {
+  return {
+    id,
+    name,
+    description,
+    provider: "private-relay",
+    upstreamModel,
+    reasoningTransport: "native",
+    unbilledPreview: true,
+    surfaces: ["thread"],
+    creator: "openai",
+  } as const satisfies ChatModel
+}
+
+const CHAT_MODEL_REGISTRY = [
   {
     id: "minimax-m2",
     name: "MiniMax M2",
@@ -161,30 +256,32 @@ export const CHAT_MODELS: readonly ChatModel[] = [
     upstreamModel: "kimi-k2.7-code",
     surfaces: ["linear", "thread"],
   },
-  {
-    id: "umapis-claude-opus-4-6",
-    name: "UMAPIS · Claude Opus 4.6",
-    description: "UMAPIS 预览（Claude 组）",
-    provider: "umapis",
-    upstreamModel: "claude-opus-4-6",
-    reasoningTransport: "native",
-    umapisCredentialGroup: "claude",
-    unbilledPreview: true,
-    surfaces: ["thread"],
-    creator: "anthropic",
-  },
-  {
-    id: "umapis-claude-sonnet-5",
-    name: "UMAPIS · Claude Sonnet 5",
-    description: "UMAPIS 预览（Claude 组）",
-    provider: "umapis",
-    upstreamModel: "claude-sonnet-5",
-    reasoningTransport: "native",
-    umapisCredentialGroup: "claude",
-    unbilledPreview: true,
-    surfaces: ["thread"],
-    creator: "anthropic",
-  },
+  createUmapisClaudeModel("claude-opus-4-6", "Claude Opus 4.6"),
+  createUmapisClaudeModel(
+    "claude-opus-4-6-thinking",
+    "Claude Opus 4.6 Thinking"
+  ),
+  createUmapisClaudeModel("claude-sonnet-4-6", "Claude Sonnet 4.6"),
+  createUmapisClaudeModel(
+    "claude-sonnet-4-6-thinking",
+    "Claude Sonnet 4.6 Thinking"
+  ),
+  createUmapisClaudeModel("claude-opus-4-7", "Claude Opus 4.7"),
+  createUmapisClaudeModel(
+    "claude-opus-4-7-thinking",
+    "Claude Opus 4.7 Thinking"
+  ),
+  createUmapisClaudeModel("claude-fable-5", "Claude Fable 5"),
+  createUmapisClaudeModel("claude-opus-5", "Claude Opus 5"),
+  createUmapisClaudeModel("claude-sonnet-5", "Claude Sonnet 5"),
+  createUmapisClaudeModel("claude-opus-4-8", "Claude Opus 4.8"),
+  createUmapisClaudeModel(
+    "claude-opus-4-8-thinking",
+    "Claude Opus 4.8 Thinking"
+  ),
+  createUmapisClaudeModel("claude-haiku-4-5", "Claude Haiku 4.5"),
+  createUmapisClaudeModel("gemini-3.7-flash", "Gemini 3.7 Flash"),
+  createUmapisClaudeModel("grok-4.6", "Grok 4.6"),
   {
     id: "umapis-gpt-5.6-sol",
     name: "UMAPIS · GPT-5.6 Sol",
@@ -209,6 +306,49 @@ export const CHAT_MODELS: readonly ChatModel[] = [
     surfaces: ["thread"],
     creator: "openai",
   },
+  // 订阅额度尚未完成成本折算，先沿用明确的预览标记，避免缺失价格被误记为 ¥0 计费。
+  createPrivateRelayModel(
+    "private-relay-gpt-5.6-sol",
+    "gpt-5.6-sol",
+    "GPT-5.6 Sol",
+    "质量优先，适合复杂推理、复杂编码和专业工作。"
+  ),
+  createPrivateRelayModel(
+    "private-relay-gpt-5.6-terra",
+    "gpt-5.6-terra",
+    "GPT-5.6 Terra",
+    "能力、延迟和配额消耗均衡，推荐用于日常复杂任务。"
+  ),
+  createPrivateRelayModel(
+    "private-relay-gpt-5.6-luna",
+    "gpt-5.6-luna",
+    "GPT-5.6 Luna",
+    "面向高吞吐和低消耗任务的快速模型。"
+  ),
+  createPrivateRelayModel(
+    "private-relay-gpt-5.5",
+    "gpt-5.5",
+    "GPT-5.5",
+    "高能力通用模型，适合作为复杂工具型 Agent 的回退。"
+  ),
+  createPrivateRelayModel(
+    "private-relay-gpt-5.4",
+    "gpt-5.4",
+    "GPT-5.4",
+    "成熟的通用编码与专业工作模型，适合作为稳定回退。"
+  ),
+  createPrivateRelayModel(
+    "private-relay-gpt-5.4-mini",
+    "gpt-5.4-mini",
+    "GPT-5.4 Mini",
+    "面向高吞吐的快速模型，适合编码和子 Agent。"
+  ),
+  createPrivateRelayModel(
+    "private-relay-gpt-5.3-codex-spark",
+    "gpt-5.3-codex-spark",
+    "GPT-5.3 Codex Spark",
+    "快速 Codex 编码模型；兼容性验证中。"
+  ),
   {
     id: "openrouter-gpt-5.6-luna",
     name: "OpenRouter · GPT-5.6 Luna",
@@ -326,9 +466,26 @@ export const CHAT_MODELS: readonly ChatModel[] = [
     surfaces: ["thread"],
     creator: "x-ai",
   },
-]
+  {
+    id: "openrouter-ox-alpha",
+    name: "OpenRouter · Ox Alpha",
+    description: "面向编程与长时 Agent 任务的免费预览模型",
+    provider: "openrouter",
+    upstreamModel: "stealth/ox-alpha",
+    reasoningTransport: "native",
+    unbilledPreview: true,
+    surfaces: ["thread"],
+    creator: "stealth",
+  },
+] as const satisfies readonly ChatModel[]
 
-export const DEFAULT_MODEL_ID = "minimax-m2"
+export type ChatModelEntry = (typeof CHAT_MODEL_REGISTRY)[number]
+export type ChatModelId = ChatModelEntry["id"]
+
+/** 运行时消费者使用宽化视图；字面量 registry 只负责派生精确 id 联合。 */
+export const CHAT_MODELS: readonly ChatModel[] = CHAT_MODEL_REGISTRY
+
+export const DEFAULT_MODEL_ID: ChatModelId = "minimax-m2"
 
 /** 从注册表的产品可见面派生 Thread Chat 选项。 */
 export const THREAD_CHAT_MODELS: readonly ChatModel[] = CHAT_MODELS.filter(
@@ -336,7 +493,8 @@ export const THREAD_CHAT_MODELS: readonly ChatModel[] = CHAT_MODELS.filter(
 )
 
 /** Thread Chat 新建树及旧树模型回退使用的默认模型。 */
-export const DEFAULT_THREAD_CHAT_MODEL_ID = "glm-5.3"
+export const DEFAULT_THREAD_CHAT_MODEL_ID: ChatModelId =
+  "umapis-claude-opus-4-6"
 
 /**
  * 单次生成的输出 token 上限（安全阀）。
@@ -355,24 +513,30 @@ export function isUnbilledPreviewModel(model: ChatModel): boolean {
   return model.unbilledPreview === true
 }
 
-export function isChatModelId(id: unknown): id is string {
+export function isChatModelId(id: unknown): id is ChatModelId {
   return typeof id === "string" && getChatModel(id) !== undefined
 }
 
 /** Thread Chat 允许写入 Thread 的模型 id。 */
-export function isThreadChatModelId(id: unknown): id is string {
+export function isThreadChatModelId(id: unknown): id is ChatModelId {
   return (
     typeof id === "string" &&
     THREAD_CHAT_MODELS.some((model) => model.id === id)
   )
 }
 
+/** 线性聊天允许使用的模型 id；与 Thread surface 一样从注册表派生。 */
+export function isLinearChatModelId(id: unknown): id is ChatModelId {
+  if (typeof id !== "string") return false
+  return getChatModel(id)?.surfaces.includes("linear") === true
+}
+
 /** 校验并回退到默认模型，避免请求体传入未知 id。 */
-export function resolveModelId(id: string | undefined): string {
-  return getChatModel(id) ? (id as string) : DEFAULT_MODEL_ID
+export function resolveModelId(id: string | undefined): ChatModelId {
+  return isChatModelId(id) ? id : DEFAULT_MODEL_ID
 }
 
 /** 校验并回退为 Thread Chat 当前可选模型，避免历史树保留已下线选项。 */
-export function resolveThreadChatModelId(id: string | undefined): string {
+export function resolveThreadChatModelId(id: string | undefined): ChatModelId {
   return isThreadChatModelId(id) ? id : DEFAULT_THREAD_CHAT_MODEL_ID
 }

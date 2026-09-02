@@ -27,7 +27,7 @@ ThreadChat 已经能把普通 assistant 正文渲染成 Markdown，也保留了 
 ## Impact
 
 - 服务端聊天编排：`app/api/chat/route.ts`、ThreadChat system prompt 与 Markdown 意图判定。
-- 客户端流与状态：`app/thread-chat/net/ui-stream.ts`、`chat-controller.ts`、`core/types.ts`、`core/store.ts`、`net/prompt.ts`、`net/persist.ts`。
+- 客户端流与状态：`app/thread-chat/net/stream/ui-stream.ts`、`chat-controller.ts`、`core/types.ts`、`core/store.ts`、`net/prompt/prompt.ts`、`net/persistence/persist.ts`。
 - 消息与面板 UI：列视图、画布展开面板、Artifact drawer、顶栏和画布统计文案。
 - 测试：新增工具事件/意图识别纯函数测试，并扩展真实模型、消息流、重试和持久化端到端验收。
 - 依赖与数据库：复用现有 `ai`、`zod`、`react-markdown`、`remark-gfm` 和 `branch_trees.state`，无新增依赖、无 SQL migration。

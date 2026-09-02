@@ -22,6 +22,6 @@
 ## Impact
 
 - **前端编排**：`app/thread-chat/thread-chat-demo.tsx` 增加 Help Dialog 状态、关闭动画和 Escape 链接线。
-- **组件**：新增 `app/thread-chat/orchestration/help-panel.tsx`，承载共用提示内容和 Dialog 外壳。
+- **组件**：新增 `app/thread-chat/orchestration/overlays/help-panel.tsx`，承载共用提示内容和 Dialog 外壳。
 - **样式**：`app/thread-chat/thread-chat.css` 增加 Help Dialog 内容区局部样式，继续复用 `.swx` 弹层基础样式。
 - **不涉及**：API、数据库、会话树数据模型、工作台持久化和新增依赖。

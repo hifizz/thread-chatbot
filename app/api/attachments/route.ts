@@ -3,6 +3,7 @@ import { db } from "@/lib/db"
 import { attachments } from "@/lib/db/schema"
 import { isR2Configured, presignUpload } from "@/lib/storage/r2"
 import { ATTACHMENT_POLICIES } from "@/constants/attachment"
+import { getCurrentUserId } from "@/lib/auth/server"
 
 const createSchema = z.object({
   filename: z.string().min(1).max(255),
@@ -15,6 +16,9 @@ const createSchema = z.object({
  * 文件字节不经过本服务器，由浏览器 PUT 到 R2。
  */
 export async function POST(req: Request) {
+  const userId = await getCurrentUserId()
+  if (!userId) return Response.json({ error: "未登录" }, { status: 401 })
+
   if (!isR2Configured()) {
     return Response.json(
       {
@@ -52,6 +56,7 @@ export async function POST(req: Request) {
 
   await db.insert(attachments).values({
     id,
+    userId,
     key,
     filename,
     mimeType: contentType,

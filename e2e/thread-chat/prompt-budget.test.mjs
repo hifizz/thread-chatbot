@@ -2,7 +2,7 @@
  * 继承段字符预算（openspec: add-bubble-composer D8）纯函数用例，无需 dev server：
  *   node --experimental-strip-types e2e/thread-chat/prompt-budget.test.mjs
  *
- * 覆盖 app/thread-chat/net/prompt-pure.ts 的 applyInheritedBudget / omittedNoticeText：
+ * 覆盖 lib/thread-chat/application/prompt-policy.ts 的预算与 kickoff policy：
  * 预算内不截断、超预算从最旧丢弃（顺序保持）、边界恰好等于预算、保底最近 1 条
  * （最新一条独超预算也保留）、省略说明文案形状、kickoffQuestion 文案形状。
  */
@@ -10,7 +10,7 @@ import {
   applyInheritedBudget,
   kickoffQuestion,
   omittedNoticeText,
-} from "../../app/thread-chat/net/prompt-pure.ts"
+} from "../../lib/thread-chat/application/prompt-policy.ts"
 import { INHERITED_CHAR_BUDGET } from "../../constants/thread-chat.ts"
 
 let failed = 0

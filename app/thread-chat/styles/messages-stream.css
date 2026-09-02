@@ -1,12 +1,31 @@
 /* ── @/thread-chat/styles ── 流式状态：思考中 / 光标 / 错误条 / 停止按钮（含 .send.stop 覆盖，必须在 composer 之后） */
 
-/* ---------------- 流式消息状态：思考中 / 光标 / 错误条 ---------------- */
+/* ---------------- 流式消息状态：思考中 / 光标 / 错误条 / 主动停止 ---------------- */
 /* 思考中：三点跳动指示器，pending 且尚无正文时覆盖气泡空窗 */
 .tc .typing {
   display: inline-flex;
   align-items: center;
   gap: 4px;
   padding: 2px 0;
+}
+.tc .generation-background {
+  display: block;
+  margin-bottom: 7px;
+  color: transparent;
+  font-size: 12px;
+  line-height: 1.4;
+  background-image: linear-gradient(
+    100deg,
+    var(--ink-faint) 30%,
+    var(--ink-soft) 50%,
+    var(--ink-faint) 70%
+  );
+  background-position: 140% 50%;
+  background-size: 240% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: tc-generation-shimmer 1.8s linear infinite;
 }
 .tc .typing i {
   width: 6px;
@@ -21,6 +40,14 @@
 }
 .tc .typing i:nth-child(3) {
   animation-delay: 0.3s;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tc .generation-background {
+    color: var(--ink-faint);
+    background-image: none;
+    -webkit-text-fill-color: currentColor;
+    animation: none;
+  }
 }
 /* 流式光标：正文末尾闪烁竖线，标示仍在生成中 */
 .tc .caret {
@@ -58,6 +85,34 @@
 }
 .tc .msg-error .retry:hover {
   background: #fbeae7;
+}
+
+/* 主动停止：与错误条分开，用纸面灰表达用户主动结束，而不是系统异常。 */
+.tc .msg-stopped {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 6px;
+  padding: 7px 11px;
+  border: 1px solid var(--rule-strong);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--paper-2) 70%, transparent);
+  color: var(--ink-soft);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.tc .msg-stopped .retry {
+  flex: none;
+  padding: 3px 9px;
+  border: 1px solid var(--rule-strong);
+  border-radius: 6px;
+  background: var(--paper);
+  color: var(--ink-soft);
+  font-size: 12px;
+  cursor: pointer;
+}
+.tc .msg-stopped .retry:hover {
+  background: var(--paper-2);
 }
 
 /* 停止按钮：busy 时发送键切换为「停止」（沿用 .send 基础样式，仅换配色示意可中断） */

@@ -1,9 +1,12 @@
 import { generateText } from "ai"
 import { minimaxModel } from "@/lib/ai/minimax"
+import { MODEL_CALL_PURPOSE } from "@/constants/model-call"
+import { withModelCallLogging } from "@/lib/ai/model-call-logger"
 import {
   INSIGHTS_INPUT_CHAR_LIMIT,
   SUGGESTED_QUESTION_COUNT,
 } from "@/constants/attachment"
+import { buildAiTelemetryConfig } from "@/lib/observability/ai-sdk"
 
 // 上传后基于 PDF 文本生成「摘要 + 建议问题」，解决用户面对空白输入框的冷启动问题。
 // 用 generateText + 容错 JSON 解析（而非 generateObject），以兼容任意 OpenAI 兼容端点。
@@ -62,8 +65,18 @@ export async function generateInsights(
   const text = pages.join("\n\n").slice(0, INSIGHTS_INPUT_CHAR_LIMIT)
   if (!text.trim()) return null
 
+  const trace = { requestId: crypto.randomUUID() }
   const { text: raw } = await generateText({
-    model: minimaxModel(),
+    ...buildAiTelemetryConfig(MODEL_CALL_PURPOSE.attachmentInsights, {
+      ...trace,
+      modelId: process.env.LLM_MODEL_ID ?? "MiniMax-M2",
+      entrypoint: "attachment-insights",
+    }),
+    model: withModelCallLogging(
+      minimaxModel(),
+      MODEL_CALL_PURPOSE.attachmentInsights,
+      trace
+    ),
     prompt: buildPrompt(text),
   })
   return parseInsights(raw)

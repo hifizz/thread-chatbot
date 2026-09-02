@@ -26,5 +26,5 @@
 
 - **DB**：`branch_trees` 加 `custom_title text` 可空列（一枚新迁移 0005，纯加列零风险）。
 - **API**：新增 `app/api/branch-trees/route.ts`（GET 列表）；`[treeId]/route.ts` 增加 PATCH/DELETE。
-- **前端**：新增 `app/thread-chat/orchestration/tree-list.tsx`（弹层，沿用 ⌘K 切换器 swx 交互语言与 .tc 视觉）；`net/persist.ts` 增加 listTrees/renameTree/deleteTree；壳层顶栏加按钮、⌘⇧K、Esc 链；CSS 追加。
+- **前端**：新增 `app/thread-chat/orchestration/navigation/tree-list.tsx`（弹层，沿用 ⌘K 切换器 swx 交互语言与 .tc 视觉）；`net/persistence/persist.ts` 增加 listTrees/renameTree/deleteTree；壳层顶栏加按钮、⌘⇧K、Esc 链；CSS 追加。
 - **不改**：store/锚点/分支/滚动/平滑；PUT 的派生 title 逻辑照旧。
