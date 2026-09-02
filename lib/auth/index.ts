@@ -16,6 +16,9 @@ const emailReady = isEmailConfigured()
 // 人机验证（Cloudflare Turnstile）：配了 secret 才启用，默认拦截 /sign-up/email 与 /sign-in/email。
 const TURNSTILE_SECRET = process.env.TURNSTILE_SECRET_KEY
 
+// localhost 的 Cookie 不按端口隔离；每个 worktree 使用独立前缀，避免登录态互相覆盖。
+const authCookiePrefix = process.env.BETTER_AUTH_COOKIE_PREFIX?.trim()
+
 // Google 社交登录：同时配齐 client id/secret 才启用（判定来自 lib/auth/social，
 // 登录页据同一来源决定是否显示按钮，无需额外的 NEXT_PUBLIC 开关）。
 const googleAuthConfig = getGoogleAuthConfig()
@@ -33,6 +36,7 @@ if (TURNSTILE_SECRET) {
 plugins.push(nextCookies())
 
 export const auth = betterAuth({
+  advanced: authCookiePrefix ? { cookiePrefix: authCookiePrefix } : undefined,
   database: drizzleAdapter(db, {
     provider: "pg",
     schema: { user, session, account, verification },

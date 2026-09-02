@@ -27,6 +27,10 @@ import type {
 } from "@/lib/thread-chat/contracts/dto"
 import type { ConversationMessageStatus } from "@/lib/thread-chat/domain/conversation"
 
+// drizzle-kit 只扫描这个入口文件导出的对象；单纯 import 不会把自定义 PostgreSQL
+// schema 暴露给 db:push。这里重新导出，避免 thread_chat 被误判为未声明的 schema。
+export { dbSchema }
+
 // 认证与计费表在独立文件中定义，这里统一 re-export，使 drizzle 客户端与迁移能感知它们。
 export * from "./auth-schema"
 export * from "./billing-schema"

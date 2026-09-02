@@ -18,6 +18,9 @@ Package manager is **pnpm** (pnpm-lock.yaml / pnpm-workspace.yaml).
 - `pnpm db:generate` — generate a Drizzle migration from `lib/db/schema.ts`
 - `pnpm db:migrate` — apply pending migrations to `DATABASE_URL`
 - `pnpm db:push` — push schema directly without a migration file (quick local iteration)
+- `pnpm worktree:seed` — register the local email/password test account in the current worktree database
+- `bash scripts/wt-new.sh <new-branch> [start-point]` — create and initialize a local worktree from the optional branch, tag, or commit (defaults to `HEAD`) in the `.bare` single-directory layout
+- `bash scripts/wt-rm.sh <branch>` — remove a local worktree and its dedicated database
 - `pnpm db:studio` — Drizzle Studio
 - `pnpm openspec:validate` — validate OpenSpec changes/specs (`@fission-ai/openspec`, pinned as a devDependency so CI works without a global install; see `.github/workflows/openspec.yml`)
 
@@ -33,6 +36,15 @@ To add a shadcn/ui component: `npx shadcn@latest add <name>` (lands in `componen
 - **After finishing a module-sized chunk of work, sweep for magic strings and duplicated variables/strings/functions.**
   - Constants go in the **`constants/` directory**, split into topic files (e.g. `constants/model.ts`), each with a short comment explaining its purpose — not inlined, not redefined per-file.
   - Shared utility functions get grouped into the matching subdirectory under `lib/` (e.g. `lib/chat/`, `lib/db/`) by domain, not left scattered across files or dumped into `lib/utils.ts`.
+
+### Drizzle migration workflow
+
+- 功能分支和临时 worktree 可以修改 `lib/db/schema.ts` 等数据库结构源码，但只能对各自的独立本地数据库运行 `pnpm db:push`。
+- 除 `develop` 外，任何分支不得运行 `pnpm db:generate`，也不得创建、修改或删除 `drizzle/` 目录中的 migration SQL、快照或 journal 文件。
+- `develop` 合并一批功能分支后，由一个明确的集成任务统一运行一次 `pnpm db:generate`；不得让多个任务并行生成 migration。
+- 生成后必须检查 SQL 是否包含意外的删除、重命名、字段类型变化或数据搬迁，并在代表上一版本结构的数据库上运行 `pnpm db:migrate` 验证升级过程。
+- `main` 正常情况下只接收已经在 `develop` 生成并验证的 migration，不直接生成；只有用户明确授权的紧急修复可以例外。
+- migration 尚未生成并验证时，不得把依赖新数据库结构的代码视为可发布状态。
 
 ## Architecture
 
@@ -78,7 +90,8 @@ Each tool's custom UI is registered with the `useAssistantTool({ toolName, type,
 
 Drizzle ORM + Postgres backs chat history so threads survive page reloads (previously in-memory only, lost on refresh).
 
-- Local dev DB: Docker container `fullstack-starter-postgres` (shared across several unrelated side-projects on this machine — never touch its other databases), dedicated database **`thread-chat`**, connected via `DATABASE_URL` in `.env.local`.
+- Local dev DB: OrbStack container `thread-chat-pg` (`pgvector/pgvector:pg17`), dedicated database **`thread-chat`**, connected via `DATABASE_URL` in `.env.local`.
+  - The bare-repository root keeps the shared `.env.local`. `scripts/wt-new.sh` copies it into a new worktree, creates an empty `wt_*` database, runs `pnpm db:push`, and seeds the configured email/password test user. Worktree setup never generates or runs migrations.
   - **Gotcha**: a native Homebrew `postgresql@17` service can also bind port 5432 and silently shadow the Docker container's port mapping for host connections (the host process wins over the container's `0.0.0.0:5432` mapping). If `DATABASE_URL` can't connect, check `brew services list | grep postgres` and `lsof -iTCP:5432 -sTCP:LISTEN` for a conflicting native instance before assuming the container itself is broken.
 - Schema: `lib/db/schema.ts` — `threads` and `messages` tables. `messages.content` stores the full AI SDK `UIMessage` (minus `id`) as JSONB rather than normalizing individual parts, so tool-call/tool-result parts (or new tools) need no schema changes.
 - Client: `lib/db/index.ts` — a global-singleton `postgres`/drizzle client so dev HMR doesn't exhaust Postgres connections.

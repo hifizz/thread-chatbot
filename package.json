@@ -9,7 +9,7 @@
   "private": true,
   "license": "AGPL-3.0-only",
   "scripts": {
-    "dev": "next dev --port 4040",
+    "dev": "bash scripts/dev.sh",
     "build": "next build",
     "vercel-build": "node scripts/vercel-migrate.mjs && next build",
     "start": "next start",
@@ -39,6 +39,7 @@
     "db:migrate": "drizzle-kit migrate",
     "db:reset-schema": "node scripts/reset-thread-chat-schema.mjs",
     "db:push": "drizzle-kit push",
+    "worktree:seed": "node --env-file=.env.local --import tsx scripts/worktree/seed-test-user.ts",
     "db:test:setup": "node scripts/setup-thread-chat-test-database.mjs",
     "db:test:reset": "node scripts/setup-thread-chat-test-database.mjs --reset-schema",
     "db:test:migrate": "drizzle-kit migrate --config drizzle.test.config.ts",

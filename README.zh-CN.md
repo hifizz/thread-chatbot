@@ -50,6 +50,31 @@ pnpm dev
 
 打开 <http://localhost:4040/thread-chat> 进入 Thread Chat 工作区。按提示登录；裸路径会在可用时恢复最近打开的树，而 `/thread-chat/{treeId}` 这样的树 URL 则标识一段特定的已持久化对话。
 
+### 裸仓库 Worktree 开发
+
+裸仓库容器目录保存一份共享 `.env.local`，每个新 worktree 从它复制完整配置，再覆盖自己的端口、数据库地址和认证 Cookie 前缀。
+
+在任意已有 worktree 中创建新分支及对应目录。可选的第二个参数用于指定起点分支、标签或提交；省略时使用当前 `HEAD`：
+
+```bash
+bash scripts/wt-new.sh feature/example main
+```
+
+脚本从 4041 开始分配端口，在 OrbStack 的 `thread-chat-pg` 容器中创建空数据库，执行 `pnpm db:push`，然后注册 `.env.local` 中配置的本地测试账号。启动服务：
+
+```bash
+cd ../feature-example
+pnpm dev
+```
+
+删除 worktree 及其数据库：
+
+```bash
+bash scripts/wt-rm.sh feature/example
+```
+
+删除命令不使用 `--force`；worktree 有未提交修改时 Git 会直接报错。
+
 ### 可选集成
 
 以下能力均为按需配置，快速开始不需要它们：

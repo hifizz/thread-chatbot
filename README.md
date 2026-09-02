@@ -94,6 +94,31 @@ pnpm dev
 
 Open <http://localhost:4040/thread-chat> to enter the Thread Chat workspace. Sign in when prompted; the bare route resumes the most recently opened tree when available, while a tree URL such as `/thread-chat/{treeId}` identifies a specific persisted conversation.
 
+### Bare-repository worktree development
+
+Keep one shared `.env.local` in the bare-repository container directory. Each new worktree copies the complete file, then replaces its port, database URL, and authentication cookie prefix.
+
+Create a branch and its worktree from any existing worktree. Pass the optional second argument to choose the branch, tag, or commit used as the starting point; it defaults to the current `HEAD`:
+
+```bash
+bash scripts/wt-new.sh feature/example main
+```
+
+The script allocates ports starting at 4041, creates an empty database in the OrbStack `thread-chat-pg` container, runs `pnpm db:push`, and registers the local test account configured in `.env.local`. Start the new environment with:
+
+```bash
+cd ../feature-example
+pnpm dev
+```
+
+Remove the worktree and its database with:
+
+```bash
+bash scripts/wt-rm.sh feature/example
+```
+
+The removal script does not use `--force`; Git reports an error when the worktree contains uncommitted changes.
+
 ### Optional integrations
 
 The following features are opt-in and are not required for the quick start:
