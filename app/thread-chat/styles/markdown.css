@@ -66,10 +66,15 @@
   color: var(--ink-faint);
 } */
 .tc .md-body blockquote {
-  margin: 0 0 12px;
+  margin: 12px 0;
   padding: 4px 0 4px 12px;
-  border-left: 1.5px solid var(--rule-strong);
+  border-left: 4px solid
+    color-mix(in srgb, var(--rule-strong) 50%, transparent);
   color: var(--ink-soft);
+}
+.tc .md-body blockquote > p {
+  /* 这里需要覆盖一下优先级 */
+  margin: 0 !important;
 }
 .tc .md-body blockquote p:last-child {
   margin-bottom: 0;
@@ -102,28 +107,43 @@
 }
 /* 表格 */
 .tc .md-body table {
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   width: 100%;
-  margin: 0 0 12px;
-  font-size: 13.5px;
+  margin: 0 0 16px;
+  font-size: 16px;
   font-family: var(--font-ui);
+  border: 1px solid #dfdedb;
+  border-radius: 8px;
+  overflow: hidden;
 }
 .tc .md-body th,
 .tc .md-body td {
-  border: 1px solid var(--rule);
-  padding: 6px 10px;
+  border: 0;
+  border-right: 1px solid #dfdedb;
+  border-bottom: 1px solid #dfdedb;
+  padding: 6px 12px;
   text-align: left;
   vertical-align: top;
 }
+.tc .md-body th:last-child,
+.tc .md-body td:last-child {
+  border-right: 0;
+}
+.tc .md-body tr:last-child td {
+  border-bottom: 0;
+}
 .tc .md-body th {
-  background: var(--paper-2);
-  font-weight: 600;
+  background: #eeeeed;
+  font-weight: 700;
+  font-size: 16px;
   color: var(--ink);
 }
 /* 代码块：语言标签 + 复制按钮 + 代码体 */
 .tc .md-body .md-code {
   margin: 10px 0;
-  border: 1px solid var(--rule);
+  border: 0.5px solid color-mix(in srgb, var(--ink) 15%, transparent);
+  position: relative;
   border-radius: 8px;
   overflow: hidden;
   background: rgba(252,252,252, 1);
@@ -132,18 +152,18 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 4px 4px 4px 12px;
+  padding: 8px 4px 4px 12px;
   /*background: var(--paper-2);*/
   /*border-bottom: 1px solid var(--rule);*/
   font-family: var(--font-mono);
 }
 .tc .md-body .md-code-head .lang {
-  font-size: 10.5px;
+  font-size: 12px;
   letter-spacing: 0.5px;
   text-transform: lowercase;
   color: var(--ink-soft);
 }
-.tc .md-body .md-code-head .copy {
+.tc .md-body .md-code .copy {
   display: inline-flex;
   align-items: center;
   background: transparent;
@@ -155,11 +175,16 @@
   opacity: 0;
   transition: opacity 0.3s ease;
 }
-.tc .md-body .md-code:hover .md-code-head .copy,
-.tc .md-body .md-code-head .copy:focus-visible {
+.tc .md-body .md-code:hover .copy,
+.tc .md-body .md-code .copy:focus-visible {
   opacity: 1;
 }
-.tc .md-body .md-code-head .copy:hover {
+.tc .md-body .md-code > .copy {
+  position: absolute;
+  top: 5px;
+  right: 10px;
+}
+.tc .md-body .md-code .copy:hover {
   color: var(--ink);
   background: color-mix(in srgb, var(--ink) 6%, transparent);
 }
@@ -167,6 +192,23 @@
   margin: 0;
   padding: 0px  12px 10px;
   overflow-x: auto;
+  scrollbar-width: auto;
+  scrollbar-color: color-mix(in srgb, var(--rule-strong) 70%, transparent)
+    transparent;
+}
+.tc .md-body .md-code pre::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+.tc .md-body .md-code pre::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--rule-strong) 70%, transparent);
+  border-radius: 5px;
+}
+.tc .md-body .md-code pre::-webkit-scrollbar-track {
+  background: transparent;
+}
+.tc .md-body .md-code.no-lang pre {
+  padding-top: 14px;
 }
 .tc .md-body .md-code pre.shiki {
   background: transparent !important;
@@ -175,7 +217,7 @@
   display: block;
   min-width: max-content;
   font-family: var(--font-mono);
-  font-size: 12.5px;
+  font-size: 14px;
   line-height: 1.6;
   color: var(--ink);
   white-space: pre;

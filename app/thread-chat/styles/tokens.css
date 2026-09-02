@@ -6,14 +6,16 @@
    ========================================================================== */
 
 .tc {
-  --paper: #f5f2ea;
-  --paper-2: #efe9dd;
+  --paper: #fdfbf8;
+  --paper-2: #f4f0e9;
+    /* --paper: #fafaf4; */
+  /* --paper-2: #f5f2eb; */
   /* Kbd 比纸面底色略深，提供可辨识的键帽层次而不过分抢眼。 */
   --kbd-bg: color-mix(in srgb, var(--paper) 65%, var(--paper-2));
   --ink: #24211b;
   --ink-soft: #6a6357;
   --ink-faint: #a79e8d;
-  --rule: #e2dccd;
+  --rule: #efece4;
   --rule-strong: #d3cbb8;
   --user-bg: #e8e2d3;
   --d1: #2f7d6b;
