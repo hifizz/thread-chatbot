@@ -64,7 +64,7 @@ pnpm dev
 
 ## OpenRouter 模型
 
-Thread Chat 提供 13 个固定走 OpenRouter 的内部模型 id：`openrouter-gpt-5.6-luna`、`openrouter-gpt-5.6-luna-pro`、`openrouter-gpt-5.6-terra`、`openrouter-gpt-5.6-terra-pro`、`openrouter-gpt-5.6-sol`、`openrouter-gpt-5.6-sol-pro`、`openrouter-gpt-5.5`、`openrouter-gpt-5.5-pro`、`openrouter-kimi-k3`、`openrouter-deepseek-v4-flash-0731`、`openrouter-qwen3.8-max`、`openrouter-grok-4.5` 和 `openrouter-grok-4.6`。必须配置 `OPENROUTER_API_KEY`；`OPENROUTER_HTTP_REFERER` 与 `OPENROUTER_APP_TITLE` 是可选归因信息。这些 id 固定使用专属 OpenRouter provider，API 会拒绝任意外部 slug。OpenRouter 当前未列出 GLM 5.3，因此不提供该模型。成功请求在每个 step 的成本元数据完整时按真实美元成本计费，否则使用保守静态价回退。附件仍沿用现有文本提取路径。
+Thread Chat 提供 14 个固定走 OpenRouter 的内部模型 id：`openrouter-gpt-5.6-luna`、`openrouter-gpt-5.6-luna-pro`、`openrouter-gpt-5.6-terra`、`openrouter-gpt-5.6-terra-pro`、`openrouter-gpt-5.6-sol`、`openrouter-gpt-5.6-sol-pro`、`openrouter-gpt-5.5`、`openrouter-gpt-5.5-pro`、`openrouter-kimi-k3`、`openrouter-deepseek-v4-flash-0731`、`openrouter-qwen3.8-max`、`openrouter-grok-4.5`、`openrouter-grok-4.6` 和 `openrouter-ox-alpha`。必须配置 `OPENROUTER_API_KEY`；`OPENROUTER_HTTP_REFERER` 与 `OPENROUTER_APP_TITLE` 是可选归因信息。这些 id 固定使用专属 OpenRouter provider，API 会拒绝任意外部 slug。Ox Alpha 使用上游 id `stealth/ox-alpha`，作为不扣额度的免费预览提供；其他模型成功请求在每个 step 的成本元数据完整时按真实美元成本计费，否则使用保守静态价回退。附件仍沿用现有文本提取路径。
 
 ## UMAPIS 预览模型
 

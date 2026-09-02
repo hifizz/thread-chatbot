@@ -24,6 +24,7 @@ const MODEL_FAMILY_ORDER = [
   "moonshotai",
   "deepseek",
   "x-ai",
+  "stealth",
   "minimax",
   "doubao",
 ] as const
@@ -33,6 +34,11 @@ function modelProviderIndex(provider: string): number {
   if (provider === "umapis") return 0
   if (provider === "openrouter") return 2
   return 1
+}
+
+/** 网关品牌仅用于内部路由，不出现在面向用户的模型名称中。 */
+function publicModelName(name: string): string {
+  return name.replace(/^UMAPIS\s*·\s*/i, "")
 }
 
 function modelFamilyIndex(upstreamModel: string): number {
@@ -60,7 +66,7 @@ const THREAD_CHAT_MODEL_OPTIONS: readonly ModelOption[] =
     )
     .map(({ model }) => ({
       id: model.id,
-      name: model.name,
+      name: publicModelName(model.name),
     }))
 
 export interface ThreadModelSelectorProps {

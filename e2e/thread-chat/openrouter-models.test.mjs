@@ -25,9 +25,10 @@ const expectedSlugs = [
   "qwen/qwen3.8-max",
   "x-ai/grok-4.5",
   "x-ai/grok-4.6",
+  "stealth/ox-alpha",
 ]
 const models = CHAT_MODELS.filter((model) => model.provider === "openrouter")
-assert.equal(models.length, 13)
+assert.equal(models.length, 14)
 assert.deepEqual([...OPENROUTER_MODEL_IDS], expectedSlugs)
 assert.deepEqual(
   models.map((model) => model.upstreamModel),
@@ -46,8 +47,17 @@ assert.notEqual(
   models.find((model) => model.id === "openrouter-deepseek-v4-flash-0731")
     ?.provider
 )
-assert.ok(models.every((model) => MODEL_COST[model.id]?.inputPerMillion > 0))
-assert.ok(models.every((model) => MODEL_COST[model.id]?.outputPerMillion > 0))
+const billedModels = models.filter((model) => model.unbilledPreview !== true)
+assert.ok(
+  billedModels.every((model) => MODEL_COST[model.id]?.inputPerMillion > 0)
+)
+assert.ok(
+  billedModels.every((model) => MODEL_COST[model.id]?.outputPerMillion > 0)
+)
+const oxAlpha = models.find((model) => model.id === "openrouter-ox-alpha")
+assert.equal(oxAlpha?.upstreamModel, "stealth/ox-alpha")
+assert.equal(oxAlpha?.unbilledPreview, true)
+assert.equal(MODEL_COST["openrouter-ox-alpha"], undefined)
 assert.deepEqual(
   Object.fromEntries(
     [
@@ -85,4 +95,4 @@ for (const steps of [
 const cost = usdToMicros(1)
 const price = priceFromCost(cost)
 assert.ok((price - cost) / price >= 0.3)
-console.log("PASS  OpenRouter 注册表、可见性、保守价与逐 step 成本校验")
+console.log("PASS  OpenRouter 注册表、免费预览、保守价与逐 step 成本校验")

@@ -8,6 +8,7 @@ import {
   Network,
   Waypoints,
 } from "lucide-react"
+import type { MouseEvent } from "react"
 import { THREAD_CHAT_SHORTCUTS } from "@/constants/thread-chat"
 type ViewMode = "columns" | "canvas"
 import type { PlacementMode } from "../columns/placement"
@@ -41,7 +42,7 @@ export function ThreadChatTopbar({
   placementMode: PlacementMode
   branchCount: number
   markdownCount: number
-  onNewConversation(): void
+  onNewConversation(openInNewPage: boolean): void
   onToggleTreeList(): void
   onOpenHelp(): void
   onShowColumns(): void
@@ -55,8 +56,10 @@ export function ThreadChatTopbar({
     <div className="topbar">
       <button
         className="tbtn"
-        title="开启一棵全新的分支对话树（当前对话已自动保存，可经其 URL 随时回访）"
-        onClick={onNewConversation}
+        title="开启一棵全新的分支对话树；按住 Command 点击可在新页面打开（当前对话已自动保存，可经其 URL 随时回访）"
+        onClick={(event: MouseEvent<HTMLButtonElement>) =>
+          onNewConversation(event.metaKey)
+        }
       >
         新对话
       </button>
