@@ -28,6 +28,7 @@ import remarkGfm from "remark-gfm"
 import { Check, Copy } from "lucide-react"
 
 import { ShikiCode } from "@/components/markdown/shiki-code"
+import { cn } from "@/lib/utils"
 import {
   createMarkdownSettlementBatch,
   markdownSettlementRevision,
@@ -151,13 +152,17 @@ const components: Components = {
   code: MarkdownCode,
 }
 
+export type MarkdownDensity = "default" | "compact"
+
 export const MarkdownBody = memo(function MarkdownBody({
   source,
   streaming = false,
+  density = "default",
   onContentSettled,
 }: {
   source: string
   streaming?: boolean
+  density?: MarkdownDensity
   onContentSettled?: (revision: number) => void
 }) {
   const batch = useMemo(
@@ -190,7 +195,10 @@ export const MarkdownBody = memo(function MarkdownBody({
 
   return (
     <div
-      className="md-body tc-prose"
+      className={cn(
+        "md-body tc-prose",
+        density === "compact" && "tc-prose-compact"
+      )}
       data-content-revision={snapshot.revision}
       data-content-settled={snapshot.settled && !streaming ? "true" : "false"}
     >

@@ -66,7 +66,9 @@ primitive 初值映射：`#fdfbf8→--tc-palette-paper-100`、`#f4f0e9→paper-2
 
 ### D6：contextual 注入改造（anchored-markdown）
 
-`anchored-markdown.tsx` 不再在 TS 内拼 color-mix 表达式，改为在元素上注入 `--tc-accent: dvar(depth)`（contextual 变量），混色统一由 CSS 派生 token 完成；`theme.ts` 的 `dvar()/accentOf()` 改产 `var(--tc-depth-N)` 并作为全仓唯一动态拼接点。
+`anchored-markdown.tsx` 不再在 TS 内拼 color-mix 表达式，改为在元素上注入 `--fc: dvar(depth)`（contextual 变量），混色统一由 CSS 派生 token 完成；`theme.ts` 的 `dvar()/accentOf()` 改产 `var(--tc-depth-N)` 并作为全仓唯一动态拼接点。
+
+派生公式只在显式 `.tc-accent-context` / `.tc-fork-context` 边界声明。注入 contextual 变量的元素必须同时挂对应边界类；token 层不得通过 `:is(.column, .canvas-card, ...)` 枚举业务组件。这样新增组件的依赖是显式契约，且 accent/fork 公式只保留一份。
 
 ### D7：数值规范与整数化映射
 
@@ -79,6 +81,8 @@ primitive 初值映射：`#fdfbf8→--tc-palette-paper-100`、`#f4f0e9→paper-2
 ### D9：响应式档位用容器查询，compact 以离散偶数 token 正交组合
 
 多列布局下视口宽度不代表列宽（`--col-min: 340px`，1440px 视口三列时每列仅 ~420px），视口媒体查询会把大屏排版套进窄列。决策：在列容器/抽屉正文/画布面板上声明 `container-type: inline-size`，`.tc-prose` 档位经 `@container` 由**容器宽度**驱动（断点初值：窄 `<480px`、标准 `480~720px`、宽松 `>720px`，与 `--lane-max: 760px` 联动校准）。compact 等修饰符为窄/标准/宽松档分别提供离散偶数字号与间距 token，由同一容器查询切换，SHALL NOT 使用 `0.9` 乘法产生 `14.4px/12.6px` 等亚像素计算值。实施 `container-type: inline-size` 时须同步审计 containment 副作用：布局包含使该元素成为后代 `absolute/fixed` 定位的包含块，switcher 弹层（z 72/74）、help-panel 等依赖更外层定位祖先的元素需逐一核对登记。
+
+`MarkdownBody` 通过 typed `density="default" | "compact"` 作为唯一变体入口；Canvas 和 Artifact 只选择 density，不在各自区块 CSS 中重写 `.tc-prose` 或标题字号。容器宽度负责档位，density 负责同档位内的密度，两者正交组合。
 
 ### D10：双轨验收
 
@@ -102,7 +106,7 @@ primitive 初值映射：`#fdfbf8→--tc-palette-paper-100`、`#f4f0e9→paper-2
 2. **z-index 轮（轨 A）**：两族语义 token + 10 处收口 + stacking 审计。
 3. **prose 结构轮（轨 B）**：`.tc-prose` 迁移（markdown + drawer + canvas）→ 数值取整（D7 表）→ 轨 B 截图基线。
 4. **档位轮（轨 B）**：容器查询 + compact 缩放系数 → 五场景截图验收。
-5. 每轮独立 commit，revert 即回滚；颜色轮与后续轮之间无交叉依赖。
+5. 每轮必须形成可独立审查的验收检查点；最终提交若因交付需要压缩，implementation record 必须保留各检查点的验证证据与行为边界，避免把颜色等价迁移与排版视觉变化描述成同一类改动。
 
 > **执行顺序修订（用户指令 2026-09-02）**：第 1、2 步为第一阶段（本轮 apply，零差异）；
 > 第 3、4 步整体推迟到改造验收通过后单独执行，且第二阶段先做「值原样保留」的结构迁移

@@ -35,7 +35,7 @@ export function MarkdownArtifactProgressCard({
 
   return (
     <div
-      className={`acard acard-progress ${depthClass} ${compact ? "compact" : ""}`}
+      className={`acard acard-progress tc-fork-context ${depthClass} ${compact ? "compact" : ""}`}
       role="status"
       aria-live="polite"
       aria-busy="true"
@@ -77,7 +77,7 @@ export function MarkdownArtifactCard({
 
   return (
     <button
-      className={`acard ${depthClass} ${compact ? "compact" : ""}`}
+      className={`acard tc-fork-context ${depthClass} ${compact ? "compact" : ""}`}
       onClick={() => onOpen(artifact.id)}
     >
       <span className="ic">

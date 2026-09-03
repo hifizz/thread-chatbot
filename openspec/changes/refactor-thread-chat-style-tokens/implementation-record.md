@@ -20,7 +20,11 @@ primitive 仅定义在 `tokens/palette.css`；区块文件只消费 semantic/con
 
 ## 派生色用途聚类
 
-`tokens/color-derived.css` 是 `color-mix()` 与 alpha 色的唯一生产代码归属文件：
+`tokens/color-derived.css` 是 `color-mix()` 与 alpha 色的唯一生产代码归属文件。派生公式仅消费 semantic 值：白色透明层从 `--tc-surface-plain` 取色，阴影从 `--tc-surface-shadow-source` / `--tc-surface-shadow-deep-source` 取色；不再重复写 `#fff` 或阴影 RGB 源值。
+
+contextual 派生只在显式 `.tc-accent-context` / `.tc-fork-context` 边界计算。注入 `--tc-accent` / `--fc` 的元素同时挂对应 class；token 层不再维护业务组件白名单，accent/fork 公式各保留一份。
+
+用途聚类如下：
 
 - contextual accent：浅底、选中底、焦点环、横幅底/边框、闪烁色、Artifact tab 底。
 - fork color：锚点下划线/高亮、Artifact 图标/进度底、进度轨道。
@@ -56,8 +60,10 @@ prose token 的标题间距、列表项间距、引用缩进与代码 padding �
 - 10 处裸 z-index 已全部替换为 `--tc-z-*`。
 - 列内 token 只在 `.column` 或 selection 内容内部的局部层叠上下文生效；文档弹层均为 `position: fixed`，未发现带 transform/filter/opacity 的共同祖先隔离其层级。
 
-## Container containment 审计
+## Prose 变体与 Container containment 审计
 
+- `MarkdownBody` 以 typed `density="default" | "compact"` 输出 `.tc-prose` / `.tc-prose-compact`；Canvas 与 Artifact 通过组件参数选择 compact。
+- 删除 drawer 对正文 `font-size` 的高优先级覆盖，以及 Canvas 对 h1~h4 的专用字号覆盖；正文和标题都由 density token + 容器档位统一决定。
 - `.lane`：只包列内阅读内容；switcher/help-panel 不在其后代，不改变弹层定位祖先。
 - `.art-body`：只包抽屉正文，不包含抽屉自身或全局弹层。
 - `.canvas-expand`：容器声明在外挂面板自身；面板仍由 `.canvas-card { position: relative }` 定位，containing block 不变。
@@ -78,6 +84,10 @@ prose token 的标题间距、列表项间距、引用缩进与代码 padding �
 - compact 独立测试：420/600/760px 下普通正文为 14/16/16px，compact 为 12/14/14px；标题 token 同步且全部为偶数。
 
 最终验证：`pnpm typecheck`、`pnpm build`、`pnpm openspec:validate` 均通过；OpenSpec 27/27 项合法。
+
+## 交付与验收边界
+
+颜色/z-index 等价迁移、`.tc-prose` 结构迁移、数值取整、容器档位曾分别完成验收检查点；当前 PR 的最终提交包含这些已批准阶段。review 修复后不再声称整个提交是单一“零差异迁移”，而是按上述检查点分别解释和验证，避免颜色等价结论掩盖排版视觉变化。
 
 ## 扫描豁免
 

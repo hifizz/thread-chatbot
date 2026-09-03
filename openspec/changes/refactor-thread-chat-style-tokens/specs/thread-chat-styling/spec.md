@@ -51,7 +51,7 @@ thread-chat 的设计 token SHALL 采用分层模型定义在 `app/thread-chat/s
 - **primitive 层**（纯值：`--tc-palette-*` 色板、`--tc-font-stack-*` 字体栈等，不代表用途）SHALL 仅被 semantic 层引用；
 - **semantic 层**（语义角色，统一命名 `--tc-{类目}-{语义角色}-{状态?}`，如 `--tc-surface-base`、`--tc-typography-family-ui`）是区块样式与组件**唯一允许引用**的层；
 - **component 层**（`--tc-composer-*`）仅当单个组件需要独立覆写语义值时才允许创建；
-- **contextual 层**（如 `--fc/--dc/--accent` 的收口形态）由 TS 按实例注入，fallback SHALL 引用 semantic 层。
+- **contextual 层**（如 `--fc/--dc/--accent` 的收口形态）由 TS 按实例注入，fallback SHALL 引用 semantic 层；派生公式 SHALL 位于显式上下文边界类中，token 层 SHALL NOT 枚举业务组件选择器。
 
 已纳入**当前迁移范围**类目的值 SHALL 经 semantic token 引用，SHALL NOT 重新声明 token、直接引用 primitive 或写裸值；**未纳入当前迁移范围**的存量裸值允许保留原状，但不得新增。`app/thread-chat/styles/tokens.css` SHALL 保留为单一入口文件（内部 `@import` 分层文件）；`theme.ts` 的「深度 → CSS 变量名」映射 SHALL 指向语义 token 名，重命名 SHALL 同步更新该映射及 `anchored-markdown.tsx` 等动态拼接处。
 
@@ -70,13 +70,18 @@ thread-chat 的设计 token SHALL 采用分层模型定义在 `app/thread-chat/s
 - **WHEN** 检查 `--fc/--dc/--accent` 的 fallback 声明
 - **THEN** fallback 均为 semantic token 引用（如 `var(--tc-depth-1)`），不存在硬编码色值
 
+#### Scenario: contextual 边界显式声明
+
+- **WHEN** 组件注入 `--tc-accent` 或 `--fc`
+- **THEN** 同一元素挂载对应的 `.tc-accent-context` 或 `.tc-fork-context`，派生 token 文件无需知道该组件的业务 class
+
 ### Requirement: `.tc-prose` 插件式正文排版
 
 markdown 正文排版 SHALL 收敛为 `.tc-prose` 排版类，排版值全部由 prose 语义 token 驱动：
 
 - 迁移范围 SHALL 包含 `markdown.css` 的全部排版规则**以及** `drawer.css`（`.tc .art-body .md-body`）与 `canvas.css`（`.tc .canvas-expand .md-body h1~h4` 等）中的排版选择器，统一迁至 `.tc-prose`；`.md-body` SHALL 仅保留「锚点定位坐标系」DOM 契约（TS 字符串选择器 `closest(".md-body")` 等不变），SHALL NOT 再承担排版职责；
 - 阅读档位（紧凑 / 标准 / 宽松）SHALL 由**正文容器宽度**经容器查询（`@container`）驱动，SHALL NOT 使用视口媒体查询决定正文排版（多列布局下视口宽度不代表列宽）；档位 token 挂 `.tc` 根，档位切换 SHALL 允许视觉变化并以截图基线验收；
-- 尺寸修饰符（至少 `.tc-prose-compact`）SHALL 以各容器档位对应的离散偶数 token 与档位正交组合，SHALL NOT 通过产生亚像素计算值的比例缩放实现；
+- 尺寸修饰符（至少 `.tc-prose-compact`）SHALL 以各容器档位对应的离散偶数 token 与档位正交组合，SHALL NOT 通过产生亚像素计算值的比例缩放实现；`MarkdownBody` SHALL 通过显式 typed density 选择修饰符，场景区块 SHALL NOT 直接覆写 `.tc-prose` 或标题字号；
 - 迁移时排版值 SHALL 遵守数值规范（整数偶数 + 待查验标注）。
 
 #### Scenario: md-body 仅保留 DOM 契约

@@ -35,3 +35,10 @@
 - [x] 5.1 `pnpm openspec:validate` 通过；变更登记表（颜色映射、color-mix 用途聚类、非偶数取整、stacking 审计）归档至 change 目录
 - [x] 5.2 更新 `CLAUDE.md` 中 thread-chat 手写样式段落：token 单一来源描述改为分层模型 + `tokens/` 结构 + 数值规范（整数偶数、`tc-review` 标注）
 - [x] 5.3 在本 change 附 Future Work 清单（space/radius/elevation/state、sizing/motion/focus/scrim、UI 排版 role、主题注入机制与深浅色），作为后续 Change 的输入
+
+## 6. Review 修复
+
+- [x] 6.1 `MarkdownBody` 增加显式 `default | compact` density；Canvas 与 Artifact 通过组件契约选择 compact，删除 drawer/canvas 对 `.tc-prose` 字号和标题的专用覆盖，确保容器档位与 density 正交组合
+- [x] 6.2 contextual 派生改为显式 `.tc-accent-context` / `.tc-fork-context` 边界，删除 token 层对业务组件选择器的白名单与根节点重复公式
+- [x] 6.3 派生色中的白色、阴影色全部从 semantic/primitive 单一来源取值，清除未消费的 palette 基色与 `#fff`/重复 RGB 源值
+- [x] 6.4 校正实施文档：区分已完成的独立验收检查点与最终提交组织，记录 review 后的 canonical 变体/上下文边界

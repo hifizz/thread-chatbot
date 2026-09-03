@@ -36,7 +36,7 @@ function ColumnShell({
   const isMain = thread.id === "main"
   return (
     <div
-      className={`column ${isMain ? "main" : "branch"} ${flashing ? "flash" : ""}`}
+      className={`column tc-accent-context ${isMain ? "main" : "branch"} ${flashing ? "flash" : ""}`}
       data-thread-id={thread.id}
       style={
         {
@@ -90,7 +90,7 @@ function FoldedStrip({
 }) {
   return (
     <button
-      className="col-strip"
+      className="col-strip tc-accent-context"
       data-thread-id={thread.id}
       style={{ "--tc-accent": accentOf(thread) } as React.CSSProperties}
       title={`「${thread.title}」已折叠为细条 · 点击原地展开`}

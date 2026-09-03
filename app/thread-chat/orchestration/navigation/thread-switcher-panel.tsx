@@ -121,7 +121,7 @@ export function ThreadSwitcherPanel({
               return (
                 <button
                   key={id}
-                  className="swx-chip"
+                  className="swx-chip tc-accent-context"
                   style={
                     {
                       "--tc-accent": dotColorOf(recentThread),
@@ -166,7 +166,7 @@ export function ThreadSwitcherPanel({
             <div
               key={row.id}
               data-swxrow={index}
-              className={`swx-row ${index === hi ? "hi" : ""}`}
+              className={`swx-row tc-accent-context ${index === hi ? "hi" : ""}`}
               style={
                 {
                   "--tc-accent": row.isMain

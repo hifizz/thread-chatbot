@@ -71,6 +71,7 @@ export function CanvasExpand({
                   state={state}
                   message={assistantMessage}
                   onOpenThread={(id) => actions.focusThread(id)}
+                  density="compact"
                 />
               ) : null
             }

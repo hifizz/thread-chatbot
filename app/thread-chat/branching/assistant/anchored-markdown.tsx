@@ -4,7 +4,10 @@ import React, { useCallback, useEffect, useReducer, useRef } from "react"
 import type { Message, ThreadTreeState } from "../../core/types"
 import { threadTitle } from "../../core/selectors"
 import { dc, dvar } from "../../theme"
-import { MarkdownBody } from "../../chat/message/markdown-body"
+import {
+  MarkdownBody,
+  type MarkdownDensity,
+} from "../../chat/message/markdown-body"
 import { useSmoothText } from "../../chat/message/smooth-text"
 import {
   clearHighlights,
@@ -25,6 +28,7 @@ export function AnchoredMarkdown({
   source,
   insertAt,
   insert,
+  density = "default",
 }: {
   state: ThreadTreeState
   msg: Message
@@ -34,6 +38,7 @@ export function AnchoredMarkdown({
   /** 在流事件记录的正文字符偏移处插入工具活动；缺省时渲染普通单段 Markdown。 */
   insertAt?: number
   insert?: React.ReactNode
+  density?: MarkdownDensity
 }) {
   const hostRef = useRef<HTMLDivElement | null>(null)
   // forksKey 只随 fork 的增删与编号变化——source 未变、仅新增 fork 时也能触发重绘
@@ -100,14 +105,18 @@ export function AnchoredMarkdown({
       )
       marks.forEach((mark) => {
         mark.setAttribute("data-fork-id", fork.threadId)
-        mark.classList.add("anchored-mark", `fc-${dc(fork.depth)}`)
+        mark.classList.add(
+          "anchored-mark",
+          "tc-fork-context",
+          `fc-${dc(fork.depth)}`
+        )
         mark.title = `分支「${threadTitle(state, fork.threadId)}」· 点击打开 · ⌘点击保留本列在右侧打开`
       })
 
       const last = marks[marks.length - 1]
       if (last) {
         const footnote = document.createElement("sup")
-        footnote.className = `fn-mark fc-${dc(fork.depth)}`
+        footnote.className = `fn-mark tc-fork-context fc-${dc(fork.depth)}`
         footnote.setAttribute("data-fork-id", fork.threadId)
         footnote.textContent = String(fork.num)
         last.after(footnote)
@@ -150,6 +159,7 @@ export function AnchoredMarkdown({
         <MarkdownBody
           source={beforeInsert}
           streaming={active}
+          density={density}
           onContentSettled={onContentSettled}
         />
       ) : null}
@@ -158,6 +168,7 @@ export function AnchoredMarkdown({
         <MarkdownBody
           source={afterInsert}
           streaming={active}
+          density={density}
           onContentSettled={onContentSettled}
         />
       ) : null}

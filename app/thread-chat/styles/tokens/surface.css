@@ -12,6 +12,9 @@
   --tc-surface-plain: var(--tc-palette-white);
   /* 墨色实底（toast、主操作按钮、划选气泡轮廓） */
   --tc-surface-ink: var(--tc-palette-ink-900);
+  /* 阴影/遮罩的取色基底；alpha 由 color-derived.css 按用途派生。 */
+  --tc-surface-shadow-source: var(--tc-palette-ink-shadow);
+  --tc-surface-shadow-deep-source: var(--tc-palette-black);
   /* 暗色代码块底（art-code） */
   --tc-surface-code: var(--tc-palette-code-900);
   /* markdown 代码块卡片冷白底 */

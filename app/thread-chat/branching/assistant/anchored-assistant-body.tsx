@@ -1,5 +1,6 @@
 "use client"
 
+import type { MarkdownDensity } from "../../chat/message/markdown-body"
 import type { ConversationViewMessage, ThreadTreeState } from "../../core/types"
 import { WebResearchPanel } from "../../orchestration/overlays/web-research-panel"
 import { AnchoredMarkdown } from "./anchored-markdown"
@@ -9,10 +10,12 @@ export function AnchoredAssistantBody({
   state,
   message,
   onOpenThread,
+  density = "default",
 }: {
   state: ThreadTreeState
   message: ConversationViewMessage
   onOpenThread: (targetId: string, opts?: { keepSource?: boolean }) => void
+  density?: MarkdownDensity
 }) {
   const renderPlan = assistantPartRenderPlan(message)
 
@@ -27,6 +30,7 @@ export function AnchoredAssistantBody({
               msg={message}
               source={part.text}
               onOpenThread={onOpenThread}
+              density={density}
             />
           )
         }
