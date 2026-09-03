@@ -15,3 +15,9 @@ project-wide instructions. `CLAUDE.md` is the single source of truth for shared
 development commands, workflow rules, architecture, and implementation notes.
 
 If an instruction in this file conflicts with `CLAUDE.md`, follow this file.
+
+## Formatting
+
+- 不得直接执行 Prettier、`pnpm format` 或其他 format 命令。
+- 仅允许已配置的 git hook 调用 Prettier 或 format；若 hook 未配置或未运行，
+  保持现有格式，不得手动补跑。

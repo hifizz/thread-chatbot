@@ -8,15 +8,14 @@
 
 import { useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { createThreadChatClient } from "./net/client"
+import { useProjectListStore } from "./core/project-list-store"
 
 export function TreeRedirect() {
   const router = useRouter()
+  const refreshProjects = useProjectListStore((state) => state.refresh)
   useEffect(() => {
     let cancelled = false
-    const client = createThreadChatClient()
-    void client
-      .listProjects(false)
+    void refreshProjects()
       .then((projects) => {
         if (!cancelled)
           router.replace(
@@ -29,7 +28,7 @@ export function TreeRedirect() {
     return () => {
       cancelled = true
     }
-  }, [router])
+  }, [refreshProjects, router])
   return (
     <div className="tc">
       <div className="boot-loading">正在打开对话…</div>

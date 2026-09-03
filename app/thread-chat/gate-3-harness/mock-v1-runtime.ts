@@ -6,6 +6,7 @@ import type {
   ProjectDTO,
   ThreadDTO,
 } from "@/lib/thread-chat/contracts/dto"
+import { PROJECT_TITLE_FALLBACK } from "@/constants/project-workspace"
 import type { ThreadChatClient } from "../net/client"
 
 export type Gate3HarnessScenario =
@@ -502,7 +503,17 @@ export function createGate3MockRuntime(
   const client: ThreadChatClient = {
     async listProjects(archived = false) {
       return project && Boolean(project.archivedAt) === archived
-        ? [clone(project)]
+        ? [
+            {
+              id: project.id,
+              title:
+                project.customTitle ??
+                project.autoTitle ??
+                PROJECT_TITLE_FALLBACK,
+              updatedAt: project.updatedAt,
+              threadCount: threads.size,
+            },
+          ]
         : []
     },
     async getProject() {
