@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { THREAD_CHAT_SHORTCUTS } from "@/constants/thread-chat"
 import type { PlacementMode } from "../columns/placement"
-import { AccountButton } from "./account-button"
+import { AccountButton, AccountMenuRow } from "./account-button"
 import { ShortcutHint } from "../overlays/shortcut-hint"
 import { COL_MIN_W } from "../columns/use-column-viewport"
 import { columnCountChoices } from "./thread-chat-topbar-logic"
@@ -156,10 +156,7 @@ export function ThreadChatMobileMenu({
             </>
           )}
           <DropdownMenuSeparator />
-          <div className="mx-1 mb-1 flex min-h-10 items-center justify-between rounded-xl px-2 py-2 text-sm text-muted-foreground">
-            <span>账户</span>
-            <AccountButton />
-          </div>
+          <AccountMenuRow />
       </DropdownMenuContent>
     </DropdownMenu>
   )
