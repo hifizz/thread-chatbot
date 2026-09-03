@@ -13,6 +13,9 @@ import {
   DropdownMenuLabel,
   DropdownMenuItem,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
 } from "@/components/ui/dropdown-menu"
 
 /**
@@ -22,6 +25,65 @@ import {
  *   点击展开下拉：用户名（含邮箱副行）/ 个人资料（→ 账户页）/ 退出登录。
  * 顶栏本被中间件保护（未登录会被弹去登录页），登录态入口仍作兜底与可发现性保留。
  */
+/**
+ * 移动端导航菜单底部的账户行：头像 + 用户名/邮箱作为子菜单触发器，
+ * 内联登录/个人资料/退出登录，样式与其他 MenuItem 对齐。
+ */
+export function AccountMenuRow() {
+  const router = useRouter()
+  const { data: session, isPending } = useSession()
+
+  if (isPending) return null
+
+  if (!session) {
+    const from =
+      typeof window !== "undefined"
+        ? window.location.pathname + window.location.search
+        : "/thread-chat"
+    return (
+      <DropdownMenuItem render={<Link href={`/sign-in?redirect=${encodeURIComponent(from)}`} />}>
+        <CircleUserRound size={16} />
+        登录
+      </DropdownMenuItem>
+    )
+  }
+
+  const { name, email, image } = session.user
+  const label = name || email || "?"
+  const initial = label[0].toUpperCase()
+
+  async function handleSignOut() {
+    await signOut()
+    router.push("/sign-in")
+    router.refresh()
+  }
+
+  return (
+    <DropdownMenuSub>
+      <DropdownMenuSubTrigger className="gap-2">
+        <Avatar size="sm">
+          {image ? <AvatarImage src={image} alt={label} /> : null}
+          <AvatarFallback>{initial}</AvatarFallback>
+        </Avatar>
+        <span className="truncate">{label}</span>
+        {name && email ? (
+          <span className="ml-auto truncate text-xs text-muted-foreground">
+            {email}
+          </span>
+        ) : null}
+      </DropdownMenuSubTrigger>
+      <DropdownMenuSubContent>
+        <DropdownMenuItem render={<Link href="/account" />}>
+          个人资料
+        </DropdownMenuItem>
+        <DropdownMenuItem variant="destructive" onClick={handleSignOut}>
+          退出登录
+        </DropdownMenuItem>
+      </DropdownMenuSubContent>
+    </DropdownMenuSub>
+  )
+}
+
 export function AccountButton() {
   const router = useRouter()
   const { data: session, isPending } = useSession()
