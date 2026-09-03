@@ -215,9 +215,6 @@
 }
 
 @media (max-width: 720px) {
-  .tc {
-    --col-min: 100%;
-  }
   .tc .col-head {
     padding: 10px 12px;
   }
