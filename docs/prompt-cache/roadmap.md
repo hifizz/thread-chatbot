@@ -1,5 +1,7 @@
 # Thread Chat Prompt Cache 后续路线图
 
+Research 阶段的需求、决策、真实模型实验和 Spec 交接结论见 [`research-handoff.md`](./research-handoff.md)。
+
 ## 原则
 
 - Quote/Fork MVP 先解决最直接的缓存浪费：具体 Quote 不进入早期 System，Child 不再使用 6000 字符专属截断。
