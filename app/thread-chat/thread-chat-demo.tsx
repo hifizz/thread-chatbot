@@ -40,7 +40,11 @@ import type {
   PlacementHint,
   PlacementMode,
 } from "./orchestration/columns/placement"
-import { ThreadChatTopbar } from "./orchestration/navigation/thread-chat-topbar"
+import {
+  ThreadChatMobileMenu,
+  type ThreadChatNavigationProps,
+  ThreadChatTopbar,
+} from "./orchestration/navigation/thread-chat-topbar"
 import {
   ThreadSwitcher,
   type SwitcherMode,
@@ -563,40 +567,45 @@ function NormalizedThreadChat({
     (count, artifact) => count + (artifact.kind === "markdown" ? 1 : 0),
     0
   )
+  const navigationProps: ThreadChatNavigationProps = {
+    viewMode: workspace.viewMode,
+    showHelp: workspace.viewMode === "canvas" || !hintVisible,
+    windowWidth: workspace.windowWidth,
+    forceCols: workspace.forceCols,
+    placementMode: workspace.mode,
+    branchCount,
+    markdownCount,
+    onNewConversation: (openInNewPage) => {
+      const newConversationUrl = `/thread-chat/${crypto.randomUUID()}`
+      if (openInNewPage) {
+        window.open(newConversationUrl, "_blank", "noopener,noreferrer")
+        return
+      }
+
+      // 空树已经是新对话；反复点击不应让 URL 持续变化。
+      if (!mainHasMessage) {
+        showToast("当前就是全新对话，直接开聊吧")
+        return
+      }
+      router.push(newConversationUrl)
+    },
+    onToggleTreeList: toggleTreeList,
+    onOpenHelp: openHelpPanel,
+    onShowColumns: workspace.showColumnsView,
+    onShowCanvas: () => workspace.setViewMode("canvas"),
+    onForceCols: workspace.setForceCols,
+    onPlacementModeChange: changeMode,
+    onToggleThreadTree: toggleGlobalSwitcher,
+    onToggleMarkdown: toggleDrawer,
+  }
 
   return (
-    <div className="tc" ref={rootRef}>
-      <ThreadChatTopbar
-        viewMode={workspace.viewMode}
-        showHelp={workspace.viewMode === "canvas" || !hintVisible}
-        windowWidth={workspace.windowWidth}
-        forceCols={workspace.forceCols}
-        placementMode={workspace.mode}
-        branchCount={branchCount}
-        markdownCount={markdownCount}
-        onNewConversation={(openInNewPage) => {
-          const newConversationUrl = `/thread-chat/${crypto.randomUUID()}`
-          if (openInNewPage) {
-            window.open(newConversationUrl, "_blank", "noopener,noreferrer")
-            return
-          }
-
-          // 空树已经是新对话；反复点击不应让 URL 持续变化。
-          if (!mainHasMessage) {
-            showToast("当前就是全新对话，直接开聊吧")
-            return
-          }
-          router.push(newConversationUrl)
-        }}
-        onToggleTreeList={toggleTreeList}
-        onOpenHelp={openHelpPanel}
-        onShowColumns={workspace.showColumnsView}
-        onShowCanvas={() => workspace.setViewMode("canvas")}
-        onForceCols={workspace.setForceCols}
-        onPlacementModeChange={changeMode}
-        onToggleThreadTree={toggleGlobalSwitcher}
-        onToggleMarkdown={toggleDrawer}
-      />
+    <div
+      className="tc"
+      data-view-mode={workspace.viewMode}
+      ref={rootRef}
+    >
+      <ThreadChatTopbar {...navigationProps} />
 
       {workspace.viewMode === "columns" ? (
         <ThreadColumns
@@ -616,6 +625,11 @@ function NormalizedThreadChat({
                 state={tree}
                 threadId={viewThreadId}
                 subtitle={viewThreadId === "main" ? mainSubtitle : undefined}
+                mainHeaderActions={
+                  viewThreadId === "main" ? (
+                    <ThreadChatMobileMenu {...navigationProps} />
+                  ) : undefined
+                }
                 intro={
                   viewThreadId === "main" && hintVisible ? (
                     <UsageHint onDismiss={() => setHintDismissed(true)} />
