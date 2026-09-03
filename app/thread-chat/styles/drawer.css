@@ -101,7 +101,6 @@
 }
 .tc .art-note { font-family: var(--tc-typography-family-read); font-size: 14px; line-height: 1.85; color: var(--tc-content-primary); }
 .tc .art-note p { margin: 0 0 13px; white-space: pre-wrap; }
-.tc .art-body .tc-prose { font-size: 14px; line-height: 1.75; }
 .tc .art-src {
   flex: none;
   border-top: 1px solid var(--tc-border-subtle);
@@ -331,7 +330,6 @@
 .tc .project-back:hover { background: var(--tc-surface-plain); color: var(--tc-content-primary); }
 .tc .artifact-detail-heading { border-bottom: 1px solid var(--tc-border-subtle); padding-bottom: 14px; }
 .tc .project-artifact-content { padding: 2px 2px 20px; }
-.tc .project-artifact-content .tc-prose { font-size: 14px; line-height: 1.75; }
 
 @media (max-width: 720px) {
   .tc .project-panel { width: 94vw; min-width: 0; }

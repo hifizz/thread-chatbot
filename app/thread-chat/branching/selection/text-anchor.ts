@@ -470,6 +470,7 @@ export function paintRange(
 
     const span = target.ownerDocument.createElement("span")
     span.setAttribute(MARK_ATTR, id)
+    if (vars?.["--fc"]) span.classList.add("tc-fork-context")
     if (vars) {
       for (const [name, value] of Object.entries(vars)) {
         span.style.setProperty(name, value)

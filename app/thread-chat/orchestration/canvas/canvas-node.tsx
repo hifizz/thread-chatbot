@@ -57,7 +57,7 @@ export const CanvasCard = memo(function CanvasCard({
 }: NodeProps<CanvasCardNode>) {
   return (
     <div
-      className="canvas-card" /* 选中态样式由 .react-flow__node.selected 提供；此前的条件类拼接丢空格产出 canvas-cardexpanded 单 token，选中即丢全部卡片样式（codex review P1） */
+      className="canvas-card tc-accent-context" /* 选中态样式由 .react-flow__node.selected 提供；此前的条件类拼接丢空格产出 canvas-cardexpanded 单 token，选中即丢全部卡片样式（codex review P1） */
       style={
         {
           "--tc-accent": data.accent,

@@ -228,17 +228,6 @@
   font-size: 12px;
   line-height: 1.62;
 }
-/* 面板里的 Markdown 缩小一号（.tc-prose 继承 bubble 字号，标题相对收敛） */
-.tc .canvas-expand .tc-prose h1 {
-  font-size: 16px;
-}
-.tc .canvas-expand .tc-prose h2 {
-  font-size: 14px;
-}
-.tc .canvas-expand .tc-prose h3,
-.tc .canvas-expand .tc-prose h4 {
-  font-size: 14px;
-}
 .tc .canvas-expand .msg-error,
 .tc .canvas-expand .msg-stopped {
   font-size: 12px;
