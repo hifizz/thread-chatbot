@@ -2,7 +2,7 @@
 
 @keyframes tc-flash {
   0% {
-    background: color-mix(in srgb, var(--accent) 14%, var(--paper));
+    background: var(--tc-accent-flash);
   }
   100% {
   }

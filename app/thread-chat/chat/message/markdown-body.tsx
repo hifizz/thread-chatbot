@@ -6,7 +6,8 @@
  * 关键约束：整个组件按 source 用 memo 记忆——source 不变时绝不重渲染。
  * 这样 anchored-markdown 在渲染后「手绘」到 .md-body 里的锚点高亮 / 脚注上标，
  * 不会被 React 的 reconcile 抹掉（详见 anchored-markdown 的绘制 effect 注释）。
- * 渲染进一个稳定容器 `<div className="md-body">`，即锚点定位的坐标系容器。
+ * 渲染进稳定容器 `<div className="md-body tc-prose">`：md-body 是锚点坐标契约，
+ * tc-prose 承担正文排版。
  */
 
 import React, {
@@ -92,7 +93,7 @@ function CodeBlock({
   )
 
   return (
-    <div className={`md-code${lang ? "" : " no-lang"}`}>
+    <div className={lang ? "md-code" : "md-code no-lang"}>
       {lang ? (
         <div className="md-code-head">
           <span className="lang">{lang}</span>
@@ -189,7 +190,7 @@ export const MarkdownBody = memo(function MarkdownBody({
 
   return (
     <div
-      className="md-body"
+      className="md-body tc-prose"
       data-content-revision={snapshot.revision}
       data-content-settled={snapshot.settled && !streaming ? "true" : "false"}
     >

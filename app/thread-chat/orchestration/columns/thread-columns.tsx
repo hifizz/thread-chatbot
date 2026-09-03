@@ -40,7 +40,7 @@ function ColumnShell({
       data-thread-id={thread.id}
       style={
         {
-          "--accent": accentOf(thread),
+          "--tc-accent": accentOf(thread),
           ...(width !== undefined ? { flex: `1 1 ${width}px` } : null),
         } as React.CSSProperties
       }
@@ -92,7 +92,7 @@ function FoldedStrip({
     <button
       className="col-strip"
       data-thread-id={thread.id}
-      style={{ "--accent": accentOf(thread) } as React.CSSProperties}
+      style={{ "--tc-accent": accentOf(thread) } as React.CSSProperties}
       title={`「${thread.title}」已折叠为细条 · 点击原地展开`}
       onClick={onClick}
     >

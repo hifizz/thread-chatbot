@@ -11,13 +11,13 @@
   align-items: center;
   gap: 8px;
   padding: 11px 13px;
-  border-bottom: 1px solid var(--rule);
-  font-family: var(--font-read);
-  font-size: 13.5px;
+  border-bottom: 1px solid var(--tc-border-subtle);
+  font-family: var(--tc-typography-family-read);
+  font-size: 14px;
   font-weight: 600;
-  color: var(--ink);
+  color: var(--tc-content-primary);
 }
 .tc .swx-title svg {
   flex: none;
-  color: var(--ink-faint);
+  color: var(--tc-content-muted);
 }

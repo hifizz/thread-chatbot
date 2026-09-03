@@ -1,56 +1,17 @@
-/* ── @/thread-chat/styles ── 设计 token 单一来源（.tc 根变量 + box-sizing reset + 基础字体）——theme.ts 的深度映射依赖此处变量名 */
+/* ── @/thread-chat/styles ── 设计 token 单一来源（.tc 根变量）——theme.ts 的深度映射
+   依赖 tokens/depth.css 的变量名。
+   分层模型：primitive（palette.css）→ semantic（surface/content/border/depth/
+   typography/prose/z-index）→ 派生色（color-derived.css，color-mix 唯一归属）；
+   contextual 层（--tc-accent 注入 / .fc-N 类注入 --fc）见 base.css 与各派生注释。
+   区块样式只允许引用 semantic 层；primitive 直引、裸色值、color-mix 均视为违规。 */
 
-/* ==========================================================================
-   Thread Chat 方案⑥优化版 —— 全部样式收敛在 .tc 作用域下
-   视觉语言：手稿批注风（paper / ink）+ 脚注式分支标记 + 深度分色
-   ========================================================================== */
-
-.tc {
-  --paper: #fdfbf8;
-  --paper-2: #f4f0e9;
-    /* --paper: #fafaf4; */
-  /* --paper-2: #f5f2eb; */
-  /* Kbd 比纸面底色略深，提供可辨识的键帽层次而不过分抢眼。 */
-  --kbd-bg: color-mix(in srgb, var(--paper) 65%, var(--paper-2));
-  --ink: #24211b;
-  --ink-soft: #6a6357;
-  --ink-faint: #a79e8d;
-  --rule: #efece4;
-  --rule-strong: #d3cbb8;
-  --user-bg: #e8e2d3;
-  --d1: #2f7d6b;
-  --d2: #b07d2e;
-  --d3: #a94f5e;
-  --d4: #5568a3;
-  --d5: #7a5ea8;
-  --font-ui:
-    -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
-    "Hiragino Sans GB", sans-serif;
-  /* 阅读字体：原 demo 用衬线（Georgia/宋体）营造纸面感，用户不喜宋体——
-     改为跟随 UI 无衬线栈；将来想换专门阅读字体仍只改这一处 token */
-  --font-read: var(--font-ui);
-  --font-mono:
-    "SF Mono", ui-monospace, "JetBrains Mono", Menlo, Consolas, monospace;
-  --col-min: 340px;
-  --lane-max: 760px;
-
-  height: 100dvh;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  background: var(--paper);
-  color: var(--ink);
-  font-family: var(--font-ui);
-}
-.tc *,
-.tc *::before,
-.tc *::after {
-  box-sizing: border-box;
-}
-
-/* shadcn Kbd：沿用组件的尺寸与圆角，仅与 thread-chat 纸面 token 对齐。 */
-.tc [data-slot="kbd"] {
-  background-color: var(--kbd-bg);
-  color: var(--ink-soft);
-  font-family: var(--font-mono);
-}
+@import "./tokens/palette.css";
+@import "./tokens/surface.css";
+@import "./tokens/content.css";
+@import "./tokens/border.css";
+@import "./tokens/depth.css";
+@import "./tokens/color-derived.css";
+@import "./tokens/typography.css";
+@import "./tokens/prose.css";
+@import "./tokens/base.css";
+@import "./tokens/z-index.css";
