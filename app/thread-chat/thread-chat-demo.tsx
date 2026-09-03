@@ -2,13 +2,10 @@
 
 import dynamic from "next/dynamic"
 import { useRouter } from "next/navigation"
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import React, { useCallback, useEffect, useMemo, useState } from "react"
 
 import { DEFAULT_THREAD_CHAT_MODEL_ID } from "@/constants/model"
-import type {
-  MessageDTO,
-  ProjectBootstrapDTO,
-} from "@/lib/thread-chat/contracts/dto"
+import { PROJECT_TITLE_FALLBACK } from "@/constants/project-workspace"
 import {
   activePathArtifacts,
   threadTitle,
@@ -20,6 +17,10 @@ import {
   projectConversationTree,
 } from "./core/projections"
 import { createProjectedConversationStore } from "./core/projected-store"
+import {
+  useProjectListStore,
+  useProjectListStoreApi,
+} from "./core/project-list-store"
 import { selectThreadBusy, selectVisibleMessages } from "./core/selectors"
 import type { Message, MessageFeedback } from "./core/types"
 import { BranchableChat } from "./branching/branchable-chat"
@@ -49,10 +50,7 @@ import {
   ThreadSwitcher,
   type SwitcherMode,
 } from "./orchestration/navigation/thread-switcher"
-import {
-  TreeList,
-  type TreeListItem,
-} from "./orchestration/navigation/tree-list"
+import { TreeList } from "./orchestration/navigation/tree-list"
 import { StoreBoundProjectPanel } from "./orchestration/artifacts/store-bound-project-panel"
 import type { CanvasChatActions } from "./orchestration/canvas/canvas-actions"
 import { HelpPanel, UsageHint } from "./orchestration/overlays/help-panel"
@@ -75,41 +73,11 @@ const ThreadCanvas = dynamic(
   }
 )
 
-const SUBTITLE_FALLBACK = "新对话"
 const MAIN_SUBTITLE_MAX_LEN = 28
 const EMPTY_SLOTS: [] = []
 
 function compactTitle(text: string, maxLength: number): string {
   return text.length > maxLength ? `${text.slice(0, maxLength)}…` : text
-}
-
-function messageText(message: MessageDTO): string {
-  return message.parts
-    .filter(
-      (part): part is Extract<MessageDTO["parts"][number], { type: "text" }> =>
-        part.type === "text"
-    )
-    .map((part) => part.text)
-    .join("")
-    .trim()
-}
-
-function deriveProjectTitle(bootstrap: ProjectBootstrapDTO): string {
-  const rootThreadId = bootstrap.project?.rootThreadId
-  if (!rootThreadId) return SUBTITLE_FALLBACK
-  const firstUserText = bootstrap.messages
-    .filter(
-      (message) =>
-        message.threadId === rootThreadId &&
-        message.role === "user" &&
-        message.supersededAt === null
-    )
-    .sort((left, right) => left.sequence - right.sequence)
-    .map(messageText)
-    .find(Boolean)
-  return firstUserText
-    ? compactTitle(firstUserText, MAIN_SUBTITLE_MAX_LEN)
-    : SUBTITLE_FALLBACK
 }
 
 function legacyFeedback(value: "up" | "down" | null): MessageFeedback | null {
@@ -181,10 +149,9 @@ function NormalizedThreadChat({
   const [draftModelId, setDraftModelId] = useState<string>(
     DEFAULT_THREAD_CHAT_MODEL_ID
   )
-  const [treeItemsCache, setTreeItemsCache] = useState<TreeListItem[] | null>(
-    null
-  )
-  const treeItemsRequestRef = useRef<Promise<TreeListItem[]> | null>(null)
+  const projectListStore = useProjectListStoreApi()
+  const projectList = useProjectListStore((value) => value)
+  const currentProjectId = state.project?.id
   const { toast, showToast, dismissToast } = useWorkspaceToast()
   const setThreadModel = useCallback(
     (threadId: string, modelId: string) => {
@@ -515,78 +482,44 @@ function NormalizedThreadChat({
     [messageCommands, send, stop]
   )
 
-  const loadTreeItems = useCallback(async (): Promise<TreeListItem[]> => {
-    const projects = await runtime.client.listProjects(false)
-    return Promise.all(
-      projects.map(async (project) => {
-        const bootstrap = await runtime.client.getProject(project.id)
-        return {
-          id: project.id,
-          title:
-            project.customTitle ??
-            project.autoTitle ??
-            deriveProjectTitle(bootstrap),
-          updatedAt: project.updatedAt,
-          threadCount: bootstrap.threads.length,
-        }
-      })
-    )
-  }, [runtime.client])
-  const refreshTreeItems = useCallback((): Promise<TreeListItem[]> => {
-    const pending = treeItemsRequestRef.current
-    if (pending) return pending
-
-    const request = loadTreeItems()
-      .then((items) => {
-        setTreeItemsCache(items)
-        return items
-      })
-      .finally(() => {
-        if (treeItemsRequestRef.current === request)
-          treeItemsRequestRef.current = null
-      })
-    treeItemsRequestRef.current = request
-    return request
-  }, [loadTreeItems])
-
-  // 当前 Project 启动完成、工作台首屏渲染后预取一次；弹窗刷新会复用进行中的请求。
-  useEffect(() => {
-    void refreshTreeItems().catch(() => undefined)
-  }, [refreshTreeItems])
-
   const renameTreeItem = useCallback(
     async (projectId: string, title: string) => {
-      if (projectId === state.project?.id) {
-        await runtime.commands.renameProject(projectId, title)
-      } else {
-        await runtime.client.renameProject(projectId, {
-          commandId: crypto.randomUUID(),
-          customTitle: title,
-        })
+      const cache = projectListStore.getState()
+      const previousTitle = cache.items?.find(
+        (item) => item.id === projectId
+      )?.title
+      cache.setTitle(projectId, title)
+      try {
+        if (projectId === currentProjectId) {
+          await runtime.commands.renameProject(projectId, title)
+        } else {
+          await runtime.client.renameProject(projectId, {
+            commandId: crypto.randomUUID(),
+            customTitle: title,
+          })
+        }
+      } catch (error) {
+        if (previousTitle !== undefined)
+          projectListStore
+            .getState()
+            .restoreTitle(projectId, title, previousTitle)
+        throw error
       }
-      setTreeItemsCache(
-        (items) =>
-          items?.map((item) =>
-            item.id === projectId ? { ...item, title } : item
-          ) ?? null
-      )
     },
-    [runtime.client, runtime.commands, state.project?.id]
+    [currentProjectId, projectListStore, runtime.client, runtime.commands]
   )
   const deleteTreeItem = useCallback(
     async (projectId: string) => {
-      if (projectId === state.project?.id)
+      if (projectId === currentProjectId)
         await runtime.commands.deleteProject(projectId)
       else
         await runtime.client.deleteProject(projectId, {
           commandId: crypto.randomUUID(),
         })
       removeWorkspaceState(window.localStorage, projectId)
-      setTreeItemsCache(
-        (items) => items?.filter((item) => item.id !== projectId) ?? null
-      )
+      projectListStore.getState().remove(projectId)
     },
-    [runtime.client, runtime.commands, state.project?.id]
+    [currentProjectId, projectListStore, runtime.client, runtime.commands]
   )
 
   const mainHasMessage = (tree.threads.main?.messages.length ?? 0) > 0
@@ -595,7 +528,7 @@ function NormalizedThreadChat({
     ?.text.trim()
   const derivedSubtitle = firstUserText
     ? compactTitle(firstUserText, MAIN_SUBTITLE_MAX_LEN)
-    : SUBTITLE_FALLBACK
+    : PROJECT_TITLE_FALLBACK
   const mainSubtitle =
     state.project?.customTitle ?? state.project?.autoTitle ?? derivedSubtitle
   const hintVisible = !hintDismissed && !mainHasMessage
@@ -637,7 +570,11 @@ function NormalizedThreadChat({
   }
 
   return (
-    <div className="tc" data-view-mode={workspace.viewMode} ref={rootRef}>
+    <div
+      className="tc"
+      data-view-mode={workspace.viewMode}
+      ref={rootRef}
+    >
       <ThreadChatTopbar {...navigationProps} />
 
       {workspace.viewMode === "columns" ? (
@@ -733,10 +670,12 @@ function NormalizedThreadChat({
         <TreeList
           key={treeList.n}
           currentTreeId={treeId}
-          currentTitle={mainSubtitle ?? SUBTITLE_FALLBACK}
+          currentTitle={mainSubtitle ?? PROJECT_TITLE_FALLBACK}
           currentThreadCount={Object.keys(tree.threads).length}
-          cachedItems={treeItemsCache}
-          refreshItems={refreshTreeItems}
+          items={projectList.items}
+          refreshing={projectList.refreshing}
+          loadFailed={projectList.loadFailed}
+          refreshItems={projectList.refresh}
           renameItem={renameTreeItem}
           deleteItem={deleteTreeItem}
           closing={treeList.closing}

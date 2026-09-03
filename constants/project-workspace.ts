@@ -1,4 +1,5 @@
 // Project Workspace 的服务端校验、上下文预算与用户文案单一来源。
+export const PROJECT_TITLE_FALLBACK = "新对话"
 export const PROJECT_TARGET_MAX_CHARS = 4_000
 export const PROJECT_INSTRUCTIONS_MAX_CHARS = 20_000
 

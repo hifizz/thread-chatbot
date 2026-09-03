@@ -565,7 +565,16 @@ try {
       })
     )
   )
-  assert(projectList.some((project) => project.id === projectId))
+  const listedProject = projectList.find((project) => project.id === projectId)
+  assert(listedProject)
+  assert.deepEqual(Object.keys(listedProject).sort(), [
+    "id",
+    "threadCount",
+    "title",
+    "updatedAt",
+  ])
+  assert.equal(listedProject.title, "根线程")
+  assert.equal(listedProject.threadCount, 2)
 
   const [projectRow] = await db
     .select()

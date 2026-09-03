@@ -2,7 +2,7 @@
 
 import { Check, Pencil, Trash2, X } from "lucide-react"
 import { CUSTOM_TITLE_MAX_LEN } from "@/constants/thread-chat"
-import type { TreeListItem } from "./tree-list"
+import type { ProjectListItemDTO } from "@/lib/thread-chat/contracts/dto"
 
 /** 相对时间：「刚刚 / N 分钟前 / N 小时前 / N 天前 / M月D日」 */
 function relativeTime(iso: string): string {
@@ -21,7 +21,7 @@ function relativeTime(iso: string): string {
 }
 
 export interface TreeListRowProps {
-  item: TreeListItem
+  item: ProjectListItemDTO
   isCurrent: boolean
   unsaved: boolean
   editing: boolean
