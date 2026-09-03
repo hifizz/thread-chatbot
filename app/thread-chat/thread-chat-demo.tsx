@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic"
 import { useRouter } from "next/navigation"
-import React, { useCallback, useEffect, useMemo, useState } from "react"
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
 import { DEFAULT_THREAD_CHAT_MODEL_ID } from "@/constants/model"
 import type {
@@ -181,6 +181,10 @@ function NormalizedThreadChat({
   const [draftModelId, setDraftModelId] = useState<string>(
     DEFAULT_THREAD_CHAT_MODEL_ID
   )
+  const [treeItemsCache, setTreeItemsCache] = useState<TreeListItem[] | null>(
+    null
+  )
+  const treeItemsRequestRef = useRef<Promise<TreeListItem[]> | null>(null)
   const { toast, showToast, dismissToast } = useWorkspaceToast()
   const setThreadModel = useCallback(
     (threadId: string, modelId: string) => {
@@ -519,23 +523,53 @@ function NormalizedThreadChat({
         return {
           id: project.id,
           title:
-            project.customTitle ?? project.autoTitle ?? deriveProjectTitle(bootstrap),
+            project.customTitle ??
+            project.autoTitle ??
+            deriveProjectTitle(bootstrap),
           updatedAt: project.updatedAt,
           threadCount: bootstrap.threads.length,
         }
       })
     )
   }, [runtime.client])
+  const refreshTreeItems = useCallback((): Promise<TreeListItem[]> => {
+    const pending = treeItemsRequestRef.current
+    if (pending) return pending
+
+    const request = loadTreeItems()
+      .then((items) => {
+        setTreeItemsCache(items)
+        return items
+      })
+      .finally(() => {
+        if (treeItemsRequestRef.current === request)
+          treeItemsRequestRef.current = null
+      })
+    treeItemsRequestRef.current = request
+    return request
+  }, [loadTreeItems])
+
+  // 当前 Project 启动完成、工作台首屏渲染后预取一次；弹窗刷新会复用进行中的请求。
+  useEffect(() => {
+    void refreshTreeItems().catch(() => undefined)
+  }, [refreshTreeItems])
+
   const renameTreeItem = useCallback(
     async (projectId: string, title: string) => {
       if (projectId === state.project?.id) {
         await runtime.commands.renameProject(projectId, title)
-        return
+      } else {
+        await runtime.client.renameProject(projectId, {
+          commandId: crypto.randomUUID(),
+          customTitle: title,
+        })
       }
-      await runtime.client.renameProject(projectId, {
-        commandId: crypto.randomUUID(),
-        customTitle: title,
-      })
+      setTreeItemsCache(
+        (items) =>
+          items?.map((item) =>
+            item.id === projectId ? { ...item, title } : item
+          ) ?? null
+      )
     },
     [runtime.client, runtime.commands, state.project?.id]
   )
@@ -548,6 +582,9 @@ function NormalizedThreadChat({
           commandId: crypto.randomUUID(),
         })
       removeWorkspaceState(window.localStorage, projectId)
+      setTreeItemsCache(
+        (items) => items?.filter((item) => item.id !== projectId) ?? null
+      )
     },
     [runtime.client, runtime.commands, state.project?.id]
   )
@@ -600,11 +637,7 @@ function NormalizedThreadChat({
   }
 
   return (
-    <div
-      className="tc"
-      data-view-mode={workspace.viewMode}
-      ref={rootRef}
-    >
+    <div className="tc" data-view-mode={workspace.viewMode} ref={rootRef}>
       <ThreadChatTopbar {...navigationProps} />
 
       {workspace.viewMode === "columns" ? (
@@ -702,7 +735,8 @@ function NormalizedThreadChat({
           currentTreeId={treeId}
           currentTitle={mainSubtitle ?? SUBTITLE_FALLBACK}
           currentThreadCount={Object.keys(tree.threads).length}
-          loadItems={loadTreeItems}
+          cachedItems={treeItemsCache}
+          refreshItems={refreshTreeItems}
           renameItem={renameTreeItem}
           deleteItem={deleteTreeItem}
           closing={treeList.closing}

@@ -4,6 +4,26 @@
 .tc .swx.tlx {
   width: min(460px, 94vw);
 }
+.tc .tlx > .swx-title {
+  position: relative;
+}
+.tc .tlx-refresh {
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  left: 0;
+  height: 2px;
+  overflow: hidden;
+  pointer-events: none;
+}
+.tc .tlx-refresh span {
+  display: block;
+  width: 38%;
+  height: 100%;
+  background: var(--tc-content-muted);
+  opacity: 0.45;
+  animation: tc-progress-slide 1.4s ease-in-out infinite;
+}
 .tc .tlx-row {
   gap: 8px;
 }
