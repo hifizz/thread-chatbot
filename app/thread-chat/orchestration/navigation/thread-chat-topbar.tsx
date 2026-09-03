@@ -66,19 +66,18 @@ export function ThreadChatMobileMenu({
   onToggleMarkdown,
 }: ThreadChatNavigationProps) {
   return (
-    <div className="mobile-nav">
-      <DropdownMenu>
-        <DropdownMenuTrigger
-          className="cbtn mobile-nav-trigger"
-          aria-label="打开导航菜单"
-          title="导航菜单"
-        >
-          <Menu size={16} />
-        </DropdownMenuTrigger>
-        <DropdownMenuContent
-          align="end"
-          className="w-52 max-w-[calc(100vw-24px)] font-mono"
-        >
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        className="cbtn mobile-nav"
+        aria-label="打开导航菜单"
+        title="导航菜单"
+      >
+        <Menu size={16} />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        align="end"
+        className="w-52 max-w-[calc(100vw-24px)] font-mono"
+      >
           <DropdownMenuGroup>
             <DropdownMenuLabel>对话</DropdownMenuLabel>
             <DropdownMenuItem onClick={() => onNewConversation(false)}>
@@ -161,9 +160,8 @@ export function ThreadChatMobileMenu({
             <span>账户</span>
             <AccountButton />
           </div>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </div>
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }
 

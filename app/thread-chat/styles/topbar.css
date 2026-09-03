@@ -106,8 +106,6 @@
 
 .tc .mobile-nav {
   display: none;
-}
-.tc .mobile-nav-trigger {
   align-items: center;
   justify-content: center;
   padding: 6px;
@@ -130,6 +128,6 @@
   }
   .tc[data-view-mode="canvas"] > .topbar .mobile-nav,
   .tc .col-head .mobile-nav {
-    display: block;
+    display: flex;
   }
 }
