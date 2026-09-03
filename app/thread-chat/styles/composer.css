@@ -1,11 +1,18 @@
 /* ── @/thread-chat/styles ── 输入框 composer */
 
 /* ---------------- 输入框 ---------------- */
+/* 外壳不做视觉容器（无背景 / 无分隔线 / 不可命中）：整块区域鼠标穿透，
+   只有内部的 .box 输入框本体接收交互。 */
 .tc .composer {
   flex: none;
-  border-top: 1px solid var(--rule);
   padding: 12px 16px 14px;
-  background: #ffffff66;
+  background: transparent;
+  border-top: none;
+  pointer-events: none;
+}
+.tc .composer .lane,
+.tc .composer .box {
+  pointer-events: auto;
 }
 .tc .composer .box {
   display: flex;
@@ -100,4 +107,49 @@
   font-weight: 600;
   color: #fff;
   background: var(--accent, #3a3733);
+}
+
+/* ---------------- 附件能力（column 变体） ---------------- */
+.tc .composer .composer-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  align-self: flex-start;
+}
+.tc .composer .attach-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  background: transparent;
+  color: var(--ink-soft);
+}
+.tc .composer .attach-btn:hover {
+  background: color-mix(in srgb, var(--accent, #3a3733) 30%, transparent);
+}
+.tc .composer .box.attach-dragging {
+  border-color: var(--accent, #3a3733);
+  background: color-mix(in srgb, var(--accent, #3a3733) 4%, #fff);
+}
+/* 附件卡片沿用卡片视觉但收敛到手稿尺寸；托盘单行横向滚动。 */
+.tc .composer .composer-attachment-tray {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 2px 0 6px;
+  scrollbar-width: thin;
+}
+.tc .composer .composer-attachment-item {
+  border-color: var(--rule-strong);
+  border-radius: 8px;
+  background: var(--paper, #fff);
+  color: var(--ink);
+}
+.tc .composer .composer-attachment-item .text-muted-foreground {
+  color: var(--ink-faint);
 }
