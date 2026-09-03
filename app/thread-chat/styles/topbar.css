@@ -103,3 +103,33 @@
   border-radius: 999px;
   padding: 1px 6px;
 }
+
+.tc .mobile-nav {
+  display: none;
+}
+.tc .mobile-nav-trigger {
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+}
+.tc .mobile-nav-check {
+  margin-left: auto;
+}
+@media (max-width: 720px) {
+  .tc[data-view-mode="columns"] > .topbar {
+    display: none;
+  }
+  .tc[data-view-mode="canvas"] > .topbar {
+    padding: 8px 12px;
+  }
+  .tc[data-view-mode="canvas"] > .topbar > :not(.brand):not(.spacer):not(.mobile-nav) {
+    display: none;
+  }
+  .tc[data-view-mode="canvas"] > .topbar .brand .mark {
+    font-size: 18px;
+  }
+  .tc[data-view-mode="canvas"] > .topbar .mobile-nav,
+  .tc .col-head .mobile-nav {
+    display: block;
+  }
+}

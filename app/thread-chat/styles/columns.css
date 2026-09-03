@@ -214,6 +214,26 @@
   line-height: 1;
 }
 
+@media (max-width: 720px) {
+  .tc {
+    --col-min: 100%;
+  }
+  .tc .col-head {
+    padding: 10px 12px;
+  }
+  .tc .ctitle-row {
+    gap: 8px;
+  }
+  .tc .cactions {
+    gap: 4px;
+  }
+  .tc .col-sub {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
 .tc .focus-banner {
   margin: 12px 0 0;
   padding: 10px 12px;

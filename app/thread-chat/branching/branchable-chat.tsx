@@ -33,6 +33,7 @@ export interface BranchableChatProps {
   subtitle?: string
   /** 消息列表顶部的插卡（主线 hint） */
   intro?: React.ReactNode
+  mainHeaderActions?: React.ReactNode
   /** 统一意图：打开某会话（本列作为「来源列」参与放置策略）。
       opts.keepSource：⌘/Ctrl 点击 = 保留本列，把目标开在紧邻右侧 */
   onOpenThread: (targetId: string, opts?: { keepSource?: boolean }) => void
@@ -64,6 +65,7 @@ export function BranchableChat({
   threadId,
   subtitle,
   intro,
+  mainHeaderActions,
   onOpenThread,
   onOpenArtifact,
   onCrumbNav,
@@ -138,7 +140,10 @@ export function BranchableChat({
             <div className="ctitle-row">
               <span className="anchor-tag">锚定</span>
               <span className="ctitle main">主线</span>
-              <div className="cactions">{subtreeBtn}</div>
+              <div className="cactions">
+                {subtreeBtn}
+                {mainHeaderActions}
+              </div>
             </div>
             {subtitle && <div className="col-sub">{subtitle}</div>}
           </>
