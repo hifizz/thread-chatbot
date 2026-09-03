@@ -46,6 +46,7 @@ import { CanvasCard, type CanvasCardNode } from "./canvas-node"
 import { CANVAS_EXPAND_WIDTH } from "./canvas-dimensions"
 import { useCanvasLayout, type CanvasViewState } from "./use-canvas-layout"
 import type { MessageActionViewState } from "../../chat/actions/message-action-types"
+import type { OpenArtifact } from "../artifacts/artifact-open"
 
 /** nodeTypes 稳定引用：模块级定义，避免 React Flow 整树重挂（skill 契约 #4） */
 const nodeTypes = { threadCard: CanvasCard }
@@ -73,7 +74,7 @@ export interface ThreadCanvasProps {
   /** 统一意图：双击节点 = 回列模式打开该会话（壳层 openBranchUI） */
   onOpenThread: (threadId: string) => void
   /** 打开全局 Markdown 面板并选中对应交付物。 */
-  onOpenArtifact: (artifactId: string) => void
+  onOpenArtifact: OpenArtifact
   /** 会话动作（send/abort/retry）：壳层用 chat-controller 组装（D3，同一发送链路） */
   chat: CanvasChatActions
   messageActionState: MessageActionViewState

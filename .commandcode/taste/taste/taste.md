@@ -1,0 +1,11 @@
+# Taste
+- Communicates in Simplified Chinese with English technical terms mixed in; respond in Chinese. Confidence: 0.95
+- Answers numbered design questions point-by-point with terse, decision-oriented replies; comfortable being presented explicit options and trade-offs to pick from. Confidence: 0.7
+- Plan-gated: wants a written pre-proposal/design draft to review and approve before implementation begins ("你先把预方案给我看下"). Confidence: 0.85
+- Uses the codex CLI (@codex / `codex exec`) as an independent second reviewer for design documents before proceeding. Confidence: 0.8
+- Expects proposals grounded in the actual codebase — inspect how existing implementations handle a concern (e.g., Esc/focus in existing popups) before designing the new one. Confidence: 0.75
+- The thread-chatbot project captures design changes as OpenSpec change proposals (proposal + design + spec deltas via `openspec` CLI); UI changes that conflict with existing specs must rewrite those requirements as deltas. Confidence: 0.7
+- Non-intrusive UI is a core principle ("不干扰"): panels/drawers must avoid covering what the user is currently reading or just clicked — e.g., pick drawer side based on the click position. Confidence: 0.8
+- Prefers one adaptive mechanism that scales gracefully across the few-to-many spectrum (progressive disclosure) over separate fixed layouts for different scales. Confidence: 0.75
+- Prefers reusing existing patterns in the codebase and extracting shared components/abstractions ("或许可以把组件抽出来") over inventing parallel new ones. Confidence: 0.8
+- Cleans up legacy naming debt and dead code within the same refactor rather than deferring ("一起改掉"). Confidence: 0.75

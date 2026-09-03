@@ -4,6 +4,7 @@ import { createContext } from "react"
 import type { ThreadTreeState } from "../../core/types"
 import type { MessageActionViewState } from "../../chat/actions/message-action-types"
 import type { ThreadMessageActionCommands } from "../../chat/actions/message-action-commands"
+import type { OpenArtifact } from "../artifacts/artifact-open"
 
 /** 壳层用 chat-controller 组装后注入画布的会话动作。 */
 export interface CanvasChatActions extends ThreadMessageActionCommands {
@@ -15,7 +16,7 @@ export interface CanvasChatActions extends ThreadMessageActionCommands {
 /** 画布节点面板可用的完整组合能力。 */
 export interface CanvasActions extends CanvasChatActions {
   focusThread: (threadId: string) => void
-  openArtifact: (artifactId: string) => void
+  openArtifact: OpenArtifact
   getState: () => ThreadTreeState
   setThreadModel: (threadId: string, modelId: string) => void
   messageActionState: MessageActionViewState

@@ -1,6 +1,7 @@
 "use client"
 
 import type { Message, ThreadTreeState } from "../../core/types"
+import type { OpenArtifact } from "./artifact-open"
 import {
   MarkdownArtifactCard,
   MarkdownArtifactProgressCard,
@@ -18,7 +19,7 @@ export function MessageArtifacts({
   message: Message
   sourceDepth: number | null
   compact?: boolean
-  onOpen?: (artifactId: string) => void
+  onOpen?: OpenArtifact
 }) {
   const artifacts = onOpen ? selectMessageArtifacts(state, message) : []
   if (!message.markdownGeneration && artifacts.length === 0) return null

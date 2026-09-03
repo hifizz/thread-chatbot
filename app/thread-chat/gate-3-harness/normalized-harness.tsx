@@ -1,7 +1,7 @@
 "use client"
 
 import dynamic from "next/dynamic"
-import React, { useEffect, useMemo, useRef, useState } from "react"
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { createConversationStore, type ConversationStore } from "../core/store"
 import { useConversationStore } from "../core/use-thread-store"
 import {
@@ -34,7 +34,17 @@ import { kickoffQuestion } from "../net/prompt/prompt-pure"
 import { ThreadColumns } from "../orchestration/columns/thread-columns"
 import type { Slot } from "../orchestration/columns/placement"
 import { ThreadChatTopbar } from "../orchestration/navigation/thread-chat-topbar"
-import { ArtifactDrawer } from "../orchestration/artifacts/artifact-drawer"
+import { StoreBoundArtifactsDrawer } from "../orchestration/artifacts/store-bound-artifacts-drawer"
+import { StoreBoundProjectDrawer } from "../orchestration/artifacts/store-bound-project-drawer"
+import {
+  drawerSideForAnchor,
+  isNarrowDrawerViewport,
+  layerZIndex,
+  openLayer,
+  type DrawerId,
+  type DrawerSide,
+} from "../orchestration/overlays/workspace-overlay-logic"
+import type { OpenArtifact } from "../orchestration/artifacts/artifact-open"
 import type { CanvasChatActions } from "../orchestration/canvas/canvas-actions"
 import type { CanvasViewState } from "../orchestration/canvas/use-canvas-layout"
 import {
@@ -139,13 +149,15 @@ export function NormalizedGate3Harness({
   const [scenario, setScenario] = useState<Gate3HarnessScenario>("normal")
   const [status, setStatus] = useState("开发 harness 已就绪")
   const [selection, setSelection] = useState<SelectionInfo | null>(null)
-  const [drawerOpen, setDrawerOpen] = useState(false)
+  const [drawerStack, setDrawerStack] = useState<DrawerId[]>([])
+  const [artifactSide, setArtifactSide] = useState<DrawerSide>("right")
   const [activeArtifactId, setActiveArtifactId] = useState<string | null>(null)
   const [forceCols, setForceCols] = useState<number | null>(3)
   const [placementMode, setPlacementMode] = useState<"replace" | "fold">(
     "replace"
   )
   const [titleDraft, setTitleDraft] = useState("规范化会话验收")
+  const rootRef = useRef<HTMLDivElement | null>(null)
   const columnsRef = useRef<HTMLDivElement | null>(null)
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>({})
   const [canvasViewState] = useState<CanvasViewState>(() => ({
@@ -395,14 +407,69 @@ export function NormalizedGate3Harness({
 
   const rootHasMessages = (tree.threads.main?.messages.length ?? 0) > 0
   const branchCount = Math.max(0, Object.keys(tree.threads).length - 1)
-  const markdownCount = Object.values(tree.artifacts).filter(
-    (artifact) => artifact.kind === "markdown"
-  ).length
+  const artifactCount = state.artifactOrder.length
   const selectedScenarioLabel =
     SCENARIOS.find((entry) => entry.id === scenario)?.label ?? scenario
+  const narrowDrawers = isNarrowDrawerViewport(windowWidth ?? 1600)
+  const topDrawer = drawerStack.at(-1) ?? null
+  const projectDrawerIndex = drawerStack.indexOf("project")
+  const artifactsDrawerIndex = drawerStack.indexOf("artifacts")
+  const openDrawer = (id: DrawerId) => {
+    setDrawerStack((current) =>
+      narrowDrawers ? [id] : openLayer(current, id)
+    )
+  }
+  const toggleDrawer = (id: DrawerId) => {
+    setDrawerStack((current) => {
+      if (current.at(-1) === id) return current.filter((item) => item !== id)
+      return narrowDrawers ? [id] : openLayer(current, id)
+    })
+  }
+  const closeDrawer = useCallback((id: DrawerId) => {
+    setDrawerStack((current) => current.filter((item) => item !== id))
+  }, [])
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (
+        event.key !== "Escape" ||
+        event.defaultPrevented ||
+        event.isComposing ||
+        event.repeat
+      )
+        return
+      const top = drawerStack.at(-1)
+      if (top) closeDrawer(top)
+    }
+    document.addEventListener("keydown", onKeyDown)
+    return () => document.removeEventListener("keydown", onKeyDown)
+  }, [closeDrawer, drawerStack])
+  const openArtifact = useCallback<OpenArtifact>(
+    (artifactId, options) => {
+      setActiveArtifactId(artifactId)
+      setDrawerStack((current) => {
+        if (!current.includes("artifacts")) {
+          const width =
+            state.workspace.panelSizes.artifactDrawer ??
+            Math.round(window.innerWidth / 3)
+          setArtifactSide(
+            options.source === "pointer" && options.anchorRect
+              ? drawerSideForAnchor({
+                  anchorLeft: options.anchorRect.left,
+                  anchorRight: options.anchorRect.right,
+                  viewportWidth: window.innerWidth,
+                  drawerWidth: width,
+                })
+              : "right"
+          )
+        }
+        return narrowDrawers ? ["artifacts"] : openLayer(current, "artifacts")
+      })
+    },
+    [narrowDrawers, state.workspace.panelSizes.artifactDrawer]
+  )
 
   return (
-    <div className="tc" data-gate3-normalized-harness="true">
+    <div ref={rootRef} className="tc" data-gate3-normalized-harness="true">
       <ThreadChatTopbar
         viewMode={viewMode}
         showHelp
@@ -410,7 +477,7 @@ export function NormalizedGate3Harness({
         forceCols={forceCols}
         placementMode={placementMode}
         branchCount={branchCount}
-        markdownCount={markdownCount}
+        artifactCount={artifactCount}
         onNewConversation={() => window.location.reload()}
         onToggleTreeList={() =>
           setStatus("对话列表将在 Gate 4 接正式 Project list API")
@@ -425,7 +492,8 @@ export function NormalizedGate3Harness({
         onForceCols={setForceCols}
         onPlacementModeChange={setPlacementMode}
         onToggleThreadTree={() => openThread(GATE3_HARNESS_IDS.nestedThreadId)}
-        onToggleMarkdown={() => setDrawerOpen((open) => !open)}
+        onToggleProject={() => toggleDrawer("project")}
+        onToggleArtifacts={() => toggleDrawer("artifacts")}
       />
 
       <aside
@@ -434,7 +502,7 @@ export function NormalizedGate3Harness({
           position: "fixed",
           zIndex: 80,
           right: 12,
-          top: 52,
+          top: narrowDrawers ? 148 : 52,
           display: "grid",
           gap: 6,
           width: 230,
@@ -539,10 +607,7 @@ export function NormalizedGate3Harness({
                     : undefined
                 }
                 onOpenThread={(target) => openThread(target)}
-                onOpenArtifact={(artifactId) => {
-                  setActiveArtifactId(artifactId)
-                  setDrawerOpen(true)
-                }}
+                onOpenArtifact={openArtifact}
                 onCrumbNav={openThread}
                 onOpenSwitcher={() =>
                   setStatus("Switcher 数据已由 normalized tree selector 提供")
@@ -587,10 +652,7 @@ export function NormalizedGate3Harness({
             runtime.store.getState().setWorkspace({ view: "columns" })
             openThread(threadId)
           }}
-          onOpenArtifact={(artifactId) => {
-            setActiveArtifactId(artifactId)
-            setDrawerOpen(true)
-          }}
+          onOpenArtifact={openArtifact}
         />
       )}
 
@@ -604,11 +666,32 @@ export function NormalizedGate3Harness({
         maxExpanded={Math.max(1, (forceCols ?? 3) - 1)}
         lastActiveOf={(threadId) => tree.threads[threadId]?.lastActive ?? 0}
       />
-      <ArtifactDrawer
-        state={tree}
-        open={drawerOpen}
+      <StoreBoundProjectDrawer
+        projectId={projectId}
+        store={runtime.store}
+        client={runtime.mock.client}
+        commands={runtime.commands}
+        open={projectDrawerIndex >= 0}
+        zIndex={layerZIndex(Math.max(0, projectDrawerIndex))}
+        topLayer={topDrawer === "project"}
+        narrow={narrowDrawers}
+        container={rootRef}
+        onActivate={() => openDrawer("project")}
+        onClose={() => closeDrawer("project")}
+      />
+      <StoreBoundArtifactsDrawer
+        store={runtime.store}
+        open={artifactsDrawerIndex >= 0}
         activeId={activeArtifactId}
-        onClose={() => setDrawerOpen(false)}
+        zIndex={layerZIndex(Math.max(0, artifactsDrawerIndex))}
+        side={artifactSide}
+        topLayer={topDrawer === "artifacts"}
+        narrow={narrowDrawers}
+        container={rootRef}
+        panelSizes={state.workspace.panelSizes}
+        setWorkspace={(next) => runtime.store.getState().setWorkspace(next)}
+        onActivate={() => openDrawer("artifacts")}
+        onClose={() => closeDrawer("artifacts")}
         onSelect={setActiveArtifactId}
         onLocate={(threadId) => {
           runtime.store.getState().setWorkspace({ view: "columns" })

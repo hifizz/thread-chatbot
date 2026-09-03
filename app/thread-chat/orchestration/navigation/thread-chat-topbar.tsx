@@ -3,6 +3,7 @@
 import {
   CircleHelp,
   Columns3,
+  FileText,
   FolderKanban,
   ListTodo,
   Network,
@@ -17,32 +18,14 @@ import { ShortcutHint } from "../overlays/shortcut-hint"
 import { COL_MIN_W } from "../columns/use-column-viewport"
 import { columnCountChoices } from "./thread-chat-topbar-logic"
 
-export function ThreadChatTopbar({
-  viewMode,
-  showHelp,
-  windowWidth,
-  forceCols,
-  placementMode,
-  branchCount,
-  markdownCount,
-  onNewConversation,
-  onToggleTreeList,
-  onOpenHelp,
-  onShowColumns,
-  onShowCanvas,
-  onForceCols,
-  onPlacementModeChange,
-  onToggleThreadTree,
-  onToggleMarkdown,
-}: {
+type ThreadChatTopbarProps = {
   viewMode: ViewMode
   showHelp: boolean
   windowWidth: number | null
   forceCols: number | null
   placementMode: PlacementMode
   branchCount: number
-  /** Project 资源总数。保留旧 prop 名，避免对 Topbar 消费方制造无关 API churn。 */
-  markdownCount: number
+  artifactCount: number
   onNewConversation(openInNewPage: boolean): void
   onToggleTreeList(): void
   onOpenHelp(): void
@@ -51,8 +34,29 @@ export function ThreadChatTopbar({
   onForceCols(value: number | null): void
   onPlacementModeChange(mode: PlacementMode): void
   onToggleThreadTree(): void
-  onToggleMarkdown(): void
-}) {
+  onToggleProject(): void
+  onToggleArtifacts(): void
+}
+
+export function ThreadChatTopbar({
+  viewMode,
+  showHelp,
+  windowWidth,
+  forceCols,
+  placementMode,
+  branchCount,
+  artifactCount,
+  onNewConversation,
+  onToggleTreeList,
+  onOpenHelp,
+  onShowColumns,
+  onShowCanvas,
+  onForceCols,
+  onPlacementModeChange,
+  onToggleThreadTree,
+  onToggleProject,
+  onToggleArtifacts,
+}: ThreadChatTopbarProps) {
   return (
     <div className="topbar">
       <button
@@ -164,13 +168,21 @@ export function ThreadChatTopbar({
         <ShortcutHint {...THREAD_CHAT_SHORTCUTS.openThreadTree} />
       </button>
       <button
-        className="tbtn"
-        title="打开 / 收起 Project Workspace"
-        onClick={onToggleMarkdown}
+        className="tbtn workspace-tool"
+        title="Project"
+        aria-label="打开 / 收起 Project"
+        onClick={onToggleProject}
       >
-        <FolderKanban size={13} />
-        Project
-        <span className="cnt">{markdownCount}</span>
+        <FolderKanban size={14} aria-hidden="true" />
+      </button>
+      <button
+        className="tbtn workspace-tool"
+        title="Artifacts"
+        aria-label="打开 / 收起 Artifacts"
+        onClick={onToggleArtifacts}
+      >
+        <FileText size={14} aria-hidden="true" />
+        <span className="cnt">{artifactCount}</span>
       </button>
       <AccountButton />
     </div>

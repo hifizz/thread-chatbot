@@ -2,6 +2,8 @@
 
 /* ---------------- 顶栏 ---------------- */
 .tc .topbar {
+  position: relative;
+  z-index: 69;
   flex: none;
   display: flex;
   align-items: center;
@@ -81,10 +83,14 @@
   border-color: var(--d1);
   color: var(--d1);
 }
-.tc .tbtn.help {
+.tc .tbtn.help,
+.tc .tbtn.workspace-tool {
   padding: 5px 7px;
   line-height: 0;
   color: var(--ink-soft);
+}
+.tc .tbtn.workspace-tool:has(.cnt) {
+  padding-right: 6px;
 }
 .tc .tbtn.help:hover {
   color: var(--ink);
@@ -95,8 +101,13 @@
   pointer-events: none;
 }
 .tc .tbtn .cnt {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
   font-size: 10px;
   font-weight: 700;
+  line-height: 14px;
   color: #fff;
   background: var(--d2);
   border-radius: 999px;

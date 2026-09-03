@@ -1,80 +1,83 @@
 import assert from "node:assert/strict"
-import { readFile } from "node:fs/promises"
+import { access, readFile } from "node:fs/promises"
 
-const panel = await readFile(
-  new URL(
-    "../../app/thread-chat/orchestration/artifacts/project-panel.tsx",
-    import.meta.url
-  ),
-  "utf8"
+const root = new URL("../../", import.meta.url)
+const artifactDir = new URL(
+  "app/thread-chat/orchestration/artifacts/",
+  root
 )
-const bound = await readFile(
-  new URL(
-    "../../app/thread-chat/orchestration/artifacts/store-bound-project-panel.tsx",
-    import.meta.url
-  ),
-  "utf8"
-)
-const chatView = await readFile(
-  new URL("../../app/thread-chat/chat/chat-view.tsx", import.meta.url),
-  "utf8"
-)
-const shell = await readFile(
-  new URL("../../app/thread-chat/thread-chat-demo.tsx", import.meta.url),
-  "utf8"
-)
+const [projectDrawer, artifactsDrawer, projectBound, artifactsBound, shell, chatView] =
+  await Promise.all([
+    readFile(new URL("project-drawer.tsx", artifactDir), "utf8"),
+    readFile(new URL("artifacts-drawer.tsx", artifactDir), "utf8"),
+    readFile(new URL("store-bound-project-drawer.tsx", artifactDir), "utf8"),
+    readFile(new URL("store-bound-artifacts-drawer.tsx", artifactDir), "utf8"),
+    readFile(new URL("app/thread-chat/thread-chat-demo.tsx", root), "utf8"),
+    readFile(new URL("app/thread-chat/chat/chat-view.tsx", root), "utf8"),
+  ])
 
-// Contract edit UX: draft is local; cancel restores authoritative server values;
-// save failure only sets error and therefore preserves the unsaved draft.
-assert.match(panel, /const \[targetDraft, setTargetDraft\] = useState\(""\)/)
-assert.match(panel, /const \[instructionsDraft, setInstructionsDraft\] = useState\(""\)/)
-assert.match(panel, /setTargetDraft\(project\?\.target \?\? ""\)/)
-assert.match(panel, /setInstructionsDraft\(project\?\.instructions \?\? ""\)/)
-assert.match(panel, /const cancelEdit = \(\) =>/)
-assert.match(panel, /await onSaveContract\(targetDraft, instructionsDraft\)/)
-assert.match(panel, /setError\(/)
-assert.doesNotMatch(
-  panel.match(/const saveContract = async \(\) => \{[\s\S]*?\n  \}/)?.[0] ?? "",
-  /setTargetDraft\(project/
-)
+for (const legacyFile of [
+  "project-panel.tsx",
+  "store-bound-project-panel.tsx",
+  "artifact-drawer.tsx",
+]) {
+  await assert.rejects(access(new URL(legacyFile, artifactDir)), { code: "ENOENT" })
+}
 
-// File lifecycle and removal are visible/recoverable rather than silently hidden.
-assert.match(panel, /uploadProjectFile\(file,/)
-assert.match(panel, /uploading \? "上传中…" : "上传文件"/)
-assert.match(panel, /file\.status === "failed"/)
-assert.match(panel, /file\.error/)
-assert.match(panel, /window\.confirm\(/)
-assert.match(panel, /历史消息中的附件不会被删除/)
+// Project Drawer 只承载 Overview / Files，并提供完整 tab 语义与编辑态 Esc。
+assert.match(projectDrawer, /type ProjectDrawerSection = "overview" \| "files"/)
+assert.doesNotMatch(projectDrawer, /ProjectDrawerSection[^\n]*artifacts/)
+assert.equal(projectDrawer.match(/role="tab"/g)?.length, 2)
+assert.equal(projectDrawer.match(/role="tabpanel"/g)?.length, 2)
+assert.match(projectDrawer, /aria-selected=/)
+assert.match(projectDrawer, /aria-controls=/)
+assert.match(projectDrawer, /onKeyDownCapture=/)
+assert.match(projectDrawer, /event\.key === "Escape"/)
+assert.match(projectDrawer, /event\.stopPropagation\(\)/)
+assert.match(projectDrawer, /cancelEdit\(\)/)
 
-// Project-wide artifact discovery/detail: search, descending createdAt, provenance,
-// stopped/failed status labels, and source navigation are all present.
-assert.match(panel, /right\.createdAt\.localeCompare\(left\.createdAt\)/)
-assert.match(panel, /artifactQuery\.trim\(\)\.toLowerCase\(\)/)
-assert.match(panel, /sourceThreadTitle/)
-assert.match(panel, /sourceMessageStatus/)
-assert.match(panel, /sourceStatusLabel\(selectedArtifact\.sourceMessageStatus\)/)
-assert.match(panel, /onLocate\(viewThreadId, artifact\.sourceMessageId\)/)
+// 原 Contract 与 File 生命周期能力仍在 Project Drawer 内。
+assert.match(projectDrawer, /await onSaveContract\(targetDraft, instructionsDraft\)/)
+assert.match(projectDrawer, /uploadProjectFile\(file,/)
+assert.match(projectDrawer, /file\.status === "failed"/)
+assert.match(projectDrawer, /window\.confirm\(/)
+assert.match(projectDrawer, /历史消息中的附件不会被删除/)
+assert.match(projectDrawer, /PROJECT_WORKSPACE_COPY\.archivedReadOnly/)
 
-// Archived workspaces expose read-only state and suppress edit/upload/remove controls.
-assert.match(panel, /const archived = Boolean\(project\?\.archivedAt\)/)
-assert.match(panel, /PROJECT_WORKSPACE_COPY\.archivedReadOnly/)
-assert.match(panel, /!archived && !editing && project/)
-assert.match(panel, /!archived && project/)
-assert.match(panel, /!archived && \(/)
+// 尚未持久化的 UUID 是明确空态，不得被误报为无限加载。
+assert.match(projectDrawer, /Project 尚未创建/)
+assert.match(projectDrawer, /发送第一条消息后/)
+assert.match(projectDrawer, /!project \? \(/)
+assert.doesNotMatch(projectDrawer, /Project 加载中/)
 
-// The live panel consumes the same normalized store/runtime commands as ThreadChat.
-assert.match(bound, /useConversationStore\(store/)
-assert.match(bound, /store\.getState\(\)\.hydrateProject\(bootstrap\)/)
-assert.match(bound, /commands\.updateProjectContract/)
-assert.match(bound, /commands\.addProjectFile/)
-assert.match(bound, /commands\.removeProjectFile/)
-assert.match(shell, /<StoreBoundProjectPanel/)
-assert.doesNotMatch(shell, /<ArtifactDrawer/)
+// Artifacts Drawer 独立负责全 Project 列表、搜索、详情和来源定位。
+assert.match(artifactsDrawer, /artifacts\.length >= ARTIFACT_SEARCH_THRESHOLD/)
+assert.match(artifactsDrawer, /right\.createdAt\.localeCompare\(left\.createdAt\)/)
+assert.match(artifactsDrawer, /无匹配 Artifact/)
+assert.match(artifactsDrawer, /还没有 Artifact/)
+assert.match(artifactsDrawer, /selectedArtifact/)
+assert.match(artifactsDrawer, /onLocate\(viewThreadId, artifact\.sourceMessageId\)/)
+assert.match(artifactsDrawer, /listScrollRef/)
+assert.match(artifactsDrawer, /detailRef\.current\?\.scrollTo/)
+assert.match(artifactsDrawer, /className="project-resource-list dense"/)
 
-// Artifact provenance can target an exact rendered message and briefly highlight it.
+// 两个 store-bound 组件订阅同一 normalized store；壳层只做一次刷新并组合渲染。
+assert.match(projectBound, /useConversationStore\(store/)
+assert.match(artifactsBound, /useConversationStore\(store/)
+assert.match(projectBound, /commands\.updateProjectContract/)
+assert.match(projectBound, /commands\.addProjectFile/)
+assert.match(projectBound, /commands\.removeProjectFile/)
+assert.match(artifactsBound, /state\.artifactOrder/)
+assert.match(shell, /const refreshProject = useCallback/)
+assert.match(shell, /runtime\.client\.getProject\(treeId\)/)
+assert.match(shell, /<StoreBoundProjectDrawer/)
+assert.match(shell, /<StoreBoundArtifactsDrawer/)
+assert.doesNotMatch(shell, /<ProjectPanel|<ArtifactDrawer/)
+
+// 来源消息仍可被精确定位并短暂高亮。
 assert.match(chatView, /data-thread-chat-message-id=\{msg\.id\}/)
-assert.match(bound, /scrollIntoView\(\{ behavior: "smooth", block: "center" \}\)/)
-assert.match(bound, /element\.animate\(/)
-assert.match(bound, /revealMessage\(sourceMessageId\)/)
+assert.match(artifactsBound, /scrollIntoView\(/)
+assert.match(artifactsBound, /element\.animate\(/)
+assert.match(artifactsBound, /revealMessage\(sourceMessageId\)/)
 
-console.log("project panel UI contract tests passed")
+console.log("PASS  split Project/Artifacts drawers preserve workspace UI contracts")
