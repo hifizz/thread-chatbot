@@ -1,3 +1,4 @@
+import { WORKSPACE_DRAWER } from "@/constants/workspace-drawers"
 import type { WorkspaceUiState } from "../../core/types"
 
 const WORKSPACE_VERSION = 1
@@ -112,7 +113,9 @@ export function sanitizeWorkspaceState(
           }
         : {}),
       ...(typeof panelRaw.artifactDrawer === "number" &&
-      Number.isFinite(panelRaw.artifactDrawer)
+      Number.isFinite(panelRaw.artifactDrawer) &&
+      panelRaw.artifactDrawer >= WORKSPACE_DRAWER.artifactMinWidth &&
+      panelRaw.artifactDrawer <= WORKSPACE_DRAWER.artifactMaxPersistedWidth
         ? { artifactDrawer: panelRaw.artifactDrawer }
         : {}),
     },

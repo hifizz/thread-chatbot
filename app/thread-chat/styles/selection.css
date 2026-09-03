@@ -9,7 +9,7 @@
    branching/selection/selection-draft-guard.css，不进本桶。 */
 .tc .sel-bubble {
   position: fixed;
-  z-index: 60;
+  z-index: 71;
   color: #fff;
 }
 /* 平滑曲线轮廓背景层：铺满面板宽度，尾巴靠 svg overflow 溢出面板上/下沿；

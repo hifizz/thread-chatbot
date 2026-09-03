@@ -25,6 +25,7 @@ import { MessageArtifacts } from "../orchestration/artifacts/message-artifacts"
 import { AnchoredAssistantBody } from "./assistant/anchored-assistant-body"
 import type { MessageActionViewState } from "../chat/actions/message-action-types"
 import type { ThreadMessageActionCommands } from "../chat/actions/message-action-commands"
+import type { OpenArtifact } from "../orchestration/artifacts/artifact-open"
 
 export interface BranchableChatProps {
   state: ThreadTreeState
@@ -36,7 +37,7 @@ export interface BranchableChatProps {
   /** 统一意图：打开某会话（本列作为「来源列」参与放置策略）。
       opts.keepSource：⌘/Ctrl 点击 = 保留本列，把目标开在紧邻右侧 */
   onOpenThread: (targetId: string, opts?: { keepSource?: boolean }) => void
-  onOpenArtifact: (artifactId: string) => void
+  onOpenArtifact: OpenArtifact
   /** 面包屑就地回退（collapse 语义由 orchestration 实现） */
   onCrumbNav: (targetId: string) => void
   /** ⇄ 把本列切换为任意会话（弹出 local 切换器，锚定在按钮上） */

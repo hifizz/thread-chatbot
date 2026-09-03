@@ -2,6 +2,9 @@
 export const PROJECT_TARGET_MAX_CHARS = 4_000
 export const PROJECT_INSTRUCTIONS_MAX_CHARS = 20_000
 
+/** Artifacts 达到此总数后显示抽屉内搜索。 */
+export const ARTIFACT_SEARCH_THRESHOLD = 6
+
 /** Message attachments 与 Project Files 共用的单次模型上下文字符预算。 */
 export const PROJECT_FILE_CONTEXT_CHAR_BUDGET = 120_000
 

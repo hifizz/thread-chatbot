@@ -112,7 +112,7 @@ const initialWorkspace = {
     pins: { [rootThreadId]: { x: 123, y: 456 } },
     viewport: { x: 30, y: 40, zoom: 0.8 },
   },
-  panelSizes: { projectPanel: 520 },
+  panelSizes: { columns: [520, 640], artifactDrawer: 560 },
   expandedNodes: [rootThreadId],
 }
 

@@ -46,7 +46,7 @@ function UsageTips() {
       <section className="helpx-section">
         <h3 className="helpx-section-title">内容与视图</h3>
         <ul>
-          <li>对话里生成的 Markdown 会插入消息流，点击后在右侧面板预览</li>
+          <li>对话里生成的 Markdown 会插入消息流，点击后在 Artifacts 抽屉预览</li>
           <li>顶栏可切换画布视图纵览全树，单击节点就地对话，双击回到列模式</li>
           <li>对话自动保存，刷新或同链接重开可恢复；「新对话」另起一棵树</li>
         </ul>

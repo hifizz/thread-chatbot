@@ -89,6 +89,7 @@ function bootstrap(overrides = {}) {
     project: project(),
     threads: [thread()],
     messages: [message()],
+    files: [],
     artifacts: [],
     activeGenerationIds: [],
     ...overrides,
@@ -990,22 +991,36 @@ async function testPartsProjectionAndWorkspaceIsolation() {
   )
   assert.equal(saved.includes("messagesById"), false)
   assert.equal(saved.includes("正文"), false)
-  assert.equal(
-    sanitizeWorkspaceState({
+  const sanitized = sanitizeWorkspaceState({
+    version: 1,
+    workspace: {
+      view: "canvas",
+      openThreadIds: [thread().id, 3],
+      selectedThreadId: thread().id,
+      recents: [],
+      canvas: { pins: {} },
+      panelSizes: {
+        columns: [480, 640],
+        artifactDrawer: 12,
+      },
+      expandedNodes: [],
+      messagesById: { leaked: true },
+    },
+  })
+  assert.equal(sanitized.view, "canvas")
+  assert.deepEqual(sanitized.panelSizes.columns, [480, 640])
+  assert.equal("artifactDrawer" in sanitized.panelSizes, false)
+
+  for (const artifactDrawer of [Number.NaN, Number.POSITIVE_INFINITY, 5000]) {
+    const invalid = sanitizeWorkspaceState({
       version: 1,
       workspace: {
-        view: "canvas",
-        openThreadIds: [thread().id, 3],
-        selectedThreadId: thread().id,
-        recents: [],
-        canvas: { pins: {} },
-        panelSizes: {},
-        expandedNodes: [],
-        messagesById: { leaked: true },
+        view: "columns",
+        panelSizes: { artifactDrawer },
       },
-    }).view,
-    "canvas"
-  )
+    })
+    assert.equal("artifactDrawer" in invalid.panelSizes, false)
+  }
 }
 
 async function testStoppedProjectionPreservesExistingPresentation() {
@@ -1078,7 +1093,8 @@ async function testGate3HarnessIsolation() {
     "ThreadColumns",
     "ThreadCanvas",
     "BranchableChat",
-    "ArtifactDrawer",
+    "StoreBoundProjectDrawer",
+    "StoreBoundArtifactsDrawer",
     "createConversationCommands",
   ])
     assert.match(harness, new RegExp(component))

@@ -9,11 +9,7 @@ import type {
   MessageDTO,
   ProjectBootstrapDTO,
 } from "@/lib/thread-chat/contracts/dto"
-import {
-  activePathArtifacts,
-  threadTitle,
-  type TreeRow,
-} from "./core/selectors"
+import { threadTitle, type TreeRow } from "./core/selectors"
 import { useConversationStore } from "./core/use-thread-store"
 import {
   fromConversationViewThreadId,
@@ -49,7 +45,10 @@ import {
   TreeList,
   type TreeListItem,
 } from "./orchestration/navigation/tree-list"
-import { StoreBoundProjectPanel } from "./orchestration/artifacts/store-bound-project-panel"
+import { StoreBoundProjectDrawer } from "./orchestration/artifacts/store-bound-project-drawer"
+import { StoreBoundArtifactsDrawer } from "./orchestration/artifacts/store-bound-artifacts-drawer"
+import type { OpenArtifact } from "./orchestration/artifacts/artifact-open"
+import { layerZIndex } from "./orchestration/overlays/workspace-overlay-logic"
 import type { CanvasChatActions } from "./orchestration/canvas/canvas-actions"
 import { HelpPanel, UsageHint } from "./orchestration/overlays/help-panel"
 import { useWorkspaceOverlays } from "./orchestration/overlays/use-workspace-overlays"
@@ -226,12 +225,18 @@ function NormalizedThreadChat({
     helpPanel,
     closeHelpPanel,
     openHelpPanel,
-    drawerOpen,
+    drawerStack,
+    closingDrawers,
+    narrowDrawers,
+    artifactSide,
     activeArtifactId,
     setActiveArtifactId,
     openArtifact,
+    toggleArtifactsDrawer,
     toggleDrawer,
     closeDrawer,
+    activateDrawer,
+    topDrawer,
   } = useWorkspaceOverlays()
   const [hintDismissed, setHintDismissed] = useState(false)
 
@@ -515,7 +520,9 @@ function NormalizedThreadChat({
         return {
           id: project.id,
           title:
-            project.customTitle ?? project.autoTitle ?? deriveProjectTitle(bootstrap),
+            project.customTitle ??
+            project.autoTitle ??
+            deriveProjectTitle(bootstrap),
           updatedAt: project.updatedAt,
           threadCount: bootstrap.threads.length,
         }
@@ -559,9 +566,27 @@ function NormalizedThreadChat({
     state.project?.customTitle ?? state.project?.autoTitle ?? derivedSubtitle
   const hintVisible = !hintDismissed && !mainHasMessage
   const branchCount = Math.max(0, Object.keys(tree.threads).length - 1)
-  const markdownCount = activePathArtifacts(tree).reduce(
-    (count, artifact) => count + (artifact.kind === "markdown" ? 1 : 0),
-    0
+  const artifactCount = state.artifactOrder.length
+  const projectDrawerIndex = drawerStack.indexOf("project")
+  const artifactsDrawerIndex = drawerStack.indexOf("artifacts")
+  const projectDrawerOpen =
+    projectDrawerIndex >= 0 && !closingDrawers.project
+  const artifactsDrawerOpen =
+    artifactsDrawerIndex >= 0 && !closingDrawers.artifacts
+  const panelSizes = state.workspace.panelSizes
+  const refreshProject = useCallback(async () => {
+    const bootstrap = await runtime.client.getProject(treeId)
+    runtime.store.getState().hydrateProject(bootstrap)
+  }, [runtime.client, runtime.store, treeId])
+  const anyDrawerOpen = projectDrawerOpen || artifactsDrawerOpen
+  useEffect(() => {
+    if (!anyDrawerOpen) return
+    void refreshProject().catch(() => showToast("Project 加载失败，请重试"))
+  }, [anyDrawerOpen, refreshProject, showToast])
+  const openArtifactWithWorkspaceWidth = useCallback<OpenArtifact>(
+    (artifactId, options) =>
+      openArtifact(artifactId, options, panelSizes.artifactDrawer),
+    [openArtifact, panelSizes.artifactDrawer]
   )
 
   return (
@@ -573,7 +598,7 @@ function NormalizedThreadChat({
         forceCols={workspace.forceCols}
         placementMode={workspace.mode}
         branchCount={branchCount}
-        markdownCount={markdownCount}
+        artifactCount={artifactCount}
         onNewConversation={(openInNewPage) => {
           const newConversationUrl = `/thread-chat/${crypto.randomUUID()}`
           if (openInNewPage) {
@@ -595,7 +620,11 @@ function NormalizedThreadChat({
         onForceCols={workspace.setForceCols}
         onPlacementModeChange={changeMode}
         onToggleThreadTree={toggleGlobalSwitcher}
-        onToggleMarkdown={toggleDrawer}
+        onToggleProject={() => toggleDrawer("project")}
+        onToggleArtifacts={() => {
+          if (artifactsDrawerOpen) toggleArtifactsDrawer()
+          else openArtifact("", { source: "topbar" }, panelSizes.artifactDrawer)
+        }}
       />
 
       {workspace.viewMode === "columns" ? (
@@ -624,7 +653,7 @@ function NormalizedThreadChat({
                 onOpenThread={(target, options) =>
                   openBranchUI(target, viewThreadId, options)
                 }
-                onOpenArtifact={openArtifact}
+                onOpenArtifact={openArtifactWithWorkspaceWidth}
                 onCrumbNav={(target) =>
                   workspace.columns.navColumn(viewportIndex, target, "collapse")
                 }
@@ -663,7 +692,7 @@ function NormalizedThreadChat({
           messageActionState={messageActionState}
           focusNode={workspace.focusNode}
           onOpenThread={(id) => openBranchUI(id, null)}
-          onOpenArtifact={openArtifact}
+          onOpenArtifact={openArtifactWithWorkspaceWidth}
         />
       )}
 
@@ -726,14 +755,33 @@ function NormalizedThreadChat({
         />
       )}
 
-      <StoreBoundProjectPanel
+      <StoreBoundProjectDrawer
         projectId={treeId}
         store={runtime.store}
         client={runtime.client}
         commands={runtime.commands}
-        open={drawerOpen}
+        open={projectDrawerOpen}
+        zIndex={layerZIndex(Math.max(0, projectDrawerIndex))}
+        topLayer={topDrawer === "project"}
+        narrow={narrowDrawers}
+        container={rootRef}
+        onActivate={() => activateDrawer("project")}
+        onClose={() => closeDrawer("project")}
+        onRefresh={refreshProject}
+      />
+      <StoreBoundArtifactsDrawer
+        store={runtime.store}
+        open={artifactsDrawerOpen}
         activeId={activeArtifactId}
-        onClose={closeDrawer}
+        zIndex={layerZIndex(Math.max(0, artifactsDrawerIndex))}
+        side={artifactSide}
+        topLayer={topDrawer === "artifacts"}
+        narrow={narrowDrawers}
+        container={rootRef}
+        panelSizes={panelSizes}
+        setWorkspace={(next) => runtime.store.getState().setWorkspace(next)}
+        onActivate={() => activateDrawer("artifacts")}
+        onClose={() => closeDrawer("artifacts")}
         onSelect={setActiveArtifactId}
         onLocate={(threadId) => openBranchUI(threadId, null)}
       />

@@ -3,11 +3,13 @@
 import { FileCode2, FileText, LoaderCircle } from "lucide-react"
 import type { Artifact, MarkdownGenerationProgress } from "../../core/types"
 import { dc } from "../../theme"
+import type { OpenArtifact } from "./artifact-open"
+import { serializeArtifactAnchorRect } from "./artifact-open"
 
 export interface MarkdownArtifactCardProps {
   artifact: Artifact
   sourceDepth: number | null
-  onOpen: (artifactId: string) => void
+  onOpen: OpenArtifact
   compact?: boolean
 }
 
@@ -78,7 +80,18 @@ export function MarkdownArtifactCard({
   return (
     <button
       className={`acard ${depthClass} ${compact ? "compact" : ""}`}
-      onClick={() => onOpen(artifact.id)}
+      onClick={(event) =>
+        onOpen(artifact.id, {
+          source: event.detail === 0 ? "keyboard" : "pointer",
+          ...(event.detail === 0
+            ? {}
+            : {
+                anchorRect: serializeArtifactAnchorRect(
+                  event.currentTarget.getBoundingClientRect()
+                ),
+              }),
+        })
+      }
     >
       <span className="ic">
         {artifact.kind === "code" ? (
@@ -95,7 +108,7 @@ export function MarkdownArtifactCard({
             : `ARTIFACT · ${artifact.kind === "code" ? (artifact.lang ?? "code") : "note"}`}
         </span>
       </span>
-      <span className="go">{isMarkdown ? "打开预览 →" : "抽屉打开 →"}</span>
+      <span className="go">{isMarkdown ? "打开预览" : "打开详情"}</span>
     </button>
   )
 }
