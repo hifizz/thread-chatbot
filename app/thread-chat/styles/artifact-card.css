@@ -8,25 +8,25 @@
   padding: 10px 12px;
   width: 100%;
   max-width: 430px;
-  background: #fff;
-  border: 1px solid var(--rule-strong);
-  border-left: 3px solid var(--fc, #8a8377);
+  background: var(--tc-surface-plain);
+  border: 1px solid var(--tc-border-strong);
+  border-left: 3px solid var(--fc, var(--tc-depth-neutral));
   border-radius: 10px;
   cursor: pointer;
-  font-family: var(--font-ui);
+  font-family: var(--tc-typography-family-ui);
   text-align: left;
 }
 .tc .acard:hover {
-  border-color: var(--fc, #8a8377);
-  box-shadow: 0 4px 14px -6px rgba(30, 26, 20, 0.25);
+  border-color: var(--fc, var(--tc-depth-neutral));
+  box-shadow: 0 4px 14px -6px var(--tc-shadow-hover);
 }
 .tc .acard .ic {
   flex: none;
   width: 30px;
   height: 30px;
   border-radius: 8px;
-  background: color-mix(in srgb, var(--fc, #8a8377) 10%, #fff);
-  color: var(--fc, #8a8377);
+  background: var(--tc-fc-icon-bg);
+  color: var(--fc, var(--tc-depth-neutral));
   display: flex;
   align-items: center;
   justify-content: center;
@@ -39,39 +39,39 @@
   display: block;
   font-size: 13px;
   font-weight: 600;
-  color: var(--ink);
+  color: var(--tc-content-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .tc .acard .t .k {
   display: block;
-  font-family: var(--font-mono);
+  font-family: var(--tc-typography-family-code);
   font-size: 10px;
-  color: var(--ink-faint);
+  color: var(--tc-content-muted);
   margin-top: 2px;
 }
 .tc .acard .go {
   flex: none;
-  font-family: var(--font-mono);
+  font-family: var(--tc-typography-family-code);
   font-size: 10px;
-  color: var(--ink-faint);
+  color: var(--tc-content-muted);
 }
 .tc .acard:hover .go {
-  color: var(--fc, #8a8377);
+  color: var(--fc, var(--tc-depth-neutral));
 }
 .tc .acard-progress {
   cursor: default;
   border-style: dashed;
-  background: color-mix(in srgb, var(--fc, #8a8377) 4%, #fff);
+  background: var(--tc-fc-progress-bg);
   overflow: hidden;
 }
 .tc .acard-progress:hover {
-  border-color: var(--rule-strong);
+  border-color: var(--tc-border-strong);
   box-shadow: none;
 }
 .tc .acard-progress:hover .go {
-  color: var(--ink-faint);
+  color: var(--tc-content-muted);
 }
 .tc .acard-progress .progress-spinner {
   display: flex;
@@ -80,7 +80,7 @@
 .tc .acard-progress .progress-heading {
   display: block;
   margin-top: 3px;
-  color: var(--ink-soft);
+  color: var(--tc-content-secondary);
   font-size: 11px;
   white-space: nowrap;
   overflow: hidden;
@@ -93,14 +93,14 @@
   margin-top: 7px;
   overflow: hidden;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--fc, #8a8377) 10%, var(--paper-2));
+  background: var(--tc-fc-track-bg);
 }
 .tc .acard-progress .progress-track span {
   position: absolute;
   inset-block: 0;
   width: 38%;
   border-radius: inherit;
-  background: var(--fc, var(--d1));
+  background: var(--fc, var(--tc-depth-1));
   animation: tc-progress-slide 1.35s ease-in-out infinite;
 }
 .tc .acard.compact {

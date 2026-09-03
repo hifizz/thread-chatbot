@@ -18,12 +18,12 @@
   height: 100%;
   display: flex;
   flex-direction: column;
-  border-right: 1px solid var(--rule);
-  background: var(--paper);
+  border-right: 1px solid var(--tc-border-subtle);
+  background: var(--tc-surface-base);
   position: relative;
 }
 .tc .column.branch {
-  background: linear-gradient(180deg, #faf8f2 0, var(--paper) 130px);
+  background: linear-gradient(180deg, var(--tc-surface-bright) 0, var(--tc-surface-base) 130px);
 }
 .tc .column.branch::before {
   content: "";
@@ -32,8 +32,8 @@
   top: 0;
   bottom: 0;
   width: 3px;
-  background: var(--accent);
-  z-index: 1;
+  background: var(--tc-accent);
+  z-index: var(--tc-z-column-base);
 }
 .tc .column:last-child {
   border-right: none;
@@ -44,6 +44,7 @@
    .lane.pad 用于父级没有水平 padding 的段（banner）：18px 侧距计入 lane 内侧，
    max-width 相应放宽 2×18px，保证内容盒与消息通道左右对齐、窄列观感不变。 */
 .tc .lane {
+  container: tc-prose / inline-size;
   width: 100%;
   max-width: var(--lane-max);
   margin-inline: auto;
@@ -63,9 +64,10 @@
 .tc .col-resizer {
   flex: none;
   width: 9px;
+  /* tc-review: 非偶数值，保留 -4.5px 以让 9px 拖拽热区对称跨列 */
   margin: 0 -4.5px;
   position: relative;
-  z-index: 3;
+  z-index: var(--tc-z-column-top);
   cursor: col-resize;
   touch-action: none;
   outline: none;
@@ -77,7 +79,7 @@
   bottom: 0;
   left: 4px;
   width: 1px;
-  background: var(--rule);
+  background: var(--tc-border-subtle);
   transition:
     left 0.12s,
     width 0.12s,
@@ -88,7 +90,7 @@
 .tc .col-resizer:focus-visible::before {
   left: 3px;
   width: 3px;
-  background: var(--d1);
+  background: var(--tc-depth-1);
 }
 .tc .cols .column:has(+ .col-resizer) {
   border-right-color: transparent;
@@ -103,13 +105,13 @@
 .tc .col-head {
   flex: none;
   padding: 12px 18px;
-  border-bottom: 1px solid var(--rule);
-  background: #ffffff55;
+  border-bottom: 1px solid var(--tc-border-subtle);
+  background: var(--tc-veil-head);
 }
 .tc .crumb {
-  font-family: var(--font-mono);
+  font-family: var(--tc-typography-family-code);
   font-size: 11px;
-  color: var(--ink-soft);
+  color: var(--tc-content-secondary);
   display: flex;
   align-items: center;
   gap: 4px;
@@ -123,18 +125,18 @@
   border: 1px solid transparent;
 }
 .tc .crumb .seg2:hover {
-  background: #fff;
-  border-color: var(--rule-strong);
-  color: var(--ink);
+  background: var(--tc-surface-plain);
+  border-color: var(--tc-border-strong);
+  color: var(--tc-content-primary);
 }
 .tc .crumb .chev {
-  color: var(--ink-faint);
+  color: var(--tc-content-muted);
 }
 .tc .crumb .here {
-  color: var(--accent);
+  color: var(--tc-accent);
   font-weight: 700;
   cursor: default;
-  background: color-mix(in srgb, var(--accent) 9%, transparent);
+  background: var(--tc-accent-wash);
   padding: 2px 7px;
   border-radius: 6px;
 }
@@ -144,28 +146,29 @@
   gap: 9px;
 }
 .tc .anchor-tag {
-  font-family: var(--font-mono);
+  font-family: var(--tc-typography-family-code);
   font-size: 10px;
-  color: var(--ink-soft);
-  border: 1px solid var(--rule-strong);
+  color: var(--tc-content-secondary);
+  border: 1px solid var(--tc-border-strong);
   border-radius: 5px;
   padding: 2px 6px;
   flex: none;
 }
 .tc .depth-badge {
-  font-family: var(--font-mono);
+  font-family: var(--tc-typography-family-code);
   font-size: 10px;
   font-weight: 700;
+  /* tc-review: 非偶数值，保留 0.5px 字距以维持深度标签辨识度 */
   letter-spacing: 0.5px;
-  color: var(--accent);
-  border: 1px solid var(--accent);
+  color: var(--tc-accent);
+  border: 1px solid var(--tc-accent);
   border-radius: 5px;
   padding: 2px 6px;
-  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  background: var(--tc-accent-tint);
   flex: none;
 }
 .tc .ctitle {
-  font-family: var(--font-read);
+  font-family: var(--tc-typography-family-read);
   font-size: 16px;
   font-weight: 600;
   flex: 1;
@@ -176,7 +179,7 @@
 }
 .tc .col-sub {
   font-size: 12px;
-  color: var(--ink-faint);
+  color: var(--tc-content-muted);
   margin-top: 2px;
 }
 .tc .cactions {
@@ -186,18 +189,18 @@
 }
 .tc .cbtn {
   cursor: pointer;
-  border: 1px solid var(--rule-strong);
-  background: #fff;
+  border: 1px solid var(--tc-border-strong);
+  background: var(--tc-surface-plain);
   border-radius: 7px;
   padding: 4px 9px;
   font-size: 12px;
-  color: var(--ink-soft);
+  color: var(--tc-content-secondary);
   line-height: 1;
   white-space: nowrap;
 }
 .tc .cbtn:hover {
-  border-color: var(--accent, var(--d1));
-  color: var(--accent, var(--d1));
+  border-color: var(--tc-accent, var(--tc-depth-1));
+  color: var(--tc-accent, var(--tc-depth-1));
 }
 .tc .cbtn.tree {
   display: inline-flex;
@@ -205,7 +208,7 @@
   gap: 4px;
 }
 .tc .cbtn.tree .n {
-  font-family: var(--font-mono);
+  font-family: var(--tc-typography-family-code);
   font-size: 10px;
   font-weight: 700;
   line-height: 1;
@@ -215,18 +218,18 @@
   margin: 12px 0 0;
   padding: 10px 12px;
   border-radius: 9px;
-  background: color-mix(in srgb, var(--accent) 8%, var(--paper));
-  border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--rule));
+  background: var(--tc-accent-banner-bg);
+  border: 1px solid var(--tc-accent-banner-border);
   display: flex;
   gap: 9px;
   align-items: flex-start;
 }
 .tc .focus-banner .fn {
-  font-family: var(--font-mono);
+  font-family: var(--tc-typography-family-code);
   font-size: 11px;
   font-weight: 700;
-  color: #fff;
-  background: var(--accent);
+  color: var(--tc-content-on-accent);
+  background: var(--tc-accent);
   border-radius: 5px;
   padding: 2px 6px;
   flex: none;
@@ -238,31 +241,31 @@
   min-width: 0;
 }
 .tc .focus-banner .ft .lbl {
-  color: var(--ink-soft);
+  color: var(--tc-content-secondary);
   font-size: 11px;
   display: block;
   margin-bottom: 2px;
-  font-family: var(--font-mono);
+  font-family: var(--tc-typography-family-code);
 }
 .tc .focus-banner .ft q {
-  font-family: var(--font-read);
-  color: var(--ink);
+  font-family: var(--tc-typography-family-read);
+  color: var(--tc-content-primary);
   quotes: "「" "」";
 }
 
 .tc details.inherited {
   margin: 12px 0 0;
-  border: 1px dashed var(--rule-strong);
+  border: 1px dashed var(--tc-border-strong);
   border-radius: 9px;
-  background: #fff6;
+  background: var(--tc-veil-detail);
 }
 .tc details.inherited > summary {
   cursor: pointer;
   list-style: none;
   padding: 9px 12px;
-  font-family: var(--font-mono);
+  font-family: var(--tc-typography-family-code);
   font-size: 11px;
-  color: var(--ink-soft);
+  color: var(--tc-content-secondary);
   display: flex;
   align-items: center;
   gap: 7px;
@@ -278,22 +281,23 @@
 }
 .tc .inherited-body {
   padding: 2px 12px 12px;
-  border-top: 1px dashed var(--rule);
+  border-top: 1px dashed var(--tc-border-subtle);
 }
 .tc .reasoning-body {
   white-space: pre-wrap;
 }
 .tc .inh-msg {
-  font-size: 12.5px;
+  font-size: 12px;
   line-height: 1.55;
-  color: var(--ink-faint);
+  color: var(--tc-content-muted);
   margin: 8px 0;
 }
 .tc .inh-msg .who {
-  font-family: var(--font-mono);
+  font-family: var(--tc-typography-family-code);
   font-size: 10px;
   text-transform: uppercase;
+  /* tc-review: 非偶数值，保留 0.5px 字距以维持深度标签辨识度 */
   letter-spacing: 0.5px;
-  color: var(--ink-faint);
+  color: var(--tc-content-muted);
   margin-right: 6px;
 }

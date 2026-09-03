@@ -123,7 +123,9 @@ export function ThreadSwitcherPanel({
                   key={id}
                   className="swx-chip"
                   style={
-                    { "--dc": dotColorOf(recentThread) } as React.CSSProperties
+                    {
+                      "--tc-accent": dotColorOf(recentThread),
+                    } as React.CSSProperties
                   }
                   onClick={() =>
                     onPick(
@@ -167,7 +169,9 @@ export function ThreadSwitcherPanel({
               className={`swx-row ${index === hi ? "hi" : ""}`}
               style={
                 {
-                  "--dc": row.isMain ? "#8a8377" : dvar(row.depth),
+                  "--tc-accent": row.isMain
+                    ? "var(--tc-depth-neutral)"
+                    : dvar(row.depth),
                   paddingLeft: filtering ? 9 : 9 + row.relDepth * 16,
                 } as React.CSSProperties
               }

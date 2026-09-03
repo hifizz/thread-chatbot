@@ -5,7 +5,7 @@
   align-items: center;
   gap: 3px;
   margin-top: 5px;
-  color: var(--ink-faint);
+  color: var(--tc-content-muted);
   transition: opacity 0.16s ease;
 }
 .tc .message-toolbar.end {
@@ -43,12 +43,12 @@
 .tc .message-action:hover,
 .tc .message-action:focus-visible,
 .tc .message-action[aria-pressed="true"] {
-  background: color-mix(in srgb, var(--ink) 8%, transparent);
-  color: var(--ink-soft);
+  background: var(--tc-ink-hover);
+  color: var(--tc-content-secondary);
   outline: none;
 }
 .tc .message-action[aria-pressed="true"] {
-  color: var(--ink);
+  color: var(--tc-content-primary);
 }
 .tc .message-action:disabled {
   cursor: not-allowed;
@@ -62,10 +62,10 @@
   display: block;
   width: 100%;
   min-height: 84px;
-  border: 1px solid var(--rule-strong);
+  border: 1px solid var(--tc-border-strong);
   border-radius: 8px;
-  background: var(--paper);
-  color: var(--ink);
+  background: var(--tc-surface-base);
+  color: var(--tc-content-primary);
   padding: 8px 9px;
   resize: vertical;
   font: inherit;
@@ -82,18 +82,18 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  border: 1px solid var(--rule-strong);
+  border: 1px solid var(--tc-border-strong);
   border-radius: 6px;
-  background: var(--paper);
-  color: var(--ink-soft);
+  background: var(--tc-surface-base);
+  color: var(--tc-content-secondary);
   padding: 4px 8px;
   font-size: 11px;
   cursor: pointer;
 }
 .tc .user-edit-actions button.primary {
-  border-color: var(--ink);
-  background: var(--ink);
-  color: var(--paper);
+  border-color: var(--tc-surface-ink);
+  background: var(--tc-surface-ink);
+  color: var(--tc-content-on-ink);
 }
 .tc .user-edit-actions button:disabled,
 .tc .recoverable-turn button:disabled {
@@ -108,13 +108,13 @@
   gap: 6px;
   max-width: 84%;
   margin-top: 7px;
-  color: #a8443a;
-  font-size: 11.5px;
+  color: var(--tc-content-danger);
+  font-size: 12px;
 }
 .tc .message-action-error {
   margin-top: 5px;
-  color: #a8443a;
-  font-size: 11.5px;
+  color: var(--tc-content-danger);
+  font-size: 12px;
 }
 @media (hover: none), (pointer: coarse) {
   .tc .message.user > .message-toolbar {

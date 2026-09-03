@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useReducer, useRef } from "react"
 import type { Message, ThreadTreeState } from "../../core/types"
 import { threadTitle } from "../../core/selectors"
-import { dc } from "../../theme"
+import { dc, dvar } from "../../theme"
 import { MarkdownBody } from "../../chat/message/markdown-body"
 import { useSmoothText } from "../../chat/message/smooth-text"
 import {
@@ -89,8 +89,11 @@ export function AnchoredMarkdown({
         }
       }
       if (!markdownBody || !located) continue
-      const color = `color-mix(in srgb, var(--d${dc(fork.depth)}) 20%, transparent)`
-      paintRange(located.range, fork.threadId, color)
+      // 高亮底色统一走 CSS 派生 token（--tc-fc-mark 内做 20% 混色），
+      // 这里只注入 fork 深度的 contextual 变量（与 marks 的 fc-N 类同源）
+      paintRange(located.range, fork.threadId, "var(--tc-fc-mark)", {
+        "--fc": dvar(fork.depth),
+      })
 
       const marks = markdownBody.querySelectorAll<HTMLElement>(
         `[data-text-anchor-mark="${cssEscape(fork.threadId)}"]`
