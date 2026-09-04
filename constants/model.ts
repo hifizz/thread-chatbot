@@ -106,6 +106,8 @@ export type ChatModel = {
   umapisCredentialGroup?: UMAPISCredentialGroup
   /** 尚未定义价格与扣费策略的模型，只保留可用 token usage。 */
   unbilledPreview?: true
+  /** 是否允许把图片作为原始多模态输入发送给供应商。未知能力必须为 false。 */
+  supportsImageInput: boolean
   /** 模型可见的产品入口。 */
   surfaces: readonly ChatModelSurface[]
   /** 仅用于展示分组，不参与鉴权和路由。 */
@@ -122,7 +124,8 @@ export type ChatModel = {
 /** 用统一的 Claude 组配置注册 UMAPIS 未计费预览模型。 */
 function createUmapisClaudeModel<const TModelId extends UMAPISClaudeModelId>(
   upstreamModel: TModelId,
-  name: string
+  name: string,
+  supportsImageInput = false
 ) {
   return {
     id: `umapis-${upstreamModel}` as const,
@@ -133,6 +136,7 @@ function createUmapisClaudeModel<const TModelId extends UMAPISClaudeModelId>(
     reasoningTransport: "native",
     umapisCredentialGroup: "claude",
     unbilledPreview: true,
+    supportsImageInput,
     surfaces: ["thread"],
     creator: "anthropic",
   } as const satisfies ChatModel
@@ -151,6 +155,7 @@ function createPrivateRelayModel<
     upstreamModel,
     reasoningTransport: "native",
     unbilledPreview: true,
+    supportsImageInput: false,
     surfaces: ["thread"],
     creator: "openai",
   } as const satisfies ChatModel
@@ -164,6 +169,7 @@ const CHAT_MODEL_REGISTRY = [
     provider: "minimax",
     upstreamModel: "MiniMax-M2",
     reasoningTransport: "think-tags",
+    supportsImageInput: false,
     surfaces: ["linear"],
   },
   {
@@ -173,6 +179,7 @@ const CHAT_MODEL_REGISTRY = [
     provider: "deepseek",
     upstreamModel: "deepseek-chat",
     gatewayModel: "deepseek/deepseek-chat",
+    supportsImageInput: false,
     surfaces: ["linear"],
   },
   {
@@ -182,6 +189,7 @@ const CHAT_MODEL_REGISTRY = [
     provider: "openai",
     upstreamModel: "gpt-4o-mini",
     gatewayModel: "openai/gpt-4o-mini",
+    supportsImageInput: false,
     surfaces: ["linear"],
   },
   {
@@ -190,6 +198,7 @@ const CHAT_MODEL_REGISTRY = [
     description: "火山方舟 Coding Plan",
     provider: "ark",
     upstreamModel: "doubao-seed-2.1-turbo",
+    supportsImageInput: false,
     surfaces: ["linear", "thread"],
   },
   {
@@ -198,6 +207,7 @@ const CHAT_MODEL_REGISTRY = [
     description: "火山方舟 Coding Plan",
     provider: "ark",
     upstreamModel: "doubao-seed-2.0-lite",
+    supportsImageInput: false,
     surfaces: ["linear", "thread"],
   },
   {
@@ -206,6 +216,7 @@ const CHAT_MODEL_REGISTRY = [
     description: "火山方舟 Coding Plan",
     provider: "ark",
     upstreamModel: "minimax-m2.7",
+    supportsImageInput: false,
     surfaces: ["linear"],
   },
   {
@@ -214,6 +225,7 @@ const CHAT_MODEL_REGISTRY = [
     description: "火山方舟 Coding Plan",
     provider: "ark",
     upstreamModel: "minimax-m3",
+    supportsImageInput: false,
     surfaces: ["linear", "thread"],
   },
   {
@@ -222,6 +234,7 @@ const CHAT_MODEL_REGISTRY = [
     description: "火山方舟 Coding Plan",
     provider: "ark",
     upstreamModel: "glm-5.3",
+    supportsImageInput: false,
     surfaces: ["linear", "thread"],
   },
   {
@@ -230,6 +243,7 @@ const CHAT_MODEL_REGISTRY = [
     description: "火山方舟 Coding Plan",
     provider: "ark",
     upstreamModel: "deepseek-v4-flash",
+    supportsImageInput: false,
     surfaces: ["linear", "thread"],
   },
   {
@@ -238,6 +252,7 @@ const CHAT_MODEL_REGISTRY = [
     description: "火山方舟 Coding Plan",
     provider: "ark",
     upstreamModel: "deepseek-v4-pro",
+    supportsImageInput: false,
     surfaces: ["linear", "thread"],
   },
   {
@@ -246,6 +261,7 @@ const CHAT_MODEL_REGISTRY = [
     description: "火山方舟 Coding Plan",
     provider: "ark",
     upstreamModel: "kimi-k2.6",
+    supportsImageInput: true,
     surfaces: ["linear", "thread"],
   },
   {
@@ -254,6 +270,7 @@ const CHAT_MODEL_REGISTRY = [
     description: "火山方舟 Coding Plan",
     provider: "ark",
     upstreamModel: "kimi-k2.7-code",
+    supportsImageInput: false,
     surfaces: ["linear", "thread"],
   },
   createUmapisClaudeModel("claude-opus-4-6", "Claude Opus 4.6"),
@@ -272,7 +289,7 @@ const CHAT_MODEL_REGISTRY = [
     "Claude Opus 4.7 Thinking"
   ),
   createUmapisClaudeModel("claude-fable-5", "Claude Fable 5"),
-  createUmapisClaudeModel("claude-opus-5", "Claude Opus 5"),
+  createUmapisClaudeModel("claude-opus-5", "Claude Opus 5", true),
   createUmapisClaudeModel("claude-sonnet-5", "Claude Sonnet 5"),
   createUmapisClaudeModel("claude-opus-4-8", "Claude Opus 4.8"),
   createUmapisClaudeModel(
@@ -291,6 +308,7 @@ const CHAT_MODEL_REGISTRY = [
     reasoningTransport: "native",
     umapisCredentialGroup: "gpt",
     unbilledPreview: true,
+    supportsImageInput: false,
     surfaces: ["thread"],
     creator: "openai",
   },
@@ -303,6 +321,7 @@ const CHAT_MODEL_REGISTRY = [
     reasoningTransport: "native",
     umapisCredentialGroup: "gpt",
     unbilledPreview: true,
+    supportsImageInput: false,
     surfaces: ["thread"],
     creator: "openai",
   },
@@ -355,6 +374,7 @@ const CHAT_MODEL_REGISTRY = [
     provider: "openrouter",
     upstreamModel: "openai/gpt-5.6-luna",
     reasoningTransport: "native",
+    supportsImageInput: false,
     surfaces: ["thread"],
     creator: "openai",
   },
@@ -364,6 +384,7 @@ const CHAT_MODEL_REGISTRY = [
     provider: "openrouter",
     upstreamModel: "openai/gpt-5.6-luna-pro",
     reasoningTransport: "native",
+    supportsImageInput: false,
     surfaces: ["thread"],
     creator: "openai",
   },
@@ -373,6 +394,7 @@ const CHAT_MODEL_REGISTRY = [
     provider: "openrouter",
     upstreamModel: "openai/gpt-5.6-terra",
     reasoningTransport: "native",
+    supportsImageInput: false,
     surfaces: ["thread"],
     creator: "openai",
   },
@@ -382,6 +404,7 @@ const CHAT_MODEL_REGISTRY = [
     provider: "openrouter",
     upstreamModel: "openai/gpt-5.6-terra-pro",
     reasoningTransport: "native",
+    supportsImageInput: false,
     surfaces: ["thread"],
     creator: "openai",
   },
@@ -391,6 +414,7 @@ const CHAT_MODEL_REGISTRY = [
     provider: "openrouter",
     upstreamModel: "openai/gpt-5.6-sol",
     reasoningTransport: "native",
+    supportsImageInput: true,
     surfaces: ["thread"],
     creator: "openai",
   },
@@ -400,6 +424,7 @@ const CHAT_MODEL_REGISTRY = [
     provider: "openrouter",
     upstreamModel: "openai/gpt-5.6-sol-pro",
     reasoningTransport: "native",
+    supportsImageInput: false,
     surfaces: ["thread"],
     creator: "openai",
   },
@@ -409,6 +434,7 @@ const CHAT_MODEL_REGISTRY = [
     provider: "openrouter",
     upstreamModel: "openai/gpt-5.5",
     reasoningTransport: "native",
+    supportsImageInput: false,
     surfaces: ["thread"],
     creator: "openai",
   },
@@ -418,6 +444,7 @@ const CHAT_MODEL_REGISTRY = [
     provider: "openrouter",
     upstreamModel: "openai/gpt-5.5-pro",
     reasoningTransport: "native",
+    supportsImageInput: false,
     surfaces: ["thread"],
     creator: "openai",
   },
@@ -427,6 +454,7 @@ const CHAT_MODEL_REGISTRY = [
     provider: "openrouter",
     upstreamModel: "moonshotai/kimi-k3",
     reasoningTransport: "native",
+    supportsImageInput: false,
     surfaces: ["thread"],
     creator: "moonshotai",
   },
@@ -436,6 +464,7 @@ const CHAT_MODEL_REGISTRY = [
     provider: "openrouter",
     upstreamModel: "deepseek/deepseek-v4-flash-0731",
     reasoningTransport: "native",
+    supportsImageInput: false,
     surfaces: ["thread"],
     creator: "deepseek",
   },
@@ -445,6 +474,7 @@ const CHAT_MODEL_REGISTRY = [
     provider: "openrouter",
     upstreamModel: "qwen/qwen3.8-max",
     reasoningTransport: "native",
+    supportsImageInput: false,
     surfaces: ["thread"],
     creator: "qwen",
   },
@@ -454,6 +484,7 @@ const CHAT_MODEL_REGISTRY = [
     provider: "openrouter",
     upstreamModel: "x-ai/grok-4.5",
     reasoningTransport: "native",
+    supportsImageInput: false,
     surfaces: ["thread"],
     creator: "x-ai",
   },
@@ -463,6 +494,7 @@ const CHAT_MODEL_REGISTRY = [
     provider: "openrouter",
     upstreamModel: "x-ai/grok-4.6",
     reasoningTransport: "native",
+    supportsImageInput: false,
     surfaces: ["thread"],
     creator: "x-ai",
   },
@@ -474,6 +506,7 @@ const CHAT_MODEL_REGISTRY = [
     upstreamModel: "stealth/ox-alpha",
     reasoningTransport: "native",
     unbilledPreview: true,
+    supportsImageInput: false,
     surfaces: ["thread"],
     creator: "stealth",
   },
@@ -506,6 +539,11 @@ export const MAX_OUTPUT_TOKENS = 8192
 
 export function getChatModel(id: string | undefined): ChatModel | undefined {
   return CHAT_MODELS.find((m) => m.id === id)
+}
+
+/** 未注册模型及未确认端点一律不获得图片输入能力。 */
+export function supportsModelImageInput(modelId: string | undefined): boolean {
+  return getChatModel(modelId)?.supportsImageInput === true
 }
 
 /** 未定义价格和额度策略的模型仅作为不扣费预览提供。 */

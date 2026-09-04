@@ -8,6 +8,7 @@ import { buildFrozenForkContext } from "@/lib/thread-chat/domain/fork-context"
 import {
   assertAllowedModel,
   assertOwnedReadyAttachments,
+  assertModelSupportsNewAttachments,
   buildUserParts,
   touchProjectAndThread,
 } from "@/lib/thread-chat/application/command-utils"
@@ -93,6 +94,7 @@ export function forkThread(
           await touchProjectAndThread(tx, project.id, child.id)
           return { thread: toThreadDTO(child), generation: null }
         }
+        assertModelSupportsNewAttachments(command.modelId, command.firstTurn.files)
         await assertOwnedReadyAttachments(tx, userId, command.firstTurn.files)
         const [userSequence, assistantSequence] = await allocateThreadSequences(
           tx,

@@ -12,13 +12,47 @@ export type AttachmentPolicy = {
   ext: string
 }
 
+export const IMAGE_MODEL_VALIDATION_MESSAGE =
+  "当前模型不支持图片，请切换视觉模型或移除图片。"
+
 const MB = 1024 * 1024
 
+/** 图片附件 MVP 限制与压缩参数的单一来源。 */
+export const IMAGE_ATTACHMENT_MIME_TYPES = [
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+] as const
+
+export type ImageAttachmentMimeType =
+  (typeof IMAGE_ATTACHMENT_MIME_TYPES)[number]
+
+export const IMAGE_ATTACHMENT_LIMITS = {
+  maxFilesPerMessage: 5,
+  maxBytesPerFile: 10 * MB,
+  maxLongestEdge: 2048,
+  lossyOutputMediaType: "image/webp",
+  lossyQuality: 0.8,
+} as const
+
 export const ATTACHMENT_POLICIES: Record<string, AttachmentPolicy> = {
+  "text/plain": { kind: "document", maxBytes: 20 * MB, ext: "txt" },
   "application/pdf": { kind: "document", maxBytes: 20 * MB, ext: "pdf" },
-  "image/png": { kind: "image", maxBytes: 10 * MB, ext: "png" },
-  "image/jpeg": { kind: "image", maxBytes: 10 * MB, ext: "jpg" },
-  "image/webp": { kind: "image", maxBytes: 10 * MB, ext: "webp" },
+  "image/png": {
+    kind: "image",
+    maxBytes: IMAGE_ATTACHMENT_LIMITS.maxBytesPerFile,
+    ext: "png",
+  },
+  "image/jpeg": {
+    kind: "image",
+    maxBytes: IMAGE_ATTACHMENT_LIMITS.maxBytesPerFile,
+    ext: "jpg",
+  },
+  "image/webp": {
+    kind: "image",
+    maxBytes: IMAGE_ATTACHMENT_LIMITS.maxBytesPerFile,
+    ext: "webp",
+  },
   "image/gif": { kind: "image", maxBytes: 10 * MB, ext: "gif" },
   "application/zip": { kind: "archive", maxBytes: 50 * MB, ext: "zip" },
   "video/mp4": { kind: "video", maxBytes: 100 * MB, ext: "mp4" },

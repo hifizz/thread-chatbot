@@ -25,6 +25,7 @@ import { MessageArtifacts } from "../orchestration/artifacts/message-artifacts"
 import { AnchoredAssistantBody } from "./assistant/anchored-assistant-body"
 import type { MessageActionViewState } from "../chat/actions/message-action-types"
 import type { ThreadMessageActionCommands } from "../chat/actions/message-action-commands"
+import type { CommandFileReference } from "../net/commands/conversation-commands"
 
 export interface BranchableChatProps {
   state: ThreadTreeState
@@ -54,7 +55,7 @@ export interface BranchableChatProps {
   composerPrefill?: string
   /** 根 Thread 模型切换意图；分支 selector 仍由本层锁定。 */
   onModelChange: (modelId: string) => void
-  onSend: (text: string) => void
+  onSend: (text: string, files: CommandFileReference[]) => void
   messageActionState?: MessageActionViewState
   messageCommands?: ThreadMessageActionCommands
 }

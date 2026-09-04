@@ -24,6 +24,7 @@ import type {
   ThreadMessageActionCommands,
 } from "../chat/actions/message-action-commands"
 import type { MessageActionViewState } from "../chat/actions/message-action-types"
+import { textFromMessageParts } from "@/lib/thread-chat/contracts/ui-message"
 import type { Message, MessageFeedback } from "../core/types"
 import { BranchableChat } from "../branching/branchable-chat"
 import {
@@ -258,10 +259,7 @@ export function NormalizedGate3Harness({
           assistantMessageId: assistant?.id,
           modelId:
             state.threadsById[threadId]?.modelId ?? "doubao-seed-2.1-turbo",
-          text: source.parts
-            .filter((part) => part.type === "text")
-            .map((part) => part.text)
-            .join(""),
+          text: textFromMessageParts(source.parts),
         })
         return actionResult({
           userMessageId: result.command.userMessageId,

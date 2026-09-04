@@ -10,6 +10,11 @@ import React, {
   type DragEvent,
 } from "react"
 import { FileIcon, PlusIcon, XIcon } from "lucide-react"
+import { toast } from "sonner"
+import {
+  IMAGE_ATTACHMENT_LIMITS,
+  IMAGE_MODEL_VALIDATION_MESSAGE,
+} from "@/constants/attachment"
 import { ThreadModelSelector } from "./thread-model-selector"
 import {
   composerMaxHeight,
@@ -17,12 +22,22 @@ import {
   shouldSubmitComposerKey,
 } from "./conversation-composer-logic"
 import {
-  appendDemoAttachments,
-  createDemoAttachments,
-  removeDemoAttachment,
-  type DemoAttachment,
-  type DemoAttachmentSource,
-} from "./attachment-composer-demo-model"
+  canAddThreadImages,
+  canSendThreadAttachments,
+  createPastedTextFile,
+  hasUnsupportedReadyImages,
+  isThreadComposerFile,
+  readyThreadAttachmentReferences,
+  THREAD_COMPOSER_ACCEPT,
+  type ThreadComposerAttachment,
+} from "./thread-attachment-model"
+import {
+  deleteUploadedAttachment,
+  uploadAttachment,
+  validateAttachmentFile,
+  type UploadedAttachmentReference,
+} from "@/lib/chat/attachment-upload"
+import { preprocessImageAttachment } from "@/lib/chat/image-attachment"
 import {
   Attachment,
   AttachmentAction,
@@ -44,7 +59,7 @@ type ConversationComposerProps = {
   modelSelectorDisabled: boolean
   modelSelectorDisabledReason?: "branch" | "busy"
   onModelChange?(modelId: string): void
-  onSend?(text: string): void
+  onSend?(text: string, files: UploadedAttachmentReference[]): void
   onStop?(): void
   onBeforeSend?(): void
 }
@@ -75,7 +90,7 @@ export function ConversationComposer({
   const taRef = useRef<HTMLTextAreaElement | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const dragDepthRef = useRef(0)
-  const [attachments, setAttachments] = useState<DemoAttachment[]>([])
+  const [attachments, setAttachments] = useState<ThreadComposerAttachment[]>([])
   const [isDragging, setIsDragging] = useState(false)
   const canvas = variant === "canvas"
   const maxHeight = composerMaxHeight(variant)
@@ -84,26 +99,115 @@ export function ConversationComposer({
     const ta = taRef.current
     if (!ta || !onSend) return
     const text = composerSubmission(ta.value, busy)
-    if (!text) return
+    if (!text || !canSendThreadAttachments(attachments)) return
+    if (hasUnsupportedReadyImages(modelId, attachments)) {
+      toast.error(IMAGE_MODEL_VALIDATION_MESSAGE)
+      return
+    }
     ta.value = ""
     ta.style.height = "auto"
     onBeforeSend?.()
-    onSend(text)
+    onSend(text, readyThreadAttachmentReferences(attachments))
     if (!canvas) setAttachments([])
     ta.focus(canvas ? { preventScroll: true } : undefined)
   }
 
   const appendFiles = useCallback(
-    (files: Iterable<File>, source: DemoAttachmentSource) => {
-      const added = createDemoAttachments(files, source)
-      if (added.length === 0) return
-      setAttachments((current) => appendDemoAttachments(current, added))
+    (files: Iterable<File>) => {
+      const incoming = Array.from(files)
+      const incomingImageCount = incoming.filter((file) =>
+        file.type.startsWith("image/")
+      ).length
+      if (!canAddThreadImages(attachments, incomingImageCount)) {
+        toast.error(
+          `单次最多添加 ${IMAGE_ATTACHMENT_LIMITS.maxFilesPerMessage} 张图片`
+        )
+        return
+      }
+
+      for (const sourceFile of incoming) {
+        const id = crypto.randomUUID()
+        try {
+          if (!isThreadComposerFile(sourceFile)) {
+            throw new Error(`不支持的文件类型：${sourceFile.type || "未知"}`)
+          }
+          validateAttachmentFile(sourceFile)
+        } catch (error) {
+          setAttachments((current) => [
+            ...current,
+            {
+              id,
+              file: sourceFile,
+              status: "error",
+              progress: 0,
+              error: error instanceof Error ? error.message : "附件校验失败",
+            },
+          ])
+          continue
+        }
+        setAttachments((current) => [
+          ...current,
+          { id, file: sourceFile, status: "uploading", progress: 0 },
+        ])
+        void preprocessImageAttachment(sourceFile)
+          .then((file) => {
+            validateAttachmentFile(file)
+            setAttachments((current) =>
+              current.map((attachment) =>
+                attachment.id === id ? { ...attachment, file } : attachment
+              )
+            )
+            return uploadAttachment(file, {
+              onProgress(progress) {
+                setAttachments((current) =>
+                  current.map((attachment) =>
+                    attachment.id === id
+                      ? { ...attachment, progress }
+                      : attachment
+                  )
+                )
+              },
+            }).then((result) => ({ file, result }))
+          })
+          .then(({ file, result }) =>
+            setAttachments((current) =>
+              current.map((attachment) =>
+                attachment.id === id
+                  ? {
+                      ...attachment,
+                      file,
+                      status: "ready",
+                      progress: 1,
+                      serverId: result.serverId,
+                      reference: result.reference,
+                    }
+                  : attachment
+              )
+            )
+          )
+          .catch((error) =>
+            setAttachments((current) =>
+              current.map((attachment) =>
+                attachment.id === id
+                  ? {
+                      ...attachment,
+                      status: "error",
+                      error:
+                        error instanceof Error
+                          ? error.message
+                          : "附件上传失败",
+                    }
+                  : attachment
+              )
+            )
+          )
+      }
     },
-    []
+    [attachments]
   )
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
-    appendFiles(event.currentTarget.files ?? [], "picker")
+    appendFiles(event.currentTarget.files ?? [])
     event.currentTarget.value = ""
   }
 
@@ -129,19 +233,23 @@ export function ConversationComposer({
     event.preventDefault()
     dragDepthRef.current = 0
     setIsDragging(false)
-    appendFiles(event.dataTransfer.files, "drop")
+    appendFiles(event.dataTransfer.files)
   }
 
   const handlePaste = (event: ClipboardEvent<HTMLDivElement>) => {
-    // 与 demo 不同：纯文本粘贴保持正常插入文字，只有文件/图片粘贴才进附件托盘。
     const pastedFiles = Array.from(event.clipboardData.items)
       .filter((item) => item.kind === "file")
       .map((item) => item.getAsFile())
       .filter((file): file is File => file !== null)
-
-    if (pastedFiles.length === 0) return
+    if (pastedFiles.length > 0) {
+      event.preventDefault()
+      appendFiles(pastedFiles)
+      return
+    }
+    const text = event.clipboardData.getData("text/plain")
+    if (!text) return
     event.preventDefault()
-    appendFiles(pastedFiles, "paste")
+    appendFiles([createPastedTextFile(text)])
   }
 
   useEffect(() => {
@@ -233,7 +341,11 @@ export function ConversationComposer({
                 {attachment.file.name || "未命名附件"}
               </AttachmentTitle>
               <AttachmentDescription>
-                {attachment.file.type || "未知类型"}
+                {attachment.status === "uploading"
+                  ? `上传中 ${Math.round(attachment.progress * 100)}%`
+                  : attachment.status === "ready"
+                    ? "已就绪"
+                    : attachment.error ?? "上传失败"}
               </AttachmentDescription>
             </AttachmentContent>
             <AttachmentActions>
@@ -244,8 +356,11 @@ export function ConversationComposer({
                 onClick={(event) => {
                   event.stopPropagation()
                   setAttachments((current) =>
-                    removeDemoAttachment(current, attachment.id)
+                    current.filter((item) => item.id !== attachment.id)
                   )
+                  if (attachment.serverId) {
+                    void deleteUploadedAttachment(attachment.serverId)
+                  }
                 }}
               >
                 <XIcon />
@@ -272,6 +387,7 @@ export function ConversationComposer({
           className="sr-only"
           type="file"
           multiple
+          accept={THREAD_COMPOSER_ACCEPT}
           tabIndex={-1}
           onChange={handleFileChange}
         />
@@ -299,7 +415,11 @@ export function ConversationComposer({
       停止
     </button>
   ) : (
-    <button className={canvas ? "cv-send" : "send"} onClick={doSend}>
+    <button
+      className={canvas ? "cv-send" : "send"}
+      onClick={doSend}
+      disabled={!canvas && !canSendThreadAttachments(attachments)}
+    >
       发送
     </button>
   )

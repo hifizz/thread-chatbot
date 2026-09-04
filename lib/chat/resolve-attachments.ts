@@ -1,4 +1,5 @@
-import type { UIMessage } from "ai"
+import type { ModelMessage, UIMessage } from "ai"
+import { getObjectBytes } from "@/lib/storage/r2"
 import { PROJECT_FILE_CONTEXT_CHAR_BUDGET } from "@/constants/project-workspace"
 import {
   attachmentIdFromUrl,
@@ -6,6 +7,7 @@ import {
   loadOwnedAttachmentRows,
   projectFileManifestLine,
   renderPdfAttachment,
+  renderTextAttachment,
   type AttachmentFilePart,
   type AttachmentRenderMode,
   type AttachmentTextPart,
@@ -26,8 +28,16 @@ export interface ProjectFileContextStats {
   mode: "none" | AttachmentRenderMode | "mixed"
 }
 
+export interface ImageFileMaterialization {
+  markerUrl: string
+  mediaType: "image/png" | "image/jpeg" | "image/webp"
+  filename?: string
+  bytes: Uint8Array
+}
+
 export interface ResolvedAttachmentContext {
   messages: UIMessage[]
+  imageFiles: ImageFileMaterialization[]
   projectContext: string | null
   projectFileIds: string[]
   stats: ProjectFileContextStats
@@ -35,6 +45,51 @@ export interface ResolvedAttachmentContext {
 
 function isFilePart(part: { type: string }): part is AttachmentFilePart {
   return part.type === "file"
+}
+
+function isSupportedImageMimeType(
+  mediaType: string
+): mediaType is ImageFileMaterialization["mediaType"] {
+  return (
+    mediaType === "image/png" ||
+    mediaType === "image/jpeg" ||
+    mediaType === "image/webp"
+  )
+}
+
+export function applyImageFileMaterializations(
+  messages: ModelMessage[],
+  imageFiles: readonly ImageFileMaterialization[]
+): ModelMessage[] {
+  const byUrl = new Map(imageFiles.map((image) => [image.markerUrl, image]))
+  return messages.map((message) => {
+    if (message.role !== "user" || !Array.isArray(message.content)) return message
+    return {
+      ...message,
+      content: message.content.map((part) => {
+        const data = part.type === "file" ? part.data : null
+        if (
+          typeof data !== "object" ||
+          data === null ||
+          !("type" in data) ||
+          data.type !== "url" ||
+          !("url" in data) ||
+          !(data.url instanceof URL)
+        ) {
+          return part
+        }
+        const image = byUrl.get(data.url.toString())
+        return image
+          ? {
+              type: "file" as const,
+              mediaType: image.mediaType,
+              ...(image.filename ? { filename: image.filename } : {}),
+              data: { type: "data" as const, data: image.bytes },
+            }
+          : part
+      }),
+    }
+  })
 }
 
 function latestUserQuery(messages: UIMessage[]): string {
@@ -66,10 +121,16 @@ export async function resolveAttachmentContext({
   messages,
   userId,
   projectFiles = [],
+  supportsImageInput = false,
+  readObjectBytes = getObjectBytes,
+  loadRows = loadOwnedAttachmentRows,
 }: {
   messages: UIMessage[]
   userId: string
   projectFiles?: ProjectFileRow[]
+  supportsImageInput?: boolean
+  readObjectBytes?: (key: string) => Promise<Uint8Array>
+  loadRows?: typeof loadOwnedAttachmentRows
 }): Promise<ResolvedAttachmentContext> {
   const explicitIds: string[] = []
   const seenExplicit = new Set<string>()
@@ -85,10 +146,7 @@ export async function resolveAttachmentContext({
   }
 
   const projectIds = projectFiles.map((row) => row.attachment.id)
-  const rowById = await loadOwnedAttachmentRows(userId, [
-    ...explicitIds,
-    ...projectIds,
-  ])
+  const rowById = await loadRows(userId, [...explicitIds, ...projectIds])
   const query = latestUserQuery(messages)
   const candidates = planAttachmentCandidates({
     explicitIds,
@@ -106,26 +164,46 @@ export async function resolveAttachmentContext({
       remainingBudget,
       candidates.length - index
     )
-    const result = await renderPdfAttachment(candidates[index], allocation, query)
+    const candidate = candidates[index]
+    const result =
+      candidate.mimeType === "text/plain"
+        ? await renderTextAttachment(candidate, allocation)
+        : await renderPdfAttachment(candidate, allocation, query)
     rendered.set(candidates[index].id, result)
     remainingBudget = Math.max(0, remainingBudget - result.text.length)
   }
 
-  const resolvedMessages = await Promise.all(
+  const imageFiles: ImageFileMaterialization[] = []
+  const resolvedMessages = (await Promise.all(
     messages.map(async (message) => ({
       ...message,
       parts: await Promise.all(
-        message.parts.map((part) => {
-          if (!isFilePart(part)) return Promise.resolve(part)
+        message.parts.map(async (part) => {
+          if (!isFilePart(part)) return part
           const id = attachmentIdFromUrl(part.url)
           const row = id ? rowById.get(id) : undefined
+          if (
+            supportsImageInput &&
+            row?.status === "ready" &&
+            isSupportedImageMimeType(part.mediaType) &&
+            row.mimeType === part.mediaType
+          ) {
+            const markerUrl = `https://attachment.invalid/${id}`
+            imageFiles.push({
+              markerUrl,
+              mediaType: part.mediaType,
+              ...(part.filename ? { filename: part.filename } : {}),
+              bytes: await readObjectBytes(row.key),
+            })
+            return { ...part, url: markerUrl }
+          }
           const resolved = id ? rendered.get(id) : undefined
-          if (resolved) return Promise.resolve({ type: "text", text: resolved.text })
-          return Promise.resolve(attachmentPlaceholder(part, row))
+          if (resolved) return { type: "text", text: resolved.text }
+          return attachmentPlaceholder(part, row)
         })
       ),
     }))
-  ) as UIMessage[]
+  )) as UIMessage[]
 
   const projectModes: AttachmentRenderMode[] = []
   const selectedContents: string[] = []
@@ -158,6 +236,7 @@ export async function resolveAttachmentContext({
 
   return {
     messages: resolvedMessages,
+    imageFiles,
     projectContext,
     projectFileIds: projectIds,
     stats: {

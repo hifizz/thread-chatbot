@@ -1,5 +1,6 @@
 "use client"
 
+import Image from "next/image"
 import type { ConversationViewMessage } from "../../core/types"
 
 /**
@@ -39,11 +40,30 @@ export function UIMessageSupplementalParts({
           </div>
         </details>
       )}
-      {files.map((part, index) => (
-        <a key={`${part.url}-${index}`} href={part.url} download={part.filename}>
-          {part.filename ?? "附件"}
-        </a>
-      ))}
+      {files.map((part, index) =>
+        part.mediaType.startsWith("image/") ? (
+          <a
+            key={`${part.url}-${index}`}
+            href={part.url}
+            target="_blank"
+            rel="noreferrer"
+          >
+            <Image
+              src={part.url}
+              alt={part.filename ?? "用户上传的图片"}
+              width={640}
+              height={480}
+              sizes="(max-width: 768px) 80vw, 480px"
+              unoptimized
+              className="h-auto max-h-48 max-w-full rounded-md object-contain"
+            />
+          </a>
+        ) : (
+          <a key={`${part.url}-${index}`} href={part.url} download={part.filename}>
+            {part.filename ?? "附件"}
+          </a>
+        )
+      )}
       {sources.map((part, index) => (
         <a
           key={`${part.url}-${index}`}

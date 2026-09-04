@@ -6,6 +6,7 @@ import { latestTurn } from "@/lib/thread-chat/domain/timeline"
 import {
   assertAllowedModel,
   assertOwnedReadyAttachments,
+  assertModelSupportsNewAttachments,
   buildUserParts,
   touchProjectAndThread,
 } from "@/lib/thread-chat/application/command-utils"
@@ -67,6 +68,7 @@ export function editLatestTurn(
         if (turn?.userMessage.id !== source.id) {
           stateConflict("只能编辑最新一轮用户消息")
         }
+        assertModelSupportsNewAttachments(command.modelId, command.files)
         await assertOwnedReadyAttachments(tx, userId, command.files)
         const [userSequence, assistantSequence] = await allocateThreadSequences(
           tx,

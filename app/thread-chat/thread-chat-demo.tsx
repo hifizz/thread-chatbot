@@ -9,6 +9,7 @@ import type {
   MessageDTO,
   ProjectBootstrapDTO,
 } from "@/lib/thread-chat/contracts/dto"
+import { textFromMessageParts } from "@/lib/thread-chat/contracts/ui-message"
 import {
   activePathArtifacts,
   threadTitle,
@@ -34,6 +35,7 @@ import type {
 } from "./chat/actions/message-action-commands"
 import type { MessageActionViewState } from "./chat/actions/message-action-types"
 import { kickoffQuestion } from "./net/prompt/prompt-pure"
+import type { CommandFileReference } from "./net/commands/conversation-commands"
 import { removeWorkspaceState } from "./net/persistence/workspace-state"
 import { ThreadColumns } from "./orchestration/columns/thread-columns"
 import type {
@@ -80,14 +82,21 @@ function compactTitle(text: string, maxLength: number): string {
 }
 
 function messageText(message: MessageDTO): string {
-  return message.parts
-    .filter(
-      (part): part is Extract<MessageDTO["parts"][number], { type: "text" }> =>
-        part.type === "text"
-    )
-    .map((part) => part.text)
-    .join("")
-    .trim()
+  return textFromMessageParts(message.parts).trim()
+}
+
+function messageFileReferences(message: MessageDTO): CommandFileReference[] {
+  return message.parts.flatMap((part) =>
+    part.type === "file"
+      ? [
+          {
+            url: part.url,
+            mediaType: part.mediaType,
+            ...(part.filename ? { filename: part.filename } : {}),
+          },
+        ]
+      : []
+  )
 }
 
 function deriveProjectTitle(bootstrap: ProjectBootstrapDTO): string {
@@ -290,10 +299,8 @@ function NormalizedThreadChat({
             modelId:
               state.threadsById[threadId]?.modelId ??
               DEFAULT_THREAD_CHAT_MODEL_ID,
-            text: source.parts
-              .filter((part) => part.type === "text")
-              .map((part) => part.text)
-              .join(""),
+            text: textFromMessageParts(source.parts),
+            files: messageFileReferences(source),
           })
           return actionResult({
             userMessageId: result.command.userMessageId,
@@ -323,6 +330,7 @@ function NormalizedThreadChat({
               state.threadsById[threadId]?.modelId ??
               DEFAULT_THREAD_CHAT_MODEL_ID,
             text,
+            files: source ? messageFileReferences(source) : [],
           })
           return actionResult({
             userMessageId: result.command.userMessageId,
@@ -353,7 +361,7 @@ function NormalizedThreadChat({
   )
 
   const send = useCallback(
-    (viewThreadId: string, text: string) => {
+    (viewThreadId: string, text: string, files: CommandFileReference[] = []) => {
       const current = runtime.store.getState()
       const normalizedThreadId = fromConversationViewThreadId(
         current,
@@ -365,11 +373,13 @@ function NormalizedThreadChat({
             modelId:
               current.threadsById[normalizedThreadId]?.modelId ?? draftModelId,
             text,
+            files,
           })
         : runtime.commands.startProject({
             projectId: treeId,
             modelId: draftModelId,
             text,
+            files,
           })
       void operation.catch((error) =>
         showToast(error instanceof Error ? error.message : "发送失败，请重试")
@@ -647,7 +657,7 @@ function NormalizedThreadChat({
                 }}
                 onRetry={(message) => retry(viewThreadId, message)}
                 onStop={() => stop(viewThreadId)}
-                onSend={(text) => send(viewThreadId, text)}
+                onSend={(text, files) => send(viewThreadId, text, files)}
                 messageActionState={messageActionState}
                 messageCommands={messageCommands}
               />
