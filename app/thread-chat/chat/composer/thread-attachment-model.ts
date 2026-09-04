@@ -7,7 +7,7 @@ import { supportsModelImageInput } from "@/constants/model"
 import {
   isTextAttachmentFile,
   type UploadedAttachmentReference,
-} from "@/lib/chat/attachment-upload"
+} from "@/lib/attachments/upload"
 
 export const THREAD_COMPOSER_MIME_TYPES = [
   "text/plain",

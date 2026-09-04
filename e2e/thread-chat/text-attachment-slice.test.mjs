@@ -6,7 +6,7 @@ import {
   isTextAttachmentFile,
   normalizeAttachmentFile,
   validateAttachmentFile,
-} from "../../lib/chat/attachment-upload.ts"
+} from "../../lib/attachments/upload.ts"
 import {
   isThreadComposerFile,
   isThreadComposerImageFile,

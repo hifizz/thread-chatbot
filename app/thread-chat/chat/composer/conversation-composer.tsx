@@ -38,8 +38,8 @@ import {
   uploadAttachment,
   validateAttachmentFile,
   type UploadedAttachmentReference,
-} from "@/lib/chat/attachment-upload"
-import { preprocessImageAttachment } from "@/lib/chat/image-attachment"
+} from "@/lib/attachments/upload"
+import { preprocessImageAttachment } from "@/lib/attachments/image"
 import {
   Attachment,
   AttachmentAction,
@@ -116,6 +116,16 @@ export function ConversationComposer({
 
   const appendFiles = useCallback(
     (files: Iterable<File>) => {
+      const updateAttachment = (
+        id: string,
+        patch: Partial<Omit<ThreadComposerAttachment, "id">>
+      ) =>
+        setAttachments((current) =>
+          current.map((attachment) =>
+            attachment.id === id ? { ...attachment, ...patch } : attachment
+          )
+        )
+
       const incoming = Array.from(files)
       const incomingImageCount = incoming.filter(
         isThreadComposerImageFile
@@ -155,54 +165,28 @@ export function ConversationComposer({
         void preprocessImageAttachment(file)
           .then((file) => {
             validateAttachmentFile(file)
-            setAttachments((current) =>
-              current.map((attachment) =>
-                attachment.id === id ? { ...attachment, file } : attachment
-              )
-            )
+            updateAttachment(id, { file })
             return uploadAttachment(file, {
               onProgress(progress) {
-                setAttachments((current) =>
-                  current.map((attachment) =>
-                    attachment.id === id
-                      ? { ...attachment, progress }
-                      : attachment
-                  )
-                )
+                updateAttachment(id, { progress })
               },
             }).then((result) => ({ file, result }))
           })
           .then(({ file, result }) =>
-            setAttachments((current) =>
-              current.map((attachment) =>
-                attachment.id === id
-                  ? {
-                      ...attachment,
-                      file,
-                      status: "ready",
-                      progress: 1,
-                      serverId: result.serverId,
-                      reference: result.reference,
-                    }
-                  : attachment
-              )
-            )
+            updateAttachment(id, {
+              file,
+              status: "ready",
+              progress: 1,
+              serverId: result.serverId,
+              reference: result.reference,
+            })
           )
           .catch((error) =>
-            setAttachments((current) =>
-              current.map((attachment) =>
-                attachment.id === id
-                  ? {
-                      ...attachment,
-                      status: "error",
-                      error:
-                        error instanceof Error
-                          ? error.message
-                          : "附件上传失败",
-                    }
-                  : attachment
-              )
-            )
+            updateAttachment(id, {
+              status: "error",
+              error:
+                error instanceof Error ? error.message : "附件上传失败",
+            })
           )
       }
     },

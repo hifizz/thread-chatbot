@@ -18,7 +18,7 @@ import {
   normalizeAttachmentFile,
   uploadAttachment,
   validateAttachmentFile,
-} from "@/lib/chat/attachment-upload"
+} from "@/lib/attachments/upload"
 
 // 覆盖 react-ai-sdk 默认的 vercelAttachmentAdapter（base64 内联进消息 → 撑爆 Postgres jsonb）。
 // 策略：选中文件即上传 R2 + 服务端解析（与用户打字并行），点发送时零等待。

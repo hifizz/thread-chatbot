@@ -8,12 +8,12 @@ import {
   IMAGE_ATTACHMENT_LIMITS,
   IMAGE_MODEL_VALIDATION_MESSAGE,
 } from "../../constants/attachment.ts"
-import { validateAttachmentFile } from "../../lib/chat/attachment-upload.ts"
+import { validateAttachmentFile } from "../../lib/attachments/upload.ts"
 import {
   imageFilenameWithExtension,
   imageResizeDimensions,
   resizedImageOutput,
-} from "../../lib/chat/image-attachment.ts"
+} from "../../lib/attachments/image.ts"
 import { canAddThreadImages } from "../../app/thread-chat/chat/composer/thread-attachment-model.ts"
 import {
   applyImageFileMaterializations,
