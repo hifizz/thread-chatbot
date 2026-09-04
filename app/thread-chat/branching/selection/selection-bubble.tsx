@@ -149,17 +149,6 @@ export function SelectionBubble({
     return () => ro.disconnect()
   }, [sel])
 
-  /* 气泡测量完成、真正 visible 后再聚焦输入框：首帧 measuredH=0 时根节点
-     visibility:hidden，Chromium 会拒绝聚焦其后代；只依赖 sel 会错过后续 visible 帧。
-     focusReady 只发生 false → true，不会在 textarea 自增高时反复抢焦点。 */
-  const focusReady = Boolean(sel && measuredH > 0)
-  useEffect(() => {
-    const ta = taRef.current
-    if (!focusReady || !ta) return
-    ta.style.height = ""
-    ta.focus({ preventScroll: true })
-  }, [sel, focusReady])
-
   /* 气泡打开期间跟踪 ⌘/Ctrl 起落（keydown/keyup 都带 metaKey/ctrlKey 快照） */
   useEffect(() => {
     if (!sel) return
@@ -339,6 +328,7 @@ export function SelectionBubble({
           <div className="ask">
             <textarea
               ref={taRef}
+              // 不自动聚焦：保留正文 DOM Selection，用户可以直接复制刚划选的内容。
               rows={1}
               className="scroll-slim"
               value={question}
