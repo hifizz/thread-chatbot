@@ -22,6 +22,10 @@
       "multimodal-text-attachment",
       "multimodal-corrupt-file",
       "multimodal-unsupported-and-size-boundary",
+      "project-contract-target-instructions",
+      "project-file-pdf-grounding",
+      "project-contract-update-boundary",
+      "project-files-cross-project-isolation",
       "reliability-stop-terminal",
       "reliability-completed-lifecycle",
       "reliability-generation-failure",
@@ -40,39 +44,43 @@
       "search-provider-fallback-429",
       "search-empty-timeout"
     ],
-    "fingerprint": "7c4b4a2455187688621824e3688c9980a0c8693e783e0741365770611a939f10"
+    "fingerprint": "3531bc37b454db9abca9de888961b31af627b6ea83b644f6a79c7460613d6195"
   },
   "kind": "fixture",
-  "createdAt": "2026-08-28T00:00:00.000Z",
-  "datasetRevision": "4f17d6d5f2a3197573d097773b14b3574c4b7fb79ee265e755452b88ac851d5a",
+  "createdAt": "2026-09-04T13:30:18.881Z",
+  "datasetRevision": "16384285a65ad16bc39fab0089334e0aa84f4d3e84a873e194d8c49d5a2a93fe",
   "candidateFingerprint": "9b84412630b72ddeecd0b8758d91907d0ae17cf81c31a98320a0aa3965dd13c6",
   "candidate": {
     "candidate": "fixture-baseline-v1",
+    "commit": "f23dedb",
+    "contextPolicy": "fixture-context-v1",
+    "environment": "evaluation",
+    "evaluatorVersion": "deterministic-v1",
+    "memoryPolicyVersion": "thread-context-v1",
     "model": "umapis-claude-opus-4-6",
+    "multimodalParserVersion": "attachment-parser-v1",
     "promptVersion": "thread-chat-prompt-v1",
+    "release": "baseline-v1",
     "searchPolicyVersion": "anysearch-v1",
     "searchProvider": "anysearch",
-    "memoryPolicyVersion": "thread-context-v1",
-    "contextPolicy": "fixture-context-v1",
-    "toolsetVersion": "thread-chat-tools-v1",
-    "multimodalParserVersion": "attachment-parser-v1",
-    "release": "baseline-v1",
-    "commit": "f23dedb",
-    "environment": "evaluation",
-    "evaluatorVersion": "deterministic-v1"
+    "toolsetVersion": "thread-chat-tools-v1"
   },
   "experimentUrl": null,
   "aggregate": {
-    "cases": 32,
+    "cases": 36,
     "hardFailures": 0,
     "p50LatencyMs": 0,
-    "p95LatencyMs": 0,
-    "totalUsage": { "inputTokens": 12, "outputTokens": 18, "totalTokens": 30 },
+    "p95LatencyMs": 1,
+    "totalUsage": {
+      "inputTokens": 12,
+      "outputTokens": 18,
+      "totalTokens": 30
+    },
     "toolCalls": 10,
     "providerAttempts": 8,
     "fallbackRate": 0.125,
     "errorRate": 0,
-    "emptyOutputRate": 0.0625,
+    "emptyOutputRate": 0.05555555555555555,
     "estimatedCostUsd": null
   },
   "cases": [
@@ -81,9 +89,10 @@
       "suite": "core-answer",
       "hardFailures": [],
       "judgeScores": {},
-      "latencyMs": 0,
+      "latencyMs": 1,
       "usage": {},
       "providerAttempts": 0,
+      "providerFailures": 0,
       "errorCategory": null
     },
     {
@@ -94,6 +103,7 @@
       "latencyMs": 0,
       "usage": {},
       "providerAttempts": 0,
+      "providerFailures": 0,
       "errorCategory": null
     },
     {
@@ -104,6 +114,7 @@
       "latencyMs": 0,
       "usage": {},
       "providerAttempts": 0,
+      "providerFailures": 0,
       "errorCategory": null
     },
     {
@@ -112,8 +123,13 @@
       "hardFailures": [],
       "judgeScores": {},
       "latencyMs": 0,
-      "usage": { "inputTokens": 12, "outputTokens": 18, "totalTokens": 30 },
+      "usage": {
+        "inputTokens": 12,
+        "outputTokens": 18,
+        "totalTokens": 30
+      },
       "providerAttempts": 0,
+      "providerFailures": 0,
       "errorCategory": null
     },
     {
@@ -124,6 +140,7 @@
       "latencyMs": 0,
       "usage": {},
       "providerAttempts": 0,
+      "providerFailures": 0,
       "errorCategory": null
     },
     {
@@ -134,6 +151,7 @@
       "latencyMs": 0,
       "usage": {},
       "providerAttempts": 0,
+      "providerFailures": 0,
       "errorCategory": null
     },
     {
@@ -144,6 +162,7 @@
       "latencyMs": 0,
       "usage": {},
       "providerAttempts": 0,
+      "providerFailures": 0,
       "errorCategory": null
     },
     {
@@ -154,6 +173,7 @@
       "latencyMs": 0,
       "usage": {},
       "providerAttempts": 0,
+      "providerFailures": 0,
       "errorCategory": null
     },
     {
@@ -164,6 +184,7 @@
       "latencyMs": 0,
       "usage": {},
       "providerAttempts": 0,
+      "providerFailures": 0,
       "errorCategory": null
     },
     {
@@ -174,6 +195,7 @@
       "latencyMs": 0,
       "usage": {},
       "providerAttempts": 0,
+      "providerFailures": 0,
       "errorCategory": null
     },
     {
@@ -184,6 +206,7 @@
       "latencyMs": 0,
       "usage": {},
       "providerAttempts": 0,
+      "providerFailures": 0,
       "errorCategory": null
     },
     {
@@ -194,6 +217,7 @@
       "latencyMs": 0,
       "usage": {},
       "providerAttempts": 0,
+      "providerFailures": 0,
       "errorCategory": null
     },
     {
@@ -204,6 +228,7 @@
       "latencyMs": 0,
       "usage": {},
       "providerAttempts": 0,
+      "providerFailures": 0,
       "errorCategory": null
     },
     {
@@ -214,6 +239,7 @@
       "latencyMs": 0,
       "usage": {},
       "providerAttempts": 0,
+      "providerFailures": 0,
       "errorCategory": null
     },
     {
@@ -224,6 +250,51 @@
       "latencyMs": 0,
       "usage": {},
       "providerAttempts": 0,
+      "providerFailures": 0,
+      "errorCategory": null
+    },
+    {
+      "caseId": "project-contract-target-instructions",
+      "suite": "memory-context",
+      "hardFailures": [],
+      "judgeScores": {},
+      "latencyMs": 0,
+      "usage": {},
+      "providerAttempts": 0,
+      "providerFailures": 0,
+      "errorCategory": null
+    },
+    {
+      "caseId": "project-file-pdf-grounding",
+      "suite": "multimodal",
+      "hardFailures": [],
+      "judgeScores": {},
+      "latencyMs": 0,
+      "usage": {},
+      "providerAttempts": 0,
+      "providerFailures": 0,
+      "errorCategory": null
+    },
+    {
+      "caseId": "project-contract-update-boundary",
+      "suite": "memory-context",
+      "hardFailures": [],
+      "judgeScores": {},
+      "latencyMs": 0,
+      "usage": {},
+      "providerAttempts": 0,
+      "providerFailures": 0,
+      "errorCategory": null
+    },
+    {
+      "caseId": "project-files-cross-project-isolation",
+      "suite": "memory-context",
+      "hardFailures": [],
+      "judgeScores": {},
+      "latencyMs": 0,
+      "usage": {},
+      "providerAttempts": 0,
+      "providerFailures": 0,
       "errorCategory": null
     },
     {
@@ -234,6 +305,7 @@
       "latencyMs": 0,
       "usage": {},
       "providerAttempts": 0,
+      "providerFailures": 0,
       "errorCategory": null
     },
     {
@@ -244,6 +316,7 @@
       "latencyMs": 0,
       "usage": {},
       "providerAttempts": 0,
+      "providerFailures": 0,
       "errorCategory": null
     },
     {
@@ -251,9 +324,10 @@
       "suite": "reliability",
       "hardFailures": [],
       "judgeScores": {},
-      "latencyMs": 0,
+      "latencyMs": 1,
       "usage": {},
       "providerAttempts": 0,
+      "providerFailures": 0,
       "errorCategory": null
     },
     {
@@ -264,6 +338,7 @@
       "latencyMs": 0,
       "usage": {},
       "providerAttempts": 0,
+      "providerFailures": 0,
       "errorCategory": null
     },
     {
@@ -274,6 +349,7 @@
       "latencyMs": 0,
       "usage": {},
       "providerAttempts": 0,
+      "providerFailures": 0,
       "errorCategory": null
     },
     {
@@ -284,6 +360,7 @@
       "latencyMs": 0,
       "usage": {},
       "providerAttempts": 1,
+      "providerFailures": 1,
       "errorCategory": null
     },
     {
@@ -294,6 +371,7 @@
       "latencyMs": 0,
       "usage": {},
       "providerAttempts": 0,
+      "providerFailures": 0,
       "errorCategory": null
     },
     {
@@ -304,6 +382,7 @@
       "latencyMs": 0,
       "usage": {},
       "providerAttempts": 0,
+      "providerFailures": 0,
       "errorCategory": null
     },
     {
@@ -314,6 +393,7 @@
       "latencyMs": 0,
       "usage": {},
       "providerAttempts": 0,
+      "providerFailures": 0,
       "errorCategory": null
     },
     {
@@ -324,6 +404,7 @@
       "latencyMs": 0,
       "usage": {},
       "providerAttempts": 0,
+      "providerFailures": 0,
       "errorCategory": null
     },
     {
@@ -334,6 +415,7 @@
       "latencyMs": 0,
       "usage": {},
       "providerAttempts": 0,
+      "providerFailures": 0,
       "errorCategory": null
     },
     {
@@ -344,6 +426,7 @@
       "latencyMs": 0,
       "usage": {},
       "providerAttempts": 1,
+      "providerFailures": 0,
       "errorCategory": null
     },
     {
@@ -354,6 +437,7 @@
       "latencyMs": 0,
       "usage": {},
       "providerAttempts": 1,
+      "providerFailures": 0,
       "errorCategory": null
     },
     {
@@ -364,6 +448,7 @@
       "latencyMs": 0,
       "usage": {},
       "providerAttempts": 1,
+      "providerFailures": 0,
       "errorCategory": null
     },
     {
@@ -374,6 +459,7 @@
       "latencyMs": 0,
       "usage": {},
       "providerAttempts": 1,
+      "providerFailures": 0,
       "errorCategory": null
     },
     {
@@ -384,6 +470,7 @@
       "latencyMs": 0,
       "usage": {},
       "providerAttempts": 2,
+      "providerFailures": 1,
       "errorCategory": null
     },
     {
@@ -394,6 +481,7 @@
       "latencyMs": 0,
       "usage": {},
       "providerAttempts": 1,
+      "providerFailures": 1,
       "errorCategory": null
     }
   ]

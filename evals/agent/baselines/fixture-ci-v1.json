@@ -17,6 +17,10 @@
       "multimodal-synthetic-chart",
       "multimodal-text-attachment",
       "multimodal-corrupt-file",
+      "project-contract-target-instructions",
+      "project-file-pdf-grounding",
+      "project-contract-update-boundary",
+      "project-files-cross-project-isolation",
       "reliability-stop-terminal",
       "reliability-completed-lifecycle",
       "reliability-generation-failure",
@@ -31,11 +35,11 @@
       "search-provider-fallback-429",
       "search-empty-timeout"
     ],
-    "fingerprint": "a99ed038bd225b58bf31b3940d7905a44a4ea5191a40a2390ae47ec169b21406"
+    "fingerprint": "7ba6963238f0a77c3af57840018b31d2d2329cdf00412818330ab110f2d050a5"
   },
   "kind": "fixture",
-  "createdAt": "2026-08-29T00:00:00.000Z",
-  "datasetRevision": "4f17d6d5f2a3197573d097773b14b3574c4b7fb79ee265e755452b88ac851d5a",
+  "createdAt": "2026-09-04T13:29:53.613Z",
+  "datasetRevision": "16384285a65ad16bc39fab0089334e0aa84f4d3e84a873e194d8c49d5a2a93fe",
   "candidateFingerprint": "9b84412630b72ddeecd0b8758d91907d0ae17cf81c31a98320a0aa3965dd13c6",
   "candidate": {
     "candidate": "fixture-baseline-v1",
@@ -54,7 +58,7 @@
   },
   "experimentUrl": null,
   "aggregate": {
-    "cases": 23,
+    "cases": 27,
     "hardFailures": 0,
     "p50LatencyMs": 0,
     "p95LatencyMs": 1,
@@ -67,7 +71,7 @@
     "providerAttempts": 6,
     "fallbackRate": 0.16666666666666666,
     "errorRate": 0,
-    "emptyOutputRate": 0.08695652173913043,
+    "emptyOutputRate": 0.07407407407407407,
     "estimatedCostUsd": null
   },
   "cases": [
@@ -76,7 +80,7 @@
       "suite": "core-answer",
       "hardFailures": [],
       "judgeScores": {},
-      "latencyMs": 1,
+      "latencyMs": 2,
       "usage": {},
       "providerAttempts": 0,
       "providerFailures": 0,
@@ -87,7 +91,7 @@
       "suite": "core-answer",
       "hardFailures": [],
       "judgeScores": {},
-      "latencyMs": 1,
+      "latencyMs": 0,
       "usage": {},
       "providerAttempts": 0,
       "providerFailures": 0,
@@ -168,7 +172,7 @@
       "suite": "multimodal",
       "hardFailures": [],
       "judgeScores": {},
-      "latencyMs": 1,
+      "latencyMs": 0,
       "usage": {},
       "providerAttempts": 0,
       "providerFailures": 0,
@@ -177,6 +181,50 @@
     {
       "caseId": "multimodal-corrupt-file",
       "suite": "multimodal",
+      "hardFailures": [],
+      "judgeScores": {},
+      "latencyMs": 1,
+      "usage": {},
+      "providerAttempts": 0,
+      "providerFailures": 0,
+      "errorCategory": null
+    },
+    {
+      "caseId": "project-contract-target-instructions",
+      "suite": "memory-context",
+      "hardFailures": [],
+      "judgeScores": {},
+      "latencyMs": 0,
+      "usage": {},
+      "providerAttempts": 0,
+      "providerFailures": 0,
+      "errorCategory": null
+    },
+    {
+      "caseId": "project-file-pdf-grounding",
+      "suite": "multimodal",
+      "hardFailures": [],
+      "judgeScores": {},
+      "latencyMs": 0,
+      "usage": {},
+      "providerAttempts": 0,
+      "providerFailures": 0,
+      "errorCategory": null
+    },
+    {
+      "caseId": "project-contract-update-boundary",
+      "suite": "memory-context",
+      "hardFailures": [],
+      "judgeScores": {},
+      "latencyMs": 0,
+      "usage": {},
+      "providerAttempts": 0,
+      "providerFailures": 0,
+      "errorCategory": null
+    },
+    {
+      "caseId": "project-files-cross-project-isolation",
+      "suite": "memory-context",
       "hardFailures": [],
       "judgeScores": {},
       "latencyMs": 0,
