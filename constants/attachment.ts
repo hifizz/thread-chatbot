@@ -35,6 +35,9 @@ export const IMAGE_ATTACHMENT_LIMITS = {
   lossyQuality: 0.8,
 } as const
 
+/** 短粘贴文本直接进入消息，避免语音转写产生无意义的附件上传。 */
+export const INLINE_PASTED_TEXT_CHAR_LIMIT = 4_000
+
 /** 作为 UTF-8 纯文本处理的常见文档与源码扩展名。 */
 export const TEXT_ATTACHMENT_FILE_EXTENSIONS = [
   ".txt",

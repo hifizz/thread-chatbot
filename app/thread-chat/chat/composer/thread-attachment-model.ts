@@ -1,6 +1,7 @@
 import {
   IMAGE_ATTACHMENT_MIME_TYPES,
   IMAGE_ATTACHMENT_LIMITS,
+  INLINE_PASTED_TEXT_CHAR_LIMIT,
   TEXT_ATTACHMENT_FILE_EXTENSIONS,
 } from "@/constants/attachment"
 import { supportsModelImageInput } from "@/constants/model"
@@ -39,6 +40,10 @@ export interface ThreadComposerAttachment {
   error?: string
   serverId?: string
   reference?: UploadedAttachmentReference
+}
+
+export function shouldInlinePastedText(text: string): boolean {
+  return text.length <= INLINE_PASTED_TEXT_CHAR_LIMIT
 }
 
 export function createPastedTextFile(

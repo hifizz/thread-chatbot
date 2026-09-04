@@ -15,3 +15,4 @@
 - Expects attachment inputs to support common plaintext and source-code extensions (including Markdown and JavaScript) rather than limiting acceptance to files the browser labels `text/plain`. Confidence: 0.9
 - In chat message bubbles, wants image previews width-constrained so they do not stretch the bubble, and wants non-image files represented as visible attachment cards rather than bare links or omitted UI. Confidence: 0.9
 - Wants user-facing UI copy stripped of development-process text, implementation details, and engineering jargon; labels, states, and errors should be phrased around what ordinary users need to understand and do. Confidence: 0.95
+- For pasted or voice-transcribed text, prefers a character-count-based hybrid UX: shorter content should be inserted directly into the composer rather than uploaded and shown as an attachment, while genuinely long content can remain an attachment. Confidence: 0.9

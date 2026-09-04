@@ -29,6 +29,7 @@ import {
   isThreadComposerFile,
   isThreadComposerImageFile,
   readyThreadAttachmentReferences,
+  shouldInlinePastedText,
   THREAD_COMPOSER_ACCEPT,
   type ThreadComposerAttachment,
 } from "./thread-attachment-model"
@@ -235,6 +236,16 @@ export function ConversationComposer({
     }
     const text = event.clipboardData.getData("text/plain")
     if (!text) return
+    if (shouldInlinePastedText(text)) {
+      const ta = taRef.current
+      if (!ta) return
+      event.preventDefault()
+      const start = ta.selectionStart
+      const end = ta.selectionEnd
+      ta.setRangeText(text, start, end, "end")
+      autoGrow(ta, maxHeight)
+      return
+    }
     event.preventDefault()
     appendFiles([createPastedTextFile(text)])
   }
