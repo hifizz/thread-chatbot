@@ -1,19 +1,32 @@
 import {
   IMAGE_ATTACHMENT_MIME_TYPES,
   IMAGE_ATTACHMENT_LIMITS,
+  TEXT_ATTACHMENT_FILE_EXTENSIONS,
 } from "@/constants/attachment"
 import { supportsModelImageInput } from "@/constants/model"
-import type { UploadedAttachmentReference } from "@/lib/chat/attachment-upload"
+import {
+  isTextAttachmentFile,
+  type UploadedAttachmentReference,
+} from "@/lib/chat/attachment-upload"
 
 export const THREAD_COMPOSER_MIME_TYPES = [
   "text/plain",
   ...IMAGE_ATTACHMENT_MIME_TYPES,
 ] as const
 
-export const THREAD_COMPOSER_ACCEPT = THREAD_COMPOSER_MIME_TYPES.join(",")
+export const THREAD_COMPOSER_ACCEPT = [
+  ...THREAD_COMPOSER_MIME_TYPES,
+  ...TEXT_ATTACHMENT_FILE_EXTENSIONS,
+].join(",")
+
+export function isThreadComposerImageFile(
+  file: Pick<File, "type">
+): boolean {
+  return (IMAGE_ATTACHMENT_MIME_TYPES as readonly string[]).includes(file.type)
+}
 
 export function isThreadComposerFile(file: File): boolean {
-  return (THREAD_COMPOSER_MIME_TYPES as readonly string[]).includes(file.type)
+  return isTextAttachmentFile(file) || isThreadComposerImageFile(file)
 }
 
 export type ThreadComposerAttachmentStatus = "uploading" | "ready" | "error"
@@ -42,7 +55,7 @@ export function canAddThreadImages(
   incomingCount: number
 ): boolean {
   const currentCount = attachments.filter((attachment) =>
-    attachment.file.type.startsWith("image/")
+    isThreadComposerImageFile(attachment.file)
   ).length
   return (
     currentCount + incomingCount <=

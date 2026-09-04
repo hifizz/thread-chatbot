@@ -27,12 +27,14 @@ import {
   createPastedTextFile,
   hasUnsupportedReadyImages,
   isThreadComposerFile,
+  isThreadComposerImageFile,
   readyThreadAttachmentReferences,
   THREAD_COMPOSER_ACCEPT,
   type ThreadComposerAttachment,
 } from "./thread-attachment-model"
 import {
   deleteUploadedAttachment,
+  normalizeAttachmentFile,
   uploadAttachment,
   validateAttachmentFile,
   type UploadedAttachmentReference,
@@ -115,8 +117,8 @@ export function ConversationComposer({
   const appendFiles = useCallback(
     (files: Iterable<File>) => {
       const incoming = Array.from(files)
-      const incomingImageCount = incoming.filter((file) =>
-        file.type.startsWith("image/")
+      const incomingImageCount = incoming.filter(
+        isThreadComposerImageFile
       ).length
       if (!canAddThreadImages(attachments, incomingImageCount)) {
         toast.error(
@@ -127,17 +129,18 @@ export function ConversationComposer({
 
       for (const sourceFile of incoming) {
         const id = crypto.randomUUID()
+        const file = normalizeAttachmentFile(sourceFile)
         try {
-          if (!isThreadComposerFile(sourceFile)) {
-            throw new Error(`不支持的文件类型：${sourceFile.type || "未知"}`)
+          if (!isThreadComposerFile(file)) {
+            throw new Error(`不支持的文件类型：${file.type || "未知"}`)
           }
-          validateAttachmentFile(sourceFile)
+          validateAttachmentFile(file)
         } catch (error) {
           setAttachments((current) => [
             ...current,
             {
               id,
-              file: sourceFile,
+              file,
               status: "error",
               progress: 0,
               error: error instanceof Error ? error.message : "附件校验失败",
@@ -147,9 +150,9 @@ export function ConversationComposer({
         }
         setAttachments((current) => [
           ...current,
-          { id, file: sourceFile, status: "uploading", progress: 0 },
+          { id, file, status: "uploading", progress: 0 },
         ])
-        void preprocessImageAttachment(sourceFile)
+        void preprocessImageAttachment(file)
           .then((file) => {
             validateAttachmentFile(file)
             setAttachments((current) =>

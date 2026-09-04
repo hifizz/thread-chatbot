@@ -15,6 +15,7 @@ import {
 } from "@/constants/attachment"
 import {
   deleteUploadedAttachment,
+  normalizeAttachmentFile,
   uploadAttachment,
   validateAttachmentFile,
 } from "@/lib/chat/attachment-upload"
@@ -84,28 +85,29 @@ export const r2AttachmentAdapter: AttachmentAdapter = {
   accept: ATTACHMENT_ACCEPT,
 
   async *add({ file }): AsyncGenerator<PendingAttachment, void> {
+    const normalizedFile = normalizeAttachmentFile(file)
     const id = crypto.randomUUID()
-    const kind = attachmentKindOrNull(file)
+    const kind = attachmentKindOrNull(normalizedFile)
     const base = {
       id,
       type: kind ? KIND_TO_ATTACHMENT_TYPE[kind] : ("file" as const),
-      name: file.name,
-      contentType: file.type,
-      file,
+      name: normalizedFile.name,
+      contentType: normalizedFile.type,
+      file: normalizedFile,
     }
     const fail = (message: string): PendingAttachment => {
       toast.error(message)
       return { ...base, status: { type: "incomplete", reason: "error" } }
     }
     try {
-      validateAttachmentFile(file)
+      validateAttachmentFile(normalizedFile)
     } catch (error) {
       yield fail(error instanceof Error ? error.message : "附件校验失败")
       return
     }
 
     const channel = createProgressChannel()
-    const upload = uploadAttachment(file, { onProgress: channel.push })
+    const upload = uploadAttachment(normalizedFile, { onProgress: channel.push })
       .then(({ serverId }) => ({ serverId }))
       .finally(channel.close)
     uploads.set(id, upload)

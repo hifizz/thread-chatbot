@@ -3,11 +3,57 @@ import {
   renderTextAttachment,
 } from "../../lib/chat/attachment-content-resolver.ts"
 import {
+  isTextAttachmentFile,
+  normalizeAttachmentFile,
+  validateAttachmentFile,
+} from "../../lib/chat/attachment-upload.ts"
+import {
+  isThreadComposerFile,
+  isThreadComposerImageFile,
+  THREAD_COMPOSER_ACCEPT,
+} from "../../app/thread-chat/chat/composer/thread-attachment-model.ts"
+import {
   startProjectCommandSchema,
 } from "../../lib/thread-chat/contracts/commands.ts"
 import {
   THREAD_MESSAGE_ATTACHMENT_MIME_TYPES,
 } from "../../lib/thread-chat/application/command-utils.ts"
+
+const sourceText = "export function demo() {\n  return 42\n}\n"
+for (const [filename, mediaType] of [
+  ["README.MD", "text/markdown"],
+  ["guide.markdown", "text/markdown"],
+  ["index.js", "text/javascript"],
+  ["types.ts", "video/mp2t"],
+  ["page.html", "text/html"],
+  ["document.xml", "application/xml"],
+  ["icon.svg", "image/svg+xml"],
+]) {
+  const sourceFile = new File([sourceText], filename, { type: mediaType })
+  const normalizedFile = normalizeAttachmentFile(sourceFile)
+  assert.equal(isTextAttachmentFile(sourceFile), true)
+  assert.equal(isThreadComposerFile(sourceFile), true)
+  assert.equal(normalizedFile.name, filename)
+  assert.equal(normalizedFile.type, "text/plain")
+  assert.equal(normalizedFile.lastModified, sourceFile.lastModified)
+  assert.equal(await normalizedFile.text(), sourceText)
+  assert.doesNotThrow(() => validateAttachmentFile(sourceFile))
+}
+
+const svgFile = new File(["<svg></svg>"], "icon.svg", {
+  type: "image/svg+xml",
+})
+assert.equal(isThreadComposerImageFile(svgFile), false)
+assert.ok(THREAD_COMPOSER_ACCEPT.split(",").includes(".md"))
+assert.ok(THREAD_COMPOSER_ACCEPT.split(",").includes(".js"))
+assert.ok(THREAD_COMPOSER_ACCEPT.split(",").includes(".svg"))
+
+const binaryFile = new File([Uint8Array.from([0, 1, 2])], "tool.exe", {
+  type: "application/octet-stream",
+})
+assert.equal(isTextAttachmentFile(binaryFile), false)
+assert.equal(isThreadComposerFile(binaryFile), false)
+assert.throws(() => validateAttachmentFile(binaryFile), /不支持的文件类型/)
 
 const id = crypto.randomUUID()
 const row = {

@@ -3,6 +3,7 @@
 import {
   ATTACHMENT_POLICIES,
   ATTACHMENT_URL_PREFIX,
+  TEXT_ATTACHMENT_FILE_EXTENSIONS,
   type AttachmentKind,
 } from "@/constants/attachment"
 
@@ -28,8 +29,30 @@ export interface AttachmentUploadValidation {
   kind: AttachmentKind
 }
 
+export function isTextAttachmentFile(
+  file: Pick<File, "name" | "type">
+): boolean {
+  if (file.type === "text/plain") return true
+  const filename = file.name?.toLowerCase()
+  return Boolean(
+    filename &&
+      TEXT_ATTACHMENT_FILE_EXTENSIONS.some((extension) =>
+        filename.endsWith(extension)
+      )
+  )
+}
+
+export function normalizeAttachmentFile(file: File): File {
+  if (!isTextAttachmentFile(file) || file.type === "text/plain") return file
+  return new File([file], file.name, {
+    type: "text/plain",
+    lastModified: file.lastModified,
+  })
+}
+
 export function validateAttachmentFile(file: File): AttachmentUploadValidation {
-  const policy = ATTACHMENT_POLICIES[file.type]
+  const normalizedFile = normalizeAttachmentFile(file)
+  const policy = ATTACHMENT_POLICIES[normalizedFile.type]
   if (!policy) throw new Error(`不支持的文件类型：${file.type || "未知"}`)
   if (file.size > policy.maxBytes) {
     throw new Error(
@@ -72,16 +95,17 @@ export async function uploadAttachment(
   file: File,
   options: AttachmentUploadOptions = {}
 ): Promise<AttachmentUploadResult> {
-  validateAttachmentFile(file)
+  const normalizedFile = normalizeAttachmentFile(file)
+  validateAttachmentFile(normalizedFile)
   const request = options.fetch ?? globalThis.fetch
   const onProgress = options.onProgress ?? (() => {})
   const createResponse = await request("/api/attachments", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      filename: file.name,
-      contentType: file.type,
-      size: file.size,
+      filename: normalizedFile.name,
+      contentType: normalizedFile.type,
+      size: normalizedFile.size,
     }),
   })
   if (!createResponse.ok)
@@ -91,7 +115,7 @@ export async function uploadAttachment(
     uploadUrl: string
   }
 
-  await putWithProgress(uploadUrl, file, (progress) =>
+  await putWithProgress(uploadUrl, normalizedFile, (progress) =>
     onProgress(progress * 0.9)
   )
   onProgress(0.9)
@@ -106,8 +130,8 @@ export async function uploadAttachment(
     serverId: id,
     reference: {
       url: `${ATTACHMENT_URL_PREFIX}${id}`,
-      mediaType: file.type,
-      ...(file.name ? { filename: file.name } : {}),
+      mediaType: normalizedFile.type,
+      ...(normalizedFile.name ? { filename: normalizedFile.name } : {}),
     },
   }
 }
