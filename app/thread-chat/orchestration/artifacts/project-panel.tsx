@@ -160,7 +160,11 @@ export function ProjectPanel({
         .filter((artifact) => {
           const query = artifactQuery.trim().toLowerCase()
           if (!query) return true
-          return [artifact.title, artifact.kind, artifact.sourceThreadTitle ?? ""]
+          return [
+            artifact.title,
+            artifact.kind,
+            artifact.sourceThreadTitle ?? "",
+          ]
             .join(" ")
             .toLowerCase()
             .includes(query)
@@ -168,7 +172,10 @@ export function ProjectPanel({
     [artifactQuery, artifacts]
   )
   const sortedFiles = useMemo(
-    () => [...files].sort((left, right) => right.addedAt.localeCompare(left.addedAt)),
+    () =>
+      [...files].sort((left, right) =>
+        right.addedAt.localeCompare(left.addedAt)
+      ),
     [files]
   )
 
@@ -277,7 +284,11 @@ export function ProjectPanel({
         </button>
       </div>
 
-      <div className="project-sections" role="tablist" aria-label="Project workspace">
+      <div
+        className="project-sections"
+        role="tablist"
+        aria-label="Project workspace"
+      >
         <button
           className={displayedSection === "overview" ? "on" : ""}
           onClick={() => selectSection("overview")}
@@ -314,7 +325,10 @@ export function ProjectPanel({
               <div>
                 <div className="project-eyebrow">PROJECT CONTRACT</div>
                 <h4>目标与长期指令</h4>
-                <p>保存后只影响之后启动的生成，不改写历史消息、Artifact 或 Fork Context。</p>
+                <p>
+                  保存后只影响之后启动的生成，不改写历史消息、Artifact 或 Fork
+                  Context。
+                </p>
               </div>
               {!archived && !editing && project && (
                 <button className="project-secondary" onClick={beginEdit}>
@@ -394,7 +408,10 @@ export function ProjectPanel({
               <div>
                 <div className="project-eyebrow">PROJECT FILES</div>
                 <h4>跨 Thread 可用的原始资料</h4>
-                <p>Ready 文件会在统一预算内参与未来生成；移除只解除 Project 成员关系。</p>
+                <p>
+                  Ready 文件会在统一预算内参与未来生成；移除只解除 Project
+                  成员关系。
+                </p>
               </div>
               {!archived && project && (
                 <>
@@ -423,7 +440,10 @@ export function ProjectPanel({
               <div className="project-empty">
                 <Paperclip size={18} />
                 <strong>还没有 Project File</strong>
-                <span>上传资料后，同一 Project 的所有 Thread 都可以在后续生成中使用它。</span>
+                <span>
+                  上传资料后，同一 Project 的所有 Thread
+                  都可以在后续生成中使用它。
+                </span>
               </div>
             ) : (
               <div className="project-resource-list">
@@ -493,7 +513,8 @@ export function ProjectPanel({
                     </div>
                     <h4>{selectedArtifact.title}</h4>
                     <p>
-                      来源：{selectedArtifact.sourceThreadTitle ?? "未命名 Thread"}
+                      来源：
+                      {selectedArtifact.sourceThreadTitle ?? "未命名 Thread"}
                       {selectedArtifact.sourceThreadFootnote !== null
                         ? ` · 脚注 ${selectedArtifact.sourceThreadFootnote}`
                         : ""}
@@ -529,7 +550,10 @@ export function ProjectPanel({
                 </div>
                 <div className="project-artifact-content">
                   {selectedArtifact.kind === "markdown" && (
-                    <MarkdownBody source={selectedArtifact.content} />
+                    <MarkdownBody
+                      source={selectedArtifact.content}
+                      density="compact"
+                    />
                   )}
                   {selectedArtifact.kind === "code" && (
                     <pre className="art-code">{selectedArtifact.content}</pre>
@@ -552,7 +576,8 @@ export function ProjectPanel({
                     <div className="project-eyebrow">PROJECT ARTIFACTS</div>
                     <h4>整个 Project 的持久化成果</h4>
                     <p>
-                      包含根 Thread 和所有 Fork 产生的 Artifact；仅发现与查看，不会自动注入无关 Thread。
+                      包含根 Thread 和所有 Fork 产生的
+                      Artifact；仅发现与查看，不会自动注入无关 Thread。
                     </p>
                   </div>
                 </div>
@@ -569,7 +594,8 @@ export function ProjectPanel({
                     <FileText size={18} />
                     <strong>还没有 Artifact</strong>
                     <span>
-                      在任意 Thread 中生成 Markdown、Code 或 Note 后会出现在这里。
+                      在任意 Thread 中生成 Markdown、Code 或 Note
+                      后会出现在这里。
                     </span>
                   </div>
                 ) : (

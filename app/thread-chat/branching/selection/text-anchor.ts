@@ -441,7 +441,10 @@ function isHighlightableTextNode(node: Text): boolean {
 export function paintRange(
   range: Range,
   id: string,
-  color = "rgba(255, 214, 0, 0.4)"
+  /** 高亮底色：CSS 值或变量引用（如 "var(--tc-fc-mark)"），不内置颜色字面量 */
+  color: string,
+  /** 需要一并写到高亮 span 上的 CSS 变量（contextual 注入，如 { "--fc": dvar(depth) }） */
+  vars?: Record<string, string>
 ): boolean {
   if (range.collapsed) return false
   const nodes = collectTextNodes(range)
@@ -467,6 +470,12 @@ export function paintRange(
 
     const span = target.ownerDocument.createElement("span")
     span.setAttribute(MARK_ATTR, id)
+    if (vars?.["--fc"]) span.classList.add("tc-fork-context")
+    if (vars) {
+      for (const [name, value] of Object.entries(vars)) {
+        span.style.setProperty(name, value)
+      }
+    }
     span.style.background = color
     span.style.borderRadius = "2px"
     span.style.color = "inherit"
@@ -513,11 +522,11 @@ function cssEscape(value: string): string {
  * const anchor = describeRange(root, range)                   // { quote, position }
  * if (anchor) save(id, anchor)                                // JSON.stringify 存起来
  *
- * // 2) 恢复高亮：页面（可能已漂移）加载后，把锚点找回来重新绘制
+ * 2) 恢复高亮：页面（可能已漂移）加载后，把锚点找回来重新绘制
  * for (const { id, anchor } of load()) {
  *   const hit = locateAnchor(root, anchor)                    // 三层降级 position/exact/fuzzy
  *   if (hit) {
- *     paintRange(hit.range, id)
+ *     paintRange(hit.range, id, "var(--tc-fc-mark)", { "--fc": dvar(depth) })
  *     console.log(id, hit.strategy, hit.score)                // 'fuzzy' 时 score < 1
  *   } else {
  *     console.warn(id, '内容改动过大，判定丢失')

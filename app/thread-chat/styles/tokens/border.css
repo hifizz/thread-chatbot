@@ -1,0 +1,16 @@
+/* ── @/thread-chat/styles/tokens ── border 类目：边框强度（semantic 层） */
+
+.tc {
+  --tc-border-subtle: var(--tc-palette-rule-100);
+  --tc-border-strong: var(--tc-palette-rule-200);
+  /* danger 家族描边（错误按钮 / 错误条） */
+  --tc-border-danger: var(--tc-palette-red-300);
+  --tc-border-danger-soft: var(--tc-palette-red-200);
+
+  /* Project workspace 边框 */
+  --tc-border-project-focus: var(--tc-palette-project-green-400);
+  --tc-border-project-hover: var(--tc-palette-project-green-300);
+  --tc-border-project-danger: var(--tc-palette-project-red-300);
+  --tc-border-project-error: var(--tc-palette-project-red-200);
+  --tc-border-project-readonly: var(--tc-palette-project-gold-200);
+}

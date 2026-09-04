@@ -1,0 +1,24 @@
+/* ── @/thread-chat/styles/tokens ── z-index 类目：层级契约（semantic 层）。
+   stacking context 审计结论（实施时逐点核对，结论记于使用处注释）：
+   列内局部层作用于 .column 内部（无 transform/filter 隔离祖先）；
+   弹层族均为 position:fixed 直挂文档流，层级数字即全局生效。 */
+
+.tc {
+  /* ── 列内局部层（.column 层叠上下文内） ── */
+  --tc-z-column-under: 0; /* 预留：列内衬底层 */
+  --tc-z-column-base: 1; /* 分支列深度色左缘条（压列底色、让位内容） */
+  --tc-z-column-raised: 2; /* 滚到底按钮（浮于消息流上） */
+  --tc-z-column-top: 3; /* 列间分割线热区（骑在两列交界之上） */
+
+  /* ── 弹层族（position:fixed，文档级） ── */
+  --tc-z-selection: 60; /* 划选气泡 */
+  --tc-z-drawer: 65; /* Artifact 抽屉 */
+  --tc-z-confirm: 70; /* 划选草稿清空确认弹窗 */
+  --tc-z-switcher: 72; /* 会话切换器遮罩 */
+  --tc-z-switcher-top: 74; /* 会话切换器面板 */
+  --tc-z-toast: 80; /* Toast（最上层） */
+
+  /* ── 组件内部分层（划选气泡 shape/content 夹层） ── */
+  --tc-z-sel-shape: 0; /* 气泡轮廓背景层 */
+  --tc-z-sel-content: 1; /* 气泡内容层 */
+}

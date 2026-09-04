@@ -6,7 +6,7 @@
   align-items: flex-end;
   gap: 4px;
   margin-left: auto;
-  color: var(--ink-faint);
+  color: var(--tc-content-muted);
   font-size: 10px;
   white-space: nowrap;
 }
@@ -14,7 +14,7 @@
   border: 0;
   border-bottom: 1px solid currentColor;
   background: transparent;
-  color: var(--accent);
+  color: var(--tc-accent);
   padding: 0;
   font: inherit;
   cursor: pointer;

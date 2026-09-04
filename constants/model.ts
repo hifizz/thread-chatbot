@@ -2,6 +2,10 @@
 // id 在全站统一使用：输入框选择器、计费定价（constants/pricing.ts 的 key）、
 // 服务端 provider 解析（lib/ai/provider.ts）。
 
+/** 标题生成固定走私有中继的 Luna；标题模型不暴露给客户端选择。 */
+export const THREAD_TITLE_MODEL_ID = "gpt-5.6-luna"
+export const THREAD_TITLE_MAX_OUTPUT_TOKENS = 36
+
 export const OPENROUTER_MODEL_IDS = [
   "openai/gpt-5.6-luna",
   "openai/gpt-5.6-luna-pro",

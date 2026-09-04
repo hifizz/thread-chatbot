@@ -1,0 +1,33 @@
+/* ── @/thread-chat/styles/tokens ── base：.tc 根挂载 + box-sizing reset + 全局结构。
+   --col-min/--lane-max 属 sizing 类目（Future Work），暂保留原变量名。 */
+
+.tc {
+  --col-min: 340px;
+  --lane-max: 760px;
+
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--tc-surface-base);
+  color: var(--tc-content-primary);
+  font-family: var(--tc-typography-family-ui);
+}
+.tc *,
+.tc *::before,
+.tc *::after {
+  box-sizing: border-box;
+}
+
+/* contextual 层默认：分支强调色（TS 按列/卡/行注入 --tc-accent 覆盖）。
+   回退中性色 = 原 --accent fallback #8a8377 的语义归位。 */
+.tc {
+  --tc-accent: var(--tc-depth-neutral);
+}
+
+/* shadcn Kbd：沿用组件的尺寸与圆角，仅与 thread-chat 纸面 token 对齐。 */
+.tc [data-slot="kbd"] {
+  background-color: var(--tc-surface-kbd);
+  color: var(--tc-content-secondary);
+  font-family: var(--tc-typography-family-code);
+}

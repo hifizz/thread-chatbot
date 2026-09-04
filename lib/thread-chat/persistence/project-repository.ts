@@ -1,4 +1,5 @@
-import { and, desc, eq, isNotNull, isNull } from "drizzle-orm"
+import { and, count, desc, eq, isNotNull, isNull, sql } from "drizzle-orm"
+import { PROJECT_TITLE_FALLBACK } from "@/constants/project-workspace"
 import { projects, threads } from "@/lib/db/schema"
 import type {
   ConversationExecutor,
@@ -38,14 +39,21 @@ export async function listOwnedProjectRows(
   archived: boolean
 ) {
   return executor
-    .select()
+    .select({
+      id: projects.id,
+      title: sql<string>`coalesce(${projects.customTitle}, ${projects.autoTitle}, ${PROJECT_TITLE_FALLBACK})`,
+      updatedAt: projects.updatedAt,
+      threadCount: count(threads.id).mapWith(Number),
+    })
     .from(projects)
+    .innerJoin(threads, eq(threads.projectId, projects.id))
     .where(
       and(
         eq(projects.userId, userId),
         archived ? isNotNull(projects.archivedAt) : isNull(projects.archivedAt)
       )
     )
+    .groupBy(projects.id)
     .orderBy(desc(projects.updatedAt))
 }
 

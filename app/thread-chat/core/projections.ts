@@ -143,11 +143,7 @@ export function projectThreadDTO(
       thread.autoTitle ??
       (thread.depth === 0
         ? "主线"
-        : thread.anchorText
-          ? thread.anchorText.length > 13
-            ? `${thread.anchorText.slice(0, 13)}…`
-            : thread.anchorText
-          : selectDisplayTitle(thread)),
+        : (thread.anchorText ?? selectDisplayTitle(thread))),
     anchorText: thread.anchorText,
     forkFromMsgId: thread.forkMessageId,
     footnote: thread.footnote,

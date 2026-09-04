@@ -1,0 +1,12 @@
+/* ── @/thread-chat/styles/tokens ── depth 类目：分支分色轴（semantic 层）。
+   theme.ts 的「深度 → CSS 变量名」映射（dvar/accentOf/dotColorOf）依赖此处变量名。 */
+
+.tc {
+  --tc-depth-1: var(--tc-palette-depth-1);
+  --tc-depth-2: var(--tc-palette-depth-2);
+  --tc-depth-3: var(--tc-palette-depth-3);
+  --tc-depth-4: var(--tc-palette-depth-4);
+  --tc-depth-5: var(--tc-palette-depth-5);
+  /* 非分支强调中性色：主线圆点/徽标、contextual 未注入时的回退 */
+  --tc-depth-neutral: var(--tc-palette-neutral-500);
+}

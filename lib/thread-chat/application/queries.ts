@@ -3,7 +3,7 @@ import type {
   ArtifactDTO,
   MessageDTO,
   ProjectBootstrapDTO,
-  ProjectDTO,
+  ProjectListItemDTO,
 } from "@/lib/thread-chat/contracts/dto"
 import {
   findOwnedArtifact,
@@ -23,7 +23,6 @@ import {
 import { listProjectFileRows } from "@/lib/thread-chat/persistence/project-file-repository"
 import {
   findOwnedProject,
-  findRootThreadId,
   listOwnedProjectRows,
 } from "@/lib/thread-chat/persistence/project-repository"
 import { listProjectThreadRows } from "@/lib/thread-chat/persistence/thread-repository"
@@ -31,15 +30,12 @@ import { listProjectThreadRows } from "@/lib/thread-chat/persistence/thread-repo
 export async function listProjects(
   userId: string,
   archived = false
-): Promise<ProjectDTO[]> {
+): Promise<ProjectListItemDTO[]> {
   const rows = await listOwnedProjectRows(db, userId, archived)
-  return Promise.all(
-    rows.map(async (row) => {
-      const rootThreadId = await findRootThreadId(db, row.id)
-      if (!rootThreadId) throw new Error("PROJECT_WITHOUT_ROOT_THREAD")
-      return toProjectDTO(row, rootThreadId)
-    })
-  )
+  return rows.map((row) => ({
+    ...row,
+    updatedAt: row.updatedAt.toISOString(),
+  }))
 }
 
 export async function getProjectBootstrap(

@@ -1,0 +1,8 @@
+/* ── @/thread-chat/styles/tokens ── typography 类目：字体族（semantic 层）。
+   字号 role（body/label 等）属后续 Change；prose 排版值见 prose.css。 */
+
+.tc {
+  --tc-typography-family-ui: var(--tc-font-stack-ui);
+  --tc-typography-family-read: var(--tc-font-stack-read);
+  --tc-typography-family-code: var(--tc-font-stack-mono);
+}

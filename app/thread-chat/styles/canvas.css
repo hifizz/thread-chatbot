@@ -14,42 +14,42 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--ink-faint);
-  font-family: var(--font-mono);
+  color: var(--tc-content-muted);
+  font-family: var(--tc-typography-family-code);
   font-size: 12px;
 }
 .tc .canvas-wrap .react-flow {
-  background: var(--paper);
-  --xy-background-pattern-color-default: var(--rule-strong);
-  --xy-edge-stroke-default: var(--rule-strong);
-  --xy-edge-stroke-selected-default: var(--ink-soft);
-  --xy-minimap-background-color-default: #fbf9f2;
-  --xy-minimap-node-background-color-default: #e6dfd0;
-  --xy-controls-button-background-color-default: #fff;
-  --xy-controls-button-background-color-hover-default: var(--paper-2);
-  --xy-controls-button-border-color-default: var(--rule);
-  --xy-controls-button-color-default: var(--ink-soft);
-  --xy-attribution-background-color-default: #ffffff88;
+  background: var(--tc-surface-base);
+  --xy-background-pattern-color-default: var(--tc-border-strong);
+  --xy-edge-stroke-default: var(--tc-border-strong);
+  --xy-edge-stroke-selected-default: var(--tc-content-secondary);
+  --xy-minimap-background-color-default: var(--tc-surface-minimap);
+  --xy-minimap-node-background-color-default: var(--tc-surface-minimap-node);
+  --xy-controls-button-background-color-default: var(--tc-surface-plain);
+  --xy-controls-button-background-color-hover-default: var(--tc-surface-raised);
+  --xy-controls-button-border-color-default: var(--tc-border-subtle);
+  --xy-controls-button-color-default: var(--tc-content-secondary);
+  --xy-attribution-background-color-default: var(--tc-veil-foot);
 }
 .tc .canvas-wrap .react-flow__minimap {
-  border: 1px solid var(--rule-strong);
+  border: 1px solid var(--tc-border-strong);
   border-radius: 9px;
   overflow: hidden;
 }
 /* MiniMap 节点深度色：SVG fill 属性不解析 var()，经 .fc-N（--fc）+ CSS fill 上色 */
 .tc .canvas-wrap .react-flow__minimap-node {
-  fill: var(--fc, #8a8377);
+  fill: var(--fc, var(--tc-depth-neutral));
   stroke: none;
 }
 .tc .canvas-wrap .react-flow__controls {
-  border: 1px solid var(--rule-strong);
+  border: 1px solid var(--tc-border-strong);
   border-radius: 9px;
   overflow: hidden;
-  box-shadow: 0 4px 14px -9px rgba(30, 26, 20, 0.3);
+  box-shadow: 0 4px 14px -9px var(--tc-shadow-controls);
 }
 .tc .canvas-wrap .react-flow__attribution {
   font-size: 9px;
-  color: var(--ink-faint);
+  color: var(--tc-content-muted);
 }
 
 /* thread 卡：与列模式同一套纸墨语言（深度色左缘 / 脚注徽章 / 衬线标题）。
@@ -57,23 +57,23 @@
 .tc .canvas-card {
   position: relative; /* 外挂面板 .canvas-expand 的定位上下文（挂卡下方） */
   width: var(--canvas-card-width);
-  background: #fff;
-  border: 1px solid var(--rule-strong);
-  border-left: 3px solid var(--accent, #8a8377);
+  background: var(--tc-surface-plain);
+  border: 1px solid var(--tc-border-strong);
+  border-left: 3px solid var(--tc-accent, var(--tc-depth-neutral));
   border-radius: 10px;
   padding: var(--canvas-card-padding-block) var(--canvas-card-padding-inline);
-  font-family: var(--font-ui);
-  box-shadow: 0 4px 14px -9px rgba(30, 26, 20, 0.22);
+  font-family: var(--tc-typography-family-ui);
+  box-shadow: 0 4px 14px -9px var(--tc-shadow-card);
   cursor: grab;
 }
 .tc .react-flow__node.dragging .canvas-card {
   cursor: grabbing;
 }
 .tc .react-flow__node.selected .canvas-card {
-  border-color: var(--accent, #8a8377);
+  border-color: var(--tc-accent, var(--tc-depth-neutral));
   box-shadow:
-    0 0 0 2px color-mix(in srgb, var(--accent, #8a8377) 30%, transparent),
-    0 8px 20px -10px rgba(30, 26, 20, 0.35);
+    0 0 0 2px var(--tc-accent-glow),
+    0 8px 20px -10px var(--tc-shadow-float);
 }
 /* 只读画布：handle 只作边的定位锚点——用 opacity 隐藏，display:none 会破坏边坐标 */
 .tc .canvas-card .react-flow__handle {
@@ -88,21 +88,21 @@
   min-height: var(--canvas-card-header-min-height);
 }
 .tc .canvas-card .fn {
-  font-family: var(--font-mono);
+  font-family: var(--tc-typography-family-code);
   font-size: 10px;
   font-weight: 700;
-  color: #fff;
-  background: var(--accent, #8a8377);
+  color: var(--tc-content-on-accent);
+  background: var(--tc-accent, var(--tc-depth-neutral));
   border-radius: 4px;
   padding: 2px 5px;
   flex: none;
   line-height: 1.2;
 }
 .tc .canvas-card .ttl {
-  font-family: var(--font-read);
-  font-size: 14.5px;
+  font-family: var(--tc-typography-family-read);
+  font-size: 14px;
   font-weight: 600;
-  color: var(--ink);
+  color: var(--tc-content-primary);
   flex: 1;
   min-width: 0;
   white-space: nowrap;
@@ -113,15 +113,15 @@
 .tc .canvas-card .sub {
   font-size: var(--canvas-card-body-font-size);
   line-height: var(--canvas-card-body-line-height);
-  color: var(--ink-faint);
+  color: var(--tc-content-muted);
   margin-bottom: 4px;
 }
 .tc .canvas-card .anch {
-  font-family: var(--font-read);
+  font-family: var(--tc-typography-family-read);
   font-size: var(--canvas-card-body-font-size);
   line-height: var(--canvas-card-body-line-height);
-  color: var(--ink-soft);
-  background: color-mix(in srgb, var(--accent, #8a8377) 7%, transparent);
+  color: var(--tc-content-secondary);
+  background: var(--tc-accent-hint);
   border-radius: 5px;
   padding: var(--canvas-card-anchor-padding-block) 6px;
   margin-bottom: var(--canvas-card-anchor-margin-bottom);
@@ -133,7 +133,7 @@
 .tc .canvas-card .sum {
   font-size: var(--canvas-card-summary-font-size);
   line-height: var(--canvas-card-summary-line-height);
-  color: var(--ink-soft);
+  color: var(--tc-content-secondary);
   margin-bottom: var(--canvas-card-summary-margin-bottom);
   display: -webkit-box;
   -webkit-line-clamp: var(--canvas-card-summary-max-lines);
@@ -144,9 +144,9 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  font-family: var(--font-mono);
+  font-family: var(--tc-typography-family-code);
   font-size: 10px;
-  color: var(--ink-faint);
+  color: var(--tc-content-muted);
 }
 .tc .canvas-card .meta .am {
   display: inline-flex;
@@ -170,19 +170,19 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  box-shadow: 0 3px 10px -6px rgba(30, 26, 20, 0.35);
+  box-shadow: 0 3px 10px -6px var(--tc-shadow-float);
 }
 .tc .canvas-panel .cbtn:hover {
-  color: var(--ink);
-  background: var(--paper-2);
-  border-color: var(--rule-strong);
+  color: var(--tc-content-primary);
+  background: var(--tc-surface-raised);
+  border-color: var(--tc-border-strong);
 }
 .tc .canvas-panel .canvas-tip {
-  font-family: var(--font-mono);
+  font-family: var(--tc-typography-family-code);
   font-size: 11px;
-  color: var(--ink-soft);
-  background: #ffffffcc;
-  border: 1px solid var(--rule);
+  color: var(--tc-content-secondary);
+  background: var(--tc-veil-tip);
+  border: 1px solid var(--tc-border-subtle);
   border-radius: 7px;
   padding: 5px 9px;
 }
@@ -192,15 +192,16 @@
    选中节点的 zIndex 由 React Flow elevateNodesOnSelect 抬升，配近不透明纸面底色 +
    深描边 + 重投影，视觉上明确「浮在树上方的工作层」。nodrag/nowheel 类由 RF 消费。 */
 .tc .canvas-expand {
+  container: tc-prose / inline-size;
   position: absolute;
   top: calc(100% + 9px);
   left: -3px; /* 与卡的深度色左缘（3px 边框）对齐 */
   width: var(--canvas-expand-width);
-  background: rgba(255, 255, 255, 0.96);
-  border: 1px solid var(--accent, #8a8377);
+  background: var(--tc-veil-expand);
+  border: 1px solid var(--tc-accent, var(--tc-depth-neutral));
   border-left-width: 3px;
   border-radius: 10px;
-  box-shadow: 0 16px 38px -12px rgba(30, 26, 20, 0.42);
+  box-shadow: 0 16px 38px -12px var(--tc-shadow-expand);
   cursor: default;
   display: flex;
   flex-direction: column;
@@ -219,28 +220,17 @@
   margin: 0 0 12px;
 }
 .tc .canvas-expand .message.user .bubble {
-  font-size: 12.5px;
+  font-size: 12px;
   line-height: 1.5;
   padding: 6px 10px;
 }
 .tc .canvas-expand .message.assistant .bubble {
-  font-size: 12.5px;
+  font-size: 12px;
   line-height: 1.62;
-}
-/* 面板里的 Markdown 缩小一号（.md-body 继承 bubble 字号，标题/代码等相对收敛） */
-.tc .canvas-expand .md-body h1 {
-  font-size: 15px;
-}
-.tc .canvas-expand .md-body h2 {
-  font-size: 14px;
-}
-.tc .canvas-expand .md-body h3,
-.tc .canvas-expand .md-body h4 {
-  font-size: 13px;
 }
 .tc .canvas-expand .msg-error,
 .tc .canvas-expand .msg-stopped {
-  font-size: 11.5px;
+  font-size: 12px;
 }
 /* mini composer：语义同列模式（busy 时发送变停止），尺寸随面板收敛 */
 .tc .canvas-expand .cv-composer {
@@ -248,7 +238,7 @@
   align-items: flex-end;
   gap: 6px;
   padding: 8px 10px 9px;
-  border-top: 1px solid var(--rule);
+  border-top: 1px solid var(--tc-border-subtle);
 }
 .tc .canvas-expand .cv-prompt-stack {
   display: flex;
@@ -260,24 +250,24 @@
 .tc .canvas-expand .cv-composer textarea {
   min-width: 0;
   flex: 1;
-  border: 1px solid var(--rule-strong);
+  border: 1px solid var(--tc-border-strong);
   border-radius: 8px;
-  background: #fff;
-  color: var(--ink);
+  background: var(--tc-surface-plain);
+  color: var(--tc-content-primary);
   resize: none;
   padding: 5px 8px;
-  font-family: var(--font-ui);
-  font-size: 12.5px;
+  font-family: var(--tc-typography-family-ui);
+  font-size: 12px;
   line-height: 1.45;
   max-height: var(--composer-max-height);
   min-height: 28px;
 }
 .tc .canvas-expand .cv-composer textarea:focus {
   outline: none;
-  border-color: var(--accent, var(--d1));
+  border-color: var(--tc-accent, var(--tc-depth-1));
 }
 .tc .canvas-expand .cv-composer textarea::placeholder {
-  color: var(--ink-faint);
+  color: var(--tc-content-muted);
 }
 .tc .canvas-expand .cv-send {
   flex: none;
@@ -287,9 +277,9 @@
   padding: 6px 11px;
   font-size: 12px;
   font-weight: 600;
-  color: #fff;
-  background: var(--accent, #3a3733);
+  color: var(--tc-content-on-accent);
+  background: var(--tc-accent);
 }
 .tc .canvas-expand .cv-send.stop {
-  background: var(--ink-soft);
+  background: var(--tc-content-secondary);
 }

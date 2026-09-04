@@ -7,8 +7,8 @@
   align-items: center;
   gap: 10px;
   padding: 10px 16px;
-  border-bottom: 1px solid var(--rule-strong);
-  background: linear-gradient(180deg, #faf8f2, var(--paper));
+  border-bottom: 1px solid var(--tc-border-strong);
+  background: linear-gradient(180deg, var(--tc-surface-bright), var(--tc-surface-base));
   flex-wrap: wrap;
 }
 .tc .brand {
@@ -17,14 +17,15 @@
   gap: 10px;
 }
 .tc .brand .mark {
-  font-family: var(--font-read);
+  font-family: var(--tc-typography-family-read);
   font-size: 20px;
   font-weight: 600;
+  /* tc-review: 非偶数值，保留 0.5px 字距以维持品牌字标视觉 */
   letter-spacing: 0.5px;
 }
 .tc .brand .mark em {
   font-style: italic;
-  color: var(--d1);
+  color: var(--tc-depth-1);
 }
 .tc .spacer {
   flex: 1;
@@ -32,30 +33,30 @@
 
 .tc .seg {
   display: inline-flex;
-  border: 1px solid var(--rule-strong);
+  border: 1px solid var(--tc-border-strong);
   border-radius: 8px;
   overflow: hidden;
-  background: #fff;
+  background: var(--tc-surface-plain);
 }
 .tc .seg button {
   border: none;
-  background: #fff;
+  background: var(--tc-surface-plain);
   cursor: pointer;
-  font-family: var(--font-mono);
+  font-family: var(--tc-typography-family-code);
   font-size: 12px;
-  color: var(--ink-soft);
+  color: var(--tc-content-secondary);
   padding: 6px 10px;
-  border-right: 1px solid var(--rule);
+  border-right: 1px solid var(--tc-border-subtle);
 }
 .tc .seg button:last-child {
   border-right: none;
 }
 .tc .seg button:hover {
-  background: var(--paper-2);
+  background: var(--tc-surface-raised);
 }
 .tc .seg button.on {
-  background: color-mix(in srgb, var(--d1) 12%, #fff);
-  color: var(--d1);
+  background: var(--tc-depth-1-seg-bg);
+  color: var(--tc-depth-1);
   font-weight: 700;
 }
 .tc .seg button.mode {
@@ -65,29 +66,29 @@
 }
 
 .tc .tbtn {
-  font-family: var(--font-mono);
+  font-family: var(--tc-typography-family-code);
   font-size: 12px;
-  color: var(--ink-soft);
+  color: var(--tc-content-secondary);
   cursor: pointer;
-  border: 1px solid var(--rule-strong);
+  border: 1px solid var(--tc-border-strong);
   border-radius: 8px;
   padding: 5px 11px;
-  background: #fff;
+  background: var(--tc-surface-plain);
   display: inline-flex;
   align-items: center;
   gap: 7px;
 }
 .tc .tbtn:hover {
-  border-color: var(--d1);
-  color: var(--d1);
+  border-color: var(--tc-depth-1);
+  color: var(--tc-depth-1);
 }
 .tc .tbtn.help {
   padding: 5px 7px;
   line-height: 0;
-  color: var(--ink-soft);
+  color: var(--tc-content-secondary);
 }
 .tc .tbtn.help:hover {
-  color: var(--ink);
+  color: var(--tc-content-primary);
 }
 .tc .tbtn[disabled] {
   opacity: 0.4;
@@ -97,8 +98,36 @@
 .tc .tbtn .cnt {
   font-size: 10px;
   font-weight: 700;
-  color: #fff;
-  background: var(--d2);
+  color: var(--tc-content-on-accent);
+  background: var(--tc-depth-2);
   border-radius: 999px;
   padding: 1px 6px;
+}
+
+.tc .mobile-nav {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+}
+.tc .mobile-nav-check {
+  margin-left: auto;
+}
+@media (max-width: 720px) {
+  .tc[data-view-mode="columns"] > .topbar {
+    display: none;
+  }
+  .tc[data-view-mode="canvas"] > .topbar {
+    padding: 8px 12px;
+  }
+  .tc[data-view-mode="canvas"] > .topbar > :not(.brand):not(.spacer):not(.mobile-nav) {
+    display: none;
+  }
+  .tc[data-view-mode="canvas"] > .topbar .brand .mark {
+    font-size: 18px;
+  }
+  .tc[data-view-mode="canvas"] > .topbar .mobile-nav,
+  .tc .col-head .mobile-nav {
+    display: flex;
+  }
 }

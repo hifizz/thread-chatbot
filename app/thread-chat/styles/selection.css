@@ -4,13 +4,11 @@
    落点走 floating-popup 定位模型（branching/bubble-position.ts），
    外轮廓 + 指向选区的尾巴是一条平滑 path（branching/bubble-shape.tsx，移植自
    smooth-tooltip），取代过去 ::after 的 CSS 旋转小方块。宽度 / left / top / visibility
-   由组件内联 style 给出（宽度 = BUBBLE_W）。
-   草稿保护相关样式（入场窗口 / 抖动 / 轻提示 / Esc 确认弹窗）与本组件共置在
-   branching/selection/selection-draft-guard.css，不进本桶。 */
+   由组件内联 style 给出（宽度 = BUBBLE_W）。 */
 .tc .sel-bubble {
   position: fixed;
-  z-index: 60;
-  color: #fff;
+  z-index: var(--tc-z-selection);
+  color: var(--tc-content-on-accent);
 }
 /* 平滑曲线轮廓背景层：铺满面板宽度，尾巴靠 svg overflow 溢出面板上/下沿；
    阴影用 CSS drop-shadow（屏幕坐标，永远朝下，不随尾巴上下翻转而反向）。
@@ -19,9 +17,9 @@
   position: absolute;
   left: 0;
   width: 100%;
-  z-index: 0;
+  z-index: var(--tc-z-sel-shape);
   pointer-events: none;
-  filter: drop-shadow(0 8px 18px rgba(30, 26, 20, 0.45));
+  filter: drop-shadow(0 8px 18px var(--tc-shadow-pop));
 }
 .tc .sel-bubble .sb-shape svg {
   width: 100%;
@@ -30,25 +28,25 @@
 /* 内容层：叠在轮廓上方；padding 决定面板高度 H（被 ResizeObserver 测量后回喂定位与 path） */
 .tc .sel-bubble .sb-content {
   position: relative;
-  z-index: 1;
+  z-index: var(--tc-z-sel-content);
   padding: 8px 9px 9px;
 }
 .tc .sel-bubble .lbl {
   font-size: 11px;
-  color: #c9c2b4;
-  font-family: var(--font-mono);
+  color: var(--tc-onink-faint);
+  font-family: var(--tc-typography-family-code);
   margin-bottom: 6px;
   position: relative;
 }
 .tc .sel-bubble .quote {
-  font-family: var(--font-read);
+  font-family: var(--tc-typography-family-read);
   font-size: 13px;
   line-height: 1.45;
   max-height: 52px;
   overflow: hidden;
   margin-bottom: 9px;
   position: relative;
-  color: #f3efe6;
+  color: var(--tc-onink-primary);
 }
 /* 可选首问输入框（Phase A 气泡输入框）：深底提亮，单行起步自增高，
    上限由组件尺寸源发布，超出后转为内部滚动。 */
@@ -62,37 +60,37 @@
   box-sizing: border-box;
   resize: none;
   overflow-y: auto;
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  background: rgba(255, 255, 255, 0.1);
-  color: #f3efe6;
+  border: 1px solid var(--tc-onink-border-ask);
+  background: var(--tc-onink-fill-soft);
+  color: var(--tc-onink-primary);
   border-radius: 8px;
   padding: 6px 8px;
-  font-family: var(--font-ui);
-  font-size: 12.5px;
+  font-family: var(--tc-typography-family-ui);
+  font-size: 12px;
   line-height: 1.45;
   max-height: var(--selection-question-max-height);
   min-height: 30px;
 }
 .tc .sel-bubble .ask textarea::placeholder {
-  color: #a9a294;
+  color: var(--tc-onink-placeholder);
 }
 .tc .sel-bubble .ask textarea:focus {
-  outline: 2px solid rgba(255, 255, 255, 0.25);
+  outline: 2px solid var(--tc-onink-border-ask);
   outline-offset: 0;
-  background: rgba(255, 255, 255, 0.14);
+  background: var(--tc-onink-fill-ask-focus);
   transition: all 0.3s;
 }
 .tc .sel-bubble button {
   width: 100%;
   border: none;
   cursor: pointer;
-  background: var(--d1);
-  color: #fff;
+  background: var(--tc-depth-1);
+  color: var(--tc-content-on-accent);
   border-radius: 8px;
   padding: 8px;
   font-size: 13px;
   font-weight: 600;
-  font-family: var(--font-ui);
+  font-family: var(--tc-typography-family-ui);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -104,7 +102,7 @@
 }
 
 /* —— 气泡底部迷你列条（micro slot map）：主线 + 各槽位的放置预览 / override 点选 ——
-   气泡是深底（--ink），全部状态色用「深度色 × #fff」提亮保证对比度；
+   气泡是深底（--tc-surface-ink），全部状态色与白色基底混合提亮以保证对比度；
    小格下方悬挂 9px 角标（本列 / 将替换 / 将折叠），行高预留在 padding-bottom 里 */
 .tc .sel-bubble .slotmap {
   display: flex;
@@ -114,8 +112,8 @@
   row-gap: 18px;
   margin: 0 0 9px;
   padding: 7px 7px 19px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: var(--tc-onink-fill-slotmap);
+  border: 1px solid var(--tc-onink-border-slotmap);
   border-radius: 8px;
   position: relative;
 }
@@ -125,54 +123,56 @@
   width: 24px;
   height: 16px;
   border-radius: 4px;
-  border: 1px solid rgba(255, 255, 255, 0.4);
-  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid var(--tc-onink-border-cell);
+  background: var(--tc-onink-fill-cell);
   cursor: pointer;
 }
 .tc .sel-bubble .smcell:hover {
-  background: rgba(255, 255, 255, 0.28);
+  background: var(--tc-onink-fill-cell-hover);
 }
 .tc .sel-bubble .smcell:focus-visible {
-  outline: 1.5px solid #fff;
+  /* tc-review: 非偶数值，保留 1.5px 以维持深底焦点环层级 */
+  outline: 1.5px solid var(--tc-content-on-accent);
   outline-offset: 1px;
 }
 .tc .sel-bubble .smcell.main {
   width: 20px;
-  background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(255, 255, 255, 0.22);
+  background: var(--tc-onink-fill-ghost);
+  border-color: var(--tc-onink-border-main);
   border-style: double;
   cursor: default;
 }
 .tc .sel-bubble .smcell.main:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--tc-onink-fill-ghost);
 }
 .tc .sel-bubble .smcell.folded {
   width: 8px;
   cursor: default;
 }
 .tc .sel-bubble .smcell.src {
-  border-color: rgba(255, 255, 255, 0.85);
+  border-color: var(--tc-onink-border-src);
 }
 .tc .sel-bubble .smcell.will-replace {
-  border-color: color-mix(in srgb, var(--d3) 55%, #fff);
+  border-color: var(--tc-depth-3-replace-border);
   background: repeating-linear-gradient(
     45deg,
-    color-mix(in srgb, var(--d3) 72%, transparent) 0 3px,
-    color-mix(in srgb, var(--d3) 26%, transparent) 3px 6px
+    var(--tc-depth-3-replace-stripe-a) 0 3px,
+    var(--tc-depth-3-replace-stripe-b) 3px 6px
   );
 }
 .tc .sel-bubble .smcell.will-fold {
-  border-color: color-mix(in srgb, var(--d2) 65%, #fff);
-  background: color-mix(in srgb, var(--d2) 48%, transparent);
+  border-color: var(--tc-depth-2-fold-border);
+  background: var(--tc-depth-2-fold-bg);
 }
 .tc .sel-bubble .smcell.ov {
-  outline: 2px solid #fff;
+  outline: 2px solid var(--tc-content-on-accent);
   outline-offset: 1px;
 }
 .tc .sel-bubble .smcell.ghost {
-  border: 1.5px dashed rgba(255, 255, 255, 0.55);
+  /* tc-review: 非偶数值，保留 1.5px 以维持 ghost 虚线可见度 */
+  border: 1.5px dashed var(--tc-onink-border-ghost);
   background: transparent;
-  color: #eae4d6;
+  color: var(--tc-onink-secondary);
   font-size: 12px;
   line-height: 13px;
   text-align: center;
@@ -184,17 +184,17 @@
   left: 50%;
   transform: translateX(-50%);
   font-style: normal;
-  font-family: var(--font-mono);
+  font-family: var(--tc-typography-family-code);
   font-size: 9px;
   line-height: 1;
   white-space: nowrap;
-  color: #d8d2c4;
+  color: var(--tc-onink-muted);
 }
 .tc .sel-bubble .smcell.will-replace .cap {
-  color: color-mix(in srgb, var(--d3) 45%, #fff);
+  color: var(--tc-depth-3-replace-cap);
 }
 .tc .sel-bubble .smcell.will-fold .cap {
-  color: color-mix(in srgb, var(--d2) 55%, #fff);
+  color: var(--tc-depth-2-fold-cap);
 }
 
 /* 划选气泡的放置后果提示行：按钮只表达动作，后果在这里单行说明（超长省略） */
@@ -202,7 +202,7 @@
   margin: 6px 2px 0;
   font-size: 10px;
   line-height: 1.4;
-  color: #d8d2c4;
+  color: var(--tc-onink-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
