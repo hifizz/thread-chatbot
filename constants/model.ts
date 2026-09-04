@@ -128,8 +128,7 @@ export type ChatModel = {
 /** 用统一的 Claude 组配置注册 UMAPIS 未计费预览模型。 */
 function createUmapisClaudeModel<const TModelId extends UMAPISClaudeModelId>(
   upstreamModel: TModelId,
-  name: string,
-  supportsImageInput = false
+  name: string
 ) {
   return {
     id: `umapis-${upstreamModel}` as const,
@@ -140,7 +139,7 @@ function createUmapisClaudeModel<const TModelId extends UMAPISClaudeModelId>(
     reasoningTransport: "native",
     umapisCredentialGroup: "claude",
     unbilledPreview: true,
-    supportsImageInput,
+    supportsImageInput: true,
     surfaces: ["thread"],
     creator: "anthropic",
   } as const satisfies ChatModel
@@ -293,7 +292,7 @@ const CHAT_MODEL_REGISTRY = [
     "Claude Opus 4.7 Thinking"
   ),
   createUmapisClaudeModel("claude-fable-5", "Claude Fable 5"),
-  createUmapisClaudeModel("claude-opus-5", "Claude Opus 5", true),
+  createUmapisClaudeModel("claude-opus-5", "Claude Opus 5"),
   createUmapisClaudeModel("claude-sonnet-5", "Claude Sonnet 5"),
   createUmapisClaudeModel("claude-opus-4-8", "Claude Opus 4.8"),
   createUmapisClaudeModel(
@@ -312,7 +311,7 @@ const CHAT_MODEL_REGISTRY = [
     reasoningTransport: "native",
     umapisCredentialGroup: "gpt",
     unbilledPreview: true,
-    supportsImageInput: false,
+    supportsImageInput: true,
     surfaces: ["thread"],
     creator: "openai",
   },
@@ -325,7 +324,7 @@ const CHAT_MODEL_REGISTRY = [
     reasoningTransport: "native",
     umapisCredentialGroup: "gpt",
     unbilledPreview: true,
-    supportsImageInput: false,
+    supportsImageInput: true,
     surfaces: ["thread"],
     creator: "openai",
   },
