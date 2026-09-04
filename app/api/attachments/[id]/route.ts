@@ -10,7 +10,7 @@ type RouteContext = { params: Promise<{ id: string }> }
  * 附件的稳定读取入口：302 到短时效 presigned GET。
  * 消息 parts 里持久化的是本路由的相对路径，presigned URL 每次请求现签，天然不过期。
  */
-export async function GET(_req: Request, { params }: RouteContext) {
+export async function GET(req: Request, { params }: RouteContext) {
   const userId = await getCurrentUserId()
   if (!userId) return Response.json({ error: "未登录" }, { status: 401 })
   if (!isR2Configured()) {
@@ -24,7 +24,11 @@ export async function GET(_req: Request, { params }: RouteContext) {
     .limit(1)
   if (!row) return Response.json({ error: "附件不存在" }, { status: 404 })
 
-  return Response.redirect(await presignDownload(row.key), 302)
+  const download = new URL(req.url).searchParams.get("download") === "1"
+  return Response.redirect(
+    await presignDownload(row.key, download ? row.filename : undefined),
+    302
+  )
 }
 
 /** composer 里移除附件时清理 R2 对象与 DB 行 */

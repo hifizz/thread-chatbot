@@ -113,7 +113,17 @@ export async function POST(_req: Request, { params }: RouteContext) {
     return Response.json({ status: "ready", pageCount: extraction.pageCount })
   }
 
-  // 非 PDF 类型：仅确认对象存在即就绪（图片/压缩包/视频一期只存储、不解析内容）
+  if (row.mimeType === "text/plain") {
+    try {
+      new TextDecoder("utf-8", { fatal: true }).decode(
+        await getObjectBytes(row.key)
+      )
+    } catch {
+      return markFailed(userId, id, row.key, "文件内容不是有效的 UTF-8 文本")
+    }
+  }
+
+  // 其他非 PDF 类型：仅确认对象存在即就绪（图片/压缩包/视频一期只存储、不解析内容）
   await db
     .update(attachments)
     .set({ status: "ready", size: actualSize })

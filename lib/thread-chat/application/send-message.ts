@@ -4,6 +4,7 @@ import type { GenerationAcceptedDTO } from "@/lib/thread-chat/contracts/dto"
 import {
   assertAllowedModel,
   assertOwnedReadyAttachments,
+  assertModelSupportsNewAttachments,
   assertThreadReadyForTurn,
   buildUserParts,
   touchProjectAndThread,
@@ -46,6 +47,7 @@ export function sendMessage(
         if (!project) notFound()
         if (project.archivedAt) stateConflict("已归档 Project 不可发送消息")
         await assertThreadReadyForTurn(tx, project.id, thread.id)
+        assertModelSupportsNewAttachments(command.modelId, command.files)
         await assertOwnedReadyAttachments(tx, userId, command.files)
         const [userSequence, assistantSequence] = await allocateThreadSequences(
           tx,
