@@ -119,7 +119,8 @@ export function forkThread(
               role: "user",
               parts: buildUserParts(
                 command.firstTurn.text,
-                command.firstTurn.files
+                command.firstTurn.files,
+                command.anchorText
               ),
               status: "completed",
               finishedAt: now,

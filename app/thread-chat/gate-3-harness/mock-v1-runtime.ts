@@ -9,6 +9,7 @@ import type {
 import { PROJECT_TITLE_FALLBACK } from "@/constants/project-workspace"
 import { textFromMessageParts } from "@/lib/thread-chat/contracts/ui-message"
 import { buildFrozenForkContext } from "@/lib/thread-chat/domain/fork-context"
+import { buildUserParts, userMessageQuoteText } from "@/lib/thread-chat/domain/user-message-parts"
 import type { ThreadChatClient } from "../net/client"
 
 export type Gate3HarnessScenario =
@@ -348,6 +349,7 @@ export function createGate3MockRuntime(
     threadId: string
     sequence: number
     text: string
+    quoteText?: string | null
   }): MessageDTO => {
     const stamp = now()
     return {
@@ -356,7 +358,7 @@ export function createGate3MockRuntime(
       threadId: input.threadId,
       sequence: input.sequence,
       role: "user",
-      parts: [{ type: "text", text: input.text }],
+      parts: buildUserParts(input.text, [], input.quoteText),
       status: "completed",
       modelId: null,
       replacesMessageId: null,
@@ -575,6 +577,7 @@ export function createGate3MockRuntime(
         threadId,
         sequence: nextSequence(threadId),
         text: input.text,
+        quoteText: nextSequence(threadId) === 1 ? thread.anchorText : null,
       })
       const assistant = makeAssistant({
         id: input.assistantMessageId,
@@ -659,6 +662,7 @@ export function createGate3MockRuntime(
         threadId: thread.id,
         sequence: 1,
         text: input.firstTurn.text,
+        quoteText: input.anchorText,
       })
       const assistant = makeAssistant({
         id: input.firstTurn.assistantMessageId,
@@ -698,6 +702,7 @@ export function createGate3MockRuntime(
         threadId: source.threadId,
         sequence: nextSequence(source.threadId),
         text: input.text,
+        quoteText: userMessageQuoteText(source.parts),
       })
       user.replacesMessageId = source.id
       const assistant = makeAssistant({

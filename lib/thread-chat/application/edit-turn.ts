@@ -3,6 +3,7 @@ import { messages } from "@/lib/db/schema"
 import type { EditLatestTurnCommand } from "@/lib/thread-chat/contracts/commands"
 import type { GenerationAcceptedDTO } from "@/lib/thread-chat/contracts/dto"
 import { latestTurn } from "@/lib/thread-chat/domain/timeline"
+import { userMessageQuoteText } from "@/lib/thread-chat/domain/user-message-parts"
 import {
   assertAllowedModel,
   assertOwnedReadyAttachments,
@@ -98,7 +99,11 @@ export function editLatestTurn(
               threadId: source.threadId,
               sequence: userSequence,
               role: "user",
-              parts: buildUserParts(command.text, command.files),
+              parts: buildUserParts(
+                command.text,
+                command.files,
+                userMessageQuoteText(source.parts)
+              ),
               status: "completed",
               replacesMessageId: source.id,
               finishedAt: now,

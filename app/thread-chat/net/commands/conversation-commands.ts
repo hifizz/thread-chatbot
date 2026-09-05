@@ -14,6 +14,10 @@ import type {
   ThreadDTO,
 } from "@/lib/thread-chat/contracts/dto"
 import type { TextAnchor } from "@/lib/thread-chat/domain/text-anchor"
+import {
+  buildUserParts as userParts,
+  userMessageQuoteText,
+} from "@/lib/thread-chat/domain/user-message-parts"
 import type { ConversationStore } from "../../core/store"
 import type { ConversationEntitySnapshot } from "../../core/types"
 import { ThreadChatApiError, type ThreadChatClient } from "../client"
@@ -46,21 +50,6 @@ export interface ForkCommandInput {
   modelId: string
   text?: string
   files?: CommandFileReference[]
-}
-
-function userParts(
-  text: string,
-  files: CommandFileReference[]
-): MessageDTO["parts"] {
-  return [
-    { type: "text", text },
-    ...files.map((file) => ({
-      type: "file" as const,
-      url: file.url,
-      mediaType: file.mediaType,
-      ...(file.filename ? { filename: file.filename } : {}),
-    })),
-  ]
 }
 
 function temporaryMessage(input: {
@@ -325,7 +314,11 @@ export function createConversationCommands(
           threadId: input.threadId,
           sequence,
           role: "user",
-          parts: userParts(command.text, files),
+          parts: userParts(
+            command.text,
+            files,
+            sequence === 1 ? snapshot.threadsById[input.threadId]?.anchorText : null
+          ),
         }),
         temporaryMessage({
           id: command.assistantMessageId,
@@ -416,7 +409,7 @@ export function createConversationCommands(
             threadId: thread.id,
             sequence: 1,
             role: "user",
-            parts: userParts(command.firstTurn.text, files),
+            parts: userParts(command.firstTurn.text, files, command.anchorText),
           }),
           temporaryMessage({
             id: command.firstTurn.assistantMessageId,
@@ -525,7 +518,7 @@ export function createConversationCommands(
           threadId: source.threadId,
           sequence,
           role: "user",
-          parts: userParts(command.text, files),
+          parts: userParts(command.text, files, userMessageQuoteText(source.parts)),
           replacesMessageId: source.id,
         }),
         temporaryMessage({

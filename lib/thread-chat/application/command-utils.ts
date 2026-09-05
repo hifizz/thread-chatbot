@@ -12,6 +12,7 @@ import {
   supportsModelImageInput,
 } from "@/constants/model"
 import type { ThreadChatUIMessage } from "@/lib/thread-chat/contracts/ui-message"
+import type { UserMessageFileReference as FileReference } from "@/lib/thread-chat/domain/user-message-parts"
 import type { ConversationTransaction } from "@/lib/thread-chat/persistence/transaction"
 import { persistentMessageParts } from "@/lib/thread-chat/persistence/message-parts"
 import {
@@ -36,11 +37,8 @@ const IMAGE_ATTACHMENT_MIME_TYPE_SET = new Set<string>(
   IMAGE_ATTACHMENT_MIME_TYPES
 )
 
-export interface FileReference {
-  url: string
-  mediaType: string
-  filename?: string
-}
+export type { UserMessageFileReference as FileReference } from "@/lib/thread-chat/domain/user-message-parts"
+export { buildUserParts } from "@/lib/thread-chat/domain/user-message-parts"
 
 export function assertAllowedModel(modelId: string): void {
   if (!isThreadChatModelId(modelId)) {
@@ -132,21 +130,6 @@ export async function assertOwnedReadyAttachments(
       "附件 mediaType 与服务端记录不一致"
     )
   }
-}
-
-export function buildUserParts(
-  text: string,
-  files: readonly FileReference[]
-): ThreadChatUIMessage["parts"] {
-  return [
-    { type: "text", text },
-    ...files.map((file) => ({
-      type: "file" as const,
-      url: file.url,
-      mediaType: file.mediaType,
-      ...(file.filename ? { filename: file.filename } : {}),
-    })),
-  ]
 }
 
 export function stripTransientParts(

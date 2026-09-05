@@ -424,6 +424,36 @@ try {
   assert.equal(directContext.at(-1).role, "user")
   await settle(directQuestion.assistantMessageId, "completed")
 
+  const selectedQuestion = {
+    commandId: id(), userMessageId: id(), assistantMessageId: id(),
+    modelId, text: "解释划选原文", files: [],
+  }
+  const selectedTurn = await commands.sendMessage(userA, forkCommand.threadId, selectedQuestion)
+  const expectedQuote = { type: "data-quote", data: { text: forkCommand.anchorText } }
+  assert.deepEqual(selectedTurn.result.userMessage.parts[0], expectedQuote)
+  const refreshed = await commands.getProjectBootstrap(userA, projectA)
+  assert.deepEqual(refreshed.messages.find((row) => row.id === selectedQuestion.userMessageId).parts[0], expectedQuote)
+  await settle(selectedQuestion.assistantMessageId, "completed")
+  const editedQuestion = {
+    commandId: id(), userMessageId: id(), assistantMessageId: id(),
+    modelId, text: "修改后的问题", files: [],
+  }
+  const editedTurn = await commands.editLatestTurn(userA, selectedQuestion.userMessageId, editedQuestion)
+  assert.deepEqual(editedTurn.result.generation.userMessage.parts[0], expectedQuote)
+  await settle(editedQuestion.assistantMessageId, "completed")
+  const followup = await commands.sendMessage(userA, forkCommand.threadId, {
+    commandId: id(), userMessageId: id(), assistantMessageId: id(),
+    modelId, text: "第二轮不应重复附加引用", files: [],
+  })
+  assert.equal(followup.result.userMessage.parts.some((part) => part.type === "data-quote"), false)
+  await settle(followup.result.assistantMessage.id, "completed")
+  const selectedImmediate = await commands.forkThread(userA, rootA, {
+    ...forkCommand, commandId: id(), threadId: id(),
+    firstTurn: { userMessageId: id(), assistantMessageId: id(), text: "带首问分叉", files: [] },
+  })
+  assert.deepEqual(selectedImmediate.result.generation.userMessage.parts[0], expectedQuote)
+  await settle(selectedImmediate.result.generation.assistantMessage.id, "completed")
+
   assert.equal(await commands.claimTitleGenerationAttempt(userA, rootA), true)
   assert.equal(await commands.claimTitleGenerationAttempt(userA, rootA), false)
   assert.equal(

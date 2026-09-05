@@ -64,7 +64,11 @@ export function sendMessage(
               threadId: thread.id,
               sequence: userSequence,
               role: "user",
-              parts: buildUserParts(command.text, command.files),
+              parts: buildUserParts(
+                command.text,
+                command.files,
+                userSequence === 1 ? thread.anchorText : null
+              ),
               status: "completed",
               finishedAt: now,
             },

@@ -17,9 +17,14 @@
 
 不新增 Thread 类型、Quote 表或额外模型调用。原有划选分叉继续保存引用文本和锚点，并支持携带首问。
 
+划选分叉的首条用户消息还会保存 `data-quote` part，用于用户气泡内的背景引用块；带首问创建和空分支稍后发送两条路径行为一致。编辑正文保留消息已有引用，后续追问不自动附加引用。无引用分叉不创建该 part。前端即时消息与服务端持久化共用内容构造函数。
+
+历史消息如果已经缺失 `data-quote`，本修复不自动从 Thread 补造，也不改写旧消息：引用是可选内容，不能仅因 Thread 有锚点就把消息中的引用强制恢复。
+
 ## 验证
 
 - `node --import tsx e2e/thread-chat/message-fork.test.mjs`：契约配对、历史截止、空创建、刷新恢复及按钮展示条件。
+- `node --import tsx e2e/thread-chat/fork-quote.test.mjs`：划选首问引用内容、两种入口的即时展示、背景引用块、编辑保留、后续追问和无引用分支。
 - `node --import tsx e2e/thread-chat/normalized-client-store.test.mjs`：现有客户端命令与划选分叉回归。
 - `pnpm typecheck`：类型检查。
 - `pnpm test:thread-chat:gate1-db`：真实数据库覆盖空分叉保存、幂等、权限、来源状态、无引用发送与模型上下文。
