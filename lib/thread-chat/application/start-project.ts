@@ -3,8 +3,10 @@ import { messages, projects, threads } from "@/lib/db/schema"
 import type { StartProjectCommand } from "@/lib/thread-chat/contracts/commands"
 import type { GenerationAcceptedDTO } from "@/lib/thread-chat/contracts/dto"
 import {
+  assertAllowedGenerationSettings,
   assertAllowedModel,
   assertOwnedReadyAttachments,
+  assertModelSupportsNewAttachments,
   buildUserParts,
 } from "@/lib/thread-chat/application/command-utils"
 import { notFound, stateConflict } from "@/lib/thread-chat/application/errors"
@@ -21,6 +23,10 @@ import {
 
 export function startProject(userId: string, command: StartProjectCommand) {
   assertAllowedModel(command.modelId)
+  assertAllowedGenerationSettings(
+    command.modelId,
+    command.generationSettings
+  )
   return withConversationTransaction(async (tx) =>
     executeIdempotentCommand({
       tx,
@@ -39,6 +45,7 @@ export function startProject(userId: string, command: StartProjectCommand) {
           if (existing.userId !== userId) notFound()
           stateConflict("Project 已存在")
         }
+        assertModelSupportsNewAttachments(command.modelId, command.files)
         await assertOwnedReadyAttachments(tx, userId, command.files)
         const now = new Date()
         const [project] = await tx

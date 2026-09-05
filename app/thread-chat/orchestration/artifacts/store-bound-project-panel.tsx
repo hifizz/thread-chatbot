@@ -8,22 +8,28 @@ import type { ConversationCommands } from "../../net/commands/conversation-comma
 import { ProjectPanel } from "./project-panel"
 
 function findMessageElement(messageId: string): HTMLElement | null {
-  return [...document.querySelectorAll<HTMLElement>("[data-thread-chat-message-id]")].find(
-    (element) => element.dataset.threadChatMessageId === messageId
-  ) ?? null
+  return (
+    [
+      ...document.querySelectorAll<HTMLElement>(
+        "[data-thread-chat-message-id]"
+      ),
+    ].find((element) => element.dataset.threadChatMessageId === messageId) ??
+    null
+  )
 }
 
 function revealMessage(messageId: string, attempt = 0) {
   const element = findMessageElement(messageId)
   if (!element) {
-    if (attempt < 8) window.setTimeout(() => revealMessage(messageId, attempt + 1), 60)
+    if (attempt < 8)
+      window.setTimeout(() => revealMessage(messageId, attempt + 1), 60)
     return
   }
   element.scrollIntoView({ behavior: "smooth", block: "center" })
   element.animate(
     [
       { backgroundColor: "transparent" },
-      { backgroundColor: "color-mix(in srgb, currentColor 8%, transparent)" },
+      { backgroundColor: "var(--tc-ink-hover)" },
       { backgroundColor: "transparent" },
     ],
     { duration: 1600, easing: "ease-out" }

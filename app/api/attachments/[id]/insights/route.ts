@@ -2,7 +2,7 @@ import { and, eq } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { attachments } from "@/lib/db/schema"
 import { generateInsights } from "@/lib/attachments/insights"
-import { isMinimaxConfigured } from "@/lib/ai/minimax"
+import { isMinimaxConfigured } from "@/lib/ai/llm/minimax"
 import { getCurrentUserId } from "@/lib/auth/server"
 
 type RouteContext = { params: Promise<{ id: string }> }

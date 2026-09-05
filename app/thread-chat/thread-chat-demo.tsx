@@ -4,11 +4,16 @@ import dynamic from "next/dynamic"
 import { useRouter } from "next/navigation"
 import React, { useCallback, useEffect, useMemo, useState } from "react"
 
-import { DEFAULT_THREAD_CHAT_MODEL_ID } from "@/constants/model"
-import type {
-  MessageDTO,
-  ProjectBootstrapDTO,
-} from "@/lib/thread-chat/contracts/dto"
+import type { GenerationSettings } from "@/constants/generation-settings"
+import { getModelGenerationSettingsCapability } from "@/constants/model"
+import { DEFAULT_THREAD_CHAT_MODEL_ID } from "@/constants/models"
+import { PROJECT_TITLE_FALLBACK } from "@/constants/project-workspace"
+import {
+  GenerationSettingsProvider,
+  useGenerationSettings,
+} from "./chat/composer/generation-settings-context"
+import type { MessageDTO } from "@/lib/thread-chat/contracts/dto"
+import { textFromMessageParts } from "@/lib/thread-chat/contracts/ui-message"
 import {
   activePathArtifacts,
   threadTitle,
@@ -20,6 +25,10 @@ import {
   projectConversationTree,
 } from "./core/projections"
 import { createProjectedConversationStore } from "./core/projected-store"
+import {
+  useProjectListStore,
+  useProjectListStoreApi,
+} from "./core/project-list-store"
 import { selectThreadBusy, selectVisibleMessages } from "./core/selectors"
 import type { Message, MessageFeedback } from "./core/types"
 import { BranchableChat } from "./branching/branchable-chat"
@@ -34,21 +43,23 @@ import type {
 } from "./chat/actions/message-action-commands"
 import type { MessageActionViewState } from "./chat/actions/message-action-types"
 import { kickoffQuestion } from "./net/prompt/prompt-pure"
+import type { CommandFileReference } from "./net/commands/conversation-commands"
 import { removeWorkspaceState } from "./net/persistence/workspace-state"
 import { ThreadColumns } from "./orchestration/columns/thread-columns"
 import type {
   PlacementHint,
   PlacementMode,
 } from "./orchestration/columns/placement"
-import { ThreadChatTopbar } from "./orchestration/navigation/thread-chat-topbar"
+import {
+  ThreadChatMobileMenu,
+  type ThreadChatNavigationProps,
+  ThreadChatTopbar,
+} from "./orchestration/navigation/thread-chat-topbar"
 import {
   ThreadSwitcher,
   type SwitcherMode,
 } from "./orchestration/navigation/thread-switcher"
-import {
-  TreeList,
-  type TreeListItem,
-} from "./orchestration/navigation/tree-list"
+import { TreeList } from "./orchestration/navigation/tree-list"
 import { StoreBoundProjectPanel } from "./orchestration/artifacts/store-bound-project-panel"
 import type { CanvasChatActions } from "./orchestration/canvas/canvas-actions"
 import { HelpPanel, UsageHint } from "./orchestration/overlays/help-panel"
@@ -71,7 +82,6 @@ const ThreadCanvas = dynamic(
   }
 )
 
-const SUBTITLE_FALLBACK = "新对话"
 const MAIN_SUBTITLE_MAX_LEN = 28
 const EMPTY_SLOTS: [] = []
 
@@ -79,33 +89,18 @@ function compactTitle(text: string, maxLength: number): string {
   return text.length > maxLength ? `${text.slice(0, maxLength)}…` : text
 }
 
-function messageText(message: MessageDTO): string {
-  return message.parts
-    .filter(
-      (part): part is Extract<MessageDTO["parts"][number], { type: "text" }> =>
-        part.type === "text"
-    )
-    .map((part) => part.text)
-    .join("")
-    .trim()
-}
-
-function deriveProjectTitle(bootstrap: ProjectBootstrapDTO): string {
-  const rootThreadId = bootstrap.project?.rootThreadId
-  if (!rootThreadId) return SUBTITLE_FALLBACK
-  const firstUserText = bootstrap.messages
-    .filter(
-      (message) =>
-        message.threadId === rootThreadId &&
-        message.role === "user" &&
-        message.supersededAt === null
-    )
-    .sort((left, right) => left.sequence - right.sequence)
-    .map(messageText)
-    .find(Boolean)
-  return firstUserText
-    ? compactTitle(firstUserText, MAIN_SUBTITLE_MAX_LEN)
-    : SUBTITLE_FALLBACK
+function messageFileReferences(message: MessageDTO): CommandFileReference[] {
+  return message.parts.flatMap((part) =>
+    part.type === "file"
+      ? [
+          {
+            url: part.url,
+            mediaType: part.mediaType,
+            ...(part.filename ? { filename: part.filename } : {}),
+          },
+        ]
+      : []
+  )
 }
 
 function legacyFeedback(value: "up" | "down" | null): MessageFeedback | null {
@@ -116,6 +111,15 @@ function normalizedFeedback(
   value: MessageFeedback | null
 ): "up" | "down" | null {
   return value === "positive" ? "up" : value === "negative" ? "down" : null
+}
+
+function generationSettingsInput(
+  modelId: string,
+  settings: GenerationSettings
+): { generationSettings?: GenerationSettings } {
+  return getModelGenerationSettingsCapability(modelId)
+    ? { generationSettings: settings }
+    : {}
 }
 
 function actionResult(input: {
@@ -162,7 +166,11 @@ export function ThreadChatDemo({ treeId }: { treeId: string }) {
       </div>
     )
   }
-  return <NormalizedThreadChat treeId={treeId} runtime={runtime} />
+  return (
+    <GenerationSettingsProvider>
+      <NormalizedThreadChat treeId={treeId} runtime={runtime} />
+    </GenerationSettingsProvider>
+  )
 }
 
 function NormalizedThreadChat({
@@ -174,9 +182,13 @@ function NormalizedThreadChat({
 }) {
   const router = useRouter()
   const state = useConversationStore(runtime.store, (value) => value)
+  const { settings: generationSettings } = useGenerationSettings()
   const [draftModelId, setDraftModelId] = useState<string>(
     DEFAULT_THREAD_CHAT_MODEL_ID
   )
+  const projectListStore = useProjectListStoreApi()
+  const projectList = useProjectListStore((value) => value)
+  const currentProjectId = state.project?.id
   const { toast, showToast, dismissToast } = useWorkspaceToast()
   const setThreadModel = useCallback(
     (threadId: string, modelId: string) => {
@@ -260,11 +272,13 @@ function NormalizedThreadChat({
       async retryAssistant(viewThreadId, assistantMessageId) {
         try {
           const threadId = fromConversationViewThreadId(state, viewThreadId)
+          const modelId =
+            state.threadsById[threadId]?.modelId ??
+            DEFAULT_THREAD_CHAT_MODEL_ID
           const result = await runtime.commands.retryMessage({
             messageId: assistantMessageId,
-            modelId:
-              state.threadsById[threadId]?.modelId ??
-              DEFAULT_THREAD_CHAT_MODEL_ID,
+            modelId,
+            ...generationSettingsInput(modelId, generationSettings),
           })
           return actionResult({
             assistantMessageId: result.command.assistantMessageId,
@@ -284,16 +298,16 @@ function NormalizedThreadChat({
             (message) =>
               message.role === "assistant" && message.sequence > source.sequence
           )
+          const modelId =
+            state.threadsById[threadId]?.modelId ??
+            DEFAULT_THREAD_CHAT_MODEL_ID
           const result = await runtime.commands.editLatestTurn({
             userMessageId,
             assistantMessageId: assistant?.id,
-            modelId:
-              state.threadsById[threadId]?.modelId ??
-              DEFAULT_THREAD_CHAT_MODEL_ID,
-            text: source.parts
-              .filter((part) => part.type === "text")
-              .map((part) => part.text)
-              .join(""),
+            modelId,
+            ...generationSettingsInput(modelId, generationSettings),
+            text: textFromMessageParts(source.parts),
+            files: messageFileReferences(source),
           })
           return actionResult({
             userMessageId: result.command.userMessageId,
@@ -316,13 +330,16 @@ function NormalizedThreadChat({
                   message.sequence > source.sequence
               )
             : undefined
+          const modelId =
+            state.threadsById[threadId]?.modelId ??
+            DEFAULT_THREAD_CHAT_MODEL_ID
           const result = await runtime.commands.editLatestTurn({
             userMessageId,
             assistantMessageId: assistant?.id,
-            modelId:
-              state.threadsById[threadId]?.modelId ??
-              DEFAULT_THREAD_CHAT_MODEL_ID,
+            modelId,
+            ...generationSettingsInput(modelId, generationSettings),
             text,
+            files: source ? messageFileReferences(source) : [],
           })
           return actionResult({
             userMessageId: result.command.userMessageId,
@@ -349,33 +366,50 @@ function NormalizedThreadChat({
         }
       },
     }),
-    [runtime.commands, state, treeId]
+    [generationSettings, runtime.commands, state, treeId]
   )
 
   const send = useCallback(
-    (viewThreadId: string, text: string) => {
+    (viewThreadId: string, text: string, files: CommandFileReference[] = []) => {
       const current = runtime.store.getState()
       const normalizedThreadId = fromConversationViewThreadId(
         current,
         viewThreadId
       )
+      const modelId = current.project
+        ? (current.threadsById[normalizedThreadId]?.modelId ?? draftModelId)
+        : draftModelId
+      const settingsInput = generationSettingsInput(
+        modelId,
+        generationSettings
+      )
       const operation = current.project
         ? runtime.commands.sendMessage({
             threadId: normalizedThreadId,
-            modelId:
-              current.threadsById[normalizedThreadId]?.modelId ?? draftModelId,
+            modelId,
+            ...settingsInput,
             text,
+            files,
           })
         : runtime.commands.startProject({
             projectId: treeId,
-            modelId: draftModelId,
+            modelId,
+            ...settingsInput,
             text,
+            files,
           })
       void operation.catch((error) =>
         showToast(error instanceof Error ? error.message : "发送失败，请重试")
       )
     },
-    [draftModelId, runtime.commands, runtime.store, showToast, treeId]
+    [
+      draftModelId,
+      generationSettings,
+      runtime.commands,
+      runtime.store,
+      showToast,
+      treeId,
+    ]
   )
   const stop = useCallback(
     (viewThreadId: string) => {
@@ -443,6 +477,7 @@ function NormalizedThreadChat({
           anchorText: info.text,
           anchor: info.anchor,
           modelId,
+          ...generationSettingsInput(modelId, generationSettings),
           ...(question?.trim() ? { text: question.trim() } : {}),
         })
         .then(({ command }) => {
@@ -458,7 +493,14 @@ function NormalizedThreadChat({
         })
         .catch(() => showToast("创建分支失败，请重试"))
     },
-    [openBranchUI, runtime.commands, runtime.store, showToast, workspace]
+    [
+      generationSettings,
+      openBranchUI,
+      runtime.commands,
+      runtime.store,
+      showToast,
+      workspace,
+    ]
   )
 
   const changeMode = useCallback(
@@ -507,45 +549,44 @@ function NormalizedThreadChat({
     [messageCommands, send, stop]
   )
 
-  const loadTreeItems = useCallback(async (): Promise<TreeListItem[]> => {
-    const projects = await runtime.client.listProjects(false)
-    return Promise.all(
-      projects.map(async (project) => {
-        const bootstrap = await runtime.client.getProject(project.id)
-        return {
-          id: project.id,
-          title:
-            project.customTitle ?? project.autoTitle ?? deriveProjectTitle(bootstrap),
-          updatedAt: project.updatedAt,
-          threadCount: bootstrap.threads.length,
-        }
-      })
-    )
-  }, [runtime.client])
   const renameTreeItem = useCallback(
     async (projectId: string, title: string) => {
-      if (projectId === state.project?.id) {
-        await runtime.commands.renameProject(projectId, title)
-        return
+      const cache = projectListStore.getState()
+      const previousTitle = cache.items?.find(
+        (item) => item.id === projectId
+      )?.title
+      cache.setTitle(projectId, title)
+      try {
+        if (projectId === currentProjectId) {
+          await runtime.commands.renameProject(projectId, title)
+        } else {
+          await runtime.client.renameProject(projectId, {
+            commandId: crypto.randomUUID(),
+            customTitle: title,
+          })
+        }
+      } catch (error) {
+        if (previousTitle !== undefined)
+          projectListStore
+            .getState()
+            .restoreTitle(projectId, title, previousTitle)
+        throw error
       }
-      await runtime.client.renameProject(projectId, {
-        commandId: crypto.randomUUID(),
-        customTitle: title,
-      })
     },
-    [runtime.client, runtime.commands, state.project?.id]
+    [currentProjectId, projectListStore, runtime.client, runtime.commands]
   )
   const deleteTreeItem = useCallback(
     async (projectId: string) => {
-      if (projectId === state.project?.id)
+      if (projectId === currentProjectId)
         await runtime.commands.deleteProject(projectId)
       else
         await runtime.client.deleteProject(projectId, {
           commandId: crypto.randomUUID(),
         })
       removeWorkspaceState(window.localStorage, projectId)
+      projectListStore.getState().remove(projectId)
     },
-    [runtime.client, runtime.commands, state.project?.id]
+    [currentProjectId, projectListStore, runtime.client, runtime.commands]
   )
 
   const mainHasMessage = (tree.threads.main?.messages.length ?? 0) > 0
@@ -554,7 +595,7 @@ function NormalizedThreadChat({
     ?.text.trim()
   const derivedSubtitle = firstUserText
     ? compactTitle(firstUserText, MAIN_SUBTITLE_MAX_LEN)
-    : SUBTITLE_FALLBACK
+    : PROJECT_TITLE_FALLBACK
   const mainSubtitle =
     state.project?.customTitle ?? state.project?.autoTitle ?? derivedSubtitle
   const hintVisible = !hintDismissed && !mainHasMessage
@@ -563,40 +604,45 @@ function NormalizedThreadChat({
     (count, artifact) => count + (artifact.kind === "markdown" ? 1 : 0),
     0
   )
+  const navigationProps: ThreadChatNavigationProps = {
+    viewMode: workspace.viewMode,
+    showHelp: workspace.viewMode === "canvas" || !hintVisible,
+    windowWidth: workspace.windowWidth,
+    forceCols: workspace.forceCols,
+    placementMode: workspace.mode,
+    branchCount,
+    markdownCount,
+    onNewConversation: (openInNewPage) => {
+      const newConversationUrl = `/thread-chat/${crypto.randomUUID()}`
+      if (openInNewPage) {
+        window.open(newConversationUrl, "_blank", "noopener,noreferrer")
+        return
+      }
+
+      // 空树已经是新对话；反复点击不应让 URL 持续变化。
+      if (!mainHasMessage) {
+        showToast("当前就是全新对话，直接开聊吧")
+        return
+      }
+      router.push(newConversationUrl)
+    },
+    onToggleTreeList: toggleTreeList,
+    onOpenHelp: openHelpPanel,
+    onShowColumns: workspace.showColumnsView,
+    onShowCanvas: () => workspace.setViewMode("canvas"),
+    onForceCols: workspace.setForceCols,
+    onPlacementModeChange: changeMode,
+    onToggleThreadTree: toggleGlobalSwitcher,
+    onToggleMarkdown: toggleDrawer,
+  }
 
   return (
-    <div className="tc" ref={rootRef}>
-      <ThreadChatTopbar
-        viewMode={workspace.viewMode}
-        showHelp={workspace.viewMode === "canvas" || !hintVisible}
-        windowWidth={workspace.windowWidth}
-        forceCols={workspace.forceCols}
-        placementMode={workspace.mode}
-        branchCount={branchCount}
-        markdownCount={markdownCount}
-        onNewConversation={(openInNewPage) => {
-          const newConversationUrl = `/thread-chat/${crypto.randomUUID()}`
-          if (openInNewPage) {
-            window.open(newConversationUrl, "_blank", "noopener,noreferrer")
-            return
-          }
-
-          // 空树已经是新对话；反复点击不应让 URL 持续变化。
-          if (!mainHasMessage) {
-            showToast("当前就是全新对话，直接开聊吧")
-            return
-          }
-          router.push(newConversationUrl)
-        }}
-        onToggleTreeList={toggleTreeList}
-        onOpenHelp={openHelpPanel}
-        onShowColumns={workspace.showColumnsView}
-        onShowCanvas={() => workspace.setViewMode("canvas")}
-        onForceCols={workspace.setForceCols}
-        onPlacementModeChange={changeMode}
-        onToggleThreadTree={toggleGlobalSwitcher}
-        onToggleMarkdown={toggleDrawer}
-      />
+    <div
+      className="tc"
+      data-view-mode={workspace.viewMode}
+      ref={rootRef}
+    >
+      <ThreadChatTopbar {...navigationProps} />
 
       {workspace.viewMode === "columns" ? (
         <ThreadColumns
@@ -616,6 +662,11 @@ function NormalizedThreadChat({
                 state={tree}
                 threadId={viewThreadId}
                 subtitle={viewThreadId === "main" ? mainSubtitle : undefined}
+                mainHeaderActions={
+                  viewThreadId === "main" ? (
+                    <ThreadChatMobileMenu {...navigationProps} />
+                  ) : undefined
+                }
                 intro={
                   viewThreadId === "main" && hintVisible ? (
                     <UsageHint onDismiss={() => setHintDismissed(true)} />
@@ -647,7 +698,7 @@ function NormalizedThreadChat({
                 }}
                 onRetry={(message) => retry(viewThreadId, message)}
                 onStop={() => stop(viewThreadId)}
-                onSend={(text) => send(viewThreadId, text)}
+                onSend={(text, files) => send(viewThreadId, text, files)}
                 messageActionState={messageActionState}
                 messageCommands={messageCommands}
               />
@@ -686,9 +737,12 @@ function NormalizedThreadChat({
         <TreeList
           key={treeList.n}
           currentTreeId={treeId}
-          currentTitle={mainSubtitle ?? SUBTITLE_FALLBACK}
+          currentTitle={mainSubtitle ?? PROJECT_TITLE_FALLBACK}
           currentThreadCount={Object.keys(tree.threads).length}
-          loadItems={loadTreeItems}
+          items={projectList.items}
+          refreshing={projectList.refreshing}
+          loadFailed={projectList.loadFailed}
+          refreshItems={projectList.refresh}
           renameItem={renameTreeItem}
           deleteItem={deleteTreeItem}
           closing={treeList.closing}

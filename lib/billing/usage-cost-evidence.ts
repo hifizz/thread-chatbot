@@ -2,7 +2,7 @@ import type { ChatModelProvider } from "@/constants/model"
 import {
   openRouterCostUsdFromSteps,
   type OpenRouterStepLike,
-} from "@/lib/ai/openrouter"
+} from "@/lib/ai/llm/openrouter"
 import type { UsageCostEvidence } from "@/lib/billing/credits"
 
 type UsageCostEvidenceInput = {

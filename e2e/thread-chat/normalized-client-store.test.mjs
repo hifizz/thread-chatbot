@@ -89,6 +89,7 @@ function bootstrap(overrides = {}) {
     project: project(),
     threads: [thread()],
     messages: [message()],
+    files: [],
     artifacts: [],
     activeGenerationIds: [],
     ...overrides,
@@ -655,6 +656,84 @@ async function testRetryABC() {
   commands.dispose()
 }
 
+async function testCommandFilesPassThrough() {
+  const store = createConversationStore({ bootstrap: bootstrap({ messages: [] }) })
+  const file = {
+    url: `/api/attachments/${crypto.randomUUID()}`,
+    mediaType: "text/plain",
+    filename: "pasted.txt",
+  }
+  let seen
+  const assistant = message({
+    id: crypto.randomUUID(),
+    sequence: 2,
+    status: "generating",
+    error: null,
+    finishedAt: null,
+    parts: [],
+  })
+  const commands = createConversationCommands({
+    store,
+    networkAttempts: 1,
+    createId: () => crypto.randomUUID(),
+    client: {
+      async sendMessage(_threadId, command) {
+        seen = command
+        return {
+          ok: true,
+          replayed: false,
+          data: {
+            project: project(),
+            thread: thread(),
+            userMessage: message({ role: "user", parts: [] }),
+            assistantMessage: assistant,
+            streamUrl: "/files",
+          },
+        }
+      },
+      async getMessage() {
+        return { ...assistant, status: "completed", finishedAt: stamp }
+      },
+      async generateThreadTitle() {
+        return {
+          project: project(),
+          thread: thread(),
+          title: "测试项目",
+          generated: false,
+        }
+      },
+    },
+    fetch: async () =>
+      sseResponse([
+        {
+          type: "terminal",
+          message: { ...assistant, status: "completed", finishedAt: stamp },
+        },
+      ]),
+  })
+  const generationSettings = {
+    effort: "high",
+    maxOutputTokens: 32_000,
+  }
+  const result = await commands.sendMessage({
+    threadId: thread().id,
+    modelId: "test/model",
+    generationSettings,
+    text: "读取附件",
+    files: [file],
+  })
+  assert.deepEqual(seen.files, [file])
+  assert.deepEqual(seen.generationSettings, generationSettings)
+  assert.notEqual(seen.generationSettings, generationSettings)
+  assert.equal(Object.isFrozen(seen.generationSettings), true)
+  assert.deepEqual(
+    store.getState().messagesById[result.command.userMessageId].parts,
+    [{ type: "text", text: "读取附件" }, { type: "file", ...file }]
+  )
+  await result.connection.finished
+  commands.dispose()
+}
+
 async function testCommandNetworkRetryReusesFrozenPayload() {
   const store = createConversationStore({
     bootstrap: bootstrap({ messages: [] }),
@@ -1098,6 +1177,7 @@ await testAcceptedGenerationStartsConnectingBeforeFirstSse()
 await testBootstrapBackgroundPollAndWorkspace()
 await testOptimisticRollbackIsolation()
 await testRetryABC()
+await testCommandFilesPassThrough()
 await testCommandNetworkRetryReusesFrozenPayload()
 await testCommandTitleGenerationUpdatesStore()
 await testPartsProjectionAndWorkspaceIsolation()

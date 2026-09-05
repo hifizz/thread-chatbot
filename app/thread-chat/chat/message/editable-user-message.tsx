@@ -9,6 +9,7 @@ import {
 } from "../actions/message-action-types"
 import { MessageToolbar } from "../actions/message-toolbar"
 import { useCopyMarkdown } from "../actions/use-copy-markdown"
+import { UIMessageSupplementalParts } from "./ui-message-parts"
 
 export function EditableUserMessage({
   threadId,
@@ -89,7 +90,10 @@ export function EditableUserMessage({
             </div>
           </>
         ) : (
-          message.text
+          <>
+            {message.text}
+            <UIMessageSupplementalParts message={message} />
+          </>
         )}
       </div>
       {!editing && (

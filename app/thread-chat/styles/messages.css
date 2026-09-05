@@ -27,7 +27,7 @@
   position: absolute;
   left: 50%;
   bottom: 14px;
-  z-index: 2;
+  z-index: var(--tc-z-column-raised);
   width: 34px;
   height: 34px;
   display: flex;
@@ -35,15 +35,15 @@
   justify-content: center;
   border-radius: 999px;
   border: 1px solid
-    color-mix(in srgb, var(--rule-strong) 55%, transparent);
-  background: color-mix(in srgb, var(--paper) 30%, transparent);
+    var(--tc-border-glass);
+  background: var(--tc-surface-glass);
   -webkit-backdrop-filter: blur(8px);
   backdrop-filter: blur(8px);
-  color: var(--ink-soft);
+  color: var(--tc-content-secondary);
   font-size: 15px;
   line-height: 1;
   cursor: pointer;
-  box-shadow: 0 4px 14px -6px rgba(30, 26, 20, 0.35);
+  box-shadow: 0 4px 14px -6px var(--tc-shadow-float);
   opacity: 1;
   transform: translateX(-50%) translateY(0);
   transition:
@@ -53,8 +53,8 @@
     background-color 0.2s ease;
 }
 .tc .scroll-end-btn:hover {
-  border-color: var(--rule-strong);
-  background: color-mix(in srgb, var(--paper) 90%, transparent);
+  border-color: var(--tc-border-strong);
+  background: var(--tc-surface-glass-hover);
   transform: translateX(-50%) translateY(0) scale(1.1);
 }
 .tc .scroll-end-icon {
@@ -72,17 +72,17 @@
   margin: 0 0 15px;
   padding: 11px 13px;
   border-radius: 9px;
-  font-size: 12.5px;
+  font-size: 12px;
   line-height: 1.55;
-  background: var(--surface);
-  border: 1px solid var(--rule-strong);
-  color: var(--ink-soft);
+  background: var(--tc-surface-plain);
+  border: 1px solid var(--tc-border-strong);
+  color: var(--tc-content-secondary);
   display: flex;
   gap: 9px;
   align-items: flex-start;
 }
 .tc .hint b {
-  color: var(--ink);
+  color: var(--tc-content-primary);
 }
 /* 功能要点列表：每个要点独占一行，行距略松、缩进克制（小圆点标记居外侧） */
 .tc .hint ul {
@@ -95,7 +95,7 @@
   margin: 3px 0;
 }
 .tc .hint li::marker {
-  color: var(--ink-faint);
+  color: var(--tc-content-muted);
 }
 .tc .hint .close {
   margin-left: auto;
@@ -103,7 +103,7 @@
   border: 0;
   background: transparent;
   cursor: pointer;
-  color: var(--ink-faint);
+  color: var(--tc-content-muted);
   flex: none;
   font: inherit;
   line-height: inherit;
@@ -118,11 +118,12 @@
   max-width: 100%;
 }
 .tc .message .who {
-  font-family: var(--font-mono);
+  font-family: var(--tc-typography-family-code);
   font-size: 10px;
+  /* tc-review: 非偶数值，保留 0.6px 字距以维持 who 标签辨识度 */
   letter-spacing: 0.6px;
   text-transform: uppercase;
-  color: var(--ink-faint);
+  color: var(--tc-content-muted);
   margin-bottom: 5px;
 }
 .tc .message.user {
@@ -131,7 +132,7 @@
   align-items: flex-end;
 }
 .tc .message.user .bubble {
-  background: var(--user-bg);
+  background: var(--tc-surface-sunken);
   border-radius: 13px 13px 3px 13px;
   padding: 9px 13px;
   font-size: 14px;
@@ -140,10 +141,10 @@
   white-space: pre-wrap;
 }
 .tc .message.assistant .bubble {
-  font-family: var(--font-read);
+  font-family: var(--tc-typography-family-read);
   font-size: 15px;
   line-height: 1.72;
-  color: var(--ink);
+  color: var(--tc-content-primary);
 }
 .tc .message.assistant .bubble p {
   /*p(strong) ~ li 的内容，需要看起来舒服一点*/
@@ -154,17 +155,17 @@
 }
 
 .tc .anchored {
-  border-bottom: 2px solid color-mix(in srgb, var(--fc) 55%, transparent);
-  background: color-mix(in srgb, var(--fc) 9%, transparent);
+  border-bottom: 2px solid var(--tc-fc-underline);
+  background: var(--tc-fc-wash);
   border-radius: 2px;
   padding: 0 1px;
   cursor: pointer;
 }
 .tc sup.fnote {
-  font-family: var(--font-mono);
+  font-family: var(--tc-typography-family-code);
   font-size: 10px;
   font-weight: 700;
-  color: var(--on-accent);
+  color: var(--tc-content-on-accent);
   cursor: pointer;
   background: var(--fc);
   border-radius: 4px;
@@ -178,31 +179,31 @@
   filter: brightness(1.1);
 }
 .tc .fc-1 {
-  --fc: var(--d1);
+  --fc: var(--tc-depth-1);
 }
 .tc .fc-2 {
-  --fc: var(--d2);
+  --fc: var(--tc-depth-2);
 }
 .tc .fc-3 {
-  --fc: var(--d3);
+  --fc: var(--tc-depth-3);
 }
 .tc .fc-4 {
-  --fc: var(--d4);
+  --fc: var(--tc-depth-4);
 }
 .tc .fc-5 {
-  --fc: var(--d5);
+  --fc: var(--tc-depth-5);
 }
 
 /* user 气泡内的划选引用条：随提问消息落库并随消息呈现。 */
 .tc .message.user .msg-quote {
   margin: 0 0 6px;
   padding: 3px 8px;
-  border-left: 2px solid color-mix(in srgb, var(--ink) 35%, transparent);
-  background: color-mix(in srgb, var(--ink) 6%, transparent);
+  border-left: 2px solid var(--tc-ink-edge);
+  background: var(--tc-ink-wash);
   border-radius: 4px;
   font-size: 12px;
   line-height: 1.5;
-  color: color-mix(in srgb, var(--ink) 72%, transparent);
+  color: var(--tc-ink-subdued);
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;

@@ -3,7 +3,7 @@
  * orchestration/tree-list —— 会话列表弹层（⌘⇧K / 顶栏「对话列表」按钮）。
  *
  * 视觉沿用 ⌘K 切换器的 swx 弹层语言（tlx-* 类在 CSS 里复用同一套 token）；
- * 数据每次打开现拉（design D3：无缓存/无轮询，壳层以重挂方式打开保证归零）。
+ * 数据由 thread-chat layout 级 Store 预取并缓存；每次打开先展示缓存，再后台刷新一次。
  * · 条目 = 展示标题（coalesce 双轨，服务端已做）+ 相对更新时间 + 分支数徽标；
  * · 当前树高亮置顶——尚未入库（空树未保存）时以本地信息合成「未保存」条目；
  * · 内联重命名（悬停铅笔 → 输入框，Enter 提交 / Esc 取消 / 失焦放弃）：
@@ -28,16 +28,10 @@ import {
   CUSTOM_TITLE_MAX_LEN,
   THREAD_CHAT_SHORTCUTS,
 } from "@/constants/thread-chat"
+import type { ProjectListItemDTO } from "@/lib/thread-chat/contracts/dto"
 import { dialogCloseToShell } from "../overlays/dialog-close-to-shell"
 import { ShortcutHint } from "../overlays/shortcut-hint"
 import { TreeListRow } from "./tree-list-row"
-
-export interface TreeListItem {
-  id: string
-  title: string
-  updatedAt: string
-  threadCount: number
-}
 
 export interface TreeListProps {
   /** 当前打开的树（用于高亮置顶与「未保存」合成） */
@@ -45,7 +39,12 @@ export interface TreeListProps {
   /** 当前树的本地合成信息：未入库时用它拼「未保存」条目 */
   currentTitle: string
   currentThreadCount: number
-  loadItems(): Promise<TreeListItem[]>
+  /** layout 级 Store 中的内存缓存；null 表示预取尚未成功。 */
+  items: ProjectListItemDTO[] | null
+  refreshing: boolean
+  loadFailed: boolean
+  /** 获取最新列表；页面预取尚未结束时会复用同一个请求。 */
+  refreshItems(): Promise<ProjectListItemDTO[]>
   renameItem(projectId: string, title: string): Promise<void>
   deleteItem(projectId: string): Promise<void>
   /** 点击非当前树条目：壳层负责跳转（组件已先自关） */
@@ -67,7 +66,10 @@ export function TreeList({
   currentTreeId,
   currentTitle,
   currentThreadCount,
-  loadItems,
+  items,
+  refreshing,
+  loadFailed,
+  refreshItems,
   renameItem,
   deleteItem,
   onSwitch,
@@ -78,8 +80,6 @@ export function TreeList({
   closing = false,
   container,
 }: TreeListProps) {
-  /** null = 拉取中 */
-  const [items, setItems] = useState<TreeListItem[] | null>(null)
   /** 内联重命名中的树 id + 草稿 */
   const [editingId, setEditingId] = useState<string | null>(null)
   const [draft, setDraft] = useState("")
@@ -88,16 +88,10 @@ export function TreeList({
   /** 删除请求进行中的树 id（防连点） */
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
-  // 打开现拉（组件每次打开重挂，天然只拉一次）
+  // 缓存已在首帧展示；组件每次打开重挂，并在后台刷新一次。
   useEffect(() => {
-    let cancelled = false
-    void loadItems().then((trees) => {
-      if (!cancelled) setItems(trees)
-    })
-    return () => {
-      cancelled = true
-    }
-  }, [loadItems])
+    void refreshItems().catch(() => undefined)
+  }, [refreshItems])
 
   // Esc：编辑态 / 确认态在捕获期先于壳层关闭链被消费
   useEffect(() => {
@@ -119,19 +113,23 @@ export function TreeList({
   const saved = items ?? []
   const currentSaved = saved.find((t) => t.id === currentTreeId) ?? null
   const rest = saved.filter((t) => t.id !== currentTreeId)
-  const currentRow: TreeListItem = currentSaved ?? {
+  const currentRow: ProjectListItemDTO = currentSaved ?? {
     id: currentTreeId,
     title: currentTitle,
     updatedAt: "",
     threadCount: currentThreadCount,
   }
-  const rows: { item: TreeListItem; isCurrent: boolean; unsaved: boolean }[] = [
+  const rows: {
+    item: ProjectListItemDTO
+    isCurrent: boolean
+    unsaved: boolean
+  }[] = [
     { item: currentRow, isCurrent: true, unsaved: currentSaved === null },
     ...rest.map((item) => ({ item, isCurrent: false, unsaved: false })),
   ]
 
   /* ---------- 内联重命名：乐观更新 + 失败回滚（design D5） ---------- */
-  function startEdit(item: TreeListItem) {
+  function startEdit(item: ProjectListItemDTO) {
     setConfirmId(null)
     setEditingId(item.id)
     setDraft(item.title)
@@ -153,18 +151,12 @@ export function TreeList({
       onToast("当前对话尚未保存，发出第一条消息后才能重命名")
       return
     }
-    setItems((list) =>
-      (list ?? []).map((t) => (t.id === id ? { ...t, title: next } : t))
-    )
     renameItem(id, next)
       .then(() => {
         // 改的是当前树：通知壳层同步本地 customTitle（主线列头副标题即时更新）
         if (id === currentTreeId) onRenamedCurrent?.(next)
       })
       .catch(() => {
-        setItems((list) =>
-          (list ?? []).map((t) => (t.id === id ? { ...t, title: prev } : t))
-        )
         onToast("重命名失败，已恢复原名")
       })
   }
@@ -181,7 +173,6 @@ export function TreeList({
       return
     }
     const remaining = (items ?? []).filter((t) => t.id !== id)
-    setItems(remaining)
     setDeletingId(null)
     if (id === currentTreeId) {
       // 跳剩余最近一棵（列表本就按 updated_at 降序）；一棵不剩开新树
@@ -218,9 +209,23 @@ export function TreeList({
               {...THREAD_CHAT_SHORTCUTS.openTreeList}
               className="ml-auto shrink-0"
             />
+            {refreshing && (
+              <div
+                className="tlx-refresh"
+                role="progressbar"
+                aria-label="正在更新对话列表"
+              >
+                <span />
+              </div>
+            )}
           </div>
           <div className="swx-list">
-            {items === null && <div className="swx-empty">加载中…</div>}
+            {items === null && !loadFailed && (
+              <div className="swx-empty">加载中…</div>
+            )}
+            {items === null && loadFailed && (
+              <div className="swx-empty">加载失败，请稍后重新打开</div>
+            )}
             {items !== null &&
               rows.map(({ item, isCurrent, unsaved }) => {
                 const editing = editingId === item.id

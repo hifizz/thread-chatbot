@@ -6,18 +6,18 @@
   left: 50%;
   bottom: 26px;
   transform: translateX(-50%) translateY(20px);
-  background: var(--floating-bg);
-  color: #fff;
+  background: var(--tc-surface-ink);
+  color: var(--tc-content-on-floating);
   padding: 10px 14px;
   border-radius: 10px;
   font-size: 13px;
-  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 10px 30px -10px var(--tc-shadow-deep);
   opacity: 0;
   pointer-events: none;
   transition:
     opacity 0.25s,
     transform 0.25s;
-  z-index: 80;
+  z-index: var(--tc-z-toast);
   display: flex;
   align-items: center;
   gap: 12px;
@@ -31,14 +31,14 @@
 .tc .toast .undo {
   cursor: pointer;
   flex: none;
-  border: 1px solid rgba(255, 255, 255, 0.35);
-  background: rgba(255, 255, 255, 0.1);
-  color: #fff;
+  border: 1px solid var(--tc-onink-border-undo);
+  background: var(--tc-onink-fill-soft);
+  color: var(--tc-content-on-floating);
   border-radius: 7px;
   padding: 3px 10px;
   font-size: 12px;
-  font-family: var(--font-ui);
+  font-family: var(--tc-typography-family-ui);
 }
 .tc .toast .undo:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: var(--tc-onink-fill-undo-hover);
 }

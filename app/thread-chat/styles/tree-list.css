@@ -4,22 +4,42 @@
 .tc .swx.tlx {
   width: min(460px, 94vw);
 }
+.tc .tlx > .swx-title {
+  position: relative;
+}
+.tc .tlx-refresh {
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  left: 0;
+  height: 2px;
+  overflow: hidden;
+  pointer-events: none;
+}
+.tc .tlx-refresh span {
+  display: block;
+  width: 38%;
+  height: 100%;
+  background: var(--tc-content-muted);
+  opacity: 0.45;
+  animation: tc-progress-slide 1.4s ease-in-out infinite;
+}
 .tc .tlx-row {
   gap: 8px;
 }
 .tc .tlx-row:hover {
-  background: var(--paper-2);
+  background: var(--tc-surface-raised);
 }
 .tc .tlx-row.cur {
-  background: color-mix(in srgb, var(--d1, var(--d2)) 9%, transparent);
+  background: var(--tc-depth-1-wash);
 }
 .tc .tlx-row.cur .dot {
-  background: var(--d1, var(--d2));
+  background: var(--tc-depth-1);
 }
 .tc .tlx-row .t {
   flex: 1;
   min-width: 0;
-  font-size: 13.5px;
+  font-size: 14px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -32,23 +52,23 @@
   gap: 8px;
 }
 .tc .tlx-badge {
-  font-family: var(--font-mono);
+  font-family: var(--tc-typography-family-code);
   font-size: 10px;
-  color: var(--ink-soft);
-  border: 1px solid var(--rule-strong);
+  color: var(--tc-content-secondary);
+  border: 1px solid var(--tc-border-strong);
   border-radius: 5px;
   padding: 1px 6px;
-  background: var(--paper-2);
+  background: var(--tc-surface-raised);
 }
 .tc .tlx-time {
-  font-family: var(--font-mono);
-  font-size: 10.5px;
-  color: var(--ink-faint);
+  font-family: var(--tc-typography-family-code);
+  font-size: 10px;
+  color: var(--tc-content-muted);
 }
 .tc .tlx-unsaved {
-  color: var(--d2);
-  border-color: color-mix(in srgb, var(--d2) 45%, transparent);
-  background: color-mix(in srgb, var(--d2) 8%, transparent);
+  color: var(--tc-depth-2);
+  border-color: var(--tc-depth-2-unsaved-border);
+  background: var(--tc-depth-2-unsaved-bg);
 }
 /* 悬停操作（铅笔 / 垃圾桶）：默认隐藏，行悬停或确认态浮现 */
 .tc .tlx-acts {
@@ -68,27 +88,27 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  border: 1px solid var(--rule-strong);
-  background: var(--surface);
+  border: 1px solid var(--tc-border-strong);
+  background: var(--tc-surface-plain);
   border-radius: 6px;
   padding: 3px 6px;
   font-size: 11px;
-  color: var(--ink-soft);
+  color: var(--tc-content-secondary);
   cursor: pointer;
 }
 .tc .tlx-act:hover {
-  color: var(--ink);
-  border-color: var(--ink-faint);
+  color: var(--tc-content-primary);
+  border-color: var(--tc-content-muted);
 }
 .tc .tlx-act.danger:hover {
-  color: var(--danger-action);
-  border-color: color-mix(in srgb, var(--danger-action) 50%, transparent);
+  color: var(--tc-danger);
+  border-color: var(--tc-danger-edge);
 }
 /* 二段删除的确认态：醒目但不弹全局 modal */
 .tc .tlx-act.danger.confirm {
-  color: var(--on-accent);
-  background: var(--danger-action);
-  border-color: var(--danger-action);
+  color: var(--tc-content-on-accent);
+  background: var(--tc-danger);
+  border-color: var(--tc-danger);
   font-weight: 600;
 }
 .tc .tlx-act.danger.confirm:hover {
@@ -102,12 +122,12 @@
 .tc .tlx-edit {
   flex: 1;
   min-width: 0;
-  border: 1px solid var(--d1, var(--d2));
+  border: 1px solid var(--tc-depth-1);
   border-radius: 6px;
   padding: 3px 7px;
-  font-family: var(--font-ui);
+  font-family: var(--tc-typography-family-ui);
   font-size: 13px;
-  color: var(--ink);
-  background: var(--surface);
+  color: var(--tc-content-primary);
+  background: var(--tc-surface-plain);
   outline: none;
 }

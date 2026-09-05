@@ -1,7 +1,18 @@
 import { and, eq, inArray, isNull } from "drizzle-orm"
 import { attachments, messages, projects, threads } from "@/lib/db/schema"
-import { ATTACHMENT_URL_PREFIX } from "@/constants/attachment"
-import { isThreadChatModelId } from "@/constants/model"
+import {
+  ATTACHMENT_URL_PREFIX,
+  IMAGE_ATTACHMENT_LIMITS,
+  IMAGE_ATTACHMENT_MIME_TYPES,
+  IMAGE_MODEL_VALIDATION_MESSAGE,
+} from "@/constants/attachment"
+
+import type { GenerationSettings } from "@/constants/generation-settings"
+import {
+  getModelGenerationSettingsCapability,
+  isThreadChatModelId,
+  supportsModelImageInput,
+} from "@/constants/model"
 import type { ThreadChatUIMessage } from "@/lib/thread-chat/contracts/ui-message"
 import type { ConversationTransaction } from "@/lib/thread-chat/persistence/transaction"
 import { persistentMessageParts } from "@/lib/thread-chat/persistence/message-parts"
@@ -9,6 +20,23 @@ import {
   ConversationApplicationError,
   stateConflict,
 } from "@/lib/thread-chat/application/errors"
+
+export const THREAD_MESSAGE_ATTACHMENT_MIME_TYPES = [
+  "text/plain",
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+] as const
+
+const THREAD_MESSAGE_ATTACHMENT_MIME_TYPE_SET = new Set<string>(
+  THREAD_MESSAGE_ATTACHMENT_MIME_TYPES
+)
+
+export { IMAGE_ATTACHMENT_MIME_TYPES }
+
+const IMAGE_ATTACHMENT_MIME_TYPE_SET = new Set<string>(
+  IMAGE_ATTACHMENT_MIME_TYPES
+)
 
 export interface FileReference {
   url: string
@@ -21,6 +49,52 @@ export function assertAllowedModel(modelId: string): void {
     throw new ConversationApplicationError(
       "MODEL_NOT_ALLOWED",
       "当前模型不可用于 ThreadChat"
+    )
+  }
+}
+
+export function assertAllowedGenerationSettings(
+  modelId: string,
+  settings: GenerationSettings | undefined
+): void {
+  if (!settings) return
+  const capability = getModelGenerationSettingsCapability(modelId)
+  if (
+    !capability ||
+    !capability.effortLevels.includes(settings.effort) ||
+    !capability.maxOutputTokenOptions.includes(settings.maxOutputTokens)
+  ) {
+    throw new ConversationApplicationError(
+      "VALIDATION_ERROR",
+      "当前模型不支持所选生成参数"
+    )
+  }
+}
+
+export function hasImageFileReferences(
+  files: readonly FileReference[]
+): boolean {
+  return files.some((file) => IMAGE_ATTACHMENT_MIME_TYPE_SET.has(file.mediaType))
+}
+
+/** 必须在创建生成消息及进入付费模型调用前执行。 */
+export function assertModelSupportsNewAttachments(
+  modelId: string,
+  files: readonly FileReference[]
+): void {
+  const imageCount = files.filter((file) =>
+    IMAGE_ATTACHMENT_MIME_TYPE_SET.has(file.mediaType)
+  ).length
+  if (imageCount > IMAGE_ATTACHMENT_LIMITS.maxFilesPerMessage) {
+    throw new ConversationApplicationError(
+      "VALIDATION_ERROR",
+      `单次最多添加 ${IMAGE_ATTACHMENT_LIMITS.maxFilesPerMessage} 张图片`
+    )
+  }
+  if (imageCount > 0 && !supportsModelImageInput(modelId)) {
+    throw new ConversationApplicationError(
+      "VALIDATION_ERROR",
+      IMAGE_MODEL_VALIDATION_MESSAGE
     )
   }
 }
@@ -44,8 +118,18 @@ export async function assertOwnedReadyAttachments(
       "附件 URL 不合法"
     )
   }
+  if (
+    files.some(
+      (file) => !THREAD_MESSAGE_ATTACHMENT_MIME_TYPE_SET.has(file.mediaType)
+    )
+  ) {
+    throw new ConversationApplicationError(
+      "VALIDATION_ERROR",
+      "附件类型不允许用于 Thread 消息"
+    )
+  }
   const rows = await tx
-    .select({ id: attachments.id })
+    .select({ id: attachments.id, mimeType: attachments.mimeType })
     .from(attachments)
     .where(
       and(
@@ -56,6 +140,17 @@ export async function assertOwnedReadyAttachments(
     )
   if (new Set(rows.map((row) => row.id)).size !== new Set(ids).size) {
     throw new ConversationApplicationError("NOT_FOUND", "附件不存在")
+  }
+  const mimeTypeById = new Map(rows.map((row) => [row.id, row.mimeType]))
+  if (
+    files.some(
+      (file, index) => mimeTypeById.get(ids[index] as string) !== file.mediaType
+    )
+  ) {
+    throw new ConversationApplicationError(
+      "VALIDATION_ERROR",
+      "附件 mediaType 与服务端记录不一致"
+    )
   }
 }
 

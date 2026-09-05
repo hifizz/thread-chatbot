@@ -25,6 +25,7 @@ import { MessageArtifacts } from "../orchestration/artifacts/message-artifacts"
 import { AnchoredAssistantBody } from "./assistant/anchored-assistant-body"
 import type { MessageActionViewState } from "../chat/actions/message-action-types"
 import type { ThreadMessageActionCommands } from "../chat/actions/message-action-commands"
+import type { CommandFileReference } from "../net/commands/conversation-commands"
 
 export interface BranchableChatProps {
   state: ThreadTreeState
@@ -33,6 +34,7 @@ export interface BranchableChatProps {
   subtitle?: string
   /** 消息列表顶部的插卡（主线 hint） */
   intro?: React.ReactNode
+  mainHeaderActions?: React.ReactNode
   /** 统一意图：打开某会话（本列作为「来源列」参与放置策略）。
       opts.keepSource：⌘/Ctrl 点击 = 保留本列，把目标开在紧邻右侧 */
   onOpenThread: (targetId: string, opts?: { keepSource?: boolean }) => void
@@ -54,7 +56,7 @@ export interface BranchableChatProps {
   composerPrefill?: string
   /** 根 Thread 模型切换意图；分支 selector 仍由本层锁定。 */
   onModelChange: (modelId: string) => void
-  onSend: (text: string) => void
+  onSend: (text: string, files: CommandFileReference[]) => void
   messageActionState?: MessageActionViewState
   messageCommands?: ThreadMessageActionCommands
 }
@@ -64,6 +66,7 @@ export function BranchableChat({
   threadId,
   subtitle,
   intro,
+  mainHeaderActions,
   onOpenThread,
   onOpenArtifact,
   onCrumbNav,
@@ -138,7 +141,10 @@ export function BranchableChat({
             <div className="ctitle-row">
               <span className="anchor-tag">锚定</span>
               <span className="ctitle main">主线</span>
-              <div className="cactions">{subtreeBtn}</div>
+              <div className="cactions">
+                {subtreeBtn}
+                {mainHeaderActions}
+              </div>
             </div>
             {subtitle && <div className="col-sub">{subtitle}</div>}
           </>

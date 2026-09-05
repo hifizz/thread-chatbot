@@ -4,7 +4,7 @@
  */
 
 import type { ThreadTreeState } from "./types"
-import { DEFAULT_THREAD_CHAT_MODEL_ID } from "@/constants/model"
+import { DEFAULT_THREAD_CHAT_MODEL_ID } from "@/constants/models"
 import { THREAD_TREE_SCHEMA_VERSION } from "@/constants/thread-chat"
 
 export function emptySeedState(): ThreadTreeState {

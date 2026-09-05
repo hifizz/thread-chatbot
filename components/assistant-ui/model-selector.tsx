@@ -49,9 +49,9 @@ export type ModelOption = {
   description?: string
   icon?: ReactNode
   disabled?: boolean
-  /** 二级选择面板使用的供应商标识与展示名。 */
-  providerId?: string
-  providerName?: string
+  /** 二级选择面板使用的中性分组标识与展示名。 */
+  groupId?: string
+  groupName?: string
   /** Extra terms matched by ModelSelector.Search, in addition to id and name. */
   keywords?: readonly string[]
   /**
@@ -452,10 +452,10 @@ function ModelSelectorList({
       Array.from(
         new Map(
           models
-            .filter((model) => model.providerId)
+            .filter((model) => model.groupId)
             .map((model) => [
-              model.providerId!,
-              model.providerName ?? model.providerId!,
+              model.groupId!,
+              model.groupName ?? model.groupId!,
             ])
         ),
         ([id, name]) => ({ id, name })
@@ -463,16 +463,16 @@ function ModelSelectorList({
     [models]
   )
   const [activeProviderId, setActiveProviderId] = useState(
-    selectedModel?.providerId ?? providers[0]?.id
+    selectedModel?.groupId ?? providers[0]?.id
   )
 
   useEffect(() => {
-    if (selectedModel?.providerId) setActiveProviderId(selectedModel.providerId)
-  }, [selectedModel?.providerId])
+    if (selectedModel?.groupId) setActiveProviderId(selectedModel.groupId)
+  }, [selectedModel?.groupId])
 
   const grouped = providers.length > 0
   const visibleModels = grouped
-    ? models.filter((model) => model.providerId === activeProviderId)
+    ? models.filter((model) => model.groupId === activeProviderId)
     : models
 
   return (
@@ -491,7 +491,7 @@ function ModelSelectorList({
             <div
               className="flex flex-col gap-0.5 border-e bg-muted/35 p-1"
               role="tablist"
-              aria-label="模型供应商"
+              aria-label="模型分组"
             >
               {providers.map((provider) => (
                 <button

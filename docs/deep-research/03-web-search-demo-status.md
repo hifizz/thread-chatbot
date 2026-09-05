@@ -27,11 +27,11 @@
 - 已完成的联网活动随消息保存，刷新页面后仍可看到。
 - 面板和正文来源使用同一批工具结果，内部重试或参数错误不作为主要用户状态展示。
 
-### 4. UMAPIS Claude 工具调用兼容
+### 4. LLM provider 路由
 
-- UMAPIS Claude 凭据组改用官方 `@ai-sdk/anthropic` 适配器。
-- UMAPIS GPT 凭据组继续使用 OpenAI-compatible 适配器。
-- 该拆分用于解决 Claude 兼容端点在工具调用流中出现的响应管道错误。
+- 聊天模型通过服务端统一解析入口创建 AI SDK `LanguageModel`。
+- 客户端只消费公开模型选项，路由地址和凭据不进入模型目录。
+- 具体渠道和模型 allowlist 以 `lib/ai/llm/` 的服务端配置为准。
 
 ### 5. Markdown 产物工具降噪
 

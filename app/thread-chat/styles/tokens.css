@@ -1,161 +1,17 @@
-/* ── @/thread-chat/styles ── 设计 token 单一来源（.tc 根变量 + box-sizing reset + 基础字体）——theme.ts 的深度映射依赖此处变量名 */
+/* ── @/thread-chat/styles ── 设计 token 单一来源（.tc 根变量）——theme.ts 的深度映射
+   依赖 tokens/depth.css 的变量名。
+   分层模型：primitive（palette.css）→ semantic（surface/content/border/depth/
+   typography/prose/z-index）→ 派生色（color-derived.css，color-mix 唯一归属）；
+   contextual 层（--tc-accent 注入 / .fc-N 类注入 --fc）见 base.css 与各派生注释。
+   区块样式只允许引用 semantic 层；primitive 直引、裸色值、color-mix 均视为违规。 */
 
-/* ==========================================================================
-   Thread Chat 方案⑥优化版 —— 全部样式收敛在 .tc 作用域下
-   视觉语言：手稿批注风（paper / ink）+ 脚注式分支标记 + 深度分色
-   ========================================================================== */
-
-.tc {
-  --paper: #fdfbf8;
-  --paper-2: #f4f0e9;
-  --paper-header: #faf8f2;
-  --surface: #fff;
-  /* Kbd 比纸面底色略深，提供可辨识的键帽层次而不过分抢眼。 */
-  --kbd-bg: color-mix(in srgb, var(--paper) 65%, var(--paper-2));
-  --ink: #24211b;
-  --ink-soft: #6a6357;
-  --ink-faint: #a79e8d;
-  --rule: #efece4;
-  --rule-strong: #d3cbb8;
-  --user-bg: #e8e2d3;
-  --d1: #2f7d6b;
-  --d2: #b07d2e;
-  --d3: #a94f5e;
-  --d4: #5568a3;
-  --d5: #7a5ea8;
-  --thread-neutral: #8a8377;
-  --on-accent: #fff;
-  /* 深底浮层独立于正文墨色，主题切换时仍保持浅色文字。 */
-  --floating-bg: #24211b;
-  --overlay: rgba(30, 26, 20, 0.18);
-  --code-bg: #fcfcfc;
-  --code-ink: #8e2626;
-  --table-rule: #dfdedb;
-  --table-head: #eeeeed;
-  --legacy-code-bg: #2b2820;
-  --legacy-code-ink: #f0ead8;
-  --minimap-bg: #fbf9f2;
-  --minimap-node: #e6dfd0;
-  --minimap-mask: rgba(245, 242, 234, 0.75);
-  --danger: #a8443a;
-  --danger-bg: #fbeae7;
-  --danger-border: #e3b3ac;
-  --danger-border-strong: #d98f85;
-  --danger-action: #b03a2e;
-  --warning-bg: #f4f0e4;
-  --warning-ink: #6a5f43;
-  --warning-border: #e4dbc1;
-  /* 项目工作区现有浅色语义色，深色在下方统一覆盖。 */
-  --project-ink: #526a5a;
-  --project-selected-bg: #e8ece8;
-  --project-selected-ink: #31473a;
-  --project-error-bg: #f9e8e3;
-  --project-error-ink: #8a3f30;
-  --project-error-border: #ecc9bf;
-  --project-focus: #718a79;
-  --project-focus-ring: #718a7918;
-  --project-primary: #405c4b;
-  --project-primary-hover: #314a3a;
-  --project-icon-bg: #edf0ec;
-  --project-danger: #9b4334;
-  --project-danger-border: #c98b7e;
-  --project-status-bg: #efeee9;
-  --project-ready-bg: #e5eee8;
-  --project-ready-ink: #3e6650;
-  --project-failed-bg: #f8e7e2;
-  --project-failed-ink: #944537;
-  --project-hover-border: #9aa89d;
-  --font-ui:
-    -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
-    "Hiragino Sans GB", sans-serif;
-  /* 阅读字体：原 demo 用衬线（Georgia/宋体）营造纸面感，用户不喜宋体——
-     改为跟随 UI 无衬线栈；将来想换专门阅读字体仍只改这一处 token */
-  --font-read: var(--font-ui);
-  --font-mono:
-    "SF Mono", ui-monospace, "JetBrains Mono", Menlo, Consolas, monospace;
-  --col-min: 340px;
-  --lane-max: 760px;
-
-  height: 100dvh;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  background: var(--paper);
-  color: var(--ink);
-  font-family: var(--font-ui);
-}
-
-/* 四层基础色与全局 .dark 共用，账户页和 Portal 菜单也沿用同一套颜色。
-   页面 paper → #0b0b0b；次级 paper-2 → #151515；
-   输入/卡片 surface → #1a1a19；用户气泡/强调底色 → #20201f。 */
-.dark .tc {
-  color-scheme: dark;
-  --paper: var(--background);
-  --paper-2: var(--secondary);
-  --paper-header: var(--paper-2);
-  --surface: var(--popover);
-  --user-bg: var(--accent);
-  --kbd-bg: var(--accent);
-  --ink: #e8e6e1;
-  --ink-soft: #b4b1aa;
-  --ink-faint: #8e8b85;
-  --rule: #2b2b29;
-  --rule-strong: #41413d;
-  --d1: #79bca6;
-  --d2: #d2ac69;
-  --d3: #d58f9b;
-  --d4: #96a7da;
-  --d5: #b09bd3;
-  --thread-neutral: var(--ink-faint);
-  --on-accent: var(--paper);
-  --floating-bg: var(--accent);
-  --overlay: rgba(0, 0, 0, 0.6);
-  --code-bg: var(--paper-2);
-  --code-ink: #e6a19a;
-  --table-rule: var(--rule-strong);
-  --table-head: var(--accent);
-  --legacy-code-bg: var(--paper-2);
-  --legacy-code-ink: var(--ink);
-  --minimap-bg: var(--paper-2);
-  --minimap-node: var(--rule-strong);
-  --minimap-mask: color-mix(in srgb, var(--paper) 75%, transparent);
-  --danger: #e49a8f;
-  --danger-bg: color-mix(in srgb, var(--danger) 10%, var(--paper-2));
-  --danger-border: color-mix(in srgb, var(--danger) 35%, var(--paper-2));
-  --danger-border-strong: color-mix(in srgb, var(--danger) 55%, var(--paper-2));
-  --danger-action: var(--danger);
-  --warning-bg: color-mix(in srgb, var(--d2) 10%, var(--paper-2));
-  --warning-ink: var(--d2);
-  --warning-border: color-mix(in srgb, var(--d2) 35%, var(--paper-2));
-  --project-ink: var(--d1);
-  --project-selected-bg: var(--accent);
-  --project-selected-ink: var(--d1);
-  --project-error-bg: var(--danger-bg);
-  --project-error-ink: var(--danger);
-  --project-error-border: var(--danger-border);
-  --project-focus: var(--d1);
-  --project-focus-ring: color-mix(in srgb, var(--d1) 15%, transparent);
-  --project-primary: var(--d1);
-  --project-primary-hover: color-mix(in srgb, var(--d1) 85%, white);
-  --project-icon-bg: var(--accent);
-  --project-danger: var(--danger);
-  --project-danger-border: var(--danger-border-strong);
-  --project-status-bg: var(--accent);
-  --project-ready-bg: color-mix(in srgb, var(--d1) 10%, var(--paper-2));
-  --project-ready-ink: var(--d1);
-  --project-failed-bg: var(--danger-bg);
-  --project-failed-ink: var(--danger);
-  --project-hover-border: var(--d1);
-}
-.tc *,
-.tc *::before,
-.tc *::after {
-  box-sizing: border-box;
-}
-
-/* shadcn Kbd：沿用组件的尺寸与圆角，仅与 thread-chat 纸面 token 对齐。 */
-.tc [data-slot="kbd"] {
-  background-color: var(--kbd-bg);
-  color: var(--ink-soft);
-  font-family: var(--font-mono);
-}
+@import "./tokens/palette.css";
+@import "./tokens/surface.css";
+@import "./tokens/content.css";
+@import "./tokens/border.css";
+@import "./tokens/depth.css";
+@import "./tokens/color-derived.css";
+@import "./tokens/typography.css";
+@import "./tokens/prose.css";
+@import "./tokens/base.css";
+@import "./tokens/z-index.css";

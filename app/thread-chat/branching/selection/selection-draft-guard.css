@@ -23,13 +23,13 @@
   position: absolute;
   top: calc(100% + 7px);
   left: 0;
-  font-family: var(--font-mono);
+  font-family: var(--tc-typography-family-code);
   font-size: 10px;
   line-height: 1;
-  color: #e8e2d4;
+  color: var(--tc-onink-secondary);
   text-shadow:
-    0 1px 2px rgba(30, 26, 20, 0.7),
-    0 0 6px rgba(30, 26, 20, 0.5);
+    0 1px 2px var(--tc-shadow-hint-strong),
+    0 0 6px var(--tc-shadow-hint-soft);
   white-space: nowrap;
   pointer-events: none;
   animation: tc-fade-in 0.12s ease;
@@ -43,8 +43,8 @@
 .tc .sb-confirm-mask {
   position: fixed;
   inset: 0;
-  z-index: 70;
-  background: rgba(30, 26, 20, 0.32);
+  z-index: var(--tc-z-confirm);
+  background: var(--tc-shadow-confirm-mask);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -52,25 +52,25 @@
 }
 .tc .sb-confirm {
   width: min(340px, calc(100vw - 48px));
-  background: var(--paper);
-  color: var(--ink);
-  border: 1px solid color-mix(in srgb, var(--ink) 18%, transparent);
+  background: var(--tc-surface-base);
+  color: var(--tc-content-primary);
+  border: 1px solid var(--tc-ink-confirm-border);
   border-radius: 12px;
   padding: 18px 18px 16px;
-  box-shadow: 0 12px 32px rgba(30, 26, 20, 0.28);
+  box-shadow: 0 12px 32px var(--tc-shadow-confirm);
   animation: tc-pop 0.14s ease;
 }
 .tc .sb-confirm-title {
-  font-family: var(--font-ui);
-  font-size: 15px;
+  font-family: var(--tc-typography-family-ui);
+  font-size: 16px;
   font-weight: 700;
   margin-bottom: 8px;
 }
 .tc .sb-confirm-body {
-  font-family: var(--font-read);
-  font-size: 13px;
+  font-family: var(--tc-typography-family-read);
+  font-size: 14px;
   line-height: 1.55;
-  color: var(--ink-soft);
+  color: var(--tc-content-secondary);
   margin-bottom: 16px;
 }
 .tc .sb-confirm-actions {
@@ -83,26 +83,26 @@
   cursor: pointer;
   border-radius: 8px;
   padding: 7px 14px;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
-  font-family: var(--font-ui);
+  font-family: var(--tc-typography-family-ui);
 }
 .tc .sb-confirm-actions button:focus-visible {
-  outline: 2px solid var(--ink);
+  outline: 2px solid var(--tc-content-primary);
   outline-offset: 1px;
 }
 .tc .sb-confirm-actions button.ghost {
   background: transparent;
-  color: var(--ink-soft);
-  border: 1px solid color-mix(in srgb, var(--ink) 25%, transparent);
+  color: var(--tc-content-secondary);
+  border: 1px solid var(--tc-ink-confirm-action-border);
 }
 .tc .sb-confirm-actions button.ghost:hover {
-  background: var(--paper-2);
-  color: var(--ink);
+  background: var(--tc-surface-raised);
+  color: var(--tc-content-primary);
 }
 .tc .sb-confirm-actions button.danger {
-  background: var(--d3);
-  color: var(--on-accent);
+  background: var(--tc-depth-3);
+  color: var(--tc-content-on-accent);
 }
 .tc .sb-confirm-actions button.danger:hover {
   filter: brightness(1.08);

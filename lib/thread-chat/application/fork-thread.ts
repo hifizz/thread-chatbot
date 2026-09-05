@@ -6,8 +6,10 @@ import type {
 } from "@/lib/thread-chat/contracts/dto"
 import { buildFrozenForkContext } from "@/lib/thread-chat/domain/fork-context"
 import {
+  assertAllowedGenerationSettings,
   assertAllowedModel,
   assertOwnedReadyAttachments,
+  assertModelSupportsNewAttachments,
   buildUserParts,
   touchProjectAndThread,
 } from "@/lib/thread-chat/application/command-utils"
@@ -41,6 +43,10 @@ export function forkThread(
   command: ForkThreadCommand
 ) {
   assertAllowedModel(command.modelId)
+  assertAllowedGenerationSettings(
+    command.modelId,
+    command.generationSettings
+  )
   return withConversationTransaction(async (tx) =>
     executeIdempotentCommand({
       tx,
@@ -93,6 +99,7 @@ export function forkThread(
           await touchProjectAndThread(tx, project.id, child.id)
           return { thread: toThreadDTO(child), generation: null }
         }
+        assertModelSupportsNewAttachments(command.modelId, command.firstTurn.files)
         await assertOwnedReadyAttachments(tx, userId, command.firstTurn.files)
         const [userSequence, assistantSequence] = await allocateThreadSequences(
           tx,

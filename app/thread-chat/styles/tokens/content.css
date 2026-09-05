@@ -1,0 +1,43 @@
+/* ── @/thread-chat/styles/tokens ── content 类目：文本层级（semantic 层） */
+
+.tc {
+  /* 墨色文字层级：正文 → 次级 → 弱化 */
+  --tc-content-primary: var(--tc-palette-ink-900);
+  --tc-content-secondary: var(--tc-palette-ink-600);
+  --tc-content-muted: var(--tc-palette-ink-400);
+  /* 强墨（比正文实、比 primary 淡一档；composer/cv-send 未注入强调色时的墨色回退） */
+  --tc-content-strong: var(--tc-palette-ink-700);
+  /* 实色强调底上的文字（脚注徽章、按钮、edge label） */
+  --tc-content-on-accent: var(--tc-palette-white);
+  /* 恒深色浮层的文字/高亮基色，独立于强调按钮上的文字。 */
+  --tc-content-on-floating: var(--tc-palette-white);
+  /* 墨色实底上的文字（user 编辑主按钮） */
+  --tc-content-on-ink: var(--tc-palette-paper-100);
+  /* 暗色代码块文字 */
+  --tc-content-oncode: var(--tc-palette-code-100);
+  /* 功能红：错误文案 / danger 实色 / 行内代码红 */
+  --tc-content-danger: var(--tc-palette-red-500);
+  --tc-danger: var(--tc-palette-red-600);
+  --tc-danger-deep: var(--tc-palette-red-700);
+
+  /* onink 系：划选气泡墨面之上的文字层级（由亮到暗） */
+  --tc-onink-primary: var(--tc-palette-cream-100);
+  --tc-onink-secondary: var(--tc-palette-cream-200);
+  --tc-onink-muted: var(--tc-palette-cream-300);
+  --tc-onink-faint: var(--tc-palette-cream-400);
+  --tc-onink-placeholder: var(--tc-palette-cream-500);
+
+  /* Project workspace 内容色 */
+  --tc-content-project-accent: var(--tc-palette-project-green-500);
+  --tc-content-project-selected: var(--tc-palette-project-green-700);
+  --tc-content-project-ready: var(--tc-palette-project-green-600);
+  --tc-content-project-error: var(--tc-palette-project-red-700);
+  --tc-content-project-failed: var(--tc-palette-project-red-650);
+  --tc-content-project-danger: var(--tc-palette-project-red-600);
+  --tc-content-project-readonly: var(--tc-palette-project-gold-700);
+}
+
+.dark .tc {
+  --tc-content-on-accent: var(--tc-palette-paper-100);
+  --tc-content-on-ink: var(--tc-palette-white);
+}

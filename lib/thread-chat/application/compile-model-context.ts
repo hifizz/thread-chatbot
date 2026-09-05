@@ -1,11 +1,16 @@
 import { convertToModelMessages, type ModelMessage } from "ai"
 import { db } from "@/lib/db"
 import { INHERITED_CHAR_BUDGET } from "@/constants/thread-chat"
+import { supportsModelImageInput } from "@/constants/model"
 import {
+  applyImageFileMaterializations,
   resolveAttachmentContext,
   type ProjectFileContextStats,
 } from "@/lib/chat/resolve-attachments"
-import type { ThreadChatUIMessage } from "@/lib/thread-chat/contracts/ui-message"
+import {
+  textFromMessageParts,
+  type ThreadChatUIMessage,
+} from "@/lib/thread-chat/contracts/ui-message"
 import {
   applyInheritedBudget,
   omittedNoticeText,
@@ -20,15 +25,7 @@ import { listProjectFileRows } from "@/lib/thread-chat/persistence/project-file-
 import { findOwnedThread } from "@/lib/thread-chat/persistence/thread-repository"
 
 function messageText(message: ThreadChatUIMessage): string {
-  return message.parts
-    .filter(
-      (
-        part
-      ): part is Extract<(typeof message.parts)[number], { type: "text" }> =>
-        part.type === "text"
-    )
-    .map((part) => part.text)
-    .join("\n")
+  return textFromMessageParts(message.parts, "\n")
 }
 
 function asUiMessage(row: {
@@ -54,10 +51,12 @@ export interface CompiledModelContext {
 export async function compileModelContextWithProject({
   userId,
   threadId,
+  modelId,
   excludeAssistantMessageId,
 }: {
   userId: string
   threadId: string
+  modelId: string
   excludeAssistantMessageId?: string
 }): Promise<CompiledModelContext> {
   const thread = await findOwnedThread(db, userId, threadId)
@@ -117,6 +116,7 @@ export async function compileModelContextWithProject({
     messages: uiMessages,
     userId,
     projectFiles,
+    supportsImageInput: supportsModelImageInput(modelId),
   })
   const withProjectContext: ThreadChatUIMessage[] = [
     ...(resolved.projectContext
@@ -156,7 +156,7 @@ export async function compileModelContextWithProject({
     },
   })
   return {
-    messages: modelMessages,
+    messages: applyImageFileMaterializations(modelMessages, resolved.imageFiles),
     projectFileIds: resolved.projectFileIds,
     projectFileStats: resolved.stats,
   }
@@ -166,6 +166,7 @@ export async function compileModelContextWithProject({
 export async function compileModelContext(input: {
   userId: string
   threadId: string
+  modelId: string
   excludeAssistantMessageId?: string
 }): Promise<ModelMessage[]> {
   return (await compileModelContextWithProject(input)).messages

@@ -6,15 +6,15 @@
   width: 30px;
   padding: 12px 0 10px;
   border: none;
-  border-right: 1px solid var(--rule);
-  background: linear-gradient(180deg, var(--paper-header), var(--paper));
+  border-right: 1px solid var(--tc-border-subtle);
+  background: linear-gradient(180deg, var(--tc-surface-bright), var(--tc-surface-base));
   position: relative;
   cursor: pointer;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 9px;
-  font-family: var(--font-ui);
+  font-family: var(--tc-typography-family-ui);
 }
 .tc .col-strip::before {
   content: "";
@@ -23,17 +23,17 @@
   top: 0;
   bottom: 0;
   width: 3px;
-  background: var(--accent);
+  background: var(--tc-accent);
 }
 .tc .col-strip:hover {
-  background: var(--paper-2);
+  background: var(--tc-surface-raised);
 }
 .tc .col-strip .fn {
-  font-family: var(--font-mono);
+  font-family: var(--tc-typography-family-code);
   font-size: 10px;
   font-weight: 700;
-  color: var(--on-accent);
-  background: var(--accent);
+  color: var(--tc-content-on-accent);
+  background: var(--tc-accent);
   border-radius: 4px;
   padding: 2px 4px;
   flex: none;
@@ -48,14 +48,14 @@
   min-height: 0;
   align-self: center;
   text-align: center;
-  font-family: var(--font-read);
+  font-family: var(--tc-typography-family-read);
   font-size: 12px;
   letter-spacing: 2px;
-  color: var(--ink-soft);
+  color: var(--tc-content-secondary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .tc .col-strip:hover .vt {
-  color: var(--ink);
+  color: var(--tc-content-primary);
 }

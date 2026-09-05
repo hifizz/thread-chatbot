@@ -12,6 +12,7 @@ import type {
 } from "@/lib/thread-chat/contracts/dto"
 import type { NormalizedThreadChatState } from "./types"
 import type { MarkdownGenerationProgress } from "@/lib/thread-chat/domain/types"
+import { textFromMessageParts } from "@/lib/thread-chat/contracts/ui-message"
 import type { WebResearchActivity } from "@/lib/chat/web-research-activity"
 import type { ResearchPlan, ResearchRoute } from "@/lib/chat/research-router"
 import { THREAD_TREE_SCHEMA_VERSION } from "@/constants/thread-chat"
@@ -26,13 +27,7 @@ function dataPart<T>(
 }
 
 function messageText(message: MessageDTO): string {
-  return message.parts
-    .filter(
-      (part): part is Extract<typeof part, { type: "text" }> =>
-        part.type === "text"
-    )
-    .map((part) => part.text)
-    .join("")
+  return textFromMessageParts(message.parts)
 }
 
 function projectMessageState(
@@ -148,11 +143,7 @@ export function projectThreadDTO(
       thread.autoTitle ??
       (thread.depth === 0
         ? "主线"
-        : thread.anchorText
-          ? thread.anchorText.length > 13
-            ? `${thread.anchorText.slice(0, 13)}…`
-            : thread.anchorText
-          : selectDisplayTitle(thread)),
+        : (thread.anchorText ?? selectDisplayTitle(thread))),
     anchorText: thread.anchorText,
     forkFromMsgId: thread.forkMessageId,
     footnote: thread.footnote,

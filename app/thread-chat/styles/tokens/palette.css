@@ -1,0 +1,145 @@
+/* ── @/thread-chat/styles/tokens ── primitive 层：色板 + 字体栈（纯值，不代表用途；
+   仅允许被 semantic 层引用，区块样式不得直接使用）。相近色相邻分节聚类（原则②），
+   主题替换只改本文件。 */
+
+.tc {
+  /* ── paper 系（纸面，由浅到深相邻） ───────────────────────────── */
+  --tc-palette-paper-40: #fbf9f2; /* 画布 minimap 纸面 */
+  --tc-palette-paper-50: #faf8f2; /* 顶栏/折叠条/分支列渐变亮端 */
+  --tc-palette-paper-100: #fdfbf8; /* 原 --paper */
+  --tc-palette-paper-200: #f4f0e9; /* 原 --paper-2 */
+  --tc-palette-paper-260: #e6dfd0; /* minimap 节点 */
+  --tc-palette-paper-300: #e8e2d3; /* 原 --user-bg */
+
+  /* ── cream 系（墨面之上的暖白文字，由亮到暗相邻） ──────────────── */
+  --tc-palette-cream-100: #f3efe6; /* 划选气泡引用正文 */
+  --tc-palette-cream-200: #eae4d6; /* ghost 单元文本 */
+  --tc-palette-cream-300: #d8d2c4; /* 角标/后果提示 */
+  --tc-palette-cream-400: #c9c2b4; /* 气泡 lbl */
+  --tc-palette-cream-500: #a9a294; /* 输入占位 */
+
+  /* ── ink 系（墨色，由深到浅相邻） ─────────────────────────────── */
+  --tc-palette-ink-900: #24211b; /* 原 --ink */
+  --tc-palette-ink-700: #3a3733; /* composer 强调回退墨 */
+  --tc-palette-ink-600: #6a6357; /* 原 --ink-soft */
+  --tc-palette-ink-400: #a79e8d; /* 原 --ink-faint */
+
+  /* ── rule 系（分隔线，纸墨之间的过渡，紧邻 ink 系） ─────────────── */
+  --tc-palette-rule-100: #efece4; /* 原 --rule */
+  --tc-palette-rule-200: #d3cbb8; /* 原 --rule-strong */
+
+  /* ── depth 系（分支分色轴 1..5 相邻） ─────────────────────────── */
+  --tc-palette-depth-1: #2f7d6b; /* 原 --d1 */
+  --tc-palette-depth-2: #b07d2e; /* 原 --d2 */
+  --tc-palette-depth-3: #a94f5e; /* 原 --d3 */
+  --tc-palette-depth-4: #5568a3; /* 原 --d4 */
+  --tc-palette-depth-5: #7a5ea8; /* 原 --d5 */
+  --tc-palette-neutral-500: #8a8377; /* 非分支中性（圆点/未注入回退） */
+
+  /* ── code 系（暗色代码块，紧邻 depth 系） ──────────────────────── */
+  --tc-palette-code-900: #2b2820; /* art-code 暗底 */
+  --tc-palette-code-100: #f0ead8; /* art-code 文字 */
+
+  /* ── 功能红系（danger 家族，由深到浅相邻） ─────────────────────── */
+  --tc-palette-red-700: #8e2626; /* 行内代码红 */
+  --tc-palette-red-600: #b03a2e; /* danger 实色 */
+  --tc-palette-red-500: #a8443a; /* 错误文案 */
+  --tc-palette-red-300: #d98f85; /* 错误按钮描边 */
+  --tc-palette-red-200: #e3b3ac; /* 错误条描边 */
+  --tc-palette-red-100: #fbeae7; /* 错误条底 */
+
+  /* ── 白 / 黑 / 阴影基色（veil、遮罩、阴影的基色） ─────────────── */
+  --tc-palette-white: #fff;
+  --tc-palette-black: #000;
+  --tc-palette-control: #fff; /* 可随主题变化的控件底，与恒白色分开 */
+  --tc-palette-neutral-50: #fcfcfc; /* md-code 冷白底 */
+
+  /* ── project workspace 系（项目面板品牌 / 状态色） ─────────────── */
+  --tc-palette-project-green-800: #314a3a;
+  --tc-palette-project-green-700: #31473a;
+  --tc-palette-project-green-600: #405c4b;
+  --tc-palette-project-green-500: #526a5a;
+  --tc-palette-project-green-400: #718a79;
+  --tc-palette-project-green-300: #9aa89d;
+  --tc-palette-project-green-100: #e5eee8;
+  --tc-palette-project-green-80: #e8ece8;
+  --tc-palette-project-green-60: #edf0ec;
+  --tc-palette-project-red-700: #8a3f30;
+  --tc-palette-project-red-650: #944537;
+  --tc-palette-project-red-600: #9b4334;
+  --tc-palette-project-red-300: #c98b7e;
+  --tc-palette-project-red-200: #ecc9bf;
+  --tc-palette-project-red-100: #f8e7e2;
+  --tc-palette-project-red-80: #f9e8e3;
+  --tc-palette-project-gold-700: #6a5f43;
+  --tc-palette-project-gold-200: #e4dbc1;
+  --tc-palette-project-gold-100: #f4f0e4;
+  --tc-palette-project-neutral-100: #efeee9;
+
+  --tc-palette-ink-shadow: #1e1a14; /* rgba(30,26,20,…) 阴影/遮罩基色 */
+
+  /* ── 字体栈 primitive ───────────────────────────────────────── */
+  --tc-font-stack-ui:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+    "Hiragino Sans GB", sans-serif;
+  --tc-font-stack-read: var(--tc-font-stack-ui);
+  --tc-font-stack-mono:
+    "SF Mono", ui-monospace, "JetBrains Mono", Menlo, Consolas, monospace;
+}
+
+/* 深色主题复用原色板名称，语义层和新加入的界面自动继承。 */
+.dark .tc {
+  --tc-palette-paper-40: #151515;
+  --tc-palette-paper-50: #151515;
+  --tc-palette-paper-100: #0b0b0b;
+  --tc-palette-paper-200: #151515;
+  --tc-palette-paper-260: #41413d;
+  --tc-palette-paper-300: #20201f;
+  --tc-palette-control: #1a1a19;
+  --tc-palette-neutral-50: #151515;
+
+  --tc-palette-ink-900: #e8e6e1;
+  --tc-palette-ink-700: #b4b1aa;
+  --tc-palette-ink-600: #b4b1aa;
+  --tc-palette-ink-400: #8e8b85;
+  --tc-palette-rule-100: #2b2b29;
+  --tc-palette-rule-200: #41413d;
+  --tc-palette-neutral-500: #8e8b85;
+
+  --tc-palette-depth-1: #79bca6;
+  --tc-palette-depth-2: #d2ac69;
+  --tc-palette-depth-3: #d58f9b;
+  --tc-palette-depth-4: #96a7da;
+  --tc-palette-depth-5: #b09bd3;
+  --tc-palette-code-900: #151515;
+  --tc-palette-code-100: #e8e6e1;
+
+  --tc-palette-red-700: #e6a19a;
+  --tc-palette-red-600: #e49a8f;
+  --tc-palette-red-500: #e49a8f;
+  --tc-palette-red-300: #875e58;
+  --tc-palette-red-200: #5d4440;
+  --tc-palette-red-100: #2a2221;
+
+  --tc-palette-project-green-800: #8dc6b3;
+  --tc-palette-project-green-700: #79bca6;
+  --tc-palette-project-green-600: #79bca6;
+  --tc-palette-project-green-500: #79bca6;
+  --tc-palette-project-green-400: #79bca6;
+  --tc-palette-project-green-300: #79bca6;
+  --tc-palette-project-green-100: #1f2624;
+  --tc-palette-project-green-80: #20201f;
+  --tc-palette-project-green-60: #20201f;
+  --tc-palette-project-red-700: #e49a8f;
+  --tc-palette-project-red-650: #e49a8f;
+  --tc-palette-project-red-600: #e49a8f;
+  --tc-palette-project-red-300: #875e58;
+  --tc-palette-project-red-200: #5d4440;
+  --tc-palette-project-red-100: #2a2221;
+  --tc-palette-project-red-80: #2a2221;
+  --tc-palette-project-gold-700: #d2ac69;
+  --tc-palette-project-gold-200: #574a32;
+  --tc-palette-project-gold-100: #28241d;
+  --tc-palette-project-neutral-100: #20201f;
+  --tc-palette-ink-shadow: #000;
+}
