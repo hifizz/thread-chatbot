@@ -15,6 +15,11 @@ export const privateRelayModels = defineProviderModels({
       description: "质量优先，适合复杂推理、复杂编码和专业工作。",
     },
     {
+      id: "gpt-6-astra",
+      name: "GPT-6 Astra",
+      description: "质量优先，适合复杂推理、复杂编码和专业工作。",
+    },
+    {
       id: "gpt-5.6-terra",
       name: "GPT-5.6 Terra",
       description: "能力、延迟和配额消耗均衡，推荐用于日常复杂任务。",

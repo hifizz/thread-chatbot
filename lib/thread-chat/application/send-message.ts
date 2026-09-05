@@ -2,6 +2,7 @@ import { messages } from "@/lib/db/schema"
 import type { SendMessageCommand } from "@/lib/thread-chat/contracts/commands"
 import type { GenerationAcceptedDTO } from "@/lib/thread-chat/contracts/dto"
 import {
+  assertAllowedGenerationSettings,
   assertAllowedModel,
   assertOwnedReadyAttachments,
   assertModelSupportsNewAttachments,
@@ -32,6 +33,10 @@ export function sendMessage(
   command: SendMessageCommand
 ) {
   assertAllowedModel(command.modelId)
+  assertAllowedGenerationSettings(
+    command.modelId,
+    command.generationSettings
+  )
   return withConversationTransaction(async (tx) =>
     executeIdempotentCommand({
       tx,

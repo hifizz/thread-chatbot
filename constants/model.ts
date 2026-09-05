@@ -43,7 +43,7 @@ export const THREAD_CHAT_MODELS: readonly ChatModel[] = CHAT_MODELS.filter(
   (model) => model.surfaces.includes("thread")
 )
 
-export const MAX_OUTPUT_TOKENS = 8192
+export const MAX_OUTPUT_TOKENS = 16_000
 
 export function getChatModel(id: string | undefined): ChatModel | undefined {
   return CHAT_MODELS.find((model) => model.id === id)
@@ -53,6 +53,12 @@ export function supportsModelImageInput(
   modelId: string | undefined
 ): boolean {
   return getChatModel(modelId)?.supportsImageInput === true
+}
+
+export function getModelGenerationSettingsCapability(
+  modelId: string | undefined
+) {
+  return getChatModel(modelId)?.capabilities.generationSettings
 }
 
 export function isUnbilledPreviewModel(model: ChatModel): boolean {

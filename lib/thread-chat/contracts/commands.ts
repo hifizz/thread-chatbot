@@ -1,5 +1,10 @@
 import { z } from "zod"
 import {
+  EFFORT_LEVELS,
+  isMaxOutputTokens,
+  type MaxOutputTokens,
+} from "@/constants/generation-settings"
+import {
   PROJECT_INSTRUCTIONS_MAX_CHARS,
   PROJECT_TARGET_MAX_CHARS,
 } from "@/constants/project-workspace"
@@ -8,6 +13,17 @@ const entityIdSchema = z.uuid()
 const commandIdSchema = z.uuid()
 const modelIdSchema = z.string().trim().min(1).max(160)
 const messageTextSchema = z.string().trim().min(1).max(200_000)
+
+export const generationSettingsSchema = z
+  .object({
+    effort: z.enum(EFFORT_LEVELS),
+    maxOutputTokens: z.custom<MaxOutputTokens>(isMaxOutputTokens),
+  })
+  .strict()
+
+const generationSettingsField = {
+  generationSettings: generationSettingsSchema.optional(),
+} as const
 
 const fileReferenceSchema = z
   .object({
@@ -52,6 +68,7 @@ export const startProjectCommandSchema = z
     userMessageId: entityIdSchema,
     assistantMessageId: entityIdSchema,
     modelId: modelIdSchema,
+    ...generationSettingsField,
     ...messageContentFields,
   })
   .strict()
@@ -62,6 +79,7 @@ export const sendMessageCommandSchema = z
     userMessageId: entityIdSchema,
     assistantMessageId: entityIdSchema,
     modelId: modelIdSchema,
+    ...generationSettingsField,
     ...messageContentFields,
   })
   .strict()
@@ -83,6 +101,7 @@ export const forkThreadCommandSchema = z
     anchorText: z.string().trim().min(1).max(20_000),
     anchor: textAnchorSchema,
     modelId: modelIdSchema,
+    ...generationSettingsField,
     firstTurn: firstForkTurnSchema.optional(),
   })
   .strict()
@@ -93,6 +112,7 @@ export const editLatestTurnCommandSchema = z
     userMessageId: entityIdSchema,
     assistantMessageId: entityIdSchema,
     modelId: modelIdSchema,
+    ...generationSettingsField,
     ...messageContentFields,
   })
   .strict()
@@ -102,6 +122,7 @@ export const retryMessageCommandSchema = z
     commandId: commandIdSchema,
     assistantMessageId: entityIdSchema,
     modelId: modelIdSchema,
+    ...generationSettingsField,
   })
   .strict()
 

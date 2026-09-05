@@ -4,8 +4,14 @@ import dynamic from "next/dynamic"
 import { useRouter } from "next/navigation"
 import React, { useCallback, useEffect, useMemo, useState } from "react"
 
+import type { GenerationSettings } from "@/constants/generation-settings"
+import { getModelGenerationSettingsCapability } from "@/constants/model"
 import { DEFAULT_THREAD_CHAT_MODEL_ID } from "@/constants/models"
 import { PROJECT_TITLE_FALLBACK } from "@/constants/project-workspace"
+import {
+  GenerationSettingsProvider,
+  useGenerationSettings,
+} from "./chat/composer/generation-settings-context"
 import type { MessageDTO } from "@/lib/thread-chat/contracts/dto"
 import { textFromMessageParts } from "@/lib/thread-chat/contracts/ui-message"
 import {
@@ -107,6 +113,15 @@ function normalizedFeedback(
   return value === "positive" ? "up" : value === "negative" ? "down" : null
 }
 
+function generationSettingsInput(
+  modelId: string,
+  settings: GenerationSettings
+): { generationSettings?: GenerationSettings } {
+  return getModelGenerationSettingsCapability(modelId)
+    ? { generationSettings: settings }
+    : {}
+}
+
 function actionResult(input: {
   userMessageId?: string
   assistantMessageId: string
@@ -151,7 +166,11 @@ export function ThreadChatDemo({ treeId }: { treeId: string }) {
       </div>
     )
   }
-  return <NormalizedThreadChat treeId={treeId} runtime={runtime} />
+  return (
+    <GenerationSettingsProvider>
+      <NormalizedThreadChat treeId={treeId} runtime={runtime} />
+    </GenerationSettingsProvider>
+  )
 }
 
 function NormalizedThreadChat({
@@ -163,6 +182,7 @@ function NormalizedThreadChat({
 }) {
   const router = useRouter()
   const state = useConversationStore(runtime.store, (value) => value)
+  const { settings: generationSettings } = useGenerationSettings()
   const [draftModelId, setDraftModelId] = useState<string>(
     DEFAULT_THREAD_CHAT_MODEL_ID
   )
@@ -252,11 +272,13 @@ function NormalizedThreadChat({
       async retryAssistant(viewThreadId, assistantMessageId) {
         try {
           const threadId = fromConversationViewThreadId(state, viewThreadId)
+          const modelId =
+            state.threadsById[threadId]?.modelId ??
+            DEFAULT_THREAD_CHAT_MODEL_ID
           const result = await runtime.commands.retryMessage({
             messageId: assistantMessageId,
-            modelId:
-              state.threadsById[threadId]?.modelId ??
-              DEFAULT_THREAD_CHAT_MODEL_ID,
+            modelId,
+            ...generationSettingsInput(modelId, generationSettings),
           })
           return actionResult({
             assistantMessageId: result.command.assistantMessageId,
@@ -276,12 +298,14 @@ function NormalizedThreadChat({
             (message) =>
               message.role === "assistant" && message.sequence > source.sequence
           )
+          const modelId =
+            state.threadsById[threadId]?.modelId ??
+            DEFAULT_THREAD_CHAT_MODEL_ID
           const result = await runtime.commands.editLatestTurn({
             userMessageId,
             assistantMessageId: assistant?.id,
-            modelId:
-              state.threadsById[threadId]?.modelId ??
-              DEFAULT_THREAD_CHAT_MODEL_ID,
+            modelId,
+            ...generationSettingsInput(modelId, generationSettings),
             text: textFromMessageParts(source.parts),
             files: messageFileReferences(source),
           })
@@ -306,12 +330,14 @@ function NormalizedThreadChat({
                   message.sequence > source.sequence
               )
             : undefined
+          const modelId =
+            state.threadsById[threadId]?.modelId ??
+            DEFAULT_THREAD_CHAT_MODEL_ID
           const result = await runtime.commands.editLatestTurn({
             userMessageId,
             assistantMessageId: assistant?.id,
-            modelId:
-              state.threadsById[threadId]?.modelId ??
-              DEFAULT_THREAD_CHAT_MODEL_ID,
+            modelId,
+            ...generationSettingsInput(modelId, generationSettings),
             text,
             files: source ? messageFileReferences(source) : [],
           })
@@ -340,7 +366,7 @@ function NormalizedThreadChat({
         }
       },
     }),
-    [runtime.commands, state, treeId]
+    [generationSettings, runtime.commands, state, treeId]
   )
 
   const send = useCallback(
@@ -350,17 +376,25 @@ function NormalizedThreadChat({
         current,
         viewThreadId
       )
+      const modelId = current.project
+        ? (current.threadsById[normalizedThreadId]?.modelId ?? draftModelId)
+        : draftModelId
+      const settingsInput = generationSettingsInput(
+        modelId,
+        generationSettings
+      )
       const operation = current.project
         ? runtime.commands.sendMessage({
             threadId: normalizedThreadId,
-            modelId:
-              current.threadsById[normalizedThreadId]?.modelId ?? draftModelId,
+            modelId,
+            ...settingsInput,
             text,
             files,
           })
         : runtime.commands.startProject({
             projectId: treeId,
-            modelId: draftModelId,
+            modelId,
+            ...settingsInput,
             text,
             files,
           })
@@ -368,7 +402,14 @@ function NormalizedThreadChat({
         showToast(error instanceof Error ? error.message : "发送失败，请重试")
       )
     },
-    [draftModelId, runtime.commands, runtime.store, showToast, treeId]
+    [
+      draftModelId,
+      generationSettings,
+      runtime.commands,
+      runtime.store,
+      showToast,
+      treeId,
+    ]
   )
   const stop = useCallback(
     (viewThreadId: string) => {
@@ -436,6 +477,7 @@ function NormalizedThreadChat({
           anchorText: info.text,
           anchor: info.anchor,
           modelId,
+          ...generationSettingsInput(modelId, generationSettings),
           ...(question?.trim() ? { text: question.trim() } : {}),
         })
         .then(({ command }) => {
@@ -451,7 +493,14 @@ function NormalizedThreadChat({
         })
         .catch(() => showToast("创建分支失败，请重试"))
     },
-    [openBranchUI, runtime.commands, runtime.store, showToast, workspace]
+    [
+      generationSettings,
+      openBranchUI,
+      runtime.commands,
+      runtime.store,
+      showToast,
+      workspace,
+    ]
   )
 
   const changeMode = useCallback(

@@ -1,9 +1,12 @@
+import type { GenerationSettingsCapability } from "@/constants/generation-settings"
+
 export type ModelSurface = "linear" | "thread"
 
 export type ModelCapabilities = {
   reasoning?: boolean
   attachments?: boolean
   imageInput?: boolean
+  generationSettings?: GenerationSettingsCapability
 }
 
 export type ModelDefinition = {

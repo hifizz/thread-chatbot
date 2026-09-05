@@ -1,4 +1,5 @@
 import type { LanguageModelUsage, TextStreamPart, ToolSet } from "ai"
+import type { GenerationSettings } from "@/constants/generation-settings"
 import { db } from "@/lib/db"
 import type { ThreadChatUIMessageChunk } from "@/lib/thread-chat/contracts/ui-message"
 import { compileModelContextWithProject } from "@/lib/thread-chat/application/compile-model-context"
@@ -109,12 +110,14 @@ async function runGenerationCore({
   session,
   identity,
   observabilityContext,
+  generationSettings,
   dependencies = {},
 }: {
   userId: string
   session: StreamSessionController
   identity: GenerationIdentity
   observabilityContext: ObservabilityContext
+  generationSettings?: GenerationSettings
   dependencies?: RunGenerationDependencies
 }): Promise<GenerationRunResult> {
   const { message, thread, project } = identity
@@ -151,6 +154,7 @@ async function runGenerationCore({
       projectId: message.projectId,
       threadId: thread.id,
       modelId: message.modelId,
+      ...(generationSettings ? { generationSettings } : {}),
       observabilityContext,
       latestUserText: textFromParts(latestUser.parts),
       recentConversation: currentRows
@@ -272,6 +276,7 @@ export async function runGeneration(input: {
   userId: string
   messageId: string
   session: StreamSessionController
+  generationSettings?: GenerationSettings
   dependencies?: RunGenerationDependencies
 }): Promise<void> {
   try {
@@ -289,6 +294,9 @@ export async function runGeneration(input: {
         session: input.session,
         identity,
         observabilityContext: traceInput.context,
+        ...(input.generationSettings
+          ? { generationSettings: input.generationSettings }
+          : {}),
         ...(input.dependencies ? { dependencies: input.dependencies } : {}),
       })
       observation.update({

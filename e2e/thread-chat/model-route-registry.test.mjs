@@ -1,4 +1,8 @@
 import assert from "node:assert/strict"
+import {
+  EFFORT_LEVELS,
+  MAX_OUTPUT_TOKEN_OPTIONS,
+} from "../../constants/generation-settings.ts"
 import { CHAT_MODELS, isChatModelId } from "../../constants/model.ts"
 import { THREAD_CHAT_MODEL_OPTIONS } from "../../constants/client-model.ts"
 import { icelandModels as icelandModelConfig } from "../../constants/models/index.ts"
@@ -33,6 +37,34 @@ const icelandOptions = THREAD_CHAT_MODEL_OPTIONS.filter(
 assert.equal(icelandModels.length, icelandModelConfig.models.length)
 assert.equal(icelandOptions.length, icelandModelConfig.models.length)
 assert.ok(icelandModels.every((model) => model.unbilledPreview === true))
+
+const configurableIcelandModelIds = [
+  "iceland-claude-fable-5",
+  "iceland-claude-fable-5-1",
+  "iceland-claude-opus-4-6",
+  "iceland-claude-opus-4-7",
+  "iceland-claude-opus-4-8",
+  "iceland-claude-opus-5",
+]
+assert.deepEqual(
+  icelandModels
+    .filter((model) => model.capabilities.generationSettings)
+    .map((model) => model.id)
+    .sort(),
+  configurableIcelandModelIds
+)
+for (const model of icelandModels) {
+  const capability = model.capabilities.generationSettings
+  if (!configurableIcelandModelIds.includes(model.id)) {
+    assert.equal(capability, undefined)
+    continue
+  }
+  assert.deepEqual(capability.effortLevels, EFFORT_LEVELS)
+  assert.deepEqual(
+    capability.maxOutputTokenOptions,
+    MAX_OUTPUT_TOKEN_OPTIONS
+  )
+}
 assert.ok(
   CHAT_MODELS.every(
     (model) =>
