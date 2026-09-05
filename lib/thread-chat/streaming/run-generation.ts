@@ -133,6 +133,7 @@ async function runGenerationCore({
   const compiledContext = await compileModelContextWithProject({
     userId,
     threadId: thread.id,
+    modelId: message.modelId,
     excludeAssistantMessageId: message.id,
   })
   const prepare = dependencies.prepare ?? prepareGeneration

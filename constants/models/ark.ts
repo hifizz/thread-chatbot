@@ -19,7 +19,11 @@ export const arkModels = defineProviderModels({
     { id: "glm-5.3", name: "GLM 5.3" },
     { id: "deepseek-v4-flash", name: "DeepSeek V4 Flash" },
     { id: "deepseek-v4-pro", name: "DeepSeek V4 Pro" },
-    { id: "kimi-k2.6", name: "Kimi K2.6" },
+    {
+      id: "kimi-k2.6",
+      name: "Kimi K2.6",
+      capabilities: { imageInput: true },
+    },
     { id: "kimi-k2.7-code", name: "Kimi K2.7 Code" },
   ],
 })

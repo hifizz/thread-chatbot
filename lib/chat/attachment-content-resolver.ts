@@ -5,6 +5,7 @@ import { db } from "@/lib/db"
 import { attachments } from "@/lib/db/schema"
 import { hasChunks, retrieveChunks } from "@/lib/chat/retrieve"
 import type { ProjectFileRow } from "@/lib/thread-chat/persistence/mappers"
+import { getObjectBytes } from "@/lib/storage/r2"
 
 export type AttachmentRow = typeof attachments.$inferSelect
 export type AttachmentRenderMode = "full" | "retrieval" | "fallback"
@@ -129,6 +130,37 @@ export async function renderPdfAttachment(
     text:
       `<attachment name="${escapeAttachmentAttribute(row.filename)}" pages="${row.pageCount ?? pages.length}">\n` +
       `${renderPdfPages(row, charBudget)}${citeHint(row.id)}\n</attachment>`,
+  }
+}
+
+export async function renderTextAttachment(
+  row: AttachmentRow,
+  charBudget: number,
+  readBytes: (key: string) => Promise<Uint8Array> = getObjectBytes
+): Promise<{ text: string; mode: AttachmentRenderMode }> {
+  try {
+    const content = new TextDecoder("utf-8", { fatal: true }).decode(
+      await readBytes(row.key)
+    )
+    const truncated = content.length > charBudget
+    const body = truncated ? content.slice(0, charBudget) : content
+    return {
+      mode: truncated ? "fallback" : "full",
+      text:
+        `<attachment name="${escapeAttachmentAttribute(row.filename)}" mime="text/plain">\n` +
+        `${body}${truncated ? "\n\n[已截断：附件正文超出本轮上下文预算]" : ""}\n</attachment>`,
+    }
+  } catch (error) {
+    const reason =
+      error instanceof TypeError
+        ? "内容不是有效的 UTF-8 文本"
+        : "读取或解码失败"
+    return {
+      mode: "fallback",
+      text:
+        `<attachment name="${escapeAttachmentAttribute(row.filename)}" mime="text/plain">\n` +
+        `[文本附件解析失败：${reason}]\n</attachment>`,
+    }
   }
 }
 

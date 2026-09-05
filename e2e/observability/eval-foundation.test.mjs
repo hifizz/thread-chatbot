@@ -80,7 +80,7 @@ test("mode manifests are explicit, non-empty, unique, and dataset-compatible", a
   const smoke = resolveDefaultEvaluationManifest(cases, "smoke")
   const release = resolveDefaultEvaluationManifest(cases, "release")
   assert.equal(smoke.manifest.profile, "default")
-  assert.equal(smoke.cases.length, 9)
+  assert.equal(smoke.cases.length, 10)
   assert.equal(release.cases.length, cases.length)
   assert.deepEqual(
     release.manifest.caseIds,

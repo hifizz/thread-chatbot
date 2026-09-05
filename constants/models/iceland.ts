@@ -6,6 +6,7 @@ export const icelandModels = defineProviderModels({
   defaults: {
     description: "冰岛预览",
     surfaces: ["thread"],
+    capabilities: { imageInput: true },
     unbilledPreview: true,
   },
   models: [

@@ -68,6 +68,15 @@ export type ThreadChatUIMessageChunk = UIMessageChunk<
   ThreadChatDataParts
 >
 
+export function textFromMessageParts(
+  parts: ThreadChatUIMessage["parts"],
+  separator = ""
+): string {
+  return parts
+    .flatMap((part) => (part.type === "text" ? [part.text] : []))
+    .join(separator)
+}
+
 export function isThreadChatUIMessage(
   value: unknown
 ): value is ThreadChatUIMessage {

@@ -21,6 +21,7 @@ export type ChatModel = {
   description?: string
   provider: ChatModelProvider
   capabilities: ModelCapabilities
+  supportsImageInput: boolean
   unbilledPreview?: true
   surfaces: readonly ChatModelSurface[]
 }
@@ -31,6 +32,7 @@ export const CHAT_MODELS: readonly ChatModel[] = MODELS.map((model) => ({
   ...(model.description ? { description: model.description } : {}),
   provider: model.providerId as ChatModelProvider,
   capabilities: model.capabilities,
+  supportsImageInput: model.capabilities.imageInput === true,
   ...(model.unbilledPreview ? { unbilledPreview: true as const } : {}),
   surfaces: model.surfaces,
 }))
@@ -45,6 +47,12 @@ export const MAX_OUTPUT_TOKENS = 8192
 
 export function getChatModel(id: string | undefined): ChatModel | undefined {
   return CHAT_MODELS.find((model) => model.id === id)
+}
+
+export function supportsModelImageInput(
+  modelId: string | undefined
+): boolean {
+  return getChatModel(modelId)?.supportsImageInput === true
 }
 
 export function isUnbilledPreviewModel(model: ChatModel): boolean {

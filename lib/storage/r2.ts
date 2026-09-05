@@ -60,10 +60,19 @@ export async function presignUpload(key: string, contentType: string) {
 }
 
 /** 签发短时效读取链接（私有桶的唯一读取入口） */
-export async function presignDownload(key: string) {
+export async function presignDownload(key: string, filename?: string) {
+  const contentDisposition = filename
+    ? `attachment; filename*=UTF-8''${encodeURIComponent(filename).replaceAll("'", "%27")}`
+    : undefined
   return getSignedUrl(
     getClient(),
-    new GetObjectCommand({ Bucket: bucket(), Key: key }),
+    new GetObjectCommand({
+      Bucket: bucket(),
+      Key: key,
+      ...(contentDisposition
+        ? { ResponseContentDisposition: contentDisposition }
+        : {}),
+    }),
     {
       expiresIn: DOWNLOAD_URL_TTL_SECONDS,
     }

@@ -5,6 +5,7 @@ import type { GenerationAcceptedDTO } from "@/lib/thread-chat/contracts/dto"
 import {
   assertAllowedModel,
   assertOwnedReadyAttachments,
+  assertModelSupportsNewAttachments,
   buildUserParts,
 } from "@/lib/thread-chat/application/command-utils"
 import { notFound, stateConflict } from "@/lib/thread-chat/application/errors"
@@ -39,6 +40,7 @@ export function startProject(userId: string, command: StartProjectCommand) {
           if (existing.userId !== userId) notFound()
           stateConflict("Project 已存在")
         }
+        assertModelSupportsNewAttachments(command.modelId, command.files)
         await assertOwnedReadyAttachments(tx, userId, command.files)
         const now = new Date()
         const [project] = await tx

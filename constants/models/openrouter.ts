@@ -11,7 +11,11 @@ export const openrouterModels = defineProviderModels({
     { id: "openai/gpt-5.6-luna-pro", name: "GPT-5.6 Luna Pro" },
     { id: "openai/gpt-5.6-terra", name: "GPT-5.6 Terra" },
     { id: "openai/gpt-5.6-terra-pro", name: "GPT-5.6 Terra Pro" },
-    { id: "openai/gpt-5.6-sol", name: "GPT-5.6 Sol" },
+    {
+      id: "openai/gpt-5.6-sol",
+      name: "GPT-5.6 Sol",
+      capabilities: { imageInput: true },
+    },
     { id: "openai/gpt-5.6-sol-pro", name: "GPT-5.6 Sol Pro" },
     { id: "openai/gpt-5.5", name: "GPT-5.5" },
     { id: "openai/gpt-5.5-pro", name: "GPT-5.5 Pro" },

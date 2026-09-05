@@ -48,7 +48,7 @@ export function ThreadModelSelector({
       variant="ghost"
       size="sm"
       disabled={disabled}
-      className={`thread-model-selector${compact ? "compact" : ""}${isBranchLocked ? "branch-locked" : ""}`}
+      className={`thread-model-selector${compact ? " compact" : ""}${isBranchLocked ? " branch-locked" : ""}`}
     >
       {compact ? <Bot aria-hidden="true" size={12} /> : undefined}
     </ModelSelector.Trigger>

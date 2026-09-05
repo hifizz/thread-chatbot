@@ -3,7 +3,7 @@ export type ModelSurface = "linear" | "thread"
 export type ModelCapabilities = {
   reasoning?: boolean
   attachments?: boolean
-  vision?: boolean
+  imageInput?: boolean
 }
 
 export type ModelDefinition = {
