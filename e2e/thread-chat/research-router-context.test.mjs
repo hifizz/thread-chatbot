@@ -32,22 +32,10 @@ assert.equal(
   null
 )
 assert.equal(deterministicResearchRoute("总结这段文字")?.mode, "answer")
-const umapisClaude = {
-  provider: "umapis",
-  umapisCredentialGroup: "claude",
-}
-const umapisGpt = { provider: "umapis", umapisCredentialGroup: "gpt" }
-const openRouter = { provider: "openrouter" }
-assert.equal(reasoningForResearchRoute("search", umapisClaude), "none")
-assert.equal(reasoningForResearchRoute("fetch", umapisClaude), "none")
-assert.equal(reasoningForResearchRoute("research", umapisClaude), "none")
-assert.equal(
-  reasoningForResearchRoute("answer", umapisClaude),
-  "provider-default"
-)
-assert.equal(reasoningForResearchRoute("search", umapisGpt), "medium")
-assert.equal(reasoningForResearchRoute("search", openRouter), "medium")
-assert.equal(reasoningForResearchRoute("research", openRouter), "high")
+assert.equal(reasoningForResearchRoute("search"), "medium")
+assert.equal(reasoningForResearchRoute("fetch"), "medium")
+assert.equal(reasoningForResearchRoute("answer"), "provider-default")
+assert.equal(reasoningForResearchRoute("research"), "high")
 
 let releaseModelCall
 const modelCallStarted = new Promise((resolve) => {

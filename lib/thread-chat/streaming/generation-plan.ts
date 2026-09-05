@@ -9,7 +9,7 @@ import { MAX_OUTPUT_TOKENS } from "@/constants/model"
 import { MODEL_CALL_PURPOSE } from "@/constants/model-call"
 import { getChatModel } from "@/constants/model"
 import { isSearchConfigured } from "@/lib/ai/search"
-import { resolveChatModel } from "@/lib/ai/provider"
+import { resolveChatModel } from "@/lib/ai/llm/model-routes"
 import { withModelCallLogging } from "@/lib/ai/model-call-logger"
 import { isExplicitMarkdownArtifactRequest } from "@/lib/chat/markdown-artifact"
 import {
@@ -168,7 +168,7 @@ export async function prepareGeneration(input: PrepareGenerationInput) {
     }),
     model: withModelCallLogging(model, MODEL_CALL_PURPOSE.chatAnswer, trace),
     abortSignal: input.abortSignal,
-    reasoning: reasoningForResearchRoute(researchRoute.mode, registeredModel),
+    reasoning: reasoningForResearchRoute(researchRoute.mode),
     system,
     messages: input.modelMessages,
     tools,

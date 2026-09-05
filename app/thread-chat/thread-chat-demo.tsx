@@ -4,7 +4,7 @@ import dynamic from "next/dynamic"
 import { useRouter } from "next/navigation"
 import React, { useCallback, useEffect, useMemo, useState } from "react"
 
-import { DEFAULT_THREAD_CHAT_MODEL_ID } from "@/constants/model"
+import { DEFAULT_THREAD_CHAT_MODEL_ID } from "@/constants/client-model"
 import { PROJECT_TITLE_FALLBACK } from "@/constants/project-workspace"
 import {
   activePathArtifacts,

@@ -91,9 +91,9 @@ bash scripts/wt-rm.sh feature/example
 
 Thread Chat 提供 14 个固定走 OpenRouter 的内部模型 id：`openrouter-gpt-5.6-luna`、`openrouter-gpt-5.6-luna-pro`、`openrouter-gpt-5.6-terra`、`openrouter-gpt-5.6-terra-pro`、`openrouter-gpt-5.6-sol`、`openrouter-gpt-5.6-sol-pro`、`openrouter-gpt-5.5`、`openrouter-gpt-5.5-pro`、`openrouter-kimi-k3`、`openrouter-deepseek-v4-flash-0731`、`openrouter-qwen3.8-max`、`openrouter-grok-4.5`、`openrouter-grok-4.6` 和 `openrouter-ox-alpha`。必须配置 `OPENROUTER_API_KEY`；`OPENROUTER_HTTP_REFERER` 与 `OPENROUTER_APP_TITLE` 是可选归因信息。这些 id 固定使用专属 OpenRouter provider，API 会拒绝任意外部 slug。Ox Alpha 使用上游 id `stealth/ox-alpha`，作为不扣额度的免费预览提供；其他模型成功请求在每个 step 的成本元数据完整时按真实美元成本计费，否则使用保守静态价回退。附件仍沿用现有文本提取路径。
 
-## UMAPIS 预览模型
+## LLM provider 路由
 
-Thread Chat Prompt 输入关联的模型选择器提供 `constants/model.ts` 中注册的 UMAPIS Claude 与 GPT 预览模型。Claude 模型配置 `UMAPIS_API_KEY_CLAUDE`，GPT 模型配置 `UMAPIS_API_KEY_GPT`；`UMAPIS_BASE_URL` 可选，可填写站点根路径或 `/v1` API 根路径。请求保持上游默认行为，不发送 Effort 参数。这些模型是未计费预览：不要求用户余额为正、不扣额度、不展示未经验证的价格。Effort 配置与 UMAPIS 计费由后续 spec 单独定义。
+聊天模型目录由服务端人工审核的 allowlist 提供。客户端只接收公开模型选项；真实 provider、上游模型 ID、网关地址和密钥均由 `lib/ai/llm/` 服务端路由管理。当前支持冰岛 Relay、OpenRouter、Vercel AI Gateway、Cloudflare AI Gateway 与私有 Relay；冰岛使用 `ICELAND_RELAY_BASE_URL` 和 `ICELAND_RELAY_API_KEY`。模型调用不会依赖实时 `/models` 请求。
 
 ## 架构
 

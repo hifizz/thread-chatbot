@@ -146,9 +146,9 @@ pnpm observability:check-release
 
 Thread Chat offers fourteen fixed OpenRouter-backed internal model IDs: `openrouter-gpt-5.6-luna`, `openrouter-gpt-5.6-luna-pro`, `openrouter-gpt-5.6-terra`, `openrouter-gpt-5.6-terra-pro`, `openrouter-gpt-5.6-sol`, `openrouter-gpt-5.6-sol-pro`, `openrouter-gpt-5.5`, `openrouter-gpt-5.5-pro`, `openrouter-kimi-k3`, `openrouter-deepseek-v4-flash-0731`, `openrouter-qwen3.8-max`, `openrouter-grok-4.5`, `openrouter-grok-4.6`, and `openrouter-ox-alpha`. Configure `OPENROUTER_API_KEY`; `OPENROUTER_HTTP_REFERER` and `OPENROUTER_APP_TITLE` are optional attribution values. These IDs always use the dedicated OpenRouter provider—arbitrary external slugs are rejected. Ox Alpha uses upstream ID `stealth/ox-alpha` and is offered as a free, unbilled preview; completed requests for the other models use OpenRouter's real per-step USD cost when complete, with conservative static pricing as fallback. Attachments remain on the existing text-extraction path.
 
-## UMAPIS preview models
+## LLM provider routing
 
-The Thread Chat Prompt input model selector includes the UMAPIS Claude and GPT preview models registered in `constants/model.ts`. Set `UMAPIS_API_KEY_CLAUDE` for the Claude models and `UMAPIS_API_KEY_GPT` for the GPT models; `UMAPIS_BASE_URL` is optional and accepts either the site root or the `/v1` API root. Requests use the upstream default behavior and do not send an Effort parameter. These models are unbilled previews: they do not require a positive user balance, do not debit credits, and do not display an unverified price. Effort configuration and UMAPIS billing belong to a later spec.
+The chat model catalog is an explicitly reviewed server-side allowlist. The client receives only public model options; real providers, upstream model IDs, gateway URLs, and credentials are managed by the server-side `lib/ai/llm/` routing modules. The Iceland Relay uses `ICELAND_RELAY_BASE_URL` and `ICELAND_RELAY_API_KEY`; OpenRouter, Vercel AI Gateway, Cloudflare AI Gateway, and a private Relay are also supported. Chat requests do not depend on live `/models` discovery.
 
 ## Architecture
 

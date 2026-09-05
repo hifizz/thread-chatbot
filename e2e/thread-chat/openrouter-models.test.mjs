@@ -9,7 +9,7 @@ import {
   priceFromCost,
   usdToMicros,
 } from "../../constants/pricing.ts"
-import { openRouterCostUsdFromSteps } from "../../lib/ai/openrouter.ts"
+import { openRouterCostUsdFromSteps } from "../../lib/ai/llm/openrouter.ts"
 
 const expectedSlugs = [
   "openai/gpt-5.6-luna",

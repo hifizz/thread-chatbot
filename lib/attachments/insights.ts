@@ -1,5 +1,5 @@
 import { generateText } from "ai"
-import { minimaxModel } from "@/lib/ai/minimax"
+import { minimaxModel } from "@/lib/ai/llm/minimax"
 import { MODEL_CALL_PURPOSE } from "@/constants/model-call"
 import { withModelCallLogging } from "@/lib/ai/model-call-logger"
 import {

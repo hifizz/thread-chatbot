@@ -1,6 +1,6 @@
 {
   "schemaVersion": "agent-run-snapshot-v2",
-  "runId": "fixture-scheduled-baseline-v1",
+  "runId": "982969f5-5b5a-41d5-9492-8a9f927f84cd",
   "mode": "scheduled",
   "manifest": {
     "schemaVersion": "agent-case-manifest-v1",
@@ -22,6 +22,10 @@
       "multimodal-text-attachment",
       "multimodal-corrupt-file",
       "multimodal-unsupported-and-size-boundary",
+      "project-contract-target-instructions",
+      "project-file-pdf-grounding",
+      "project-contract-update-boundary",
+      "project-files-cross-project-isolation",
       "reliability-stop-terminal",
       "reliability-completed-lifecycle",
       "reliability-generation-failure",
@@ -40,12 +44,12 @@
       "search-provider-fallback-429",
       "search-empty-timeout"
     ],
-    "fingerprint": "05cb873bc2b4a4cfbc99f9ea30d309d0ff897a28099bfc0e413519b26669c999"
+    "fingerprint": "d11c50394561f55f03ce7432d8dcfe8ae686521f11cf84b19913e667d6d25cba"
   },
   "kind": "fixture",
   "createdAt": "2026-08-29T00:00:00.000Z",
-  "datasetRevision": "4f17d6d5f2a3197573d097773b14b3574c4b7fb79ee265e755452b88ac851d5a",
-  "candidateFingerprint": "9b84412630b72ddeecd0b8758d91907d0ae17cf81c31a98320a0aa3965dd13c6",
+  "datasetRevision": "16384285a65ad16bc39fab0089334e0aa84f4d3e84a873e194d8c49d5a2a93fe",
+  "candidateFingerprint": "16f54e093fdc69e9d05ec6175c09a928ea9b22f6d0ff4d11ecdebba06e136d86",
   "candidate": {
     "candidate": "fixture-baseline-v1",
     "commit": "f23dedb",
@@ -53,7 +57,7 @@
     "environment": "evaluation",
     "evaluatorVersion": "deterministic-v1",
     "memoryPolicyVersion": "thread-context-v1",
-    "model": "umapis-claude-opus-4-6",
+    "model": "openrouter-gpt-5.6-luna",
     "multimodalParserVersion": "attachment-parser-v1",
     "promptVersion": "thread-chat-prompt-v1",
     "release": "baseline-v1",
@@ -63,7 +67,7 @@
   },
   "experimentUrl": null,
   "aggregate": {
-    "cases": 32,
+    "cases": 36,
     "hardFailures": 0,
     "p50LatencyMs": 0,
     "p95LatencyMs": 0,
@@ -76,7 +80,7 @@
     "providerAttempts": 8,
     "fallbackRate": 0.125,
     "errorRate": 0,
-    "emptyOutputRate": 0.0625,
+    "emptyOutputRate": 0.05555555555555555,
     "estimatedCostUsd": null
   },
   "cases": [
@@ -85,7 +89,7 @@
       "suite": "core-answer",
       "hardFailures": [],
       "judgeScores": {},
-      "latencyMs": 1,
+      "latencyMs": 0,
       "usage": {},
       "providerAttempts": 0,
       "providerFailures": 0,
@@ -241,6 +245,50 @@
     {
       "caseId": "multimodal-unsupported-and-size-boundary",
       "suite": "multimodal",
+      "hardFailures": [],
+      "judgeScores": {},
+      "latencyMs": 0,
+      "usage": {},
+      "providerAttempts": 0,
+      "providerFailures": 0,
+      "errorCategory": null
+    },
+    {
+      "caseId": "project-contract-target-instructions",
+      "suite": "memory-context",
+      "hardFailures": [],
+      "judgeScores": {},
+      "latencyMs": 0,
+      "usage": {},
+      "providerAttempts": 0,
+      "providerFailures": 0,
+      "errorCategory": null
+    },
+    {
+      "caseId": "project-file-pdf-grounding",
+      "suite": "multimodal",
+      "hardFailures": [],
+      "judgeScores": {},
+      "latencyMs": 0,
+      "usage": {},
+      "providerAttempts": 0,
+      "providerFailures": 0,
+      "errorCategory": null
+    },
+    {
+      "caseId": "project-contract-update-boundary",
+      "suite": "memory-context",
+      "hardFailures": [],
+      "judgeScores": {},
+      "latencyMs": 0,
+      "usage": {},
+      "providerAttempts": 0,
+      "providerFailures": 0,
+      "errorCategory": null
+    },
+    {
+      "caseId": "project-files-cross-project-isolation",
+      "suite": "memory-context",
       "hardFailures": [],
       "judgeScores": {},
       "latencyMs": 0,

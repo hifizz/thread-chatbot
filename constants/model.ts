@@ -1,6 +1,6 @@
 // 对话模型注册表（单一事实来源）。
 // id 在全站统一使用：输入框选择器、计费定价（constants/pricing.ts 的 key）、
-// 服务端 provider 解析（lib/ai/provider.ts）。
+// 服务端 provider 解析（lib/ai/llm/model-routes.ts）。
 
 /** 标题生成固定走私有中继的 Luna；标题模型不暴露给客户端选择。 */
 export const THREAD_TITLE_MODEL_ID = "gpt-5.6-luna"
@@ -24,67 +24,16 @@ export const OPENROUTER_MODEL_IDS = [
 ] as const
 
 export type OpenRouterModelId = (typeof OPENROUTER_MODEL_IDS)[number]
-export const UMAPIS_CLAUDE_MODEL_IDS = [
-  "claude-opus-4-6",
-  "claude-opus-4-6-thinking",
-  "claude-sonnet-4-6",
-  "claude-sonnet-4-6-thinking",
-  "claude-opus-4-7",
-  "claude-opus-4-7-thinking",
-  "claude-fable-5",
-  "claude-opus-5",
-  "claude-sonnet-5",
-  "claude-opus-4-8",
-  "claude-opus-4-8-thinking",
-  "claude-haiku-4-5",
-  "gemini-3.7-flash",
-  "grok-4.6",
-] as const
-
-export type UMAPISClaudeModelId = (typeof UMAPIS_CLAUDE_MODEL_IDS)[number]
-
-export const UMAPIS_MODEL_IDS = [
-  ...UMAPIS_CLAUDE_MODEL_IDS,
-  "gpt-5.6-sol",
-  "gpt-5.6-terra",
-] as const
-
-export type UMAPISModelId = (typeof UMAPIS_MODEL_IDS)[number]
-export type UMAPISCredentialGroup = "claude" | "gpt"
+export type IcelandRelayProtocol = "anthropic" | "openai"
 export type ChatModelProvider =
   | "minimax"
   | "deepseek"
   | "openai"
   | "ark"
   | "openrouter"
-  | "umapis"
   | "private-relay"
+  | "iceland-relay"
 
-/** 模型选择器使用的供应商展示名。 */
-export const CHAT_MODEL_PROVIDER_LABELS: Readonly<
-  Record<ChatModelProvider, string>
-> = {
-  minimax: "MiniMax",
-  deepseek: "DeepSeek",
-  openai: "OpenAI",
-  ark: "火山方舟",
-  openrouter: "OpenRouter",
-  umapis: "UMAPIS",
-  "private-relay": "Private Relay",
-}
-
-/** Thread Chat 对外展示的中性模型组名称，不暴露实际服务供应商。 */
-export const THREAD_CHAT_MODEL_GROUP_LABELS: Readonly<
-  Record<ChatModelProvider, string>
-> = {
-  minimax: "海南岛",
-  deepseek: "崇明岛",
-  openai: "马略卡",
-  ark: "济州岛",
-  openrouter: "巴厘岛",
-  umapis: "冰岛",
-  "private-relay": "塞班岛",
-}
 export type ReasoningTransport = "think-tags" | "native"
 export type ChatModelSurface = "linear" | "thread"
 
@@ -106,39 +55,29 @@ export type ChatModel = {
   gatewayModel?: string
   /** 推理传输方式；只有 think-tags 需要标签抽取中间件。 */
   reasoningTransport?: ReasoningTransport
-  /** UMAPIS 模型使用的服务端凭据组。 */
-  umapisCredentialGroup?: UMAPISCredentialGroup
+  /** 冰岛 Relay 使用的服务端调用协议。 */
+  icelandProtocol?: IcelandRelayProtocol
   /** 尚未定义价格与扣费策略的模型，只保留可用 token usage。 */
   unbilledPreview?: true
   /** 模型可见的产品入口。 */
   surfaces: readonly ChatModelSurface[]
-  /** 仅用于展示分组，不参与鉴权和路由。 */
-  creator?:
-    | "anthropic"
-    | "openai"
-    | "moonshotai"
-    | "deepseek"
-    | "qwen"
-    | "x-ai"
-    | "stealth"
 }
 
-/** 用统一的 Claude 组配置注册 UMAPIS 未计费预览模型。 */
-function createUmapisClaudeModel<const TModelId extends UMAPISClaudeModelId>(
-  upstreamModel: TModelId,
-  name: string
-) {
+/** 注册仅供 Thread Chat 使用的冰岛 Relay 模型。 */
+function createIcelandRelayModel<
+  const TUpstreamModel extends string,
+  const TProtocol extends IcelandRelayProtocol,
+>(upstreamModel: TUpstreamModel, name: string, protocol: TProtocol) {
   return {
-    id: `umapis-${upstreamModel}` as const,
-    name: `UMAPIS · ${name}`,
-    description: "UMAPIS 预览（Claude 组）",
-    provider: "umapis",
+    id: `iceland-${upstreamModel}` as const,
+    name: `冰岛 · ${name}`,
+    description: "冰岛预览",
+    provider: "iceland-relay",
     upstreamModel,
     reasoningTransport: "native",
-    umapisCredentialGroup: "claude",
+    icelandProtocol: protocol,
     unbilledPreview: true,
     surfaces: ["thread"],
-    creator: "anthropic",
   } as const satisfies ChatModel
 }
 
@@ -156,7 +95,6 @@ function createPrivateRelayModel<
     reasoningTransport: "native",
     unbilledPreview: true,
     surfaces: ["thread"],
-    creator: "openai",
   } as const satisfies ChatModel
 }
 
@@ -260,56 +198,38 @@ const CHAT_MODEL_REGISTRY = [
     upstreamModel: "kimi-k2.7-code",
     surfaces: ["linear", "thread"],
   },
-  createUmapisClaudeModel("claude-opus-4-6", "Claude Opus 4.6"),
-  createUmapisClaudeModel(
+  createIcelandRelayModel("claude-opus-4-6", "Claude Opus 4.6", "anthropic"),
+  createIcelandRelayModel(
     "claude-opus-4-6-thinking",
-    "Claude Opus 4.6 Thinking"
+    "Claude Opus 4.6 Thinking",
+    "anthropic"
   ),
-  createUmapisClaudeModel("claude-sonnet-4-6", "Claude Sonnet 4.6"),
-  createUmapisClaudeModel(
+  createIcelandRelayModel("claude-sonnet-4-6", "Claude Sonnet 4.6", "anthropic"),
+  createIcelandRelayModel(
     "claude-sonnet-4-6-thinking",
-    "Claude Sonnet 4.6 Thinking"
+    "Claude Sonnet 4.6 Thinking",
+    "anthropic"
   ),
-  createUmapisClaudeModel("claude-opus-4-7", "Claude Opus 4.7"),
-  createUmapisClaudeModel(
+  createIcelandRelayModel("claude-opus-4-7", "Claude Opus 4.7", "anthropic"),
+  createIcelandRelayModel(
     "claude-opus-4-7-thinking",
-    "Claude Opus 4.7 Thinking"
+    "Claude Opus 4.7 Thinking",
+    "anthropic"
   ),
-  createUmapisClaudeModel("claude-fable-5", "Claude Fable 5"),
-  createUmapisClaudeModel("claude-opus-5", "Claude Opus 5"),
-  createUmapisClaudeModel("claude-sonnet-5", "Claude Sonnet 5"),
-  createUmapisClaudeModel("claude-opus-4-8", "Claude Opus 4.8"),
-  createUmapisClaudeModel(
+  createIcelandRelayModel("claude-fable-5", "Claude Fable 5", "anthropic"),
+  createIcelandRelayModel("claude-opus-5", "Claude Opus 5", "anthropic"),
+  createIcelandRelayModel("claude-sonnet-5", "Claude Sonnet 5", "anthropic"),
+  createIcelandRelayModel("claude-opus-4-8", "Claude Opus 4.8", "anthropic"),
+  createIcelandRelayModel(
     "claude-opus-4-8-thinking",
-    "Claude Opus 4.8 Thinking"
+    "Claude Opus 4.8 Thinking",
+    "anthropic"
   ),
-  createUmapisClaudeModel("claude-haiku-4-5", "Claude Haiku 4.5"),
-  createUmapisClaudeModel("gemini-3.7-flash", "Gemini 3.7 Flash"),
-  createUmapisClaudeModel("grok-4.6", "Grok 4.6"),
-  {
-    id: "umapis-gpt-5.6-sol",
-    name: "UMAPIS · GPT-5.6 Sol",
-    description: "UMAPIS 预览（GPT 组）",
-    provider: "umapis",
-    upstreamModel: "gpt-5.6-sol",
-    reasoningTransport: "native",
-    umapisCredentialGroup: "gpt",
-    unbilledPreview: true,
-    surfaces: ["thread"],
-    creator: "openai",
-  },
-  {
-    id: "umapis-gpt-5.6-terra",
-    name: "UMAPIS · GPT-5.6 Terra",
-    description: "UMAPIS 预览（GPT 组）",
-    provider: "umapis",
-    upstreamModel: "gpt-5.6-terra",
-    reasoningTransport: "native",
-    umapisCredentialGroup: "gpt",
-    unbilledPreview: true,
-    surfaces: ["thread"],
-    creator: "openai",
-  },
+  createIcelandRelayModel("claude-haiku-4-5", "Claude Haiku 4.5", "anthropic"),
+  createIcelandRelayModel("gemini-3.7-flash", "Gemini 3.7 Flash", "openai"),
+  createIcelandRelayModel("grok-4.6", "Grok 4.6", "openai"),
+  createIcelandRelayModel("gpt-5.6-sol", "GPT-5.6 Sol", "openai"),
+  createIcelandRelayModel("gpt-5.6-terra", "GPT-5.6 Terra", "openai"),
   // 订阅额度尚未完成成本折算，先沿用明确的预览标记，避免缺失价格被误记为 ¥0 计费。
   createPrivateRelayModel(
     "private-relay-gpt-5.6-sol",
@@ -360,7 +280,6 @@ const CHAT_MODEL_REGISTRY = [
     upstreamModel: "openai/gpt-5.6-luna",
     reasoningTransport: "native",
     surfaces: ["thread"],
-    creator: "openai",
   },
   {
     id: "openrouter-gpt-5.6-luna-pro",
@@ -369,7 +288,6 @@ const CHAT_MODEL_REGISTRY = [
     upstreamModel: "openai/gpt-5.6-luna-pro",
     reasoningTransport: "native",
     surfaces: ["thread"],
-    creator: "openai",
   },
   {
     id: "openrouter-gpt-5.6-terra",
@@ -378,7 +296,6 @@ const CHAT_MODEL_REGISTRY = [
     upstreamModel: "openai/gpt-5.6-terra",
     reasoningTransport: "native",
     surfaces: ["thread"],
-    creator: "openai",
   },
   {
     id: "openrouter-gpt-5.6-terra-pro",
@@ -387,7 +304,6 @@ const CHAT_MODEL_REGISTRY = [
     upstreamModel: "openai/gpt-5.6-terra-pro",
     reasoningTransport: "native",
     surfaces: ["thread"],
-    creator: "openai",
   },
   {
     id: "openrouter-gpt-5.6-sol",
@@ -396,7 +312,6 @@ const CHAT_MODEL_REGISTRY = [
     upstreamModel: "openai/gpt-5.6-sol",
     reasoningTransport: "native",
     surfaces: ["thread"],
-    creator: "openai",
   },
   {
     id: "openrouter-gpt-5.6-sol-pro",
@@ -405,7 +320,6 @@ const CHAT_MODEL_REGISTRY = [
     upstreamModel: "openai/gpt-5.6-sol-pro",
     reasoningTransport: "native",
     surfaces: ["thread"],
-    creator: "openai",
   },
   {
     id: "openrouter-gpt-5.5",
@@ -414,7 +328,6 @@ const CHAT_MODEL_REGISTRY = [
     upstreamModel: "openai/gpt-5.5",
     reasoningTransport: "native",
     surfaces: ["thread"],
-    creator: "openai",
   },
   {
     id: "openrouter-gpt-5.5-pro",
@@ -423,7 +336,6 @@ const CHAT_MODEL_REGISTRY = [
     upstreamModel: "openai/gpt-5.5-pro",
     reasoningTransport: "native",
     surfaces: ["thread"],
-    creator: "openai",
   },
   {
     id: "openrouter-kimi-k3",
@@ -432,7 +344,6 @@ const CHAT_MODEL_REGISTRY = [
     upstreamModel: "moonshotai/kimi-k3",
     reasoningTransport: "native",
     surfaces: ["thread"],
-    creator: "moonshotai",
   },
   {
     id: "openrouter-deepseek-v4-flash-0731",
@@ -441,7 +352,6 @@ const CHAT_MODEL_REGISTRY = [
     upstreamModel: "deepseek/deepseek-v4-flash-0731",
     reasoningTransport: "native",
     surfaces: ["thread"],
-    creator: "deepseek",
   },
   {
     id: "openrouter-qwen3.8-max",
@@ -450,7 +360,6 @@ const CHAT_MODEL_REGISTRY = [
     upstreamModel: "qwen/qwen3.8-max",
     reasoningTransport: "native",
     surfaces: ["thread"],
-    creator: "qwen",
   },
   {
     id: "openrouter-grok-4.5",
@@ -459,7 +368,6 @@ const CHAT_MODEL_REGISTRY = [
     upstreamModel: "x-ai/grok-4.5",
     reasoningTransport: "native",
     surfaces: ["thread"],
-    creator: "x-ai",
   },
   {
     id: "openrouter-grok-4.6",
@@ -468,7 +376,6 @@ const CHAT_MODEL_REGISTRY = [
     upstreamModel: "x-ai/grok-4.6",
     reasoningTransport: "native",
     surfaces: ["thread"],
-    creator: "x-ai",
   },
   {
     id: "openrouter-ox-alpha",
@@ -479,7 +386,6 @@ const CHAT_MODEL_REGISTRY = [
     reasoningTransport: "native",
     unbilledPreview: true,
     surfaces: ["thread"],
-    creator: "stealth",
   },
 ] as const satisfies readonly ChatModel[]
 
@@ -498,7 +404,7 @@ export const THREAD_CHAT_MODELS: readonly ChatModel[] = CHAT_MODELS.filter(
 
 /** Thread Chat 新建树及旧树模型回退使用的默认模型。 */
 export const DEFAULT_THREAD_CHAT_MODEL_ID: ChatModelId =
-  "umapis-claude-opus-4-6"
+  "openrouter-gpt-5.6-luna"
 
 /**
  * 单次生成的输出 token 上限（安全阀）。
