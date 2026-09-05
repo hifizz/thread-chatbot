@@ -15,6 +15,11 @@ import type {
   ThreadDTO,
 } from "@/lib/thread-chat/contracts/dto"
 import type { TextAnchor } from "@/lib/thread-chat/domain/text-anchor"
+import type {
+  MessageContentInput,
+  MessageContentPartInput,
+} from "@/lib/thread-chat/contracts/message-content"
+import { THREAD_QUOTE_SCHEMA_VERSION } from "@/lib/thread-chat/contracts/quote"
 import type { ConversationStore } from "../../core/store"
 import type { ConversationEntitySnapshot } from "../../core/types"
 import { ThreadChatApiError, type ThreadChatClient } from "../client"
@@ -51,24 +56,32 @@ export interface ForkCommandInput {
 }
 
 function generationSettingsField(settings: GenerationSettings | undefined) {
-  return settings
-    ? { generationSettings: Object.freeze({ ...settings }) }
-    : {}
+  return settings ? { generationSettings: Object.freeze({ ...settings }) } : {}
 }
 
-function userParts(
+function commandParts(
   text: string,
   files: CommandFileReference[]
-): MessageDTO["parts"] {
+): MessageContentPartInput[] {
   return [
     { type: "text", text },
-    ...files.map((file) => ({
-      type: "file" as const,
-      url: file.url,
-      mediaType: file.mediaType,
-      ...(file.filename ? { filename: file.filename } : {}),
-    })),
+    ...files.map((file) => ({ type: "file" as const, file })),
   ]
+}
+
+function userParts(content: MessageContentInput): MessageDTO["parts"] {
+  return content.parts.map((part) => {
+    if (part.type === "text") return { type: "text" as const, text: part.text }
+    if (part.type === "file") {
+      return {
+        type: "file" as const,
+        url: part.file.url,
+        mediaType: part.file.mediaType,
+        ...(part.file.filename ? { filename: part.file.filename } : {}),
+      }
+    }
+    return { type: "data-quote" as const, data: part.quote }
+  })
 }
 
 function temporaryMessage(input: {
@@ -233,8 +246,7 @@ export function createConversationCommands(
       assistantMessageId: createId(),
       modelId: input.modelId,
       ...generationSettingsField(input.generationSettings),
-      text: input.text,
-      files,
+      parts: commandParts(input.text, files),
     })
     const now = new Date().toISOString()
     const project: ProjectDTO = {
@@ -273,7 +285,7 @@ export function createConversationCommands(
       threadId: thread.id,
       sequence: 1,
       role: "user",
-      parts: userParts(command.text, files),
+      parts: userParts(command),
     })
     const assistant = temporaryMessage({
       id: command.assistantMessageId,
@@ -325,8 +337,7 @@ export function createConversationCommands(
       assistantMessageId: createId(),
       modelId: input.modelId,
       ...generationSettingsField(input.generationSettings),
-      text: input.text,
-      files,
+      parts: commandParts(input.text, files),
     })
     store.getState().beginOptimisticCommand(command.commandId, (snapshot) => {
       const sequence = nextSequence(snapshot, input.threadId)
@@ -337,7 +348,7 @@ export function createConversationCommands(
           threadId: input.threadId,
           sequence,
           role: "user",
-          parts: userParts(command.text, files),
+          parts: userParts(command),
         }),
         temporaryMessage({
           id: command.assistantMessageId,
@@ -385,8 +396,21 @@ export function createConversationCommands(
             firstTurn: {
               userMessageId: createId(),
               assistantMessageId: createId(),
-              text: input.text!.trim(),
-              files,
+              parts: [
+                {
+                  type: "quote" as const,
+                  quote: {
+                    schemaVersion: THREAD_QUOTE_SCHEMA_VERSION,
+                    text: input.anchorText,
+                    source: {
+                      type: "message" as const,
+                      messageId: input.sourceMessageId,
+                      anchor: input.anchor,
+                    },
+                  },
+                },
+                ...commandParts(input.text!.trim(), files),
+              ],
             },
           }
         : {}),
@@ -429,7 +453,7 @@ export function createConversationCommands(
             threadId: thread.id,
             sequence: 1,
             role: "user",
-            parts: userParts(command.firstTurn.text, files),
+            parts: userParts(command.firstTurn),
           }),
           temporaryMessage({
             id: command.firstTurn.assistantMessageId,
@@ -525,8 +549,7 @@ export function createConversationCommands(
       assistantMessageId: createId(),
       modelId: input.modelId,
       ...generationSettingsField(input.generationSettings),
-      text: input.text,
-      files,
+      parts: commandParts(input.text, files),
     })
     store.getState().beginOptimisticCommand(command.commandId, (snapshot) => {
       const now = new Date().toISOString()
@@ -545,7 +568,7 @@ export function createConversationCommands(
           threadId: source.threadId,
           sequence,
           role: "user",
-          parts: userParts(command.text, files),
+          parts: userParts(command),
           replacesMessageId: source.id,
         }),
         temporaryMessage({

@@ -33,6 +33,11 @@ export function isMinimaxConfigured() {
 
 export const minimaxModelProvider = createModels({
   models: minimaxModels,
+  routeIdentity: (model) => ({
+    actualProvider: "minimax",
+    protocol: "openai-compatible",
+    upstreamModel: model.id,
+  }),
   isConfigured: isMinimaxConfigured,
   createProvider: () => (model) => minimaxChatModel(model.id),
 })

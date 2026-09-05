@@ -14,12 +14,20 @@ import {
   supportsModelImageInput,
 } from "@/constants/model"
 import type { ThreadChatUIMessage } from "@/lib/thread-chat/contracts/ui-message"
+import {
+  filesFromMessageContent,
+  messageContentToUiParts,
+  type FileReference,
+  type MessageContentInput,
+} from "@/lib/thread-chat/contracts/message-content"
 import type { ConversationTransaction } from "@/lib/thread-chat/persistence/transaction"
 import { persistentMessageParts } from "@/lib/thread-chat/persistence/message-parts"
 import {
   ConversationApplicationError,
   stateConflict,
 } from "@/lib/thread-chat/application/errors"
+
+export type { FileReference } from "@/lib/thread-chat/contracts/message-content"
 
 export const THREAD_MESSAGE_ATTACHMENT_MIME_TYPES = [
   "text/plain",
@@ -37,12 +45,6 @@ export { IMAGE_ATTACHMENT_MIME_TYPES }
 const IMAGE_ATTACHMENT_MIME_TYPE_SET = new Set<string>(
   IMAGE_ATTACHMENT_MIME_TYPES
 )
-
-export interface FileReference {
-  url: string
-  mediaType: string
-  filename?: string
-}
 
 export function assertAllowedModel(modelId: string): void {
   if (!isThreadChatModelId(modelId)) {
@@ -74,7 +76,9 @@ export function assertAllowedGenerationSettings(
 export function hasImageFileReferences(
   files: readonly FileReference[]
 ): boolean {
-  return files.some((file) => IMAGE_ATTACHMENT_MIME_TYPE_SET.has(file.mediaType))
+  return files.some((file) =>
+    IMAGE_ATTACHMENT_MIME_TYPE_SET.has(file.mediaType)
+  )
 }
 
 /** 必须在创建生成消息及进入付费模型调用前执行。 */
@@ -155,18 +159,13 @@ export async function assertOwnedReadyAttachments(
 }
 
 export function buildUserParts(
-  text: string,
-  files: readonly FileReference[]
+  content: MessageContentInput
 ): ThreadChatUIMessage["parts"] {
-  return [
-    { type: "text", text },
-    ...files.map((file) => ({
-      type: "file" as const,
-      url: file.url,
-      mediaType: file.mediaType,
-      ...(file.filename ? { filename: file.filename } : {}),
-    })),
-  ]
+  return messageContentToUiParts(content)
+}
+
+export function commandFiles(content: MessageContentInput): FileReference[] {
+  return filesFromMessageContent(content)
 }
 
 export function stripTransientParts(

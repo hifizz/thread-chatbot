@@ -19,23 +19,19 @@ export function createMarkdownArtifactTool(messageId: string) {
 
 export function buildGenerationTools(input: {
   messageId: string
-  artifactRequested: boolean
-  researchMode: "answer" | "fetch" | "search" | "research"
+  toolNames: readonly ("createMarkdownArtifact" | "webSearch" | "readUrl")[]
   routeReason?: string
-  searchReady: boolean
 }) {
   const { readUrl: readUrlTool, webSearch: webSearchTool } =
     createResearchTools({ routeReason: input.routeReason })
-  return {
-    ...(input.artifactRequested
-      ? { createMarkdownArtifact: createMarkdownArtifactTool(input.messageId) }
-      : {}),
-    ...(input.searchReady && input.researchMode === "fetch"
-      ? { readUrl: readUrlTool }
-      : {}),
-    ...(input.searchReady &&
-    (input.researchMode === "search" || input.researchMode === "research")
-      ? { webSearch: webSearchTool, readUrl: readUrlTool }
-      : {}),
-  }
+  return Object.fromEntries(
+    input.toolNames.map((name) => [
+      name,
+      name === "createMarkdownArtifact"
+        ? createMarkdownArtifactTool(input.messageId)
+        : name === "webSearch"
+          ? webSearchTool
+          : readUrlTool,
+    ])
+  )
 }

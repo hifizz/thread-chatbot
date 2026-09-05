@@ -8,6 +8,7 @@ import {
 } from "@/lib/ai/llm/providers"
 
 export type { ModelRoute }
+export { resolveChatModelWithRoute } from "@/lib/ai/llm/providers"
 
 export function isModelConfigured(model: Pick<ChatModel, "id">): boolean {
   return configured(model.id)

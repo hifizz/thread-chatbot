@@ -8,6 +8,7 @@ import {
   assertOwnedReadyAttachments,
   assertModelSupportsNewAttachments,
   buildUserParts,
+  commandFiles,
 } from "@/lib/thread-chat/application/command-utils"
 import { notFound, stateConflict } from "@/lib/thread-chat/application/errors"
 import { executeIdempotentCommand } from "@/lib/thread-chat/persistence/command-repository"
@@ -23,10 +24,7 @@ import {
 
 export function startProject(userId: string, command: StartProjectCommand) {
   assertAllowedModel(command.modelId)
-  assertAllowedGenerationSettings(
-    command.modelId,
-    command.generationSettings
-  )
+  assertAllowedGenerationSettings(command.modelId, command.generationSettings)
   return withConversationTransaction(async (tx) =>
     executeIdempotentCommand({
       tx,
@@ -45,8 +43,12 @@ export function startProject(userId: string, command: StartProjectCommand) {
           if (existing.userId !== userId) notFound()
           stateConflict("Project 已存在")
         }
-        assertModelSupportsNewAttachments(command.modelId, command.files)
-        await assertOwnedReadyAttachments(tx, userId, command.files)
+        const files = commandFiles(command)
+        assertModelSupportsNewAttachments(command.modelId, files)
+        await assertOwnedReadyAttachments(tx, userId, files)
+        if (command.parts.some((part) => part.type === "quote")) {
+          stateConflict("新建 Project 时不能引用尚不属于该 Project 的内容")
+        }
         const now = new Date()
         const [project] = await tx
           .insert(projects)
@@ -75,7 +77,7 @@ export function startProject(userId: string, command: StartProjectCommand) {
               threadId: thread.id,
               sequence: userSequence,
               role: "user",
-              parts: buildUserParts(command.text, command.files),
+              parts: buildUserParts(command),
               status: "completed",
               finishedAt: now,
             },

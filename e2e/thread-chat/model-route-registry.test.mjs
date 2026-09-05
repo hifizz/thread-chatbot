@@ -9,13 +9,19 @@ import { icelandModels as icelandModelConfig } from "../../constants/models/inde
 import {
   getModelRouteProvider,
   resolveChatModel,
+  resolveChatModelWithRoute,
 } from "../../lib/ai/llm/model-routes.ts"
+import { PROVIDERS } from "../../lib/ai/llm/providers.ts"
+import { resolvePromptCachePolicy } from "../../lib/thread-chat/streaming/prompt-cache-policy.ts"
 import {
   isIcelandRelayConfigured,
   normalizeIcelandRelayBaseURL,
 } from "../../lib/ai/llm/iceland-relay.ts"
 
-assert.equal(new Set(CHAT_MODELS.map((model) => model.id)).size, CHAT_MODELS.length)
+assert.equal(
+  new Set(CHAT_MODELS.map((model) => model.id)).size,
+  CHAT_MODELS.length
+)
 assert.ok(THREAD_CHAT_MODEL_OPTIONS.length > 0)
 
 for (const option of THREAD_CHAT_MODEL_OPTIONS) {
@@ -60,10 +66,7 @@ for (const model of icelandModels) {
     continue
   }
   assert.deepEqual(capability.effortLevels, EFFORT_LEVELS)
-  assert.deepEqual(
-    capability.maxOutputTokenOptions,
-    MAX_OUTPUT_TOKEN_OPTIONS
-  )
+  assert.deepEqual(capability.maxOutputTokenOptions, MAX_OUTPUT_TOKEN_OPTIONS)
 }
 assert.ok(
   CHAT_MODELS.every(
@@ -84,6 +87,19 @@ try {
   process.env.ICELAND_RELAY_BASE_URL = "https://relay.example.test"
   process.env.ICELAND_RELAY_API_KEY = "test-api-key"
   assert.equal(isIcelandRelayConfigured(), true)
+  for (const name of ["claude-opus-5", "claude-sonnet-5"]) {
+    const resolved = resolveChatModelWithRoute(`iceland-${name}`)
+    assert.equal(resolved.model.modelId, name)
+    assert.deepEqual(resolved.route, {
+      actualProvider: "iceland-relay",
+      protocol: "anthropic",
+      upstreamModel: name,
+    })
+    assert.equal(
+      resolvePromptCachePolicy(resolved.route).explicitCacheEnabled,
+      name === "claude-sonnet-5"
+    )
+  }
   delete process.env.ICELAND_RELAY_API_KEY
   assert.equal(isIcelandRelayConfigured(), false)
 } finally {
@@ -95,5 +111,29 @@ try {
 
 assert.throws(() => resolveChatModel("legacy-provider-model"), /未知模型/)
 assert.throws(() => resolveChatModel("not-registered"), /未知模型/)
+assert.throws(() => resolveChatModelWithRoute("not-registered"), /未知模型/)
+for (const provider of Object.values(PROVIDERS)) {
+  for (const { route } of provider.routes) {
+    assert.ok(route.identity.actualProvider)
+    assert.ok(route.identity.protocol)
+    assert.ok(route.identity.upstreamModel)
+    assert.equal(
+      resolvePromptCachePolicy(route.identity).explicitCacheEnabled,
+      route.identity.actualProvider === "iceland-relay" &&
+        route.identity.protocol === "anthropic" &&
+        route.identity.upstreamModel === "claude-sonnet-5"
+    )
+  }
+}
+assert.equal(
+  PROVIDERS.openai.routes[0].route.identity.actualProvider,
+  "vercel-ai-gateway"
+)
+assert.equal(
+  PROVIDERS.deepseek.routes[0].route.identity.actualProvider,
+  "cloudflare-ai-gateway"
+)
 
-console.log("PASS  model routes, public fields, Iceland relay, and unknown model rejection")
+console.log(
+  "PASS  model routes, public fields, Iceland relay, and unknown model rejection"
+)

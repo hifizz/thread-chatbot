@@ -9,9 +9,14 @@ import {
   assertOwnedReadyAttachments,
   assertModelSupportsNewAttachments,
   buildUserParts,
+  commandFiles,
   touchProjectAndThread,
 } from "@/lib/thread-chat/application/command-utils"
 import { notFound, stateConflict } from "@/lib/thread-chat/application/errors"
+import {
+  assertEditQuoteSemantics,
+  assertValidQuoteSources,
+} from "@/lib/thread-chat/application/quote-validation"
 import { executeIdempotentCommand } from "@/lib/thread-chat/persistence/command-repository"
 import {
   toConversationMessage,
@@ -44,10 +49,7 @@ export function editLatestTurn(
   command: EditLatestTurnCommand
 ) {
   assertAllowedModel(command.modelId)
-  assertAllowedGenerationSettings(
-    command.modelId,
-    command.generationSettings
-  )
+  assertAllowedGenerationSettings(command.modelId, command.generationSettings)
   return withConversationTransaction(async (tx) =>
     executeIdempotentCommand({
       tx,
@@ -73,8 +75,16 @@ export function editLatestTurn(
         if (turn?.userMessage.id !== source.id) {
           stateConflict("只能编辑最新一轮用户消息")
         }
-        assertModelSupportsNewAttachments(command.modelId, command.files)
-        await assertOwnedReadyAttachments(tx, userId, command.files)
+        const files = commandFiles(command)
+        assertModelSupportsNewAttachments(command.modelId, files)
+        await assertOwnedReadyAttachments(tx, userId, files)
+        assertEditQuoteSemantics(source.parts, command)
+        await assertValidQuoteSources({
+          tx,
+          projectId: project.id,
+          sourceThreadId: thread.id,
+          content: command,
+        })
         const [userSequence, assistantSequence] = await allocateThreadSequences(
           tx,
           thread.id,
@@ -103,7 +113,7 @@ export function editLatestTurn(
               threadId: source.threadId,
               sequence: userSequence,
               role: "user",
-              parts: buildUserParts(command.text, command.files),
+              parts: buildUserParts(command),
               status: "completed",
               replacesMessageId: source.id,
               finishedAt: now,

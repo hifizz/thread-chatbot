@@ -1,5 +1,8 @@
 # Workflow / Process
 
+- 使用 OpenSpec 时，先完成并确认 `spec.md` 和 `design.md`，经用户明确同意后才编写 `tasks.md`。Confidence: 0.95
+- 使用 Research/调研流程时按 Phase A/B/C/D 分阶段推进，并在每个阶段结束等待用户确认。Confidence: 0.9
+- Design 文档优先定义数据契约与类型，包括新实体的数据库 schema 及输入框/表单类型，再展开其他设计内容。Confidence: 0.9
 - Uses OpenSpec for change management: formalize a design as a change (`pnpm exec openspec new change "<name>"`), write artifacts in the tool's prescribed build order (proposal → specs delta → design → tasks), fetching per-artifact instructions via `openspec instructions <artifact> --change ...`, and finish with `openspec validate --all --strict`. Confidence: 0.85
 - Wants change artifacts (design/tasks) grounded in verified code reality before being written — e.g. confirmed `theme.ts` dynamically builds `var(--d${N})`, enumerated every `.md-body` selector dependency in TS/CSS — rather than resting on discussion-level assumptions. Confidence: 0.75
 - Operates as a principles-then-review loop: before implementation, wants a concrete and sufficiently complete plan covering responsibilities, boundaries, file structure, request flow, implementation order, and explicit non-goals; states a few inviolable principles up front, delegates the remaining design judgment ("其他的你再看看"), and wants reviewable increments presented for explicit confirmation before proceeding. This applies during implementation too: start with one focused, well-commented, standalone example file that does not yet alter the existing business path; include concrete examples for the relevant implementation variants so he can compare them, then wait for feedback rather than expanding or integrating the change unbidden. Confidence: 0.95

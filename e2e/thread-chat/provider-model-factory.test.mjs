@@ -11,6 +11,11 @@ const provider = createModels({
     models: [{ id: "model-a" }, { id: "model-b" }],
   },
   isConfigured: () => true,
+  routeIdentity: (model) => ({
+    actualProvider: "demo-relay",
+    protocol: "anthropic",
+    upstreamModel: model.id,
+  }),
   createProvider() {
     providerCreations += 1
     return (model) => {
@@ -21,6 +26,11 @@ const provider = createModels({
 })
 
 assert.equal(providerCreations, 0)
+assert.deepEqual(provider.routes[0].route.identity, {
+  actualProvider: "demo-relay",
+  protocol: "anthropic",
+  upstreamModel: "model-a",
+})
 assert.equal(provider.routes[0].route.createModel().modelId, "model-a")
 assert.equal(provider.routes[1].route.createModel().modelId, "model-b")
 assert.equal(provider.routes[0].route.createModel().modelId, "model-a")

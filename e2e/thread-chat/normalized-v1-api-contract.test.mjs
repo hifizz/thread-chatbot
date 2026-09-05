@@ -22,8 +22,7 @@ const validStart = {
   userMessageId: id(),
   assistantMessageId: id(),
   modelId: "test/model",
-  text: "hello",
-  files: [],
+  parts: [{ type: "text", text: "hello" }],
 }
 
 const parsed = await parseJson(

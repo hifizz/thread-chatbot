@@ -8,11 +8,11 @@ import {
   PROJECT_INSTRUCTIONS_MAX_CHARS,
   PROJECT_TARGET_MAX_CHARS,
 } from "@/constants/project-workspace"
+import { messageContentInputSchema } from "@/lib/thread-chat/contracts/message-content"
 
 const entityIdSchema = z.uuid()
 const commandIdSchema = z.uuid()
 const modelIdSchema = z.string().trim().min(1).max(160)
-const messageTextSchema = z.string().trim().min(1).max(200_000)
 
 export const generationSettingsSchema = z
   .object({
@@ -25,13 +25,61 @@ const generationSettingsField = {
   generationSettings: generationSettingsSchema.optional(),
 } as const
 
-const fileReferenceSchema = z
+const baseGenerationFields = {
+  commandId: commandIdSchema,
+  userMessageId: entityIdSchema,
+  assistantMessageId: entityIdSchema,
+  modelId: modelIdSchema,
+  ...generationSettingsField,
+  parts: messageContentInputSchema.shape.parts,
+} as const
+
+export const startProjectCommandSchema = z
   .object({
-    url: z.string().min(1),
-    mediaType: z.string().trim().min(1).max(160),
-    filename: z.string().trim().min(1).max(500).optional(),
+    ...baseGenerationFields,
+    projectId: entityIdSchema,
+    rootThreadId: entityIdSchema,
   })
   .strict()
+  .superRefine((command, context) => {
+    const result = messageContentInputSchema.safeParse({ parts: command.parts })
+    if (!result.success)
+      context.addIssue({
+        code: "custom",
+        path: ["parts"],
+        message: "消息内容不合法",
+      })
+  })
+
+export const sendMessageCommandSchema = z
+  .object(baseGenerationFields)
+  .strict()
+  .superRefine((command, context) => {
+    const result = messageContentInputSchema.safeParse({ parts: command.parts })
+    if (!result.success)
+      context.addIssue({
+        code: "custom",
+        path: ["parts"],
+        message: "消息内容不合法",
+      })
+  })
+
+const firstForkTurnSchema = z
+  .object({
+    userMessageId: entityIdSchema,
+    assistantMessageId: entityIdSchema,
+    parts: messageContentInputSchema.shape.parts,
+  })
+  .strict()
+  .superRefine((command, context) => {
+    const result = messageContentInputSchema.safeParse({ parts: command.parts })
+    if (!result.success)
+      context.addIssue({
+        code: "custom",
+        path: ["parts"],
+        message: "消息内容不合法",
+      })
+  })
 
 const textAnchorSchema = z
   .object({
@@ -43,53 +91,12 @@ const textAnchorSchema = z
       })
       .strict(),
     position: z
-      .object({
-        start: z.number().int().min(0),
-        end: z.number().int().min(0),
-      })
+      .object({ start: z.number().int().min(0), end: z.number().int().min(0) })
       .strict()
       .refine((position) => position.end > position.start, {
         message: "position.end 必须大于 position.start",
       })
       .optional(),
-  })
-  .strict()
-
-const messageContentFields = {
-  text: messageTextSchema,
-  files: z.array(fileReferenceSchema).max(20).default([]),
-} as const
-
-export const startProjectCommandSchema = z
-  .object({
-    commandId: commandIdSchema,
-    projectId: entityIdSchema,
-    rootThreadId: entityIdSchema,
-    userMessageId: entityIdSchema,
-    assistantMessageId: entityIdSchema,
-    modelId: modelIdSchema,
-    ...generationSettingsField,
-    ...messageContentFields,
-  })
-  .strict()
-
-export const sendMessageCommandSchema = z
-  .object({
-    commandId: commandIdSchema,
-    userMessageId: entityIdSchema,
-    assistantMessageId: entityIdSchema,
-    modelId: modelIdSchema,
-    ...generationSettingsField,
-    ...messageContentFields,
-  })
-  .strict()
-
-const firstForkTurnSchema = z
-  .object({
-    userMessageId: entityIdSchema,
-    assistantMessageId: entityIdSchema,
-    text: messageTextSchema,
-    files: z.array(fileReferenceSchema).max(20).default([]),
   })
   .strict()
 
@@ -107,15 +114,17 @@ export const forkThreadCommandSchema = z
   .strict()
 
 export const editLatestTurnCommandSchema = z
-  .object({
-    commandId: commandIdSchema,
-    userMessageId: entityIdSchema,
-    assistantMessageId: entityIdSchema,
-    modelId: modelIdSchema,
-    ...generationSettingsField,
-    ...messageContentFields,
-  })
+  .object(baseGenerationFields)
   .strict()
+  .superRefine((command, context) => {
+    const result = messageContentInputSchema.safeParse({ parts: command.parts })
+    if (!result.success)
+      context.addIssue({
+        code: "custom",
+        path: ["parts"],
+        message: "消息内容不合法",
+      })
+  })
 
 export const retryMessageCommandSchema = z
   .object({
@@ -125,25 +134,21 @@ export const retryMessageCommandSchema = z
     ...generationSettingsField,
   })
   .strict()
-
 export const stopMessageCommandSchema = z
   .object({ commandId: commandIdSchema })
   .strict()
-
 export const setFeedbackCommandSchema = z
   .object({
     commandId: commandIdSchema,
     feedback: z.enum(["up", "down"]).nullable(),
   })
   .strict()
-
 export const renameProjectCommandSchema = z
   .object({
     commandId: commandIdSchema,
     customTitle: z.string().trim().min(1).max(60),
   })
   .strict()
-
 export const updateProjectContractCommandSchema = z
   .object({
     commandId: commandIdSchema,
@@ -152,32 +157,16 @@ export const updateProjectContractCommandSchema = z
     instructions: z.string().max(PROJECT_INSTRUCTIONS_MAX_CHARS),
   })
   .strict()
-
 export const addProjectFileCommandSchema = z
-  .object({
-    commandId: commandIdSchema,
-    attachmentId: entityIdSchema,
-  })
+  .object({ commandId: commandIdSchema, attachmentId: entityIdSchema })
   .strict()
-
-export const removeProjectFileCommandSchema = z
-  .object({
-    commandId: commandIdSchema,
-    attachmentId: entityIdSchema,
-  })
-  .strict()
-
+export const removeProjectFileCommandSchema = addProjectFileCommandSchema
 export const setProjectArchivedCommandSchema = z
-  .object({
-    commandId: commandIdSchema,
-    archived: z.boolean(),
-  })
+  .object({ commandId: commandIdSchema, archived: z.boolean() })
   .strict()
-
 export const deleteProjectCommandSchema = z
   .object({ commandId: commandIdSchema })
   .strict()
-
 export const updateThreadCommandSchema = z
   .object({
     commandId: commandIdSchema,
@@ -188,15 +177,15 @@ export const updateThreadCommandSchema = z
   .refine(
     (command) =>
       command.modelId !== undefined || command.customTitle !== undefined,
-    { message: "至少提供 modelId 或 customTitle" }
+    {
+      message: "至少提供 modelId 或 customTitle",
+    }
   )
 
 export type StartProjectCommand = z.infer<typeof startProjectCommandSchema>
 export type SendMessageCommand = z.infer<typeof sendMessageCommandSchema>
 export type ForkThreadCommand = z.infer<typeof forkThreadCommandSchema>
-export type EditLatestTurnCommand = z.infer<
-  typeof editLatestTurnCommandSchema
->
+export type EditLatestTurnCommand = z.infer<typeof editLatestTurnCommandSchema>
 export type RetryMessageCommand = z.infer<typeof retryMessageCommandSchema>
 export type StopMessageCommand = z.infer<typeof stopMessageCommandSchema>
 export type SetFeedbackCommand = z.infer<typeof setFeedbackCommandSchema>

@@ -22,6 +22,7 @@ import {
   saveWorkspaceState,
 } from "../../app/thread-chat/net/persistence/workspace-state.ts"
 import { createConversationCommands } from "../../app/thread-chat/net/commands/conversation-commands.ts"
+import { messageContentToUiParts } from "../../lib/thread-chat/contracts/message-content.ts"
 import { followAcceptedGeneration } from "../../app/thread-chat/net/stream/generation-connection.ts"
 import { bootConversationProject } from "../../app/thread-chat/net/boot/conversation-boot.ts"
 import { hasCompletedAssistantActions } from "../../app/thread-chat/chat/actions/message-action-types.ts"
@@ -657,7 +658,9 @@ async function testRetryABC() {
 }
 
 async function testCommandFilesPassThrough() {
-  const store = createConversationStore({ bootstrap: bootstrap({ messages: [] }) })
+  const store = createConversationStore({
+    bootstrap: bootstrap({ messages: [] }),
+  })
   const file = {
     url: `/api/attachments/${crypto.randomUUID()}`,
     mediaType: "text/plain",
@@ -722,13 +725,19 @@ async function testCommandFilesPassThrough() {
     text: "读取附件",
     files: [file],
   })
-  assert.deepEqual(seen.files, [file])
+  assert.deepEqual(seen.parts, [
+    { type: "text", text: "读取附件" },
+    { type: "file", file },
+  ])
   assert.deepEqual(seen.generationSettings, generationSettings)
   assert.notEqual(seen.generationSettings, generationSettings)
   assert.equal(Object.isFrozen(seen.generationSettings), true)
   assert.deepEqual(
     store.getState().messagesById[result.command.userMessageId].parts,
-    [{ type: "text", text: "读取附件" }, { type: "file", ...file }]
+    [
+      { type: "text", text: "读取附件" },
+      { type: "file", ...file },
+    ]
   )
   await result.connection.finished
   commands.dispose()
@@ -870,7 +879,7 @@ async function testCommandTitleGenerationUpdatesStore() {
               role: "user",
               status: "completed",
               error: null,
-              parts: [{ type: "text", text: command.text }],
+              parts: messageContentToUiParts(command),
             }),
             assistantMessage: message({
               id: command.assistantMessageId,
@@ -917,7 +926,7 @@ async function testCommandTitleGenerationUpdatesStore() {
                 role: "user",
                 status: "completed",
                 error: null,
-                parts: [{ type: "text", text: command.firstTurn.text }],
+                parts: messageContentToUiParts(command.firstTurn),
               }),
               assistantMessage: message({
                 id: command.firstTurn.assistantMessageId,

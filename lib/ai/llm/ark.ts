@@ -29,6 +29,11 @@ export function arkCodingChatModel(modelId: string): LanguageModel {
 
 export const arkModelProvider = createModels({
   models: arkModels,
+  routeIdentity: (model) => ({
+    actualProvider: "ark",
+    protocol: "openai-compatible",
+    upstreamModel: model.id,
+  }),
   isConfigured: isArkCodingConfigured,
   createProvider: () => (model) => getArkProvider()(model.id),
 })

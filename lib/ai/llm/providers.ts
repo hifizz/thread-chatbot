@@ -29,9 +29,13 @@ export function isModelConfigured(modelId: string): boolean {
 }
 
 export function resolveChatModel(modelId: string): LanguageModel {
+  return resolveChatModelWithRoute(modelId).model
+}
+
+export function resolveChatModelWithRoute(modelId: string) {
   const route = MODEL_ROUTES.get(modelId)
   if (!route) throw new Error(`未知模型：${modelId}`)
-  return route.createModel()
+  return { model: route.createModel(), route: route.identity }
 }
 
 export function getModelRouteProvider(modelId: string): ModelProviderId {

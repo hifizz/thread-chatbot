@@ -36,6 +36,11 @@ export function openRouterChatModel(modelId: string): LanguageModel {
 
 export const openrouterModelProvider = createModels({
   models: openrouterModels,
+  routeIdentity: (model) => ({
+    actualProvider: "openrouter",
+    protocol: "openrouter",
+    upstreamModel: model.id,
+  }),
   isConfigured: isOpenRouterConfigured,
   createProvider: () => (model) =>
     getOpenRouterProvider()(model.id, { usage: { include: true } }),

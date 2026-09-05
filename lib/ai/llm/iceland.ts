@@ -48,7 +48,7 @@ function protocol(modelId: string): IcelandRelayProtocol {
 export function isIcelandRelayConfigured(): boolean {
   return Boolean(
     process.env.ICELAND_RELAY_BASE_URL?.trim() &&
-      process.env.ICELAND_RELAY_API_KEY?.trim()
+    process.env.ICELAND_RELAY_API_KEY?.trim()
   )
 }
 
@@ -63,6 +63,12 @@ export function icelandRelayChatModel(
 
 export const icelandModelProvider = createModels({
   models: icelandModels,
+  routeIdentity: (model) => ({
+    actualProvider: "iceland-relay",
+    protocol:
+      protocol(model.id) === "anthropic" ? "anthropic" : "openai-compatible",
+    upstreamModel: model.id,
+  }),
   isConfigured: isIcelandRelayConfigured,
   createProvider: () => (model) =>
     icelandRelayChatModel(model.id, protocol(model.id)),

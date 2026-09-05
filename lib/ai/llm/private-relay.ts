@@ -30,7 +30,7 @@ function getPrivateRelayProvider() {
 export function isPrivateRelayConfigured(): boolean {
   return Boolean(
     process.env.PRIVATE_RELAY_BASE_URL?.trim() &&
-      process.env.PRIVATE_RELAY_API_KEY?.trim()
+    process.env.PRIVATE_RELAY_API_KEY?.trim()
   )
 }
 
@@ -40,6 +40,11 @@ export function privateRelayChatModel(modelId: string): LanguageModel {
 
 export const privateRelayModelProvider = createModels({
   models: privateRelayModels,
+  routeIdentity: (model) => ({
+    actualProvider: "private-relay",
+    protocol: "openai-compatible",
+    upstreamModel: model.id,
+  }),
   isConfigured: isPrivateRelayConfigured,
   createProvider: () => (model) => getPrivateRelayProvider()(model.id),
 })

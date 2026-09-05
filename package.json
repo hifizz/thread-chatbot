@@ -53,6 +53,7 @@
     "test:thread-chat:gate2-api-db": "node --import tsx e2e/thread-chat/normalized-v1-api-db.test.mjs",
     "test:thread-chat:gate3-client": "node --import tsx e2e/thread-chat/normalized-client-store.test.mjs",
     "test:thread-chat:gate4-cutover": "node scripts/check-thread-chat-cutover.mjs && node --import tsx e2e/thread-chat/normalized-cutover-db.test.mjs",
+    "test:thread-chat:prompt-cache": "node --import tsx e2e/thread-chat/prompt-cache-contract.test.mjs && node --import tsx e2e/thread-chat/prompt-cache-wire.test.mjs",
     "test:attachment-composer-demo:model": "node --import tsx e2e/thread-chat/attachment-composer-demo-model.test.mjs",
     "test:attachment-composer-demo:browser": "node e2e/thread-chat/verify-attachment-composer-demo.mjs",
     "test:attachment-composer-demo": "node --import tsx e2e/thread-chat/attachment-composer-demo-model.test.mjs && node e2e/thread-chat/verify-attachment-composer-demo.mjs",

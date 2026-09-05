@@ -12,11 +12,19 @@ function apiKey(): string {
 }
 
 function isDeepSeekConfigured(): boolean {
-  return isCloudflareGatewayConfigured() && Boolean(process.env.DEEPSEEK_API_KEY?.trim())
+  return (
+    isCloudflareGatewayConfigured() &&
+    Boolean(process.env.DEEPSEEK_API_KEY?.trim())
+  )
 }
 
 export const deepseekModelProvider = createModels({
   models: deepseekModels,
+  routeIdentity: (model) => ({
+    actualProvider: "cloudflare-ai-gateway",
+    protocol: "openai-compatible",
+    upstreamModel: `deepseek/${model.id}`,
+  }),
   isConfigured: isDeepSeekConfigured,
   createProvider: () => (model) =>
     cloudflareGatewayChatModel({

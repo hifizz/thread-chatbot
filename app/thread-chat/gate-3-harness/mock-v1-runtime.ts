@@ -433,7 +433,10 @@ export function createGate3MockRuntime(
         projectId,
         threadId: current.threadId,
         sourceMessageId: messageId,
-        sourceThreadTitle: threads.get(current.threadId)?.customTitle ?? threads.get(current.threadId)?.autoTitle ?? null,
+        sourceThreadTitle:
+          threads.get(current.threadId)?.customTitle ??
+          threads.get(current.threadId)?.autoTitle ??
+          null,
         sourceThreadFootnote: threads.get(current.threadId)?.footnote ?? null,
         sourceMessageStatus: "completed",
         kind: "markdown",
@@ -553,7 +556,10 @@ export function createGate3MockRuntime(
         id: input.userMessageId,
         threadId: thread.id,
         sequence: nextSequence(thread.id),
-        text: input.text,
+        text: input.parts
+          .filter((part) => part.type === "text")
+          .map((part) => part.text)
+          .join("\n"),
       })
       const assistant = makeAssistant({
         id: input.assistantMessageId,
@@ -573,7 +579,10 @@ export function createGate3MockRuntime(
         id: input.userMessageId,
         threadId,
         sequence: nextSequence(threadId),
-        text: input.text,
+        text: input.parts
+          .filter((part) => part.type === "text")
+          .map((part) => part.text)
+          .join("\n"),
       })
       const assistant = makeAssistant({
         id: input.assistantMessageId,
@@ -653,7 +662,10 @@ export function createGate3MockRuntime(
         id: input.firstTurn.userMessageId,
         threadId: thread.id,
         sequence: 1,
-        text: input.firstTurn.text,
+        text: input.firstTurn.parts
+          .filter((part) => part.type === "text")
+          .map((part) => part.text)
+          .join("\n"),
       })
       const assistant = makeAssistant({
         id: input.firstTurn.assistantMessageId,
@@ -692,7 +704,10 @@ export function createGate3MockRuntime(
         id: input.userMessageId,
         threadId: source.threadId,
         sequence: nextSequence(source.threadId),
-        text: input.text,
+        text: input.parts
+          .filter((part) => part.type === "text")
+          .map((part) => part.text)
+          .join("\n"),
       })
       user.replacesMessageId = source.id
       const assistant = makeAssistant({

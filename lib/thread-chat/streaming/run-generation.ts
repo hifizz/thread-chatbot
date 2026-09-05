@@ -22,6 +22,12 @@ import { assistantMessageTraceId } from "@/lib/observability/identity"
 import { safeErrorMetadata } from "@/lib/observability/error"
 import { observeAppOperation, runAgentTrace } from "@/lib/observability/trace"
 import type { ObservabilityContext } from "@/lib/observability/types"
+import {
+  buildPromptCacheObservation,
+  reportPromptCacheObservation,
+  type PromptCacheObservationContext,
+} from "@/lib/thread-chat/streaming/prompt-cache-observation"
+import type { PromptCacheObservation } from "@/lib/thread-chat/contracts/prompt-cache"
 
 export interface PreparedGeneration {
   textStream: ReadableStream<TextStreamPart<ToolSet>>
@@ -29,6 +35,7 @@ export interface PreparedGeneration {
   leadingChunks?: ThreadChatUIMessageChunk[]
   usage?: PromiseLike<LanguageModelUsage>
   contextMetadata?: Record<string, unknown>
+  promptCacheContext?: PromptCacheObservationContext
 }
 
 export interface RunGenerationDependencies {
@@ -52,6 +59,7 @@ type GenerationRunResult = {
   partCount: number
   providerUsage?: Record<string, unknown>
   contextMetadata?: Record<string, unknown>
+  promptCacheObservation?: PromptCacheObservation
   checkpoint: ReturnType<MessageCheckpointer["getSummary"]>
   error?: ReturnType<typeof safeErrorMetadata>
 }
@@ -161,7 +169,6 @@ async function runGenerationCore({
         .slice(-6)
         .map((row) => `${row.role}: ${textFromParts(row.parts)}`)
         .join("\n"),
-      anchorText: thread.anchorText,
       projectContract: {
         target: project.target,
         instructions: project.instructions,
@@ -169,6 +176,7 @@ async function runGenerationCore({
       },
       projectFileStats: compiledContext.projectFileStats,
       modelMessages: compiledContext.messages,
+      promptCacheBoundaries: compiledContext.boundaries,
       abortSignal: session.signal,
     })
     pipelineEnd = await consumeUIMessagePipeline({
@@ -215,7 +223,22 @@ async function runGenerationCore({
       ? { finishReason: pipelineEnd.finishReason }
       : {}),
   })
-  const providerUsage = rawUsage(usage)
+  const promptCacheObservation = prepared?.promptCacheContext
+    ? buildPromptCacheObservation(usage, prepared.promptCacheContext)
+    : undefined
+  if (promptCacheObservation)
+    reportPromptCacheObservation(promptCacheObservation)
+  const serializedUsage = rawUsage(usage)
+  const providerUsage = serializedUsage
+    ? {
+        ...serializedUsage,
+        ...(promptCacheObservation
+          ? { promptCache: promptCacheObservation }
+          : {}),
+      }
+    : promptCacheObservation
+      ? { promptCache: promptCacheObservation }
+      : undefined
   const resolvedFinishReason =
     pipelineEnd?.finishReason ?? (outcome.failed ? "error" : undefined)
   const terminal = await observeAppOperation(
@@ -225,6 +248,9 @@ async function runGenerationCore({
         assistantMessageId: message.id,
         requestedStatus: outcome.status,
         ...(prepared?.contextMetadata ?? {}),
+        ...(promptCacheObservation
+          ? { promptCache: promptCacheObservation }
+          : {}),
       },
     },
     async (observation) => {
@@ -265,6 +291,7 @@ async function runGenerationCore({
     ...(prepared?.contextMetadata
       ? { contextMetadata: prepared.contextMetadata }
       : {}),
+    ...(promptCacheObservation ? { promptCacheObservation } : {}),
     checkpoint: checkpointer.getSummary(),
     ...(outcome.failed && (thrown || protocolError)
       ? { error: safeErrorMetadata(thrown ?? protocolError) }
@@ -311,6 +338,9 @@ export async function runGeneration(input: {
           ...result.checkpoint,
           ...(result.contextMetadata ?? {}),
           ...(result.error ?? {}),
+          ...(result.promptCacheObservation
+            ? { promptCache: result.promptCacheObservation }
+            : {}),
           hasProviderUsage: Boolean(result.providerUsage),
         },
       })

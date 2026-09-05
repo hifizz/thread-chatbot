@@ -14,6 +14,12 @@ Before working in this repository, read `CLAUDE.md` in full and follow its
 project-wide instructions. `CLAUDE.md` is the single source of truth for shared
 development commands, workflow rules, architecture, and implementation notes.
 
+Project-specific Command Code Taste belongs in `.commandcode/taste/`. This
+directory is intended to be committed and shared with the team so repository
+workflow and implementation preferences remain consistent. Personal preferences
+that should apply across repositories belong in `~/.commandcode/taste/` and
+must not be committed to this repository.
+
 If an instruction in this file conflicts with `CLAUDE.md`, follow this file.
 
 ## Formatting

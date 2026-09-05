@@ -8,9 +8,11 @@ import {
   assertModelSupportsNewAttachments,
   assertThreadReadyForTurn,
   buildUserParts,
+  commandFiles,
   touchProjectAndThread,
 } from "@/lib/thread-chat/application/command-utils"
 import { notFound, stateConflict } from "@/lib/thread-chat/application/errors"
+import { assertValidQuoteSources } from "@/lib/thread-chat/application/quote-validation"
 import { executeIdempotentCommand } from "@/lib/thread-chat/persistence/command-repository"
 import {
   toMessageDTO,
@@ -33,10 +35,7 @@ export function sendMessage(
   command: SendMessageCommand
 ) {
   assertAllowedModel(command.modelId)
-  assertAllowedGenerationSettings(
-    command.modelId,
-    command.generationSettings
-  )
+  assertAllowedGenerationSettings(command.modelId, command.generationSettings)
   return withConversationTransaction(async (tx) =>
     executeIdempotentCommand({
       tx,
@@ -52,8 +51,15 @@ export function sendMessage(
         if (!project) notFound()
         if (project.archivedAt) stateConflict("已归档 Project 不可发送消息")
         await assertThreadReadyForTurn(tx, project.id, thread.id)
-        assertModelSupportsNewAttachments(command.modelId, command.files)
-        await assertOwnedReadyAttachments(tx, userId, command.files)
+        const files = commandFiles(command)
+        assertModelSupportsNewAttachments(command.modelId, files)
+        await assertOwnedReadyAttachments(tx, userId, files)
+        await assertValidQuoteSources({
+          tx,
+          projectId: project.id,
+          sourceThreadId: thread.id,
+          content: command,
+        })
         const [userSequence, assistantSequence] = await allocateThreadSequences(
           tx,
           thread.id,
@@ -69,7 +75,7 @@ export function sendMessage(
               threadId: thread.id,
               sequence: userSequence,
               role: "user",
-              parts: buildUserParts(command.text, command.files),
+              parts: buildUserParts(command),
               status: "completed",
               finishedAt: now,
             },

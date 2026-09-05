@@ -1,7 +1,5 @@
 import assert from "node:assert/strict"
-import {
-  renderTextAttachment,
-} from "../../lib/chat/attachment-content-resolver.ts"
+import { renderTextAttachment } from "../../lib/chat/attachment-content-resolver.ts"
 import {
   isTextAttachmentFile,
   normalizeAttachmentFile,
@@ -12,12 +10,8 @@ import {
   isThreadComposerImageFile,
   THREAD_COMPOSER_ACCEPT,
 } from "../../app/thread-chat/chat/composer/thread-attachment-model.ts"
-import {
-  startProjectCommandSchema,
-} from "../../lib/thread-chat/contracts/commands.ts"
-import {
-  THREAD_MESSAGE_ATTACHMENT_MIME_TYPES,
-} from "../../lib/thread-chat/application/command-utils.ts"
+import { startProjectCommandSchema } from "../../lib/thread-chat/contracts/commands.ts"
+import { THREAD_MESSAGE_ATTACHMENT_MIME_TYPES } from "../../lib/thread-chat/application/command-utils.ts"
 
 const sourceText = "export function demo() {\n  return 42\n}\n"
 for (const [filename, mediaType] of [
@@ -75,28 +69,25 @@ const row = {
 }
 
 const original = "function demo() {\n  return 42\n}\n\n尾行"
-const full = await renderTextAttachment(
-  row,
-  1_000,
-  async () => new TextEncoder().encode(original)
+const full = await renderTextAttachment(row, 1_000, async () =>
+  new TextEncoder().encode(original)
 )
 assert.equal(full.mode, "full")
-assert.match(full.text, /name="code &amp; &quot;notes&quot;\.txt" mime="text\/plain"/)
+assert.match(
+  full.text,
+  /name="code &amp; &quot;notes&quot;\.txt" mime="text\/plain"/
+)
 assert.ok(full.text.includes(original), "必须原样保留换行与代码缩进")
 
-const truncated = await renderTextAttachment(
-  row,
-  12,
-  async () => new TextEncoder().encode(original)
+const truncated = await renderTextAttachment(row, 12, async () =>
+  new TextEncoder().encode(original)
 )
 assert.equal(truncated.mode, "fallback")
 assert.ok(truncated.text.includes(original.slice(0, 12)))
 assert.match(truncated.text, /已截断：附件正文超出本轮上下文预算/)
 
-const invalidUtf8 = await renderTextAttachment(
-  row,
-  100,
-  async () => Uint8Array.from([0xc3, 0x28])
+const invalidUtf8 = await renderTextAttachment(row, 100, async () =>
+  Uint8Array.from([0xc3, 0x28])
 )
 assert.match(invalidUtf8.text, /文本附件解析失败：内容不是有效的 UTF-8 文本/)
 
@@ -113,15 +104,18 @@ const parsed = startProjectCommandSchema.parse({
   userMessageId: crypto.randomUUID(),
   assistantMessageId: crypto.randomUUID(),
   modelId: "test/model",
-  text: "请阅读附件",
-  files: [
+  parts: [
+    { type: "text", text: "请阅读附件" },
     {
-      url: `/api/attachments/${id}`,
-      mediaType: "text/plain",
-      filename: row.filename,
+      type: "file",
+      file: {
+        url: `/api/attachments/${id}`,
+        mediaType: "text/plain",
+        filename: row.filename,
+      },
     },
   ],
 })
-assert.equal(parsed.files[0].mediaType, "text/plain")
+assert.equal(parsed.parts[1].file.mediaType, "text/plain")
 
 console.log("text attachment slice tests passed")
