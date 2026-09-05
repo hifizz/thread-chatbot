@@ -48,6 +48,15 @@ import { canvasLayoutPositions } from "./canvas-layout"
  */
 export interface CanvasViewState {
   pins: ReadonlyMap<string, XYPosition>
+  viewport?: { x: number; y: number; zoom: number }
+  selectedId?: string | null
+}
+
+export function persistCanvasViewport(host: CanvasViewState, viewport: NonNullable<CanvasViewState["viewport"]>) {
+  host.viewport = viewport
+}
+function persistCanvasSelection(host: CanvasViewState, id: string | null) {
+  host.selectedId = id
 }
 
 /** 写宿主镜像：对长寿对象的突变收敛在非 React 代码里（与 core/store 同一约定） */
@@ -257,7 +266,7 @@ export function useCanvasLayout({
   const [pins, setPins] = useState<ReadonlyMap<string, XYPosition>>(
     () => new Map(viewState.pins)
   )
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [selectedId, setSelectedId] = useState<string | null>(viewState.selectedId ?? null)
 
   /* store 原地修改、state 引用永不变化：组一个随 version 变化的快照对象作为派生 key */
   const snap = useMemo(
@@ -307,6 +316,7 @@ export function useCanvasLayout({
       }
       changes.forEach((c) => {
         if (c.type === "select") {
+          persistCanvasSelection(viewState, c.selected ? c.id : viewState.selectedId === c.id ? null : viewState.selectedId ?? null)
           setSelectedId((cur) =>
             c.selected ? c.id : cur === c.id ? null : cur
           )
@@ -325,7 +335,10 @@ export function useCanvasLayout({
 
   /** 程序化单选某节点（画布 fork 跟随 / 面板内点锚点聚焦）：与点选走同一 selectedId，
       展开外挂面板；受控 nodes 的 selected 由它派生，React Flow 侧随渲染同步 */
-  const selectNode = useCallback((id: string | null) => setSelectedId(id), [])
+  const selectNode = useCallback((id: string | null) => {
+    persistCanvasSelection(viewState, id)
+    setSelectedId(id)
+  }, [viewState])
 
   return {
     nodes,

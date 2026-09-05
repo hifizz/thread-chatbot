@@ -20,7 +20,8 @@
  * 不能 display:none，会破坏 React Flow 的边坐标计算，skill 契约 #8）。
  */
 
-import React, { memo } from "react"
+import React, { memo, useContext } from "react"
+import { CanvasReadOnlyContext } from "./canvas-read-only"
 import { Handle, Position, type Node, type NodeProps } from "@xyflow/react"
 import type { Message } from "../../core/types"
 import { CANVAS_CARD_DIMENSIONS } from "./canvas-card-dimensions"
@@ -55,6 +56,7 @@ export const CanvasCard = memo(function CanvasCard({
   data,
   selected,
 }: NodeProps<CanvasCardNode>) {
+  const readOnly = useContext(CanvasReadOnlyContext)
   return (
     <div
       className="canvas-card tc-accent-context" /* 选中态样式由 .react-flow__node.selected 提供；此前的条件类拼接丢空格产出 canvas-cardexpanded 单 token，选中即丢全部卡片样式（codex review P1） */
@@ -106,7 +108,7 @@ export const CanvasCard = memo(function CanvasCard({
           </span>
         )}
       </div>
-      {selected && <CanvasExpand threadId={id} data={data} />}
+      {selected && (readOnly ? <div className="share-canvas-reading nodrag nowheel" onDoubleClick={(event) => event.stopPropagation()}>{readOnly(id)}</div> : <CanvasExpand threadId={id} data={data} />)}
       <Handle type="source" position={Position.Right} isConnectable={false} />
     </div>
   )

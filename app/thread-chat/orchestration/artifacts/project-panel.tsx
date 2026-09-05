@@ -39,6 +39,7 @@ export interface ProjectPanelProps {
   onClose(): void
   onSelect(id: string): void
   onLocate(threadId: string, sourceMessageId: string): void
+  onShareArtifact?(id: string): void
   onRefresh(): Promise<void>
   onSaveContract(target: string, instructions: string): Promise<void>
   onAddProjectFile(attachmentId: string): Promise<void>
@@ -90,6 +91,7 @@ export function ProjectPanel({
   onClose,
   onSelect,
   onLocate,
+  onShareArtifact,
   onRefresh,
   onSaveContract,
   onAddProjectFile,
@@ -523,6 +525,7 @@ export function ProjectPanel({
                     </p>
                   </div>
                   <div className="project-actions">
+                    {onShareArtifact && selectedArtifact.kind === "markdown" && selectedArtifact.sourceMessageStatus === "completed" && <button className="project-secondary" onClick={() => onShareArtifact(selectedArtifact.id)}>分享 Markdown</button>}
                     {selectedArtifact.kind === "markdown" && (
                       <button
                         type="button"

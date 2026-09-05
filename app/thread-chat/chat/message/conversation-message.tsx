@@ -49,6 +49,8 @@ export interface ConversationMessageProps {
   threadId: string
   message: ConversationViewMessage
   showRoleLabel?: boolean
+  userRoleLabel?: string
+  hasSupplementalContent?: boolean
   assistantBubbleClassName?: string
   renderAssistantBody?: (message: ConversationViewMessage) => React.ReactNode
   renderAfterMessage?: (message: ConversationViewMessage) => React.ReactNode
@@ -64,6 +66,8 @@ export function ConversationMessage({
   threadId,
   message,
   showRoleLabel = false,
+  userRoleLabel = "你",
+  hasSupplementalContent = false,
   assistantBubbleClassName = "bubble",
   renderAssistantBody = defaultAssistantBody,
   renderAfterMessage,
@@ -79,7 +83,7 @@ export function ConversationMessage({
   return (
     <div className={`message ${message.role}`} data-msg-id={message.id}>
       {showRoleLabel && (
-        <div className="who">{message.role === "user" ? "你" : "AI"}</div>
+        <div className="who">{message.role === "user" ? userRoleLabel : "AI"}</div>
       )}
       {message.role === "user" ? (
         messageCommands ? (
@@ -97,7 +101,7 @@ export function ConversationMessage({
         )
       ) : (
         <>
-          {presentation.showBubble && (
+          {(presentation.showBubble || hasSupplementalContent) && (
             <div className={assistantBubbleClassName} data-role="assistant">
               {message.backgroundGeneration && (
                 <span className="generation-background" role="status">
@@ -129,17 +133,17 @@ export function ConversationMessage({
           {message.status === "error" && (
             <div className="msg-error">
               {message.error ?? "生成失败"}
-              <button className="retry" onClick={() => onRetry?.(message)}>
+              {onRetry && <button className="retry" onClick={() => onRetry(message)}>
                 重试
-              </button>
+              </button>}
             </div>
           )}
           {message.status === "stopped" && (
             <div className="msg-stopped" role="status">
               <span>{GENERATION_STOPPED_LABEL}</span>
-              <button className="retry" onClick={() => onRetry?.(message)}>
+              {onRetry && <button className="retry" onClick={() => onRetry(message)}>
                 重试
-              </button>
+              </button>}
             </div>
           )}
           {messageCommands && hasCompletedAssistantActions(message) && (

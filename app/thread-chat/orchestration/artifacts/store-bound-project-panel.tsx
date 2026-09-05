@@ -46,6 +46,7 @@ export function StoreBoundProjectPanel({
   onClose,
   onSelect,
   onLocate,
+  onShareArtifact,
 }: {
   projectId: string
   store: ConversationStore
@@ -56,6 +57,7 @@ export function StoreBoundProjectPanel({
   onClose(): void
   onSelect(id: string): void
   onLocate(threadId: string, sourceMessageId: string): void
+  onShareArtifact?(id: string): void
 }) {
   const state = useConversationStore(store, (value) => value)
   const files = useMemo(
@@ -120,6 +122,7 @@ export function StoreBoundProjectPanel({
       onClose={onClose}
       onSelect={onSelect}
       onLocate={locate}
+      onShareArtifact={onShareArtifact}
       onRefresh={refresh}
       onSaveContract={saveContract}
       onAddProjectFile={addProjectFile}
