@@ -20,7 +20,7 @@ export const RESEARCH_MAX_STEPS = 20
 /** 单次 webSearch 返回的结果数 */
 export const SEARCH_MAX_RESULTS = 8
 /** 单次网页抽取正文注入模型的最大字符数（控制上下文占用） */
-export const EXTRACT_CHAR_LIMIT = 8000
+export const EXTRACT_CHAR_LIMIT = 16_000
 /** 模糊路由分类最多参考的最近消息数，避免为决策重复发送整段长会话。 */
 export const RESEARCH_ROUTER_CONTEXT_MESSAGES = 6
 /** 结构化 Router 的输出上限；只生成一个很小的分类对象。 */

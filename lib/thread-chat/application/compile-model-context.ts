@@ -1,6 +1,8 @@
 import { convertToModelMessages, type ModelMessage } from "ai"
 import { db } from "@/lib/db"
+import { supportsModelImageInput } from "@/constants/model"
 import {
+  applyImageFileMaterializations,
   resolveAttachmentContext,
   type ProjectFileContextStats,
 } from "@/lib/chat/resolve-attachments"
@@ -45,10 +47,12 @@ export interface CompiledModelContext {
 export async function compileModelContextWithProject({
   userId,
   threadId,
+  modelId,
   excludeAssistantMessageId,
 }: {
   userId: string
   threadId: string
+  modelId: string
   excludeAssistantMessageId?: string
 }): Promise<CompiledModelContext> {
   const thread = await findOwnedThread(db, userId, threadId)
@@ -85,6 +89,7 @@ export async function compileModelContextWithProject({
     messages: uiMessages,
     userId,
     projectFiles,
+    supportsImageInput: supportsModelImageInput(modelId),
   })
   const withProjectContext: ThreadChatUIMessage[] = [
     ...(resolved.projectContext
@@ -124,7 +129,10 @@ export async function compileModelContextWithProject({
     },
   })
   return {
-    messages: modelMessages,
+    messages: applyImageFileMaterializations(
+      modelMessages,
+      resolved.imageFiles
+    ),
     boundaries: {
       stableInstructionsEnd: true,
       stableHistoryMessageIndex:
@@ -139,6 +147,7 @@ export async function compileModelContextWithProject({
 export async function compileModelContext(input: {
   userId: string
   threadId: string
+  modelId: string
   excludeAssistantMessageId?: string
 }): Promise<ModelMessage[]> {
   return (await compileModelContextWithProject(input)).messages

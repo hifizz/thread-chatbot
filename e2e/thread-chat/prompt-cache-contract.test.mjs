@@ -8,7 +8,12 @@ import {
   composerDraftToMessageContent,
   messageContentToUiParts,
 } from "../../lib/thread-chat/contracts/message-content.ts"
-import { sendMessageCommandSchema } from "../../lib/thread-chat/contracts/commands.ts"
+import {
+  sendMessageCommandSchema,
+  editLatestTurnCommandSchema,
+  forkThreadCommandSchema,
+  startProjectCommandSchema,
+} from "../../lib/thread-chat/contracts/commands.ts"
 import { resolveGenerationMode } from "../../lib/thread-chat/streaming/generation-modes.ts"
 import { resolvePromptCachePolicy } from "../../lib/thread-chat/streaming/prompt-cache-policy.ts"
 import { decoratePromptCache } from "../../lib/thread-chat/streaming/prompt-cache-decorator.ts"
@@ -79,18 +84,14 @@ const content = composerDraftToMessageContent({
     { localId: "4", type: "text", text: "follow-up" },
   ],
 })
-assert.deepEqual(content.parts.map((part) => part.type), [
-  "text",
-  "quote",
-  "file",
-  "text",
-])
-assert.deepEqual(messageContentToUiParts(content).map((part) => part.type), [
-  "text",
-  "data-quote",
-  "file",
-  "text",
-])
+assert.deepEqual(
+  content.parts.map((part) => part.type),
+  ["text", "quote", "file", "text"]
+)
+assert.deepEqual(
+  messageContentToUiParts(content).map((part) => part.type),
+  ["text", "data-quote", "file", "text"]
+)
 assert.equal(
   sendMessageCommandSchema.safeParse({
     commandId: ids.command,
@@ -113,28 +114,82 @@ assert.equal(
   "Quote 不能代替总体问题"
 )
 
-const registeredModel = {
-  id: "test",
-  name: "test",
-  provider: "umapis",
-  upstreamModel: "claude-sonnet-5",
-  umapisCredentialGroup: "claude",
-  surfaces: ["thread"],
-}
 const seenModes = new Set()
+const generationSettings = { effort: "high", maxOutputTokens: 32_000 }
+const imageFile = {
+  url: `/api/attachments/${ids.source}`,
+  mediaType: "image/png",
+  filename: "reference.png",
+}
+const mixedParts = [
+  { type: "quote", quote },
+  { type: "file", file: imageFile },
+  { type: "text", text: "解释引用并对照图片" },
+]
+const turn = {
+  commandId: ids.command,
+  userMessageId: ids.user,
+  assistantMessageId: ids.assistant,
+  modelId: "iceland-claude-opus-5",
+  generationSettings,
+  parts: mixedParts,
+}
+for (const schema of [sendMessageCommandSchema, editLatestTurnCommandSchema]) {
+  const parsed = schema.parse(turn)
+  assert.deepEqual(parsed.generationSettings, generationSettings)
+  assert.deepEqual(messageContentToUiParts(parsed), [
+    { type: "data-quote", data: quote },
+    { type: "file", ...imageFile },
+    { type: "text", text: "解释引用并对照图片" },
+  ])
+  assert.equal(
+    schema.safeParse({
+      ...turn,
+      generationSettings: { ...generationSettings, maxOutputTokens: 12345 },
+    }).success,
+    false
+  )
+}
+assert.deepEqual(
+  startProjectCommandSchema.parse({
+    ...turn,
+    projectId: ids.source,
+    rootThreadId: ids.command,
+    parts: mixedParts.slice(1),
+  }).generationSettings,
+  generationSettings
+)
+const fork = forkThreadCommandSchema.parse({
+  commandId: ids.command,
+  threadId: ids.command,
+  sourceMessageId: ids.source,
+  anchorText: quote.text,
+  anchor: quote.source.anchor,
+  modelId: turn.modelId,
+  generationSettings,
+  firstTurn: {
+    userMessageId: ids.user,
+    assistantMessageId: ids.assistant,
+    parts: mixedParts,
+  },
+})
+assert.deepEqual(fork.generationSettings, generationSettings)
+assert.deepEqual(fork.firstTurn.parts, mixedParts)
+
 for (const researchMode of ["answer", "fetch", "search", "research"]) {
   for (const artifactRequested of [false, true]) {
     const mode = resolveGenerationMode({
       researchMode,
       artifactRequested,
-      registeredModel,
     })
     seenModes.add(mode.id)
     assert.equal(mode.artifactRequested, artifactRequested)
     assert.equal(mode.researchMode, researchMode)
     assert.ok(mode.maxSteps > 0)
-    assert.ok(mode.maxOutputTokens > 0)
-    if (artifactRequested) assert.equal(mode.toolNames[0], "createMarkdownArtifact")
+    assert.equal("maxOutputTokens" in mode, false)
+    assert.equal("reasoning" in mode, false)
+    if (artifactRequested)
+      assert.equal(mode.toolNames[0], "createMarkdownArtifact")
   }
 }
 assert.equal(seenModes.size, 8)
@@ -157,7 +212,11 @@ for (const route of [
   { ...eligibleRoute, upstreamModel: "claude-opus-4-7" },
   { ...eligibleRoute, actualProvider: "openrouter", protocol: "openrouter" },
   { ...eligibleRoute, credentialGroup: "gpt", protocol: "openai-compatible" },
-  { ...eligibleRoute, actualProvider: "private-relay", protocol: "openai-compatible" },
+  {
+    ...eligibleRoute,
+    actualProvider: "private-relay",
+    protocol: "openai-compatible",
+  },
 ]) {
   assert.equal(resolvePromptCachePolicy(route).explicitCacheEnabled, false)
 }

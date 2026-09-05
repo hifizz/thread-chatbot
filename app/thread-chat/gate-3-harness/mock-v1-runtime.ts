@@ -6,6 +6,8 @@ import type {
   ProjectDTO,
   ThreadDTO,
 } from "@/lib/thread-chat/contracts/dto"
+import { PROJECT_TITLE_FALLBACK } from "@/constants/project-workspace"
+import { textFromMessageParts } from "@/lib/thread-chat/contracts/ui-message"
 import type { ThreadChatClient } from "../net/client"
 
 export type Gate3HarnessScenario =
@@ -32,13 +34,7 @@ function now(): string {
 }
 
 function textOf(message: MessageDTO): string {
-  return message.parts
-    .filter(
-      (part): part is Extract<typeof part, { type: "text" }> =>
-        part.type === "text"
-    )
-    .map((part) => part.text)
-    .join("")
+  return textFromMessageParts(message.parts)
 }
 
 function commandResponse<T>(data: T) {
@@ -505,7 +501,17 @@ export function createGate3MockRuntime(
   const client: ThreadChatClient = {
     async listProjects(archived = false) {
       return project && Boolean(project.archivedAt) === archived
-        ? [clone(project)]
+        ? [
+            {
+              id: project.id,
+              title:
+                project.customTitle ??
+                project.autoTitle ??
+                PROJECT_TITLE_FALLBACK,
+              updatedAt: project.updatedAt,
+              threadCount: threads.size,
+            },
+          ]
         : []
     },
     async getProject() {

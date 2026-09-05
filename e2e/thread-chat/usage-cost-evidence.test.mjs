@@ -42,7 +42,7 @@ for (const providerMetadata of [
 ]) {
   assert.deepEqual(
     usageCostEvidence({
-      provider: "umapis",
+      provider: "private-relay",
       steps: [],
       providerMetadata,
     }),

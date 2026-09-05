@@ -11,13 +11,16 @@ export interface AttachmentCandidatePlan<T extends AttachmentContextCandidate> {
   ordered: T[]
 }
 
-function readablePdf<T extends AttachmentContextCandidate>(row: T | undefined): row is T {
+function readableAttachment<T extends AttachmentContextCandidate>(
+  row: T | undefined
+): row is T {
   return Boolean(
     row &&
       row.status === "ready" &&
-      row.mimeType === "application/pdf" &&
-      row.pages &&
-      row.pages.length > 0
+      (row.mimeType === "text/plain" ||
+        (row.mimeType === "application/pdf" &&
+          row.pages &&
+          row.pages.length > 0))
   )
 }
 
@@ -37,12 +40,12 @@ export function planAttachmentCandidates<T extends AttachmentContextCandidate>({
   const explicitSet = new Set(explicitIds)
   const explicit = explicitIds.flatMap((id) => {
     const row = rowById.get(id)
-    return readablePdf(row) ? [row] : []
+    return readableAttachment(row) ? [row] : []
   })
   const project = projectIds.flatMap((id) => {
     if (explicitSet.has(id)) return []
     const row = rowById.get(id)
-    return readablePdf(row) ? [row] : []
+    return readableAttachment(row) ? [row] : []
   })
   return { explicit, project, ordered: [...explicit, ...project] }
 }

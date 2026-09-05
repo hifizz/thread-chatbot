@@ -62,7 +62,7 @@ const FOCUS_OFFSET_Y = 140
 
 /** MiniMap 节点深度色走 .fc-N 类 + CSS fill（SVG 的 fill 属性不解析 var()，只能经 CSS） */
 const minimapNodeClass = (n: CanvasCardNode) =>
-  n.data.depth > 0 ? `fc-${dc(n.data.depth)}` : ""
+  n.data.depth > 0 ? `tc-fork-context fc-${dc(n.data.depth)}` : ""
 
 export interface ThreadCanvasProps {
   store: ThreadTreeReadableStore
@@ -193,7 +193,7 @@ function CanvasFlow({
             pannable
             zoomable
             nodeClassName={minimapNodeClass}
-            maskColor="rgba(245, 242, 234, 0.75)"
+            maskColor="var(--tc-canvas-minimap-mask)"
           />
           <Panel position="top-left" className="canvas-panel">
             <button

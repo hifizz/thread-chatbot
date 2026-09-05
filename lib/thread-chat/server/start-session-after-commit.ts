@@ -1,3 +1,4 @@
+import type { GenerationSettings } from "@/constants/generation-settings"
 import type { GenerationAcceptedDTO } from "@/lib/thread-chat/contracts/dto"
 import { getSessionStore } from "@/lib/thread-chat/streaming/session-store"
 import { initialAssistantSnapshot } from "@/lib/thread-chat/streaming/stream-session"
@@ -5,7 +6,8 @@ import { runGeneration } from "@/lib/thread-chat/streaming/run-generation"
 
 export function startSessionAfterCommit(
   userId: string,
-  generation: GenerationAcceptedDTO
+  generation: GenerationAcceptedDTO,
+  generationSettings?: GenerationSettings
 ): boolean {
   const assistant = generation.assistantMessage
   return getSessionStore().start({
@@ -16,6 +18,11 @@ export function startSessionAfterCommit(
       modelId: assistant.modelId ?? undefined,
     }),
     run: (session) =>
-      runGeneration({ userId, messageId: assistant.id, session }),
+      runGeneration({
+        userId,
+        messageId: assistant.id,
+        session,
+        ...(generationSettings ? { generationSettings } : {}),
+      }),
   }).started
 }

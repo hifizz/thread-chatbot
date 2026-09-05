@@ -1,274 +1,280 @@
-/* ── @/thread-chat/styles ── assistant 正文 Markdown（md-body）+ 表格 + 代码块 + 手绘锚点 / 脚注 */
+/* ── @/thread-chat/styles ── assistant 正文 Markdown（tc-prose）+ 表格 + 代码块 + 手绘锚点 / 脚注 */
 
 /* ==========================================================================
-   assistant 正文 Markdown 排版（.md-body）+ 手绘锚点高亮 / 脚注上标
+   assistant 正文 Markdown 排版（.tc-prose）+ 手绘锚点高亮 / 脚注上标
    沿用 .tc 的 paper/ink 暖色 token，与 demo 手稿批注风一致。
    用户消息仍是纯文本（不过 Markdown），样式见 .message.user .bubble。
    ========================================================================== */
-.tc .md-body {
-  font-family: var(--font-read);
-  font-size: 16px;
-  line-height: 1.7;
-  color: var(--ink);
+.tc .tc-prose {
+  min-width: 0;
+  max-width: 100%;
+  font-family: var(--tc-typography-family-read);
+  font-size: var(--tc-prose-size);
+  line-height: var(--tc-prose-leading);
+  color: var(--tc-content-primary);
 }
-.tc .md-body > *:first-child {
+.tc .tc-prose > *:first-child {
   margin-top: 0;
 }
-.tc .md-body > *:last-child {
+.tc .tc-prose > *:last-child {
   margin-bottom: 0;
 }
-.tc .md-body p {
-  margin: 0 0 12px;
+.tc .tc-prose p {
+  margin: 0 0 var(--tc-prose-paragraph-gap);
 }
-.tc .md-body h1,
-.tc .md-body h2,
-.tc .md-body h3,
-.tc .md-body h4 {
-  font-family: var(--font-ui);
-  color: var(--ink);
+.tc .tc-prose h1,
+.tc .tc-prose h2,
+.tc .tc-prose h3,
+.tc .tc-prose h4 {
+  font-family: var(--tc-typography-family-ui);
+  color: var(--tc-content-primary);
   font-weight: 600;
   line-height: 1.35;
-  margin: 20px 0 9px;
+  margin: var(--tc-prose-heading-gap-before) 0 var(--tc-prose-heading-gap-after);
 }
-.tc .md-body h1 {
-  font-size: 22px;
+.tc .tc-prose h1 {
+  font-size: var(--tc-prose-heading-size-1);
   font-weight: 800;
 }
-.tc .md-body h2 {
-  font-size: 17px;
+.tc .tc-prose h2 {
+  font-size: var(--tc-prose-heading-size-2);
 }
-.tc .md-body h3 {
-  font-size: 15.5px;
+.tc .tc-prose h3 {
+  font-size: var(--tc-prose-heading-size-3);
 }
-.tc .md-body h4 {
-  font-size: 14px;
-  color: var(--ink-soft);
+.tc .tc-prose h4 {
+  font-size: var(--tc-prose-heading-size-4);
+  color: var(--tc-content-secondary);
 }
-.tc .md-body ul,
-.tc .md-body ol {
-  margin: 0 0 12px;
-  padding-left: 22px;
+.tc .tc-prose ul,
+.tc .tc-prose ol {
+  margin: 0 0 var(--tc-prose-paragraph-gap);
+  padding-left: var(--tc-prose-list-indent);
 }
 /* Tailwind preflight 全局 list-style:none 会吞掉 marker——正文列表必须显式恢复 */
-.tc .md-body ul {
+.tc .tc-prose ul {
   list-style: disc;
 }
-.tc .md-body ol {
+.tc .tc-prose ol {
   list-style: decimal;
 }
-.tc .md-body ul ul {
+.tc .tc-prose ul ul {
   list-style: circle;
 }
-.tc .md-body li {
-  margin: 3px 0;
+.tc .tc-prose li {
+  margin: var(--tc-prose-list-item-gap) 0;
 }
-/* .tc .md-body li::marker {
-  color: var(--ink-faint);
-} */
-.tc .md-body blockquote {
-  margin: 12px 0;
-  padding: 4px 0 4px 12px;
-  border-left: 4px solid
-    color-mix(in srgb, var(--rule-strong) 50%, transparent);
-  color: var(--ink-soft);
+.tc .tc-prose li::marker {
+  color: var(--tc-content-muted);
 }
-.tc .md-body blockquote > p {
-  /* 这里需要覆盖一下优先级 */
+.tc .tc-prose blockquote {
+  margin: 0 0 var(--tc-prose-quote-gap);
+  padding: 2px 0 2px var(--tc-prose-quote-indent);
+  border-left: 3px solid var(--tc-border-strong);
+  color: var(--tc-content-secondary);
+}
+.tc .tc-prose blockquote > p {
   margin: 0 !important;
 }
-.tc .md-body blockquote p:last-child {
+.tc .tc-prose blockquote p:last-child {
   margin-bottom: 0;
 }
-.tc .md-body a {
-  color: var(--d1);
+.tc .tc-prose a {
+  color: var(--tc-depth-1);
   text-decoration: underline;
   text-underline-offset: 2px;
 }
-.tc .md-body hr {
+.tc .tc-prose hr {
   border: none;
-  border-top: 1px solid var(--rule);
-  margin: 18px 0;
+  border-top: 1px solid var(--tc-border-subtle);
+  margin: var(--tc-prose-hr-gap) 0;
 }
-.tc .md-body strong {
+.tc .tc-prose strong {
   font-weight: 700;
-  color: var(--ink);
+  color: var(--tc-content-primary);
 }
-.tc .md-body em {
+.tc .tc-prose em {
   font-style: italic;
 }
-.tc .md-body .md-inline-code {
-  font-family: var(--font-mono);
-  font-size: 0.85em;
-  color: color-mix(in srgb, #8e2626 calc(1 * 100%), transparent);
-  background: var(--paper-2);
-  border: 1px solid var(--rule);
+.tc .tc-prose .md-inline-code {
+  font-family: var(--tc-typography-family-code);
+  font-size: var(--tc-prose-inline-code-size);
+  color: var(--tc-danger-deep);
+  background: var(--tc-surface-raised);
+  border: 1px solid var(--tc-border-subtle);
   border-radius: 4px;
   padding: 1px 5px;
 }
 /* 表格 */
-.tc .md-body table {
+/* 让表格的最小内容宽度留在独立滚动区内，不撑开正文和消息列表。 */
+.tc .md-table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  margin: 0 0 var(--tc-prose-table-gap);
+  scrollbar-color: var(--tc-border-scrollbar) transparent;
+}
+.tc .tc-prose table {
   border-collapse: separate;
   border-spacing: 0;
   width: 100%;
-  margin: 0 0 16px;
-  font-size: 16px;
-  font-family: var(--font-ui);
-  border: 1px solid #dfdedb;
+  margin: 0;
+  font-size: var(--tc-prose-table-size);
+  font-family: var(--tc-typography-family-ui);
+  border: 1px solid var(--tc-border-subtle);
   border-radius: 8px;
   overflow: hidden;
 }
-.tc .md-body th,
-.tc .md-body td {
+.tc .tc-prose th,
+.tc .tc-prose td {
   border: 0;
-  border-right: 1px solid #dfdedb;
-  border-bottom: 1px solid #dfdedb;
+  border-right: 1px solid var(--tc-border-subtle);
+  border-bottom: 1px solid var(--tc-border-subtle);
   padding: 6px 12px;
   text-align: left;
   vertical-align: top;
 }
-.tc .md-body th:last-child,
-.tc .md-body td:last-child {
+.tc .tc-prose th:last-child,
+.tc .tc-prose td:last-child {
   border-right: 0;
 }
-.tc .md-body tr:last-child td {
+.tc .tc-prose tr:last-child td {
   border-bottom: 0;
 }
-.tc .md-body th {
-  background: #eeeeed;
+.tc .tc-prose th {
+  background: var(--tc-surface-raised);
   font-weight: 700;
-  font-size: 16px;
-  color: var(--ink);
+  color: var(--tc-content-primary);
 }
 /* 代码块：语言标签 + 复制按钮 + 代码体 */
-.tc .md-body .md-code {
-  margin: 10px 0;
-  border: 0.5px solid color-mix(in srgb, var(--ink) 15%, transparent);
+.tc .tc-prose .md-code {
+  margin: 0 0 var(--tc-prose-code-gap);
+  border: 1px solid var(--tc-border-subtle);
   position: relative;
   border-radius: 8px;
   overflow: hidden;
-  background: rgba(252,252,252, 1);
+  background: var(--tc-surface-code-card);
 }
-.tc .md-body .md-code-head {
+.tc .tc-prose .md-code-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 4px 4px 12px;
-  /*background: var(--paper-2);*/
-  /*border-bottom: 1px solid var(--rule);*/
-  font-family: var(--font-mono);
+  padding: 5px 10px;
+  /*background: var(--tc-surface-raised);*/
+  /*border-bottom: 1px solid var(--tc-border-subtle);*/
+  font-family: var(--tc-typography-family-code);
 }
-.tc .md-body .md-code-head .lang {
-  font-size: 12px;
+.tc .tc-prose .md-code-head .lang {
+  font-size: var(--tc-prose-lang-size);
+  /* tc-review: 非偶数值，保留字距以维持代码语言标签辨识度 */
   letter-spacing: 0.5px;
   text-transform: lowercase;
-  color: var(--ink-soft);
+  color: var(--tc-content-secondary);
 }
-.tc .md-body .md-code .copy {
+.tc .tc-prose .md-code .copy {
   display: inline-flex;
   align-items: center;
   background: transparent;
   border: none;
-  color: var(--ink-soft);
+  color: var(--tc-content-secondary);
   cursor: pointer;
   padding: 4px;
   border-radius: 4px;
   opacity: 0;
   transition: opacity 0.3s ease;
 }
-.tc .md-body .md-code:hover .copy,
-.tc .md-body .md-code .copy:focus-visible {
+.tc .tc-prose .md-code:hover .copy,
+.tc .tc-prose .md-code .copy:focus-visible {
   opacity: 1;
 }
-.tc .md-body .md-code > .copy {
+.tc .tc-prose .md-code > .copy {
   position: absolute;
   top: 5px;
   right: 10px;
 }
-.tc .md-body .md-code .copy:hover {
-  color: var(--ink);
-  background: color-mix(in srgb, var(--ink) 6%, transparent);
+.tc .tc-prose .md-code .copy:hover {
+  color: var(--tc-content-primary);
+  background: var(--tc-ink-wash);
 }
-.tc .md-body .md-code pre {
+.tc .tc-prose .md-code pre {
   margin: 0;
-  padding: 0px  12px 10px;
+  padding: var(--tc-prose-code-pad-block) var(--tc-prose-code-pad-inline);
   overflow-x: auto;
   scrollbar-width: auto;
-  scrollbar-color: color-mix(in srgb, var(--rule-strong) 70%, transparent)
-    transparent;
+  scrollbar-color: var(--tc-border-scrollbar) transparent;
 }
-.tc .md-body .md-code pre::-webkit-scrollbar {
+.tc .tc-prose .md-code pre::-webkit-scrollbar {
   width: 5px;
   height: 5px;
 }
-.tc .md-body .md-code pre::-webkit-scrollbar-thumb {
-  background: color-mix(in srgb, var(--rule-strong) 70%, transparent);
+.tc .tc-prose .md-code pre::-webkit-scrollbar-thumb {
+  background: var(--tc-border-scrollbar);
   border-radius: 5px;
 }
-.tc .md-body .md-code pre::-webkit-scrollbar-track {
+.tc .tc-prose .md-code pre::-webkit-scrollbar-track {
   background: transparent;
 }
-.tc .md-body .md-code.no-lang pre {
+.tc .tc-prose .md-code.no-lang pre {
   padding-top: 14px;
 }
-.tc .md-body .md-code pre.shiki {
+.tc .tc-prose .md-code pre.shiki {
   background: transparent !important;
 }
-.tc .md-body .md-code code {
+.tc .tc-prose .md-code code {
   display: block;
   min-width: max-content;
-  font-family: var(--font-mono);
-  font-size: 14px;
-  line-height: 1.6;
-  color: var(--ink);
+  font-family: var(--tc-typography-family-code);
+  font-size: var(--tc-prose-code-size);
+  line-height: var(--tc-prose-code-leading);
+  color: var(--tc-content-primary);
   white-space: pre;
 }
-.tc .md-body .md-code .line {
+.tc .tc-prose .md-code .line {
   display: inline-block;
   width: 100%;
 }
-.tc .md-body .md-code .line.highlighted {
-  background: color-mix(in srgb, var(--d4) 10%, transparent);
-  box-shadow: -13px 0 color-mix(in srgb, var(--d4) 10%, transparent);
+.tc .tc-prose .md-code .line.highlighted {
+  background: var(--tc-depth-4-highlight);
+  box-shadow: -13px 0 var(--tc-depth-4-highlight);
 }
-.tc .md-body .md-code .line.diff {
+.tc .tc-prose .md-code .line.diff {
   position: relative;
   padding-left: 14px;
 }
-.tc .md-body .md-code .line.diff::before {
+.tc .tc-prose .md-code .line.diff::before {
   position: absolute;
   left: 0;
-  color: var(--ink-faint);
+  color: var(--tc-content-muted);
 }
-.tc .md-body .md-code .line.diff.add {
-  background: color-mix(in srgb, var(--d1) 12%, transparent);
+.tc .tc-prose .md-code .line.diff.add {
+  background: var(--tc-depth-1-diff-add);
 }
-.tc .md-body .md-code .line.diff.add::before {
+.tc .tc-prose .md-code .line.diff.add::before {
   content: "+";
-  color: var(--d1);
+  color: var(--tc-depth-1);
 }
-.tc .md-body .md-code .line.diff.remove {
-  background: color-mix(in srgb, var(--d3) 12%, transparent);
+.tc .tc-prose .md-code .line.diff.remove {
+  background: var(--tc-depth-3-diff-remove);
 }
-.tc .md-body .md-code .line.diff.remove::before {
+.tc .tc-prose .md-code .line.diff.remove::before {
   content: "-";
-  color: var(--d3);
+  color: var(--tc-depth-3);
 }
 
 /* 手绘锚点高亮（data-text-anchor-mark 由 paintRange 绘制，背景色内联）+ 脚注上标 */
-.tc .md-body [data-text-anchor-mark] {
+.tc .tc-prose [data-text-anchor-mark] {
   cursor: pointer;
   border-radius: 2px;
   padding: 0 1px;
   border-bottom: 2px solid
-    color-mix(in srgb, var(--fc, var(--d1)) 55%, transparent);
+    var(--tc-fc-underline);
 }
-.tc .md-body sup.fn-mark {
-  font-family: var(--font-mono);
-  font-size: 10px;
+.tc .tc-prose sup.fn-mark {
+  font-family: var(--tc-typography-family-code);
+  font-size: var(--tc-prose-fn-size);
   font-weight: 700;
-  color: #fff;
+  color: var(--tc-content-on-accent);
   cursor: pointer;
-  background: var(--fc, var(--d1));
+  background: var(--fc, var(--tc-depth-1));
   border-radius: 4px;
   padding: 1px 4px;
   margin: 0 1px 0 2px;
@@ -276,6 +282,6 @@
   line-height: 1;
   user-select: none;
 }
-.tc .md-body sup.fn-mark:hover {
+.tc .tc-prose sup.fn-mark:hover {
   filter: brightness(1.1);
 }

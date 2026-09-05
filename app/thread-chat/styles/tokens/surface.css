@@ -1,0 +1,38 @@
+/* ── @/thread-chat/styles/tokens ── surface 类目：表面海拔与实色底（semantic 层，
+   区块样式唯一允许引用的层之一；只允许引用 palette primitive） */
+
+.tc {
+  /* 海拔：页面 → 抬起 → 凹陷 */
+  --tc-surface-base: var(--tc-palette-paper-100);
+  --tc-surface-raised: var(--tc-palette-paper-200);
+  --tc-surface-sunken: var(--tc-palette-paper-300);
+  /* 亮端纸面（顶栏/折叠条/分支列渐变的起点） */
+  --tc-surface-bright: var(--tc-palette-paper-50);
+  /* 白底控件/面板（弹层内按钮、卡片、输入框） */
+  --tc-surface-plain: var(--tc-palette-white);
+  /* 墨色实底（toast、主操作按钮、划选气泡轮廓） */
+  --tc-surface-ink: var(--tc-palette-ink-900);
+  /* 阴影/遮罩的取色基底；alpha 由 color-derived.css 按用途派生。 */
+  --tc-surface-shadow-source: var(--tc-palette-ink-shadow);
+  --tc-surface-shadow-deep-source: var(--tc-palette-black);
+  /* 暗色代码块底（art-code） */
+  --tc-surface-code: var(--tc-palette-code-900);
+  /* markdown 代码块卡片冷白底 */
+  --tc-surface-code-card: var(--tc-palette-neutral-50);
+  /* 错误条底 */
+  --tc-surface-danger: var(--tc-palette-red-100);
+  /* 画布 minimap 专用面 */
+  --tc-surface-minimap: var(--tc-palette-paper-40);
+  --tc-surface-minimap-node: var(--tc-palette-paper-260);
+
+  /* Project workspace 表面 */
+  --tc-surface-project-selected: var(--tc-palette-project-green-80);
+  --tc-surface-project-icon: var(--tc-palette-project-green-60);
+  --tc-surface-project-primary: var(--tc-palette-project-green-600);
+  --tc-surface-project-primary-hover: var(--tc-palette-project-green-800);
+  --tc-surface-project-ready: var(--tc-palette-project-green-100);
+  --tc-surface-project-error: var(--tc-palette-project-red-80);
+  --tc-surface-project-failed: var(--tc-palette-project-red-100);
+  --tc-surface-project-readonly: var(--tc-palette-project-gold-100);
+  --tc-surface-project-status: var(--tc-palette-project-neutral-100);
+}

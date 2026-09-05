@@ -20,6 +20,7 @@ import type {
   MessageDTO,
   ProjectBootstrapDTO,
   ProjectDTO,
+  ProjectListItemDTO,
   ProjectFileDTO,
   ThreadTitleDTO,
   ThreadDTO,
@@ -130,7 +131,7 @@ export function createThreadChatClient(options: ThreadChatClientOptions = {}) {
 
   return {
     listProjects(archived = false) {
-      return requestJson<ProjectDTO[]>(
+      return requestJson<ProjectListItemDTO[]>(
         fetcher,
         url(`/api/thread-chat/v1/projects?archived=${String(archived)}`)
       )

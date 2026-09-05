@@ -22,6 +22,13 @@ export interface ProjectDTO {
   updatedAt: string
 }
 
+export interface ProjectListItemDTO {
+  id: string
+  title: string
+  updatedAt: string
+  threadCount: number
+}
+
 export interface ProjectFileDTO {
   projectId: string
   attachmentId: string

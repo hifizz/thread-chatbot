@@ -1,9 +1,10 @@
 import { isStepCount, streamText, type ModelMessage, type ToolSet } from "ai"
+import type { GenerationSettings } from "@/constants/generation-settings"
 import { THREAD_CHAT_PROMPT_SCHEMA_VERSION } from "@/constants/thread-chat-prompt"
 import { MODEL_CALL_PURPOSE } from "@/constants/model-call"
 import { getChatModel } from "@/constants/model"
 import { isSearchConfigured } from "@/lib/ai/search"
-import { resolveChatModelWithRoute } from "@/lib/ai/provider"
+import { resolveChatModelWithRoute } from "@/lib/ai/llm/model-routes"
 import { withModelCallLogging } from "@/lib/ai/model-call-logger"
 import { isExplicitMarkdownArtifactRequest } from "@/lib/chat/markdown-artifact"
 import {
@@ -24,6 +25,7 @@ import {
   decoratePromptCache,
   type PromptCacheBoundaries,
 } from "@/lib/thread-chat/streaming/prompt-cache-decorator"
+import { chatAnswerGenerationOptions } from "@/lib/thread-chat/streaming/generation-settings"
 import { throwIfGenerationCancelled } from "@/lib/ai/generation-cancellation"
 import { buildAiTelemetryConfig } from "@/lib/observability/ai-sdk"
 import { OBSERVATION_NAMES } from "@/constants/observability"
@@ -35,6 +37,7 @@ export interface PrepareGenerationInput {
   projectId: string
   threadId: string
   modelId: string
+  generationSettings?: GenerationSettings
   observabilityContext: ObservabilityContext
   latestUserText: string
   recentConversation: string
@@ -63,6 +66,12 @@ export async function prepareGeneration(input: PrepareGenerationInput) {
     selectedProjectFileCount: input.projectFileStats.selectedCount,
     projectFileContextChars: input.projectFileStats.contextChars,
     projectFileContextMode: input.projectFileStats.mode,
+    ...(input.generationSettings
+      ? {
+          generationEffort: input.generationSettings.effort,
+          generationMaxOutputTokens: input.generationSettings.maxOutputTokens,
+        }
+      : {}),
   }
   const searchReady = isSearchConfigured()
   const researchRoute = await observeAppOperation(
@@ -130,7 +139,6 @@ export async function prepareGeneration(input: PrepareGenerationInput) {
   const generationMode = resolveGenerationMode({
     researchMode: researchRoute.mode,
     artifactRequested,
-    registeredModel,
   })
   const tools = buildGenerationTools({
     messageId: input.messageId,
@@ -171,6 +179,10 @@ export async function prepareGeneration(input: PrepareGenerationInput) {
   })
 
   throwIfGenerationCancelled(input.abortSignal)
+  const generationOptions = chatAnswerGenerationOptions(
+    researchRoute.mode,
+    input.generationSettings
+  )
   const result = streamText({
     ...buildAiTelemetryConfig(MODEL_CALL_PURPOSE.chatAnswer, {
       ...trace,
@@ -178,7 +190,7 @@ export async function prepareGeneration(input: PrepareGenerationInput) {
     }),
     model: withModelCallLogging(model, MODEL_CALL_PURPOSE.chatAnswer, trace),
     abortSignal: input.abortSignal,
-    reasoning: generationMode.reasoning,
+    ...generationOptions,
     instructions: cachedPrompt.instructions,
     messages: cachedPrompt.messages,
     tools,
@@ -197,7 +209,6 @@ export async function prepareGeneration(input: PrepareGenerationInput) {
           }),
         }
       : {}),
-    maxOutputTokens: generationMode.maxOutputTokens,
     stopWhen: isStepCount(generationMode.maxSteps),
   })
 

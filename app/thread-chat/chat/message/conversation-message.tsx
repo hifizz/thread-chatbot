@@ -10,6 +10,7 @@ import type { ThreadMessageActionCommands } from "../actions/message-action-comm
 import { AssistantMessageToolbar } from "../actions/assistant-message-toolbar"
 import { assistantMessagePresentation } from "./conversation-message-logic"
 import { EditableUserMessage } from "./editable-user-message"
+import { UIMessageSupplementalParts } from "./ui-message-parts"
 import {
   hasCompletedAssistantActions,
   type MessageActionViewState,
@@ -39,6 +40,7 @@ function defaultUserFallback(message: ConversationViewMessage): React.ReactNode 
     <div className="bubble" data-role="user">
       {message.quote && <div className="msg-quote">{message.quote.text}</div>}
       {message.text}
+      <UIMessageSupplementalParts message={message} />
     </div>
   )
 }

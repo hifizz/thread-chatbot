@@ -21,3 +21,9 @@ that should apply across repositories belong in `~/.commandcode/taste/` and
 must not be committed to this repository.
 
 If an instruction in this file conflicts with `CLAUDE.md`, follow this file.
+
+## Formatting
+
+- 不得直接执行 Prettier、`pnpm format` 或其他 format 命令。
+- 仅允许已配置的 git hook 调用 Prettier 或 format；若 hook 未配置或未运行，
+  保持现有格式，不得手动补跑。

@@ -3,7 +3,7 @@ import type { ChatModel } from "@/constants/model"
 import { GENERATION_ERRORS } from "@/constants/generation"
 import { chargeUsage } from "@/lib/billing/credits"
 import { usageCostEvidence } from "@/lib/billing/usage-cost-evidence"
-import type { OpenRouterStepLike } from "@/lib/ai/openrouter"
+import type { OpenRouterStepLike } from "@/lib/ai/llm/openrouter"
 
 type UsageStep = OpenRouterStepLike & {
   usage: {

@@ -2,8 +2,10 @@ import { messages } from "@/lib/db/schema"
 import type { SendMessageCommand } from "@/lib/thread-chat/contracts/commands"
 import type { GenerationAcceptedDTO } from "@/lib/thread-chat/contracts/dto"
 import {
+  assertAllowedGenerationSettings,
   assertAllowedModel,
   assertOwnedReadyAttachments,
+  assertModelSupportsNewAttachments,
   assertThreadReadyForTurn,
   buildUserParts,
   commandFiles,
@@ -33,6 +35,7 @@ export function sendMessage(
   command: SendMessageCommand
 ) {
   assertAllowedModel(command.modelId)
+  assertAllowedGenerationSettings(command.modelId, command.generationSettings)
   return withConversationTransaction(async (tx) =>
     executeIdempotentCommand({
       tx,
@@ -48,7 +51,9 @@ export function sendMessage(
         if (!project) notFound()
         if (project.archivedAt) stateConflict("已归档 Project 不可发送消息")
         await assertThreadReadyForTurn(tx, project.id, thread.id)
-        await assertOwnedReadyAttachments(tx, userId, commandFiles(command))
+        const files = commandFiles(command)
+        assertModelSupportsNewAttachments(command.modelId, files)
+        await assertOwnedReadyAttachments(tx, userId, files)
         await assertValidQuoteSources({
           tx,
           projectId: project.id,

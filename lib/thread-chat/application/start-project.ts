@@ -3,8 +3,10 @@ import { messages, projects, threads } from "@/lib/db/schema"
 import type { StartProjectCommand } from "@/lib/thread-chat/contracts/commands"
 import type { GenerationAcceptedDTO } from "@/lib/thread-chat/contracts/dto"
 import {
+  assertAllowedGenerationSettings,
   assertAllowedModel,
   assertOwnedReadyAttachments,
+  assertModelSupportsNewAttachments,
   buildUserParts,
   commandFiles,
 } from "@/lib/thread-chat/application/command-utils"
@@ -22,6 +24,7 @@ import {
 
 export function startProject(userId: string, command: StartProjectCommand) {
   assertAllowedModel(command.modelId)
+  assertAllowedGenerationSettings(command.modelId, command.generationSettings)
   return withConversationTransaction(async (tx) =>
     executeIdempotentCommand({
       tx,
@@ -40,7 +43,9 @@ export function startProject(userId: string, command: StartProjectCommand) {
           if (existing.userId !== userId) notFound()
           stateConflict("Project 已存在")
         }
-        await assertOwnedReadyAttachments(tx, userId, commandFiles(command))
+        const files = commandFiles(command)
+        assertModelSupportsNewAttachments(command.modelId, files)
+        await assertOwnedReadyAttachments(tx, userId, files)
         if (command.parts.some((part) => part.type === "quote")) {
           stateConflict("新建 Project 时不能引用尚不属于该 Project 的内容")
         }

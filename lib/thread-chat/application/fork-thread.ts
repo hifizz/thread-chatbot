@@ -6,8 +6,10 @@ import type {
 } from "@/lib/thread-chat/contracts/dto"
 import { buildFrozenForkContext } from "@/lib/thread-chat/domain/fork-context"
 import {
+  assertAllowedGenerationSettings,
   assertAllowedModel,
   assertOwnedReadyAttachments,
+  assertModelSupportsNewAttachments,
   buildUserParts,
   commandFiles,
   touchProjectAndThread,
@@ -43,6 +45,7 @@ export function forkThread(
   command: ForkThreadCommand
 ) {
   assertAllowedModel(command.modelId)
+  assertAllowedGenerationSettings(command.modelId, command.generationSettings)
   return withConversationTransaction(async (tx) =>
     executeIdempotentCommand({
       tx,
@@ -95,11 +98,9 @@ export function forkThread(
           await touchProjectAndThread(tx, project.id, child.id)
           return { thread: toThreadDTO(child), generation: null }
         }
-        await assertOwnedReadyAttachments(
-          tx,
-          userId,
-          commandFiles(command.firstTurn)
-        )
+        const files = commandFiles(command.firstTurn)
+        assertModelSupportsNewAttachments(command.modelId, files)
+        await assertOwnedReadyAttachments(tx, userId, files)
         await assertValidQuoteSources({
           tx,
           projectId: project.id,

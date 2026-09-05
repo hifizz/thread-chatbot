@@ -5,7 +5,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--ink-faint);
-  font-family: var(--font-mono);
+  color: var(--tc-content-muted);
+  font-family: var(--tc-typography-family-code);
   font-size: 12px;
 }

@@ -13,7 +13,7 @@ import { isSearchConfigured } from "@/lib/ai/search"
 import { RESEARCH_MAX_STEPS } from "@/constants/research"
 import { MAX_OUTPUT_TOKENS } from "@/constants/model"
 import { MODEL_CALL_PURPOSE } from "@/constants/model-call"
-import { resolveChatModel } from "@/lib/ai/provider"
+import { resolveChatModel } from "@/lib/ai/llm/model-routes"
 import {
   withModelCallLogging,
   type ModelCallTrace,
@@ -114,7 +114,7 @@ export async function POST(req: Request) {
               MODEL_CALL_PURPOSE.chatAnswer,
               modelCallTrace
             ),
-            reasoning: reasoningForResearchRoute(researchRoute.mode, model),
+            reasoning: reasoningForResearchRoute(researchRoute.mode),
             system,
             messages: await convertToModelMessages(resolvedMessages, {
               tools: allTools,

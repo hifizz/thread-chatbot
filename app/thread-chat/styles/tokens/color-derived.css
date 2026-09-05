@@ -1,0 +1,111 @@
+/* ── @/thread-chat/styles/tokens ── 派生色：color-mix 与 alpha 色的**唯一**归属文件。
+   全部按用途命名（不按混色强度机械建 token）；区块文件不得直接书写 color-mix 表达式。
+   值一律与迁移前的字面量/混色表达式完全一致（轨 A 等价）。
+
+   contextual 层说明：
+   - --tc-accent：TS 按列/卡/行注入的分支强调色（原 --accent + --dc 收口），
+     .tc 根默认回退 --tc-depth-neutral（原 --accent fallback #8a8377 的语义归位）；
+   - --fc：仅由 .fc-1..5 类与 paintRange 注入的 fork 强调色，主线元素无类，
+     派生 token 内保留原 fallback（旧 fork 中性色 → --tc-depth-neutral / 旧 depth-1 → --tc-depth-1）。 */
+
+.tc {
+  /* ═══ 玻璃 veil（白 alpha 玻璃条/面） ═══ */
+  --tc-veil-head: color-mix(in srgb, var(--tc-surface-plain) 33.33%, transparent); /* 列头 / 抽屉头 / tab 栏玻璃条 */
+  --tc-veil-bar: color-mix(in srgb, var(--tc-surface-plain) 40%, transparent); /* composer 底 / art-src 玻璃条 */
+  --tc-veil-foot: color-mix(in srgb, var(--tc-surface-plain) 53.33%, transparent); /* react-flow attribution 底 */
+  --tc-veil-tip: color-mix(in srgb, var(--tc-surface-plain) 80%, transparent); /* 画布提示条底 */
+  --tc-veil-detail: color-mix(in srgb, var(--tc-surface-plain) 40%, transparent); /* 折叠继承块底 */
+  --tc-veil-card: color-mix(in srgb, var(--tc-surface-plain) 56.08%, transparent); /* Project 资源卡玻璃底 */
+  --tc-veil-expand: color-mix(in srgb, var(--tc-surface-plain) 96%, transparent); /* 画布外挂面板底 */
+
+  /* ═══ onink 填充/描边（划选气泡、toast 墨面上的白 alpha 状态层） ═══ */
+  --tc-onink-fill-ghost: color-mix(in srgb, var(--tc-surface-plain) 5%, transparent); /* main 槽位底 */
+  --tc-onink-fill-slotmap: color-mix(in srgb, var(--tc-surface-plain) 8%, transparent); /* slotmap 容器底 */
+  --tc-onink-fill-soft: color-mix(in srgb, var(--tc-surface-plain) 10%, transparent); /* 首问输入框底 / undo 按钮底 */
+  --tc-onink-fill-ask-focus: color-mix(in srgb, var(--tc-surface-plain) 14%, transparent); /* 首问输入框聚焦底 */
+  --tc-onink-fill-cell: color-mix(in srgb, var(--tc-surface-plain) 16%, transparent); /* slotmap 单元底 */
+  --tc-onink-fill-undo-hover: color-mix(in srgb, var(--tc-surface-plain) 20%, transparent); /* undo 悬停底 */
+  --tc-onink-fill-cell-hover: color-mix(in srgb, var(--tc-surface-plain) 28%, transparent); /* 单元悬停底 */
+  --tc-onink-border-main: color-mix(in srgb, var(--tc-surface-plain) 22%, transparent); /* main 槽位描边 */
+  --tc-onink-border-ask: color-mix(in srgb, var(--tc-surface-plain) 25%, transparent); /* 首问输入框描边/聚焦环 */
+  --tc-onink-border-undo: color-mix(in srgb, var(--tc-surface-plain) 35%, transparent); /* undo 按钮描边 */
+  --tc-onink-border-cell: color-mix(in srgb, var(--tc-surface-plain) 40%, transparent);
+  --tc-onink-border-slotmap: color-mix(in srgb, var(--tc-surface-plain) 16%, transparent); /* slotmap 容器描边 */
+  --tc-onink-border-ghost: color-mix(in srgb, var(--tc-surface-plain) 55%, transparent); /* ghost 虚线描边 */
+  --tc-onink-border-src: color-mix(in srgb, var(--tc-surface-plain) 85%, transparent); /* src 高亮描边 */
+
+  /* ═══ 墨影（阴影/遮罩的颜色位，偏移量留在区块文件） ═══ */
+  --tc-shadow-scrim: color-mix(in srgb, var(--tc-surface-shadow-source) 18%, transparent); /* swx-scrim 全局遮罩 */
+  --tc-shadow-confirm-mask: color-mix(in srgb, var(--tc-surface-shadow-source) 32%, transparent);
+  --tc-shadow-confirm: color-mix(in srgb, var(--tc-surface-shadow-source) 28%, transparent);
+  --tc-shadow-hint-strong: color-mix(in srgb, var(--tc-surface-shadow-source) 70%, transparent);
+  --tc-shadow-hint-soft: color-mix(in srgb, var(--tc-surface-shadow-source) 50%, transparent);
+  --tc-shadow-card: color-mix(in srgb, var(--tc-surface-shadow-source) 22%, transparent); /* 画布卡片静置投影 */
+  --tc-shadow-hover: color-mix(in srgb, var(--tc-surface-shadow-source) 25%, transparent); /* artifact 卡悬停投影 */
+  --tc-shadow-controls: color-mix(in srgb, var(--tc-surface-shadow-source) 30%, transparent); /* RF controls 投影 */
+  --tc-shadow-float: color-mix(in srgb, var(--tc-surface-shadow-source) 35%, transparent); /* 悬浮按钮/抽屉投影 */
+  --tc-shadow-expand: color-mix(in srgb, var(--tc-surface-shadow-source) 42%, transparent); /* 画布外挂面板投影 */
+  --tc-shadow-pop: color-mix(in srgb, var(--tc-surface-shadow-source) 45%, transparent); /* swx/sel-bubble 弹层投影 */
+  --tc-shadow-deep: color-mix(in srgb, var(--tc-surface-shadow-deep-source) 40%, transparent); /* toast 投影 */
+
+  /* ═══ 墨色派生（引用条 / 图标按钮悬停） ═══ */
+  --tc-ink-wash: color-mix(in srgb, var(--tc-content-primary) 6%, transparent); /* 引用条底 / 复制按钮悬停底 */
+  --tc-ink-hover: color-mix(in srgb, var(--tc-content-primary) 8%, transparent); /* 消息图标按钮悬停底 */
+  --tc-ink-confirm-border: color-mix(in srgb, var(--tc-content-primary) 18%, transparent);
+  --tc-ink-confirm-action-border: color-mix(in srgb, var(--tc-content-primary) 25%, transparent);
+  --tc-ink-edge: color-mix(in srgb, var(--tc-content-primary) 35%, transparent); /* 引用条描边 */
+  --tc-ink-subdued: color-mix(in srgb, var(--tc-content-primary) 72%, transparent); /* 引用条文字 */
+
+  /* ═══ 纸面玻璃（滚到底按钮） ═══ */
+  --tc-surface-glass: color-mix(in srgb, var(--tc-surface-base) 30%, transparent);
+  --tc-surface-glass-hover: color-mix(in srgb, var(--tc-surface-base) 90%, transparent);
+  --tc-border-glass: color-mix(in srgb, var(--tc-border-strong) 55%, transparent);
+  --tc-border-scrollbar: color-mix(in srgb, var(--tc-border-strong) 70%, transparent);
+  --tc-project-focus-ring: color-mix(in srgb, var(--tc-border-project-focus) 9%, transparent);
+  --tc-surface-stopped: color-mix(in srgb, var(--tc-surface-raised) 70%, transparent); /* 主动停止条底 */
+  --tc-canvas-minimap-mask: color-mix(in srgb, var(--tc-surface-base) 75%, transparent);
+
+  /* ═══ kbd 键帽底（原 --kbd-bg） ═══ */
+  --tc-surface-kbd: color-mix(in srgb, var(--tc-surface-base) 65%, var(--tc-surface-raised));
+
+  /* ═══ 深度色专用派生（静态 depth，非 contextual） ═══ */
+  --tc-depth-1-seg-bg: color-mix(in srgb, var(--tc-depth-1) 12%, var(--tc-surface-plain)); /* 顶栏 seg 选中底 */
+  --tc-depth-1-diff-add: color-mix(in srgb, var(--tc-depth-1) 12%, transparent); /* diff 增行底 */
+  --tc-depth-3-diff-remove: color-mix(in srgb, var(--tc-depth-3) 12%, transparent); /* diff 删行底 */
+  --tc-depth-4-highlight: color-mix(in srgb, var(--tc-depth-4) 10%, transparent); /* 代码高亮行底 */
+  --tc-depth-2-fold-bg: color-mix(in srgb, var(--tc-depth-2) 48%, transparent); /* 将折叠单元底 */
+  --tc-depth-2-fold-border: color-mix(in srgb, var(--tc-depth-2) 65%, var(--tc-surface-plain)); /* 将折叠单元描边 */
+  --tc-depth-2-fold-cap: color-mix(in srgb, var(--tc-depth-2) 55%, var(--tc-surface-plain)); /* 将折叠角标文字 */
+  --tc-depth-3-replace-border: color-mix(in srgb, var(--tc-depth-3) 55%, var(--tc-surface-plain)); /* 将替换单元描边 */
+  --tc-depth-3-replace-stripe-a: color-mix(in srgb, var(--tc-depth-3) 72%, transparent); /* 替换斜纹 A */
+  --tc-depth-3-replace-stripe-b: color-mix(in srgb, var(--tc-depth-3) 26%, transparent); /* 替换斜纹 B */
+  --tc-depth-3-replace-cap: color-mix(in srgb, var(--tc-depth-3) 45%, var(--tc-surface-plain)); /* 将替换角标文字 */
+  --tc-depth-1-wash: color-mix(in srgb, var(--tc-depth-1) 9%, transparent); /* 会话列表当前行底 */
+  --tc-depth-2-unsaved-border: color-mix(in srgb, var(--tc-depth-2) 45%, transparent); /* 未保存徽标描边 */
+  --tc-depth-2-unsaved-bg: color-mix(in srgb, var(--tc-depth-2) 8%, transparent); /* 未保存徽标底 */
+  --tc-danger-edge: color-mix(in srgb, var(--tc-danger) 50%, transparent); /* danger 悬停描边 */
+}
+
+/* contextual 派生只在显式上下文边界计算。注入变量与上下文类必须成对出现，
+   token 层不枚举业务组件，新增组件也不会静默继承根节点的中性色计算结果。 */
+.tc .tc-accent-context {
+  --tc-accent-wash: color-mix(in srgb, var(--tc-accent, var(--tc-depth-neutral)) 9%, transparent);
+  --tc-accent-tint: color-mix(in srgb, var(--tc-accent, var(--tc-depth-neutral)) 8%, transparent);
+  --tc-accent-hint: color-mix(in srgb, var(--tc-accent, var(--tc-depth-neutral)) 7%, transparent);
+  --tc-accent-glow: color-mix(in srgb, var(--tc-accent, var(--tc-depth-neutral)) 30%, transparent);
+  --tc-accent-focus-ring: color-mix(in srgb, var(--tc-accent, var(--tc-depth-neutral)) 65%, transparent);
+  --tc-accent-edge: color-mix(in srgb, var(--tc-accent, var(--tc-depth-neutral)) 45%, transparent);
+  --tc-accent-tab-bg: color-mix(in srgb, var(--tc-accent, var(--tc-depth-neutral)) 8%, var(--tc-surface-plain));
+  --tc-accent-banner-bg: color-mix(in srgb, var(--tc-accent, var(--tc-depth-neutral)) 8%, var(--tc-surface-base));
+  --tc-accent-banner-border: color-mix(in srgb, var(--tc-accent, var(--tc-depth-neutral)) 30%, var(--tc-border-subtle));
+  --tc-accent-flash: color-mix(in srgb, var(--tc-accent, var(--tc-depth-neutral)) 14%, var(--tc-surface-base));
+}
+
+.tc .tc-fork-context {
+  --tc-fc-underline: color-mix(in srgb, var(--fc, var(--tc-depth-1)) 55%, transparent);
+  --tc-fc-wash: color-mix(in srgb, var(--fc, var(--tc-depth-1)) 9%, transparent);
+  --tc-fc-mark: color-mix(in srgb, var(--fc, var(--tc-depth-1)) 20%, transparent);
+  --tc-fc-icon-bg: color-mix(in srgb, var(--fc, var(--tc-depth-neutral)) 10%, var(--tc-surface-plain));
+  --tc-fc-progress-bg: color-mix(in srgb, var(--fc, var(--tc-depth-neutral)) 4%, var(--tc-surface-plain));
+  --tc-fc-track-bg: color-mix(in srgb, var(--fc, var(--tc-depth-neutral)) 10%, var(--tc-surface-raised));
+}

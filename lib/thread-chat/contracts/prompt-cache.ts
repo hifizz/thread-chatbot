@@ -8,12 +8,8 @@ export type ThreadChatGenerationModeId =
   | "research"
   | "research-artifact"
 
-export interface PromptCacheRouteIdentity {
-  actualProvider: string
-  protocol: "anthropic" | "openai-compatible" | "openrouter"
-  credentialGroup?: string
-  upstreamModel: string
-}
+export type { ModelRouteIdentity as PromptCacheRouteIdentity } from "@/lib/ai/llm/create-models"
+import type { ModelRouteIdentity as PromptCacheRouteIdentity } from "@/lib/ai/llm/create-models"
 
 export interface PromptCachePolicy {
   explicitCacheEnabled: boolean

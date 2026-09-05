@@ -1,11 +1,14 @@
 import { generateText } from "ai"
 
 import {
-  ARK_BRANCH_TITLE_MAX_OUTPUT_TOKENS,
-  ARK_BRANCH_TITLE_MODEL,
-} from "@/constants/ark"
+  THREAD_TITLE_MAX_OUTPUT_TOKENS,
+  THREAD_TITLE_MODEL_ID,
+} from "@/constants/model"
 import { MODEL_CALL_PURPOSE } from "@/constants/model-call"
-import { arkCodingChatModel, isArkCodingConfigured } from "@/lib/ai/ark"
+import {
+  isPrivateRelayConfigured,
+  privateRelayChatModel,
+} from "@/lib/ai/llm/private-relay"
 import { withModelCallLogging } from "@/lib/ai/model-call-logger"
 import type { ThreadTitleInput } from "@/lib/thread-chat/contracts/title-request"
 import { buildAiTelemetryConfig } from "@/lib/observability/ai-sdk"
@@ -20,8 +23,8 @@ function buildPrompt(input: ThreadTitleInput): string {
     return (
       "这是一个新对话的首条用户消息。\n" +
       `用户消息：「${input.question.slice(0, INPUT_EXCERPT_LIMIT)}」\n\n` +
-      "请根据用户消息所用的语言，为这个对话拟一个简短、清晰、便于扫描的标题，概括对话主题。" +
-      "中文和英文都使用自然短语；不要为了凑长度或限制长度而删词、截断。" +
+      "请根据用户消息所用的语言，为这个对话拟一个极简标题，只保留核心主题。" +
+      "中文尽量控制在 4 至 10 个字，英文尽量控制在 2 至 6 个单词；使用自然短语，不要生硬截断。" +
       "只输出标题本身，不要引号、标点、序号或任何解释。"
     )
   }
@@ -31,8 +34,8 @@ function buildPrompt(input: ThreadTitleInput): string {
     `被划选的文字：「${input.anchorText.slice(0, INPUT_EXCERPT_LIMIT)}」\n` +
     `用户的问题：「${input.question.slice(0, INPUT_EXCERPT_LIMIT)}」\n` +
     `首答摘录：「${input.answer.slice(0, ANSWER_EXCERPT_LIMIT)}」\n\n` +
-    "请根据用户问题所用的语言，为这个分支拟一个简短、清晰、便于扫描的标题，概括这轮讨论的主题。" +
-    "中文和英文都使用自然短语；不要为了凑长度或限制长度而删词、截断。" +
+    "请根据用户问题所用的语言，为这个分支拟一个极简标题，只保留核心主题。" +
+    "中文尽量控制在 4 至 10 个字，英文尽量控制在 2 至 6 个单词；使用自然短语，不要生硬截断。" +
     "只输出标题本身，不要引号、标点、序号或任何解释。"
   )
 }
@@ -55,22 +58,22 @@ export function sanitizeGeneratedTitle(raw: string): string | null {
 export async function generateThreadTitleText(
   input: ThreadTitleInput
 ): Promise<string | null> {
-  if (!isArkCodingConfigured()) return null
+  if (!isPrivateRelayConfigured()) return null
 
   try {
     const trace = { requestId: crypto.randomUUID() }
     const { text } = await generateText({
       ...buildAiTelemetryConfig(MODEL_CALL_PURPOSE.threadTitle, {
         ...trace,
-        modelId: ARK_BRANCH_TITLE_MODEL,
+        modelId: THREAD_TITLE_MODEL_ID,
         entrypoint: "thread-title",
       }),
       model: withModelCallLogging(
-        arkCodingChatModel(ARK_BRANCH_TITLE_MODEL),
+        privateRelayChatModel(THREAD_TITLE_MODEL_ID),
         MODEL_CALL_PURPOSE.threadTitle,
         trace
       ),
-      maxOutputTokens: ARK_BRANCH_TITLE_MAX_OUTPUT_TOKENS,
+      maxOutputTokens: THREAD_TITLE_MAX_OUTPUT_TOKENS,
       // 标题是可选增强；配额不足、鉴权失败等确定性错误不应额外消耗请求。
       maxRetries: 0,
       prompt: buildPrompt(input),

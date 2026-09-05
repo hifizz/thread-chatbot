@@ -4,8 +4,10 @@ import type { EditLatestTurnCommand } from "@/lib/thread-chat/contracts/commands
 import type { GenerationAcceptedDTO } from "@/lib/thread-chat/contracts/dto"
 import { latestTurn } from "@/lib/thread-chat/domain/timeline"
 import {
+  assertAllowedGenerationSettings,
   assertAllowedModel,
   assertOwnedReadyAttachments,
+  assertModelSupportsNewAttachments,
   buildUserParts,
   commandFiles,
   touchProjectAndThread,
@@ -47,6 +49,7 @@ export function editLatestTurn(
   command: EditLatestTurnCommand
 ) {
   assertAllowedModel(command.modelId)
+  assertAllowedGenerationSettings(command.modelId, command.generationSettings)
   return withConversationTransaction(async (tx) =>
     executeIdempotentCommand({
       tx,
@@ -72,7 +75,9 @@ export function editLatestTurn(
         if (turn?.userMessage.id !== source.id) {
           stateConflict("只能编辑最新一轮用户消息")
         }
-        await assertOwnedReadyAttachments(tx, userId, commandFiles(command))
+        const files = commandFiles(command)
+        assertModelSupportsNewAttachments(command.modelId, files)
+        await assertOwnedReadyAttachments(tx, userId, files)
         assertEditQuoteSemantics(source.parts, command)
         await assertValidQuoteSources({
           tx,

@@ -1,3 +1,4 @@
+import type { GenerationSettings } from "@/constants/generation-settings"
 import type {
   AddProjectFileCommand,
   EditLatestTurnCommand,
@@ -49,8 +50,13 @@ export interface ForkCommandInput {
   anchorText: string
   anchor: TextAnchor
   modelId: string
+  generationSettings?: GenerationSettings
   text?: string
   files?: CommandFileReference[]
+}
+
+function generationSettingsField(settings: GenerationSettings | undefined) {
+  return settings ? { generationSettings: Object.freeze({ ...settings }) } : {}
 }
 
 function commandParts(
@@ -227,6 +233,7 @@ export function createConversationCommands(
     projectId: string
     rootThreadId?: string
     modelId: string
+    generationSettings?: GenerationSettings
     text: string
     files?: CommandFileReference[]
   }) {
@@ -238,6 +245,7 @@ export function createConversationCommands(
       userMessageId: createId(),
       assistantMessageId: createId(),
       modelId: input.modelId,
+      ...generationSettingsField(input.generationSettings),
       parts: commandParts(input.text, files),
     })
     const now = new Date().toISOString()
@@ -315,6 +323,7 @@ export function createConversationCommands(
   async function sendMessage(input: {
     threadId: string
     modelId: string
+    generationSettings?: GenerationSettings
     text: string
     files?: CommandFileReference[]
   }) {
@@ -327,6 +336,7 @@ export function createConversationCommands(
       userMessageId: createId(),
       assistantMessageId: createId(),
       modelId: input.modelId,
+      ...generationSettingsField(input.generationSettings),
       parts: commandParts(input.text, files),
     })
     store.getState().beginOptimisticCommand(command.commandId, (snapshot) => {
@@ -380,6 +390,7 @@ export function createConversationCommands(
       anchorText: input.anchorText,
       anchor: input.anchor,
       modelId: input.modelId,
+      ...generationSettingsField(input.generationSettings),
       ...(hasFirstTurn
         ? {
             firstTurn: {
@@ -474,13 +485,18 @@ export function createConversationCommands(
     }
   }
 
-  async function retryMessage(input: { messageId: string; modelId: string }) {
+  async function retryMessage(input: {
+    messageId: string
+    modelId: string
+    generationSettings?: GenerationSettings
+  }) {
     const source = store.getState().messagesById[input.messageId]
     if (!source) throw new Error("回复尚未加载")
     const command: RetryMessageCommand = Object.freeze({
       commandId: createId(),
       assistantMessageId: createId(),
       modelId: input.modelId,
+      ...generationSettingsField(input.generationSettings),
     })
     store.getState().beginOptimisticCommand(command.commandId, (snapshot) => {
       const now = new Date().toISOString()
@@ -520,6 +536,7 @@ export function createConversationCommands(
     userMessageId: string
     assistantMessageId?: string
     modelId: string
+    generationSettings?: GenerationSettings
     text: string
     files?: CommandFileReference[]
   }) {
@@ -531,6 +548,7 @@ export function createConversationCommands(
       userMessageId: createId(),
       assistantMessageId: createId(),
       modelId: input.modelId,
+      ...generationSettingsField(input.generationSettings),
       parts: commandParts(input.text, files),
     })
     store.getState().beginOptimisticCommand(command.commandId, (snapshot) => {

@@ -96,7 +96,12 @@ export function handleStartProject(
     if (command.projectId !== parseId(projectId))
       validation("path projectId 与请求体不一致")
     const result = await startProject(userId, command)
-    if (!result.replayed) startSessionAfterCommit(userId, result.result)
+    if (!result.replayed)
+      startSessionAfterCommit(
+        userId,
+        result.result,
+        command.generationSettings
+      )
     return commandResponse(result)
   })
 }
@@ -217,12 +222,14 @@ export function handleSendMessage(
   threadId: string
 ): Promise<Response> {
   return withThreadChatRoute(request, async (userId) => {
-    const result = await sendMessage(
-      userId,
-      parseId(threadId),
-      await parseJson(request, sendMessageCommandSchema)
-    )
-    if (!result.replayed) startSessionAfterCommit(userId, result.result)
+    const command = await parseJson(request, sendMessageCommandSchema)
+    const result = await sendMessage(userId, parseId(threadId), command)
+    if (!result.replayed)
+      startSessionAfterCommit(
+        userId,
+        result.result,
+        command.generationSettings
+      )
     return commandResponse(result)
   })
 }
@@ -232,13 +239,14 @@ export function handleForkThread(
   threadId: string
 ): Promise<Response> {
   return withThreadChatRoute(request, async (userId) => {
-    const result = await forkThread(
-      userId,
-      parseId(threadId),
-      await parseJson(request, forkThreadCommandSchema)
-    )
+    const command = await parseJson(request, forkThreadCommandSchema)
+    const result = await forkThread(userId, parseId(threadId), command)
     if (!result.replayed && result.result.generation)
-      startSessionAfterCommit(userId, result.result.generation)
+      startSessionAfterCommit(
+        userId,
+        result.result.generation,
+        command.generationSettings
+      )
     return commandResponse(result)
   })
 }
@@ -248,11 +256,8 @@ export function handleEditMessage(
   messageId: string
 ): Promise<Response> {
   return withThreadChatRoute(request, async (userId) => {
-    const result = await editLatestTurn(
-      userId,
-      parseId(messageId),
-      await parseJson(request, editLatestTurnCommandSchema)
-    )
+    const command = await parseJson(request, editLatestTurnCommandSchema)
+    const result = await editLatestTurn(userId, parseId(messageId), command)
     if (!result.replayed) {
       if (result.result.abortMessageId)
         if (
@@ -262,7 +267,11 @@ export function handleEditMessage(
           )
         )
           await failOrphanedGeneratingMessage(result.result.abortMessageId)
-      startSessionAfterCommit(userId, result.result.generation)
+      startSessionAfterCommit(
+        userId,
+        result.result.generation,
+        command.generationSettings
+      )
     }
     return commandResponse(result)
   })
@@ -273,12 +282,14 @@ export function handleRetryMessage(
   messageId: string
 ): Promise<Response> {
   return withThreadChatRoute(request, async (userId) => {
-    const result = await retryMessage(
-      userId,
-      parseId(messageId),
-      await parseJson(request, retryMessageCommandSchema)
-    )
-    if (!result.replayed) startSessionAfterCommit(userId, result.result)
+    const command = await parseJson(request, retryMessageCommandSchema)
+    const result = await retryMessage(userId, parseId(messageId), command)
+    if (!result.replayed)
+      startSessionAfterCommit(
+        userId,
+        result.result,
+        command.generationSettings
+      )
     return commandResponse(result)
   })
 }

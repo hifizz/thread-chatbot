@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation"
 import { getSession } from "@/lib/auth/server"
 import { ROUTES, signInWithRedirect } from "@/constants/routes"
+import { ProjectListStoreProvider } from "./core/project-list-store"
 import "./thread-chat.css"
 
 // 旗舰访问门禁：一处服务端 layout 同时包住 /thread-chat 跳板与 /thread-chat/[treeId]，
@@ -15,5 +16,5 @@ export default async function ThreadChatLayout({
 }) {
   const session = await getSession()
   if (!session) redirect(signInWithRedirect(ROUTES.flagship))
-  return <>{children}</>
+  return <ProjectListStoreProvider>{children}</ProjectListStoreProvider>
 }
