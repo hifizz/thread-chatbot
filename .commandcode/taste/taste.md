@@ -1,5 +1,8 @@
 # Taste
 
+## Architecture
+- Prefers provider/client instances to be created once and reused across model creation calls, with provider construction kept separate from per-model selection rather than rebuilding the provider inside every `createModel`. Confidence: 0.95
+
 ## Communication
 - Communicates in Simplified Chinese; respond in Chinese. Confidence: 0.7
 - Prefers terse, conclusion-first responses: state the verdict before the reasons and avoid unnecessary exposition. Confidence: 0.95
