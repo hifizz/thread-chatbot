@@ -27,7 +27,7 @@ export function ShareDialog({ target, captureLayout, onClose }: { target: ShareT
   }, [target])
   async function create() {
     if (inFlight.current) return
-    inFlight.current = true; setBusy(true); setError(""); setNotice("")
+    inFlight.current = true; setBusy(true); setError(""); setNotice(""); setCreated(null)
     try {
       // 失败重试沿用同一请求；成功后才允许创建新快照。
       pending.current ??= target.resourceType === "project"

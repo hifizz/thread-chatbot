@@ -41,6 +41,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
       - run: pnpm test:thread-chat:sharing
+      - run: pnpm test:thread-chat:sharing-dialog
       - name: PostgreSQL contract and concurrency
         run: pnpm test:thread-chat:sharing-db
         env:
@@ -49,7 +50,7 @@ jobs:
         run: psql postgres://postgres:postgres@localhost:5432/postgres -c 'CREATE DATABASE snapshot_sharing_http'
       - run: pnpm build
       - name: Production HTTP lifecycle and privacy
-        run: node --import tsx e2e/thread-chat/snapshot-sharing-http.test.mjs
+        run: pnpm test:thread-chat:sharing-http
         env:
           SNAPSHOT_SHARING_TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/snapshot_sharing_http
       - run: pnpm exec openspec validate add-snapshot-sharing --strict

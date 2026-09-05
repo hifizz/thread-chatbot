@@ -26,6 +26,9 @@
 | `pnpm typecheck` 对应的 `tsc --noEmit` | 通过；本次也用 `next typegen` 同步路由类型 |
 | `pnpm test:thread-chat:sharing` | 9 项通过 |
 | `pnpm test:thread-chat:sharing-db` | 8 项通过（含子项） |
+| 同一数据库套件在 PostgreSQL 17 + pgvector 上运行 | 12 项通过，包含多连接竞争；[CI 记录](https://github.com/hifizz/thread-chatbot/actions/runs/33985730994) |
+| `pnpm test:thread-chat:sharing-http` | 4 项通过，真实生产 Next 服务 + PostgreSQL；匿名和已登录 JSON/HTML/RSC、元信息、撤销/到期、私有接口权限 |
+| `pnpm test:thread-chat:sharing-dialog` | 5 项通过；React DOM + jsdom 的真实组件交互，未替换弹窗或文档面板 |
 | 私有工作台回归：normalized-client-store、canvas-expand-ownership、canvas-layout-cache、project-panel-workspace-state、message-action-presentation | 7 项通过 |
 | 全仓库 ESLint | 0 error；2 条基线 warning，位于 app/layout.tsx、lib/auth/session-recovery.ts |
 | `pnpm build` | 清理临时验收页面的生成缓存后通过；最终产物仅保留动态 `/share/[token]` 分享页面 |
@@ -35,7 +38,13 @@
 
 覆盖：跨用户拒绝、伪造 bearer token 不授权管理、严格请求/Origin 校验、四种期限及截止边界、重放与冲突命令、创建失败事务回滚、快照不随修改/归档变化、独立文档范围、撤销幂等、Project/用户删除级联。
 
-原生 PostgreSQL 服务在本环境受非 root 运行及进程连接限制，未能完成普通 PostgreSQL 的独立多连接联调。PGlite 是单连接测试库，不能代替竞争条件和生产数据库升级验收。未创建、修改或删除任何 `drizzle/` 文件。
+本地原生 PostgreSQL 仍受运行用户权限限制；新增 `.github/workflows/snapshot-sharing.yml` 在 GitHub 独立 PostgreSQL 17 + pgvector 服务中完成真实多连接联调。测试通过锁等待协调不同连接，验证两次读取之间修改源数据仍得到同一可见时点、相同 commandId 竞争后的 40001 错误可重试且只有一个结果、读取期间删除 Project 不留下快照或命令回执。
+
+外部数据库测试只接受显式 `SNAPSHOT_SHARING_TEST_DATABASE_URL`，数据库名必须以 `snapshot_sharing_` 开头且初始为空；不会重置已有库。CI 不读取生产秘密，只在空库应用 schema 源码，未创建、修改或删除任何 `drizzle/` 文件。这仍不代替上一版本数据库升级验收。
+
+HTTP 套件启动真实 `next start`，使用真实注册/会话请求创建分享。对匿名和所有者分别检查 JSON、HTML、RSC；跟随 Next 的 RSC 参数校验重定向后确认组件流类型，避免把重定向响应误算成 RSC 验收。先读取、再撤销或到期，重复读取时正文均不可用；元信息恒定，私有 Project/Message/Artifact、附件和业务写接口均拒绝仅持 token 的请求。本地套件也通过 PGlite Socket 运行，CI 使用原生 PostgreSQL。
+
+本轮修复：分享管理接口的 Origin 检查使用 `BETTER_AUTH_URL` 配置的公开站点地址，避免反向代理后的内部 Next 地址误拒绝合法请求；伪造 forwarded-host 仍不能扩大来源范围。弹窗开始下一次创建时清除上次的“新分享链接”，失败时保留旧链接的管理列表但不把它展示为本次成功结果。
 
 ## 浏览器检查
 
@@ -50,19 +59,19 @@
 - 页面无 textarea、contenteditable 和自动加载的 img；安全资料链接保留。
 - 弹窗：默认无限，3/7/30 天选项及隐私提示完整；匿名失败请求显示“请先登录”，没有成功链接，支持沿用请求重试。
 
-浏览器使用测试样本进行阅读组件验收，**不是所有者创建 → 真实数据库 → 匿名打开的完整端到端验收**。也未宣称完成所有网络/缓存组合和已登录所有者的浏览器覆盖。完整验收脚本 `e2e/thread-chat/verify-snapshot-sharing.mjs` 已提供，但该脚本本轮未运行。
+上述浏览器证据来自首轮测试样本阅读验收，**不是所有者创建 → 数据库 → 匿名打开的完整浏览器端到端验收**。本轮完成了真实 HTTP 链路与 React DOM 交互测试，但没有将它们算作真实浏览器覆盖。组件测试验证了四种期限、连续点击只提交一次、失败不显示旧成功链接、重试沿用请求、撤销与复制失败提示，以及实际文档面板仅向 completed Markdown 展示分享入口。
+
+本轮隔离预览先遇到测试样本 ID 映射错误，修正后遇到自定义测试服务器的 Next AsyncLocalStorage 启动错误。按 `sites-preview-troubleshooting` 技能最多两次启动的限制停止尝试；已删除临时预览服务器，恢复正常 dev 命令，移除仅用于该预览的新增依赖。未改动生产登录门禁。完整浏览器脚本 `e2e/thread-chat/verify-snapshot-sharing.mjs` 仍未运行。
 
 开发预览修复仅有：`scripts/dev.sh` 将预览参数映射到 Next CLI，`next.config.ts` 为开发资源允许精确的本地预览 origin。两项不改变生产路由鉴权。
 
 ## 仍待完成的验收与发布门槛
 
-- 3.5：在真实多连接 PostgreSQL 验证创建期间源内容修改/删除、并发同 commandId 的竞争与重试。
-- 4.4、6.6、7.1、7.3：实际部署运行时中验证匿名及已登录所有者的 JSON/HTML/RSC/metadata、到期/撤销、网络无写请求、私有 workspace 缓存不污染，以及全部规格场景。
-- 5.4：完整所有者 UI 创建/复制/撤销与失败重试、非 Markdown/未完成文档入口，以及私有工作台浏览器回归。
+- 6.6、7.1：在可用的真实浏览器集成环境中完成所有者 UI 创建到匿名阅读的流程、已登录所有者只读交互、网络无业务写请求及私有 workspace 缓存不污染，并逐项完成全部规格场景。
 - 8.1：由明确的 develop 集成任务生成 migration、审查 SQL，并在上一版本数据库验证升级。
 - 8.2：升级数据库并部署，执行匿名/期限/撤销/私有权限 smoke；回滚时关闭分享入口及公开路由，保留原会话数据和新增表。
 
-因此保留 8 项任务未勾选，不将这次实现视为可直接发布。公开内容一旦已经加载或复制，不承诺远程收回；链接处理不等于语义脱敏。
+当前 31/35 项完成，保留上述 4 项任务未勾选，不将这次实现视为可直接发布。公开内容一旦已经加载或复制，不承诺远程收回；链接处理不等于语义脱敏。
 
 ## 集成浏览器脚本
 

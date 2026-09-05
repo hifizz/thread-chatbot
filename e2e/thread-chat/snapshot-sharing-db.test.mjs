@@ -6,8 +6,8 @@ import * as schema from "../../lib/db/schema.ts"
 import { sharingFixture } from "./snapshot-sharing-fixture.mjs"
 import { sharingDatabase } from "./snapshot-sharing-database.mjs"
 
-// 进程内、全新 PostgreSQL WASM 库；不会读取 DATABASE_URL 或接触已有数据。
-// 单连接测试不声称覆盖真实多连接事务竞争；该门槛须在集成 PostgreSQL 上运行。
+// 默认进程内空白 PGlite；CI 显式指定独立 PostgreSQL 测试库并执行多连接竞争。
+// 不读取应用 DATABASE_URL，也不重置已有数据库。
 const database = await sharingDatabase()
 const { db } = database
 mock.module(new URL("../../lib/db/index.ts", import.meta.url).href, { namedExports: { db } })
