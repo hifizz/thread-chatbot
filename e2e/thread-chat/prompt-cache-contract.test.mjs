@@ -196,12 +196,11 @@ assert.equal(seenModes.size, 8)
 assert.equal(THREAD_CHAT_PROMPT_SCHEMA_VERSION, "thread-chat-prompt-v1")
 
 const eligibleRoute = {
-  actualProvider: "umapis",
+  actualProvider: "iceland-relay",
   protocol: "anthropic",
-  credentialGroup: "claude",
   upstreamModel: "claude-sonnet-5",
 }
-for (const upstreamModel of ["claude-sonnet-5", "claude-opus-5"]) {
+for (const upstreamModel of ["claude-sonnet-5"]) {
   assert.equal(
     resolvePromptCachePolicy({ ...eligibleRoute, upstreamModel })
       .explicitCacheEnabled,
@@ -209,6 +208,8 @@ for (const upstreamModel of ["claude-sonnet-5", "claude-opus-5"]) {
   )
 }
 for (const route of [
+  { ...eligibleRoute, upstreamModel: "claude-opus-5" },
+  { ...eligibleRoute, actualProvider: "umapis", credentialGroup: "claude" },
   { ...eligibleRoute, upstreamModel: "claude-opus-4-7" },
   { ...eligibleRoute, actualProvider: "openrouter", protocol: "openrouter" },
   { ...eligibleRoute, credentialGroup: "gpt", protocol: "openai-compatible" },

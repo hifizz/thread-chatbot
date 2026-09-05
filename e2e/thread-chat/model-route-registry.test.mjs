@@ -97,7 +97,7 @@ try {
     })
     assert.equal(
       resolvePromptCachePolicy(resolved.route).explicitCacheEnabled,
-      false
+      name === "claude-sonnet-5"
     )
   }
   delete process.env.ICELAND_RELAY_API_KEY
@@ -119,7 +119,9 @@ for (const provider of Object.values(PROVIDERS)) {
     assert.ok(route.identity.upstreamModel)
     assert.equal(
       resolvePromptCachePolicy(route.identity).explicitCacheEnabled,
-      false
+      route.identity.actualProvider === "iceland-relay" &&
+        route.identity.protocol === "anthropic" &&
+        route.identity.upstreamModel === "claude-sonnet-5"
     )
   }
 }
