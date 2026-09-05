@@ -9,7 +9,7 @@ import {
 } from "../actions/message-action-types"
 import { MessageToolbar } from "../actions/message-toolbar"
 import { useCopyMarkdown } from "../actions/use-copy-markdown"
-import { UIMessageSupplementalParts } from "./ui-message-parts"
+import { UserMessageContent } from "./user-message-content"
 
 export function EditableUserMessage({
   threadId,
@@ -48,12 +48,12 @@ export function EditableUserMessage({
   return (
     <>
       <div
-        className={`bubble user-message-body${editing ? "editing" : ""}`}
+        className={`bubble user-message-body${editing ? " editing" : ""}`}
         data-role="user"
       >
-        {message.quote && <div className="msg-quote">{message.quote.text}</div>}
         {editing ? (
           <>
+            {message.quote && <div className="msg-quote">{message.quote.text}</div>}
             <textarea
               value={draft}
               aria-label="编辑用户消息"
@@ -90,10 +90,7 @@ export function EditableUserMessage({
             </div>
           </>
         ) : (
-          <>
-            {message.text}
-            <UIMessageSupplementalParts message={message} />
-          </>
+          <UserMessageContent key={message.id} message={message} />
         )}
       </div>
       {!editing && (

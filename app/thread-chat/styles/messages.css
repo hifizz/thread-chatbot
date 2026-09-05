@@ -138,7 +138,44 @@
   font-size: 14px;
   line-height: 1.55;
   max-width: 84%;
+  min-width: 0;
+  box-sizing: border-box;
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.tc .user-message-viewport {
+  max-height: calc(1lh * var(--tc-user-message-collapsed-lines));
+  overflow: hidden;
+}
+.tc .user-message-viewport[data-expanded="true"] {
+  max-height: max(calc(1lh * var(--tc-user-message-collapsed-lines)), min(60dvh, 640px));
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+}
+.tc .user-message-content {
+  display: flow-root;
+  min-width: 0;
+}
+.tc .user-message-toggle {
+  display: block;
+  margin-top: 8px;
+  padding: 4px 0;
+  border: 0;
+  background: transparent;
+  color: var(--tc-content-secondary);
+  font: inherit;
+  font-size: 12px;
+  white-space: normal;
+  cursor: pointer;
+}
+.tc .user-message-toggle:hover {
+  color: var(--tc-content-primary);
+  text-decoration: underline;
+}
+.tc .user-message-toggle:focus-visible,
+.tc .user-message-viewport:focus-visible {
+  outline: 2px solid var(--tc-border-strong);
+  outline-offset: 2px;
 }
 .tc .message.assistant .bubble {
   font-family: var(--tc-typography-family-read);
