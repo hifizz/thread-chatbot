@@ -42,7 +42,8 @@ async function create(resourceType = "project", extra = {}) {
 }
 async function read(share, kind, loggedIn = false) {
   const path = kind === "json" ? share.path.replace("/share/", "/api/share/") : share.path
-  const response = await fetch(origin + path, { headers: { ...(kind === "rsc" ? { RSC: "1" } : {}), ...(loggedIn ? { cookie } : {}) }, redirect: "manual" })
+  // Next 为 RSC 请求补齐校验查询参数时会重定向；跟随后验证真正的组件流。
+  const response = await fetch(origin + path, { headers: { ...(kind === "rsc" ? { RSC: "1" } : {}), ...(loggedIn ? { cookie } : {}) } })
   const body = await response.text()
   assert.match(response.headers.get("cache-control"), /no-store/)
   assert.equal(response.headers.get("referrer-policy"), "no-referrer")

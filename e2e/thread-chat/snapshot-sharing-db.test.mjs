@@ -135,7 +135,7 @@ test("真实 PostgreSQL 多连接竞争与一致读取", { skip: !database.sql }
   await db.insert(schema.user).values({ id: "concurrent-owner", name: "并发测试", email: "concurrent@sharing.test" })
   await db.insert(schema.projects).values({ id: "concurrent-project", userId: "concurrent-owner", customTitle: "修改前" })
   await db.insert(schema.threads).values({ id: "concurrent-root", projectId: "concurrent-project", modelId: "test-model", depth: 0 })
-  await db.insert(schema.messages).values({ id: "concurrent-message", projectId: "concurrent-project", threadId: "concurrent-root", sequence: 1, role: "user", status: "completed", parts: [{ type: "text", text: "修改前" }] })
+  await db.insert(schema.messages).values({ id: "concurrent-message", projectId: "concurrent-project", threadId: "concurrent-root", sequence: 1, role: "user", status: "completed", finishedAt: new Date(), parts: [{ type: "text", text: "修改前" }] })
   const input = () => ({ commandId: randomUUID(), resourceType: "project", resourceId: "concurrent-project", expiry: "3", layout: {} })
   async function waitForBlocked(query) {
     const end = Date.now() + 10000
