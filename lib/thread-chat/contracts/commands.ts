@@ -80,12 +80,15 @@ export const forkThreadCommandSchema = z
     commandId: commandIdSchema,
     threadId: entityIdSchema,
     sourceMessageId: entityIdSchema,
-    anchorText: z.string().trim().min(1).max(20_000),
-    anchor: textAnchorSchema,
+    anchorText: z.string().trim().min(1).max(20_000).nullish(),
+    anchor: textAnchorSchema.nullish(),
     modelId: modelIdSchema,
     firstTurn: firstForkTurnSchema.optional(),
   })
   .strict()
+  .refine((command) => (command.anchor == null) === (command.anchorText == null), {
+    message: "引用文本与选区锚点必须同时提供或同时省略",
+  })
 
 export const editLatestTurnCommandSchema = z
   .object({

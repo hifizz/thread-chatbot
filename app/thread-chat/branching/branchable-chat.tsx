@@ -23,6 +23,7 @@ import {
 import { ChatView } from "../chat/chat-view"
 import { MessageArtifacts } from "../orchestration/artifacts/message-artifacts"
 import { AnchoredAssistantBody } from "./assistant/anchored-assistant-body"
+import { MessageForkActions } from "./message-fork-actions"
 import type { MessageActionViewState } from "../chat/actions/message-action-types"
 import type { ThreadMessageActionCommands } from "../chat/actions/message-action-commands"
 import type { CommandFileReference } from "../net/commands/conversation-commands"
@@ -39,6 +40,7 @@ export interface BranchableChatProps {
       opts.keepSource：⌘/Ctrl 点击 = 保留本列，把目标开在紧邻右侧 */
   onOpenThread: (targetId: string, opts?: { keepSource?: boolean }) => void
   onOpenArtifact: (artifactId: string) => void
+  onForkMessage?: (message: Message) => Promise<unknown>
   /** 面包屑就地回退（collapse 语义由 orchestration 实现） */
   onCrumbNav: (targetId: string) => void
   /** ⇄ 把本列切换为任意会话（弹出 local 切换器，锚定在按钮上） */
@@ -69,6 +71,7 @@ export function BranchableChat({
   mainHeaderActions,
   onOpenThread,
   onOpenArtifact,
+  onForkMessage,
   onCrumbNav,
   onOpenSwitcher,
   onOpenSubtree,
@@ -108,15 +111,23 @@ export function BranchableChat({
     )
   }
 
-  /* ---------- 注入：消息下方的 artifact 卡片 ---------- */
+  /* ---------- 注入：消息下方的 artifact 卡片与分叉入口 ---------- */
   const renderAfterMessage = (msg: Message) => {
     return (
-      <MessageArtifacts
-        state={state}
-        message={msg}
-        sourceDepth={thread.depth}
-        onOpen={onOpenArtifact}
-      />
+      <>
+        <MessageArtifacts
+          state={state}
+          message={msg}
+          sourceDepth={thread.depth}
+          onOpen={onOpenArtifact}
+        />
+        <MessageForkActions
+          state={state}
+          message={msg}
+          onFork={onForkMessage ? () => onForkMessage(msg) : undefined}
+          onOpenThread={onOpenThread}
+        />
+      </>
     )
   }
 
@@ -198,12 +209,12 @@ export function BranchableChat({
         <span className="fn">{thread.footnote}</span>
         <div className="ft">
           <span className="lbl">
-            讨论焦点 · 划选自
+            {thread.anchorText ? "讨论焦点 · 划选自" : "分叉聊天 · 续接自"}
             {thread.parentId === "main"
               ? "主线"
               : `「${threadTitle(state, thread.parentId!)}」`}
           </span>
-          <q>{thread.anchorText}</q>
+          {thread.anchorText && <q>{thread.anchorText}</q>}
         </div>
         {sourceProvenance && !sourceProvenance.isOnActivePath && (
           <div className="inactive-source">

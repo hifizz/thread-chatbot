@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import React, { useCallback, useEffect, useMemo, useState } from "react"
 
 import { DEFAULT_THREAD_CHAT_MODEL_ID } from "@/constants/model"
+import { MESSAGE_FORK_LABELS } from "@/constants/message-fork"
 import { PROJECT_TITLE_FALLBACK } from "@/constants/project-workspace"
 import type { MessageDTO } from "@/lib/thread-chat/contracts/dto"
 import { textFromMessageParts } from "@/lib/thread-chat/contracts/ui-message"
@@ -420,7 +421,12 @@ function NormalizedThreadChat({
   )
 
   const handleFork = useCallback(
-    (info: SelectionInfo, hint?: PlacementHint, question?: string) => {
+    (
+      info: Pick<SelectionInfo, "threadId" | "msgId"> &
+        Partial<Pick<SelectionInfo, "text" | "anchor">>,
+      hint?: PlacementHint,
+      question?: string
+    ) => {
       const current = runtime.store.getState()
       const parentThreadId = fromConversationViewThreadId(
         current,
@@ -429,7 +435,7 @@ function NormalizedThreadChat({
       const modelId =
         current.threadsById[parentThreadId]?.modelId ??
         DEFAULT_THREAD_CHAT_MODEL_ID
-      void runtime.commands
+      return runtime.commands
         .forkThread({
           parentThreadId,
           sourceMessageId: info.msgId,
@@ -439,8 +445,8 @@ function NormalizedThreadChat({
           ...(question?.trim() ? { text: question.trim() } : {}),
         })
         .then(({ command }) => {
-          const title =
-            info.text.length > 13 ? `${info.text.slice(0, 13)}…` : info.text
+          const text = info.text ?? MESSAGE_FORK_LABELS.untitled
+          const title = text.length > 13 ? `${text.slice(0, 13)}…` : text
           if (workspace.viewMode === "canvas") {
             workspace.focusCanvasNode(command.threadId)
             showToast(`已开启分支 · ${title}`)
@@ -449,7 +455,7 @@ function NormalizedThreadChat({
           openBranchUI(command.threadId, info.threadId, hint)
           showToast(`已开启分支 · ${title}`)
         })
-        .catch(() => showToast("创建分支失败，请重试"))
+        .catch(() => showToast(MESSAGE_FORK_LABELS.failed))
     },
     [openBranchUI, runtime.commands, runtime.store, showToast, workspace]
   )
@@ -492,12 +498,13 @@ function NormalizedThreadChat({
     () => ({
       send,
       stop,
+      forkMessage: (threadId, msgId) => handleFork({ threadId, msgId }),
       retry(viewThreadId, messageId) {
         void messageCommands.retryAssistant(viewThreadId, messageId)
       },
       ...messageCommands,
     }),
-    [messageCommands, send, stop]
+    [handleFork, messageCommands, send, stop]
   )
 
   const renameTreeItem = useCallback(
@@ -627,6 +634,10 @@ function NormalizedThreadChat({
                   openBranchUI(target, viewThreadId, options)
                 }
                 onOpenArtifact={openArtifact}
+                onForkMessage={(message) => handleFork({
+                  threadId: viewThreadId,
+                  msgId: message.id,
+                })}
                 onCrumbNav={(target) =>
                   workspace.columns.navColumn(viewportIndex, target, "collapse")
                 }

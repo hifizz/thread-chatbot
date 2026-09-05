@@ -41,8 +41,8 @@ export interface ConversationCommandOptions {
 export interface ForkCommandInput {
   parentThreadId: string
   sourceMessageId: string
-  anchorText: string
-  anchor: TextAnchor
+  anchorText?: string | null
+  anchor?: TextAnchor | null
   modelId: string
   text?: string
   files?: CommandFileReference[]
@@ -393,8 +393,8 @@ export function createConversationCommands(
         parentId: parent.id,
         forkMessageId: command.sourceMessageId,
         forkContext: [],
-        forkAnchor: command.anchor,
-        anchorText: command.anchorText,
+        forkAnchor: command.anchor ?? null,
+        anchorText: command.anchorText ?? null,
         footnote,
         depth: parent.depth + 1,
         modelId: command.modelId,
