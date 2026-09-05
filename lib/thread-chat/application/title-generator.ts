@@ -8,7 +8,7 @@ import { MODEL_CALL_PURPOSE } from "@/constants/model-call"
 import {
   isPrivateRelayConfigured,
   privateRelayChatModel,
-} from "@/lib/ai/private-relay"
+} from "@/lib/ai/llm/private-relay"
 import { withModelCallLogging } from "@/lib/ai/model-call-logger"
 import type { ThreadTitleInput } from "@/lib/thread-chat/contracts/title-request"
 import { buildAiTelemetryConfig } from "@/lib/observability/ai-sdk"

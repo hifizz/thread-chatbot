@@ -7,7 +7,9 @@ import {
   IMAGE_MODEL_VALIDATION_MESSAGE,
 } from "@/constants/attachment"
 
+import type { GenerationSettings } from "@/constants/generation-settings"
 import {
+  getModelGenerationSettingsCapability,
   isThreadChatModelId,
   supportsModelImageInput,
 } from "@/constants/model"
@@ -47,6 +49,24 @@ export function assertAllowedModel(modelId: string): void {
     throw new ConversationApplicationError(
       "MODEL_NOT_ALLOWED",
       "当前模型不可用于 ThreadChat"
+    )
+  }
+}
+
+export function assertAllowedGenerationSettings(
+  modelId: string,
+  settings: GenerationSettings | undefined
+): void {
+  if (!settings) return
+  const capability = getModelGenerationSettingsCapability(modelId)
+  if (
+    !capability ||
+    !capability.effortLevels.includes(settings.effort) ||
+    !capability.maxOutputTokenOptions.includes(settings.maxOutputTokens)
+  ) {
+    throw new ConversationApplicationError(
+      "VALIDATION_ERROR",
+      "当前模型不支持所选生成参数"
     )
   }
 }

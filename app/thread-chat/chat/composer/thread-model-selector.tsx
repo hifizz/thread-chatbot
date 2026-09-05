@@ -10,68 +10,11 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import {
-  CHAT_MODEL_PROVIDER_LABELS,
-  THREAD_CHAT_MODEL_GROUP_LABELS,
-  THREAD_CHAT_MODELS,
-} from "@/constants/model"
+import { THREAD_CHAT_MODEL_OPTIONS as PUBLIC_MODEL_OPTIONS } from "@/constants/models"
 import { Bot } from "lucide-react"
 
-/** 模型 selector 的产品展示顺序；同一品牌内沿用模型注册表顺序。 */
-const MODEL_FAMILY_ORDER = [
-  "openai",
-  "gpt",
-  "claude",
-  "glm",
-  "qwen",
-  "kimi",
-  "moonshotai",
-  "deepseek",
-  "x-ai",
-  "stealth",
-  "minimax",
-  "doubao",
-] as const
-
-/** 服务端供应商只用于排序和路由；用户界面统一展示为中性模型组。 */
-function modelProviderIndex(provider: string): number {
-  if (provider === "umapis") return 0
-  if (provider === "openrouter") return 2
-  return 1
-}
-
-function modelFamilyIndex(upstreamModel: string): number {
-  const normalizedName = upstreamModel.toLowerCase()
-  const familyIndex = MODEL_FAMILY_ORDER.findIndex((family) =>
-    normalizedName.startsWith(family)
-  )
-
-  return familyIndex === -1 ? MODEL_FAMILY_ORDER.length : familyIndex
-}
-
-/**
- * Thread Chat 仅展示当前产品入口可用的模型。
- * 隐藏项和未接入 provider 仍保留在全站注册表，避免影响其他入口与历史配置。
- */
-const THREAD_CHAT_MODEL_OPTIONS: readonly ModelOption[] =
-  THREAD_CHAT_MODELS.map((model, registryIndex) => ({ model, registryIndex }))
-    .sort(
-      (left, right) =>
-        modelProviderIndex(left.model.provider) -
-          modelProviderIndex(right.model.provider) ||
-        modelFamilyIndex(left.model.upstreamModel) -
-          modelFamilyIndex(right.model.upstreamModel) ||
-        left.registryIndex - right.registryIndex
-    )
-    .map(({ model }) => ({
-      id: model.id,
-      name: model.name.replace(
-        `${CHAT_MODEL_PROVIDER_LABELS[model.provider]} · `,
-        ""
-      ),
-      providerId: model.provider,
-      providerName: THREAD_CHAT_MODEL_GROUP_LABELS[model.provider],
-    }))
+/** Thread Chat 仅展示公开模型选项，不读取服务端路由表。 */
+const THREAD_CHAT_MODEL_OPTIONS: readonly ModelOption[] = PUBLIC_MODEL_OPTIONS
 
 export interface ThreadModelSelectorProps {
   modelId: string

@@ -70,8 +70,6 @@ jobs:
       LANGFUSE_BASE_URL: ${{ vars.LANGFUSE_BASE_URL }}
       AI_OBSERVABILITY_ID_SALT: ${{ secrets.AI_OBSERVABILITY_ID_SALT }}
       EVAL_MODEL_ID: ${{ vars.EVAL_MODEL_ID }}
-      UMAPIS_API_KEY_CLAUDE: ${{ secrets.UMAPIS_API_KEY_CLAUDE }}
-      UMAPIS_API_KEY_GPT: ${{ secrets.UMAPIS_API_KEY_GPT }}
       ANYSEARCH_API_KEY: ${{ secrets.ANYSEARCH_API_KEY }}
     steps:
       - uses: actions/checkout@v4

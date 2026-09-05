@@ -8,7 +8,7 @@ import {
   isLinearChatModelId,
   isUnbilledPreviewModel,
 } from "@/constants/model"
-import { isModelConfigured } from "@/lib/ai/provider"
+import { isModelConfigured } from "@/lib/ai/llm/model-routes"
 import { hasPositiveBalance } from "@/lib/billing/credits"
 
 type ChatRequestBody = {

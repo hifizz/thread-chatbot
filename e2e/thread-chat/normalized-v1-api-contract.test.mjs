@@ -36,6 +36,43 @@ const parsed = await parseJson(
 )
 assert.deepEqual(parsed, validStart)
 
+const validGenerationSettings = {
+  effort: "high",
+  maxOutputTokens: 32_000,
+}
+const parsedWithGenerationSettings = startProjectCommandSchema.parse({
+  ...validStart,
+  generationSettings: validGenerationSettings,
+})
+assert.deepEqual(
+  parsedWithGenerationSettings.generationSettings,
+  validGenerationSettings
+)
+assert.equal(
+  startProjectCommandSchema.safeParse({
+    ...validStart,
+    generationSettings: { ...validGenerationSettings, effort: "extreme" },
+  }).success,
+  false
+)
+assert.equal(
+  startProjectCommandSchema.safeParse({
+    ...validStart,
+    generationSettings: {
+      ...validGenerationSettings,
+      maxOutputTokens: 12_345,
+    },
+  }).success,
+  false
+)
+assert.equal(
+  startProjectCommandSchema.safeParse({
+    ...validStart,
+    generationSettings: { ...validGenerationSettings, unknownField: true },
+  }).success,
+  false
+)
+
 await assert.rejects(() =>
   parseJson(
     new Request("http://localhost/api/thread-chat/v1/projects/x/start", {
@@ -94,7 +131,7 @@ async function filesUnder(directory) {
 
 const routeRoot = path.join(root, "app/api/thread-chat/v1")
 const routeFiles = await filesUnder(routeRoot)
-assert.equal(routeFiles.length, 14, "v1 应实现全部查询、命令和 stream 路由文件")
+assert.equal(routeFiles.length, 16, "v1 应实现全部查询、命令和 stream 路由文件")
 assert.ok(
   routeFiles.some((filename) =>
     filename.endsWith(

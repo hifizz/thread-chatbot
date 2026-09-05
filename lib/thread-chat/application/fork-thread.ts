@@ -6,6 +6,7 @@ import type {
 } from "@/lib/thread-chat/contracts/dto"
 import { buildFrozenForkContext } from "@/lib/thread-chat/domain/fork-context"
 import {
+  assertAllowedGenerationSettings,
   assertAllowedModel,
   assertOwnedReadyAttachments,
   assertModelSupportsNewAttachments,
@@ -42,6 +43,10 @@ export function forkThread(
   command: ForkThreadCommand
 ) {
   assertAllowedModel(command.modelId)
+  assertAllowedGenerationSettings(
+    command.modelId,
+    command.generationSettings
+  )
   return withConversationTransaction(async (tx) =>
     executeIdempotentCommand({
       tx,

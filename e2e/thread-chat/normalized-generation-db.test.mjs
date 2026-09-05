@@ -96,6 +96,10 @@ try {
   const assistantId = start.result.assistantMessage.id
   const store = new streaming.SessionStore({ startCleanupTimer: false })
   let prepareCount = 0
+  const sessionGenerationSettings = {
+    effort: "low",
+    maxOutputTokens: 16_000,
+  }
   const started = store.start({
     messageId: assistantId,
     initialSnapshot: streaming.initialAssistantSnapshot({
@@ -108,9 +112,15 @@ try {
         userId,
         messageId: assistantId,
         session,
+        generationSettings: sessionGenerationSettings,
         dependencies: {
-          prepare: async () => {
+          prepare: async (input) => {
             prepareCount += 1
+            assert.deepEqual(
+              input.generationSettings,
+              sessionGenerationSettings,
+              "Session 生成参数必须原样传给 prepareGeneration"
+            )
             return {
               textStream: textStream([
                 { type: "start" },
@@ -323,9 +333,10 @@ try {
   assert.equal(store.get(assistantId), null)
   assert.equal((await application.getMessage(userId, assistantId)).status, "completed")
 
+  store.dispose()
   console.log("normalized generation Gate 2 DB tests passed")
 } finally {
   await db.delete(schema.user).where(and(eq(schema.user.id, userId)))
   await db.delete(schema.user).where(and(eq(schema.user.id, otherUserId)))
-  await globalThis.__dbClient?.end()
+  await globalThis.__dbClient?.end({ timeout: 5 })
 }

@@ -1,6 +1,6 @@
 {
   "schemaVersion": "agent-run-snapshot-v2",
-  "runId": "fixture-baseline-v1",
+  "runId": "580ad4ba-21ad-4edf-8cb1-b6611d3ef39d",
   "mode": "release",
   "manifest": {
     "schemaVersion": "agent-case-manifest-v1",
@@ -47,9 +47,9 @@
     "fingerprint": "3531bc37b454db9abca9de888961b31af627b6ea83b644f6a79c7460613d6195"
   },
   "kind": "fixture",
-  "createdAt": "2026-09-04T13:30:18.881Z",
+  "createdAt": "2026-08-28T00:00:00.000Z",
   "datasetRevision": "16384285a65ad16bc39fab0089334e0aa84f4d3e84a873e194d8c49d5a2a93fe",
-  "candidateFingerprint": "9b84412630b72ddeecd0b8758d91907d0ae17cf81c31a98320a0aa3965dd13c6",
+  "candidateFingerprint": "16f54e093fdc69e9d05ec6175c09a928ea9b22f6d0ff4d11ecdebba06e136d86",
   "candidate": {
     "candidate": "fixture-baseline-v1",
     "commit": "f23dedb",
@@ -57,7 +57,7 @@
     "environment": "evaluation",
     "evaluatorVersion": "deterministic-v1",
     "memoryPolicyVersion": "thread-context-v1",
-    "model": "umapis-claude-opus-4-6",
+    "model": "openrouter-gpt-5.6-luna",
     "multimodalParserVersion": "attachment-parser-v1",
     "promptVersion": "thread-chat-prompt-v1",
     "release": "baseline-v1",
@@ -70,7 +70,7 @@
     "cases": 36,
     "hardFailures": 0,
     "p50LatencyMs": 0,
-    "p95LatencyMs": 1,
+    "p95LatencyMs": 0,
     "totalUsage": {
       "inputTokens": 12,
       "outputTokens": 18,
@@ -89,7 +89,7 @@
       "suite": "core-answer",
       "hardFailures": [],
       "judgeScores": {},
-      "latencyMs": 1,
+      "latencyMs": 0,
       "usage": {},
       "providerAttempts": 0,
       "providerFailures": 0,
@@ -324,7 +324,7 @@
       "suite": "reliability",
       "hardFailures": [],
       "judgeScores": {},
-      "latencyMs": 1,
+      "latencyMs": 0,
       "usage": {},
       "providerAttempts": 0,
       "providerFailures": 0,

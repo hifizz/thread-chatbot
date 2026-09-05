@@ -77,9 +77,9 @@
 
 该计划作为 Executor 的约束提示，同时通过 UI Message Stream 发送给前端并随消息保存。
 
-### 4. UMAPIS 结构化输出兼容
+### 4. 兼容端点结构化输出
 
-UMAPIS Opus 4.6 的 Anthropic-compatible Endpoint 可以完成结构化任务，但实测偶尔会忽略 AI SDK 的输出协议，返回 Markdown fenced JSON 或改写字段名。
+部分 Anthropic-compatible 端点可以完成结构化任务，但实测偶尔会忽略 AI SDK 的输出协议，返回 Markdown fenced JSON 或改写字段名。
 
 当前兼容策略：
 
@@ -104,9 +104,9 @@ UMAPIS Opus 4.6 的 Anthropic-compatible Endpoint 可以完成结构化任务，
 - 计划、路由和联网来源随消息持久化，刷新后可以恢复。
 - UI 只展示可审计的结构化计划，不展示原始 CoT。
 
-## UMAPIS Opus 4.6 + 联网工具真实验收
+## 联网工具真实验收
 
-以下模型多步链路数据来自切换 AnySearch 之前的 Tavily 验收；当前 AnySearch REST Search 与 MCP Extract 已分别通过匿名端到端适配器验证，完整模型压力测试尚未重跑。
+以下多步链路数据来自切换 AnySearch 之前的 Tavily 验收；当前 AnySearch REST Search 与 MCP Extract 已分别通过匿名端到端适配器验证，完整模型压力测试尚未重跑。
 
 ### Planner 验收
 
@@ -124,7 +124,7 @@ UMAPIS Opus 4.6 的 Anthropic-compatible Endpoint 可以完成结构化任务，
 验证链路：
 
 ```text
-UMAPIS Opus 4.6
+已验证模型
   → streamText
   → webSearch
   → Search provider
@@ -166,7 +166,7 @@ UMAPIS Opus 4.6
 - 建立固定测试集，覆盖 answer/fetch/search/research 的正确路由率。
 - 记录 Router、Planner、每次工具调用和最终综合的耗时、Token 与失败原因。
 - 建立来源正确性、引用覆盖率和幻觉率的人工评分模板。
-- 为 UMAPIS Opus 4.6、GLM 5.3 等重点模型维护能力矩阵。
+- 为重点模型维护能力矩阵。
 
 ### Batch B2：预算与执行控制
 

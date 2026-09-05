@@ -4,6 +4,7 @@ import type { RetryMessageCommand } from "@/lib/thread-chat/contracts/commands"
 import type { GenerationAcceptedDTO } from "@/lib/thread-chat/contracts/dto"
 import { canRetryLatestAssistant } from "@/lib/thread-chat/domain/timeline"
 import {
+  assertAllowedGenerationSettings,
   assertAllowedModel,
   touchProjectAndThread,
 } from "@/lib/thread-chat/application/command-utils"
@@ -35,6 +36,10 @@ export function retryMessage(
   command: RetryMessageCommand
 ) {
   assertAllowedModel(command.modelId)
+  assertAllowedGenerationSettings(
+    command.modelId,
+    command.generationSettings
+  )
   return withConversationTransaction(async (tx) =>
     executeIdempotentCommand({
       tx,

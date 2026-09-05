@@ -3,8 +3,12 @@ import { convertToModelMessages } from "ai"
 import {
   getChatModel,
   supportsModelImageInput,
-  UMAPIS_MODEL_IDS,
 } from "../../constants/model.ts"
+import {
+  icelandModels,
+  privateRelayModels,
+  publicModelId,
+} from "../../constants/models/index.ts"
 import {
   IMAGE_ATTACHMENT_LIMITS,
   IMAGE_MODEL_VALIDATION_MESSAGE,
@@ -88,13 +92,17 @@ const files = [
 ]
 
 assert.equal(supportsModelImageInput("kimi-k2.6"), true)
-for (const upstreamModel of UMAPIS_MODEL_IDS) {
-  const modelId = `umapis-${upstreamModel}`
+for (const model of icelandModels.models) {
+  const modelId = publicModelId(icelandModels, model)
   assert.equal(supportsModelImageInput(modelId), true, modelId)
   assert.equal(getChatModel(modelId)?.supportsImageInput, true, modelId)
 }
 assert.equal(supportsModelImageInput("openrouter-gpt-5.6-sol"), true)
-assert.equal(supportsModelImageInput("private-relay-gpt-5.6-sol"), false)
+for (const model of privateRelayModels.models) {
+  const modelId = publicModelId(privateRelayModels, model)
+  assert.equal(supportsModelImageInput(modelId), true, modelId)
+  assert.equal(getChatModel(modelId)?.capabilities.attachments, true, modelId)
+}
 assert.equal(supportsModelImageInput("deepseek-v4-flash"), false)
 assert.equal(supportsModelImageInput("deepseek-v4-pro"), false)
 assert.equal(

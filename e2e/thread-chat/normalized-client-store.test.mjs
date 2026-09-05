@@ -711,13 +711,21 @@ async function testCommandFilesPassThrough() {
         },
       ]),
   })
+  const generationSettings = {
+    effort: "high",
+    maxOutputTokens: 32_000,
+  }
   const result = await commands.sendMessage({
     threadId: thread().id,
     modelId: "test/model",
+    generationSettings,
     text: "读取附件",
     files: [file],
   })
   assert.deepEqual(seen.files, [file])
+  assert.deepEqual(seen.generationSettings, generationSettings)
+  assert.notEqual(seen.generationSettings, generationSettings)
+  assert.equal(Object.isFrozen(seen.generationSettings), true)
   assert.deepEqual(
     store.getState().messagesById[result.command.userMessageId].parts,
     [{ type: "text", text: "读取附件" }, { type: "file", ...file }]

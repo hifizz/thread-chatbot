@@ -1,6 +1,6 @@
 import { generateText, Output, type LanguageModel } from "ai"
 import { z } from "zod"
-import { resolveChatModel } from "@/lib/ai/provider"
+import { resolveChatModel } from "@/lib/ai/llm/model-routes"
 import { buildAiTelemetryConfig } from "@/lib/observability/ai-sdk"
 import type { AgentCase } from "@/evals/agent/schema"
 import type {

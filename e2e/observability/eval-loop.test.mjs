@@ -12,7 +12,7 @@ import {
 
 const candidate = {
   candidate: "fixture-baseline-v1",
-  model: "umapis-claude-opus-4-6",
+  model: "openrouter-gpt-5.6-luna",
   promptVersion: "thread-chat-prompt-v1",
   searchPolicyVersion: "anysearch-v1",
   searchProvider: "anysearch",

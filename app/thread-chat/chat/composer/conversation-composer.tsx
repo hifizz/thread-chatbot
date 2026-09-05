@@ -15,6 +15,7 @@ import {
   IMAGE_ATTACHMENT_LIMITS,
   IMAGE_MODEL_VALIDATION_MESSAGE,
 } from "@/constants/attachment"
+import { GenerationSettingsControls } from "./generation-settings-controls"
 import { ThreadModelSelector } from "./thread-model-selector"
 import {
   composerMaxHeight,
@@ -316,6 +317,12 @@ export function ConversationComposer({
       onValueChange={(nextModelId) => onModelChange?.(nextModelId)}
     />
   ) : null
+  const generationSettingsControls = modelId ? (
+    <GenerationSettingsControls
+      modelId={modelId}
+      disabled={modelSelectorDisabled}
+    />
+  ) : null
 
   const attachmentTray =
     !canvas && attachments.length > 0 ? (
@@ -372,6 +379,7 @@ export function ConversationComposer({
   const promptStack = canvas ? (
     <div className="cv-prompt-stack">
       {selector}
+      {generationSettingsControls}
       {textarea}
     </div>
   ) : (
@@ -400,6 +408,7 @@ export function ConversationComposer({
           <PlusIcon size={14} aria-hidden="true" />
         </button>
         {selector}
+        {generationSettingsControls}
       </div>
     </div>
   )

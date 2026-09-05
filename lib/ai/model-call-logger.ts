@@ -25,6 +25,14 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null
 }
 
+function anthropicEffort(providerOptions: unknown): string | undefined {
+  if (!isRecord(providerOptions)) return undefined
+  const anthropic = providerOptions.anthropic
+  if (!isRecord(anthropic) || typeof anthropic.effort !== "string")
+    return undefined
+  return anthropic.effort
+}
+
 function summarizePrompt(prompt: readonly unknown[]): PromptSummary {
   const summary: PromptSummary = {
     messageCount: prompt.length,
@@ -103,6 +111,7 @@ export function withModelCallLogging(
           ...summarizePrompt(params.prompt),
           availableToolCount: params.tools?.length ?? 0,
           maxOutputTokens: params.maxOutputTokens,
+          effort: anthropicEffort(params.providerOptions),
         },
       })
       return doGenerate()
@@ -118,6 +127,7 @@ export function withModelCallLogging(
           ...summarizePrompt(params.prompt),
           availableToolCount: params.tools?.length ?? 0,
           maxOutputTokens: params.maxOutputTokens,
+          effort: anthropicEffort(params.providerOptions),
         },
       })
       return doStream()
