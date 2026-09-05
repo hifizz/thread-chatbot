@@ -16,7 +16,8 @@ import { textFromMessageParts } from "@/lib/thread-chat/contracts/ui-message"
 import type { WebResearchActivity } from "@/lib/chat/web-research-activity"
 import type { ResearchPlan, ResearchRoute } from "@/lib/chat/research-router"
 import { THREAD_TREE_SCHEMA_VERSION } from "@/constants/thread-chat"
-import { selectDisplayTitle, selectVisibleMessages } from "./selectors"
+import { MESSAGE_FORK_LABELS } from "@/constants/message-fork"
+import { selectVisibleMessages } from "./selectors"
 import { emptySeedState } from "./seed"
 
 function dataPart<T>(
@@ -143,7 +144,7 @@ export function projectThreadDTO(
       thread.autoTitle ??
       (thread.depth === 0
         ? "主线"
-        : (thread.anchorText ?? selectDisplayTitle(thread))),
+        : (thread.anchorText ?? MESSAGE_FORK_LABELS.untitled)),
     anchorText: thread.anchorText,
     forkFromMsgId: thread.forkMessageId,
     footnote: thread.footnote,
