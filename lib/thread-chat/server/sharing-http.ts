@@ -25,7 +25,10 @@ export async function withShareOwner(request: Request, execute: (userId: string)
   try {
     const userId = await requireThreadChatUser(request.headers)
     const origin = request.headers.get("origin")
-    if (request.method !== "GET" && origin && origin !== new URL(request.url).origin) return shareJson({ error: "请求来源不合法" }, 403)
+    // Next 的内部请求 URL 在反向代理后可能是 localhost；使用登录服务的公开站点地址。
+    // 不信任客户端可伪造的 forwarded-host 来扩大允许的来源。
+    const siteOrigin = new URL(process.env.BETTER_AUTH_URL || request.url).origin
+    if (request.method !== "GET" && origin && origin !== siteOrigin) return shareJson({ error: "请求来源不合法" }, 403)
     return await execute(userId)
   } catch (error) {
     if (error instanceof ThreadChatUnauthorizedError) return shareJson({ error: "请先登录" }, 401)

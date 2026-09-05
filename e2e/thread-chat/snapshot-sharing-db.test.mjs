@@ -1,21 +1,15 @@
 import assert from "node:assert/strict"
 import { after, mock, test } from "node:test"
 import { randomUUID } from "node:crypto"
-import { PGlite } from "@electric-sql/pglite"
-import { vector } from "@electric-sql/pglite-pgvector"
-import { drizzle } from "drizzle-orm/pglite"
 import { eq } from "drizzle-orm"
-import { pushSchema } from "drizzle-kit/api"
 import * as schema from "../../lib/db/schema.ts"
 import { sharingFixture } from "./snapshot-sharing-fixture.mjs"
+import { sharingDatabase } from "./snapshot-sharing-database.mjs"
 
 // 进程内、全新 PostgreSQL WASM 库；不会读取 DATABASE_URL 或接触已有数据。
 // 单连接测试不声称覆盖真实多连接事务竞争；该门槛须在集成 PostgreSQL 上运行。
-const client = await PGlite.create({ extensions: { vector } })
-await client.exec("CREATE EXTENSION vector")
-const db = drizzle(client, { schema })
-const plan = await pushSchema(schema, db, ["thread_chat"])
-await plan.apply()
+const database = await sharingDatabase()
+const { db } = database
 mock.module(new URL("../../lib/db/index.ts", import.meta.url).href, { namedExports: { db } })
 process.env.BETTER_AUTH_SECRET = "snapshot-sharing-test-secret-with-more-than-32-characters"
 process.env.BETTER_AUTH_URL = "http://localhost:3000"
@@ -25,7 +19,7 @@ const { auth } = await import("../../lib/auth/index.ts")
 const { POST, GET } = await import("../../app/api/thread-chat/v1/shares/route.ts")
 const { DELETE } = await import("../../app/api/thread-chat/v1/shares/[shareId]/route.ts")
 const { GET: PUBLIC_GET } = await import("../../app/api/share/[token]/route.ts")
-after(async () => { mock.restoreAll(); await client.close() })
+after(async () => { mock.restoreAll(); await database.close() })
 
 test("数据库结构与分享生命周期", async (t) => {
   const f = sharingFixture()
@@ -120,6 +114,9 @@ test("真实登录授权下的分享 HTTP handler", async () => {
   assert.equal((await POST(request(input))).status, 401)
   assert.equal((await POST(request({ ...input, ownerId: "attacker" }, { cookie }))).status, 400)
   assert.equal((await POST(request(input, { cookie, origin: "https://other.example" }))).status, 403)
+  const proxied = new Request("http://internal-next:3000/api/thread-chat/v1/shares", { method: "POST", headers: { cookie, origin: "http://localhost:3000", "content-type": "application/json" }, body: JSON.stringify(input) })
+  assert.equal((await POST(proxied)).status, 200)
+  assert.equal((await POST(request(input, { cookie, origin: "https://other.example", "x-forwarded-host": "other.example" }))).status, 403)
   const response = await POST(request(input, { cookie }))
   assert.equal(response.status, 200)
   const result = await response.json(), token = result.data.path.split("/").at(-1)
@@ -131,4 +128,70 @@ test("真实登录授权下的分享 HTTP handler", async () => {
   const revoke = await DELETE(new Request("http://localhost:3000/api/thread-chat/v1/shares/x", { method: "DELETE", headers: { cookie } }), { params: Promise.resolve({ shareId: result.data.id }) })
   assert.equal(revoke.status, 200)
   assert.equal(await readPublicShare(token), null)
+})
+
+test("真实 PostgreSQL 多连接竞争与一致读取", { skip: !database.sql }, async (t) => {
+  const sql = database.sql
+  await db.insert(schema.user).values({ id: "concurrent-owner", name: "并发测试", email: "concurrent@sharing.test" })
+  await db.insert(schema.projects).values({ id: "concurrent-project", userId: "concurrent-owner", customTitle: "修改前" })
+  await db.insert(schema.threads).values({ id: "concurrent-root", projectId: "concurrent-project", modelId: "test-model", depth: 0 })
+  await db.insert(schema.messages).values({ id: "concurrent-message", projectId: "concurrent-project", threadId: "concurrent-root", sequence: 1, role: "user", status: "completed", parts: [{ type: "text", text: "修改前" }] })
+  const input = () => ({ commandId: randomUUID(), resourceType: "project", resourceId: "concurrent-project", expiry: "3", layout: {} })
+  async function waitForBlocked(query) {
+    const end = Date.now() + 10000
+    do {
+      const rows = await sql`select pid from pg_stat_activity where datname = current_database() and pid <> pg_backend_pid() and application_name = 'snapshot-sharing-test' and wait_event_type = 'Lock' and query like ${query}`
+      if (rows.length) return
+      await new Promise((resolve) => setTimeout(resolve, 20))
+    } while (Date.now() < end)
+    assert.fail("未观测到预期的数据库锁等待")
+  }
+  await t.test("两次读取间修改来源，快照仍使用同一可见时点", async () => {
+    let creation
+    await sql.begin(async (blocker) => {
+      await blocker`lock table thread_chat.threads in access exclusive mode`
+      creation = createShare("concurrent-owner", input())
+      await waitForBlocked('%from "thread_chat"."threads"%')
+      await blocker`update thread_chat.projects set custom_title = '修改后' where id = 'concurrent-project'`
+      await blocker`update thread_chat.messages set parts = '[{"type":"text","text":"修改后"}]'::jsonb where id = 'concurrent-message'`
+    })
+    const created = await creation
+    const result = await readPublicShare(created.result.path.split("/").at(-1))
+    assert.equal(result.snapshot.title, "修改前")
+    assert.equal(result.snapshot.messages[0].parts[0].text, "修改前")
+  })
+  await t.test("并发相同命令失败可重试，最终只有一份链接及期限", async () => {
+    const command = input()
+    let first, second
+    await sql.begin(async (blocker) => {
+      await blocker`lock table thread_chat.shares in access exclusive mode`
+      first = createShare("concurrent-owner", command).then((value) => ({ value }), (error) => ({ error }))
+      await waitForBlocked('%insert into "thread_chat"."shares"%')
+      second = createShare("concurrent-owner", command).then((value) => ({ value }), (error) => ({ error }))
+      await waitForBlocked('%insert into "thread_chat"."conversation_commands"%')
+    })
+    const results = await Promise.all([first, second])
+    assert.equal(results.filter((result) => result.value).length, 1)
+    const failure = results.find((result) => result.error).error
+    assert.equal(failure.code ?? failure.cause?.code, "40001")
+    const success = results.find((result) => result.value).value
+    const replay = await createShare("concurrent-owner", command)
+    assert.equal(replay.replayed, true)
+    assert.deepEqual(replay.result, success.result)
+    const links = await listShares("concurrent-owner", "project", "concurrent-project")
+    assert.equal(links.filter((link) => link.id === success.result.id).length, 1)
+  })
+  await t.test("读取期间删除来源，不保存孤立快照或待处理回执", async () => {
+    const command = input()
+    let creation
+    await sql.begin(async (blocker) => {
+      await blocker`lock table thread_chat.threads in access exclusive mode`
+      creation = createShare("concurrent-owner", command).then(() => null, (error) => error)
+      await waitForBlocked('%from "thread_chat"."threads"%')
+      await blocker`delete from thread_chat.projects where id = 'concurrent-project'`
+    })
+    assert.ok(await creation)
+    assert.equal((await listShares("concurrent-owner", "project", "concurrent-project")).length, 0)
+    assert.equal((await db.select().from(schema.conversationCommands).where(eq(schema.conversationCommands.id, command.commandId))).length, 0)
+  })
 })
