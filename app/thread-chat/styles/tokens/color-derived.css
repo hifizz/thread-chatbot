@@ -19,20 +19,20 @@
   --tc-veil-expand: color-mix(in srgb, var(--tc-surface-plain) 96%, transparent); /* 画布外挂面板底 */
 
   /* ═══ onink 填充/描边（划选气泡、toast 墨面上的白 alpha 状态层） ═══ */
-  --tc-onink-fill-ghost: color-mix(in srgb, var(--tc-surface-plain) 5%, transparent); /* main 槽位底 */
-  --tc-onink-fill-slotmap: color-mix(in srgb, var(--tc-surface-plain) 8%, transparent); /* slotmap 容器底 */
-  --tc-onink-fill-soft: color-mix(in srgb, var(--tc-surface-plain) 10%, transparent); /* 首问输入框底 / undo 按钮底 */
-  --tc-onink-fill-ask-focus: color-mix(in srgb, var(--tc-surface-plain) 14%, transparent); /* 首问输入框聚焦底 */
-  --tc-onink-fill-cell: color-mix(in srgb, var(--tc-surface-plain) 16%, transparent); /* slotmap 单元底 */
-  --tc-onink-fill-undo-hover: color-mix(in srgb, var(--tc-surface-plain) 20%, transparent); /* undo 悬停底 */
-  --tc-onink-fill-cell-hover: color-mix(in srgb, var(--tc-surface-plain) 28%, transparent); /* 单元悬停底 */
-  --tc-onink-border-main: color-mix(in srgb, var(--tc-surface-plain) 22%, transparent); /* main 槽位描边 */
-  --tc-onink-border-ask: color-mix(in srgb, var(--tc-surface-plain) 25%, transparent); /* 首问输入框描边/聚焦环 */
-  --tc-onink-border-undo: color-mix(in srgb, var(--tc-surface-plain) 35%, transparent); /* undo 按钮描边 */
-  --tc-onink-border-cell: color-mix(in srgb, var(--tc-surface-plain) 40%, transparent);
-  --tc-onink-border-slotmap: color-mix(in srgb, var(--tc-surface-plain) 16%, transparent); /* slotmap 容器描边 */
-  --tc-onink-border-ghost: color-mix(in srgb, var(--tc-surface-plain) 55%, transparent); /* ghost 虚线描边 */
-  --tc-onink-border-src: color-mix(in srgb, var(--tc-surface-plain) 85%, transparent); /* src 高亮描边 */
+  --tc-onink-fill-ghost: color-mix(in srgb, var(--tc-content-on-floating) 5%, transparent); /* main 槽位底 */
+  --tc-onink-fill-slotmap: color-mix(in srgb, var(--tc-content-on-floating) 8%, transparent); /* slotmap 容器底 */
+  --tc-onink-fill-soft: color-mix(in srgb, var(--tc-content-on-floating) 10%, transparent); /* 首问输入框底 / undo 按钮底 */
+  --tc-onink-fill-ask-focus: color-mix(in srgb, var(--tc-content-on-floating) 14%, transparent); /* 首问输入框聚焦底 */
+  --tc-onink-fill-cell: color-mix(in srgb, var(--tc-content-on-floating) 16%, transparent); /* slotmap 单元底 */
+  --tc-onink-fill-undo-hover: color-mix(in srgb, var(--tc-content-on-floating) 20%, transparent); /* undo 悬停底 */
+  --tc-onink-fill-cell-hover: color-mix(in srgb, var(--tc-content-on-floating) 28%, transparent); /* 单元悬停底 */
+  --tc-onink-border-main: color-mix(in srgb, var(--tc-content-on-floating) 22%, transparent); /* main 槽位描边 */
+  --tc-onink-border-ask: color-mix(in srgb, var(--tc-content-on-floating) 25%, transparent); /* 首问输入框描边/聚焦环 */
+  --tc-onink-border-undo: color-mix(in srgb, var(--tc-content-on-floating) 35%, transparent); /* undo 按钮描边 */
+  --tc-onink-border-cell: color-mix(in srgb, var(--tc-content-on-floating) 40%, transparent);
+  --tc-onink-border-slotmap: color-mix(in srgb, var(--tc-content-on-floating) 16%, transparent); /* slotmap 容器描边 */
+  --tc-onink-border-ghost: color-mix(in srgb, var(--tc-content-on-floating) 55%, transparent); /* ghost 虚线描边 */
+  --tc-onink-border-src: color-mix(in srgb, var(--tc-content-on-floating) 85%, transparent); /* src 高亮描边 */
 
   /* ═══ 墨影（阴影/遮罩的颜色位，偏移量留在区块文件） ═══ */
   --tc-shadow-scrim: color-mix(in srgb, var(--tc-surface-shadow-source) 18%, transparent); /* swx-scrim 全局遮罩 */
@@ -74,12 +74,12 @@
   --tc-depth-3-diff-remove: color-mix(in srgb, var(--tc-depth-3) 12%, transparent); /* diff 删行底 */
   --tc-depth-4-highlight: color-mix(in srgb, var(--tc-depth-4) 10%, transparent); /* 代码高亮行底 */
   --tc-depth-2-fold-bg: color-mix(in srgb, var(--tc-depth-2) 48%, transparent); /* 将折叠单元底 */
-  --tc-depth-2-fold-border: color-mix(in srgb, var(--tc-depth-2) 65%, var(--tc-surface-plain)); /* 将折叠单元描边 */
-  --tc-depth-2-fold-cap: color-mix(in srgb, var(--tc-depth-2) 55%, var(--tc-surface-plain)); /* 将折叠角标文字 */
-  --tc-depth-3-replace-border: color-mix(in srgb, var(--tc-depth-3) 55%, var(--tc-surface-plain)); /* 将替换单元描边 */
+  --tc-depth-2-fold-border: color-mix(in srgb, var(--tc-depth-2) 65%, var(--tc-content-on-floating)); /* 将折叠单元描边 */
+  --tc-depth-2-fold-cap: color-mix(in srgb, var(--tc-depth-2) 55%, var(--tc-content-on-floating)); /* 将折叠角标文字 */
+  --tc-depth-3-replace-border: color-mix(in srgb, var(--tc-depth-3) 55%, var(--tc-content-on-floating)); /* 将替换单元描边 */
   --tc-depth-3-replace-stripe-a: color-mix(in srgb, var(--tc-depth-3) 72%, transparent); /* 替换斜纹 A */
   --tc-depth-3-replace-stripe-b: color-mix(in srgb, var(--tc-depth-3) 26%, transparent); /* 替换斜纹 B */
-  --tc-depth-3-replace-cap: color-mix(in srgb, var(--tc-depth-3) 45%, var(--tc-surface-plain)); /* 将替换角标文字 */
+  --tc-depth-3-replace-cap: color-mix(in srgb, var(--tc-depth-3) 45%, var(--tc-content-on-floating)); /* 将替换角标文字 */
   --tc-depth-1-wash: color-mix(in srgb, var(--tc-depth-1) 9%, transparent); /* 会话列表当前行底 */
   --tc-depth-2-unsaved-border: color-mix(in srgb, var(--tc-depth-2) 45%, transparent); /* 未保存徽标描边 */
   --tc-depth-2-unsaved-bg: color-mix(in srgb, var(--tc-depth-2) 8%, transparent); /* 未保存徽标底 */
@@ -108,4 +108,9 @@
   --tc-fc-icon-bg: color-mix(in srgb, var(--fc, var(--tc-depth-neutral)) 10%, var(--tc-surface-plain));
   --tc-fc-progress-bg: color-mix(in srgb, var(--fc, var(--tc-depth-neutral)) 4%, var(--tc-surface-plain));
   --tc-fc-track-bg: color-mix(in srgb, var(--fc, var(--tc-depth-neutral)) 10%, var(--tc-surface-raised));
+}
+
+.dark .tc {
+  --tc-shadow-scrim: color-mix(in srgb, var(--tc-surface-shadow-source) 60%, transparent);
+  --tc-surface-kbd: var(--tc-surface-sunken);
 }

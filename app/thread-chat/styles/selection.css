@@ -8,7 +8,7 @@
 .tc .sel-bubble {
   position: fixed;
   z-index: var(--tc-z-selection);
-  color: var(--tc-content-on-accent);
+  color: var(--tc-content-on-floating);
 }
 /* 平滑曲线轮廓背景层：铺满面板宽度，尾巴靠 svg overflow 溢出面板上/下沿；
    阴影用 CSS drop-shadow（屏幕坐标，永远朝下，不随尾巴上下翻转而反向）。
@@ -132,7 +132,7 @@
 }
 .tc .sel-bubble .smcell:focus-visible {
   /* tc-review: 非偶数值，保留 1.5px 以维持深底焦点环层级 */
-  outline: 1.5px solid var(--tc-content-on-accent);
+  outline: 1.5px solid var(--tc-content-on-floating);
   outline-offset: 1px;
 }
 .tc .sel-bubble .smcell.main {
@@ -165,7 +165,7 @@
   background: var(--tc-depth-2-fold-bg);
 }
 .tc .sel-bubble .smcell.ov {
-  outline: 2px solid var(--tc-content-on-accent);
+  outline: 2px solid var(--tc-content-on-floating);
   outline-offset: 1px;
 }
 .tc .sel-bubble .smcell.ghost {

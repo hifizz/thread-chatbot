@@ -9,7 +9,7 @@
   /* 亮端纸面（顶栏/折叠条/分支列渐变的起点） */
   --tc-surface-bright: var(--tc-palette-paper-50);
   /* 白底控件/面板（弹层内按钮、卡片、输入框） */
-  --tc-surface-plain: var(--tc-palette-white);
+  --tc-surface-plain: var(--tc-palette-control);
   /* 墨色实底（toast、主操作按钮、划选气泡轮廓） */
   --tc-surface-ink: var(--tc-palette-ink-900);
   /* 阴影/遮罩的取色基底；alpha 由 color-derived.css 按用途派生。 */
@@ -35,4 +35,9 @@
   --tc-surface-project-failed: var(--tc-palette-project-red-100);
   --tc-surface-project-readonly: var(--tc-palette-project-gold-100);
   --tc-surface-project-status: var(--tc-palette-project-neutral-100);
+}
+
+/* 墨面保持深底，不随正文墨色一起反转。 */
+.dark .tc {
+  --tc-surface-ink: var(--tc-palette-paper-300);
 }

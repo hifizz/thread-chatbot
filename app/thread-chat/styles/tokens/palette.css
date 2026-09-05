@@ -51,6 +51,7 @@
   /* ── 白 / 黑 / 阴影基色（veil、遮罩、阴影的基色） ─────────────── */
   --tc-palette-white: #fff;
   --tc-palette-black: #000;
+  --tc-palette-control: #fff; /* 可随主题变化的控件底，与恒白色分开 */
   --tc-palette-neutral-50: #fcfcfc; /* md-code 冷白底 */
 
   /* ── project workspace 系（项目面板品牌 / 状态色） ─────────────── */
@@ -84,4 +85,61 @@
   --tc-font-stack-read: var(--tc-font-stack-ui);
   --tc-font-stack-mono:
     "SF Mono", ui-monospace, "JetBrains Mono", Menlo, Consolas, monospace;
+}
+
+/* 深色主题复用原色板名称，语义层和新加入的界面自动继承。 */
+.dark .tc {
+  --tc-palette-paper-40: #151515;
+  --tc-palette-paper-50: #151515;
+  --tc-palette-paper-100: #0b0b0b;
+  --tc-palette-paper-200: #151515;
+  --tc-palette-paper-260: #41413d;
+  --tc-palette-paper-300: #20201f;
+  --tc-palette-control: #1a1a19;
+  --tc-palette-neutral-50: #151515;
+
+  --tc-palette-ink-900: #e8e6e1;
+  --tc-palette-ink-700: #b4b1aa;
+  --tc-palette-ink-600: #b4b1aa;
+  --tc-palette-ink-400: #8e8b85;
+  --tc-palette-rule-100: #2b2b29;
+  --tc-palette-rule-200: #41413d;
+  --tc-palette-neutral-500: #8e8b85;
+
+  --tc-palette-depth-1: #79bca6;
+  --tc-palette-depth-2: #d2ac69;
+  --tc-palette-depth-3: #d58f9b;
+  --tc-palette-depth-4: #96a7da;
+  --tc-palette-depth-5: #b09bd3;
+  --tc-palette-code-900: #151515;
+  --tc-palette-code-100: #e8e6e1;
+
+  --tc-palette-red-700: #e6a19a;
+  --tc-palette-red-600: #e49a8f;
+  --tc-palette-red-500: #e49a8f;
+  --tc-palette-red-300: #875e58;
+  --tc-palette-red-200: #5d4440;
+  --tc-palette-red-100: #2a2221;
+
+  --tc-palette-project-green-800: #8dc6b3;
+  --tc-palette-project-green-700: #79bca6;
+  --tc-palette-project-green-600: #79bca6;
+  --tc-palette-project-green-500: #79bca6;
+  --tc-palette-project-green-400: #79bca6;
+  --tc-palette-project-green-300: #79bca6;
+  --tc-palette-project-green-100: #1f2624;
+  --tc-palette-project-green-80: #20201f;
+  --tc-palette-project-green-60: #20201f;
+  --tc-palette-project-red-700: #e49a8f;
+  --tc-palette-project-red-650: #e49a8f;
+  --tc-palette-project-red-600: #e49a8f;
+  --tc-palette-project-red-300: #875e58;
+  --tc-palette-project-red-200: #5d4440;
+  --tc-palette-project-red-100: #2a2221;
+  --tc-palette-project-red-80: #2a2221;
+  --tc-palette-project-gold-700: #d2ac69;
+  --tc-palette-project-gold-200: #574a32;
+  --tc-palette-project-gold-100: #28241d;
+  --tc-palette-project-neutral-100: #20201f;
+  --tc-palette-ink-shadow: #000;
 }

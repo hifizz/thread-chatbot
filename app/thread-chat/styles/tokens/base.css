@@ -31,3 +31,7 @@
   color: var(--tc-content-secondary);
   font-family: var(--tc-typography-family-code);
 }
+
+.dark .tc {
+  color-scheme: dark;
+}

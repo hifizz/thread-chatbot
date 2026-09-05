@@ -7,7 +7,7 @@
   bottom: 26px;
   transform: translateX(-50%) translateY(20px);
   background: var(--tc-surface-ink);
-  color: var(--tc-content-on-accent);
+  color: var(--tc-content-on-floating);
   padding: 10px 14px;
   border-radius: 10px;
   font-size: 13px;
@@ -33,7 +33,7 @@
   flex: none;
   border: 1px solid var(--tc-onink-border-undo);
   background: var(--tc-onink-fill-soft);
-  color: var(--tc-content-on-accent);
+  color: var(--tc-content-on-floating);
   border-radius: 7px;
   padding: 3px 10px;
   font-size: 12px;
