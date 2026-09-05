@@ -1,7 +1,10 @@
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible"
 import type { LanguageModel } from "ai"
+import { privateRelayModels } from "@/constants/models"
+import { createModels } from "@/lib/ai/llm/create-models"
 
-/** 私有模型中继可配置服务根地址或 API 根地址；统一规范为恰好一个 `/v1` 后缀。 */
+let privateRelayProvider: ReturnType<typeof createOpenAICompatible> | undefined
+
 export function normalizePrivateRelayBaseURL(
   baseURL: string | undefined = process.env.PRIVATE_RELAY_BASE_URL
 ): string {
@@ -11,24 +14,32 @@ export function normalizePrivateRelayBaseURL(
   return normalized.endsWith("/v1") ? normalized : `${normalized}/v1`
 }
 
-export function isPrivateRelayConfigured(): boolean {
-  return Boolean(
-    process.env.PRIVATE_RELAY_BASE_URL?.trim() &&
-    process.env.PRIVATE_RELAY_API_KEY?.trim()
-  )
-}
-
-/** 私有模型中继固定使用独立 OpenAI-compatible provider，不参与通用网关回退。 */
-export function privateRelayChatModel(modelId: string): LanguageModel {
+function getPrivateRelayProvider() {
+  if (privateRelayProvider) return privateRelayProvider
   const apiKey = process.env.PRIVATE_RELAY_API_KEY?.trim()
   if (!apiKey) throw new Error("私有模型中继未配置 API Key")
-
-  const privateRelay = createOpenAICompatible({
+  privateRelayProvider = createOpenAICompatible({
     name: "private-relay",
     baseURL: normalizePrivateRelayBaseURL(),
     apiKey,
     includeUsage: true,
   })
-
-  return privateRelay(modelId)
+  return privateRelayProvider
 }
+
+export function isPrivateRelayConfigured(): boolean {
+  return Boolean(
+    process.env.PRIVATE_RELAY_BASE_URL?.trim() &&
+      process.env.PRIVATE_RELAY_API_KEY?.trim()
+  )
+}
+
+export function privateRelayChatModel(modelId: string): LanguageModel {
+  return getPrivateRelayProvider()(modelId)
+}
+
+export const privateRelayModelProvider = createModels({
+  models: privateRelayModels,
+  isConfigured: isPrivateRelayConfigured,
+  createProvider: () => (model) => getPrivateRelayProvider()(model.id),
+})

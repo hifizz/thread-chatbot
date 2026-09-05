@@ -4,9 +4,9 @@
 
 ## What Changes
 
-- **BREAKING** 将客户端使用的模型目录与服务端私有路由配置分离。
-- **BREAKING** 用稳定的公开 `modelId` 作为请求、持久化和产品准入标识；客户端不再接收真实 provider、上游模型 ID、网关地址或凭据组。
-- 在 `lib/ai/llm/` 聚合聊天 LLM 的路由和 provider 创建函数，保留扁平结构：`model-routes.ts`、`openrouter.ts`、`gateway.ts`、`private-relay.ts`，以及仍需保留的专用 provider 实现。
+- **BREAKING** 将客户端安全的模型目录按 provider 拆到 `constants/models/`，并与服务端密钥、地址和 SDK 创建逻辑分离。
+- **BREAKING** 用稳定的公开 `modelId` 作为请求、持久化和产品准入标识；客户端不接收网关地址、API Key、凭据组或路由优先级。
+- 在 `lib/ai/llm/` 为每个 provider 保留服务端配置，由 `createModels.ts` 生成路由并确保 provider 实例只创建一次。
 - 用 `ModelRoute.createModel()` 和单一 `resolveChatModel(modelId)` 将公开模型解析为 AI SDK `LanguageModel`。
 - 支持 OpenRouter、Vercel AI Gateway、Cloudflare AI Gateway 和私有 Relay；每个公开模型明确绑定服务端调用渠道，不使用隐式全局回退。
 - **BREAKING** 全局移除 UMAPIS/Aiberm 的模型、代码、环境变量、默认值、CI、文档和测试引用。

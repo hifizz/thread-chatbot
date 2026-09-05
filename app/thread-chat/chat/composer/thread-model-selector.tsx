@@ -10,7 +10,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { THREAD_CHAT_MODEL_OPTIONS as PUBLIC_MODEL_OPTIONS } from "@/constants/client-model"
+import { THREAD_CHAT_MODEL_OPTIONS as PUBLIC_MODEL_OPTIONS } from "@/constants/models"
 import { Bot } from "lucide-react"
 
 /** Thread Chat 仅展示公开模型选项，不读取服务端路由表。 */

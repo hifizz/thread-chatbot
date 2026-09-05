@@ -27,21 +27,23 @@
 
 ### 1. 使用 `lib/ai/llm/` 作为聊天 LLM 聚合目录
 
-采用以下扁平结构：
+采用以下结构：
 
 ```text
+constants/models/
+  types.ts
+  <provider>.ts
+  index.ts
 lib/ai/llm/
+  create-models.ts
+  <provider>.ts
+  providers.ts
   model-routes.ts
-  openrouter.ts
-  gateway.ts
-  private-relay.ts
-  minimax.ts
-  ark.ts
 ```
 
-`model-routes.ts` 是唯一的服务端解析入口；其它文件只提供真实存在协议差异的薄创建函数。UMAPIS 文件删除，embeddings 和搜索继续留在原有领域目录。
+`constants/models/<provider>.ts` 只声明客户端可安全消费的 provider 分组、默认值和人工审核模型；`lib/ai/llm/<provider>.ts` 只保存环境变量、协议和 SDK provider 创建逻辑。`providers.ts` 汇总服务端路由，`model-routes.ts` 保留为业务兼容入口。UMAPIS 文件删除，embeddings 和搜索继续留在原有领域目录。
 
-不新增 `adapters/`、`strategies/`、`repositories/` 或 `factories/` 子目录，因为当前每个模块只需要创建一个 AI SDK provider/model，额外层级不会提供独立职责。
+不新增 `adapters/`、`strategies/` 或 `repositories/` 子目录；当前唯一共享抽象是 `createModels`，用于从 provider 模型目录生成路由并复用 provider 实例。
 
 ### 2. 将产品目录和私有路由分成两种数据
 
@@ -65,28 +67,31 @@ ModelRoute = {
 }
 ```
 
-公开模型目录与私有路由表通过同一个稳定 `id` 关联，但不导出包含私有字段的对象给客户端。真实 provider、upstream model、gateway model、Base URL、凭据组和计费来源全部留在服务端模块。
+公开模型目录与私有路由表通过同一个稳定 `id` 关联。客户端只消费目录派生的 DTO；Base URL、API Key、网关账号、协议实例和计费来源全部留在服务端模块。
 
-备选方案是继续让客户端读取完整 `ChatModel`，只把 UI 文案改成中性名称；该方案不能阻止浏览器拿到 `provider` 和 `upstreamModel`，因此不采用。
+备选方案是继续分别维护 `constants/model.ts` 与 `constants/client-model.ts`；该方案会让模型 ID、名称、分组和入口持续漂移，因此不采用。这两个文件只保留兼容导出。
 
-### 3. `modelsList` 作为人工审核 allowlist
+### 3. provider 模型文件作为人工审核 allowlist
 
-每个调用渠道可以在服务端维护一个类型化的模型列表，将公开 ID 映射到真实上游模型 ID：
+每个 provider 在 `constants/models/<provider>.ts` 声明一份共享模型目录：
 
 ```ts
-const openrouterModels = {
-  "model-primary": "<upstream-model-id>",
-  "model-fast": "<upstream-model-id>",
-} as const
+const openrouterModels = defineProviderModels({
+  id: "openrouter",
+  name: "巴厘岛",
+  defaults: { surfaces: ["thread"] },
+  models: [{ id: "openai/model-a", name: "Model A" }],
+  toPublicModelId: (id) => `openrouter-${id.slice(id.lastIndexOf("/") + 1)}`,
+})
 ```
 
-路由表由这些列表生成或显式组合。provider 级别的密钥、地址和网关账号从环境变量读取；模型列表本身不通过远程 `/models` 自动生成。
+客户端从这些目录生成展示 DTO，服务端把同一目录交给 `createModels` 生成路由。provider 级别的密钥、地址和网关账号从环境变量读取；模型列表不通过远程 `/models` 自动生成。
 
 这样新增模型需要一次代码审查，能够同步确认产品入口、价格、reasoning 传输和工具兼容性。若未来需要自动发现，只增加独立的 CI/运维差异检查，不改变线上 allowlist。
 
 ### 4. provider 作为服务端实现细节，而不是产品身份
 
-`resolveChatModel(modelId)` 只接受产品模型 ID，并从私有路由表找到 `createModel()`。创建函数直接返回 AI SDK `LanguageModel`，业务层继续调用 `streamText({ model, ... })`。
+`resolveChatModel(modelId)` 只接受产品模型 ID，并从私有路由表找到 `createModel()`。`createModels` 延迟调用一次 `createProvider()`，同一 provider 的所有模型复用该实例；每次选模只调用复用实例的模型创建函数。创建函数直接返回 AI SDK `LanguageModel`，业务层继续调用 `streamText({ model, ... })`。
 
 - OpenRouter 使用专用 SDK，并保留 usage accounting 所需设置。
 - Vercel Gateway 使用 AI SDK 的 Gateway provider。
@@ -103,7 +108,7 @@ const openrouterModels = {
 
 ### 6. 保留窄策略字段，删除未消费能力抽象
 
-保留当前已有且有真实消费者的入口、计费和 reasoning 传输策略；删除未被业务消费的死字段，并不新增由 provider metadata 推断的通用 capability 对象。模型只有在产品真正需要按能力改变工具、附件或 reasoning 行为时，才单独增加经过验证的字段和场景。
+共享目录允许声明前端确实需要的窄能力字段，例如 reasoning、附件或视觉支持；provider 默认能力由工厂合并，单个模型只写差异。没有业务消费者的能力不提前登记，也不从 provider metadata 自动推断。
 
 ### 7. 旧渠道按无兼容方式删除
 

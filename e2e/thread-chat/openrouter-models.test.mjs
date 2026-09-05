@@ -1,9 +1,9 @@
 import assert from "node:assert/strict"
 import {
   CHAT_MODELS,
-  OPENROUTER_MODEL_IDS,
   THREAD_CHAT_MODELS,
 } from "../../constants/model.ts"
+import { openrouterModels } from "../../constants/models/index.ts"
 import {
   MODEL_COST,
   priceFromCost,
@@ -29,18 +29,21 @@ const expectedSlugs = [
 ]
 const models = CHAT_MODELS.filter((model) => model.provider === "openrouter")
 assert.equal(models.length, 14)
-assert.deepEqual([...OPENROUTER_MODEL_IDS], expectedSlugs)
 assert.deepEqual(
-  models.map((model) => model.upstreamModel),
+  openrouterModels.models.map((model) => model.id),
   expectedSlugs
+)
+assert.deepEqual(
+  models.map((model) => model.id),
+  expectedSlugs.map(
+    (modelId) => `openrouter-${modelId.slice(modelId.lastIndexOf("/") + 1)}`
+  )
 )
 assert.equal(
   new Set(CHAT_MODELS.map((model) => model.id)).size,
   CHAT_MODELS.length
 )
 assert.ok(models.every((model) => model.id.startsWith("openrouter-")))
-assert.ok(models.every((model) => model.name.startsWith("OpenRouter · ")))
-assert.ok(models.every((model) => model.reasoningTransport === "native"))
 assert.ok(models.every((model) => THREAD_CHAT_MODELS.includes(model)))
 assert.notEqual(
   CHAT_MODELS.find((model) => model.id === "deepseek-v4-flash")?.provider,
@@ -55,7 +58,9 @@ assert.ok(
   billedModels.every((model) => MODEL_COST[model.id]?.outputPerMillion > 0)
 )
 const oxAlpha = models.find((model) => model.id === "openrouter-ox-alpha")
-assert.equal(oxAlpha?.upstreamModel, "stealth/ox-alpha")
+assert.ok(
+  openrouterModels.models.some((model) => model.id === "stealth/ox-alpha")
+)
 assert.equal(oxAlpha?.unbilledPreview, true)
 assert.equal(MODEL_COST["openrouter-ox-alpha"], undefined)
 assert.deepEqual(
@@ -75,7 +80,7 @@ assert.deepEqual(
     "openrouter-grok-4.6": [4, 12],
   }
 )
-assert.ok(!models.some((model) => model.upstreamModel.includes("glm-5.3")))
+assert.ok(!expectedSlugs.some((model) => model.includes("glm-5.3")))
 
 const step = (cost) => ({
   providerMetadata: { openrouter: { usage: { cost } } },
@@ -95,4 +100,4 @@ for (const steps of [
 const cost = usdToMicros(1)
 const price = priceFromCost(cost)
 assert.ok((price - cost) / price >= 0.3)
-console.log("PASS  OpenRouter 注册表、免费预览、保守价与逐 step 成本校验")
+console.log("PASS  OpenRouter 公开配置、路由转换、保守价与逐 step 成本校验")

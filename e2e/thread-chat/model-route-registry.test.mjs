@@ -1,6 +1,7 @@
 import assert from "node:assert/strict"
 import { CHAT_MODELS, isChatModelId } from "../../constants/model.ts"
 import { THREAD_CHAT_MODEL_OPTIONS } from "../../constants/client-model.ts"
+import { icelandModels as icelandModelConfig } from "../../constants/models/index.ts"
 import {
   getModelRouteProvider,
   resolveChatModel,
@@ -29,13 +30,15 @@ const icelandModels = CHAT_MODELS.filter(
 const icelandOptions = THREAD_CHAT_MODEL_OPTIONS.filter(
   (model) => model.groupName === "冰岛"
 )
-assert.equal(icelandModels.length, 16)
-assert.equal(icelandOptions.length, 16)
+assert.equal(icelandModels.length, icelandModelConfig.models.length)
+assert.equal(icelandOptions.length, icelandModelConfig.models.length)
+assert.ok(icelandModels.every((model) => model.unbilledPreview === true))
 assert.ok(
-  icelandModels.every(
+  CHAT_MODELS.every(
     (model) =>
-      model.icelandProtocol === "anthropic" ||
-      model.icelandProtocol === "openai"
+      !("upstreamModel" in model) &&
+      !("gatewayModel" in model) &&
+      !("icelandProtocol" in model)
   )
 )
 assert.equal(

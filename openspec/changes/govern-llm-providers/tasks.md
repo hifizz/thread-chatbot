@@ -1,16 +1,16 @@
 ## 1. 建立模型身份与目录契约
 
 - [x] 1.1 将产品模型目录收敛为客户端可安全消费的公开字段，并为当前入口选择稳定的公开模型 ID
-- [x] 1.2 将真实 provider、上游模型 ID、网关模型 ID、凭据组和计费策略从公开模型对象中移出
-- [x] 1.3 为每个目标 provider 建立服务端人工审核的 `modelsList`，校验公开 ID 唯一且覆盖所有允许入口
+- [x] 1.2 按 provider 拆分客户端安全的模型配置，共同分组、入口和能力由 provider 默认值统一声明
+- [x] 1.3 由共享 provider 模型配置同时派生客户端 DTO 与服务端路由，校验公开 ID 唯一且覆盖所有允许入口
 
 ## 2. 建立服务端 LLM 路由
 
-- [x] 2.1 创建 `lib/ai/llm/`，迁移仍使用的聊天 LLM 创建函数并保持扁平结构
-- [x] 2.2 实现 `ModelRoute` 与单一模型解析入口，使合法公开 ID 返回 AI SDK `LanguageModel`
+- [x] 2.1 创建 `constants/models/` 和 `lib/ai/llm/`，每个 provider 分别维护公开模型配置与服务端 SDK 配置
+- [x] 2.2 实现 `createModels`、`ModelRoute` 与单一模型解析入口，使同一 provider 的模型复用一个 SDK provider 实例
 - [x] 2.3 实现 OpenRouter 路由，保留必要的 usage accounting 与成本元数据处理
 - [x] 2.4 实现 Vercel AI Gateway 路由和 Cloudflare AI Gateway compat 路由
-- [x] 2.5 实现私有 OpenAI-compatible Relay 路由，确保地址、密钥和真实上游模型只在服务端读取
+- [x] 2.5 实现私有 OpenAI-compatible Relay 路由，确保地址、密钥和协议实例只在服务端读取
 - [x] 2.6 将缺少路由配置的错误收敛为不泄露秘密值的服务端配置错误
 
 ## 3. 迁移聊天业务调用
@@ -24,7 +24,7 @@
 
 - [x] 4.1 修改 Thread Chat 模型选择器，只消费公开模型 DTO，不导入 `lib/ai/llm/*`
 - [x] 4.2 确认客户端请求只提交公开模型 ID，服务端忽略或拒绝 provider、endpoint 和上游模型覆盖字段
-- [x] 4.3 检查模型列表、错误响应和日志回传，确认不包含真实 provider、上游模型、网关地址、凭据组或密钥
+- [x] 4.3 检查模型列表、错误响应和日志回传，确认不包含网关地址、凭据组、协议实例或密钥
 
 ## 5. 移除旧中转渠道
 
