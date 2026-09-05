@@ -30,6 +30,8 @@ import { useTheme } from "next-themes"
 
 import { ShikiCode } from "@/components/markdown/shiki-code"
 import { cn } from "@/lib/utils"
+import { safePublicHref } from "@/lib/thread-chat/sharing/content"
+import { SHARE_ATTACHMENT } from "@/constants/sharing"
 import {
   createMarkdownSettlementBatch,
   markdownSettlementRevision,
@@ -43,6 +45,8 @@ interface MarkdownSettlementContextValue {
 
 const MarkdownSettlementContext =
   createContext<MarkdownSettlementContextValue | null>(null)
+
+export const PublicMarkdownContext = createContext(false)
 
 /** 代码块：语言标签 + 复制按钮 + 高亮体（视觉参考 assistant-ui markdown-text 的代码头） */
 function CodeBlock({
@@ -161,6 +165,15 @@ const components: Components = {
 
 export type MarkdownDensity = "default" | "compact"
 
+const publicComponents: Components = {
+  ...components,
+  img: () => <span>[{SHARE_ATTACHMENT}]</span>,
+  a: ({ href, children }) => {
+    const safe = href && safePublicHref(href)
+    return safe ? <a href={safe} target="_blank" rel="noopener noreferrer nofollow">{children} ↗</a> : <span>{children}</span>
+  },
+}
+
 export const MarkdownBody = memo(function MarkdownBody({
   source,
   streaming = false,
@@ -172,6 +185,7 @@ export const MarkdownBody = memo(function MarkdownBody({
   density?: MarkdownDensity
   onContentSettled?: (revision: number) => void
 }) {
+  const publicView = useContext(PublicMarkdownContext)
   const batch = useMemo(
     () =>
       createMarkdownSettlementBatch(
@@ -210,7 +224,7 @@ export const MarkdownBody = memo(function MarkdownBody({
       data-content-settled={snapshot.settled && !streaming ? "true" : "false"}
     >
       <MarkdownSettlementContext.Provider value={contextValue}>
-        <Markdown remarkPlugins={[remarkGfm]} components={components}>
+        <Markdown remarkPlugins={[remarkGfm]} components={publicView ? publicComponents : components} skipHtml={publicView}>
           {source}
         </Markdown>
       </MarkdownSettlementContext.Provider>

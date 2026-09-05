@@ -44,8 +44,9 @@ import {
 } from "./canvas-actions"
 import { CanvasCard, type CanvasCardNode } from "./canvas-node"
 import { CANVAS_EXPAND_WIDTH } from "./canvas-dimensions"
-import { useCanvasLayout, type CanvasViewState } from "./use-canvas-layout"
+import { persistCanvasViewport, useCanvasLayout, type CanvasViewState } from "./use-canvas-layout"
 import type { MessageActionViewState } from "../../chat/actions/message-action-types"
+import { CanvasReadOnlyContext } from "./canvas-read-only"
 
 /** nodeTypes 稳定引用：模块级定义，避免 React Flow 整树重挂（skill 契约 #4） */
 const nodeTypes = { threadCard: CanvasCard }
@@ -75,7 +76,8 @@ export interface ThreadCanvasProps {
   /** 打开全局 Markdown 面板并选中对应交付物。 */
   onOpenArtifact: (artifactId: string) => void
   /** 会话动作（send/abort/retry）：壳层用 chat-controller 组装（D3，同一发送链路） */
-  chat: CanvasChatActions
+  chat?: CanvasChatActions
+  renderReadOnlyThread?: (threadId: string) => React.ReactNode
   messageActionState: MessageActionViewState
   /** 画布内 fork 的视口跟随指令：壳层每次 fork 置 {id, n}（n 递增去重），
       新节点入树后 selectNode + setCenter 平滑跟随（D4）；离开画布时壳层清空 */
@@ -91,6 +93,7 @@ function CanvasFlow({
   chat,
   messageActionState,
   focusNode,
+  renderReadOnlyThread,
 }: ThreadCanvasProps) {
   const version = useThreadStore(store)
   const { nodes, edges, onNodesChange, resetLayout, selectNode, pinCount } =
@@ -132,15 +135,15 @@ function CanvasFlow({
 
   /* 节点面板的动作面（D3）：chat 三件套直达壳层 chat-controller；
      getState 供面板渲染读树快照（锚点 title 文案等） */
-  const actions = useMemo<CanvasActions>(
-    () => ({
+  const actions = useMemo<CanvasActions | null>(
+    () => chat ? ({
       ...chat,
       focusThread,
       openArtifact: onOpenArtifact,
       getState: store.getState,
       setThreadModel: store.setThreadModel,
       messageActionState,
-    }),
+    }) : null,
     [chat, focusThread, messageActionState, onOpenArtifact, store]
   )
 
@@ -172,6 +175,7 @@ function CanvasFlow({
   return (
     /* React Flow 父容器必须有确定宽高：flex:1 + min-height:0 + width:100%（skill 契约 #3） */
     <div className="canvas-wrap">
+      <CanvasReadOnlyContext.Provider value={renderReadOnlyThread ?? null}>
       <CanvasActionsContext.Provider value={actions}>
         <ReactFlow
           nodes={nodes}
@@ -179,7 +183,9 @@ function CanvasFlow({
           nodeTypes={nodeTypes}
           onNodesChange={onNodesChange}
           onNodeDoubleClick={onNodeDoubleClick}
-          fitView
+          fitView={!viewState.viewport}
+          defaultViewport={viewState.viewport}
+          onMoveEnd={(_, viewport) => persistCanvasViewport(viewState, viewport)}
           fitViewOptions={fitViewOptions}
           minZoom={0.2}
           maxZoom={1.75}
@@ -205,11 +211,12 @@ function CanvasFlow({
               重新排列{pinCount > 0 ? ` · 已固定 ${pinCount}` : ""}
             </button>
             <span className="canvas-tip">
-              单击节点就地对话（可划选开分支）· 拖动固定位置 · 双击回列模式
+              {renderReadOnlyThread ? "单击阅读 · 拖动调整位置 · 双击回列模式" : "单击节点就地对话（可划选开分支）· 拖动固定位置 · 双击回列模式"}
             </span>
           </Panel>
         </ReactFlow>
       </CanvasActionsContext.Provider>
+      </CanvasReadOnlyContext.Provider>
     </div>
   )
 }
