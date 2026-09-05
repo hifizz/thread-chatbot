@@ -6,6 +6,8 @@
    用户消息仍是纯文本（不过 Markdown），样式见 .message.user .bubble。
    ========================================================================== */
 .tc .tc-prose {
+  min-width: 0;
+  max-width: 100%;
   font-family: var(--tc-typography-family-read);
   font-size: var(--tc-prose-size);
   line-height: var(--tc-prose-leading);
@@ -104,11 +106,18 @@
   padding: 1px 5px;
 }
 /* 表格 */
+/* 让表格的最小内容宽度留在独立滚动区内，不撑开正文和消息列表。 */
+.tc .md-table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  margin: 0 0 var(--tc-prose-table-gap);
+  scrollbar-color: var(--tc-border-scrollbar) transparent;
+}
 .tc .tc-prose table {
   border-collapse: separate;
   border-spacing: 0;
   width: 100%;
-  margin: 0 0 var(--tc-prose-table-gap);
+  margin: 0;
   font-size: var(--tc-prose-table-size);
   font-family: var(--tc-typography-family-ui);
   border: 1px solid var(--tc-border-subtle);

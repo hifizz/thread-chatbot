@@ -150,6 +150,11 @@ const components: Components = {
   // 避免出现 <pre><div class=md-code> 的多余嵌套。
   pre: ({ children }) => <>{children}</>,
   code: MarkdownCode,
+  table: ({ children }) => (
+    <div className="md-table-scroll" role="region" aria-label="表格" tabIndex={0}>
+      <table>{children}</table>
+    </div>
+  ),
 }
 
 export type MarkdownDensity = "default" | "compact"
