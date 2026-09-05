@@ -6,6 +6,7 @@ import {
 } from "../../constants/model.ts"
 import {
   icelandModels,
+  privateRelayModels,
   publicModelId,
 } from "../../constants/models/index.ts"
 import {
@@ -97,7 +98,11 @@ for (const model of icelandModels.models) {
   assert.equal(getChatModel(modelId)?.supportsImageInput, true, modelId)
 }
 assert.equal(supportsModelImageInput("openrouter-gpt-5.6-sol"), true)
-assert.equal(supportsModelImageInput("private-relay-gpt-5.6-sol"), false)
+for (const model of privateRelayModels.models) {
+  const modelId = publicModelId(privateRelayModels, model)
+  assert.equal(supportsModelImageInput(modelId), true, modelId)
+  assert.equal(getChatModel(modelId)?.capabilities.attachments, true, modelId)
+}
 assert.equal(supportsModelImageInput("deepseek-v4-flash"), false)
 assert.equal(supportsModelImageInput("deepseek-v4-pro"), false)
 assert.equal(

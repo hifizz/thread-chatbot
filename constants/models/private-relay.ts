@@ -5,6 +5,7 @@ export const privateRelayModels = defineProviderModels({
   name: "塞班岛",
   defaults: {
     surfaces: ["thread"],
+    capabilities: { attachments: true, imageInput: true },
     unbilledPreview: true,
   },
   models: [
