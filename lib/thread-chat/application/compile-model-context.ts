@@ -1,15 +1,14 @@
 import { convertToModelMessages, type ModelMessage } from "ai"
 import { db } from "@/lib/db"
-import { INHERITED_CHAR_BUDGET } from "@/constants/thread-chat"
 import {
   resolveAttachmentContext,
   type ProjectFileContextStats,
 } from "@/lib/chat/resolve-attachments"
 import type { ThreadChatUIMessage } from "@/lib/thread-chat/contracts/ui-message"
 import {
-  applyInheritedBudget,
-  omittedNoticeText,
-} from "@/lib/thread-chat/application/prompt-policy"
+  persistedThreadQuotePartSchema,
+  quoteForModel,
+} from "@/lib/thread-chat/contracts/quote"
 import { stripTransientParts } from "@/lib/thread-chat/application/command-utils"
 import { notFound, stateConflict } from "@/lib/thread-chat/application/errors"
 import {
@@ -18,18 +17,6 @@ import {
 } from "@/lib/thread-chat/persistence/message-repository"
 import { listProjectFileRows } from "@/lib/thread-chat/persistence/project-file-repository"
 import { findOwnedThread } from "@/lib/thread-chat/persistence/thread-repository"
-
-function messageText(message: ThreadChatUIMessage): string {
-  return message.parts
-    .filter(
-      (
-        part
-      ): part is Extract<(typeof message.parts)[number], { type: "text" }> =>
-        part.type === "text"
-    )
-    .map((part) => part.text)
-    .join("\n")
-}
 
 function asUiMessage(row: {
   id: string
@@ -46,6 +33,10 @@ function asUiMessage(row: {
 
 export interface CompiledModelContext {
   messages: ModelMessage[]
+  boundaries: {
+    stableInstructionsEnd: true
+    stableHistoryMessageIndex: number | null
+  }
   projectFileIds: string[]
   projectFileStats: ProjectFileContextStats
 }
@@ -73,11 +64,6 @@ export async function compileModelContextWithProject({
     stateConflict("冻结分支上下文不完整")
   }
   const inheritedMessages = inherited.map((row) => asUiMessage(row!))
-  const budgeted = applyInheritedBudget(
-    inheritedMessages,
-    messageText,
-    INHERITED_CHAR_BUDGET
-  )
   const currentRows = await listThreadMessageRows(
     db,
     thread.projectId,
@@ -91,25 +77,7 @@ export async function compileModelContextWithProject({
     )
     .map(asUiMessage)
   const uiMessages: ThreadChatUIMessage[] = [
-    ...(budgeted.omitted > 0
-      ? [
-          {
-            id: "inherited-omitted",
-            role: "user" as const,
-            parts: [
-              {
-                type: "text" as const,
-                text: omittedNoticeText(budgeted.omitted),
-              },
-            ],
-            metadata: {
-              messageId: "inherited-omitted",
-              threadId: thread.id,
-            },
-          },
-        ]
-      : []),
-    ...budgeted.kept,
+    ...inheritedMessages,
     ...currentMessages,
   ]
   const projectFiles = await listProjectFileRows(db, thread.projectId)
@@ -146,17 +114,22 @@ export async function compileModelContextWithProject({
     ignoreIncompleteToolCalls: true,
     convertDataPart: (part) => {
       if (part.type !== "data-quote") return undefined
-      const data = part.data
-      return typeof data === "object" &&
-        data !== null &&
-        "text" in data &&
-        typeof data.text === "string"
-        ? { type: "text", text: data.text }
-        : undefined
+      const parsed = persistedThreadQuotePartSchema.safeParse(part)
+      if (!parsed.success) return undefined
+      const quote = quoteForModel(parsed.data.data)
+      const text = quote.comment
+        ? `<quote>\n${quote.text}\n</quote>\n<comment>${quote.comment}</comment>`
+        : `<quote>\n${quote.text}\n</quote>`
+      return { type: "text", text }
     },
   })
   return {
     messages: modelMessages,
+    boundaries: {
+      stableInstructionsEnd: true,
+      stableHistoryMessageIndex:
+        modelMessages.length > 1 ? modelMessages.length - 2 : null,
+    },
     projectFileIds: resolved.projectFileIds,
     projectFileStats: resolved.stats,
   }

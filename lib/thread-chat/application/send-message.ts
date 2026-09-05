@@ -6,9 +6,11 @@ import {
   assertOwnedReadyAttachments,
   assertThreadReadyForTurn,
   buildUserParts,
+  commandFiles,
   touchProjectAndThread,
 } from "@/lib/thread-chat/application/command-utils"
 import { notFound, stateConflict } from "@/lib/thread-chat/application/errors"
+import { assertValidQuoteSources } from "@/lib/thread-chat/application/quote-validation"
 import { executeIdempotentCommand } from "@/lib/thread-chat/persistence/command-repository"
 import {
   toMessageDTO,
@@ -46,7 +48,13 @@ export function sendMessage(
         if (!project) notFound()
         if (project.archivedAt) stateConflict("已归档 Project 不可发送消息")
         await assertThreadReadyForTurn(tx, project.id, thread.id)
-        await assertOwnedReadyAttachments(tx, userId, command.files)
+        await assertOwnedReadyAttachments(tx, userId, commandFiles(command))
+        await assertValidQuoteSources({
+          tx,
+          projectId: project.id,
+          sourceThreadId: thread.id,
+          content: command,
+        })
         const [userSequence, assistantSequence] = await allocateThreadSequences(
           tx,
           thread.id,
@@ -62,7 +70,7 @@ export function sendMessage(
               threadId: thread.id,
               sequence: userSequence,
               role: "user",
-              parts: buildUserParts(command.text, command.files),
+              parts: buildUserParts(command),
               status: "completed",
               finishedAt: now,
             },

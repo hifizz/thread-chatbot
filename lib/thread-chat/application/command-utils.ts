@@ -3,6 +3,12 @@ import { attachments, messages, projects, threads } from "@/lib/db/schema"
 import { ATTACHMENT_URL_PREFIX } from "@/constants/attachment"
 import { isThreadChatModelId } from "@/constants/model"
 import type { ThreadChatUIMessage } from "@/lib/thread-chat/contracts/ui-message"
+import {
+  filesFromMessageContent,
+  messageContentToUiParts,
+  type FileReference,
+  type MessageContentInput,
+} from "@/lib/thread-chat/contracts/message-content"
 import type { ConversationTransaction } from "@/lib/thread-chat/persistence/transaction"
 import { persistentMessageParts } from "@/lib/thread-chat/persistence/message-parts"
 import {
@@ -10,11 +16,7 @@ import {
   stateConflict,
 } from "@/lib/thread-chat/application/errors"
 
-export interface FileReference {
-  url: string
-  mediaType: string
-  filename?: string
-}
+export type { FileReference } from "@/lib/thread-chat/contracts/message-content"
 
 export function assertAllowedModel(modelId: string): void {
   if (!isThreadChatModelId(modelId)) {
@@ -60,18 +62,13 @@ export async function assertOwnedReadyAttachments(
 }
 
 export function buildUserParts(
-  text: string,
-  files: readonly FileReference[]
+  content: MessageContentInput
 ): ThreadChatUIMessage["parts"] {
-  return [
-    { type: "text", text },
-    ...files.map((file) => ({
-      type: "file" as const,
-      url: file.url,
-      mediaType: file.mediaType,
-      ...(file.filename ? { filename: file.filename } : {}),
-    })),
-  ]
+  return messageContentToUiParts(content)
+}
+
+export function commandFiles(content: MessageContentInput): FileReference[] {
+  return filesFromMessageContent(content)
 }
 
 export function stripTransientParts(

@@ -1,20 +1,13 @@
 import { isStepCount, streamText, type ModelMessage, type ToolSet } from "ai"
-import {
-  DIRECT_FETCH_SYSTEM_PROMPT,
-  RESEARCH_MAX_STEPS,
-  RESEARCH_SYSTEM_PROMPT,
-  WEB_ACCESS_SYSTEM_PROMPT,
-} from "@/constants/research"
-import { MAX_OUTPUT_TOKENS } from "@/constants/model"
+import { THREAD_CHAT_PROMPT_SCHEMA_VERSION } from "@/constants/thread-chat-prompt"
 import { MODEL_CALL_PURPOSE } from "@/constants/model-call"
 import { getChatModel } from "@/constants/model"
 import { isSearchConfigured } from "@/lib/ai/search"
-import { resolveChatModel } from "@/lib/ai/provider"
+import { resolveChatModelWithRoute } from "@/lib/ai/provider"
 import { withModelCallLogging } from "@/lib/ai/model-call-logger"
 import { isExplicitMarkdownArtifactRequest } from "@/lib/chat/markdown-artifact"
 import {
   createResearchPlan,
-  reasoningForResearchRoute,
   researchPlanExecutionPrompt,
   resolveResearchRoute,
 } from "@/lib/chat/research-router"
@@ -22,10 +15,15 @@ import {
   buildProjectContractContext,
   type ProjectContractContextInput,
 } from "@/lib/chat/project-contract"
-import { buildThreadChatSystem } from "@/lib/chat/thread-chat-prompt"
 import type { ProjectFileContextStats } from "@/lib/chat/resolve-attachments"
 import type { ThreadChatUIMessageChunk } from "@/lib/thread-chat/contracts/ui-message"
 import { buildGenerationTools } from "@/lib/thread-chat/streaming/generation-tools"
+import { resolveGenerationMode } from "@/lib/thread-chat/streaming/generation-modes"
+import { resolvePromptCachePolicy } from "@/lib/thread-chat/streaming/prompt-cache-policy"
+import {
+  decoratePromptCache,
+  type PromptCacheBoundaries,
+} from "@/lib/thread-chat/streaming/prompt-cache-decorator"
 import { throwIfGenerationCancelled } from "@/lib/ai/generation-cancellation"
 import { buildAiTelemetryConfig } from "@/lib/observability/ai-sdk"
 import { OBSERVATION_NAMES } from "@/constants/observability"
@@ -40,17 +38,18 @@ export interface PrepareGenerationInput {
   observabilityContext: ObservabilityContext
   latestUserText: string
   recentConversation: string
-  anchorText: string | null
   projectContract: ProjectContractContextInput
   projectFileStats: ProjectFileContextStats
   modelMessages: ModelMessage[]
+  promptCacheBoundaries: PromptCacheBoundaries
   abortSignal: AbortSignal
 }
 
 export async function prepareGeneration(input: PrepareGenerationInput) {
   const registeredModel = getChatModel(input.modelId)
   if (!registeredModel) throw new Error("MODEL_NOT_ALLOWED")
-  const model = resolveChatModel(input.modelId)
+  const resolvedModel = resolveChatModelWithRoute(input.modelId)
+  const model = resolvedModel.model
   const trace = {
     requestId: crypto.randomUUID(),
     ...input.observabilityContext,
@@ -128,37 +127,48 @@ export async function prepareGeneration(input: PrepareGenerationInput) {
   const artifactRequested = isExplicitMarkdownArtifactRequest(
     input.latestUserText
   )
+  const generationMode = resolveGenerationMode({
+    researchMode: researchRoute.mode,
+    artifactRequested,
+    registeredModel,
+  })
   const tools = buildGenerationTools({
     messageId: input.messageId,
-    artifactRequested,
-    researchMode: researchRoute.mode,
+    toolNames: searchReady
+      ? generationMode.toolNames
+      : generationMode.toolNames.filter(
+          (name) => name === "createMarkdownArtifact"
+        ),
     routeReason: researchRoute.reasonCode,
-    searchReady,
   })
-  const activeTools = Object.keys(tools) as Array<keyof typeof tools>
-  const firstTool =
-    researchRoute.mode === "fetch"
-      ? "readUrl"
-      : researchRoute.mode === "search" || researchRoute.mode === "research"
-        ? "webSearch"
-        : artifactRequested
-          ? "createMarkdownArtifact"
-          : null
+  const activeTools = Object.keys(tools)
   const projectContract = buildProjectContractContext(input.projectContract)
-  const system = [
-    buildThreadChatSystem(input.anchorText, {
-      enableMarkdownArtifact: artifactRequested,
-    }),
+  const stableInstructions = [
+    ...generationMode.systemParts.slice(0, 1),
     projectContract,
-    researchRoute.mode === "fetch" ? DIRECT_FETCH_SYSTEM_PROMPT : null,
-    researchRoute.mode === "search" || researchRoute.mode === "research"
-      ? WEB_ACCESS_SYSTEM_PROMPT
-      : null,
-    researchRoute.mode === "research" ? RESEARCH_SYSTEM_PROMPT : null,
-    researchPlan ? researchPlanExecutionPrompt(researchPlan) : null,
+    ...generationMode.systemParts.slice(1),
   ]
     .filter((part): part is string => part !== null)
     .join("\n\n")
+  const instructions = [
+    { role: "system" as const, content: stableInstructions },
+    ...(researchPlan
+      ? [
+          {
+            role: "system" as const,
+            content: researchPlanExecutionPrompt(researchPlan),
+          },
+        ]
+      : []),
+  ]
+
+  const cachePolicy = resolvePromptCachePolicy(resolvedModel.route)
+  const cachedPrompt = decoratePromptCache({
+    instructions,
+    messages: input.modelMessages,
+    boundaries: input.promptCacheBoundaries,
+    policy: cachePolicy,
+  })
 
   throwIfGenerationCancelled(input.abortSignal)
   const result = streamText({
@@ -168,24 +178,27 @@ export async function prepareGeneration(input: PrepareGenerationInput) {
     }),
     model: withModelCallLogging(model, MODEL_CALL_PURPOSE.chatAnswer, trace),
     abortSignal: input.abortSignal,
-    reasoning: reasoningForResearchRoute(researchRoute.mode, registeredModel),
-    system,
-    messages: input.modelMessages,
+    reasoning: generationMode.reasoning,
+    instructions: cachedPrompt.instructions,
+    messages: cachedPrompt.messages,
     tools,
     ...(activeTools.length > 0
       ? {
           prepareStep: ({ stepNumber }: { stepNumber: number }) => ({
             activeTools,
-            ...(stepNumber === 0 && firstTool
-              ? { toolChoice: { type: "tool" as const, toolName: firstTool } }
+            ...(stepNumber === 0 && generationMode.firstTool
+              ? {
+                  toolChoice: {
+                    type: "tool" as const,
+                    toolName: generationMode.firstTool as string,
+                  },
+                }
               : {}),
           }),
         }
       : {}),
-    maxOutputTokens: MAX_OUTPUT_TOKENS,
-    stopWhen: isStepCount(
-      researchRoute.mode === "answer" ? 5 : RESEARCH_MAX_STEPS
-    ),
+    maxOutputTokens: generationMode.maxOutputTokens,
+    stopWhen: isStepCount(generationMode.maxSteps),
   })
 
   const leadingChunks: ThreadChatUIMessageChunk[] = [
@@ -211,6 +224,23 @@ export async function prepareGeneration(input: PrepareGenerationInput) {
     tools: tools as ToolSet,
     leadingChunks,
     usage: result.usage,
-    contextMetadata,
+    contextMetadata: {
+      ...contextMetadata,
+      generationMode: generationMode.id,
+      promptSchemaVersion: THREAD_CHAT_PROMPT_SCHEMA_VERSION,
+      actualProvider: resolvedModel.route.actualProvider,
+      protocol: resolvedModel.route.protocol,
+      credentialGroup: resolvedModel.route.credentialGroup,
+      upstreamModel: resolvedModel.route.upstreamModel,
+      explicitCacheEnabled: cachePolicy.explicitCacheEnabled,
+      promptCacheBreakpointCount: cachedPrompt.breakpointCount,
+    },
+    promptCacheContext: {
+      route: resolvedModel.route,
+      generationMode: generationMode.id,
+      promptSchemaVersion: THREAD_CHAT_PROMPT_SCHEMA_VERSION,
+      projectContractVersion: input.projectContract.version,
+      explicitCacheEnabled: cachePolicy.explicitCacheEnabled,
+    },
   }
 }

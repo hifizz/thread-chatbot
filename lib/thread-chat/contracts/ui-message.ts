@@ -4,10 +4,8 @@ import type {
   MarkdownArtifactProgressEvent,
 } from "@/lib/chat/markdown-artifact"
 import type { WebResearchActivity } from "@/lib/chat/web-research-activity"
-import type {
-  ResearchPlan,
-  ResearchRoute,
-} from "@/lib/chat/research-contract"
+import type { ResearchPlan, ResearchRoute } from "@/lib/chat/research-contract"
+import type { ThreadChatQuoteData } from "@/lib/thread-chat/contracts/quote"
 
 export interface ThreadChatMessageMetadata {
   messageId: string
@@ -16,7 +14,7 @@ export interface ThreadChatMessageMetadata {
 }
 
 export type ThreadChatDataParts = {
-  quote: { text: string }
+  quote: ThreadChatQuoteData
   "research-activity": WebResearchActivity
   "research-route": ResearchRoute
   "research-plan": ResearchPlan

@@ -20,23 +20,6 @@ export const THREAD_CHAT_MARKDOWN_ARTIFACT_SYSTEM =
   "用户只是要求详细回答、分析、解释、研究或总结，或者询问 Markdown 的概念、用法、语法时，不要调用工具。" +
   "When the user asks for multiple standalone Markdown/.md deliverables, call createMarkdownArtifact once for each document in the same reply. Do not call it for conceptual Markdown questions or ordinary Markdown-formatted prose."
 
-/** 分支焦点段的前半：后接被划选的锚点原文（见 lib/chat/thread-chat-prompt.ts） */
-export const THREAD_CHAT_BRANCH_PREFIX =
-  "你在一个支持分支对话的应用中：用户阅读你此前的回答时，划选了其中一段文字，开启了当前分支。" +
-  "本分支的讨论焦点是这段被划选的话："
-
-/** 分支焦点段的后半：跟在锚点原文之后 */
-export const THREAD_CHAT_BRANCH_SUFFIX =
-  "请围绕这个焦点结合上文展开，除非用户把话题引向别处。" +
-  "用户问题里的指代（如「这」「它」「这段话」）默认指向这段被划选的话，而不是上文的其他内容。"
-
-/**
- * 继承段上下文字符总预算（openspec: add-bubble-composer D8）：
- * buildRequestBody 组继承段时从最新往回累计正文字符，超预算即以完整消息为单位
- * 丢弃更旧的部分（最少保 1 条），深树请求不再上下文爆炸。当前会话消息不受此限。
- */
-export const INHERITED_CHAR_BUDGET = 6000
-
 /** ThreadTreeState JSONB 中消息 DAG 结构的当前版本。 */
 export const THREAD_TREE_SCHEMA_VERSION = 2 as const
 

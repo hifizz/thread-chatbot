@@ -22,6 +22,7 @@ import {
   isPrivateRelayConfigured,
   privateRelayChatModel,
 } from "@/lib/ai/private-relay"
+import type { PromptCacheRouteIdentity } from "@/lib/thread-chat/contracts/prompt-cache"
 
 // 统一的对话模型解析层。Ark、OpenRouter、UMAPIS 与私有模型中继固定走各自专用端点；其余非 MiniMax 模型按优先级路由：
 //   1) Vercel AI 网关（配 AI_GATEWAY_API_KEY）—— 会回传 generationId，供真实成本对账；
@@ -83,34 +84,72 @@ export function isModelConfigured(model: ChatModel): boolean {
   return Boolean(PROVIDER_ENV[model.provider].key)
 }
 
-/**
- * 把注册表模型解析为 AI SDK 的 LanguageModel。
- * 抛错场景：未知模型 id 或所选模型缺少配置——交由 chat route 转成可读提示。
- */
-export function resolveChatModel(modelId: string): LanguageModel {
+export interface ResolvedChatModel {
+  model: LanguageModel
+  route: PromptCacheRouteIdentity
+}
+
+function routeIdentity(
+  model: ChatModel,
+  actualProvider: string,
+  protocol: PromptCacheRouteIdentity["protocol"]
+): PromptCacheRouteIdentity {
+  return {
+    actualProvider,
+    protocol,
+    ...(model.umapisCredentialGroup
+      ? { credentialGroup: model.umapisCredentialGroup }
+      : {}),
+    upstreamModel: model.upstreamModel,
+  }
+}
+
+/** 返回模型及真实调用线路身份；缓存策略不得从展示名或 creator 推断。 */
+export function resolveChatModelWithRoute(modelId: string): ResolvedChatModel {
   const model = getChatModel(modelId)
   if (!model) throw new Error(`未知模型：${modelId}`)
 
   if (model.provider === "minimax") {
-    return minimaxChatModel(model.upstreamModel)
+    return {
+      model: minimaxChatModel(model.upstreamModel),
+      route: routeIdentity(model, "minimax", "openai-compatible"),
+    }
   }
   if (model.provider === "ark") {
-    return arkCodingChatModel(model.upstreamModel)
+    return {
+      model: arkCodingChatModel(model.upstreamModel),
+      route: routeIdentity(model, "ark", "openai-compatible"),
+    }
   }
   if (model.provider === "openrouter") {
-    return openRouterChatModel(model.upstreamModel as OpenRouterModelId)
+    return {
+      model: openRouterChatModel(model.upstreamModel as OpenRouterModelId),
+      route: routeIdentity(model, "openrouter", "openrouter"),
+    }
   }
   if (model.provider === "private-relay") {
-    return privateRelayChatModel(model.upstreamModel)
+    return {
+      model: privateRelayChatModel(model.upstreamModel),
+      route: routeIdentity(model, "private-relay", "openai-compatible"),
+    }
   }
   if (model.provider === "umapis") {
     if (!model.umapisCredentialGroup) {
       throw new Error(`UMAPIS 模型 ${model.name} 未声明凭据组`)
     }
-    return umapisChatModel(
-      model.upstreamModel as UMAPISModelId,
-      model.umapisCredentialGroup
-    )
+    return {
+      model: umapisChatModel(
+        model.upstreamModel as UMAPISModelId,
+        model.umapisCredentialGroup
+      ),
+      route: routeIdentity(
+        model,
+        "umapis",
+        model.umapisCredentialGroup === "claude"
+          ? "anthropic"
+          : "openai-compatible"
+      ),
+    }
   }
 
   // 优先 Vercel AI 网关：用 "creator/model" 标识（复用 gatewayModel），响应带 generationId。
@@ -119,12 +158,16 @@ export function resolveChatModel(modelId: string): LanguageModel {
     const base = gateway(
       model.gatewayModel ?? `${model.provider}/${model.upstreamModel}`
     )
-    return model.reasoningTransport === "think-tags"
-      ? wrapLanguageModel({
-          model: base,
-          middleware: extractReasoningMiddleware({ tagName: "think" }),
-        })
-      : base
+    return {
+      model:
+        model.reasoningTransport === "think-tags"
+          ? wrapLanguageModel({
+              model: base,
+              middleware: extractReasoningMiddleware({ tagName: "think" }),
+            })
+          : base,
+      route: routeIdentity(model, "vercel-ai-gateway", "openai-compatible"),
+    }
   }
 
   const env = PROVIDER_ENV[model.provider]
@@ -151,10 +194,22 @@ export function resolveChatModel(modelId: string): LanguageModel {
   const base = provider(upstreamId)
 
   // DeepSeek reasoner 等会输出 <think>，通用 chat 模型不需要抽取；此处按需包裹。
-  return model.reasoningTransport === "think-tags"
-    ? wrapLanguageModel({
-        model: base,
-        middleware: extractReasoningMiddleware({ tagName: "think" }),
-      })
-    : base
+  return {
+    model:
+      model.reasoningTransport === "think-tags"
+        ? wrapLanguageModel({
+            model: base,
+            middleware: extractReasoningMiddleware({ tagName: "think" }),
+          })
+        : base,
+    route: routeIdentity(
+      model,
+      useGateway ? "cloudflare-ai-gateway" : model.provider,
+      "openai-compatible"
+    ),
+  }
+}
+
+export function resolveChatModel(modelId: string): LanguageModel {
+  return resolveChatModelWithRoute(modelId).model
 }

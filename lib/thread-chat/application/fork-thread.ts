@@ -9,9 +9,11 @@ import {
   assertAllowedModel,
   assertOwnedReadyAttachments,
   buildUserParts,
+  commandFiles,
   touchProjectAndThread,
 } from "@/lib/thread-chat/application/command-utils"
 import { notFound, stateConflict } from "@/lib/thread-chat/application/errors"
+import { assertValidQuoteSources } from "@/lib/thread-chat/application/quote-validation"
 import { executeIdempotentCommand } from "@/lib/thread-chat/persistence/command-repository"
 import {
   toConversationMessage,
@@ -93,7 +95,17 @@ export function forkThread(
           await touchProjectAndThread(tx, project.id, child.id)
           return { thread: toThreadDTO(child), generation: null }
         }
-        await assertOwnedReadyAttachments(tx, userId, command.firstTurn.files)
+        await assertOwnedReadyAttachments(
+          tx,
+          userId,
+          commandFiles(command.firstTurn)
+        )
+        await assertValidQuoteSources({
+          tx,
+          projectId: project.id,
+          sourceThreadId: parent.id,
+          content: command.firstTurn,
+        })
         const [userSequence, assistantSequence] = await allocateThreadSequences(
           tx,
           child.id,
@@ -109,10 +121,7 @@ export function forkThread(
               threadId: child.id,
               sequence: userSequence,
               role: "user",
-              parts: buildUserParts(
-                command.firstTurn.text,
-                command.firstTurn.files
-              ),
+              parts: buildUserParts(command.firstTurn),
               status: "completed",
               finishedAt: now,
             },

@@ -153,8 +153,7 @@ const sendPayload = {
   userMessageId: ids.user,
   assistantMessageId: ids.assistantA,
   modelId: "test/model",
-  text: "hello",
-  files: [],
+  parts: [{ type: "text", text: "hello" }],
 }
 assert.equal(sendMessageCommandSchema.safeParse(sendPayload).success, true)
 assert.equal(
@@ -168,8 +167,7 @@ assert.equal(
 )
 
 const reorderedPayload = {
-  text: "hello",
-  files: [],
+  parts: [{ type: "text", text: "hello" }],
   modelId: "test/model",
   assistantMessageId: ids.assistantA,
   userMessageId: ids.user,
@@ -177,7 +175,10 @@ const reorderedPayload = {
 }
 assert.equal(hasSameCommandSemantics(sendPayload, reorderedPayload), true)
 assert.equal(
-  hasSameCommandSemantics(sendPayload, { ...reorderedPayload, text: "changed" }),
+  hasSameCommandSemantics(sendPayload, {
+    ...reorderedPayload,
+    parts: [{ type: "text", text: "changed" }],
+  }),
   false,
   "同 command ID 的异义负载必须可检测"
 )
