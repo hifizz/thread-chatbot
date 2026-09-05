@@ -25,6 +25,7 @@ import React, {
 import Markdown, { type Components, type ExtraProps } from "react-markdown"
 import remarkGfm from "remark-gfm"
 import { Check, Copy } from "lucide-react"
+import { useTheme } from "next-themes"
 
 import { ShikiCode } from "@/components/markdown/shiki-code"
 import {
@@ -51,6 +52,7 @@ function CodeBlock({
   code: string
   meta?: string
 }) {
+  const { resolvedTheme } = useTheme()
   const settlement = useContext(MarkdownSettlementContext)
   const settlementBatch = settlement?.batch
   const [copied, setCopied] = useState(false)
@@ -92,7 +94,7 @@ function CodeBlock({
   )
 
   return (
-    <div className={`md-code${lang ? "" : " no-lang"}`}>
+    <div className={`md-code${lang ? "" : "no-lang"}`}>
       {lang ? (
         <div className="md-code-head">
           <span className="lang">{lang}</span>
@@ -106,7 +108,7 @@ function CodeBlock({
         language={lang}
         meta={meta}
         streaming={settlement?.streaming ?? false}
-        themeMode="light"
+        themeMode={resolvedTheme === "dark" ? "dark" : "light"}
         onSettled={onSettled}
       />
     </div>

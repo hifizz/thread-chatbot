@@ -193,7 +193,7 @@ function CanvasFlow({
             pannable
             zoomable
             nodeClassName={minimapNodeClass}
-            maskColor="rgba(245, 242, 234, 0.75)"
+            maskColor="var(--minimap-mask)"
           />
           <Panel position="top-left" className="canvas-panel">
             <button

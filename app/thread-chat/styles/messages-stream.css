@@ -66,25 +66,25 @@
   gap: 10px;
   margin-top: 6px;
   padding: 7px 11px;
-  border: 1px solid #e3b3ac;
+  border: 1px solid var(--danger-border);
   border-radius: 8px;
-  background: #fbeae7;
-  color: #a8443a;
+  background: var(--danger-bg);
+  color: var(--danger);
   font-size: 12.5px;
   line-height: 1.5;
 }
 .tc .msg-error .retry {
   flex: none;
-  border: 1px solid #d98f85;
+  border: 1px solid var(--danger-border-strong);
   border-radius: 6px;
-  background: #fff;
-  color: #a8443a;
+  background: var(--surface);
+  color: var(--danger);
   font-size: 12px;
   padding: 3px 9px;
   cursor: pointer;
 }
 .tc .msg-error .retry:hover {
-  background: #fbeae7;
+  background: var(--danger-bg);
 }
 
 /* 主动停止：与错误条分开，用纸面灰表达用户主动结束，而不是系统异常。 */
@@ -117,11 +117,11 @@
 
 /* 停止按钮：busy 时发送键切换为「停止」（沿用 .send 基础样式，仅换配色示意可中断） */
 .tc .send.stop {
-  background: #fff;
-  color: #a8443a;
-  border: 1px solid #d98f85;
+  background: var(--surface);
+  color: var(--danger);
+  border: 1px solid var(--danger-border-strong);
   padding: 6px 12px;
 }
 .tc .send.stop:hover {
-  background: #fbeae7;
+  background: var(--danger-bg);
 }

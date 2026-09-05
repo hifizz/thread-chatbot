@@ -8,7 +8,7 @@
   gap: 10px;
   padding: 10px 16px;
   border-bottom: 1px solid var(--rule-strong);
-  background: linear-gradient(180deg, #faf8f2, var(--paper));
+  background: linear-gradient(180deg, var(--paper-header), var(--paper));
   flex-wrap: wrap;
 }
 .tc .brand {
@@ -35,11 +35,11 @@
   border: 1px solid var(--rule-strong);
   border-radius: 8px;
   overflow: hidden;
-  background: #fff;
+  background: var(--surface);
 }
 .tc .seg button {
   border: none;
-  background: #fff;
+  background: var(--surface);
   cursor: pointer;
   font-family: var(--font-mono);
   font-size: 12px;
@@ -54,7 +54,7 @@
   background: var(--paper-2);
 }
 .tc .seg button.on {
-  background: color-mix(in srgb, var(--d1) 12%, #fff);
+  background: color-mix(in srgb, var(--d1) 12%, var(--surface));
   color: var(--d1);
   font-weight: 700;
 }
@@ -72,7 +72,7 @@
   border: 1px solid var(--rule-strong);
   border-radius: 8px;
   padding: 5px 11px;
-  background: #fff;
+  background: var(--surface);
   display: inline-flex;
   align-items: center;
   gap: 7px;
@@ -97,7 +97,7 @@
 .tc .tbtn .cnt {
   font-size: 10px;
   font-weight: 700;
-  color: #fff;
+  color: var(--on-accent);
   background: var(--d2);
   border-radius: 999px;
   padding: 1px 6px;

@@ -167,7 +167,9 @@ export function ThreadSwitcherPanel({
               className={`swx-row ${index === hi ? "hi" : ""}`}
               style={
                 {
-                  "--dc": row.isMain ? "#8a8377" : dvar(row.depth),
+                  "--dc": row.isMain
+                    ? "var(--thread-neutral)"
+                    : dvar(row.depth),
                   paddingLeft: filtering ? 9 : 9 + row.relDepth * 16,
                 } as React.CSSProperties
               }

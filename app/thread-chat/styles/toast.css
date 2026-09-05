@@ -6,7 +6,7 @@
   left: 50%;
   bottom: 26px;
   transform: translateX(-50%) translateY(20px);
-  background: var(--ink);
+  background: var(--floating-bg);
   color: #fff;
   padding: 10px 14px;
   border-radius: 10px;

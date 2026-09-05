@@ -23,13 +23,13 @@
   --xy-background-pattern-color-default: var(--rule-strong);
   --xy-edge-stroke-default: var(--rule-strong);
   --xy-edge-stroke-selected-default: var(--ink-soft);
-  --xy-minimap-background-color-default: #fbf9f2;
-  --xy-minimap-node-background-color-default: #e6dfd0;
-  --xy-controls-button-background-color-default: #fff;
+  --xy-minimap-background-color-default: var(--minimap-bg);
+  --xy-minimap-node-background-color-default: var(--minimap-node);
+  --xy-controls-button-background-color-default: var(--surface);
   --xy-controls-button-background-color-hover-default: var(--paper-2);
   --xy-controls-button-border-color-default: var(--rule);
   --xy-controls-button-color-default: var(--ink-soft);
-  --xy-attribution-background-color-default: #ffffff88;
+  --xy-attribution-background-color-default: color-mix(in srgb, var(--surface) 53.333%, transparent);
 }
 .tc .canvas-wrap .react-flow__minimap {
   border: 1px solid var(--rule-strong);
@@ -38,7 +38,7 @@
 }
 /* MiniMap 节点深度色：SVG fill 属性不解析 var()，经 .fc-N（--fc）+ CSS fill 上色 */
 .tc .canvas-wrap .react-flow__minimap-node {
-  fill: var(--fc, #8a8377);
+  fill: var(--fc, var(--thread-neutral));
   stroke: none;
 }
 .tc .canvas-wrap .react-flow__controls {
@@ -57,9 +57,9 @@
 .tc .canvas-card {
   position: relative; /* 外挂面板 .canvas-expand 的定位上下文（挂卡下方） */
   width: var(--canvas-card-width);
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--rule-strong);
-  border-left: 3px solid var(--accent, #8a8377);
+  border-left: 3px solid var(--accent, var(--thread-neutral));
   border-radius: 10px;
   padding: var(--canvas-card-padding-block) var(--canvas-card-padding-inline);
   font-family: var(--font-ui);
@@ -70,9 +70,9 @@
   cursor: grabbing;
 }
 .tc .react-flow__node.selected .canvas-card {
-  border-color: var(--accent, #8a8377);
+  border-color: var(--accent, var(--thread-neutral));
   box-shadow:
-    0 0 0 2px color-mix(in srgb, var(--accent, #8a8377) 30%, transparent),
+    0 0 0 2px color-mix(in srgb, var(--accent, var(--thread-neutral)) 30%, transparent),
     0 8px 20px -10px rgba(30, 26, 20, 0.35);
 }
 /* 只读画布：handle 只作边的定位锚点——用 opacity 隐藏，display:none 会破坏边坐标 */
@@ -91,8 +91,8 @@
   font-family: var(--font-mono);
   font-size: 10px;
   font-weight: 700;
-  color: #fff;
-  background: var(--accent, #8a8377);
+  color: var(--on-accent);
+  background: var(--accent, var(--thread-neutral));
   border-radius: 4px;
   padding: 2px 5px;
   flex: none;
@@ -121,7 +121,7 @@
   font-size: var(--canvas-card-body-font-size);
   line-height: var(--canvas-card-body-line-height);
   color: var(--ink-soft);
-  background: color-mix(in srgb, var(--accent, #8a8377) 7%, transparent);
+  background: color-mix(in srgb, var(--accent, var(--thread-neutral)) 7%, transparent);
   border-radius: 5px;
   padding: var(--canvas-card-anchor-padding-block) 6px;
   margin-bottom: var(--canvas-card-anchor-margin-bottom);
@@ -181,7 +181,7 @@
   font-family: var(--font-mono);
   font-size: 11px;
   color: var(--ink-soft);
-  background: #ffffffcc;
+  background: color-mix(in srgb, var(--surface) 80%, transparent);
   border: 1px solid var(--rule);
   border-radius: 7px;
   padding: 5px 9px;
@@ -196,8 +196,8 @@
   top: calc(100% + 9px);
   left: -3px; /* 与卡的深度色左缘（3px 边框）对齐 */
   width: var(--canvas-expand-width);
-  background: rgba(255, 255, 255, 0.96);
-  border: 1px solid var(--accent, #8a8377);
+  background: color-mix(in srgb, var(--surface) 96%, transparent);
+  border: 1px solid var(--accent, var(--thread-neutral));
   border-left-width: 3px;
   border-radius: 10px;
   box-shadow: 0 16px 38px -12px rgba(30, 26, 20, 0.42);
@@ -262,7 +262,7 @@
   flex: 1;
   border: 1px solid var(--rule-strong);
   border-radius: 8px;
-  background: #fff;
+  background: var(--surface);
   color: var(--ink);
   resize: none;
   padding: 5px 8px;
@@ -287,8 +287,8 @@
   padding: 6px 11px;
   font-size: 12px;
   font-weight: 600;
-  color: #fff;
-  background: var(--accent, #3a3733);
+  color: var(--on-accent);
+  background: var(--accent, var(--ink-soft));
 }
 .tc .canvas-expand .cv-send.stop {
   background: var(--ink-soft);

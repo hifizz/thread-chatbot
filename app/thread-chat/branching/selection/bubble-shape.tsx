@@ -101,7 +101,7 @@ export function buildBubblePath({
  * 纯形状（svg 背景层）。面板宽 W、高 H，尾巴另占 ah 高。
  * dir="down"：面板在上、尾巴朝下（顶点 y=H+ah）；
  * dir="up"  ：整条 path 竖直翻转，面板落到下半、尾巴翻到上半（顶点 y=0）。
- * fill 默认 var(--ink)，与气泡深底一致；shadow 用 feDropShadow 复刻原气泡阴影。
+ * fill 默认 var(--floating-bg)，与气泡深底一致；shadow 用 feDropShadow 复刻原气泡阴影。
  */
 export function BubbleShape({
   W,
@@ -109,7 +109,7 @@ export function BubbleShape({
   cx,
   geo,
   dir,
-  fill = "var(--ink)",
+  fill = "var(--floating-bg)",
   shadow = true,
 }: {
   W: number

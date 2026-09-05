@@ -87,7 +87,7 @@
   border: none;
   cursor: pointer;
   background: var(--d1);
-  color: #fff;
+  color: var(--on-accent);
   border-radius: 8px;
   padding: 8px;
   font-size: 13px;
@@ -104,7 +104,7 @@
 }
 
 /* —— 气泡底部迷你列条（micro slot map）：主线 + 各槽位的放置预览 / override 点选 ——
-   气泡是深底（--ink），全部状态色用「深度色 × #fff」提亮保证对比度；
+   气泡是深底（--floating-bg），全部状态色用「深度色 × #fff」提亮保证对比度；
    小格下方悬挂 9px 角标（本列 / 将替换 / 将折叠），行高预留在 padding-bottom 里 */
 .tc .sel-bubble .slotmap {
   display: flex;

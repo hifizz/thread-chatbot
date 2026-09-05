@@ -63,7 +63,7 @@ export interface UsageHintProps {
 export function UsageHint({ onDismiss }: UsageHintProps) {
   return (
     <div className="hint">
-      <Highlighter size={15} color="#b07d2e" />
+      <Highlighter size={15} color="var(--d2)" />
       <UsageTips />
       <button
         type="button"

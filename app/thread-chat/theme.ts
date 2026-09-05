@@ -17,4 +17,4 @@ export const accentOf = (t: Thread) =>
 
 /** 圆点 / 徽标色：主线用中性墨色，其余按深度循环 */
 export const dotColorOf = (t: Thread) =>
-  t.depth === 0 ? "#8a8377" : dvar(t.depth)
+  t.depth === 0 ? "var(--thread-neutral)" : dvar(t.depth)

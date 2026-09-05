@@ -23,7 +23,7 @@
   position: relative;
 }
 .tc .column.branch {
-  background: linear-gradient(180deg, #faf8f2 0, var(--paper) 130px);
+  background: linear-gradient(180deg, var(--paper-header) 0, var(--paper) 130px);
 }
 .tc .column.branch::before {
   content: "";
@@ -104,7 +104,7 @@
   flex: none;
   padding: 12px 18px;
   border-bottom: 1px solid var(--rule);
-  background: #ffffff55;
+  background: color-mix(in srgb, var(--surface) 33.333%, transparent);
 }
 .tc .crumb {
   font-family: var(--font-mono);
@@ -123,7 +123,7 @@
   border: 1px solid transparent;
 }
 .tc .crumb .seg2:hover {
-  background: #fff;
+  background: var(--surface);
   border-color: var(--rule-strong);
   color: var(--ink);
 }
@@ -187,7 +187,7 @@
 .tc .cbtn {
   cursor: pointer;
   border: 1px solid var(--rule-strong);
-  background: #fff;
+  background: var(--surface);
   border-radius: 7px;
   padding: 4px 9px;
   font-size: 12px;
@@ -225,7 +225,7 @@
   font-family: var(--font-mono);
   font-size: 11px;
   font-weight: 700;
-  color: #fff;
+  color: var(--on-accent);
   background: var(--accent);
   border-radius: 5px;
   padding: 2px 6px;
@@ -254,7 +254,7 @@
   margin: 12px 0 0;
   border: 1px dashed var(--rule-strong);
   border-radius: 9px;
-  background: #fff6;
+  background: color-mix(in srgb, var(--surface) 40%, transparent);
 }
 .tc details.inherited > summary {
   cursor: pointer;

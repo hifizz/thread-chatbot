@@ -108,12 +108,12 @@
   gap: 6px;
   max-width: 84%;
   margin-top: 7px;
-  color: #a8443a;
+  color: var(--danger);
   font-size: 11.5px;
 }
 .tc .message-action-error {
   margin-top: 5px;
-  color: #a8443a;
+  color: var(--danger);
   font-size: 11.5px;
 }
 @media (hover: none), (pointer: coarse) {

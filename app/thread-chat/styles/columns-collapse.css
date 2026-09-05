@@ -7,7 +7,7 @@
   padding: 12px 0 10px;
   border: none;
   border-right: 1px solid var(--rule);
-  background: linear-gradient(180deg, #faf8f2, var(--paper));
+  background: linear-gradient(180deg, var(--paper-header), var(--paper));
   position: relative;
   cursor: pointer;
   display: flex;
@@ -32,7 +32,7 @@
   font-family: var(--font-mono);
   font-size: 10px;
   font-weight: 700;
-  color: #fff;
+  color: var(--on-accent);
   background: var(--accent);
   border-radius: 4px;
   padding: 2px 4px;

@@ -5,7 +5,7 @@
   flex: none;
   border-top: 1px solid var(--rule);
   padding: 12px 16px 14px;
-  background: #ffffff66;
+  background: color-mix(in srgb, var(--surface) 40%, transparent);
 }
 .tc .composer .box {
   display: flex;
@@ -14,7 +14,7 @@
      多行态 textarea autoGrow 后自己成为最高项，文字天然顶对齐，不受影响。 */
   align-items: center;
   gap: 8px;
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--rule-strong);
   border-radius: 12px;
   padding: 8px 8px 8px 12px;
@@ -63,7 +63,7 @@
   gap: 1px;
 }
 .tc .thread-model-selector:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--accent, #3a3733) 30%, transparent);
+  background: color-mix(in srgb, var(--accent, var(--ink-soft)) 30%, transparent);
 }
 .tc .thread-model-selector-tooltip-trigger {
   display: inline-flex;
@@ -82,10 +82,10 @@
   .thread-model-selector-tooltip-trigger:focus-visible
   .thread-model-selector.branch-locked:disabled {
   color: var(--ink);
-  background: color-mix(in srgb, var(--accent, #3a3733) 30%, transparent);
+  background: color-mix(in srgb, var(--accent, var(--ink-soft)) 30%, transparent);
 }
 .tc .thread-model-selector-tooltip-trigger:focus-visible {
-  outline: 1px solid color-mix(in srgb, var(--accent, #3a3733) 65%, transparent);
+  outline: 1px solid color-mix(in srgb, var(--accent, var(--ink-soft)) 65%, transparent);
   outline-offset: 2px;
 }
 .tc .send {
@@ -98,6 +98,6 @@
   padding: 7px 13px;
   font-size: 13px;
   font-weight: 600;
-  color: #fff;
-  background: var(--accent, #3a3733);
+  color: var(--on-accent);
+  background: var(--accent, var(--ink-soft));
 }

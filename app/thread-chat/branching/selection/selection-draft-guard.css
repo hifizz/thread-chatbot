@@ -102,7 +102,7 @@
 }
 .tc .sb-confirm-actions button.danger {
   background: var(--d3);
-  color: #fff;
+  color: var(--on-accent);
 }
 .tc .sb-confirm-actions button.danger:hover {
   filter: brightness(1.08);

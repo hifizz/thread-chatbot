@@ -215,7 +215,7 @@ function buildBaseGraph(
         label: t.footnote !== null ? String(t.footnote) : undefined,
         style: { stroke: color, strokeWidth: 1.6 },
         labelStyle: {
-          fill: "#fff",
+          fill: "var(--on-accent)",
           fontWeight: 700,
           fontSize: 10,
           fontFamily: "var(--font-mono)",
