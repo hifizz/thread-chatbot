@@ -13,6 +13,7 @@ import {
 import { loadReferenceArtifacts, resolveUserMessageParts } from "../../lib/thread-chat/application/artifact-reference-resolution.ts"
 import { ARTIFACT_REFERENCE_MAX_CHARS } from "../../constants/artifact-reference.ts"
 import { positionArtifactMenu } from "../../lib/thread-chat/artifact-menu-position.ts"
+import { inlineComposerPartsEqual } from "../../lib/thread-chat/inline-composer.ts"
 import { ArtifactReferenceNode } from "../../app/thread-chat/chat/composer/artifact-reference-node.ts"
 import { $insertArtifactReference, $readInlineDocument, $selectArtifactBoundary, $writeInlineDocument } from "../../app/thread-chat/chat/composer/inline-editor-document.ts"
 
@@ -50,6 +51,12 @@ const byId = new Map([self, sibling, deepBranch].map((a) => [a.id, a]))
 const ref = (artifact) => ({ type: "artifact-reference", artifactId: artifact.id })
 const text = (value) => ({ type: "text", text: value })
 const inline = [text("对照 "), ref(deepBranch), text(" 与 "), ref(self), text("，再检查 "), ref(deepBranch), text("。")]
+assert.equal(inlineComposerPartsEqual(inline, structuredClone(inline)), true, "未修改不能发送")
+assert.equal(inlineComposerPartsEqual([text("你好"), text(""), text("世界")], [text("你好世界")]), true, "编辑器合并文本分段不算修改")
+assert.equal(inlineComposerPartsEqual([text("问题"), ref(self)], [text("问题"), ref(sibling)]), false, "同名引用替换也算修改")
+assert.equal(inlineComposerPartsEqual([text("问题"), ref(self)], [ref(self), text("问题")]), false, "移动引用也算修改")
+assert.equal(inlineComposerPartsEqual([text("问题"), ref(self)], [text("问题")]), false, "删除引用也算修改")
+assert.equal(inlineComposerPartsEqual([text("问题")], [text("新问题")]), false, "文本修改允许提交")
 const quote = { type: "quote", quote: {
   schemaVersion: "thread-quote-v1", text: "原文", source: {
     type: "message", messageId: id(50), anchor: {

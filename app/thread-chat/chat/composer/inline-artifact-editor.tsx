@@ -10,6 +10,7 @@ import {
 } from "lexical"
 import { $getClipboardDataFromSelection, $insertDataTransferForRichText, setLexicalClipboardDataTransfer } from "@lexical/clipboard"
 import { LexicalComposer } from "@lexical/react/LexicalComposer"
+import { AutoFocusPlugin } from "@lexical/react/LexicalAutoFocusPlugin"
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext"
 import { PlainTextPlugin } from "@lexical/react/LexicalPlainTextPlugin"
 import { ContentEditable } from "@lexical/react/LexicalContentEditable"
@@ -36,6 +37,7 @@ interface EditorProps {
   onSubmit?(): void
   submitMode?: "enter" | "mod-enter"
   disabled?: boolean
+  autoFocus?: boolean
   maxHeight?: number
   label?: string
   editorRef?: Ref<InlineArtifactEditorHandle>
@@ -201,6 +203,7 @@ export function InlineArtifactEditor(props: EditorProps) {
         ErrorBoundary={LexicalErrorBoundary}
       />
       <EditorPlugins {...props} />
+      {props.autoFocus && <AutoFocusPlugin defaultSelection="rootEnd" />}
     </div>
   </LexicalComposer>
 }

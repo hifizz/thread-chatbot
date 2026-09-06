@@ -13,6 +13,7 @@ import { InlineArtifactEditor } from "../composer/inline-artifact-editor"
 import { inlineComposerText } from "../composer/inline-editor-document"
 import type { InlineComposerPart } from "@/lib/thread-chat/contracts/artifact-reference"
 import { messagePartsToContent } from "@/lib/thread-chat/contracts/message-content"
+import { inlineComposerPartsEqual } from "@/lib/thread-chat/inline-composer"
 import { UserMessageContent } from "./user-message-content"
 
 export function EditableUserMessage({
@@ -32,10 +33,18 @@ export function EditableUserMessage({
   const [retrying, setRetrying] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const { copied, copy } = useCopyMarkdown(setError)
+  const hasChanges = !inlineComposerPartsEqual(draft, initialParts)
+  const canSubmit = hasChanges && !submitting && inlineComposerText(draft).trim() !== ""
+
+  const startEditing = () => {
+    setDraft(initialParts)
+    setError(null)
+    setEditing(true)
+  }
 
   const submit = async () => {
+    if (!canSubmit) return
     const text = inlineComposerText(draft).trim()
-    if (!text || submitting) return
     setSubmitting(true)
     setError(null)
     const result = await commands.editAndRegenerate(threadId, message.id, text, [
@@ -74,10 +83,12 @@ export function EditableUserMessage({
               titles={titles}
               onSubmit={() => void submit()}
               submitMode="mod-enter"
+              autoFocus
             />
             <div className="user-edit-actions">
               <button
                 type="button"
+                className={!hasChanges ? "default-action" : undefined}
                 onClick={() => {
                   setEditing(false)
                   setDraft(initialParts)
@@ -90,9 +101,8 @@ export function EditableUserMessage({
               </button>
               <button
                 type="button"
-                className="primary"
                 onClick={() => void submit()}
-                disabled={submitting || inlineComposerText(draft).trim() === ""}
+                disabled={!canSubmit}
               >
                 {submitting ? "提交中…" : "发送"}
               </button>
@@ -120,10 +130,7 @@ export function EditableUserMessage({
               key: "edit",
               label: MESSAGE_ACTION_LABELS.edit,
               icon: Pencil,
-              onSelect: () => {
-                setDraft(initialParts)
-                setEditing(true)
-              },
+              onSelect: startEditing,
               disabled: !editable,
               disabledReason: MESSAGE_ACTION_ERRORS.latestUserOnly,
             },
@@ -141,7 +148,7 @@ export function EditableUserMessage({
             <RotateCcw size={13} />
             {retrying ? "重试中…" : "重试"}
           </button>
-          <button type="button" onClick={() => setEditing(true)}>
+          <button type="button" onClick={startEditing}>
             <Pencil size={13} />
             编辑后重试
           </button>

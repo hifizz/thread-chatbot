@@ -90,10 +90,19 @@
   font-size: 11px;
   cursor: pointer;
 }
-.tc .user-edit-actions button.primary {
-  border-color: var(--tc-surface-ink);
-  background: var(--tc-surface-ink);
-  color: var(--tc-content-on-ink);
+.tc .user-edit-actions button {
+  border-color: transparent;
+  background: transparent;
+}
+.tc .user-edit-actions button.default-action {
+  border-color: var(--tc-border-strong);
+}
+.tc .user-edit-actions button:hover:not(:disabled) {
+  background: var(--tc-ink-hover);
+}
+.tc .user-edit-actions button:focus-visible {
+  outline: 2px solid var(--tc-border-strong);
+  outline-offset: 2px;
 }
 .tc .user-edit-actions button:disabled,
 .tc .recoverable-turn button:disabled {
