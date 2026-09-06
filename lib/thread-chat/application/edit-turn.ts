@@ -1,4 +1,5 @@
 import { and, inArray, isNull } from "drizzle-orm"
+import { buildEditedUserParts } from "@/lib/thread-chat/domain/user-message-parts"
 import { messages } from "@/lib/db/schema"
 import type { EditLatestTurnCommand } from "@/lib/thread-chat/contracts/commands"
 import type { GenerationAcceptedDTO } from "@/lib/thread-chat/contracts/dto"
@@ -8,14 +9,12 @@ import {
   assertAllowedModel,
   assertOwnedReadyAttachments,
   assertModelSupportsNewAttachments,
-  buildUserParts,
   commandFiles,
   touchProjectAndThread,
 } from "@/lib/thread-chat/application/command-utils"
 import { notFound, stateConflict } from "@/lib/thread-chat/application/errors"
 import {
   assertEditQuoteSemantics,
-  assertValidQuoteSources,
 } from "@/lib/thread-chat/application/quote-validation"
 import { executeIdempotentCommand } from "@/lib/thread-chat/persistence/command-repository"
 import {
@@ -79,12 +78,8 @@ export function editLatestTurn(
         assertModelSupportsNewAttachments(command.modelId, files)
         await assertOwnedReadyAttachments(tx, userId, files)
         assertEditQuoteSemantics(source.parts, command)
-        await assertValidQuoteSources({
-          tx,
-          projectId: project.id,
-          sourceThreadId: thread.id,
-          content: command,
-        })
+        // 上面已校验仅保留旧引用快照；分叉引用来自父 Thread，不能按当前
+        // Thread 重新校验来源。新增、复制或修改来源仍由快照校验拒绝。
         const [userSequence, assistantSequence] = await allocateThreadSequences(
           tx,
           thread.id,
@@ -113,7 +108,7 @@ export function editLatestTurn(
               threadId: source.threadId,
               sequence: userSequence,
               role: "user",
-              parts: buildUserParts(command),
+              parts: buildEditedUserParts(command, source.parts),
               status: "completed",
               replacesMessageId: source.id,
               finishedAt: now,

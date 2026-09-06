@@ -1,3 +1,5 @@
+import { messageContentToUiParts } from "@/lib/thread-chat/contracts/message-content"
+import { buildForkUserParts, buildEditedUserParts } from "@/lib/thread-chat/domain/user-message-parts"
 import type {
   ArtifactDTO,
   GenerationAcceptedDTO,
@@ -346,7 +348,7 @@ export function createGate3MockRuntime(
     id: string
     threadId: string
     sequence: number
-    text: string
+    parts: MessageDTO["parts"]
   }): MessageDTO => {
     const stamp = now()
     return {
@@ -355,7 +357,7 @@ export function createGate3MockRuntime(
       threadId: input.threadId,
       sequence: input.sequence,
       role: "user",
-      parts: [{ type: "text", text: input.text }],
+      parts: input.parts,
       status: "completed",
       modelId: null,
       replacesMessageId: null,
@@ -556,10 +558,7 @@ export function createGate3MockRuntime(
         id: input.userMessageId,
         threadId: thread.id,
         sequence: nextSequence(thread.id),
-        text: input.parts
-          .filter((part) => part.type === "text")
-          .map((part) => part.text)
-          .join("\n"),
+        parts: messageContentToUiParts(input),
       })
       const assistant = makeAssistant({
         id: input.assistantMessageId,
@@ -579,10 +578,7 @@ export function createGate3MockRuntime(
         id: input.userMessageId,
         threadId,
         sequence: nextSequence(threadId),
-        text: input.parts
-          .filter((part) => part.type === "text")
-          .map((part) => part.text)
-          .join("\n"),
+        parts: buildForkUserParts(input, thread, nextSequence(threadId)),
       })
       const assistant = makeAssistant({
         id: input.assistantMessageId,
@@ -662,10 +658,7 @@ export function createGate3MockRuntime(
         id: input.firstTurn.userMessageId,
         threadId: thread.id,
         sequence: 1,
-        text: input.firstTurn.parts
-          .filter((part) => part.type === "text")
-          .map((part) => part.text)
-          .join("\n"),
+        parts: buildForkUserParts(input.firstTurn, thread, 1),
       })
       const assistant = makeAssistant({
         id: input.firstTurn.assistantMessageId,
@@ -704,10 +697,7 @@ export function createGate3MockRuntime(
         id: input.userMessageId,
         threadId: source.threadId,
         sequence: nextSequence(source.threadId),
-        text: input.parts
-          .filter((part) => part.type === "text")
-          .map((part) => part.text)
-          .join("\n"),
+        parts: buildEditedUserParts(input, source.parts),
       })
       user.replacesMessageId = source.id
       const assistant = makeAssistant({

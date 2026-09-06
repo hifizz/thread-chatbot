@@ -1,3 +1,4 @@
+import { buildForkUserParts } from "@/lib/thread-chat/domain/user-message-parts"
 import { messages } from "@/lib/db/schema"
 import type { SendMessageCommand } from "@/lib/thread-chat/contracts/commands"
 import type { GenerationAcceptedDTO } from "@/lib/thread-chat/contracts/dto"
@@ -7,7 +8,6 @@ import {
   assertOwnedReadyAttachments,
   assertModelSupportsNewAttachments,
   assertThreadReadyForTurn,
-  buildUserParts,
   commandFiles,
   touchProjectAndThread,
 } from "@/lib/thread-chat/application/command-utils"
@@ -75,7 +75,7 @@ export function sendMessage(
               threadId: thread.id,
               sequence: userSequence,
               role: "user",
-              parts: buildUserParts(command),
+              parts: buildForkUserParts(command, thread, userSequence),
               status: "completed",
               finishedAt: now,
             },
