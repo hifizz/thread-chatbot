@@ -53,7 +53,7 @@ export function ArtifactMenuSurface({ children }: { children: ReactNode }) {
     position()
     return () => win.cancelAnimationFrame(frame)
   }, [editor])
-  return <div className="tc artifact-reference-menu-root">
+  return <div className="tc tc-accent-context artifact-reference-menu-root">
     <ul ref={listRef} className="artifact-reference-menu" role="listbox" aria-label="引用项目 Artifact">
       {children}
     </ul>

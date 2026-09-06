@@ -1,6 +1,6 @@
 import {
   $createLineBreakNode, $createParagraphNode, $createTextNode, $getRoot,
-  $isElementNode, $isLineBreakNode, $isTextNode, $getSelection, $isRangeSelection, type LexicalNode,
+  $isElementNode, $isLineBreakNode, $isTextNode, $getSelection, $isRangeSelection, type LexicalNode, type TextNode,
 } from "lexical"
 import type { InlineComposerPart } from "@/lib/thread-chat/contracts/artifact-reference"
 import { ArtifactReferenceNode, $createArtifactReferenceNode } from "./artifact-reference-node"
@@ -14,6 +14,37 @@ export function $insertInlineText(text: string) {
   const current = $getSelection()
   const selection = $isRangeSelection(current) ? current : $getRoot().selectEnd()
   selection.insertText(text)
+}
+
+/** 插入后落在真实可编辑文本中；避免末尾引用只留下不可见的元素选区。 */
+export function $insertArtifactReference(artifactId: string, title: string, queryNode: TextNode | null) {
+  const node = $createArtifactReferenceNode(artifactId, title)
+  if (queryNode) queryNode.replace(node)
+  else {
+    const selection = $getSelection()
+    if (!$isRangeSelection(selection)) return
+    selection.insertNodes([node])
+  }
+  const next = node.getNextSibling()
+  if ($isTextNode(next) && next.isSimpleText() && next.getTextContent().startsWith(" ")) {
+    next.select(1, 1)
+  } else {
+    const space = $createTextNode(" ")
+    node.insertAfter(space)
+    space.selectEnd()
+  }
+}
+
+/** 点击胶囊只定位到两侧，不把选区放入冻结标题。 */
+export function $selectArtifactBoundary(node: ArtifactReferenceNode, before: boolean) {
+  const sibling = before ? node.getPreviousSibling() : node.getNextSibling()
+  if ($isTextNode(sibling)) {
+    if (before) sibling.selectEnd()
+    else sibling.selectStart()
+  } else {
+    const index = node.getIndexWithinParent() + (before ? 0 : 1)
+    node.getParentOrThrow().select(index, index)
+  }
 }
 
 export function $readInlineDocument(): InlineComposerPart[] {

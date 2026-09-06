@@ -1,5 +1,5 @@
 import assert from "node:assert/strict"
-import { createEditor, $getRoot } from "lexical"
+import { createEditor, $getRoot, $getSelection, $isRangeSelection, $isDecoratorNode } from "lexical"
 import { convertToModelMessages } from "ai"
 import { PgDialect } from "drizzle-orm/pg-core"
 import {
@@ -14,7 +14,7 @@ import { loadReferenceArtifacts, resolveUserMessageParts } from "../../lib/threa
 import { ARTIFACT_REFERENCE_MAX_CHARS } from "../../constants/artifact-reference.ts"
 import { positionArtifactMenu } from "../../lib/thread-chat/artifact-menu-position.ts"
 import { ArtifactReferenceNode } from "../../app/thread-chat/chat/composer/artifact-reference-node.ts"
-import { $readInlineDocument, $writeInlineDocument } from "../../app/thread-chat/chat/composer/inline-editor-document.ts"
+import { $insertArtifactReference, $readInlineDocument, $selectArtifactBoundary, $writeInlineDocument } from "../../app/thread-chat/chat/composer/inline-editor-document.ts"
 
 const id = (n) => `10000000-0000-4000-8000-${String(n).padStart(12, "0")}`
 // 单行底部输入框必须按视口翻转；边缘、长列表和软键盘均不得越界。
@@ -118,7 +118,16 @@ assert.equal((await loadReferenceArtifacts(executor(), project, [self.id, self.i
 const editor = createEditor({ namespace: "artifact-test", nodes: [ArtifactReferenceNode], onError(error) { throw error } })
 editor.update(() => $writeInlineDocument(inline, (key) => byId.get(key).title), { discrete: true })
 assert.deepEqual(editor.getEditorState().read($readInlineDocument), inline)
-assert.equal(editor.getEditorState().read(() => $getRoot().getAllTextNodes().filter((n) => n instanceof ArtifactReferenceNode).every((n) => n.isToken())), true)
+editor.getEditorState().read(() => {
+  const references = $getRoot().getFirstChild().getChildren().filter((n) => n instanceof ArtifactReferenceNode)
+  assert.equal(references.length, inline.filter((p) => p.type === "artifact-reference").length)
+  assert.ok(references.length > 0)
+  for (const node of references) {
+    assert.ok($isDecoratorNode(node), "引用是不可编辑的装饰节点，不是标题文本")
+    assert.equal(node.isInline(), true)
+    assert.equal(node.isKeyboardSelectable(), false, "方向键保留文本光标，不切换到节点选区")
+  }
+})
 const serialized = JSON.stringify(editor.getEditorState().toJSON())
 const restored = createEditor({ namespace: "artifact-test", nodes: [ArtifactReferenceNode], onError(error) { throw error } })
 restored.setEditorState(restored.parseEditorState(serialized))
@@ -192,3 +201,66 @@ editor.update(() => {
 }, { discrete: true })
 assert.deepEqual(editor.getEditorState().read($readInlineDocument), [text("对 @照 "), ...inline.slice(1)], "工具栏插入保留光标位置和已有引用")
 console.log("PASS inline artifact toolbar insertion with and without a selection")
+
+// 候选确认后在引用右侧保留真实文本选区，既能继续输入，也不会跳到后文末尾。
+editor.update(() => {
+  $writeInlineDocument([text("@"), ref(self), text("后文")], (key) => byId.get(key).title)
+  const query = $getRoot().getFirstChild().getFirstChild()
+  query.selectEnd()
+  $insertArtifactReference(sibling.id, sibling.title, query)
+  const selection = $getSelection()
+  assert.ok($isRangeSelection(selection) && selection.isCollapsed())
+  assert.equal(selection.anchor.type, "text")
+  selection.insertText("继续")
+}, { discrete: true })
+assert.deepEqual(editor.getEditorState().read($readInlineDocument), [ref(sibling), text(" 继续"), ref(self), text("后文")])
+
+editor.update(() => {
+  $writeInlineDocument([text("@")], () => "")
+  const query = $getRoot().getFirstChild().getFirstChild()
+  query.selectEnd()
+  $insertArtifactReference(self.id, self.title, query)
+}, { discrete: true })
+editor.getEditorState().read(() => {
+  const selection = $getSelection()
+  assert.ok($isRangeSelection(selection) && selection.isCollapsed())
+  assert.equal(selection.anchor.getNode().getTextContent(), " ")
+  assert.equal(selection.anchor.offset, 1)
+})
+editor.update(() => {
+  const node = $getRoot().getFirstChild().getFirstChild()
+  $selectArtifactBoundary(node, false)
+  $getSelection().insertLineBreak()
+}, { discrete: true })
+assert.deepEqual(editor.getEditorState().read($readInlineDocument), [ref(self), text("\n ")], "胶囊右侧回车换行不移除引用")
+
+// 方向键在两侧跨越整体；相邻 Backspace/Delete 仅删除整颗引用。
+editor.update(() => {
+  $writeInlineDocument([text("左"), ref(self), text("右")], (key) => byId.get(key).title)
+  const node = $getRoot().getFirstChild().getChildAtIndex(1)
+  $selectArtifactBoundary(node, false)
+  $getSelection().modify("move", true, "character")
+  assert.equal($getSelection().anchor.getNode().getTextContent(), "左")
+  assert.equal($getSelection().anchor.offset, 1)
+  $getSelection().modify("move", false, "character")
+  assert.equal($getSelection().anchor.getNode().getTextContent(), "右")
+  assert.equal($getSelection().anchor.offset, 0)
+  $getSelection().deleteCharacter(true)
+}, { discrete: true })
+assert.deepEqual(editor.getEditorState().read($readInlineDocument), [text("左右")])
+editor.update(() => {
+  $writeInlineDocument([ref(self), text("右")], (key) => byId.get(key).title)
+  $selectArtifactBoundary($getRoot().getFirstChild().getFirstChild(), true)
+  $getSelection().deleteCharacter(false)
+}, { discrete: true })
+assert.deepEqual(editor.getEditorState().read($readInlineDocument), [text("右")])
+
+// 历史内部剪贴板仍可导入旧 TextNode token 格式，标题身份保持不变。
+editor.update(() => {
+  const legacy = { type: "artifact-reference", version: 1, artifactId: self.id, title: self.title,
+    text: `@${self.title}`, mode: "token", format: 0, detail: 0, style: "" }
+  const selection = $getRoot().clear().selectEnd()
+  selection.insertNodes($generateNodesFromSerializedNodes([legacy]))
+}, { discrete: true })
+assert.deepEqual(editor.getEditorState().read($readInlineDocument), [ref(self)])
+console.log("PASS inline artifact insertion caret, atomic arrows/deletion, line break and legacy clipboard")

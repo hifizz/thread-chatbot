@@ -5,6 +5,7 @@ import { createPortal } from "react-dom"
 import {
   $getSelection, $isRangeSelection, COMMAND_PRIORITY_CRITICAL, COMMAND_PRIORITY_HIGH,
   COMMAND_PRIORITY_LOW, KEY_ENTER_COMMAND, KEY_DOWN_COMMAND, COPY_COMMAND, CUT_COMMAND, PASTE_COMMAND,
+  $onUpdate, $addUpdateTag, HISTORY_PUSH_TAG, $getNearestNodeFromDOMNode,
   type LexicalEditor,
 } from "lexical"
 import { $getClipboardDataFromSelection, $insertDataTransferForRichText, setLexicalClipboardDataTransfer } from "@lexical/clipboard"
@@ -19,8 +20,8 @@ import { LexicalTypeaheadMenuPlugin, MenuOption } from "@lexical/react/LexicalTy
 import { ARTIFACT_REFERENCE_COPY } from "@/constants/artifact-reference"
 import type { InlineComposerPart } from "@/lib/thread-chat/contracts/artifact-reference"
 import type { ArtifactDTO } from "@/lib/thread-chat/contracts/dto"
-import { ArtifactReferenceNode, $createArtifactReferenceNode } from "./artifact-reference-node"
-import { $insertInlineText, $readInlineDocument, $writeInlineDocument } from "./inline-editor-document"
+import { ArtifactReferenceNode } from "./artifact-reference-node"
+import { $insertArtifactReference, $insertInlineText, $readInlineDocument, $selectArtifactBoundary, $writeInlineDocument } from "./inline-editor-document"
 import { useArtifactResources } from "./artifact-composer-context"
 import { artifactReferenceCandidates, matchArtifactTrigger } from "./artifact-typeahead"
 import { ArtifactMenuSurface } from "./artifact-menu-surface"
@@ -64,6 +65,25 @@ function EditorPlugins({ value, onChange, onSubmit, submitMode, disabled, editor
     insertText: (text) => editor.focus(() => editor.update(() => $insertInlineText(text))),
   }), [editor])
   useEffect(() => { editor.setEditable(!disabled) }, [editor, disabled])
+  useEffect(() => {
+    const onPointerDown = (event: PointerEvent) => {
+      const token = event.target instanceof Element ? event.target.closest<HTMLElement>("[data-artifact-id]") : null
+      if (!token || !editor.isEditable()) return
+      event.preventDefault()
+      const rect = token.getBoundingClientRect()
+      editor.update(() => {
+        const node = $getNearestNodeFromDOMNode(token)
+        if (node instanceof ArtifactReferenceNode) {
+          $selectArtifactBoundary(node, event.clientX < rect.left + rect.width / 2)
+          $onUpdate(() => editor.focus())
+        }
+      })
+    }
+    return editor.registerRootListener((root, previous) => {
+      previous?.removeEventListener("pointerdown", onPointerDown)
+      root?.addEventListener("pointerdown", onPointerDown)
+    })
+  }, [editor])
   useEffect(() => {
     const current = editor.getEditorState().read($readInlineDocument)
     if (JSON.stringify(current) === JSON.stringify(value)) return
@@ -118,22 +138,18 @@ function EditorPlugins({ value, onChange, onSubmit, submitMode, disabled, editor
     <LexicalTypeaheadMenuPlugin<ArtifactOption>
       anchorClassName="tc artifact-reference-menu-anchor"
       options={options}
+      preselectFirstItem
       triggerFn={matchArtifactTrigger}
       onQueryChange={setQuery}
       onOpen={() => { menuOpen.current = true }}
       onClose={() => { menuOpen.current = false }}
       commandPriority={COMMAND_PRIORITY_HIGH}
       onSelectOption={(option, queryNode, close) => {
-        editor.update(() => {
-          const node = $createArtifactReferenceNode(option.artifact.id, option.artifact.title)
-          if (queryNode) queryNode.replace(node)
-          else {
-            const selection = $getSelection()
-            if ($isRangeSelection(selection)) selection.insertNodes([node])
-          }
-          node.selectNext()
-          close()
-        })
+        // Lexical 已在更新事务内调用此回调；插入和选区只提交一次。
+        $addUpdateTag(HISTORY_PUSH_TAG)
+        $insertArtifactReference(option.artifact.id, option.artifact.title, queryNode)
+        close()
+        $onUpdate(() => editor.focus())
       }}
       menuRenderFn={(anchor, { selectedIndex, selectOptionAndCleanUp, setHighlightedIndex }) => anchor.current
         ? createPortal(<ArtifactMenuSurface>

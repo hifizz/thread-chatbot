@@ -89,6 +89,11 @@
   outline: 2px solid var(--tc-accent-focus-ring);
   outline-offset: 2px;
 }
+.tc .inline-artifact-input .artifact-reference-token {
+  user-select: none;
+  -webkit-user-select: none;
+  caret-color: transparent;
+}
 .tc.artifact-reference-menu-anchor {
   /* Lexical 写入内联绝对定位；此容器只承载 portal，不参与页面尺寸计算。 */
   position: fixed !important;
@@ -139,7 +144,11 @@
   border-radius: 4px;
   cursor: pointer;
 }
-.tc .artifact-reference-menu li[aria-selected="true"] { background: var(--tc-accent-glow); }
+.tc .artifact-reference-menu li[aria-selected="true"] {
+  background: var(--tc-ink-hover);
+  outline: 2px solid var(--tc-border-strong);
+  outline-offset: -2px;
+}
 .tc .artifact-reference-menu li span,
 .tc .artifact-reference-menu li small {
   overflow: hidden;
