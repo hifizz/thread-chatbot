@@ -1,12 +1,19 @@
 import {
   $createLineBreakNode, $createParagraphNode, $createTextNode, $getRoot,
-  $isElementNode, $isLineBreakNode, $isTextNode, type LexicalNode,
+  $isElementNode, $isLineBreakNode, $isTextNode, $getSelection, $isRangeSelection, type LexicalNode,
 } from "lexical"
 import type { InlineComposerPart } from "@/lib/thread-chat/contracts/artifact-reference"
 import { ArtifactReferenceNode, $createArtifactReferenceNode } from "./artifact-reference-node"
 
 export function inlineComposerText(parts: InlineComposerPart[]) {
   return parts.flatMap((part) => part.type === "text" ? [part.text] : []).join("")
+}
+
+/** 工具栏插入复用原光标；尚未进入编辑器时落到文档末尾。 */
+export function $insertInlineText(text: string) {
+  const current = $getSelection()
+  const selection = $isRangeSelection(current) ? current : $getRoot().selectEnd()
+  selection.insertText(text)
 }
 
 export function $readInlineDocument(): InlineComposerPart[] {

@@ -9,4 +9,7 @@ export const ARTIFACT_REFERENCE_COPY = {
   budget: "引用内容过长，请减少引用或先生成精简版 Artifact",
   empty: "没有匹配的 Artifact",
   placeholder: "输入消息，使用 @ 引用项目中的 Artifact",
+  action: "引用",
+  actionLabel: "引用当前 Project 的 Artifact（所有 Thread，包含自己）",
+  triggerText: " @",
 } as const

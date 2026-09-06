@@ -155,3 +155,19 @@ editor.update(() => {
 }, { discrete: true })
 assert.deepEqual(editor.getEditorState().read($readInlineDocument), inline, "结构化剪贴板保留文字和多次引用的位置与 ID")
 console.log("PASS inline artifact Chinese triggers, candidate scope and structured clipboard")
+
+const { $setSelection } = await import("lexical")
+const { $insertInlineText } = await import("../../app/thread-chat/chat/composer/inline-editor-document.ts")
+editor.update(() => {
+  $writeInlineDocument([], () => "")
+  $setSelection(null)
+  $insertInlineText(" @")
+}, { discrete: true })
+assert.deepEqual(editor.getEditorState().read($readInlineDocument), [text(" @")], "未聚焦时也能从工具栏打开引用入口")
+editor.update(() => {
+  $writeInlineDocument(inline, (key) => byId.get(key).title)
+  $getRoot().getFirstChild().getFirstChild().select(1, 1)
+  $insertInlineText(" @")
+}, { discrete: true })
+assert.deepEqual(editor.getEditorState().read($readInlineDocument), [text("对 @照 "), ...inline.slice(1)], "工具栏插入保留光标位置和已有引用")
+console.log("PASS inline artifact toolbar insertion with and without a selection")

@@ -13,7 +13,8 @@ import { InlineArtifactEditor, type InlineArtifactEditorHandle } from "./inline-
 import { useArtifactComposerDraft } from "./artifact-composer-context"
 import { inlineComposerText } from "./inline-editor-document"
 import type { MessageContentPartInput } from "@/lib/thread-chat/contracts/message-content"
-import { FileIcon, PlusIcon, XIcon } from "lucide-react"
+import { AtSignIcon, FileIcon, PlusIcon, XIcon } from "lucide-react"
+import { ARTIFACT_REFERENCE_COPY } from "@/constants/artifact-reference"
 import { toast } from "sonner"
 import {
   IMAGE_ATTACHMENT_LIMITS,
@@ -101,6 +102,9 @@ export function ConversationComposer({
   const [isDragging, setIsDragging] = useState(false)
   const canvas = variant === "canvas"
   const maxHeight = composerMaxHeight(variant)
+  const referenceCount = new Set(draft.parts.flatMap((part) =>
+    part.type === "artifact-reference" ? [part.artifactId] : []
+  )).size
 
   const doSend = async () => {
     if (!onSend || submitting) return
@@ -348,12 +352,30 @@ export function ConversationComposer({
       </AttachmentGroup>
     ) : null
 
+  const referenceAction = <>
+    <button
+      type="button"
+      className="artifact-reference-action"
+      aria-label={ARTIFACT_REFERENCE_COPY.actionLabel}
+      title={ARTIFACT_REFERENCE_COPY.actionLabel}
+      onMouseDown={(event) => event.preventDefault()}
+      onClick={() => editorRef.current?.insertText(ARTIFACT_REFERENCE_COPY.triggerText)}
+    >
+      <AtSignIcon size={14} aria-hidden="true" />
+      {ARTIFACT_REFERENCE_COPY.action}
+    </button>
+    {referenceCount > 0 && <span className="artifact-reference-count" aria-live="polite">
+      {referenceCount} 份产物
+    </span>}
+  </>
+
   const promptStack = canvas ? (
     <div className="cv-prompt-stack">
       {selector}
       {generationSettingsControls}
       {attachmentTray}
       {input}
+      <div className="artifact-reference-toolbar">{referenceAction}</div>
     </div>
   ) : (
     <div className="prompt-stack">
@@ -380,6 +402,7 @@ export function ConversationComposer({
         >
           <PlusIcon size={14} aria-hidden="true" />
         </button>
+        {referenceAction}
         {selector}
         {generationSettingsControls}
       </div>

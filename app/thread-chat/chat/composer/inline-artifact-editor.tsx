@@ -20,7 +20,7 @@ import { ARTIFACT_REFERENCE_COPY } from "@/constants/artifact-reference"
 import type { InlineComposerPart } from "@/lib/thread-chat/contracts/artifact-reference"
 import type { ArtifactDTO } from "@/lib/thread-chat/contracts/dto"
 import { ArtifactReferenceNode, $createArtifactReferenceNode } from "./artifact-reference-node"
-import { $readInlineDocument, $writeInlineDocument } from "./inline-editor-document"
+import { $insertInlineText, $readInlineDocument, $writeInlineDocument } from "./inline-editor-document"
 import { useArtifactResources } from "./artifact-composer-context"
 import { artifactReferenceCandidates, matchArtifactTrigger } from "./artifact-typeahead"
 
@@ -60,10 +60,7 @@ function EditorPlugins({ value, onChange, onSubmit, submitMode, disabled, editor
 
   useImperativeHandle(editorRef, () => ({
     focus: () => editor.focus(),
-    insertText: (text) => editor.update(() => {
-      const selection = $getSelection()
-      if ($isRangeSelection(selection)) selection.insertText(text)
-    }),
+    insertText: (text) => editor.focus(() => editor.update(() => $insertInlineText(text))),
   }), [editor])
   useEffect(() => { editor.setEditable(!disabled) }, [editor, disabled])
   useEffect(() => {
