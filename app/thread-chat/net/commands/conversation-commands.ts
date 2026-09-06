@@ -16,9 +16,10 @@ import type {
 } from "@/lib/thread-chat/contracts/dto"
 import type { TextAnchor } from "@/lib/thread-chat/domain/text-anchor"
 import type {
-  MessageContentInput,
   MessageContentPartInput,
 } from "@/lib/thread-chat/contracts/message-content"
+import { buildForkUserParts, buildEditedUserParts, editUserMessageContent } from "@/lib/thread-chat/domain/user-message-parts"
+import { messageContentToUiParts } from "@/lib/thread-chat/contracts/message-content"
 import { THREAD_QUOTE_SCHEMA_VERSION } from "@/lib/thread-chat/contracts/quote"
 import type { ConversationStore } from "../../core/store"
 import type { ConversationEntitySnapshot } from "../../core/types"
@@ -69,20 +70,7 @@ function commandParts(
   ]
 }
 
-function userParts(content: MessageContentInput): MessageDTO["parts"] {
-  return content.parts.map((part) => {
-    if (part.type === "text") return { type: "text" as const, text: part.text }
-    if (part.type === "file") {
-      return {
-        type: "file" as const,
-        url: part.file.url,
-        mediaType: part.file.mediaType,
-        ...(part.file.filename ? { filename: part.file.filename } : {}),
-      }
-    }
-    return { type: "data-quote" as const, data: part.quote }
-  })
-}
+const userParts = messageContentToUiParts
 
 function temporaryMessage(input: {
   id: string
@@ -348,7 +336,7 @@ export function createConversationCommands(
           threadId: input.threadId,
           sequence,
           role: "user",
-          parts: userParts(command),
+          parts: buildForkUserParts(command, snapshot.threadsById[input.threadId], sequence),
         }),
         temporaryMessage({
           id: command.assistantMessageId,
@@ -549,7 +537,7 @@ export function createConversationCommands(
       assistantMessageId: createId(),
       modelId: input.modelId,
       ...generationSettingsField(input.generationSettings),
-      parts: commandParts(input.text, files),
+      ...editUserMessageContent(source.parts, input.text, files),
     })
     store.getState().beginOptimisticCommand(command.commandId, (snapshot) => {
       const now = new Date().toISOString()
@@ -568,7 +556,7 @@ export function createConversationCommands(
           threadId: source.threadId,
           sequence,
           role: "user",
-          parts: userParts(command),
+          parts: buildEditedUserParts(command, source.parts),
           replacesMessageId: source.id,
         }),
         temporaryMessage({

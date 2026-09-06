@@ -1,3 +1,4 @@
+import { buildForkUserParts } from "@/lib/thread-chat/domain/user-message-parts"
 import { messages, threads } from "@/lib/db/schema"
 import type { ForkThreadCommand } from "@/lib/thread-chat/contracts/commands"
 import type {
@@ -10,7 +11,6 @@ import {
   assertAllowedModel,
   assertOwnedReadyAttachments,
   assertModelSupportsNewAttachments,
-  buildUserParts,
   commandFiles,
   touchProjectAndThread,
 } from "@/lib/thread-chat/application/command-utils"
@@ -122,7 +122,7 @@ export function forkThread(
               threadId: child.id,
               sequence: userSequence,
               role: "user",
-              parts: buildUserParts(command.firstTurn),
+              parts: buildForkUserParts(command.firstTurn, child, userSequence),
               status: "completed",
               finishedAt: now,
             },
