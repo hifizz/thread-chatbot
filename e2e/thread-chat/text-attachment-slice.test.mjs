@@ -12,6 +12,7 @@ import {
 } from "../../app/thread-chat/chat/composer/thread-attachment-model.ts"
 import { startProjectCommandSchema } from "../../lib/thread-chat/contracts/commands.ts"
 import { THREAD_MESSAGE_ATTACHMENT_MIME_TYPES } from "../../lib/thread-chat/application/command-utils.ts"
+import { THREAD_ATTACHMENT_MIME_TYPES } from "../../constants/attachment.ts"
 
 const sourceText = "export function demo() {\n  return 42\n}\n"
 for (const [filename, mediaType] of [
@@ -91,12 +92,7 @@ const invalidUtf8 = await renderTextAttachment(row, 100, async () =>
 )
 assert.match(invalidUtf8.text, /文本附件解析失败：内容不是有效的 UTF-8 文本/)
 
-assert.deepEqual(THREAD_MESSAGE_ATTACHMENT_MIME_TYPES, [
-  "text/plain",
-  "image/png",
-  "image/jpeg",
-  "image/webp",
-])
+assert.deepEqual(THREAD_MESSAGE_ATTACHMENT_MIME_TYPES, THREAD_ATTACHMENT_MIME_TYPES)
 const parsed = startProjectCommandSchema.parse({
   commandId: crypto.randomUUID(),
   projectId: crypto.randomUUID(),

@@ -1,4 +1,5 @@
 "use client"
+import { UNSUPPORTED_THREAD_FILE_MESSAGE } from "@/constants/office-attachment"
 
 import React, {
   useCallback,
@@ -144,7 +145,7 @@ export function ConversationComposer({
         const file = normalizeAttachmentFile(sourceFile)
         try {
           if (!isThreadComposerFile(file)) {
-            throw new Error(`不支持的文件类型：${file.type || "未知"}`)
+            throw new Error(UNSUPPORTED_THREAD_FILE_MESSAGE)
           }
           validateAttachmentFile(file)
         } catch (error) {
@@ -347,7 +348,9 @@ export function ConversationComposer({
               </AttachmentTitle>
               <AttachmentDescription>
                 {attachment.status === "uploading"
-                  ? `上传中 ${Math.round(attachment.progress * 100)}%`
+                  ? attachment.progress >= 0.9
+                    ? "正在解析文件…"
+                    : `上传中 ${Math.round(attachment.progress * 100)}%`
                   : attachment.status === "ready"
                     ? "已就绪"
                     : attachment.error ?? "上传失败"}

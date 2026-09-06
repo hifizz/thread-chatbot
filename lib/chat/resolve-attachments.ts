@@ -8,6 +8,7 @@ import {
   projectFileManifestLine,
   renderPdfAttachment,
   renderTextAttachment,
+  renderOfficeAttachment,
   type AttachmentFilePart,
   type AttachmentRenderMode,
   type AttachmentTextPart,
@@ -17,6 +18,7 @@ import {
   planAttachmentCandidates,
 } from "@/lib/chat/attachment-context-policy"
 import type { ProjectFileRow } from "@/lib/thread-chat/persistence/mappers"
+import { isOfficeAttachmentMimeType } from "@/constants/office-attachment"
 
 export { attachmentIdFromUrl } from "@/lib/chat/attachment-content-resolver"
 
@@ -167,8 +169,10 @@ export async function resolveAttachmentContext({
     const candidate = candidates[index]
     const result =
       candidate.mimeType === "text/plain"
-        ? await renderTextAttachment(candidate, allocation)
-        : await renderPdfAttachment(candidate, allocation, query)
+        ? await renderTextAttachment(candidate, allocation, readObjectBytes)
+        : isOfficeAttachmentMimeType(candidate.mimeType)
+          ? renderOfficeAttachment(candidate, allocation)
+          : await renderPdfAttachment(candidate, allocation, query)
     rendered.set(candidates[index].id, result)
     remainingBudget = Math.max(0, remainingBudget - result.text.length)
   }

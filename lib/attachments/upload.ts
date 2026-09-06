@@ -1,5 +1,7 @@
 "use client"
 
+import { OFFICE_ATTACHMENT_MIME_BY_EXTENSION } from "@/constants/office-attachment"
+
 import {
   ATTACHMENT_POLICIES,
   ATTACHMENT_URL_PREFIX,
@@ -43,9 +45,16 @@ export function isTextAttachmentFile(
 }
 
 export function normalizeAttachmentFile(file: File): File {
-  if (!isTextAttachmentFile(file) || file.type === "text/plain") return file
+  // 浏览器对 Office/CSV 的 MIME 经常为空或误报为 application/zip、vnd.ms-excel。
+  // 这里只规范声明，服务端 ingest 仍必须验证真实文件结构。
+  const extension = file.name?.toLowerCase().match(/\.[^.]+$/)?.[0]
+  const documentMime = extension === ".pdf"
+    ? "application/pdf"
+    : OFFICE_ATTACHMENT_MIME_BY_EXTENSION[extension as keyof typeof OFFICE_ATTACHMENT_MIME_BY_EXTENSION]
+  const mime = documentMime ?? (isTextAttachmentFile(file) ? "text/plain" : file.type)
+  if (mime === file.type) return file
   return new File([file], file.name, {
-    type: "text/plain",
+    type: mime,
     lastModified: file.lastModified,
   })
 }

@@ -1,5 +1,10 @@
 // 附件模块的策略表：客户端（accept/预校验）与服务端（presign 校验、模型注入策略）共用。
 // 新增附件类型 = 在 ATTACHMENT_POLICIES 加一行，无需改动上传/存储链路。
+import {
+  OFFICE_ATTACHMENT_LIMITS,
+  OFFICE_ATTACHMENT_MIME_BY_EXTENSION,
+  OFFICE_ATTACHMENT_MIME_TYPES,
+} from "@/constants/office-attachment"
 
 /** 附件大类，决定 UI 展示形态与模型注入策略 */
 export type AttachmentKind = "document" | "image" | "archive" | "video"
@@ -26,6 +31,14 @@ export const IMAGE_ATTACHMENT_MIME_TYPES = [
 
 export type ImageAttachmentMimeType =
   (typeof IMAGE_ATTACHMENT_MIME_TYPES)[number]
+
+/** Thread 消息的客户端与服务端共用白名单。 */
+export const THREAD_ATTACHMENT_MIME_TYPES = [
+  "text/plain",
+  ...IMAGE_ATTACHMENT_MIME_TYPES,
+  "application/pdf",
+  ...OFFICE_ATTACHMENT_MIME_TYPES,
+] as const
 
 export const IMAGE_ATTACHMENT_LIMITS = {
   maxFilesPerMessage: 5,
@@ -102,6 +115,12 @@ export const TEXT_ATTACHMENT_FILE_EXTENSIONS = [
 ] as const
 
 export const ATTACHMENT_POLICIES: Record<string, AttachmentPolicy> = {
+  ...Object.fromEntries(
+    Object.entries(OFFICE_ATTACHMENT_MIME_BY_EXTENSION).map(([ext, mime]) => [
+      mime,
+      { kind: "document" as const, maxBytes: OFFICE_ATTACHMENT_LIMITS.maxBytes, ext: ext.slice(1) },
+    ])
+  ),
   "text/plain": { kind: "document", maxBytes: 20 * MB, ext: "txt" },
   "application/pdf": { kind: "document", maxBytes: 20 * MB, ext: "pdf" },
   "image/png": {
@@ -129,6 +148,8 @@ export const ATTACHMENT_POLICIES: Record<string, AttachmentPolicy> = {
 export const ATTACHMENT_ACCEPT = [
   ...Object.keys(ATTACHMENT_POLICIES),
   ...TEXT_ATTACHMENT_FILE_EXTENSIONS,
+  ...Object.keys(OFFICE_ATTACHMENT_MIME_BY_EXTENSION),
+  ".pdf",
 ].join(",")
 
 /** 附件在应用内的稳定访问路径前缀（消息 parts 里存的 URL；presigned URL 会过期，不能落库） */

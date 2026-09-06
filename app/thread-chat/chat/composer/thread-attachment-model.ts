@@ -3,21 +3,23 @@ import {
   IMAGE_ATTACHMENT_LIMITS,
   INLINE_PASTED_TEXT_CHAR_LIMIT,
   TEXT_ATTACHMENT_FILE_EXTENSIONS,
+  THREAD_ATTACHMENT_MIME_TYPES,
 } from "@/constants/attachment"
+import { OFFICE_ATTACHMENT_MIME_BY_EXTENSION } from "@/constants/office-attachment"
 import { supportsModelImageInput } from "@/constants/model"
 import {
   isTextAttachmentFile,
+  normalizeAttachmentFile,
   type UploadedAttachmentReference,
 } from "@/lib/attachments/upload"
 
-export const THREAD_COMPOSER_MIME_TYPES = [
-  "text/plain",
-  ...IMAGE_ATTACHMENT_MIME_TYPES,
-] as const
+export const THREAD_COMPOSER_MIME_TYPES = THREAD_ATTACHMENT_MIME_TYPES
 
 export const THREAD_COMPOSER_ACCEPT = [
   ...THREAD_COMPOSER_MIME_TYPES,
   ...TEXT_ATTACHMENT_FILE_EXTENSIONS,
+  ...Object.keys(OFFICE_ATTACHMENT_MIME_BY_EXTENSION),
+  ".pdf",
 ].join(",")
 
 export function isThreadComposerImageFile(
@@ -27,7 +29,8 @@ export function isThreadComposerImageFile(
 }
 
 export function isThreadComposerFile(file: File): boolean {
-  return isTextAttachmentFile(file) || isThreadComposerImageFile(file)
+  return isTextAttachmentFile(file) ||
+    (THREAD_COMPOSER_MIME_TYPES as readonly string[]).includes(normalizeAttachmentFile(file).type)
 }
 
 export type ThreadComposerAttachmentStatus = "uploading" | "ready" | "error"

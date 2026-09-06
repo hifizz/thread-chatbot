@@ -3,6 +3,7 @@ import { getCurrentUserId } from "@/lib/auth/server"
 import { db } from "@/lib/db"
 import { attachments } from "@/lib/db/schema"
 import { getObjectBytes, isR2Configured } from "@/lib/storage/r2"
+import { extractedAttachmentContent } from "@/lib/attachments/extracted-content"
 
 type RouteContext = { params: Promise<{ id: string }> }
 
@@ -32,22 +33,25 @@ export async function GET(_req: Request, { params }: RouteContext) {
       { status: row.status === "failed" ? 422 : 409 }
     )
   }
-  if (row.mimeType !== "text/plain") {
+  const extracted = extractedAttachmentContent(row)
+  if (row.mimeType !== "text/plain" && extracted === null) {
     return Response.json({ error: "暂不支持预览这个文件" }, { status: 415 })
   }
 
-  let bytes: Uint8Array
-  try {
-    bytes = await getObjectBytes(row.key)
-  } catch {
-    return Response.json({ error: "文件读取失败，请稍后重试" }, { status: 502 })
-  }
+  let content = extracted
+  if (content === null) {
+    let bytes: Uint8Array
+    try {
+      bytes = await getObjectBytes(row.key)
+    } catch {
+      return Response.json({ error: "文件读取失败，请稍后重试" }, { status: 502 })
+    }
 
-  let content: string
-  try {
-    content = new TextDecoder("utf-8", { fatal: true }).decode(bytes)
-  } catch {
-    return Response.json({ error: "这个文件暂时无法预览" }, { status: 422 })
+    try {
+      content = new TextDecoder("utf-8", { fatal: true }).decode(bytes)
+    } catch {
+      return Response.json({ error: "这个文件暂时无法预览" }, { status: 422 })
+    }
   }
 
   return new Response(content, {

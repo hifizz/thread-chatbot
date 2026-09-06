@@ -6,6 +6,8 @@ import { attachments } from "@/lib/db/schema"
 import { hasChunks, retrieveChunks } from "@/lib/chat/retrieve"
 import type { ProjectFileRow } from "@/lib/thread-chat/persistence/mappers"
 import { getObjectBytes } from "@/lib/storage/r2"
+import { isOfficeAttachmentMimeType } from "@/constants/office-attachment"
+import { extractedAttachmentContent } from "@/lib/attachments/extracted-content"
 
 export type AttachmentRow = typeof attachments.$inferSelect
 export type AttachmentRenderMode = "full" | "retrieval" | "fallback"
@@ -75,9 +77,11 @@ function renderPdfPages(row: AttachmentRow, charBudget: number): string {
   const chunks: string[] = []
   let used = 0
   let includedPages = 0
+  let clippedPage = false
   for (let index = 0; index < pages.length; index += 1) {
     const pageText = `[第 ${index + 1} 页]\n${pages[index]}`
     if (used + pageText.length > charBudget && includedPages > 0) break
+    if (used + pageText.length > charBudget) clippedPage = true
     chunks.push(
       used + pageText.length > charBudget
         ? pageText.slice(0, Math.max(0, charBudget - used))
@@ -87,10 +91,10 @@ function renderPdfPages(row: AttachmentRow, charBudget: number): string {
     includedPages += 1
     if (used >= charBudget) break
   }
-  const truncated = includedPages < pages.length
+  const truncated = clippedPage || includedPages < pages.length
   return `${chunks.join("\n\n")}${
     truncated
-      ? `\n\n[已截断：全文共 ${pages.length} 页，以上仅包含前 ${includedPages} 页内容]`
+      ? `\n\n[已截断：全文共 ${pages.length} 页，以上仅包含前 ${includedPages} 页的部分内容]`
       : ""
   }`
 }
@@ -164,19 +168,36 @@ export async function renderTextAttachment(
   }
 }
 
+export function renderOfficeAttachment(row: AttachmentRow, charBudget: number): { text: string; mode: AttachmentRenderMode } {
+  const content = extractedAttachmentContent(row) ?? "[未提取到正文]"
+  const prefix = `<attachment name="${escapeAttachmentAttribute(row.filename)}" mime="${escapeAttachmentAttribute(row.mimeType)}">\n`
+  const suffix = "\n</attachment>"
+  const note = "\n[已截断：这里只提供文件的部分内容，不能据此计算全表总量或声称已读取全文]"
+  const available = Math.max(0, charBudget - prefix.length - suffix.length)
+  const truncated = content.length > available
+  // 封装和截断说明也计入预算，防止多文件累计超额。
+  if (prefix.length + suffix.length + note.length >= charBudget) {
+    return { mode: "fallback", text: "[附件正文未提供：本轮上下文预算不足]".slice(0, charBudget) }
+  }
+  return {
+    mode: truncated ? "fallback" : "full",
+    text: prefix + content.slice(0, truncated ? available - note.length : available) + (truncated ? note : "") + suffix,
+  }
+}
+
 export function attachmentPlaceholder(
   part: AttachmentFilePart,
   row?: AttachmentRow
 ): AttachmentTextPart {
   const name = part.filename ?? "未命名文件"
   let note: string
-  if (part.mediaType === "application/pdf") {
+  if (part.mediaType === "application/pdf" || isOfficeAttachmentMimeType(part.mediaType)) {
     note =
       row?.status === "failed"
         ? `解析失败：${row.error ?? "未知原因"}`
         : row?.status === "uploading"
           ? "仍在上传或解析，正文尚不可用"
-          : "内容不可读取"
+          : "本轮没有提供正文（可能超出上下文预算），请勿推测文件内容"
   } else if (part.mediaType.startsWith("image/")) {
     note = "当前模型不支持查看图片，仅知晓其存在"
   } else {
@@ -198,7 +219,9 @@ export function projectFileManifestLine(
       ? attachment.status
       : attachment.mimeType === "application/pdf" && attachment.pages?.length
         ? "可读取 PDF"
-        : "仅元信息可用"
+        : isOfficeAttachmentMimeType(attachment.mimeType) && attachment.pages?.length
+          ? "可读取办公文档文本/表格"
+          : "仅元信息可用"
   return (
     `  <file id="${attachment.id}" name="${escapeAttachmentAttribute(attachment.filename)}" ` +
     `mime="${escapeAttachmentAttribute(attachment.mimeType)}" size="${attachment.size}" ` +
