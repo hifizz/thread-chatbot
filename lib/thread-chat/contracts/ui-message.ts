@@ -6,6 +6,7 @@ import type {
 import type { WebResearchActivity } from "@/lib/chat/web-research-activity"
 import type { ResearchPlan, ResearchRoute } from "@/lib/chat/research-contract"
 import type { ThreadChatQuoteData } from "@/lib/thread-chat/contracts/quote"
+import type { CloudToolOutput } from "@/lib/cloud-research/generation"
 
 export interface ThreadChatMessageMetadata {
   messageId: string
@@ -32,6 +33,12 @@ export type WebSearchOutput = {
 }
 
 export type ThreadChatTools = {
+  prepareRepository: { input: Record<string, never>; output: CloudToolOutput }
+  inspectRepository: {
+    input: { mode: "list" | "read" | "search"; path: string; query?: string; start: number }
+    output: CloudToolOutput
+  }
+  publishResearchReport: { input: Record<string, never>; output: CloudToolOutput }
   createMarkdownArtifact: {
     input: MarkdownArtifactInput
     output: MarkdownArtifactOutput

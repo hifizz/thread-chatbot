@@ -75,6 +75,7 @@
     "@aws-sdk/client-s3": "^3.1079.0",
     "@aws-sdk/s3-request-presigner": "^3.1079.0",
     "@base-ui/react": "^1.6.0",
+    "@computesdk/e2b": "1.7.53",
     "@dagrejs/dagre": "^3.0.0",
     "@langfuse/client": "^5.11.0",
     "@langfuse/otel": "^5.11.0",

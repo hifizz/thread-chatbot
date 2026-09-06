@@ -5,6 +5,8 @@ import type { ConversationViewMessage, ThreadTreeState } from "../../core/types"
 import { WebResearchPanel } from "../../orchestration/overlays/web-research-panel"
 import { AnchoredMarkdown } from "./anchored-markdown"
 import { assistantPartRenderPlan } from "./assistant-part-render-plan"
+import { CLOUD_RESEARCH_TOOL_LABELS } from "@/constants/cloud-research"
+import { CloudResearchTool } from "./cloud-research-tool"
 
 export function AnchoredAssistantBody({
   state,
@@ -91,6 +93,9 @@ export function AnchoredAssistantBody({
         }
 
         if (kind === "tool") {
+          if (Object.hasOwn(CLOUD_RESEARCH_TOOL_LABELS, part.type.slice(5))) {
+            return <CloudResearchTool key={`${part.type}-${index}`} part={part} generating={message.status === "streaming"} />
+          }
           const toolState = "state" in part ? String(part.state) : ""
           return (
             <span

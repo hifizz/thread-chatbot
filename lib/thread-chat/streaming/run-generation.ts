@@ -158,6 +158,7 @@ async function runGenerationCore({
 
   try {
     prepared = await prepare({
+      userId,
       messageId: message.id,
       projectId: message.projectId,
       threadId: thread.id,
