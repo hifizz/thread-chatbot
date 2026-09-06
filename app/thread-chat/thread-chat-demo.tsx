@@ -3,6 +3,10 @@
 import dynamic from "next/dynamic"
 import { useRouter } from "next/navigation"
 import React, { useCallback, useEffect, useMemo, useState } from "react"
+import { ShareDialog, type ShareTarget } from "./orchestration/sharing/share-dialog"
+import { shareLayoutSchema } from "@/lib/thread-chat/sharing/contracts"
+import { SHARE_LIMITS } from "@/constants/sharing"
+import "./styles/sharing.css"
 
 import type { GenerationSettings } from "@/constants/generation-settings"
 import { getModelGenerationSettingsCapability } from "@/constants/model"
@@ -246,6 +250,15 @@ function NormalizedThreadChat({
     closeDrawer,
   } = useWorkspaceOverlays()
   const [hintDismissed, setHintDismissed] = useState(false)
+  const [shareTarget, setShareTarget] = useState<ShareTarget | null>(null)
+  const rememberReadingFocus = useCallback((event: React.SyntheticEvent) => {
+    const column = (event.target as HTMLElement).closest<HTMLElement>(".column[data-thread-id]")
+    const current = runtime.store.getState()
+    const id = column?.dataset.threadId
+    if (!id || !current.project) return
+    const selectedThreadId = id === "main" ? current.project.rootThreadId : id
+    if (current.workspace.selectedThreadId !== selectedThreadId) current.setWorkspace({ selectedThreadId })
+  }, [runtime.store])
 
   const feedbackByMessageId = useMemo(
     () =>
@@ -634,6 +647,7 @@ function NormalizedThreadChat({
     onPlacementModeChange: changeMode,
     onToggleThreadTree: toggleGlobalSwitcher,
     onToggleMarkdown: toggleDrawer,
+    onShare: currentProjectId ? () => setShareTarget({ resourceType: "project", resourceId: currentProjectId }) : undefined,
   }
 
   return (
@@ -641,6 +655,8 @@ function NormalizedThreadChat({
       className="tc"
       data-view-mode={workspace.viewMode}
       ref={rootRef}
+      onPointerDownCapture={rememberReadingFocus}
+      onFocusCapture={rememberReadingFocus}
     >
       <ThreadChatTopbar {...navigationProps} />
 
@@ -789,9 +805,31 @@ function NormalizedThreadChat({
         activeId={activeArtifactId}
         onClose={closeDrawer}
         onSelect={setActiveArtifactId}
+        onShareArtifact={(resourceId) => setShareTarget({ resourceType: "artifact", resourceId })}
         onLocate={(threadId) => openBranchUI(threadId, null)}
       />
       <WorkspaceToast toast={toast} onDismiss={dismissToast} />
+      {shareTarget && <ShareDialog target={shareTarget} onClose={() => setShareTarget(null)} captureLayout={() => {
+        const current = runtime.store.getState()
+        const entityId = (id: string) => id === "main" ? current.project!.rootThreadId : id
+        const clampWidth = (width: number) => Math.min(SHARE_LIMITS.maxWidth, Math.max(SHARE_LIMITS.minWidth, width))
+        const selected = workspace.viewMode === "canvas" ? workspace.canvasViewState.selectedId : current.workspace.selectedThreadId
+        const liveWidths = workspace.viewMode === "columns"
+          ? Object.fromEntries([...(workspace.columns.colsRef.current?.querySelectorAll<HTMLElement>(".column[data-thread-id]") ?? [])].map((column) => [column.dataset.threadId!, column.getBoundingClientRect().width]))
+          : workspace.columns.widths
+        return shareLayoutSchema.parse({
+          view: workspace.viewMode,
+          slots: workspace.columns.slots.map((slot) => ({ id: entityId(slot.id), folded: slot.folded })),
+          widths: Object.fromEntries(Object.entries(liveWidths).map(([id, width]) => [entityId(id), clampWidth(width)])),
+          focusId: selected ? entityId(selected) : current.project!.rootThreadId,
+          columnCount: Math.min(4, workspace.maxExpanded + 1),
+          placementMode: workspace.mode,
+          pins: [...workspace.canvasViewState.pins].map(([id, position]) => ({ id: entityId(id), x: position.x, y: position.y })),
+          viewport: workspace.canvasViewState.viewport ?? null,
+          artifactId: drawerOpen ? activeArtifactId : null,
+          panelWidth: clampWidth(rootRef.current?.querySelector(".project-panel")?.getBoundingClientRect().width || 480),
+        })
+      }} />}
     </div>
   )
 }

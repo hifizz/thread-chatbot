@@ -1,0 +1,6 @@
+.tc.share-dialog { height: auto; max-height: 88dvh; overflow: auto; display: grid; z-index: var(--tc-z-confirm); }
+.tc.share-dialog label { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.tc.share-dialog input, .tc.share-dialog select { min-width: 0; padding: 8px; border: 1px solid var(--tc-border-subtle); background: var(--tc-surface-plain); }
+.tc.share-dialog input { width: 100%; }
+.tc.share-dialog li { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 12px 0; border-bottom: 1px solid var(--tc-border-subtle); }
+.tc.share-dialog li span { width: 100%; color: var(--tc-content-secondary); }

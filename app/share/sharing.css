@@ -1,0 +1,30 @@
+.tc.share-reader { height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
+.tc .share-heading, .tc .share-tools, .tc .share-thread-head { display: flex; align-items: center; gap: 12px; padding: 12px 20px; border-bottom: 2px solid var(--tc-border-subtle); flex-wrap: wrap; }
+.tc .share-heading { justify-content: space-between; }
+.tc .share-heading h1 { font-size: 24px; margin: 4px 0; }
+.tc .share-status, .tc .share-footer { color: var(--tc-content-muted); font-size: 12px; }
+.tc .share-tools label { display: flex; align-items: center; gap: 8px; }
+.tc .share-tools select { max-width: 240px; padding: 4px; background: var(--tc-surface-base); border: 2px solid var(--tc-border-subtle); }
+.tc .share-workspace { display: flex; flex: 1; min-height: 0; overflow: hidden; }
+.tc .share-workspace .cols { overflow-x: auto; flex: 1; }
+.tc .share-workspace .column { min-width: 280px; }
+.tc .share-thread-head h2 { flex: 1; font-size: 16px; }
+.tc .share-thread-body { flex: 1; overflow: auto; padding: 20px; }
+.tc .share-message { margin-bottom: 24px; overflow-wrap: anywhere; }
+.tc .share-message-links { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.tc .share-artifact { max-width: 90vw; min-width: 280px; flex-shrink: 0; overflow: auto; padding: 24px; border-left: 2px solid var(--tc-border-subtle); background: var(--tc-surface-base); }
+.tc .share-artifact header { margin-bottom: 24px; }
+.tc .share-artifact h2 { font-size: 20px; margin-bottom: 12px; }
+.tc .share-document { width: min(100%, 880px); margin: 0 auto; padding: 32px; flex: 1; overflow: auto; }
+.tc .share-footer { padding: 8px 20px; border-top: 2px solid var(--tc-border-subtle); }
+.tc .share-history, .tc .share-anchor { margin-bottom: 20px; padding: 12px; border-left: 2px solid var(--tc-border-subtle); }
+.tc .share-canvas-reading { position: absolute; top: 100%; left: 0; width: 480px; height: 480px; overflow: auto; background: var(--tc-surface-base); border: 2px solid var(--tc-border-subtle); }
+.tc.share-source { height: auto; max-height: 80dvh; overflow: auto; padding: 24px; background: var(--tc-surface-base); border: 2px solid var(--tc-border-subtle); z-index: var(--tc-z-drawer); }
+.tc.share-unavailable { min-height: 100dvh; padding: 48px; }
+@media (max-width: 768px) {
+  .tc .share-heading, .tc .share-tools { padding: 8px 12px; }
+  .tc .share-heading h1 { font-size: 20px; }
+  .tc .share-workspace .column { min-width: 86vw; }
+  .tc .share-artifact { position: absolute; inset: 16% 0 0 auto; max-width: 100vw; z-index: var(--tc-z-drawer); }
+  .tc .share-document { padding: 20px; }
+}

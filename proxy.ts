@@ -1,12 +1,18 @@
 import { NextResponse, type NextRequest } from "next/server"
 import { getSessionCookie } from "better-auth/cookies"
 import { ROUTES } from "@/constants/routes"
+import { SHARE_HEADERS, SHARE_PAGE_PATTERN } from "@/constants/sharing"
 
 // 乐观鉴权：仅检查会话 cookie 是否存在（不做数据库校验，避免 Edge 开销）。
 // 真正的会话有效性由各 API 路由 / 服务端再次校验。
 // Next 16 已将 middleware 约定重命名为 proxy（同签名）。
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
+  if (SHARE_PAGE_PATTERN.test(pathname)) {
+    const response = NextResponse.next()
+    for (const [name, value] of Object.entries(SHARE_HEADERS)) response.headers.set(name, value)
+    return response
+  }
   const hasSession = getSessionCookie(request) != null
 
   // 无需登录即可访问的页面（公开落地页 + 登录/注册/找回密码 + 法务页）

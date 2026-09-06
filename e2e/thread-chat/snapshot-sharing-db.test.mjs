@@ -1,0 +1,197 @@
+import assert from "node:assert/strict"
+import { after, mock, test } from "node:test"
+import { randomUUID } from "node:crypto"
+import { eq } from "drizzle-orm"
+import * as schema from "../../lib/db/schema.ts"
+import { sharingFixture } from "./snapshot-sharing-fixture.mjs"
+import { sharingDatabase } from "./snapshot-sharing-database.mjs"
+
+// 默认进程内空白 PGlite；CI 显式指定独立 PostgreSQL 测试库并执行多连接竞争。
+// 不读取应用 DATABASE_URL，也不重置已有数据库。
+const database = await sharingDatabase()
+const { db } = database
+mock.module(new URL("../../lib/db/index.ts", import.meta.url).href, { namedExports: { db } })
+process.env.BETTER_AUTH_SECRET = "snapshot-sharing-test-secret-with-more-than-32-characters"
+process.env.BETTER_AUTH_URL = "http://localhost:3000"
+const { createShare, listShares, revokeShare, readPublicShare } = await import("../../lib/thread-chat/application/sharing.ts")
+const { findActiveShare } = await import("../../lib/thread-chat/persistence/share-repository.ts")
+const { auth } = await import("../../lib/auth/index.ts")
+const { POST, GET } = await import("../../app/api/thread-chat/v1/shares/route.ts")
+const { DELETE } = await import("../../app/api/thread-chat/v1/shares/[shareId]/route.ts")
+const { GET: PUBLIC_GET } = await import("../../app/api/share/[token]/route.ts")
+after(async () => { mock.restoreAll(); await database.close() })
+
+test("数据库结构与分享生命周期", async (t) => {
+  const f = sharingFixture()
+  await db.insert(schema.user).values([{ id: "owner", name: "测试所有者", email: "owner@sharing.test" }, { id: "other", name: "其他测试用户", email: "other@sharing.test" }])
+  await db.insert(schema.projects).values(f.project)
+  for (const thread of f.threads) {
+    await db.insert(schema.threads).values(thread)
+    await db.insert(schema.messages).values(f.messages.filter((m) => m.threadId === thread.id))
+  }
+  await db.insert(schema.artifacts).values(f.artifacts)
+  const input = { commandId: randomUUID(), resourceType: "project", resourceId: f.project.id, expiry: "3", layout: f.layout }
+  const first = await createShare("owner", input)
+  const token = first.result.path.split("/").at(-1)
+  const frozen = await readPublicShare(token)
+  await t.test("公开快照与私有字段隔离，匿名结果不查询来源", async () => {
+    assert.ok(frozen)
+    assert.equal(JSON.stringify(frozen).includes("PRIVATE_SENTINEL"), false)
+    assert.equal(frozen.snapshot.threads.length, 3)
+    assert.equal((await listShares("other", "project", f.project.id)).length, 0)
+    await assert.rejects(createShare("other", { ...input, commandId: randomUUID() }), /资源不存在/)
+    await assert.rejects(revokeShare("other", first.result.id), /资源不存在/)
+  })
+  await t.test("同命令重放不读取新内容、不重发 token、不延长期限；新命令得到新快照", async () => {
+    await db.update(schema.projects).set({ customTitle: "修改后的标题", archivedAt: new Date() }).where(eq(schema.projects.id, f.project.id))
+    await db.update(schema.messages).set({ parts: [{ type: "text", text: "后续编辑" }] }).where(eq(schema.messages.id, "branch-answer"))
+    const replay = await createShare("owner", input)
+    assert.equal(replay.replayed, true); assert.deepEqual(replay.result, first.result)
+    assert.deepEqual(await readPublicShare(token), frozen)
+    await assert.rejects(createShare("owner", { ...input, expiry: "7" }), /commandId/)
+    const next = await createShare("owner", { ...input, commandId: randomUUID() })
+    assert.notEqual(next.result.path, first.result.path)
+    assert.equal((await readPublicShare(next.result.path.split("/").at(-1))).snapshot.title, "修改后的标题")
+  })
+  await t.test("全部期限和数据库截止边界", async () => {
+    for (const expiry of ["unlimited", "3", "7", "30"]) {
+      const created = await createShare("owner", { ...input, commandId: randomUUID(), expiry })
+      const row = created.result, currentToken = row.path.split("/").at(-1)
+      if (expiry === "unlimited") assert.equal(row.expiresAt, null)
+      else {
+        assert.equal(Date.parse(row.expiresAt) - Date.parse(row.createdAt), Number(expiry) * 86400000)
+        assert.ok(await findActiveShare(db, currentToken, new Date(Date.parse(row.expiresAt) - 1)))
+        assert.equal(await findActiveShare(db, currentToken, new Date(row.expiresAt)), null)
+      }
+    }
+  })
+  await t.test("撤销幂等，JSON 立即不可用且有禁止缓存响应头", async () => {
+    await revokeShare("owner", first.result.id)
+    const [before] = await db.select().from(schema.shares).where(eq(schema.shares.id, first.result.id))
+    await revokeShare("owner", first.result.id)
+    const [after] = await db.select().from(schema.shares).where(eq(schema.shares.id, first.result.id))
+    assert.equal(+before.revokedAt, +after.revokedAt)
+    assert.equal(await readPublicShare(token), null)
+    const response = await PUBLIC_GET(new Request(`http://localhost:3000/api/share/${token}`), { params: Promise.resolve({ token }) })
+    assert.equal(response.status, 404)
+    assert.match(response.headers.get("cache-control"), /no-store/)
+    assert.equal(response.headers.get("referrer-policy"), "no-referrer")
+    assert.equal(JSON.stringify(await response.json()).includes(f.project.customTitle), false)
+  })
+  await t.test("独立 Artifact 快照不包含来源 ID，非法来源不留下命令回执或半份快照", async () => {
+    const artifactInput = { commandId: randomUUID(), resourceType: "artifact", resourceId: "document", expiry: "unlimited" }
+    const created = await createShare("owner", artifactInput)
+    const result = await readPublicShare(created.result.path.split("/").at(-1))
+    assert.equal(result.snapshot.resourceType, "artifact")
+    assert.equal("threadId" in result.snapshot, false)
+    await db.update(schema.messages).set({ status: "failed" }).where(eq(schema.messages.id, "branch-answer"))
+    const failed = { ...artifactInput, commandId: randomUUID() }
+    await assert.rejects(createShare("owner", failed), /SHARE_INVALID_SOURCE/)
+    assert.equal((await db.select().from(schema.conversationCommands).where(eq(schema.conversationCommands.id, failed.commandId))).length, 0)
+    await db.update(schema.messages).set({ status: "completed" }).where(eq(schema.messages.id, "branch-answer"))
+  })
+  await t.test("来源删除级联失效，用户删除也不留下公开记录", async () => {
+    const links = await listShares("owner", "project", f.project.id)
+    await db.delete(schema.projects).where(eq(schema.projects.id, f.project.id))
+    for (const link of links) assert.equal(await readPublicShare(link.path.split("/").at(-1)), null)
+    await db.insert(schema.projects).values({ id: "user-cascade-project", userId: "owner" })
+    await db.insert(schema.threads).values({ id: "user-cascade-root", projectId: "user-cascade-project", modelId: "test-model", depth: 0 })
+    const link = await createShare("owner", { ...input, commandId: randomUUID(), resourceId: "user-cascade-project" })
+    await db.delete(schema.user).where(eq(schema.user.id, "owner"))
+    assert.equal(await readPublicShare(link.result.path.split("/").at(-1)), null)
+  })
+})
+
+test("真实登录授权下的分享 HTTP handler", async () => {
+  const signup = await auth.api.signUpEmail({ body: { name: "分享接口测试", email: "api@sharing.test", password: "generated-local-test-password" }, asResponse: true })
+  assert.equal(signup.status, 200)
+  const cookie = signup.headers.getSetCookie().map((value) => value.split(";")[0]).join("; ")
+  const account = await signup.json()
+  await db.insert(schema.projects).values({ id: "api-project", userId: account.user.id, customTitle: "API 快照" })
+  await db.insert(schema.threads).values({ id: "api-root", projectId: "api-project", modelId: "test-model", depth: 0 })
+  const input = { commandId: randomUUID(), resourceType: "project", resourceId: "api-project", layout: {} }
+  const request = (body, headers = {}) => new Request("http://localhost:3000/api/thread-chat/v1/shares", { method: "POST", headers: { "Content-Type": "application/json", ...headers }, body: JSON.stringify(body) })
+  assert.equal((await POST(request(input))).status, 401)
+  assert.equal((await POST(request({ ...input, ownerId: "attacker" }, { cookie }))).status, 400)
+  assert.equal((await POST(request(input, { cookie, origin: "https://other.example" }))).status, 403)
+  const proxied = new Request("http://internal-next:3000/api/thread-chat/v1/shares", { method: "POST", headers: { cookie, origin: "http://localhost:3000", "content-type": "application/json" }, body: JSON.stringify(input) })
+  assert.equal((await POST(proxied)).status, 200)
+  assert.equal((await POST(request(input, { cookie, origin: "https://other.example", "x-forwarded-host": "other.example" }))).status, 403)
+  const response = await POST(request(input, { cookie }))
+  assert.equal(response.status, 200)
+  const result = await response.json(), token = result.data.path.split("/").at(-1)
+  const publicResponse = await PUBLIC_GET(new Request(`http://localhost:3000/api/share/${token}`), { params: Promise.resolve({ token }) })
+  assert.equal(publicResponse.status, 200)
+  assert.equal((await publicResponse.json()).snapshot.title, "API 快照")
+  assert.equal((await GET(new Request("http://localhost:3000/api/thread-chat/v1/shares?resourceType=project&resourceId=api-project", { headers: { cookie } }))).status, 200)
+  assert.equal((await DELETE(new Request("http://localhost:3000/api/thread-chat/v1/shares/x", { method: "DELETE", headers: { authorization: `Bearer ${token}` } }), { params: Promise.resolve({ shareId: result.data.id }) })).status, 401)
+  const revoke = await DELETE(new Request("http://localhost:3000/api/thread-chat/v1/shares/x", { method: "DELETE", headers: { cookie } }), { params: Promise.resolve({ shareId: result.data.id }) })
+  assert.equal(revoke.status, 200)
+  assert.equal(await readPublicShare(token), null)
+})
+
+test("真实 PostgreSQL 多连接竞争与一致读取", { skip: !database.sql }, async (t) => {
+  const sql = database.sql
+  await db.insert(schema.user).values({ id: "concurrent-owner", name: "并发测试", email: "concurrent@sharing.test" })
+  await db.insert(schema.projects).values({ id: "concurrent-project", userId: "concurrent-owner", customTitle: "修改前" })
+  await db.insert(schema.threads).values({ id: "concurrent-root", projectId: "concurrent-project", modelId: "test-model", depth: 0 })
+  await db.insert(schema.messages).values({ id: "concurrent-message", projectId: "concurrent-project", threadId: "concurrent-root", sequence: 1, role: "user", status: "completed", finishedAt: new Date(), parts: [{ type: "text", text: "修改前" }] })
+  const input = () => ({ commandId: randomUUID(), resourceType: "project", resourceId: "concurrent-project", expiry: "3", layout: {} })
+  async function waitForBlocked(query) {
+    const end = Date.now() + 10000
+    do {
+      const rows = await sql`select pid from pg_stat_activity where datname = current_database() and pid <> pg_backend_pid() and application_name = 'snapshot-sharing-test' and wait_event_type = 'Lock' and query like ${query}`
+      if (rows.length) return
+      await new Promise((resolve) => setTimeout(resolve, 20))
+    } while (Date.now() < end)
+    assert.fail("未观测到预期的数据库锁等待")
+  }
+  await t.test("两次读取间修改来源，快照仍使用同一可见时点", async () => {
+    let creation
+    await sql.begin(async (blocker) => {
+      await blocker`lock table thread_chat.threads in access exclusive mode`
+      creation = createShare("concurrent-owner", input())
+      await waitForBlocked('%from "thread_chat"."threads"%')
+      await blocker`update thread_chat.projects set custom_title = '修改后' where id = 'concurrent-project'`
+      await blocker`update thread_chat.messages set parts = '[{"type":"text","text":"修改后"}]'::jsonb where id = 'concurrent-message'`
+    })
+    const created = await creation
+    const result = await readPublicShare(created.result.path.split("/").at(-1))
+    assert.equal(result.snapshot.title, "修改前")
+    assert.equal(result.snapshot.messages[0].parts[0].text, "修改前")
+  })
+  await t.test("并发相同命令失败可重试，最终只有一份链接及期限", async () => {
+    const command = input()
+    let first, second
+    await sql.begin(async (blocker) => {
+      await blocker`lock table thread_chat.shares in access exclusive mode`
+      first = createShare("concurrent-owner", command).then((value) => ({ value }), (error) => ({ error }))
+      await waitForBlocked('%insert into "thread_chat"."shares"%')
+      second = createShare("concurrent-owner", command).then((value) => ({ value }), (error) => ({ error }))
+      await waitForBlocked('%insert into "thread_chat"."conversation_commands"%')
+    })
+    const results = await Promise.all([first, second])
+    assert.equal(results.filter((result) => result.value).length, 1)
+    const failure = results.find((result) => result.error).error
+    assert.equal(failure.code ?? failure.cause?.code, "40001")
+    const success = results.find((result) => result.value).value
+    const replay = await createShare("concurrent-owner", command)
+    assert.equal(replay.replayed, true)
+    assert.deepEqual(replay.result, success.result)
+    const links = await listShares("concurrent-owner", "project", "concurrent-project")
+    assert.equal(links.filter((link) => link.id === success.result.id).length, 1)
+  })
+  await t.test("读取期间删除来源，不保存孤立快照或待处理回执", async () => {
+    const command = input()
+    let creation
+    await sql.begin(async (blocker) => {
+      await blocker`lock table thread_chat.threads in access exclusive mode`
+      creation = createShare("concurrent-owner", command).then(() => null, (error) => error)
+      await waitForBlocked('%from "thread_chat"."threads"%')
+      await blocker`delete from thread_chat.projects where id = 'concurrent-project'`
+    })
+    assert.ok(await creation)
+    assert.equal((await listShares("concurrent-owner", "project", "concurrent-project")).length, 0)
+    assert.equal((await db.select().from(schema.conversationCommands).where(eq(schema.conversationCommands.id, command.commandId))).length, 0)
+  })
+})

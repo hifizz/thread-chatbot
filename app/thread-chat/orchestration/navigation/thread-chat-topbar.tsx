@@ -9,6 +9,7 @@ import {
   Menu,
   Network,
   Waypoints,
+  Share2,
 } from "lucide-react"
 import type { MouseEvent } from "react"
 import {
@@ -46,6 +47,7 @@ export interface ThreadChatNavigationProps {
   onPlacementModeChange(mode: PlacementMode): void
   onToggleThreadTree(): void
   onToggleMarkdown(): void
+  onShare?: () => void
 }
 
 export function ThreadChatMobileMenu({
@@ -64,6 +66,7 @@ export function ThreadChatMobileMenu({
   onPlacementModeChange,
   onToggleThreadTree,
   onToggleMarkdown,
+  onShare,
 }: ThreadChatNavigationProps) {
   return (
     <DropdownMenu>
@@ -101,6 +104,7 @@ export function ThreadChatMobileMenu({
                 使用提示
               </DropdownMenuItem>
             )}
+            {onShare && <DropdownMenuItem onClick={onShare}><Share2 />分享 Project</DropdownMenuItem>}
           </DropdownMenuGroup>
           <DropdownMenuSeparator />
           <DropdownMenuGroup>
@@ -180,6 +184,7 @@ export function ThreadChatTopbar(props: ThreadChatNavigationProps) {
     onPlacementModeChange,
     onToggleThreadTree,
     onToggleMarkdown,
+    onShare,
   } = props
   return (
     <div className="topbar">
@@ -302,6 +307,7 @@ export function ThreadChatTopbar(props: ThreadChatNavigationProps) {
         <span className="cnt">{markdownCount}</span>
       </button>
       <AccountButton />
+      {onShare && <button className="tbtn" onClick={onShare}><Share2 size={13} />分享</button>}
     </div>
   )
 }

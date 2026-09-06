@@ -36,6 +36,31 @@ export * from "./auth-schema"
 export * from "./billing-schema"
 export * from "./payment-schema"
 
+/** 公开内容只在创建事务中写入；撤销只修改生命周期。 */
+export const shares = dbSchema.table("shares", {
+  id: text("id").primaryKey(),
+  token: text("token").notNull(),
+  ownerId: text("owner_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+  sourceProjectId: text("source_project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  resourceType: text("resource_type", { enum: ["project", "artifact"] }).notNull(),
+  resourceId: text("resource_id").notNull(),
+  snapshot: jsonb("snapshot").$type<import("@/lib/thread-chat/sharing/contracts").PublicSnapshot>().notNull(),
+  schemaVersion: integer("schema_version").notNull().default(1),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }),
+  revokedAt: timestamp("revoked_at", { withTimezone: true }),
+}, (table) => [
+  uniqueIndex("shares_token_uq").on(table.token),
+  index("shares_owner_resource_created_idx").on(table.ownerId, table.resourceType, table.resourceId, table.createdAt),
+  index("shares_source_project_idx").on(table.sourceProjectId),
+  check("shares_resource_type", sql`${table.resourceType} in ('project', 'artifact')`),
+  check("shares_project_resource", sql`${table.resourceType} <> 'project' or ${table.resourceId} = ${table.sourceProjectId}`),
+  check("shares_token_shape", sql`${table.token} ~ '^[A-Za-z0-9_-]{32}$'`),
+  check("shares_schema_version", sql`${table.schemaVersion} = 1`),
+  check("shares_expiry_after_creation", sql`${table.expiresAt} is null or ${table.expiresAt} > ${table.createdAt}`),
+  check("shares_revocation_after_creation", sql`${table.revokedAt} is null or ${table.revokedAt} >= ${table.createdAt}`),
+])
+
 export const attachments = dbSchema.table(
   "attachments",
   {
