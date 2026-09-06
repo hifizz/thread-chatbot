@@ -12,10 +12,31 @@ import {
 } from "../../lib/thread-chat/contracts/message-content.ts"
 import { loadReferenceArtifacts, resolveUserMessageParts } from "../../lib/thread-chat/application/artifact-reference-resolution.ts"
 import { ARTIFACT_REFERENCE_MAX_CHARS } from "../../constants/artifact-reference.ts"
+import { positionArtifactMenu } from "../../lib/thread-chat/artifact-menu-position.ts"
 import { ArtifactReferenceNode } from "../../app/thread-chat/chat/composer/artifact-reference-node.ts"
 import { $readInlineDocument, $writeInlineDocument } from "../../app/thread-chat/chat/composer/inline-editor-document.ts"
 
 const id = (n) => `10000000-0000-4000-8000-${String(n).padStart(12, "0")}`
+// 单行底部输入框必须按视口翻转；边缘、长列表和软键盘均不得越界。
+const viewport = { left: 0, top: 0, width: 1024, height: 768 }
+const bottomMenu = positionArtifactMenu({ left: 40, top: 700, bottom: 722 }, viewport, 180)
+assert.equal(bottomMenu.side, "top")
+assert.equal(bottomMenu.top + 180, 696)
+assert.equal(positionArtifactMenu({ left: 40, top: 30, bottom: 52 }, viewport, 180).side, "bottom")
+for (const view of [viewport, { left: 0, top: 0, width: 240, height: 200 }, { left: 40, top: 300, width: 320, height: 240 }]) {
+  for (const x of [view.left, view.left + view.width - 2]) {
+    for (const y of [view.top + 18, view.top + view.height / 2, view.top + view.height - 40]) {
+      for (const contentHeight of [60, 180, 1400]) {
+        const menu = positionArtifactMenu({ left: x, top: y, bottom: y + 22 }, view, contentHeight)
+        assert.ok(menu.left >= view.left + 16)
+        assert.ok(menu.left + menu.width <= view.left + view.width - 16)
+        assert.ok(menu.top >= view.top + 16)
+        assert.ok(menu.top + Math.min(contentHeight, menu.maxHeight) <= view.top + view.height - 16)
+        assert.ok(menu.maxHeight <= 280)
+      }
+    }
+  }
+}
 const project = id(1)
 const makeArtifact = (n, overrides = {}) => ({
   id: id(n), projectId: project, threadId: id(n + 10), sourceMessageId: id(n + 20),

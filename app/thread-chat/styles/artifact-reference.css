@@ -89,20 +89,40 @@
   outline: 2px solid var(--tc-accent-focus-ring);
   outline-offset: 2px;
 }
-.tc.artifact-reference-menu-root {
-  position: relative;
-  display: block;
-  height: auto;
+.tc.artifact-reference-menu-anchor {
+  /* Lexical 写入内联绝对定位；此容器只承载 portal，不参与页面尺寸计算。 */
+  position: fixed !important;
+  inset: 0 !important;
+  width: 0 !important;
+  height: 0 !important;
   min-height: 0;
   overflow: visible;
   z-index: var(--tc-z-switcher-top);
 }
+.tc.artifact-reference-menu-root {
+  /* 同时隔离 Lexical 对 firstChild.style.top 的写入。 */
+  position: fixed;
+  inset: 0 !important;
+  display: block;
+  height: 100%;
+  min-height: 0;
+  overflow: clip;
+  pointer-events: none;
+  background: transparent;
+  z-index: var(--tc-z-switcher-top);
+}
 .tc .artifact-reference-menu {
+  position: absolute;
+  visibility: hidden;
+  box-sizing: border-box;
+  pointer-events: auto;
   width: min(320px, calc(100vw - 32px));
-  max-height: min(280px, 40dvh);
+  max-height: 280px;
+  overflow-x: hidden;
   overflow-y: auto;
+  overscroll-behavior: contain;
   list-style: none;
-  margin: 4px 0;
+  margin: 0;
   padding: 4px;
   border: 1px solid var(--tc-border-strong); /* tc-review: 1px 沿用控件边框 */
   border-radius: 8px;

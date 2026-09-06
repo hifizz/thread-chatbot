@@ -23,6 +23,7 @@ import { ArtifactReferenceNode, $createArtifactReferenceNode } from "./artifact-
 import { $insertInlineText, $readInlineDocument, $writeInlineDocument } from "./inline-editor-document"
 import { useArtifactResources } from "./artifact-composer-context"
 import { artifactReferenceCandidates, matchArtifactTrigger } from "./artifact-typeahead"
+import { ArtifactMenuSurface } from "./artifact-menu-surface"
 
 export interface InlineArtifactEditorHandle {
   focus(): void
@@ -115,6 +116,7 @@ function EditorPlugins({ value, onChange, onSubmit, submitMode, disabled, editor
       if (JSON.stringify(next) !== JSON.stringify(value)) onChange(next)
     }} />
     <LexicalTypeaheadMenuPlugin<ArtifactOption>
+      anchorClassName="tc artifact-reference-menu-anchor"
       options={options}
       triggerFn={matchArtifactTrigger}
       onQueryChange={setQuery}
@@ -134,8 +136,7 @@ function EditorPlugins({ value, onChange, onSubmit, submitMode, disabled, editor
         })
       }}
       menuRenderFn={(anchor, { selectedIndex, selectOptionAndCleanUp, setHighlightedIndex }) => anchor.current
-        ? createPortal(<div className="tc artifact-reference-menu-root">
-          <ul className="artifact-reference-menu" role="listbox" aria-label="引用项目 Artifact">
+        ? createPortal(<ArtifactMenuSurface>
             {options.map((option, index) => <li
               key={option.key}
               id={`typeahead-item-${index}`}
@@ -151,8 +152,7 @@ function EditorPlugins({ value, onChange, onSubmit, submitMode, disabled, editor
               <small>{option.artifact.createdAt.slice(0, 19).replace("T", " ")} UTC</small>
             </li>)}
             {options.length === 0 && <li role="presentation">{ARTIFACT_REFERENCE_COPY.empty}</li>}
-          </ul>
-        </div>, anchor.current) : null}
+        </ArtifactMenuSurface>, anchor.current) : null}
     />
   </>
 }

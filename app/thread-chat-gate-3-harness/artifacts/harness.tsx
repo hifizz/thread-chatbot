@@ -30,6 +30,7 @@ export function ArtifactReferenceHarness() {
   const [sent, setSent] = useState<MessageContentPartInput[]>([])
   const [opened, setOpened] = useState("")
   const [editing, setEditing] = useState(false)
+  const [bottom, setBottom] = useState(true)
   const [edit, setEdit] = useState<InlineComposerPart[]>([])
   return <ArtifactComposerProvider artifacts={artifacts} openArtifact={setOpened}>
     <main className="tc" style={{ padding: 24, height: "100vh", overflow: "auto" }}>
@@ -38,8 +39,9 @@ export function ArtifactReferenceHarness() {
         <button onClick={() => setThread(thread === id(4) ? id(3) : id(4))}>切换 Thread（{thread === id(4) ? "当前" : "兄弟"}）</button>
         <button onClick={() => setVariant(variant === "column" ? "canvas" : "column")}>切换视图（{variant}）</button>
         <label><input type="checkbox" checked={fail} onChange={(e) => setFail(e.target.checked)} />模拟发送失败</label>
+        <label><input type="checkbox" checked={bottom} onChange={(e) => setBottom(e.target.checked)} />输入框置底</label>
       </nav>
-      <section style={{ maxWidth: 680 }}>
+      <section style={{ maxWidth: 680, flexShrink: 0, order: bottom ? 1 : 0, marginTop: bottom ? "auto" : 0 }}>
         <ConversationComposer key={`${thread}-${variant}`} threadId={thread} variant={variant}
           isMain={thread === id(4)} busy={false} modelSelectorDisabled
           onSend={async (_text, _files, parts) => {

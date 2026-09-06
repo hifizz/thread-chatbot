@@ -3,6 +3,8 @@ export const ARTIFACT_REFERENCE_SCHEMA_VERSION = 1 as const
 export const ARTIFACT_REFERENCE_MAX_OCCURRENCES = 20
 export const ARTIFACT_REFERENCE_MAX_CHARS = 200_000
 export const ARTIFACT_REFERENCE_MENU_LIMIT = 20
+/** 候选菜单与可视区域、光标的间距（CSS 像素）。 */
+export const ARTIFACT_REFERENCE_MENU_LAYOUT = { padding: 16, gap: 4, width: 320, maxHeight: 280 } as const
 export const ARTIFACT_REFERENCE_COPY = {
   missing: "引用的 Artifact 不存在或不属于当前 Project",
   incomplete: "只能引用来源已完成的 Artifact",
