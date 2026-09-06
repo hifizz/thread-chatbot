@@ -7,6 +7,9 @@ import { InlineArtifactEditor } from "../../thread-chat/chat/composer/inline-art
 import type { ArtifactDTO } from "@/lib/thread-chat/contracts/dto"
 import type { InlineComposerPart } from "@/lib/thread-chat/contracts/artifact-reference"
 import type { MessageContentPartInput } from "@/lib/thread-chat/contracts/message-content"
+import { SelectionBubble, type SelectionInfo } from "../../thread-chat/branching/selection/selection-bubble"
+import type { ThreadTreeState } from "../../thread-chat/core/types"
+import { THREAD_TREE_SCHEMA_VERSION } from "@/constants/thread-chat"
 import "../../thread-chat/thread-chat.css"
 
 const id = (n: number) => `10000000-0000-4000-8000-${String(n).padStart(12, "0")}`
@@ -32,6 +35,19 @@ export function ArtifactReferenceHarness() {
   const [editing, setEditing] = useState(false)
   const [bottom, setBottom] = useState(true)
   const [edit, setEdit] = useState<InlineComposerPart[]>([])
+  const [selection, setSelection] = useState<SelectionInfo | null>(null)
+  const [fork, setFork] = useState("")
+  const sourceText = "Selection toolbar preserves existing drafts. 划选这段回答，验证继续聊与提问。"
+  const tree: ThreadTreeState = {
+    schemaVersion: THREAD_TREE_SCHEMA_VERSION,
+    artifacts: {}, artifactOrder: [], recents: [], footnoteCounter: 0, seq: 0, tick: 0,
+    threads: { [thread]: {
+      id: thread, modelId: "doubao-seed-2.1-turbo", parentId: null, depth: 0,
+      title: "划选测试", anchorText: null, forkFromMsgId: null, footnote: null,
+      children: [], activeLeafMessageId: id(50), lastActive: 0,
+      messages: [{ id: id(50), parentMessageId: null, role: "assistant", text: sourceText, forks: [], status: "done" }],
+    } },
+  }
   return <ArtifactComposerProvider artifacts={artifacts} openArtifact={setOpened}>
     <main className="tc" style={{ padding: 24, height: "100vh", overflow: "auto" }}>
       <h1>Artifact 行内引用测试</h1>
@@ -41,6 +57,15 @@ export function ArtifactReferenceHarness() {
         <label><input type="checkbox" checked={fail} onChange={(e) => setFail(e.target.checked)} />模拟发送失败</label>
         <label><input type="checkbox" checked={bottom} onChange={(e) => setBottom(e.target.checked)} />输入框置底</label>
       </nav>
+      <section className="msg-list" data-list={thread} style={{ flex: "none", maxWidth: 680, margin: "32px 0" }}>
+        <div className="message" data-msg-id={id(50)}>
+          <p className="md-body">{sourceText}</p>
+        </div>
+      </section>
+      <SelectionBubble state={tree} sel={selection} onSelChange={setSelection}
+        onFork={(source, _hint, question) => setFork(JSON.stringify({ text: source.text, question }))}
+        slots={[]} mode="replace" maxExpanded={2} lastActiveOf={() => 0} />
+      <output aria-label="分叉结果">{fork}</output>
       <section style={{ maxWidth: 680, flexShrink: 0, order: bottom ? 1 : 0, marginTop: bottom ? "auto" : 0 }}>
         <ConversationComposer key={`${thread}-${variant}`} threadId={thread} variant={variant}
           isMain={thread === id(4)} busy={false} modelSelectorDisabled

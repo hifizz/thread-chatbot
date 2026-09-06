@@ -168,6 +168,104 @@
   outline: 2px solid var(--tc-content-on-floating);
   outline-offset: 1px;
 }
+
+/* 四按钮工具条为 fixed 浮层，不参与列宽或正文高度计算。 */
+.tc .selection-toolbar {
+  display: flex;
+  gap: 2px;
+  padding: 4px;
+  border-radius: 8px;
+  background: var(--tc-surface-ink);
+  box-shadow: 0 8px 18px var(--tc-shadow-pop);
+}
+.tc .selection-toolbar > button,
+.tc .selection-coming-soon {
+  flex: 1;
+  min-width: 0;
+}
+.tc .selection-toolbar button {
+  width: 100%;
+  height: 36px;
+  padding: 6px 4px;
+  gap: 4px;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--tc-content-on-floating);
+  font-size: 12px;
+  font-weight: 400;
+  white-space: nowrap;
+}
+.tc .selection-toolbar button:hover,
+.tc .selection-toolbar button:focus-visible {
+  filter: none;
+  background: var(--tc-onink-fill-soft);
+}
+.tc .selection-toolbar button:focus-visible {
+  outline: 2px solid var(--tc-onink-border-src);
+  outline-offset: -2px;
+}
+.tc .selection-toolbar button[aria-disabled="true"] {
+  color: var(--tc-onink-placeholder);
+  cursor: not-allowed;
+  background: transparent;
+}
+.tc .selection-coming-soon { position: relative; }
+.tc .selection-coming-soon-hint {
+  display: none;
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 6px 8px;
+  border-radius: 4px;
+  background: var(--tc-surface-ink);
+  color: var(--tc-content-on-floating);
+  font-size: 12px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.tc .selection-coming-soon:hover .selection-coming-soon-hint,
+.tc .selection-coming-soon:focus-within .selection-coming-soon-hint { display: block; }
+.tc .composer-selection-quotes {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+  max-height: 128px;
+  overflow: auto;
+}
+.tc .composer-selection-quote {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: var(--tc-surface-sunken);
+}
+.tc .composer-selection-quote blockquote {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--tc-content-secondary);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.tc .composer-selection-quote button {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--tc-content-muted);
+  cursor: pointer;
+}
 .tc .sel-bubble .smcell.ghost {
   /* tc-review: 非偶数值，保留 1.5px 以维持 ghost 虚线可见度 */
   border: 1.5px dashed var(--tc-onink-border-ghost);

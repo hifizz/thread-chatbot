@@ -15,6 +15,7 @@ import { inlineComposerText } from "./inline-editor-document"
 import type { MessageContentPartInput } from "@/lib/thread-chat/contracts/message-content"
 import { AtSignIcon, FileIcon, PlusIcon, XIcon } from "lucide-react"
 import { ARTIFACT_REFERENCE_COPY } from "@/constants/artifact-reference"
+import { SELECTION_TOOLBAR_COPY } from "@/constants/selection-toolbar"
 import { toast } from "sonner"
 import {
   IMAGE_ATTACHMENT_LIMITS,
@@ -92,6 +93,13 @@ export function ConversationComposer({
 }: ConversationComposerProps) {
   const editorRef = useRef<InlineArtifactEditorHandle | null>(null)
   const { draft, update } = useArtifactComposerDraft(threadId)
+  const lastFocusRequest = useRef("")
+  useEffect(() => {
+    const request = `${threadId}:${draft.focusRequest}`
+    if (!draft.focusRequest || request === lastFocusRequest.current) return
+    lastFocusRequest.current = request
+    editorRef.current?.focus()
+  }, [draft.focusRequest, threadId])
   const attachments = draft.attachments
   const [submitting, setSubmitting] = useState(false)
   const setAttachments = useCallback((next: ThreadComposerAttachment[] | ((current: ThreadComposerAttachment[]) => ThreadComposerAttachment[])) => {
@@ -109,6 +117,7 @@ export function ConversationComposer({
   const doSend = async () => {
     if (!onSend || submitting) return
     const snapshot = draft.parts
+    const quotes = draft.quotes
     const text = composerSubmission(inlineComposerText(snapshot), busy)
     if (!text || !canSendThreadAttachments(attachments)) return
     if (hasUnsupportedReadyImages(modelId, attachments)) {
@@ -117,6 +126,7 @@ export function ConversationComposer({
     }
     const files = readyThreadAttachmentReferences(attachments)
     const parts: MessageContentPartInput[] = [
+      ...quotes.map((quote) => ({ type: "quote" as const, quote })),
       ...snapshot,
       ...files.map((file) => ({ type: "file" as const, file })),
     ]
@@ -124,8 +134,8 @@ export function ConversationComposer({
     try {
       onBeforeSend?.()
       await onSend(text, files, parts)
-      update((current) => current.parts === snapshot && current.attachments === attachments
-        ? { parts: [], attachments: [] } : current)
+      update((current) => current.parts === snapshot && current.attachments === attachments && current.quotes === quotes
+        ? { ...current, parts: [], attachments: [], quotes: [] } : current)
       editorRef.current?.focus()
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "发送失败，请重试")
@@ -369,17 +379,38 @@ export function ConversationComposer({
     </span>}
   </>
 
+  const quoteTray = draft.quotes.length > 0 && (
+    <div className="composer-selection-quotes" aria-label={SELECTION_TOOLBAR_COPY.quoteLabel}>
+      {draft.quotes.map((quote, index) => (
+        <div className="composer-selection-quote" key={`${quote.source.messageId}-${index}`}>
+          <blockquote>{quote.text}</blockquote>
+          <button
+            type="button"
+            aria-label={SELECTION_TOOLBAR_COPY.removeQuote}
+            title={SELECTION_TOOLBAR_COPY.removeQuote}
+            onClick={() => update((current) => ({
+              ...current,
+              quotes: current.quotes.filter((item) => item !== quote),
+            }))}
+          ><XIcon size={14} aria-hidden="true" /></button>
+        </div>
+      ))}
+    </div>
+  )
+
   const promptStack = canvas ? (
     <div className="cv-prompt-stack">
       {selector}
       {generationSettingsControls}
       {attachmentTray}
+      {quoteTray}
       {input}
       <div className="artifact-reference-toolbar">{referenceAction}</div>
     </div>
   ) : (
     <div className="prompt-stack">
       {attachmentTray}
+      {quoteTray}
       {input}
       <div className="composer-tools">
         <input

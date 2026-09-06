@@ -1,6 +1,6 @@
 "use client"
 /**
- * branching/selection-bubble —— 划选 assistant 消息文字 → 迷你气泡 → 开分支。
+ * branching/selection-bubble —— 划选 assistant 消息 → 工具条 → 本会话引用 / 提问气泡。
  *
  * document 级划选监听与命令式 DOM Selection 读取由
  * useAssistantTextSelection 封装；本组件组合气泡状态、定位、放置预览与提交 UI。
@@ -31,6 +31,11 @@ import React, {
 } from "react"
 import "./selection-draft-guard.css"
 import { GitMerge } from "lucide-react"
+import { toast } from "sonner"
+import { SelectionToolbar } from "./selection-toolbar"
+import { useArtifactComposerDraft } from "../../chat/composer/artifact-composer-context"
+import { appendSelectionQuote, selectionComposerQuote } from "@/lib/thread-chat/selection-composer"
+import { SELECTION_TOOLBAR_COPY, SELECTION_TOOLBAR_WIDTH } from "@/constants/selection-toolbar"
 import type { ThreadTreeState } from "../../core/types"
 import { threadTitle } from "../../core/selectors"
 import {
@@ -81,6 +86,8 @@ export function SelectionBubble({
   maxExpanded,
   lastActiveOf,
 }: SelectionBubbleProps) {
+  const [asking, setAsking] = useState(false)
+  const { update: updateComposer } = useArtifactComposerDraft(sel?.threadId ?? "")
   /** 可选首问（受控 textarea）：留空提交 = 现有预填流；非空提交 = 带问开分支 */
   const [question, setQuestion] = useState("")
   const hasQuestion = question.trim().length > 0
@@ -125,6 +132,7 @@ export function SelectionBubble({
   const [forSel, setForSel] = useState<SelectionInfo | null>(sel)
   if (forSel !== sel) {
     setForSel(sel)
+    setAsking(false)
     setOverride(null)
     setMetaHeld(sel?.meta ?? false)
     setQuestion("")
@@ -147,7 +155,7 @@ export function SelectionBubble({
     const ro = new ResizeObserver(measure)
     ro.observe(el)
     return () => ro.disconnect()
-  }, [sel])
+  }, [sel, asking])
 
   /* 气泡打开期间跟踪 ⌘/Ctrl 起落（keydown/keyup 都带 metaKey/ctrlKey 快照） */
   useEffect(() => {
@@ -189,13 +197,18 @@ export function SelectionBubble({
 
   if (!sel) return null
 
+  const panelWidth = Math.min(
+    asking ? BUBBLE_W : SELECTION_TOOLBAR_WIDTH,
+    typeof window === "undefined" ? BUBBLE_W : window.innerWidth - BUBBLE_SAFE_PADDING * 2
+  )
+
   /* —— 落点：floating-popup 定位模型，只用上/下两向（尾巴竖直指向选区）——
      测得高度前（measuredH=0）先把气泡藏到屏外并隐藏，测完这一帧即就位，避免旧位闪现。 */
   const ready = measuredH > 0 && typeof window !== "undefined"
   const pos = ready
     ? computePopupPosition(
         sel.rect,
-        { width: BUBBLE_W, height: measuredH },
+        { width: panelWidth, height: measuredH },
         {
           left: 0,
           top: 0,
@@ -203,7 +216,7 @@ export function SelectionBubble({
           height: window.innerHeight,
         },
         {
-          sides: ["bottom", "top"],
+          sides: ["top", "bottom"],
           gap: BUBBLE_GAP,
           safePadding: BUBBLE_SAFE_PADDING,
         }
@@ -215,10 +228,46 @@ export function SelectionBubble({
   const anchorCx = sel.rect.left + sel.rect.width / 2
   const cx = pos
     ? Math.min(
-        BUBBLE_W - BUBBLE_TAIL_MARGIN,
+        panelWidth - BUBBLE_TAIL_MARGIN,
         Math.max(BUBBLE_TAIL_MARGIN, anchorCx - pos.left)
       )
-    : BUBBLE_W / 2
+    : panelWidth / 2
+
+  if (!asking) {
+    return (
+      <div
+        className="sel-bubble sel-toolbar"
+        ref={contentRef}
+        style={{
+          left: pos ? pos.left : -9999,
+          top: pos ? pos.top : -9999,
+          width: panelWidth,
+          visibility: pos ? "visible" : "hidden",
+        }}
+      >
+        <SelectionToolbar
+          onContinue={() => {
+            try {
+              const quote = selectionComposerQuote(sel)
+              window.getSelection()?.removeAllRanges()
+              updateComposer((current) => ({
+                ...current,
+                quotes: appendSelectionQuote(current.quotes, quote),
+                focusRequest: (current.focusRequest ?? 0) + 1,
+              }))
+              onSelChange(null)
+            } catch {
+              toast.error(SELECTION_TOOLBAR_COPY.invalidQuote)
+            }
+          }}
+          onAsk={() => {
+            setMeasuredH(0)
+            setAsking(true)
+          }}
+        />
+      </div>
+    )
+  }
 
   /* —— 生效目标 = override > 修饰键推导 > 默认规则（列条与提交共用 hint） —— */
   const ov =
@@ -300,7 +349,7 @@ export function SelectionBubble({
         style={{
           left: pos ? pos.left : -9999,
           top: pos ? pos.top : -9999,
-          width: BUBBLE_W,
+          width: panelWidth,
           visibility: pos ? "visible" : "hidden",
         }}
       >
@@ -313,7 +362,7 @@ export function SelectionBubble({
         >
           {ready && (
             <BubbleShape
-              W={BUBBLE_W}
+              W={panelWidth}
               H={measuredH}
               cx={cx}
               geo={BUBBLE_TAIL}
@@ -328,7 +377,8 @@ export function SelectionBubble({
           <div className="ask">
             <textarea
               ref={taRef}
-              // 不自动聚焦：保留正文 DOM Selection，用户可以直接复制刚划选的内容。
+              // 用户已明确点击提问，聚焦输入；选文快照由 sel 保留。
+              autoFocus
               rows={1}
               className="scroll-slim"
               value={question}
