@@ -5,6 +5,7 @@ import {
   IMAGE_ATTACHMENT_LIMITS,
   IMAGE_ATTACHMENT_MIME_TYPES,
   IMAGE_MODEL_VALIDATION_MESSAGE,
+  THREAD_ATTACHMENT_MIME_TYPES,
 } from "@/constants/attachment"
 
 import type { GenerationSettings } from "@/constants/generation-settings"
@@ -29,12 +30,7 @@ import {
 
 export type { FileReference } from "@/lib/thread-chat/contracts/message-content"
 
-export const THREAD_MESSAGE_ATTACHMENT_MIME_TYPES = [
-  "text/plain",
-  "image/png",
-  "image/jpeg",
-  "image/webp",
-] as const
+export const THREAD_MESSAGE_ATTACHMENT_MIME_TYPES = THREAD_ATTACHMENT_MIME_TYPES
 
 const THREAD_MESSAGE_ATTACHMENT_MIME_TYPE_SET = new Set<string>(
   THREAD_MESSAGE_ATTACHMENT_MIME_TYPES

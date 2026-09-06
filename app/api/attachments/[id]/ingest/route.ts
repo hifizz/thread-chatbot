@@ -15,6 +15,7 @@ import {
 import { indexAttachment } from "@/lib/attachments/index-chunks"
 import { ATTACHMENT_POLICIES } from "@/constants/attachment"
 import { getCurrentUserId } from "@/lib/auth/server"
+import { isOfficeAttachmentMimeType } from "@/constants/office-attachment"
 
 type RouteContext = { params: Promise<{ id: string }> }
 
@@ -65,6 +66,28 @@ export async function POST(_req: Request, { params }: RouteContext) {
   }
   if (policy && actualSize > policy.maxBytes) {
     return markFailed(userId, id, row.key, "文件超过大小上限")
+  }
+
+  if (isOfficeAttachmentMimeType(row.mimeType)) {
+    let extraction
+    try {
+      const { extractOfficeDocument } = await import("@/lib/attachments/office")
+      extraction = await extractOfficeDocument(await getObjectBytes(row.key), row.mimeType)
+    } catch (error) {
+      // 解析器异常不直接暴露内部堆栈/对象路径；可操作的中文错误保留。
+      const message = error instanceof Error && /[\u4e00-\u9fff]/.test(error.message)
+        ? error.message
+        : "办公文件解析失败，文件可能已损坏或加密；请重新另存后上传"
+      return markFailed(userId, id, row.key, message)
+    }
+    await db.update(attachments).set({
+      status: "ready",
+      size: actualSize,
+      pages: extraction.pages,
+      pageCount: null,
+      error: null,
+    }).where(and(eq(attachments.id, id), eq(attachments.userId, userId)))
+    return Response.json({ status: "ready" })
   }
 
   if (row.mimeType === "application/pdf") {

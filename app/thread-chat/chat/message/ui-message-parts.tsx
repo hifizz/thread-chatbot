@@ -20,6 +20,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import type { ConversationViewMessage } from "../../core/types"
+import { isOfficeAttachmentMimeType } from "@/constants/office-attachment"
 
 function attachmentTypeLabel(filename: string | undefined, mediaType: string) {
   const extension = filename?.match(/\.([^.]+)$/)?.[1]
@@ -102,6 +103,8 @@ function TextAttachmentPreview({ part }: { part: MessageFilePart }) {
           <DialogTitle className="truncate">{filename}</DialogTitle>
           <DialogDescription className="mt-1 text-xs">
             {attachmentTypeLabel(part.filename, part.mediaType)}
+            {(isOfficeAttachmentMimeType(part.mediaType) || part.mediaType === "application/pdf") &&
+              " · 已提取内容预览；图片和图表未识别，可下载原文件核对"}
           </DialogDescription>
         </div>
         <div className="min-h-0 overflow-auto rounded-xl border bg-muted/30">
@@ -281,4 +284,3 @@ export function UIMessageSupplementalParts({
     </div>
   )
 }
-

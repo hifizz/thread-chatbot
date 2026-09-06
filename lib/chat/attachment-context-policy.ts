@@ -18,7 +18,7 @@ function readableAttachment<T extends AttachmentContextCandidate>(
     row &&
       row.status === "ready" &&
       (row.mimeType === "text/plain" ||
-        (row.mimeType === "application/pdf" &&
+        ((row.mimeType === "application/pdf" || isOfficeAttachmentMimeType(row.mimeType)) &&
           row.pages &&
           row.pages.length > 0))
   )
@@ -58,3 +58,4 @@ export function attachmentBudgetAllocation(
   if (remainingBudget <= 0 || remainingFiles <= 0) return 0
   return Math.max(1, Math.floor(remainingBudget / remainingFiles))
 }
+import { isOfficeAttachmentMimeType } from "@/constants/office-attachment"

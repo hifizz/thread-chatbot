@@ -54,6 +54,7 @@ export const attachments = dbSchema.table(
       .notNull()
       .default("uploading"),
     pageCount: integer("page_count"),
+    // PDF：按物理页存文本；Office：带段落/幻灯片/工作表位置的片段，pageCount 留空。
     pages: jsonb("pages").$type<string[]>(),
     summary: text("summary"),
     suggestedQuestions: jsonb("suggested_questions").$type<string[]>(),
