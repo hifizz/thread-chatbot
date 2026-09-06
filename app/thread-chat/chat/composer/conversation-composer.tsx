@@ -9,6 +9,10 @@ import React, {
   type ClipboardEvent,
   type DragEvent,
 } from "react"
+import { InlineArtifactEditor, type InlineArtifactEditorHandle } from "./inline-artifact-editor"
+import { useArtifactComposerDraft } from "./artifact-composer-context"
+import { inlineComposerText } from "./inline-editor-document"
+import type { MessageContentPartInput } from "@/lib/thread-chat/contracts/message-content"
 import { FileIcon, PlusIcon, XIcon } from "lucide-react"
 import { toast } from "sonner"
 import {
@@ -20,7 +24,6 @@ import { ThreadModelSelector } from "./thread-model-selector"
 import {
   composerMaxHeight,
   composerSubmission,
-  shouldSubmitComposerKey,
 } from "./conversation-composer-logic"
 import {
   canAddThreadImages,
@@ -63,14 +66,9 @@ type ConversationComposerProps = {
   modelSelectorDisabled: boolean
   modelSelectorDisabledReason?: "branch" | "busy"
   onModelChange?(modelId: string): void
-  onSend?(text: string, files: UploadedAttachmentReference[]): void
+  onSend?(text: string, files: UploadedAttachmentReference[], parts?: MessageContentPartInput[]): void | Promise<void>
   onStop?(): void
   onBeforeSend?(): void
-}
-
-function autoGrow(ta: HTMLTextAreaElement, maxHeight: number) {
-  ta.style.height = "auto"
-  ta.style.height = Math.min(ta.scrollHeight, maxHeight) + "px"
 }
 
 function hasDraggedFiles(event: DragEvent<HTMLElement>) {
@@ -91,29 +89,43 @@ export function ConversationComposer({
   onStop,
   onBeforeSend,
 }: ConversationComposerProps) {
-  const taRef = useRef<HTMLTextAreaElement | null>(null)
+  const editorRef = useRef<InlineArtifactEditorHandle | null>(null)
+  const { draft, update } = useArtifactComposerDraft(threadId)
+  const attachments = draft.attachments
+  const [submitting, setSubmitting] = useState(false)
+  const setAttachments = useCallback((next: ThreadComposerAttachment[] | ((current: ThreadComposerAttachment[]) => ThreadComposerAttachment[])) => {
+    update((current) => ({ ...current, attachments: typeof next === "function" ? next(current.attachments) : next }))
+  }, [update])
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const dragDepthRef = useRef(0)
-  const [attachments, setAttachments] = useState<ThreadComposerAttachment[]>([])
   const [isDragging, setIsDragging] = useState(false)
   const canvas = variant === "canvas"
   const maxHeight = composerMaxHeight(variant)
 
-  const doSend = () => {
-    const ta = taRef.current
-    if (!ta || !onSend) return
-    const text = composerSubmission(ta.value, busy)
+  const doSend = async () => {
+    if (!onSend || submitting) return
+    const snapshot = draft.parts
+    const text = composerSubmission(inlineComposerText(snapshot), busy)
     if (!text || !canSendThreadAttachments(attachments)) return
     if (hasUnsupportedReadyImages(modelId, attachments)) {
       toast.error(IMAGE_MODEL_VALIDATION_MESSAGE)
       return
     }
-    ta.value = ""
-    ta.style.height = "auto"
-    onBeforeSend?.()
-    onSend(text, readyThreadAttachmentReferences(attachments))
-    if (!canvas) setAttachments([])
-    ta.focus(canvas ? { preventScroll: true } : undefined)
+    const files = readyThreadAttachmentReferences(attachments)
+    const parts: MessageContentPartInput[] = [
+      ...snapshot,
+      ...files.map((file) => ({ type: "file" as const, file })),
+    ]
+    setSubmitting(true)
+    try {
+      onBeforeSend?.()
+      await onSend(text, files, parts)
+      update((current) => current.parts === snapshot && current.attachments === attachments
+        ? { parts: [], attachments: [] } : current)
+      editorRef.current?.focus()
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "发送失败，请重试")
+    } finally { setSubmitting(false) }
   }
 
   const appendFiles = useCallback(
@@ -192,7 +204,7 @@ export function ConversationComposer({
           )
       }
     },
-    [attachments]
+    [attachments, setAttachments]
   )
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -232,81 +244,41 @@ export function ConversationComposer({
       .filter((file): file is File => file !== null)
     if (pastedFiles.length > 0) {
       event.preventDefault()
+      event.stopPropagation()
       appendFiles(pastedFiles)
       return
     }
+    // 同一编辑器复制的结构化引用必须交给 Lexical，不能按纯文本长度转为附件。
+    if (event.clipboardData.getData("application/x-lexical-editor")) return
     const text = event.clipboardData.getData("text/plain")
     if (!text) return
-    if (shouldInlinePastedText(text)) {
-      const ta = taRef.current
-      if (!ta) return
-      event.preventDefault()
-      const start = ta.selectionStart
-      const end = ta.selectionEnd
-      ta.setRangeText(text, start, end, "end")
-      autoGrow(ta, maxHeight)
-      return
-    }
+    if (shouldInlinePastedText(text)) return
+    // Lexical 自身负责短文本和结构化 clipboard，长文本仍沿用附件行为。
     event.preventDefault()
+    event.stopPropagation()
     appendFiles([createPastedTextFile(text)])
   }
 
   useEffect(() => {
-    const ta = taRef.current
-    if (!ta || !prefill || ta.value !== "") return
-    ta.value = prefill
-    autoGrow(ta, maxHeight)
-    ta.focus(canvas ? { preventScroll: true } : undefined)
-    ta.setSelectionRange(ta.value.length, ta.value.length)
-  }, [canvas, maxHeight, threadId, prefill])
+    if (!prefill) return
+    update((current) => current.parts.length === 0
+      ? { ...current, parts: [{ type: "text", text: prefill }] } : current)
+  }, [prefill, threadId, update])
 
   const handleBoxPointerDown = (event: React.MouseEvent<HTMLDivElement>) => {
-    // 点击 box 任意位置都把焦点交给 textarea（附件卡片的交互不吞掉这个行为之外的事）。
-    if (event.target instanceof Element && event.target.closest("button, a")) {
-      if (event.target.closest('[data-slot="attachment"]')) return
-    }
-    const ta = taRef.current
-    if (!ta) return
-    const isFocused = document.activeElement === ta
-    const selection = window.getSelection()
-    if (isFocused || !selection?.isCollapsed) return
-    event.preventDefault()
-    ta.focus()
-    ta.setSelectionRange(ta.value.length, ta.value.length)
+    if (event.target instanceof Element && event.target.closest("button, a, [contenteditable], [role=listbox]")) return
+    editorRef.current?.focus()
   }
 
-  const textarea = (
-    <textarea
-      ref={taRef}
-      rows={1}
-      style={
-        { "--composer-max-height": `${maxHeight}px` } as React.CSSProperties
-      }
-      placeholder={
-        canvas
-          ? "就地继续这段会话…"
-          : isMain
-            ? "继续在主线提问…"
-            : "在这个分支里追问…"
-      }
-      aria-label={canvas ? "在画布节点里继续对话" : undefined}
-      onInput={(event) => autoGrow(event.currentTarget, maxHeight)}
-      onKeyDown={(event) => {
-        const nativeEvent = event.nativeEvent
-        if (
-          !shouldSubmitComposerKey({
-            key: event.key,
-            shiftKey: event.shiftKey,
-            isComposing: nativeEvent.isComposing,
-            keyCode: nativeEvent.keyCode,
-          })
-        )
-          return
-        event.preventDefault()
-        doSend()
-      }}
-    />
-  )
+  const input = <InlineArtifactEditor
+    key={threadId}
+    value={draft.parts}
+    onChange={(parts) => update((current) => ({ ...current, parts }))}
+    onSubmit={() => void doSend()}
+    editorRef={editorRef}
+    maxHeight={maxHeight}
+    label={canvas ? "在画布节点里继续对话" : "消息输入框"}
+  />
 
   const selector = modelId ? (
     <ThreadModelSelector
@@ -325,7 +297,7 @@ export function ConversationComposer({
   ) : null
 
   const attachmentTray =
-    !canvas && attachments.length > 0 ? (
+    attachments.length > 0 ? (
       <AttachmentGroup
         data-testid="composer-attachment-tray"
         aria-label="已添加的附件"
@@ -380,12 +352,13 @@ export function ConversationComposer({
     <div className="cv-prompt-stack">
       {selector}
       {generationSettingsControls}
-      {textarea}
+      {attachmentTray}
+      {input}
     </div>
   ) : (
     <div className="prompt-stack">
       {attachmentTray}
-      {textarea}
+      {input}
       <div className="composer-tools">
         <input
           ref={fileInputRef}
@@ -424,8 +397,8 @@ export function ConversationComposer({
   ) : (
     <button
       className={canvas ? "cv-send" : "send"}
-      onClick={doSend}
-      disabled={!canvas && !canSendThreadAttachments(attachments)}
+      onClick={() => void doSend()}
+      disabled={submitting || !canSendThreadAttachments(attachments)}
     >
       发送
     </button>
@@ -433,7 +406,7 @@ export function ConversationComposer({
 
   if (canvas) {
     return (
-      <div className="cv-composer">
+      <div className="cv-composer" onPasteCapture={handlePaste}>
         {promptStack}
         {button}
       </div>
@@ -448,7 +421,7 @@ export function ConversationComposer({
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
-          onPaste={handlePaste}
+          onPasteCapture={handlePaste}
           onMouseDown={handleBoxPointerDown}
         >
           {promptStack}

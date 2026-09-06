@@ -46,7 +46,7 @@ export function startProject(userId: string, command: StartProjectCommand) {
         const files = commandFiles(command)
         assertModelSupportsNewAttachments(command.modelId, files)
         await assertOwnedReadyAttachments(tx, userId, files)
-        if (command.parts.some((part) => part.type === "quote")) {
+        if (command.parts.some((part) => part.type === "quote" || part.type === "artifact-reference")) {
           stateConflict("新建 Project 时不能引用尚不属于该 Project 的内容")
         }
         const now = new Date()

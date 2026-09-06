@@ -1,4 +1,5 @@
 import { z } from "zod"
+import { artifactReferenceInputSchema, type ArtifactReferenceData } from "./artifact-reference"
 import type { ThreadChatUIMessage } from "@/lib/thread-chat/contracts/ui-message"
 import {
   THREAD_QUOTE_SCHEMA_VERSION,
@@ -25,6 +26,7 @@ export const threadQuoteInputV1Schema = threadQuoteDataV1Schema
 export type ThreadQuoteInputV1 = ThreadQuoteDataV1
 
 export const messageContentPartInputSchema = z.discriminatedUnion("type", [
+  artifactReferenceInputSchema,
   z.object({ type: z.literal("text"), text: z.string().max(200_000) }).strict(),
   z.object({ type: z.literal("file"), file: fileReferenceSchema }).strict(),
   z
@@ -71,6 +73,8 @@ export function composerDraftToMessageContent(
 ): MessageContentInput {
   return messageContentInputSchema.parse({
     parts: draft.parts.map((part) => {
+      if (part.type === "artifact-reference")
+        return { type: "artifact-reference" as const, artifactId: part.artifactId }
       if (part.type === "text")
         return { type: "text" as const, text: part.text }
       if (part.type === "file")
@@ -91,9 +95,14 @@ export function composerDraftToMessageContent(
 
 /** 网络命令到持久化 UI Message Parts 的唯一转换，禁止按类型重排。 */
 export function messageContentToUiParts(
-  content: MessageContentInput
+  content: MessageContentInput,
+  resolveArtifact?: (id: string) => ArtifactReferenceData
 ): ThreadChatUIMessage["parts"] {
   return content.parts.map((part) => {
+    if (part.type === "artifact-reference") {
+      if (!resolveArtifact) throw new Error("Artifact 引用需要先由服务端解析")
+      return { type: "data-artifact-reference" as const, data: resolveArtifact(part.artifactId) }
+    }
     if (part.type === "text") return { type: "text" as const, text: part.text }
     if (part.type === "file") {
       return {
@@ -113,4 +122,21 @@ export function filesFromMessageContent(
   return content.parts.flatMap((part) =>
     part.type === "file" ? [part.file] : []
   )
+}
+
+/** 编辑和重试从完整 Parts 恢复，不从展示文字反向重建引用。 */
+export function messagePartsToContent(parts: ThreadChatUIMessage["parts"]): MessageContentPartInput[] {
+  return parts.flatMap((part): MessageContentPartInput[] => {
+    if (part.type === "text") return [{ type: "text", text: part.text }]
+    if (part.type === "data-artifact-reference")
+      return [{ type: "artifact-reference", artifactId: part.data.artifactId }]
+    if (part.type === "file") return [{ type: "file", file: {
+      url: part.url, mediaType: part.mediaType, ...(part.filename ? { filename: part.filename } : {}),
+    } }]
+    if (part.type === "data-quote") {
+      const parsed = threadQuoteDataV1Schema.safeParse(part.data)
+      if (parsed.success) return [{ type: "quote", quote: parsed.data }]
+    }
+    return []
+  })
 }

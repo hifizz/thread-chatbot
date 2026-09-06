@@ -1,5 +1,7 @@
 import { convertToModelMessages, type ModelMessage } from "ai"
 import { db } from "@/lib/db"
+import { loadReferenceArtifacts } from "./artifact-reference-resolution"
+import { artifactReferenceDataSchema, expandArtifactReferenceParts } from "../contracts/artifact-reference"
 import { supportsModelImageInput } from "@/constants/model"
 import {
   applyImageFileMaterializations,
@@ -115,7 +117,15 @@ export async function compileModelContextWithProject({
     // generic UIMessage-shaped, so restore the narrower ThreadChat type here.
     ...(resolved.messages as ThreadChatUIMessage[]),
   ]
-  const modelMessages = await convertToModelMessages(withProjectContext, {
+  const referenceIds = withProjectContext.flatMap((message) => message.parts.flatMap((part) =>
+    part.type === "data-artifact-reference" ? [artifactReferenceDataSchema.parse(part.data).artifactId] : []
+  ))
+  const referenceArtifacts = await loadReferenceArtifacts(db, thread.projectId, referenceIds)
+  const expandedReferences = withProjectContext.map((message) => ({
+    ...message,
+    parts: expandArtifactReferenceParts(message.parts, referenceArtifacts),
+  }))
+  const modelMessages = await convertToModelMessages(expandedReferences, {
     ignoreIncompleteToolCalls: true,
     convertDataPart: (part) => {
       if (part.type !== "data-quote") return undefined

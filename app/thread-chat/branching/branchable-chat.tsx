@@ -10,6 +10,8 @@
  * 本层只发出意图回调（打开会话 / 回退 / 收起…），列槽的增删换由 orchestration 决定。
  */
 
+import type { MessageContentPartInput } from "@/lib/thread-chat/contracts/message-content"
+
 import React from "react"
 import { ListTree } from "lucide-react"
 import type { Message, ThreadTreeState } from "../core/types"
@@ -56,7 +58,7 @@ export interface BranchableChatProps {
   composerPrefill?: string
   /** 根 Thread 模型切换意图；分支 selector 仍由本层锁定。 */
   onModelChange: (modelId: string) => void
-  onSend: (text: string, files: CommandFileReference[]) => void
+  onSend: (text: string, files: CommandFileReference[], parts?: MessageContentPartInput[]) => void | Promise<void>
   messageActionState?: MessageActionViewState
   messageCommands?: ThreadMessageActionCommands
 }

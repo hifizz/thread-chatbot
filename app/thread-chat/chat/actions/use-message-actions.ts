@@ -56,11 +56,12 @@ export function useMessageActions({
           )
         return result
       },
-      async editAndRegenerate(threadId, userMessageId, text) {
+      async editAndRegenerate(threadId, userMessageId, text, parts) {
         const result = await commands.editAndRegenerate(
           threadId,
           userMessageId,
-          text
+          text,
+          parts
         )
         if (result.ok)
           setRecoverableByUserMessageId((current) =>

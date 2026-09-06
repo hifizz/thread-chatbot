@@ -1,5 +1,6 @@
 import type { FileReference } from "@/lib/thread-chat/contracts/message-content"
 import type { ComposerQuoteSourceDraft } from "@/lib/thread-chat/contracts/quote"
+import type { ArtifactReferenceInput } from "./artifact-reference"
 
 export interface ComposerQuoteDraft {
   text: string
@@ -10,6 +11,7 @@ export interface ComposerQuoteDraft {
 }
 
 export type ComposerMessagePartDraft =
+  | ({ localId: string } & ArtifactReferenceInput)
   | { localId: string; type: "text"; text: string }
   | { localId: string; type: "file"; file: FileReference }
   | { localId: string; type: "quote"; quote: ComposerQuoteDraft }

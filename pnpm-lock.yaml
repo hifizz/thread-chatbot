@@ -17,6 +17,15 @@ importers:
 
   .:
     dependencies:
+      lexical:
+        specifier: 0.45.0
+        version: 0.45.0
+      '@lexical/clipboard':
+        specifier: 0.45.0
+        version: 0.45.0
+      '@lexical/react':
+        specifier: 0.45.0
+        version: 0.45.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(yjs@13.6.31)
       '@ai-sdk/anthropic':
         specifier: ^4.0.44
         version: 4.0.44(zod@4.4.3)
