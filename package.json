@@ -9,6 +9,7 @@
   "private": true,
   "license": "AGPL-3.0-only",
   "scripts": {
+    "cloud-research:smoke": "node --import tsx scripts/cloud-research-smoke.ts",
     "dev": "bash scripts/dev.sh",
     "build": "next build",
     "vercel-build": "node scripts/vercel-migrate.mjs && next build",

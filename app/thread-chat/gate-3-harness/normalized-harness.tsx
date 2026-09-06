@@ -59,6 +59,7 @@ const SCENARIOS: Array<{ id: Gate3HarnessScenario; label: string }> = [
   { id: "failure", label: "可重试失败" },
   { id: "artifact", label: "Artifact-only" },
   { id: "research", label: "研究 parts" },
+  { id: "cloud-research", label: "云调研 UI（模拟服务）" },
 ]
 
 function legacyFeedback(value: "up" | "down" | null): MessageFeedback | null {

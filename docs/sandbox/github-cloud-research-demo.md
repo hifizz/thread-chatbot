@@ -33,6 +33,23 @@ corepack pnpm dev
 
 ## 可观察结果
 
+### 无数据库的真实联调入口
+
+配置上面的变量，再设置 `CLOUD_RESEARCH_MODEL_ID` 为项目中已有、且对应 Provider Key 已配置的模型 ID。可以先不启动数据库，用同一份任务逻辑验证外部服务：
+
+```bash
+corepack pnpm cloud-research:smoke --check "@GitHub github/hifizz/thread-chatbot 调研 agent 云任务"
+corepack pnpm cloud-research:smoke --publish "@GitHub github/hifizz/thread-chatbot 调研 agent 云任务，给出源码依据和实现建议"
+```
+
+第一条仅检查配置，不消费额度；第二条调用真实模型、E2B 和 GitHub，并打印阶段、报告正文和真实 PR 链接。它不模拟外部服务，但不覆盖应用登录、数据库保存和浏览器展示；完整验收仍需在 ThreadChat 页面执行。Ctrl+C 会请求停止和回收。
+
+### 开发页面的 UI 验收入口
+
+启动 `pnpm dev` 后访问 `http://localhost:4040/thread-chat-gate-3-harness/00000000-0000-4000-8000-000000000098`，右侧测试场景选择“云调研 UI（模拟服务）”，再发送一条消息。阶段约 3.6 秒收敛，可检查任务卡、超长读取内容和 Artifact 抽屉。此入口只在开发模式且 localhost 可访问，沿用项目原有 harness 权限边界；所有阶段明确标为演示数据，PR 链接指向本功能实现 PR #98。
+
+### 正常任务的结果
+
 1. 消息内实时出现配置校验、版本确认、沙箱启动和代码加载状态。
 2. 每次检索/读取分别显示进行中、完成或失败，展开可查看返回内容及截断提示。
 3. 模型的行动说明和报告参数逐步到达前端，报告复用 Markdown Artifact 的生成进度、阅读与保存逻辑。
@@ -59,9 +76,12 @@ corepack pnpm dev
 corepack pnpm typecheck
 node --import tsx e2e/thread-chat/cloud-research.test.mjs
 node --import tsx e2e/thread-chat/cloud-research-reader.test.mjs
+node --import tsx e2e/thread-chat/cloud-research-client.test.mjs
 node --import tsx e2e/thread-chat/normalized-ui-message-pipeline.test.mjs
 ```
 
 云调研测试使用真实 AI SDK 多轮调用、preliminary 事件和项目消息流 reducer，模拟外部模型、E2B 和 GitHub；覆盖报告提取、发布失败保留报告、停止与延迟创建后的回收、账号/仓库限制及 PR REST 参数。读取器测试在本机 Python 运行同一份固定脚本。
 
 开发环境没有 E2B、模型、数据库凭据，因此尚未做真实云端端到端、实际数据库保存或真实报告 PR 验收。代码通过不等于服务已联通；配置完成后以以上示例实际跑一遍，验收私有仓库读取、报告引用、真实 PR、刷新与 Stop。
+
+2026-09-06 补充检查：GitHub 连接器已成功创建本功能草稿 PR #98；`hifizz/coding` 返回 404，不能确认是仓库不存在还是当前连接无权限。未找到 E2B/Daytona/ComputeSDK/Coolify 插件，本地也没有 Coolify CLI 或项目 `.env.local`。Cloud Browser 访问 localhost 返回 `ERR_BLOCKED_BY_CLIENT`，浏览器视觉验收未完成。新增客户端测试覆盖实际 SSE 解析、Store 阶段更新和 React 任务卡渲染，但使用模拟服务，不能代替真实云端与浏览器验收。

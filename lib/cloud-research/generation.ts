@@ -24,7 +24,7 @@ export const inspectRepositorySchema = z.object({
 })
 
 export function prepareCloudResearch(
-  input: PrepareGenerationInput,
+  input: Pick<PrepareGenerationInput, "userId" | "messageId" | "latestUserText" | "abortSignal" | "generationSettings">,
   request: CloudResearchRequest,
   model: LanguageModel,
   dependencies = { createSandbox: createResearchSandbox, GitHub: ResearchGitHub },
