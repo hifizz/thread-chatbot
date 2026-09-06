@@ -115,7 +115,7 @@ export function CanvasExpand({
         onBeforeSend={() => {
           stickRef.current = true
         }}
-        onSend={actions ? (text) => actions.send(threadId, text) : undefined}
+        onSend={actions ? (text, files, parts) => actions.send(threadId, text, files, parts) : undefined}
         onStop={() => actions?.stop(threadId)}
       />
     </div>

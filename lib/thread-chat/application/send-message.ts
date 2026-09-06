@@ -1,3 +1,4 @@
+import { resolveUserMessageParts } from "./artifact-reference-resolution"
 import { messages } from "@/lib/db/schema"
 import type { SendMessageCommand } from "@/lib/thread-chat/contracts/commands"
 import type { GenerationAcceptedDTO } from "@/lib/thread-chat/contracts/dto"
@@ -7,7 +8,6 @@ import {
   assertOwnedReadyAttachments,
   assertModelSupportsNewAttachments,
   assertThreadReadyForTurn,
-  buildUserParts,
   commandFiles,
   touchProjectAndThread,
 } from "@/lib/thread-chat/application/command-utils"
@@ -60,6 +60,7 @@ export function sendMessage(
           sourceThreadId: thread.id,
           content: command,
         })
+        const resolvedParts = await resolveUserMessageParts(tx, project.id, command)
         const [userSequence, assistantSequence] = await allocateThreadSequences(
           tx,
           thread.id,
@@ -75,7 +76,7 @@ export function sendMessage(
               threadId: thread.id,
               sequence: userSequence,
               role: "user",
-              parts: buildUserParts(command),
+              parts: resolvedParts,
               status: "completed",
               finishedAt: now,
             },

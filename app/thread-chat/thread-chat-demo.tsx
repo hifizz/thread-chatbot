@@ -1,5 +1,8 @@
 "use client"
 
+import { ArtifactComposerProvider } from "./chat/composer/artifact-composer-context"
+import { messagePartsToContent, type MessageContentPartInput } from "@/lib/thread-chat/contracts/message-content"
+
 import dynamic from "next/dynamic"
 import { useRouter } from "next/navigation"
 import React, { useCallback, useEffect, useMemo, useState } from "react"
@@ -306,6 +309,7 @@ function NormalizedThreadChat({
             assistantMessageId: assistant?.id,
             modelId,
             ...generationSettingsInput(modelId, generationSettings),
+            parts: messagePartsToContent(source.parts),
             text: textFromMessageParts(source.parts),
             files: messageFileReferences(source),
           })
@@ -319,7 +323,7 @@ function NormalizedThreadChat({
           return actionFailure(error)
         }
       },
-      async editAndRegenerate(viewThreadId, userMessageId, text) {
+      async editAndRegenerate(viewThreadId, userMessageId, text, parts) {
         try {
           const threadId = fromConversationViewThreadId(state, viewThreadId)
           const source = state.messagesById[userMessageId]
@@ -339,6 +343,7 @@ function NormalizedThreadChat({
             modelId,
             ...generationSettingsInput(modelId, generationSettings),
             text,
+            parts,
             files: source ? messageFileReferences(source) : [],
           })
           return actionResult({
@@ -370,7 +375,7 @@ function NormalizedThreadChat({
   )
 
   const send = useCallback(
-    (viewThreadId: string, text: string, files: CommandFileReference[] = []) => {
+    (viewThreadId: string, text: string, files: CommandFileReference[] = [], parts?: MessageContentPartInput[]) => {
       const current = runtime.store.getState()
       const normalizedThreadId = fromConversationViewThreadId(
         current,
@@ -390,6 +395,7 @@ function NormalizedThreadChat({
             ...settingsInput,
             text,
             files,
+            parts,
           })
         : runtime.commands.startProject({
             projectId: treeId,
@@ -397,17 +403,15 @@ function NormalizedThreadChat({
             ...settingsInput,
             text,
             files,
+            parts,
           })
-      void operation.catch((error) =>
-        showToast(error instanceof Error ? error.message : "发送失败，请重试")
-      )
+      return operation.then(() => undefined)
     },
     [
       draftModelId,
       generationSettings,
       runtime.commands,
       runtime.store,
-      showToast,
       treeId,
     ]
   )
@@ -637,6 +641,7 @@ function NormalizedThreadChat({
   }
 
   return (
+    <ArtifactComposerProvider key={treeId} artifacts={Object.values(state.artifactsById)} openArtifact={openArtifact}>
     <div
       className="tc"
       data-view-mode={workspace.viewMode}
@@ -698,7 +703,7 @@ function NormalizedThreadChat({
                 }}
                 onRetry={(message) => retry(viewThreadId, message)}
                 onStop={() => stop(viewThreadId)}
-                onSend={(text, files) => send(viewThreadId, text, files)}
+                onSend={(text, files, parts) => send(viewThreadId, text, files, parts)}
                 messageActionState={messageActionState}
                 messageCommands={messageCommands}
               />
@@ -793,5 +798,6 @@ function NormalizedThreadChat({
       />
       <WorkspaceToast toast={toast} onDismiss={dismissToast} />
     </div>
+    </ArtifactComposerProvider>
   )
 }

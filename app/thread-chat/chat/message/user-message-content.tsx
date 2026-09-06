@@ -7,6 +7,7 @@ import {
 } from "@/constants/user-message"
 import type { ConversationViewMessage } from "../../core/types"
 import { UIMessageSupplementalParts } from "./ui-message-parts"
+import { InlineUserContent } from "./inline-user-content"
 
 /** 只折叠展示，不裁剪消息原文；按钮始终位于内部滚动区之外。 */
 export function UserMessageContent({ message }: { message: ConversationViewMessage }) {
@@ -49,8 +50,7 @@ export function UserMessageContent({ message }: { message: ConversationViewMessa
         style={{ "--tc-user-message-collapsed-lines": USER_MESSAGE_COLLAPSED_LINES } as CSSProperties}
       >
         <div ref={contentRef} className="user-message-content">
-          {message.quote && <div className="msg-quote">{message.quote.text}</div>}
-          {message.text}
+          <InlineUserContent message={message} />
           <UIMessageSupplementalParts message={message} />
         </div>
       </div>

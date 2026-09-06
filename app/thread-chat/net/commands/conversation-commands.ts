@@ -1,3 +1,5 @@
+import { messageContentToUiParts, messagePartsToContent } from "@/lib/thread-chat/contracts/message-content"
+import { artifactReferenceData } from "@/lib/thread-chat/contracts/artifact-reference"
 import type { GenerationSettings } from "@/constants/generation-settings"
 import type {
   AddProjectFileCommand,
@@ -52,6 +54,7 @@ export interface ForkCommandInput {
   modelId: string
   generationSettings?: GenerationSettings
   text?: string
+  parts?: MessageContentPartInput[]
   files?: CommandFileReference[]
 }
 
@@ -69,20 +72,6 @@ function commandParts(
   ]
 }
 
-function userParts(content: MessageContentInput): MessageDTO["parts"] {
-  return content.parts.map((part) => {
-    if (part.type === "text") return { type: "text" as const, text: part.text }
-    if (part.type === "file") {
-      return {
-        type: "file" as const,
-        url: part.file.url,
-        mediaType: part.file.mediaType,
-        ...(part.file.filename ? { filename: part.file.filename } : {}),
-      }
-    }
-    return { type: "data-quote" as const, data: part.quote }
-  })
-}
 
 function temporaryMessage(input: {
   id: string
@@ -164,6 +153,13 @@ export function createConversationCommands(
   options: ConversationCommandOptions
 ) {
   const { store, client } = options
+  function userParts(content: MessageContentInput): MessageDTO["parts"] {
+    return messageContentToUiParts(content, (id) => {
+      const artifact = store.getState().artifactsById[id]
+      if (!artifact) throw new Error("引用的 Artifact 尚未加载")
+      return artifactReferenceData(artifact)
+    })
+  }
   const createId = options.createId ?? (() => crypto.randomUUID())
   const attempts = Math.max(1, options.networkAttempts ?? 2)
   const connections = new Map<string, GenerationConnection>()
@@ -235,6 +231,7 @@ export function createConversationCommands(
     modelId: string
     generationSettings?: GenerationSettings
     text: string
+    parts?: MessageContentPartInput[]
     files?: CommandFileReference[]
   }) {
     const files = input.files ?? []
@@ -246,7 +243,7 @@ export function createConversationCommands(
       assistantMessageId: createId(),
       modelId: input.modelId,
       ...generationSettingsField(input.generationSettings),
-      parts: commandParts(input.text, files),
+      parts: input.parts ?? commandParts(input.text, files),
     })
     const now = new Date().toISOString()
     const project: ProjectDTO = {
@@ -325,6 +322,7 @@ export function createConversationCommands(
     modelId: string
     generationSettings?: GenerationSettings
     text: string
+    parts?: MessageContentPartInput[]
     files?: CommandFileReference[]
   }) {
     const state = store.getState()
@@ -337,7 +335,7 @@ export function createConversationCommands(
       assistantMessageId: createId(),
       modelId: input.modelId,
       ...generationSettingsField(input.generationSettings),
-      parts: commandParts(input.text, files),
+      parts: input.parts ?? commandParts(input.text, files),
     })
     store.getState().beginOptimisticCommand(command.commandId, (snapshot) => {
       const sequence = nextSequence(snapshot, input.threadId)
@@ -409,7 +407,7 @@ export function createConversationCommands(
                     },
                   },
                 },
-                ...commandParts(input.text!.trim(), files),
+                ...(input.parts ?? commandParts(input.text!.trim(), files)),
               ],
             },
           }
@@ -538,6 +536,7 @@ export function createConversationCommands(
     modelId: string
     generationSettings?: GenerationSettings
     text: string
+    parts?: MessageContentPartInput[]
     files?: CommandFileReference[]
   }) {
     const source = store.getState().messagesById[input.userMessageId]
@@ -549,7 +548,10 @@ export function createConversationCommands(
       assistantMessageId: createId(),
       modelId: input.modelId,
       ...generationSettingsField(input.generationSettings),
-      parts: commandParts(input.text, files),
+      parts: input.parts ?? [
+        ...messagePartsToContent(source.parts).filter((part) => part.type !== "text" && part.type !== "file"),
+        ...commandParts(input.text, files),
+      ],
     })
     store.getState().beginOptimisticCommand(command.commandId, (snapshot) => {
       const now = new Date().toISOString()

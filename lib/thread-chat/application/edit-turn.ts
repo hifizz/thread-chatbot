@@ -1,3 +1,4 @@
+import { resolveUserMessageParts } from "./artifact-reference-resolution"
 import { and, inArray, isNull } from "drizzle-orm"
 import { messages } from "@/lib/db/schema"
 import type { EditLatestTurnCommand } from "@/lib/thread-chat/contracts/commands"
@@ -8,14 +9,12 @@ import {
   assertAllowedModel,
   assertOwnedReadyAttachments,
   assertModelSupportsNewAttachments,
-  buildUserParts,
   commandFiles,
   touchProjectAndThread,
 } from "@/lib/thread-chat/application/command-utils"
 import { notFound, stateConflict } from "@/lib/thread-chat/application/errors"
 import {
   assertEditQuoteSemantics,
-  assertValidQuoteSources,
 } from "@/lib/thread-chat/application/quote-validation"
 import { executeIdempotentCommand } from "@/lib/thread-chat/persistence/command-repository"
 import {
@@ -66,6 +65,7 @@ export function editLatestTurn(
         if (!thread) notFound()
         const project = await lockOwnedProject(tx, userId, source.projectId)
         if (!project) notFound()
+        if (project.archivedAt) stateConflict("已归档 Project 不可编辑消息")
         const timeline = await listThreadMessageRows(
           tx,
           source.projectId,
@@ -79,12 +79,8 @@ export function editLatestTurn(
         assertModelSupportsNewAttachments(command.modelId, files)
         await assertOwnedReadyAttachments(tx, userId, files)
         assertEditQuoteSemantics(source.parts, command)
-        await assertValidQuoteSources({
-          tx,
-          projectId: project.id,
-          sourceThreadId: thread.id,
-          content: command,
-        })
+        // 已有 Quote 已通过快照等价校验，编辑不重新限制为当前 Thread（分支首问可能来自父级）。
+        const resolvedParts = await resolveUserMessageParts(tx, project.id, command)
         const [userSequence, assistantSequence] = await allocateThreadSequences(
           tx,
           thread.id,
@@ -113,7 +109,7 @@ export function editLatestTurn(
               threadId: source.threadId,
               sequence: userSequence,
               role: "user",
-              parts: buildUserParts(command),
+              parts: resolvedParts,
               status: "completed",
               replacesMessageId: source.id,
               finishedAt: now,

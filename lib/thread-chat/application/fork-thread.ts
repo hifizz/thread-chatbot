@@ -1,3 +1,4 @@
+import { resolveUserMessageParts } from "./artifact-reference-resolution"
 import { messages, threads } from "@/lib/db/schema"
 import type { ForkThreadCommand } from "@/lib/thread-chat/contracts/commands"
 import type {
@@ -10,7 +11,6 @@ import {
   assertAllowedModel,
   assertOwnedReadyAttachments,
   assertModelSupportsNewAttachments,
-  buildUserParts,
   commandFiles,
   touchProjectAndThread,
 } from "@/lib/thread-chat/application/command-utils"
@@ -107,6 +107,7 @@ export function forkThread(
           sourceThreadId: parent.id,
           content: command.firstTurn,
         })
+        const resolvedParts = await resolveUserMessageParts(tx, project.id, command.firstTurn)
         const [userSequence, assistantSequence] = await allocateThreadSequences(
           tx,
           child.id,
@@ -122,7 +123,7 @@ export function forkThread(
               threadId: child.id,
               sequence: userSequence,
               role: "user",
-              parts: buildUserParts(command.firstTurn),
+              parts: resolvedParts,
               status: "completed",
               finishedAt: now,
             },

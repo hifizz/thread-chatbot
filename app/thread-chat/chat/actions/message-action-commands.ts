@@ -1,3 +1,4 @@
+import type { MessageContentPartInput } from "@/lib/thread-chat/contracts/message-content"
 import type { MessageFeedback, MessageFeedbackSummary } from "../../core/types"
 import type { MessageActionFailureCode } from "@/lib/thread-chat/contracts/message-action-failure"
 
@@ -27,7 +28,8 @@ export interface ThreadMessageActionCommands {
   editAndRegenerate(
     threadId: string,
     userMessageId: string,
-    text: string
+    text: string,
+    parts?: MessageContentPartInput[]
   ): Promise<GenerationActionResult>
   submitFeedback(
     threadId: string,

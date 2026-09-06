@@ -10,6 +10,8 @@
  * 的内容收敛在通道里，纸面 / padding / 边框仍随列通栏；本层不感知列宽。
  */
 
+import type { MessageContentPartInput } from "@/lib/thread-chat/contracts/message-content"
+
 import React from "react"
 import { MessageScroller } from "@shadcn/react/message-scroller"
 import type { ConversationViewMessage } from "../core/types"
@@ -49,7 +51,7 @@ export interface ChatViewProps {
   /** 分支锁定时显示模型切换限制说明；生成期间仅禁用。 */
   modelSelectorDisabledReason?: "branch" | "busy"
   onModelChange: (modelId: string) => void
-  onSend: (text: string, files: CommandFileReference[]) => void
+  onSend: (text: string, files: CommandFileReference[], parts?: MessageContentPartInput[]) => void | Promise<void>
   messageActionState?: MessageActionViewState
   messageCommands?: ThreadMessageActionCommands
   editableUserMessageId?: string
