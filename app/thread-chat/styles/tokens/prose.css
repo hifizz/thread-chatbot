@@ -16,18 +16,18 @@
   --tc-prose-list-item-gap: 4px;
 
   --tc-prose-quote-gap: 12px;
-  --tc-prose-quote-indent: 14px;
-  --tc-prose-hr-gap: 18px;
+  --tc-prose-quote-indent: 8px;
+  --tc-prose-hr-gap: 24px;
 
   --tc-prose-table-size: 14px;
-  --tc-prose-table-gap: 12px;
+  --tc-prose-table-gap: 16px;
 
-  --tc-prose-code-size: 12px;
+  --tc-prose-code-size: 14px;
   --tc-prose-code-leading: 1.6;
-  --tc-prose-code-gap: 12px;
+  --tc-prose-code-gap: 16px;
   --tc-prose-code-pad-block: 12px;
   --tc-prose-code-pad-inline: 14px;
-  --tc-prose-lang-size: 10px;
+  --tc-prose-lang-size: 12px;
 
   --tc-prose-inline-code-size: 0.85em;
   --tc-prose-fn-size: 10px;
