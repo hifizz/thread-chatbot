@@ -31,8 +31,10 @@ import { buildAiTelemetryConfig } from "@/lib/observability/ai-sdk"
 import { OBSERVATION_NAMES } from "@/constants/observability"
 import { observeAppOperation } from "@/lib/observability/trace"
 import type { ObservabilityContext } from "@/lib/observability/types"
+import { parseCloudResearchRequest } from "@/lib/cloud-research/request"
 
 export interface PrepareGenerationInput {
+  userId?: string
   messageId: string
   projectId: string
   threadId: string
@@ -74,6 +76,17 @@ export async function prepareGeneration(input: PrepareGenerationInput) {
       : {}),
   }
   const searchReady = isSearchConfigured()
+  if (process.env.CLOUD_RESEARCH_DEMO_ENABLED === "true") {
+    const cloudRequest = parseCloudResearchRequest(input.latestUserText)
+    if (cloudRequest) {
+      const { prepareCloudResearch } = await import("@/lib/cloud-research/generation")
+      return prepareCloudResearch(
+        input,
+        cloudRequest,
+        withModelCallLogging(model, MODEL_CALL_PURPOSE.chatAnswer, trace),
+      )
+    }
+  }
   const researchRoute = await observeAppOperation(
     OBSERVATION_NAMES.researchRoute,
     {

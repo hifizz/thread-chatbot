@@ -13,7 +13,7 @@ import { textFromMessageParts } from "@/lib/thread-chat/contracts/ui-message"
 import type { ThreadChatClient } from "../net/client"
 
 export type Gate3HarnessScenario =
-  "normal" | "late-sse" | "disconnect" | "failure" | "artifact" | "research"
+  "normal" | "late-sse" | "disconnect" | "failure" | "artifact" | "research" | "cloud-research"
 
 const ROOT_THREAD_ID = "00000000-0000-4000-8000-000000000010"
 const CHILD_THREAD_ID = "00000000-0000-4000-8000-000000000020"
@@ -428,7 +428,7 @@ export function createGate3MockRuntime(
       status = "failed"
       error = { code: "HARNESS_FAILURE", message: "可控失败：请使用重新生成" }
       parts = [{ type: "text", text: "失败前保留的部分内容", state: "done" }]
-    } else if (scenario === "artifact") {
+    } else if (scenario === "artifact" || scenario === "cloud-research") {
       const artifactId = crypto.randomUUID()
       artifacts.set(artifactId, {
         id: artifactId,
@@ -451,6 +451,13 @@ export function createGate3MockRuntime(
         updatedAt: stamp,
       })
       parts = [
+        ...(scenario === "cloud-research" ? [{
+          type: "tool-prepareRepository" as const,
+          toolCallId: `cloud-${messageId}`,
+          state: "output-available" as const,
+          input: {},
+          output: { status: "completed" as const, detail: "演示数据 · 代码环境已就绪", text: "README.md\nlib/cloud-research/generation.ts\n" + "超长文件路径/".repeat(80) },
+        }] : []),
         {
           type: "tool-createMarkdownArtifact",
           toolCallId: `artifact-${messageId}`,
@@ -461,6 +468,13 @@ export function createGate3MockRuntime(
           },
           output: { created: true, artifactId },
         },
+        ...(scenario === "cloud-research" ? [{
+          type: "tool-publishResearchReport" as const,
+          toolCallId: `publish-${messageId}`,
+          state: "output-available" as const,
+          input: {},
+          output: { status: "completed" as const, detail: "演示数据 · 链接指向本功能实现 PR #98", url: "https://github.com/hifizz/thread-chatbot/pull/98" },
+        }] : []),
       ]
     } else if (scenario === "research") {
       parts = [
@@ -847,6 +861,25 @@ export function createGate3MockRuntime(
             throughSeq: 0,
             replay: [],
           })
+          if (scenario === "cloud-research") {
+            send({ type: "chunk", seq: 1, chunk: {
+              type: "tool-input-available", toolCallId: `cloud-${messageId}`,
+              toolName: "prepareRepository", input: {},
+            } })
+            const stages = ["校验配置", "启动沙箱", "加载代码快照", "读取与调研代码"]
+            stages.forEach((stage, index) => setTimeout(() => {
+              if (messages.get(messageId)?.status !== "generating") return
+              send({ type: "chunk", seq: index + 2, chunk: {
+                type: "tool-output-available", toolCallId: `cloud-${messageId}`, preliminary: true,
+                output: { status: "running", detail: `演示数据 · ${stage}` },
+              } })
+            }, index * 800))
+            setTimeout(() => {
+              send({ type: "terminal", message: finalMessage(messageId) })
+              close()
+            }, 3600)
+            return
+          }
           send({
             type: "chunk",
             seq: 1,
