@@ -28,6 +28,7 @@ import remarkGfm from "remark-gfm"
 import { Check, Copy } from "lucide-react"
 import { useTheme } from "next-themes"
 
+import { MermaidBlock } from "./mermaid-block"
 import { ShikiCode } from "@/components/markdown/shiki-code"
 import { cn } from "@/lib/utils"
 import {
@@ -125,6 +126,7 @@ function MarkdownCode({
   node,
   ...props
 }: MarkdownCodeProps) {
+  const settlement = useContext(MarkdownSettlementContext)
   const match = /(?:^|\s)language-([^\s]+)/.exec(className || "")
   const raw = String(children ?? "")
   // 有语言围栏、或内容含换行 = 代码块；否则是行内 code
@@ -132,13 +134,21 @@ function MarkdownCode({
   if (isBlock) {
     const nodeData = node?.data as { meta?: unknown } | undefined
     const meta = typeof nodeData?.meta === "string" ? nodeData.meta : undefined
-    return (
+    const block = (
       <CodeBlock
         lang={match?.[1] ?? ""}
         code={raw.replace(/\n$/, "")}
         meta={meta}
       />
     )
+    if (match?.[1].toLowerCase() === "mermaid") {
+      return (
+        <MermaidBlock code={raw.replace(/\n$/, "")} streaming={settlement?.streaming ?? false} batch={settlement?.batch}>
+          {block}
+        </MermaidBlock>
+      )
+    }
+    return block
   }
   return (
     <code className="md-inline-code" {...props}>

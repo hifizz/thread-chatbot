@@ -285,3 +285,65 @@
 .tc .tc-prose sup.fn-mark:hover {
   filter: brightness(1.1);
 }
+
+/* 图表延续纸面阅读：透明底、无卡片边框，轻量切换入口。 */
+.tc .md-mermaid {
+  min-width: 0;
+  max-width: 100%;
+  margin: 0 0 var(--tc-prose-code-gap);
+}
+.tc .md-mermaid-tools {
+  display: flex;
+  justify-content: flex-end;
+  gap: 4px;
+  font-family: var(--tc-typography-family-ui);
+  font-size: var(--tc-prose-lang-size);
+}
+.tc .md-mermaid-tools button {
+  padding: 4px 8px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--tc-content-muted);
+  cursor: pointer;
+}
+.tc .md-mermaid-tools button[aria-pressed="true"] {
+  color: var(--tc-content-secondary);
+}
+.tc .md-mermaid-tools button:hover,
+.tc .md-mermaid-tools button:focus-visible {
+  color: var(--tc-content-primary);
+  background: var(--tc-ink-wash);
+}
+.tc .md-mermaid-tools button:focus-visible,
+.tc .md-mermaid-viewport:focus-visible {
+  outline: 2px solid var(--tc-border-strong);
+  outline-offset: 2px;
+}
+.tc .md-mermaid-tools button:disabled {
+  cursor: default;
+}
+.tc .md-mermaid-viewport {
+  max-width: 100%;
+  max-height: 70vh;
+  overflow: auto;
+  padding: 8px 0;
+  scrollbar-color: var(--tc-border-scrollbar) transparent;
+}
+.tc .md-mermaid-viewport img {
+  display: block;
+  /* 保留标签字号，大图只在自身区域滚动。 */
+  max-width: none;
+  margin: 0 auto;
+}
+.tc .md-mermaid-status {
+  padding: 16px 0;
+  color: var(--tc-content-muted);
+  font-size: var(--tc-prose-lang-size);
+}
+.tc .md-mermaid [hidden] {
+  display: none;
+}
+.tc .md-mermaid .md-code {
+  margin-bottom: 0;
+}
