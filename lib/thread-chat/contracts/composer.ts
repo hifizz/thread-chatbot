@@ -11,6 +11,7 @@ export interface ComposerQuoteDraft {
 
 export type ComposerMessagePartDraft =
   | { localId: string; type: "text"; text: string }
+  | { localId: string; type: "artifact-reference"; artifactId: string }
   | { localId: string; type: "file"; file: FileReference }
   | { localId: string; type: "quote"; quote: ComposerQuoteDraft }
 

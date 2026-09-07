@@ -1,4 +1,4 @@
-import { and, desc, eq } from "drizzle-orm"
+import { and, desc, eq, inArray } from "drizzle-orm"
 import { artifacts, messages, projects, threads } from "@/lib/db/schema"
 import type { ConversationExecutor } from "@/lib/thread-chat/persistence/transaction"
 
@@ -50,4 +50,17 @@ export function listProjectArtifactRows(
   return withSource(executor)
     .where(eq(artifacts.projectId, projectId))
     .orderBy(desc(artifacts.createdAt))
+}
+
+/** 调用方先校验 Project 所有权；返回来源状态，由应用层决定新引用规则。 */
+export async function loadProjectReferenceArtifactRows(
+  executor: ConversationExecutor,
+  projectId: string,
+  ids: readonly string[]
+) {
+  if (!ids.length) return []
+  return withSource(executor).where(and(
+    eq(artifacts.projectId, projectId),
+    inArray(artifacts.id, [...new Set(ids)])
+  ))
 }

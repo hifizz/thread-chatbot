@@ -1,3 +1,4 @@
+import { artifactReferenceInputSchema, artifactReferenceDataSchema, type ArtifactReferenceData } from "./artifact-reference"
 import { z } from "zod"
 import type { ThreadChatUIMessage } from "@/lib/thread-chat/contracts/ui-message"
 import {
@@ -7,11 +8,7 @@ import {
 } from "@/lib/thread-chat/contracts/quote"
 import type { ThreadComposerDraft } from "@/lib/thread-chat/contracts/composer"
 
-export interface FileReference {
-  url: string
-  mediaType: string
-  filename?: string
-}
+export type FileReference = z.infer<typeof fileReferenceSchema>
 
 export const fileReferenceSchema = z
   .object({
@@ -25,6 +22,7 @@ export const threadQuoteInputV1Schema = threadQuoteDataV1Schema
 export type ThreadQuoteInputV1 = ThreadQuoteDataV1
 
 export const messageContentPartInputSchema = z.discriminatedUnion("type", [
+  artifactReferenceInputSchema,
   z.object({ type: z.literal("text"), text: z.string().max(200_000) }).strict(),
   z.object({ type: z.literal("file"), file: fileReferenceSchema }).strict(),
   z
@@ -75,6 +73,7 @@ export function composerDraftToMessageContent(
         return { type: "text" as const, text: part.text }
       if (part.type === "file")
         return { type: "file" as const, file: part.file }
+      if (part.type === "artifact-reference") return { type: "artifact-reference" as const, artifactId: part.artifactId }
       const comment = part.quote.comment.trim()
       return {
         type: "quote" as const,
@@ -91,7 +90,8 @@ export function composerDraftToMessageContent(
 
 /** 网络命令到持久化 UI Message Parts 的唯一转换，禁止按类型重排。 */
 export function messageContentToUiParts(
-  content: MessageContentInput
+  content: MessageContentInput,
+  resolveReference?: (id: string) => ArtifactReferenceData
 ): ThreadChatUIMessage["parts"] {
   return content.parts.map((part) => {
     if (part.type === "text") return { type: "text" as const, text: part.text }
@@ -103,7 +103,9 @@ export function messageContentToUiParts(
         ...(part.file.filename ? { filename: part.file.filename } : {}),
       }
     }
-    return { type: "data-quote" as const, data: part.quote }
+    if (part.type === "quote") return { type: "data-quote" as const, data: part.quote }
+    if (!resolveReference) throw new Error("Artifact 引用必须先解析权威快照")
+    return { type: "data-artifact-reference" as const, data: artifactReferenceDataSchema.parse(resolveReference(part.artifactId)) }
   })
 }
 
@@ -113,4 +115,44 @@ export function filesFromMessageContent(
   return content.parts.flatMap((part) =>
     part.type === "file" ? [part.file] : []
   )
+}
+
+/** 只合并相邻文字；不改变空格和非文字部分的顺序或次数。 */
+export function normalizeMessageContentParts(parts: readonly MessageContentPartInput[]): MessageContentPartInput[] {
+  const result: MessageContentPartInput[] = []
+  for (const part of parts) {
+    if (part.type === "text" && part.text.length === 0) continue
+    const previous = result.at(-1)
+    if (part.type === "text" && previous?.type === "text") {
+      result[result.length - 1] = { type: "text", text: previous.text + part.text }
+    } else result.push(part)
+  }
+  return result
+}
+
+/** 已保存用户内容恢复为完整草稿，位置由原数组决定。 */
+export function messagePartsToComposerDraft(parts: ThreadChatUIMessage["parts"], createId: () => string = () => crypto.randomUUID()): ThreadComposerDraft {
+  return { parts: parts.map((part) => {
+    const localId = createId()
+    switch (part.type) {
+      case "text": return { localId, type: "text" as const, text: part.text }
+      case "file": return { localId, type: "file" as const, file: fileReferenceSchema.parse({ url: part.url, mediaType: part.mediaType, ...(part.filename ? { filename: part.filename } : {}) }) }
+      case "data-artifact-reference": return { localId, type: "artifact-reference" as const, artifactId: artifactReferenceDataSchema.parse(part.data).artifactId }
+      case "data-quote": {
+        if (!("schemaVersion" in part.data)) throw new Error("旧版 Quote 缺少来源快照，不能作为新引用提交")
+        const quote = threadQuoteDataV1Schema.parse(part.data)
+        return { localId, type: "quote" as const, quote: { text: quote.text, comment: quote.comment ?? "", source: quote.source, origin: "message-edit" as const, readonlySnapshot: true } }
+      }
+      default: throw new Error(`用户消息包含不支持的内容类型：${part.type}`)
+    }
+  }) }
+}
+
+export function messagePartsToContent(parts: ThreadChatUIMessage["parts"]): MessageContentInput {
+  return composerDraftToMessageContent(messagePartsToComposerDraft(parts))
+}
+
+/** 文字入口（如划选提问弹窗）也先产生完整内容，再调用命令。 */
+export function textMessageContent(text: string, files: readonly FileReference[] = []): MessageContentInput {
+  return messageContentInputSchema.parse({ parts: [{ type: "text", text }, ...files.map((file) => ({ type: "file", file }))] })
 }
