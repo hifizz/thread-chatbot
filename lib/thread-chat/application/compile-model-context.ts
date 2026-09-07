@@ -1,7 +1,8 @@
 import { convertToModelMessages, type ModelMessage } from "ai"
 import { db } from "@/lib/db"
 import { loadReferenceArtifacts } from "./artifact-reference-resolution"
-import { artifactReferenceDataSchema, expandArtifactReferenceParts } from "../contracts/artifact-reference"
+import { artifactReferenceDataSchema } from "../contracts/artifact-reference"
+import { expandArtifactReferencesInContext } from "./artifact-reference-context"
 import { supportsModelImageInput } from "@/constants/model"
 import {
   applyImageFileMaterializations,
@@ -121,10 +122,7 @@ export async function compileModelContextWithProject({
     part.type === "data-artifact-reference" ? [artifactReferenceDataSchema.parse(part.data).artifactId] : []
   ))
   const referenceArtifacts = await loadReferenceArtifacts(db, thread.projectId, referenceIds)
-  const expandedReferences = withProjectContext.map((message) => ({
-    ...message,
-    parts: expandArtifactReferenceParts(message.parts, referenceArtifacts),
-  }))
+  const expandedReferences = expandArtifactReferencesInContext(withProjectContext, referenceArtifacts)
   const modelMessages = await convertToModelMessages(expandedReferences, {
     ignoreIncompleteToolCalls: true,
     convertDataPart: (part) => {

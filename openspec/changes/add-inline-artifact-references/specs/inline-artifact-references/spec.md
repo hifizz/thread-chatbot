@@ -19,7 +19,7 @@
 - **THEN** 系统在模型调用前拒绝，且客户端保留草稿
 
 ### Requirement: Immutable and explicit model context
-系统 SHALL 固定 Artifact ID，从服务端读取其完整内容并编入对应用户消息；MUST NOT 将未引用的其他 Thread 内容隐式加入上下文。
+系统 SHALL 固定 Artifact ID，从服务端读取其完整内容；前文没有完整正文时在对应用户消息展开，已有时使用固定引用标记。系统 MUST NOT 将未引用的其他 Thread 内容隐式加入上下文。
 
 #### Scenario: Source regenerated
 - **WHEN** 原 Artifact 来源消息被重新生成替代
@@ -28,6 +28,22 @@
 #### Scenario: Repeated reference or oversized content
 - **WHEN** 同一消息重复提及同一 Artifact 或引用内容超过预算
 - **THEN** 重复提及保留但正文只展开一次；超预算明确拒绝，不静默截断
+
+#### Scenario: Source body already included
+- **WHEN** 当前 Thread 或继承历史中的已完成工具记录包含同一 Artifact 的权威完整正文
+- **THEN** 后续显式引用只提供固定 ID、标题和前文引用标记，保留原工具记录与引用位置，不再次展开正文
+
+#### Scenario: References across multiple turns
+- **WHEN** Artifact 正文已在前一条用户消息首次展开
+- **THEN** 后续各条消息对此 Artifact 的引用使用相同固定标记，不重复提供正文
+
+#### Scenario: Incomplete or absent source
+- **WHEN** 来源不在实际发送的前文中、被 SDK 剔除、为临时结果，或其身份与完整正文无法核对
+- **THEN** 首次显式引用仍提供服务端权威全文，不能仅按 Thread 或标题判定已包含
+
+#### Scenario: Stable cache prefix
+- **WHEN** 在同一历史前缀后追加新的引用消息
+- **THEN** 前面的模型消息字节保持不变；引用标记字段与顺序固定，不含轮次、位置或时间；不得因后文出现来源正文而改写前文
 
 ### Requirement: Reference lifecycle and navigation
 系统 SHALL 在发送、编辑、重试、Fork 继承、刷新和历史展示中保留引用，并允许点击打开原 Artifact。

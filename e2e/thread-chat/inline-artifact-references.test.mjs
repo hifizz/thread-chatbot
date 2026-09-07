@@ -1,4 +1,5 @@
 import assert from "node:assert/strict"
+import "./artifact-reference-context.test.mjs"
 import { createEditor, $getRoot, $getSelection, $isRangeSelection, $isDecoratorNode } from "lexical"
 import { convertToModelMessages } from "ai"
 import { PgDialect } from "drizzle-orm/pg-core"
@@ -80,7 +81,7 @@ const expanded = expandArtifactReferenceParts(persisted, byId)
 assert.deepEqual(persisted, original, "模型展开不改写历史 Parts")
 assert.equal(JSON.parse(expanded[2].text).content, deepBranch.content)
 assert.equal(JSON.parse(expanded[4].text).content, self.content)
-assert.equal(JSON.parse(expanded[6].text).previouslyIncludedInThisMessage, true)
+assert.equal(JSON.parse(expanded[6].text).previouslyIncludedInContext, true)
 assert.equal("content" in JSON.parse(expanded[6].text), false, "同条消息重复引用只展开一次正文")
 const model = await convertToModelMessages([{ id: id(70), role: "user", parts: expandArtifactReferenceParts(persisted.slice(1, -1), byId) }])
 assert.deepEqual(model[0].content.map((p) => p.text), expanded.slice(1, -1).map((p) => p.text), "模型接收到文字与完整正文原序")

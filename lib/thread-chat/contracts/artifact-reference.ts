@@ -60,7 +60,7 @@ export function assertArtifactReferenceBudget(ids: string[], artifacts: Map<stri
   if (chars > ARTIFACT_REFERENCE_MAX_CHARS) throw new Error(ARTIFACT_REFERENCE_COPY.budget)
 }
 
-/** 每条消息独立去重，历史展开结果不随后续问题或引用变化。JSON 编码明确区分数据与边界。 */
+/** 固定字段与顺序；重复标记不带轮次、位置或时间，保持可缓存的历史前缀。 */
 export function artifactReferenceForModel(artifact: ReferenceArtifact, seen: Set<string>): string {
   const repeated = seen.has(artifact.id)
   seen.add(artifact.id)
@@ -68,7 +68,7 @@ export function artifactReferenceForModel(artifact: ReferenceArtifact, seen: Set
     contextType: "artifact-reference",
     artifactId: artifact.id,
     title: artifact.title,
-    ...(repeated ? { previouslyIncludedInThisMessage: true } : {
+    ...(repeated ? { previouslyIncludedInContext: true } : {
       kind: artifact.kind,
       content: artifact.content,
     }),
@@ -77,9 +77,9 @@ export function artifactReferenceForModel(artifact: ReferenceArtifact, seen: Set
 
 export function expandArtifactReferenceParts(
   parts: ThreadChatUIMessage["parts"],
-  artifacts: Map<string, ReferenceArtifact>
+  artifacts: Map<string, ReferenceArtifact>,
+  seen: Set<string> = new Set()
 ): ThreadChatUIMessage["parts"] {
-  const seen = new Set<string>()
   return parts.map((part) => {
     if (part.type !== "data-artifact-reference") return part
     const artifact = artifacts.get(artifactReferenceDataSchema.parse(part.data).artifactId)
