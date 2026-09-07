@@ -22,11 +22,13 @@
 .tc .tc-prose p {
   margin: 0 0 var(--tc-prose-paragraph-gap);
 }
+.tc .tc-prose :is(h1, h2, h3, h4, h5, h6) {
+  font-family: var(--tc-typography-family-heading);
+}
 .tc .tc-prose h1,
 .tc .tc-prose h2,
 .tc .tc-prose h3,
 .tc .tc-prose h4 {
-  font-family: var(--tc-typography-family-ui);
   color: var(--tc-content-primary);
   font-weight: 600;
   line-height: 1.35;

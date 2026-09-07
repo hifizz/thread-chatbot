@@ -1,4 +1,4 @@
-import { Geist_Mono, Inter, Lora } from "next/font/google"
+import { Brawler, Geist_Mono, Inter, Lora } from "next/font/google"
 
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
@@ -7,6 +7,13 @@ import { TooltipProvider } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" })
+
+const brawler = Brawler({
+  subsets: ["latin"],
+  weight: ["400", "700"],
+  variable: "--font-brawler",
+  display: "swap",
+})
 
 const lora = Lora({
   subsets: ["latin"],
@@ -35,6 +42,7 @@ export default function RootLayout({
         "antialiased",
         fontMono.variable,
         lora.variable,
+        brawler.variable,
         "font-sans",
         inter.variable
       )}
