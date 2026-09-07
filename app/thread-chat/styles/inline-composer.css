@@ -10,6 +10,9 @@
 .tc.composer-artifact-menu { z-index: var(--tc-z-selection); }
 .tc.composer-artifact-menu { box-sizing: border-box; width: min(280px, calc(100vw - 24px)); max-height: min(240px, 50dvh); overflow-y: auto; border: 1px solid var(--tc-border-strong); border-radius: 8px; padding: 4px; background: var(--tc-surface-plain); color: var(--tc-content-primary); }
 .tc.composer-artifact-menu button { display: flex; flex-direction: column; width: 100%; padding: 8px; border: 0; border-radius: 4px; background: transparent; text-align: left; cursor: pointer; overflow-wrap: anywhere; }
-.tc.composer-artifact-menu button.selected { background: var(--tc-accent-glow); }
+.tc.composer-artifact-menu button.selected, .tc.composer-artifact-menu button:focus-visible { background: var(--tc-surface-project-selected); outline: 2px solid var(--tc-border-project-focus); outline-offset: -2px; }
 .tc.composer-artifact-menu small { color: var(--tc-content-secondary); }
 .tc .user-message-content .msg-quote { display: block; }
+
+/* 冻结胶囊不暴露文本插入光标；跨胶囊选区由 Lexical 管理。 */
+.tc .composer-editor .composer-capsule { display: inline-block; user-select: none; cursor: default; vertical-align: baseline; }

@@ -93,7 +93,7 @@ Lexical 负责活动编辑器文档、选区、输入法及撤销栈；草稿 St
 
 Artifact 候选从已有 normalized Store 的资源切片订阅；query 为 null 不搜索；无关流式更新不重新构建候选。历史引用按钮通过明确导航回调工作，不依赖草稿 Provider。必需上下文缺失应显式暴露接入错误，不静默建立替代 Store。
 
-复用官方 PlainText/History/OnChange 及 Typeahead；节点形态按官方支持的不可编辑原子行为验证，不把官方 MentionNode 的 segmented 模式误认为必然符合需求。使用公开序列化/剪贴板接口保留 ID；跨 Project 粘贴仍由服务端校验。普通 @ 字符不自动升级成业务引用。
+复用官方 PlainText/History/OnChange 及 Typeahead；冻结胶囊使用官方行内 DecoratorNode，isKeyboardSelectable 返回 false，左右键在胶囊两侧移动。点击通过公开 selectNext 将光标放到胶囊右侧；不使用仍可进入光标、输入可替换整块的 token TextNode。候选首项显示可见 outline ring，焦点保留在输入框。使用公开序列化/剪贴板接口保留 ID；跨 Project 粘贴仍由服务端校验。普通 @ 字符不自动升级成业务引用。
 
 不移植覆盖 Lexical anchor/firstChild 定位的 !important、不读取或改写其私有字段，不常驻逐帧循环对抗官方定位。如果公开能力无法满足底部翻转、窄列、画布变换、软键盘，停止该问题的变通实现，提交最小复现、版本、官方依据与可选取舍并向用户求助。不能以删除已确认交互来规避验收。
 

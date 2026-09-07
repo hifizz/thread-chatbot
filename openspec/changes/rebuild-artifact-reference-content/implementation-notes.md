@@ -14,7 +14,7 @@
 - 模型引用展开归位 application，实际历史及附件处理后前向编译，再调用真实 AI SDK 转换；固定重复标记、完整源工具核对及前缀字节稳定测试保留。
 - 最终请求边界记录总预算状态。目前模型配置没有完整输入 tokenizer 或上下文上限，明确为 `unknown`；不会声称已完成总 token 预检。纯预算函数覆盖已知总量与输出预留，提供商超限在异常和 SDK failed outcome 两条路径统一转换。字符接收预算不作为 token 估算。
 - PlainText 默认剪贴板会将胶囊降为普通文字；通过官方 COPY/CUT/PASTE Command 和 @lexical/clipboard 的导出/插入函数补齐应用内胶囊剪贴板。未自定义剪贴板数据协议。旧 Quote 粘贴为普通显示文字，不新增 Quote 身份。
-- 输入框按 Lexical 0.45.0 官方 TextNode/token、PlainText、History、OnChange、Command、Typeahead 拆分，唯一 codec 连接活动文档和完整草稿。上传占据固定 localId 位置，异步更新只替换该节点。成功清理匹配快照，迟到结果不覆盖新内容。
+- 输入框按 Lexical 0.45.0 官方行内 DecoratorNode、PlainText、History、OnChange、Command、Typeahead 拆分，唯一 codec 连接活动文档和完整草稿。上传占据固定 localId 位置，异步更新只替换该节点。成功清理匹配快照，迟到结果不覆盖新内容。
 - 草稿、normalized 资源订阅和历史导航使用独立 Provider。历史消息按 Parts 顺序展示，编辑恢复全部内容。引用菜单关闭时不搜索，无关流式状态不重建候选。
 - 官方默认 Typeahead 在底部单行输入框没有翻转（最小复现 y=663、菜单高240、视口700）。现通过公开 onOpen/MenuResolution/menuRenderFn 配合官方 NodeContextMenuPlugin 已使用的 Floating UI 实现：仅定位自己渲染的菜单，不修改 Lexical anchor/firstChild 或使用内部字段。Floating UI autoUpdate 仅在菜单挂载期间运行，跟踪画布 transform。
 - 直接依赖声明 lexical、@lexical/react、@lexical/clipboard、@floating-ui/react，锁文件 frozen/offline 安装通过；去掉未使用的直接 @lexical/utils。
@@ -48,3 +48,11 @@
 ## 回滚
 
 无需数据库迁移。尚未保存新引用时可以回退本分支；已有引用写入后不能退回不认识 data-artifact-reference 的服务端。应关闭新引用入口，保留引用读取和模型展开，再修复。不得删掉引用或把历史指向新产物。
+
+## 用户实测后的胶囊光标修复
+
+原 token TextNode 虽然整块删除，却仍允许光标进入标题；此时打字会替换整个 token。按用户反馈改为官方行内 DecoratorNode，由 Lexical 设置 contenteditable=false；禁用节点的键盘选中，左右键跨越胶囊，点击通过公开 selectNext 放置右侧光标。消息 Schema 和有序 codec 不变，剪贴板旧 token 序列化仍可读。
+
+候选首项和键盘选中项显示 2px outline ring。顶层 portal 不依赖缺失的分支强调色，使用现有根主题变量；键盘焦点留在输入框，沿用官方上下键/Enter Command。
+
+Chromium 实际组件测试覆盖：首项 aria-selected 与可见 outline、上下键切换、Enter 后光标位于胶囊之后、左右键跨越、鼠标点击后输入空格/文字仍保留原胶囊。已有原子删除/撤销、剪贴板、草稿切换、附件上传及混排消息编辑回归继续通过。typecheck 与修改文件 ESLint 通过；系统输入法/软键盘及真实模型链路仍保持未验收。
