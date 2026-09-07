@@ -1,12 +1,13 @@
 "use client"
 
-import { useCallback, useMemo, useState } from "react"
-import { $getSelection, $isRangeSelection, COMMAND_PRIORITY_HIGH } from "lexical"
+import { useCallback, useEffect, useMemo, useState } from "react"
+import { $createTextNode, $getSelection, $isRangeSelection, COMMAND_PRIORITY_HIGH, KEY_ENTER_COMMAND } from "lexical"
 import { ArtifactMenu } from "./artifact-menu"
 import { LexicalTypeaheadMenuPlugin, MenuOption, type MenuResolution } from "@lexical/react/LexicalTypeaheadMenuPlugin"
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext"
 import type { ArtifactDTO } from "@/lib/thread-chat/contracts/dto"
 import { $createComposerCapsuleNode } from "./composer-capsule-node"
+import { matchArtifactMention } from "@/lib/thread-chat/artifact-mention-match"
 
 class ArtifactOption extends MenuOption {
   constructor(readonly artifact: ArtifactDTO) { super(artifact.id) }
@@ -24,12 +25,13 @@ export function ArtifactMentionPlugin({ artifacts }: { artifacts: Record<string,
       .map((item) => new ArtifactOption(item))
   }, [artifacts, query])
   const triggerFn = useCallback((text: string) => {
-    // 中文前缀允许直接触发；邮箱中的 ASCII 单词前缀不触发。
-    const match = /(?:^|[^a-zA-Z0-9_@])@([^@\n]{0,80})$/.exec(text)
-    if (!match || editor.isComposing()) return null
-    const query = match[1]
-    return { leadOffset: text.length - query.length - 1, matchingString: query, replaceableString: `@${query}` }
+    return editor.isComposing() ? null : matchArtifactMention(text)
   }, [editor])
+  useEffect(() => editor.registerCommand(KEY_ENTER_COMMAND, (event) => {
+    if (!resolution || options.length || !event || editor.isComposing()) return false
+    event.preventDefault()
+    return true
+  }, COMMAND_PRIORITY_HIGH), [editor, options.length, resolution])
   return <LexicalTypeaheadMenuPlugin
     options={options}
     onQueryChange={setQuery}
@@ -44,11 +46,14 @@ export function ArtifactMentionPlugin({ artifacts }: { artifacts: Record<string,
         const node = $createComposerCapsuleNode({ type: "artifact-reference", artifactId: option.artifact.id, localId: crypto.randomUUID() }, `@${option.artifact.title}`)
         if (queryNode) queryNode.replace(node)
         else { const selection = $getSelection(); if ($isRangeSelection(selection)) selection.insertNodes([node]) }
-        node.selectNext()
+        // 显式保留胶囊之后的文字落点，后续输入不会替换引用节点。
+        const space = $createTextNode(" ")
+        node.insertAfter(space)
+        space.selectEnd()
         close()
       })
     }}
     menuRenderFn={(_anchor, props) => resolution
-      ? <ArtifactMenu resolution={resolution} root={editor.getRootElement()} {...props} /> : null}
+      ? <ArtifactMenu resolution={resolution} root={editor.getRootElement()} query={query ?? ""} {...props} /> : null}
   />
 }

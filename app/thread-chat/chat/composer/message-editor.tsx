@@ -17,10 +17,10 @@ import { ComposerSyncPlugin } from "./composer-sync-plugin"
 import { ComposerSubmitPlugin } from "./composer-submit-plugin"
 import { ArtifactMentionPlugin } from "./artifact-mention-plugin"
 
-export function MessageEditor({ draft, revision = 0, artifacts, onChange, onSubmit, editorRef, placeholder = "输入问题…", mentions = true, disabled = false }: {
+export function MessageEditor({ draft, revision = 0, artifacts, onChange, onSubmit, editorRef, placeholder = "输入问题…", mentions = true, disabled = false, className }: {
   draft: ThreadComposerDraft; revision?: number; artifacts: Record<string, ArtifactDTO>;
   onChange: (draft: ThreadComposerDraft) => void; onSubmit?: () => void;
-  editorRef?: RefObject<LexicalEditor | null>; placeholder?: string; mentions?: boolean; disabled?: boolean
+  editorRef?: RefObject<LexicalEditor | null>; placeholder?: string; mentions?: boolean; disabled?: boolean; className?: string
 }) {
   const [initialConfig] = useState(() => ({
     namespace: "thread-chat-message", nodes: [ComposerCapsuleNode],
@@ -28,7 +28,7 @@ export function MessageEditor({ draft, revision = 0, artifacts, onChange, onSubm
     editorState: () => $importComposerDraft(draft, artifacts),
   }))
   return <LexicalComposer initialConfig={initialConfig}>
-    <div className="composer-editor-wrap">
+    <div className={`composer-editor-wrap${className ? ` ${className}` : ""}`}>
       <PlainTextPlugin contentEditable={<ContentEditable className="composer-editor" aria-label={placeholder} placeholder={null} />} placeholder={<span className="composer-placeholder">{placeholder}</span>} ErrorBoundary={LexicalErrorBoundary} />
     </div>
     <HistoryPlugin />

@@ -1,6 +1,6 @@
 # Assistant UI 官网 Composer 预览复刻
 
-Thread 底部直接渲染 GitHub 上的 `ComposerDemo`，使用局部主题包装保留官方样式，不使用 iframe。本轮不连接业务，不改写官方组件或示例数据。
+独立示例页直接渲染 GitHub 上的 `ComposerDemo`，保留官方源码和示例数据。Thread 底部使用同一套官方外壳与局部主题，不使用 iframe；当前已通过 `conversation-composer.tsx` 接入真实 Artifact 引用与发送。
 
 ## 源码依据
 
@@ -20,7 +20,7 @@ Thread 底部直接渲染 GitHub 上的 `ComposerDemo`，使用局部主题包�
 
 上述文件与配套 hooks、DemoStage、SampleFrame 原样复制，保留官方 import 路径。`upstream.json` 记录每个文件的 GitHub 路径和 SHA-256；核心组件还与相同提交下的 `packages/ui/src/components/react/assistant-ui/` 源码逐字节核对。
 
-## 保留的官网行为
+## 独立示例保留的官网行为
 
 - 完整 Composer 原文件已经组合命令、人物、附件、模型菜单、语音模拟与 Context 弹窗；仅通过一行 export 挂载。
 - 命令是 review / explain / branch / improve；选中后输入框显示 `/review ` 一类文本。
@@ -33,10 +33,18 @@ Thread 底部直接渲染 GitHub 上的 `ComposerDemo`，使用局部主题包�
 
 ## 样式隔离与验证
 
-新增代码仅用于页面挂载及样式隔离：Thread 和独立示例共用 OfficialComposerTheme，加载与官网一致的 Public Sans / JetBrains Mono；CSS Module 从官网 globals.css 复制主题值并恢复官网圆角 token，避免宿主 shadcn 半径比例影响示例。Thread 挂载时隐藏预览专用的顶部占位空白，弹窗直接浮在消息区之上。官方 TSX 源码未修改。
+Thread 和独立示例共用 OfficialComposerTheme，加载与官网一致的 Public Sans / JetBrains Mono；CSS Module 从官网 globals.css 复制主题值并恢复官网圆角 token，避免宿主 shadcn 半径比例影响示例。官方 TSX 源码未修改。
 
 通过 ego-browser 对照官网与本地的命令、人物、附件和模型独立示例，核对内容及计算样式（字体、字号、行高、字重、圆角、背景、前景、padding、gap、边框）。同时实测选择 Max、命令 Enter、模型切换、删除/恢复附件及发送清空。
 
 原有 react-markdown@0.14.5 项目补丁保留，其 peer 范围仍有安装警告；这与本轮预览复刻无关。
 
-等待人工验收后再讨论业务适配与 Artifact 迁移。
+## Thread Artifact 业务接入
+
+- 官方 Composer / ComposerMenu 外壳组合项目现有的 Lexical 编辑器，沿用有序草稿和消息协议。
+- `@` 搜索当前 Project 已完成的 Markdown Artifacts；首项高亮，支持上下键、Enter、Escape 和空结果提示。连续 `@@` 结束查询，退格回到单个 `@` 重新打开。
+- 选中后插入带真实 Artifact ID 的不可编辑胶囊，点击打开现有预览面板。发送沿用服务端归属校验、引用保存及 Markdown 上下文展开。
+- 成功发送清空草稿，失败保留输入与引用；已有消息重新编辑可恢复胶囊。未发送草稿的刷新恢复仍待后续 draft restore 阶段。
+- 模型展示当前会话的真实模型；模型选择、Slash/Skill、附件上传及语音业务后续接入。
+
+验证涵盖 ego-browser 实际键盘选择、胶囊光标行为、预览、失败重试、真实发送与刷新恢复，以及引用匹配、消息编解码、上下文展开和数据库集成测试。

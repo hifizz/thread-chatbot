@@ -1,0 +1,30 @@
+/* 官方 Composer 排版只覆盖当前输入区域，历史消息编辑器沿用原样式。 */
+:global(.tc) .editor {
+  padding: 8px 12px;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+:global(.tc) .editor :global(.composer-editor) {
+  min-height: 28px;
+  max-height: 160px;
+  color: var(--foreground);
+}
+
+:global(.tc) .editor :global(.composer-placeholder) {
+  top: 8px;
+  left: 12px;
+  color: var(--muted-foreground);
+}
+
+:global(.tc) .editor :global(.composer-capsule) {
+  border-color: var(--border);
+  background: var(--muted);
+  color: var(--foreground);
+  font-size: 12px;
+}
+
+:global(.tc) .editor :global(.composer-capsule-action:focus-visible) {
+  outline-color: var(--ring);
+}
