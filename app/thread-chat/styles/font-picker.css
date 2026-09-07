@@ -1,0 +1,49 @@
+@font-face {
+  font-family: "LXGW WenKai";
+  src: url("/fonts/markdown/LXGWWenKai-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "LXGW WenKai";
+  src: url("/fonts/markdown/LXGWWenKai-Medium.woff2") format("woff2");
+  font-weight: 500;
+  font-display: swap;
+}
+@font-face {
+  font-family: "LXGW Neo XiHei";
+  src: url("/fonts/markdown/LXGWNeoXiHei.ttf") format("truetype");
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "IPAexGothic";
+  src: url("/fonts/markdown/ipaexg.ttf") format("truetype");
+  font-weight: 400;
+  font-display: swap;
+}
+
+.tc .markdown-font-picker {
+  position: fixed;
+  right: max(16px, env(safe-area-inset-right));
+  bottom: calc(96px + env(safe-area-inset-bottom));
+  z-index: var(--tc-z-toast);
+  display: grid;
+  gap: 4px;
+  max-width: calc(100vw - 32px);
+  padding: 8px 12px;
+  border: 2px solid var(--tc-border-subtle);
+  border-radius: 12px;
+  background: var(--tc-surface-plain);
+  color: var(--tc-content-primary);
+  font-family: var(--tc-typography-family-ui);
+  font-size: 12px;
+}
+.tc .markdown-font-picker small,
+.tc .markdown-font-picker a {
+  font-size: 12px;
+  color: var(--tc-content-secondary);
+}
+.tc .markdown-font-picker a {
+  text-decoration: underline;
+}

@@ -74,6 +74,11 @@ import {
 import { useConversationRuntime } from "./orchestration/workspace/use-conversation-runtime"
 import { useNormalizedWorkspace } from "./orchestration/workspace/use-normalized-workspace"
 
+const MarkdownFontPicker = dynamic(
+  () => import("./orchestration/overlays/markdown-font-picker").then((module) => module.MarkdownFontPicker),
+  { ssr: false }
+)
+
 const ThreadCanvas = dynamic(
   () =>
     import("./orchestration/canvas/thread-canvas").then(
@@ -628,6 +633,7 @@ function NormalizedThreadChat({
       ref={rootRef}
     >
       <ThreadChatTopbar {...navigationProps} />
+      <MarkdownFontPicker />
 
       {workspace.viewMode === "columns" ? (
         <ThreadColumns

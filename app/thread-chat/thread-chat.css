@@ -28,6 +28,8 @@
 @import "./styles/scrollbar.css";
 @import "./styles/messages-stream.css";
 @import "./styles/markdown.css";
+/* 中文字体试读控件与按需加载的字体声明。 */
+@import "./styles/font-picker.css";
 @import "./styles/tree-list.css";
 
 @import "./styles/inline-composer.css";

@@ -1,4 +1,4 @@
-import { Brawler, Geist_Mono, Inter, Lora } from "next/font/google"
+import { Brawler, Geist_Mono, Inter, Lora, Noto_Sans_SC, Noto_Serif_SC } from "next/font/google"
 
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
@@ -7,6 +7,18 @@ import { TooltipProvider } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" })
+
+const notoSansSC = Noto_Sans_SC({
+  variable: "--font-noto-sans-sc",
+  display: "swap",
+  preload: false,
+})
+
+const notoSerifSC = Noto_Serif_SC({
+  variable: "--font-noto-serif-sc",
+  display: "swap",
+  preload: false,
+})
 
 const brawler = Brawler({
   subsets: ["latin"],
@@ -43,6 +55,8 @@ export default function RootLayout({
         fontMono.variable,
         lora.variable,
         brawler.variable,
+        notoSansSC.variable,
+        notoSerifSC.variable,
         "font-sans",
         inter.variable
       )}

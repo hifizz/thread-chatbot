@@ -4,7 +4,21 @@
 .tc {
   --tc-typography-family-ui: var(--tc-font-stack-ui);
   --tc-typography-family-read: var(--tc-font-stack-read);
-  --tc-typography-family-prose: var(--font-lora), var(--tc-font-stack-read);
+  --tc-typography-family-chinese: var(--font-noto-sans-sc);
+  --tc-typography-family-prose: var(--font-lora), var(--tc-typography-family-chinese), var(--tc-font-stack-read);
   --tc-typography-family-heading: var(--font-brawler), var(--tc-font-stack-ui);
   --tc-typography-family-code: var(--tc-font-stack-mono);
+}
+
+html[data-prose-font="noto-serif"] .tc {
+  --tc-typography-family-chinese: var(--font-noto-serif-sc);
+}
+html[data-prose-font="wenkai"] .tc {
+  --tc-typography-family-chinese: "LXGW WenKai";
+}
+html[data-prose-font="neo-xihei"] .tc {
+  --tc-typography-family-chinese: "LXGW Neo XiHei";
+}
+html[data-prose-font="ipa-original"] .tc {
+  --tc-typography-family-chinese: "IPAexGothic";
 }
