@@ -1,4 +1,4 @@
-import { Brawler, Fira_Code, Geist_Mono, Inter, JetBrains_Mono, Lora, Noto_Sans_SC, Noto_Serif_SC } from "next/font/google"
+import { Brawler, Fira_Code, Geist_Mono, Inter, JetBrains_Mono, Noto_Sans_SC, Noto_Serif_SC, Gelasio } from "next/font/google"
 
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
@@ -42,12 +42,10 @@ const brawler = Brawler({
   display: "swap",
 })
 
-const lora = Lora({
+const gelasio = Gelasio({
   subsets: ["latin"],
-  // 英文常规字重匹配到 500，正文仍用 400，保留中文原有粗细。
-  weight: ["500", "600", "700"],
   style: ["normal", "italic"],
-  variable: "--font-lora",
+  variable: "--font-gelasio",
   display: "swap",
 })
 
@@ -70,7 +68,7 @@ export default function RootLayout({
         fontMono.variable,
         firaCode.variable,
         jetBrainsMono.variable,
-        lora.variable,
+        gelasio.variable,
         brawler.variable,
         notoSansSC.variable,
         notoSerifSC.variable,

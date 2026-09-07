@@ -5,8 +5,8 @@
 ## 当前选择
 
 - 英文标题（h1–h6）：Brawler，加载 400、700 字重。
-- 英文正文与表格：Lora，加载 500、600、700 字重及对应斜体。正文 CSS 仍为 400，匹配到 Lora 500，让英文更厚实，同时保持中文原有字重。
-- 中文正文与表格：默认 Noto Sans SC，可通过右下角选择框试读 Noto Serif SC、霞鹜文楷、霞鹜新晰黑；中文标题继续使用原有系统字体。
+- 英文正文、表格与用户消息气泡：默认 Gelasio，可变字重 400–700，支持常规与斜体。此前试用过 Lora（常规匹配 500）和 PT Serif（400、700），目前按用户要求改为 Gelasio。
+- 中文正文、表格与用户消息气泡：默认 Noto Sans SC，可通过右下角选择框试读 Noto Serif SC、霞鹜文楷、霞鹜新晰黑；中文标题继续使用原有系统字体。
 - 表格默认字号：16px；紧凑模式保留 12px。
 - 行内代码：继续使用原有等宽字体。代码块默认 Fira Code，可独立切换其他等宽字体。
 
@@ -47,13 +47,15 @@
 
 ## 中文字体试读控件
 
-右下角「中文正文」选择框仅修改正文与表格的中文字体，保留 Lora 英文、Brawler 标题和等宽代码。选择保存在当前浏览器；字体加载成功后才应用，失败时保留之前的字体并显示提示。
+右下角「中文正文」选择框同步修改正文、表格与用户消息气泡的中文字体，保留独立选择的英文、标题和代码字体。用户消息气泡共用正文的字体 token，原有字号、行高和纯文本呈现方式保持不变。选择保存在当前浏览器；字体加载成功后才应用，失败时保留之前的字体并显示提示。
 
 Noto 系列由 `next/font/google` 提供。霞鹜文楷 v1.522 的 Regular、Medium 从官方 TTF 压缩为 WOFF2；霞鹜新晰黑 v1.305 保留官方 TTF。字体按需加载，本地资源和许可见 `public/fonts/markdown/`。
 
 新晰黑使用 IPA Font License 1.0；选择框额外提供「IPAex Gothic（恢复原始字体）」，使用随项目附带的原始 IPAex Gothic 004.01，以便用户停止使用衍生字体。字体许可与恢复说明可从控件打开。该额外选项用于恢复，不属于四款试读候选。
 
 霞鹜文楷的常规与 Medium 字重、新晰黑的单一字重，与 Noto 系列的可变字重不同；加粗效果不应视为完全相同的字重对比。
+
+思源宋体（Noto Serif SC）曾试读 500 Medium，用户比较后选择恢复 400 Regular；内置选项与动态加载均保持常规 400、加粗 700，不额外加厚中文正文。
 
 ## 代码块字体选择
 
@@ -62,3 +64,16 @@ Noto 系列由 `next/font/google` 提供。霞鹜文楷 v1.522 的 Regular、Med
 默认回退顺序为 Fira Code → JetBrains Mono → Menlo → Monaco → Courier New → monospace。前两款通过 `next/font/google` 自托管，JetBrains Mono 同时加载常规和斜体。后三款命名字体使用设备已有字体，未安装时按等宽字体栈回退；系统等宽选项由浏览器决定字体。
 
 选择仅应用于 `.tc-prose .md-code code`，不改变正文、标题、行内代码、代码块语言标签或其他界面文字。使用独立的 `thread-chat:code-font` 浏览器存储键，和中文字体选择互不影响。加载与记忆逻辑由 `hooks/use-preview-font.ts` 共用。
+
+## 动态 Google 字体试读
+
+展开「添加 Google 字体」，粘贴 `fonts.google.com/specimen/…` 或 `fonts.google.com/noto/specimen/…` 链接，也可输入字体名称，选择英文正文、中文正文、标题、代码块后点击「加载并应用」。成功使用的字体全部保留，最近使用的排在前面；历史胶囊区域超过固定高度后独立滚动，可一键再次应用到当前选定位置。
+
+动态字体通过固定的 Google Fonts CSS API 下载，不需要 API Key，也不向字体服务发送对话内容。先尝试常规／粗体及斜体组合，不支持时依次退回常规／粗体、默认样式；没有真实粗体或斜体时由浏览器匹配或合成。加载完成后才更新字体，失败保留之前的选择。
+
+英文、中文正文分别限制字体的字符范围，避免一种字体同时覆盖两种语言；不包含中文字形的字体不能应用到中文正文。标题和代码块不限制语言范围。每个位置的选择与最近使用记录存放在 `thread-chat:google-fonts:v1`，刷新后自动恢复；「恢复预设」恢复对应位置的预设字体，选择已有中文／代码字体也会取消该位置的动态覆盖。
+
+动态试读需要浏览器能访问 Google 字体服务；与构建时通过 `next/font` 自托管的预设字体不同。
+
+- [Gelasio 字体信息](https://github.com/google/fonts/blob/main/ofl/gelasio/METADATA.pb)：设计者 Eben Sorkin，SIL OFL 1.1。
+- [Google Fonts CSS API](https://developers.google.com/fonts/docs/css2)

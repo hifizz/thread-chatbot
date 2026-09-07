@@ -132,6 +132,7 @@
   align-items: flex-end;
 }
 .tc .message.user .bubble {
+  font-family: var(--tc-typography-family-prose);
   background: var(--tc-surface-sunken);
   border-radius: 13px 13px 3px 13px;
   padding: 9px 13px;

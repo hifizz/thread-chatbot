@@ -225,7 +225,7 @@
 .tc .tc-prose .md-code code {
   display: block;
   min-width: max-content;
-  font-family: var(--tc-typography-family-code-block);
+  font-family: var(--font-google-code, var(--tc-typography-family-code-block)), monospace;
   font-size: var(--tc-prose-code-size);
   line-height: var(--tc-prose-code-leading);
   color: var(--tc-content-primary);

@@ -1,6 +1,13 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useSyncExternalStore } from "react"
+import { clearGoogleFontTarget, readGoogleFontPreferences } from "@/lib/chat/google-font-preferences"
+import { GOOGLE_FONT_CHANGE_EVENT } from "@/constants/google-fonts"
+
+function subscribeGoogleFont(listener: () => void) {
+  window.addEventListener(GOOGLE_FONT_CHANGE_EVENT, listener)
+  return () => window.removeEventListener(GOOGLE_FONT_CHANGE_EVENT, listener)
+}
 
 type PreviewFont = {
   id: string
@@ -17,6 +24,12 @@ export function usePreviewFont(
   attribute: "proseFont" | "codeFont",
   sample: string
 ) {
+  const target = attribute === "proseFont" ? "chinese" : "code"
+  const override = useSyncExternalStore(
+    subscribeGoogleFont,
+    () => readGoogleFontPreferences().active[target] ?? "",
+    () => ""
+  )
   const [selected, setSelected] = useState(() => {
     try {
       const saved = localStorage.getItem(storageKey)
@@ -60,10 +73,12 @@ export function usePreviewFont(
 
   return {
     selected,
+    override,
     loading: loaded !== selected,
     failed: failed === selected,
     selectFont(value: string) {
       if (fonts.some((font) => font.id === value)) {
+        clearGoogleFontTarget(attribute === "proseFont" ? "chinese" : "code")
         setFailed(null)
         setSelected(value)
       }

@@ -5,8 +5,8 @@
   --tc-typography-family-ui: var(--tc-font-stack-ui);
   --tc-typography-family-read: var(--tc-font-stack-read);
   --tc-typography-family-chinese: var(--font-noto-sans-sc);
-  --tc-typography-family-prose: var(--font-lora), var(--tc-typography-family-chinese), var(--tc-font-stack-read);
-  --tc-typography-family-heading: var(--font-brawler), var(--tc-font-stack-ui);
+  --tc-typography-family-prose: var(--font-google-english, var(--font-gelasio)), var(--font-google-chinese, var(--tc-typography-family-chinese)), var(--tc-font-stack-read);
+  --tc-typography-family-heading: var(--font-google-heading, var(--font-brawler)), var(--tc-font-stack-ui);
   --tc-typography-family-code: var(--tc-font-stack-mono);
   --tc-typography-family-code-block: var(--font-fira-code), var(--font-jetbrains-mono), Menlo, Monaco, "Courier New", monospace;
 }

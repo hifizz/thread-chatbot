@@ -31,6 +31,8 @@
   display: grid;
   gap: 4px;
   max-width: calc(100vw - 32px);
+  max-height: calc(100dvh - 128px);
+  overflow-y: auto;
   padding: 8px 12px;
   border: 2px solid var(--tc-border-subtle);
   border-radius: 12px;
@@ -46,4 +48,37 @@
 }
 .tc .markdown-font-picker a {
   text-decoration: underline;
+}
+.tc .google-font-picker {
+  width: 280px;
+  max-width: 100%;
+  border-top: 2px solid var(--tc-border-subtle);
+  padding-top: 8px;
+  margin-top: 4px;
+}
+.tc .google-font-picker summary {
+  cursor: pointer;
+}
+.tc .google-font-picker form,
+.tc .font-picker-recent {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+.tc .font-picker-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.tc .font-picker-history {
+  max-height: 144px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  scrollbar-color: var(--tc-border-scrollbar) transparent;
+  padding: 4px;
+}
+.tc .font-picker-history:focus-visible {
+  outline: 2px solid var(--tc-border-strong);
+  outline-offset: 2px;
 }

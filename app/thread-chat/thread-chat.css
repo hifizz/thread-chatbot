@@ -28,7 +28,7 @@
 @import "./styles/scrollbar.css";
 @import "./styles/messages-stream.css";
 @import "./styles/markdown.css";
-/* 正文与代码字体试读控件，以及按需加载的中文字体声明。 */
+/* 正文、代码与 Google 字体试读控件（历史列表独立滚动），以及中文字体声明。 */
 @import "./styles/font-picker.css";
 @import "./styles/tree-list.css";
 

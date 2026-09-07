@@ -10,9 +10,11 @@ import {
 
 import { usePreviewFont } from "@/hooks/use-preview-font"
 import { CodeFontPicker } from "./code-font-picker"
+import { GoogleFontPicker } from "./google-font-picker"
+import { CUSTOM_GOOGLE_FONT_OPTION } from "@/constants/google-fonts"
 
 export function MarkdownFontPicker() {
-  const { selected, loading, failed, selectFont } = usePreviewFont(
+  const { selected, override, loading, failed, selectFont } = usePreviewFont(
     MARKDOWN_FONTS, DEFAULT_MARKDOWN_FONT, MARKDOWN_FONT_STORAGE_KEY, "proseFont", MARKDOWN_FONT_SAMPLE
   )
 
@@ -21,20 +23,22 @@ export function MarkdownFontPicker() {
       <label htmlFor="markdown-font-select">中文正文</label>
       <NativeSelect
         id="markdown-font-select"
-        value={selected}
+        value={override ? CUSTOM_GOOGLE_FONT_OPTION : selected}
         onChange={(event) => selectFont(event.target.value)}
       >
+        {override && <NativeSelectOption value={CUSTOM_GOOGLE_FONT_OPTION} disabled>Google · {override}</NativeSelectOption>}
         {MARKDOWN_FONTS.map((font) => (
           <NativeSelectOption key={font.id} value={font.id}>{font.label}</NativeSelectOption>
         ))}
       </NativeSelect>
       <small role="status">
-        {failed ? "加载失败，请切换字体后重试" : !loading ? "已应用 · 英文保持原样" : "正在加载字体…"}
+        {override ? "Google 字体 · 可在下方管理" : failed ? "加载失败，请切换字体后重试" : !loading ? "已应用 · 英文保持原样" : "正在加载字体…"}
       </small>
       {(selected === "neo-xihei" || selected === "ipa-original") && (
         <a href="/fonts/markdown/README.txt" target="_blank" rel="noreferrer">字体许可与恢复说明</a>
       )}
       <CodeFontPicker />
+      <GoogleFontPicker />
     </aside>
   )
 }
