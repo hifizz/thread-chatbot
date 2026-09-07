@@ -4,5 +4,6 @@
 .tc {
   --tc-typography-family-ui: var(--tc-font-stack-ui);
   --tc-typography-family-read: var(--tc-font-stack-read);
+  --tc-typography-family-prose: var(--font-lora), var(--tc-font-stack-read);
   --tc-typography-family-code: var(--tc-font-stack-mono);
 }

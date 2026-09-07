@@ -8,7 +8,7 @@
 .tc .tc-prose {
   min-width: 0;
   max-width: 100%;
-  font-family: var(--tc-typography-family-read);
+  font-family: var(--tc-typography-family-prose);
   font-size: var(--tc-prose-size);
   line-height: var(--tc-prose-leading);
   color: var(--tc-content-primary);
@@ -120,7 +120,7 @@
   width: 100%;
   margin: 0;
   font-size: var(--tc-prose-table-size);
-  font-family: var(--tc-typography-family-ui);
+  font-family: var(--tc-typography-family-prose);
   border: 1px solid var(--tc-border-subtle);
   border-radius: 8px;
   overflow: hidden;

@@ -1,4 +1,4 @@
-import { Geist, Geist_Mono, Inter } from "next/font/google"
+import { Geist_Mono, Inter, Lora } from "next/font/google"
 
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
@@ -7,6 +7,15 @@ import { TooltipProvider } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" })
+
+const lora = Lora({
+  subsets: ["latin"],
+  // 英文常规字重匹配到 500，正文仍用 400，保留中文原有粗细。
+  weight: ["500", "600", "700"],
+  style: ["normal", "italic"],
+  variable: "--font-lora",
+  display: "swap",
+})
 
 const fontMono = Geist_Mono({
   subsets: ["latin"],
@@ -25,6 +34,7 @@ export default function RootLayout({
       className={cn(
         "antialiased",
         fontMono.variable,
+        lora.variable,
         "font-sans",
         inter.variable
       )}
