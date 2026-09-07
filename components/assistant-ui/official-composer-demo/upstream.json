@@ -1,0 +1,85 @@
+{
+  "commit": "98010f17b4a8d4bc506a6084007ecdaf4a823503",
+  "files": [
+    {
+      "path": "components/demo/utils/canvas.ts",
+      "upstream": "apps/docs/components/demo/utils/canvas.ts",
+      "sha256": "c0e8ae840ec345bcd2c6f5a3cdeafbfcebeabf3ab45e75e5b8b1645da7e819dd"
+    },
+    {
+      "path": "components/demo/elements/demo-stage.tsx",
+      "upstream": "apps/docs/components/demo/elements/demo-stage.tsx",
+      "sha256": "e9f2f359c449417dc4367db12bfdd070b2b9a95da6153708befaa73a4778afdc"
+    },
+    {
+      "path": "components/demo/elements/mobile-composer.tsx",
+      "upstream": "apps/docs/components/demo/elements/mobile-composer.tsx",
+      "sha256": "ee64c7a3bb2fa1912d85316cf12d82721f6d8af3208eaecbeddfd6e6133fe7bd"
+    },
+    {
+      "path": "components/demo/elements/composer-models.tsx",
+      "upstream": "apps/docs/components/demo/elements/composer-models.tsx",
+      "sha256": "794e8d8f9c5b6a16622825288b1cdfefcaa8c9e7089a7dfdb17bdaa1ebee4ad1"
+    },
+    {
+      "path": "components/demo/elements/composer-slash.tsx",
+      "upstream": "apps/docs/components/demo/elements/composer-slash.tsx",
+      "sha256": "54854035b93726d230f89c4da130f0cdb3027518763eaeb52b3f8130fdcd57f5"
+    },
+    {
+      "path": "components/demo/elements/composer.tsx",
+      "upstream": "apps/docs/components/demo/elements/composer.tsx",
+      "sha256": "fed57f2955942484476b4edd89d222b2496835873b951b97419992ffeb92fae3"
+    },
+    {
+      "path": "components/demo/elements/composer-mentions.tsx",
+      "upstream": "apps/docs/components/demo/elements/composer-mentions.tsx",
+      "sha256": "24a0315b9683018f2c3d21cc33202ec5a85edbdc27180a964a8c76928c1c8acf"
+    },
+    {
+      "path": "components/demo/elements/composer-attachments.tsx",
+      "upstream": "apps/docs/components/demo/elements/composer-attachments.tsx",
+      "sha256": "03c40fbdb7a5d3f1155621be54876581bf80f2039ab17b01739725e7b436473f"
+    },
+    {
+      "path": "components/demo/hooks/use-demo.ts",
+      "upstream": "apps/docs/components/demo/hooks/use-demo.ts",
+      "sha256": "19315175ed357cf0b43d02c33dfb5de6c30b7ec315145b453867907efe2448b0"
+    },
+    {
+      "path": "components/pages/docs/samples/sample-frame.tsx",
+      "upstream": "apps/docs/components/pages/docs/samples/sample-frame.tsx",
+      "sha256": "b3e8408ced99bd83fb613e6a0d711ba7d9b9731190c7cfb41ea680c162f564d1"
+    },
+    {
+      "path": "components/pages/docs/samples/composer-trigger-popover.tsx",
+      "upstream": "apps/docs/components/pages/docs/samples/composer-trigger-popover.tsx",
+      "sha256": "ff8387b6a950e5d83e14e968e26404192c1957988c2ea38a75c2b4b0e02d9fc2"
+    },
+    {
+      "path": "components/assistant-ui/elements/composer.tsx",
+      "upstream": "packages/ui/src/components/react/assistant-ui/elements/composer.tsx",
+      "sha256": "361a15d0f2f07a251c20d61b8a260c043e23440222e9bc5bc78954be37d38dec"
+    },
+    {
+      "path": "components/assistant-ui/elements/mobile-composer.tsx",
+      "upstream": "packages/ui/src/components/react/assistant-ui/elements/mobile-composer.tsx",
+      "sha256": "1ffdf0e868e8cdc1010300ae32c4e4e76f7a95b52b309fb22cdfd3ce62797e46"
+    },
+    {
+      "path": "components/assistant-ui/elements/surfaces.tsx",
+      "upstream": "packages/ui/src/components/react/assistant-ui/elements/surfaces.tsx",
+      "sha256": "a82542ec08f0afd0565b220a1d32235b1fd7c08b394c55977119665da3860d3a"
+    },
+    {
+      "path": "components/assistant-ui/elements/composer-trigger-popover.aui.tsx",
+      "upstream": "packages/ui/src/components/react/assistant-ui/elements/composer-trigger-popover.aui.tsx",
+      "sha256": "592d5681d4fe197174d54a0fc7243ef64155f0d2c7bd878117a04f6d050fad81"
+    },
+    {
+      "path": "components/assistant-ui/utils/range.ts",
+      "upstream": "packages/ui/src/components/react/assistant-ui/utils/range.ts",
+      "sha256": "3506d5f07865c042a4ef9b96904f687d19372a14e7dfccf946749860a3606182"
+    }
+  ]
+}
