@@ -36,11 +36,12 @@ try {
   }
   await commands.forkThread(userId, rootThreadId, fork)
   const first = turn("先分叉后发送")
-  const sent = await commands.sendMessage(userId, fork.threadId, first)
   const expectedQuote = { type: "data-quote", data: {
     schemaVersion: "thread-quote-v1", text: fork.anchorText,
     source: { type: "message", messageId: fork.sourceMessageId, anchor: fork.anchor },
   } }
+  first.parts.unshift({ type: "quote", quote: expectedQuote.data })
+  const sent = await commands.sendMessage(userId, fork.threadId, first)
   assert.deepEqual(sent.result.userMessage.parts[0], expectedQuote)
   const reloaded = await commands.getProjectBootstrap(userId, projectId)
   assert.deepEqual(reloaded.messages.find((message) => message.id === first.userMessageId).parts[0], expectedQuote)
@@ -56,6 +57,7 @@ try {
   assert.equal(followup.result.userMessage.parts.some((part) => part.type === "data-quote"), false)
   await settle(followup.result.assistantMessage.id)
   const immediate = turn("带首问分叉")
+  immediate.parts.unshift({ type: "quote", quote: expectedQuote.data })
   const forked = await commands.forkThread(userId, rootThreadId, {
     ...fork, commandId: id(), threadId: id(),
     firstTurn: { userMessageId: immediate.userMessageId, assistantMessageId: immediate.assistantMessageId, parts: immediate.parts },

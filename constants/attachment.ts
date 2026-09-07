@@ -155,3 +155,6 @@ export type AttachmentStatus = (typeof ATTACHMENT_STATUSES)[number]
 export const INSIGHTS_INPUT_CHAR_LIMIT = 20_000
 /** 建议问题数量 */
 export const SUGGESTED_QUESTION_COUNT = 3
+
+/** 单条消息的附件数量上限，供输入协议和上传入口共用。 */
+export const MESSAGE_ATTACHMENT_MAX_FILES = 20

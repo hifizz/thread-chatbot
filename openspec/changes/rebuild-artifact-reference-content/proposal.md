@@ -31,7 +31,7 @@ PR #93 已证明行内 Artifact 引用的核心行为可行，但 text/files/par
 - 行为参考：[PR #93](https://github.com/hifizz/thread-chatbot/pull/93)，审查 HEAD `6b4019fb3f764e6b89cb8029a6dd4cf3afe4e74b`。不整体合并或 cherry-pick 该 PR。
 - 涉及现有 contracts、application、persistence、上下文编译、客户端命令、列/画布输入框与消息编辑展示。
 - 复用 messages.parts JSONB 和现有 Artifact 表；预期无需数据库结构或 migration 变更。直接使用的 Lexical 包显式声明依赖，版本与已锁定的 0.45.0 家族对齐。
-- 本提交只包含 OpenSpec 规划文档。实现阶段保留已有权限、事务、幂等、生成和历史替代机制。
+- OpenSpec 规划先行提交，后续实现保留已有权限、事务、幂等、生成和历史替代机制。
 
 ## Non-goals
 

@@ -1,0 +1,15 @@
+/* 有序消息编辑器与官方 Typeahead 菜单；不覆盖 Lexical 内部定位。 */
+.tc .composer-editor-wrap { position: relative; width: 100%; min-width: 0; }
+.tc .composer-editor { outline: none; width: 100%; min-height: 24px; max-height: 120px; overflow-y: auto; overflow-wrap: anywhere; white-space: pre-wrap; font: inherit; color: var(--tc-content-primary); }
+.tc .composer-editor p { margin: 0; }
+.tc .composer-placeholder { position: absolute; top: 0; left: 0; pointer-events: none; color: var(--tc-content-secondary); }
+.tc .composer-capsule { display: inline; border: 1px solid var(--tc-border-subtle); border-radius: 8px; padding: 2px 4px; background: var(--tc-accent-glow); color: var(--tc-content-primary); font: inherit; overflow-wrap: anywhere; }
+.tc .cv-composer .box { display: flex; gap: 8px; min-width: 0; width: 100%; }
+.tc .cv-composer .prompt-stack { min-width: 0; flex: 1; }
+.tc .cv-composer .composer-editor { max-height: 68px; }
+.tc.composer-artifact-menu { z-index: var(--tc-z-selection); }
+.tc.composer-artifact-menu { box-sizing: border-box; width: min(280px, calc(100vw - 24px)); max-height: min(240px, 50dvh); overflow-y: auto; border: 1px solid var(--tc-border-strong); border-radius: 8px; padding: 4px; background: var(--tc-surface-plain); color: var(--tc-content-primary); }
+.tc.composer-artifact-menu button { display: flex; flex-direction: column; width: 100%; padding: 8px; border: 0; border-radius: 4px; background: transparent; text-align: left; cursor: pointer; overflow-wrap: anywhere; }
+.tc.composer-artifact-menu button.selected { background: var(--tc-accent-glow); }
+.tc.composer-artifact-menu small { color: var(--tc-content-secondary); }
+.tc .user-message-content .msg-quote { display: block; }

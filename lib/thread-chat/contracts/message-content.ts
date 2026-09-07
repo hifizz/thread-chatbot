@@ -1,9 +1,12 @@
+import { MESSAGE_ATTACHMENT_MAX_FILES } from "@/constants/attachment"
 import { artifactReferenceInputSchema, artifactReferenceDataSchema, type ArtifactReferenceData } from "./artifact-reference"
 import { z } from "zod"
 import type { ThreadChatUIMessage } from "@/lib/thread-chat/contracts/ui-message"
 import {
   THREAD_QUOTE_SCHEMA_VERSION,
   threadQuoteDataV1Schema,
+  legacyThreadQuoteDataSchema,
+  persistedThreadQuotePartSchema,
   type ThreadQuoteDataV1,
 } from "@/lib/thread-chat/contracts/quote"
 import type { ThreadComposerDraft } from "@/lib/thread-chat/contracts/composer"
@@ -26,7 +29,7 @@ export const messageContentPartInputSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("text"), text: z.string().max(200_000) }).strict(),
   z.object({ type: z.literal("file"), file: fileReferenceSchema }).strict(),
   z
-    .object({ type: z.literal("quote"), quote: threadQuoteInputV1Schema })
+    .object({ type: z.literal("quote"), quote: z.union([threadQuoteInputV1Schema, legacyThreadQuoteDataSchema]) })
     .strict(),
 ])
 
@@ -49,11 +52,11 @@ export const messageContentInputSchema = z
     const fileCount = content.parts.filter(
       (part) => part.type === "file"
     ).length
-    if (fileCount > 20) {
+    if (fileCount > MESSAGE_ATTACHMENT_MAX_FILES) {
       context.addIssue({
         code: "custom",
         path: ["parts"],
-        message: "附件不能超过 20 个",
+        message: `附件不能超过 ${MESSAGE_ATTACHMENT_MAX_FILES} 个`,
       })
     }
   })
@@ -68,23 +71,11 @@ export function composerDraftToMessageContent(
   draft: ThreadComposerDraft
 ): MessageContentInput {
   return messageContentInputSchema.parse({
-    parts: draft.parts.map((part) => {
-      if (part.type === "text")
-        return { type: "text" as const, text: part.text }
-      if (part.type === "file")
-        return { type: "file" as const, file: part.file }
-      if (part.type === "artifact-reference") return { type: "artifact-reference" as const, artifactId: part.artifactId }
-      const comment = part.quote.comment.trim()
-      return {
-        type: "quote" as const,
-        quote: {
-          schemaVersion: THREAD_QUOTE_SCHEMA_VERSION,
-          text: part.quote.text,
-          ...(comment ? { comment } : {}),
-          source: part.quote.source,
-        },
-      }
-    }),
+    parts: normalizeMessageContentParts(draft.parts.map(({ localId, ...part }) => {
+      void localId
+      if (part.type === "upload") throw new Error("附件尚未上传完成，请等待或移除附件")
+      return part
+    })),
   })
 }
 
@@ -139,9 +130,8 @@ export function messagePartsToComposerDraft(parts: ThreadChatUIMessage["parts"],
       case "file": return { localId, type: "file" as const, file: fileReferenceSchema.parse({ url: part.url, mediaType: part.mediaType, ...(part.filename ? { filename: part.filename } : {}) }) }
       case "data-artifact-reference": return { localId, type: "artifact-reference" as const, artifactId: artifactReferenceDataSchema.parse(part.data).artifactId }
       case "data-quote": {
-        if (!("schemaVersion" in part.data)) throw new Error("旧版 Quote 缺少来源快照，不能作为新引用提交")
-        const quote = threadQuoteDataV1Schema.parse(part.data)
-        return { localId, type: "quote" as const, quote: { text: quote.text, comment: quote.comment ?? "", source: quote.source, origin: "message-edit" as const, readonlySnapshot: true } }
+        const quote = persistedThreadQuotePartSchema.parse(part).data
+        return { localId, type: "quote" as const, quote }
       }
       default: throw new Error(`用户消息包含不支持的内容类型：${part.type}`)
     }
@@ -155,4 +145,11 @@ export function messagePartsToContent(parts: ThreadChatUIMessage["parts"]): Mess
 /** 文字入口（如划选提问弹窗）也先产生完整内容，再调用命令。 */
 export function textMessageContent(text: string, files: readonly FileReference[] = []): MessageContentInput {
   return messageContentInputSchema.parse({ parts: [{ type: "text", text }, ...files.map((file) => ({ type: "file", file }))] })
+}
+
+export function forkFirstTurnContent(input: { text: string; sourceMessageId: string; anchorText: string; anchor: import("../domain/text-anchor").TextAnchor }): MessageContentInput {
+  return messageContentInputSchema.parse({ parts: [
+    { type: "quote", quote: { schemaVersion: THREAD_QUOTE_SCHEMA_VERSION, text: input.anchorText, source: { type: "message", messageId: input.sourceMessageId, anchor: input.anchor } } },
+    { type: "text", text: input.text },
+  ] })
 }

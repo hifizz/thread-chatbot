@@ -722,8 +722,7 @@ async function testCommandFilesPassThrough() {
     threadId: thread().id,
     modelId: "test/model",
     generationSettings,
-    text: "读取附件",
-    files: [file],
+    content: { parts: [{ type: "text", text: "读取附件" }, { type: "file", file }] },
   })
   assert.deepEqual(seen.parts, [
     { type: "text", text: "读取附件" },
@@ -822,7 +821,7 @@ async function testCommandNetworkRetryReusesFrozenPayload() {
   const result = await commands.sendMessage({
     threadId: thread().id,
     modelId: "test/model",
-    text: "同一负载",
+    content: { parts: [{ type: "text", text: "同一负载" }] },
   })
   await result.connection.finished
   assert.equal(seen.length, 2)
@@ -989,7 +988,7 @@ async function testCommandTitleGenerationUpdatesStore() {
   const started = await commands.startProject({
     projectId: project().id,
     modelId: "test/model",
-    text: "研究主线标题",
+    content: { parts: [{ type: "text", text: "研究主线标题" }] },
   })
   await Promise.resolve()
   await started.connection.finished
@@ -1005,7 +1004,7 @@ async function testCommandTitleGenerationUpdatesStore() {
     anchorText: "锚点",
     anchor: { quote: { exact: "锚点", prefix: "", suffix: "" } },
     modelId: "test/model",
-    text: "解释锚点",
+    firstTurn: { parts: [{ type: "text", text: "解释锚点" }] },
   })
   await forked.connection.finished
   assert.equal(

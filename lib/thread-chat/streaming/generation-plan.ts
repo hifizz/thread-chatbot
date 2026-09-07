@@ -1,3 +1,4 @@
+import { evaluateContextBudget } from "../application/context-budget"
 import { isStepCount, streamText, type ModelMessage, type ToolSet } from "ai"
 import type { GenerationSettings } from "@/constants/generation-settings"
 import { THREAD_CHAT_PROMPT_SCHEMA_VERSION } from "@/constants/thread-chat-prompt"
@@ -183,6 +184,10 @@ export async function prepareGeneration(input: PrepareGenerationInput) {
     researchRoute.mode,
     input.generationSettings
   )
+  // 当前模型目录没有上下文上限或完整请求 tokenizer（含工具/多模态）。
+  // 在所有 system、历史、附件和工具已确定的边界明确记录 unknown。
+  const contextBudget = evaluateContextBudget({ inputTokens: null, contextWindow: null, outputTokens: generationOptions.maxOutputTokens ?? 0 })
+  if (contextBudget.status === "exceeded") throw new Error("context_length_exceeded")
   const result = streamText({
     ...buildAiTelemetryConfig(MODEL_CALL_PURPOSE.chatAnswer, {
       ...trace,
@@ -237,6 +242,7 @@ export async function prepareGeneration(input: PrepareGenerationInput) {
     usage: result.usage,
     contextMetadata: {
       ...contextMetadata,
+      contextBudget,
       generationMode: generationMode.id,
       promptSchemaVersion: THREAD_CHAT_PROMPT_SCHEMA_VERSION,
       actualProvider: resolvedModel.route.actualProvider,

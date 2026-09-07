@@ -1,18 +1,15 @@
-import { buildForkUserParts } from "@/lib/thread-chat/domain/user-message-parts"
+import { THREAD_QUOTE_SCHEMA_VERSION } from "@/lib/thread-chat/contracts/quote"
+import { resolveUserContent } from "./resolve-user-content"
 import { messages } from "@/lib/db/schema"
 import type { SendMessageCommand } from "@/lib/thread-chat/contracts/commands"
 import type { GenerationAcceptedDTO } from "@/lib/thread-chat/contracts/dto"
 import {
   assertAllowedGenerationSettings,
   assertAllowedModel,
-  assertOwnedReadyAttachments,
-  assertModelSupportsNewAttachments,
   assertThreadReadyForTurn,
-  commandFiles,
   touchProjectAndThread,
 } from "@/lib/thread-chat/application/command-utils"
 import { notFound, stateConflict } from "@/lib/thread-chat/application/errors"
-import { assertValidQuoteSources } from "@/lib/thread-chat/application/quote-validation"
 import { executeIdempotentCommand } from "@/lib/thread-chat/persistence/command-repository"
 import {
   toMessageDTO,
@@ -51,15 +48,12 @@ export function sendMessage(
         if (!project) notFound()
         if (project.archivedAt) stateConflict("已归档 Project 不可发送消息")
         await assertThreadReadyForTurn(tx, project.id, thread.id)
-        const files = commandFiles(command)
-        assertModelSupportsNewAttachments(command.modelId, files)
-        await assertOwnedReadyAttachments(tx, userId, files)
-        await assertValidQuoteSources({
-          tx,
-          projectId: project.id,
-          sourceThreadId: thread.id,
-          content: command,
-        })
+        const parts = await resolveUserContent({ tx, userId, projectId: project.id, modelId: command.modelId, content: command, operation: { type: "send", sourceThreadId: thread.id,
+          ...(thread.nextSequence === 1 && thread.forkMessageId && thread.forkAnchor && thread.anchorText ? { frozenFirstQuote: {
+            schemaVersion: THREAD_QUOTE_SCHEMA_VERSION, text: thread.anchorText,
+            source: { type: "message", messageId: thread.forkMessageId, anchor: thread.forkAnchor },
+          } } : {}),
+        } })
         const [userSequence, assistantSequence] = await allocateThreadSequences(
           tx,
           thread.id,
@@ -75,7 +69,7 @@ export function sendMessage(
               threadId: thread.id,
               sequence: userSequence,
               role: "user",
-              parts: buildForkUserParts(command, thread, userSequence),
+              parts,
               status: "completed",
               finishedAt: now,
             },

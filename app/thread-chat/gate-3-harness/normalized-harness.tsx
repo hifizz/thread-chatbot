@@ -1,5 +1,10 @@
 "use client"
 
+import { ComposerDraftProvider } from "../chat/composer/composer-drafts"
+import { ArtifactResourcesProvider, ArtifactNavigationProvider } from "../chat/composer/artifact-resources"
+
+import { messagePartsToContent, forkFirstTurnContent, type MessageContentInput } from "@/lib/thread-chat/contracts/message-content"
+
 import dynamic from "next/dynamic"
 import React, { useEffect, useMemo, useRef, useState } from "react"
 import { createConversationStore, type ConversationStore } from "../core/store"
@@ -24,7 +29,6 @@ import type {
   ThreadMessageActionCommands,
 } from "../chat/actions/message-action-commands"
 import type { MessageActionViewState } from "../chat/actions/message-action-types"
-import { textFromMessageParts } from "@/lib/thread-chat/contracts/ui-message"
 import type { Message, MessageFeedback } from "../core/types"
 import { BranchableChat } from "../branching/branchable-chat"
 import {
@@ -259,7 +263,7 @@ export function NormalizedGate3Harness({
           assistantMessageId: assistant?.id,
           modelId:
             state.threadsById[threadId]?.modelId ?? "doubao-seed-2.1-turbo",
-          text: textFromMessageParts(source.parts),
+          content: messagePartsToContent(source.parts),
         })
         return actionResult({
           userMessageId: result.command.userMessageId,
@@ -268,7 +272,7 @@ export function NormalizedGate3Harness({
           sourceAssistantMessageId: assistant?.id,
         })
       },
-      async editAndRegenerate(viewThreadId, userMessageId, text) {
+      async editAndRegenerate(viewThreadId, userMessageId, content) {
         const threadId = fromConversationViewThreadId(state, viewThreadId)
         const source = state.messagesById[userMessageId]
         const assistant = source
@@ -283,7 +287,7 @@ export function NormalizedGate3Harness({
           assistantMessageId: assistant?.id,
           modelId:
             state.threadsById[threadId]?.modelId ?? "doubao-seed-2.1-turbo",
-          text,
+          content,
         })
         setStatus("Edit 已追加新的 user/assistant，旧 turn 保留为 superseded")
         return actionResult({
@@ -312,14 +316,14 @@ export function NormalizedGate3Harness({
     [projectId, runtime.commands, state]
   )
 
-  const send = (viewThreadId: string, text: string) => {
+  const send = (viewThreadId: string, content: MessageContentInput) => {
     const threadId = fromConversationViewThreadId(state, viewThreadId)
     void runtime.commands
       .sendMessage({
         threadId,
         modelId:
           state.threadsById[threadId]?.modelId ?? "doubao-seed-2.1-turbo",
-        text,
+        content,
       })
       .then(({ connection }) => {
         setStatus(`${scenario}：命令已接受，等待终态`)
@@ -378,7 +382,7 @@ export function NormalizedGate3Harness({
         anchor: info.anchor,
         modelId:
           state.threadsById[parentThreadId]?.modelId ?? "doubao-seed-2.1-turbo",
-        ...(question ? { text: question } : {}),
+        ...(question ? { firstTurn: forkFirstTurnContent({ text: question, sourceMessageId: info.msgId, anchorText: info.text, anchor: info.anchor }) } : {}),
       })
       .then(({ command, connection }) => {
         openThread(command.threadId)
@@ -400,7 +404,7 @@ export function NormalizedGate3Harness({
     SCENARIOS.find((entry) => entry.id === scenario)?.label ?? scenario
 
   return (
-    <div className="tc" data-gate3-normalized-harness="true">
+    <ArtifactResourcesProvider store={runtime.store}><ComposerDraftProvider><ArtifactNavigationProvider onOpen={(id) => { setActiveArtifactId(id); setDrawerOpen(true) }}><div className="tc" data-gate3-normalized-harness="true">
       <ThreadChatTopbar
         viewMode={viewMode}
         showHelp
@@ -616,6 +620,6 @@ export function NormalizedGate3Harness({
       {!rootHasMessages && state.project && (
         <div className="boot-loading">当前 Project 尚无消息。</div>
       )}
-    </div>
+    </div></ArtifactNavigationProvider></ComposerDraftProvider></ArtifactResourcesProvider>
   )
 }

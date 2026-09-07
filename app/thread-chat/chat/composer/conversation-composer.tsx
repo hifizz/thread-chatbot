@@ -1,460 +1,136 @@
 "use client"
 
-import React, {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  type ChangeEvent,
-  type ClipboardEvent,
-  type DragEvent,
-} from "react"
-import { FileIcon, PlusIcon, XIcon } from "lucide-react"
+import { useRef, useState, type ClipboardEvent, type DragEvent } from "react"
+import { $getRoot, $getSelection, $isRangeSelection, type LexicalEditor } from "lexical"
 import { toast } from "sonner"
-import {
-  IMAGE_ATTACHMENT_LIMITS,
-  IMAGE_MODEL_VALIDATION_MESSAGE,
-} from "@/constants/attachment"
+import { PlusIcon, AtSign } from "lucide-react"
+import { composerDraftToMessageContent, forkFirstTurnContent, messageContentToUiParts, messagePartsToComposerDraft, type MessageContentInput } from "@/lib/thread-chat/contracts/message-content"
+import type { ThreadComposerDraft } from "@/lib/thread-chat/contracts/composer"
+import { IMAGE_MODEL_VALIDATION_MESSAGE, MESSAGE_ATTACHMENT_MAX_FILES } from "@/constants/attachment"
+import { supportsModelImageInput } from "@/constants/model"
+import { uploadAttachment, normalizeAttachmentFile, validateAttachmentFile } from "@/lib/attachments/upload"
+import { preprocessImageAttachment } from "@/lib/attachments/image"
+import { createPastedTextFile, shouldInlinePastedText, canAddThreadImages, THREAD_COMPOSER_ACCEPT, isThreadComposerFile } from "./thread-attachment-model"
 import { GenerationSettingsControls } from "./generation-settings-controls"
 import { ThreadModelSelector } from "./thread-model-selector"
-import {
-  composerMaxHeight,
-  composerSubmission,
-  shouldSubmitComposerKey,
-} from "./conversation-composer-logic"
-import {
-  canAddThreadImages,
-  canSendThreadAttachments,
-  createPastedTextFile,
-  hasUnsupportedReadyImages,
-  isThreadComposerFile,
-  isThreadComposerImageFile,
-  readyThreadAttachmentReferences,
-  shouldInlinePastedText,
-  THREAD_COMPOSER_ACCEPT,
-  type ThreadComposerAttachment,
-} from "./thread-attachment-model"
-import {
-  deleteUploadedAttachment,
-  normalizeAttachmentFile,
-  uploadAttachment,
-  validateAttachmentFile,
-  type UploadedAttachmentReference,
-} from "@/lib/attachments/upload"
-import { preprocessImageAttachment } from "@/lib/attachments/image"
-import {
-  Attachment,
-  AttachmentAction,
-  AttachmentActions,
-  AttachmentContent,
-  AttachmentDescription,
-  AttachmentGroup,
-  AttachmentMedia,
-  AttachmentTitle,
-} from "@/components/ui/attachment"
+import { MessageEditor } from "./message-editor"
+import { $createComposerCapsuleNode } from "./composer-capsule-node"
+import { $exportComposerDraft } from "./composer-codec"
+import { useComposerDraft } from "./composer-drafts"
+import { useArtifactResources, useComposerThread } from "./artifact-resources"
 
 type ConversationComposerProps = {
-  variant: "column" | "canvas"
-  threadId: string
-  isMain: boolean
-  busy: boolean
-  prefill?: string | null
-  modelId?: string
-  modelSelectorDisabled: boolean
-  modelSelectorDisabledReason?: "branch" | "busy"
-  onModelChange?(modelId: string): void
-  onSend?(text: string, files: UploadedAttachmentReference[]): void
-  onStop?(): void
-  onBeforeSend?(): void
+  variant: "column" | "canvas"; threadId: string; isMain: boolean; busy: boolean; prefill?: string | null;
+  modelId?: string; modelSelectorDisabled: boolean; modelSelectorDisabledReason?: "branch" | "busy";
+  onModelChange?(modelId: string): void; onSend?(content: MessageContentInput): unknown | Promise<unknown>;
+  onStop?(): void; onBeforeSend?(): void
 }
 
-function autoGrow(ta: HTMLTextAreaElement, maxHeight: number) {
-  ta.style.height = "auto"
-  ta.style.height = Math.min(ta.scrollHeight, maxHeight) + "px"
+export function ConversationComposer(props: ConversationComposerProps) {
+  return <ThreadComposer key={props.threadId} {...props} />
 }
 
-function hasDraggedFiles(event: DragEvent<HTMLElement>) {
-  return Array.from(event.dataTransfer.types).includes("Files")
-}
-
-export function ConversationComposer({
-  variant,
-  threadId,
-  isMain,
-  busy,
-  prefill,
-  modelId,
-  modelSelectorDisabled,
-  modelSelectorDisabledReason,
-  onModelChange,
-  onSend,
-  onStop,
-  onBeforeSend,
-}: ConversationComposerProps) {
-  const taRef = useRef<HTMLTextAreaElement | null>(null)
-  const fileInputRef = useRef<HTMLInputElement | null>(null)
-  const dragDepthRef = useRef(0)
-  const [attachments, setAttachments] = useState<ThreadComposerAttachment[]>([])
-  const [isDragging, setIsDragging] = useState(false)
-  const canvas = variant === "canvas"
-  const maxHeight = composerMaxHeight(variant)
-
-  const doSend = () => {
-    const ta = taRef.current
-    if (!ta || !onSend) return
-    const text = composerSubmission(ta.value, busy)
-    if (!text || !canSendThreadAttachments(attachments)) return
-    if (hasUnsupportedReadyImages(modelId, attachments)) {
-      toast.error(IMAGE_MODEL_VALIDATION_MESSAGE)
+function ThreadComposer(props: ConversationComposerProps) {
+  const { threadId, variant, modelId, busy, onSend } = props
+  const thread = useComposerThread(threadId)
+  const artifacts = useArtifactResources()
+  const editorRef = useRef<LexicalEditor | null>(null)
+  const fileInput = useRef<HTMLInputElement>(null)
+  const [submitting, setSubmitting] = useState(false)
+  const { entry, update, clearSubmitted, resolveUpload, failUpload } = useComposerDraft(threadId, () => {
+    if (props.prefill && thread?.forkMessageId && thread.forkAnchor && thread.anchorText) {
+      const content = forkFirstTurnContent({ text: props.prefill, sourceMessageId: thread.forkMessageId, anchorText: thread.anchorText, anchor: thread.forkAnchor })
+      return messagePartsToComposerDraft(messageContentToUiParts(content))
+    }
+    return { parts: props.prefill ? [{ localId: crypto.randomUUID(), type: "text", text: props.prefill }] : [] }
+  })
+  const submit = async () => {
+    if (!onSend || busy || submitting || !editorRef.current) return
+    let snapshot: ThreadComposerDraft
+    let content: MessageContentInput
+    try {
+      snapshot = editorRef.current.getEditorState().read($exportComposerDraft)
+      content = composerDraftToMessageContent(snapshot)
+      if (!supportsModelImageInput(modelId) && content.parts.some((part) => part.type === "file" && part.file.mediaType.startsWith("image/"))) throw new Error(IMAGE_MODEL_VALIDATION_MESSAGE)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "请检查输入内容")
       return
     }
-    ta.value = ""
-    ta.style.height = "auto"
-    onBeforeSend?.()
-    onSend(text, readyThreadAttachmentReferences(attachments))
-    if (!canvas) setAttachments([])
-    ta.focus(canvas ? { preventScroll: true } : undefined)
+    update(snapshot)
+    setSubmitting(true)
+    props.onBeforeSend?.()
+    try {
+      await onSend(content)
+      clearSubmitted(snapshot)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "发送失败，草稿已保留")
+    } finally { setSubmitting(false) }
   }
-
-  const appendFiles = useCallback(
-    (files: Iterable<File>) => {
-      const updateAttachment = (
-        id: string,
-        patch: Partial<Omit<ThreadComposerAttachment, "id">>
-      ) =>
-        setAttachments((current) =>
-          current.map((attachment) =>
-            attachment.id === id ? { ...attachment, ...patch } : attachment
-          )
-        )
-
-      const incoming = Array.from(files)
-      const incomingImageCount = incoming.filter(
-        isThreadComposerImageFile
-      ).length
-      if (!canAddThreadImages(attachments, incomingImageCount)) {
-        toast.error(
-          `单次最多添加 ${IMAGE_ATTACHMENT_LIMITS.maxFilesPerMessage} 张图片`
-        )
-        return
-      }
-
-      for (const sourceFile of incoming) {
-        const id = crypto.randomUUID()
-        const file = normalizeAttachmentFile(sourceFile)
-        try {
-          if (!isThreadComposerFile(file)) {
-            throw new Error(`不支持的文件类型：${file.type || "未知"}`)
-          }
-          validateAttachmentFile(file)
-        } catch (error) {
-          setAttachments((current) => [
-            ...current,
-            {
-              id,
-              file,
-              status: "error",
-              progress: 0,
-              error: error instanceof Error ? error.message : "附件校验失败",
-            },
-          ])
-          continue
+  const appendFiles = (files: Iterable<File>) => {
+    const editor = editorRef.current
+    if (!editor) return
+    const reserved = editor.getEditorState().read($exportComposerDraft).parts.slice()
+    for (const source of files) {
+      const file = normalizeAttachmentFile(source)
+      try {
+        if (!isThreadComposerFile(file)) throw new Error("不支持的文件类型")
+        validateAttachmentFile(file)
+        if (reserved.filter((part) => part.type === "file" || part.type === "upload").length >= MESSAGE_ATTACHMENT_MAX_FILES) throw new Error(`附件不能超过 ${MESSAGE_ATTACHMENT_MAX_FILES} 个`)
+        if (file.type.startsWith("image/")) {
+          if (!supportsModelImageInput(modelId)) throw new Error(IMAGE_MODEL_VALIDATION_MESSAGE)
+          if (!canAddThreadImages(reserved, 1)) throw new Error("图片数量超过单条消息上限")
         }
-        setAttachments((current) => [
-          ...current,
-          { id, file, status: "uploading", progress: 0 },
-        ])
-        void preprocessImageAttachment(file)
-          .then((file) => {
-            validateAttachmentFile(file)
-            updateAttachment(id, { file })
-            return uploadAttachment(file, {
-              onProgress(progress) {
-                updateAttachment(id, { progress })
-              },
-            }).then((result) => ({ file, result }))
-          })
-          .then(({ file, result }) =>
-            updateAttachment(id, {
-              file,
-              status: "ready",
-              progress: 1,
-              serverId: result.serverId,
-              reference: result.reference,
-            })
-          )
-          .catch((error) =>
-            updateAttachment(id, {
-              status: "error",
-              error:
-                error instanceof Error ? error.message : "附件上传失败",
-            })
-          )
-      }
-    },
-    [attachments]
-  )
-
-  const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
-    appendFiles(event.currentTarget.files ?? [])
-    event.currentTarget.value = ""
-  }
-
-  const handleDragEnter = (event: DragEvent<HTMLDivElement>) => {
-    if (!hasDraggedFiles(event)) return
-    event.preventDefault()
-    dragDepthRef.current += 1
-    setIsDragging(true)
-  }
-
-  const handleDragOver = (event: DragEvent<HTMLDivElement>) => {
-    event.preventDefault()
-    if (hasDraggedFiles(event)) event.dataTransfer.dropEffect = "copy"
-  }
-
-  const handleDragLeave = (event: DragEvent<HTMLDivElement>) => {
-    event.preventDefault()
-    dragDepthRef.current = Math.max(0, dragDepthRef.current - 1)
-    if (dragDepthRef.current === 0) setIsDragging(false)
-  }
-
-  const handleDrop = (event: DragEvent<HTMLDivElement>) => {
-    event.preventDefault()
-    dragDepthRef.current = 0
-    setIsDragging(false)
-    appendFiles(event.dataTransfer.files)
-  }
-
-  const handlePaste = (event: ClipboardEvent<HTMLDivElement>) => {
-    const pastedFiles = Array.from(event.clipboardData.items)
-      .filter((item) => item.kind === "file")
-      .map((item) => item.getAsFile())
-      .filter((file): file is File => file !== null)
-    if (pastedFiles.length > 0) {
-      event.preventDefault()
-      appendFiles(pastedFiles)
-      return
+      } catch (error) { toast.error(error instanceof Error ? error.message : "附件校验失败"); continue }
+      const localId = crypto.randomUUID()
+      const part = { type: "upload" as const, localId, filename: file.name, mediaType: file.type }
+      reserved.push(part)
+      editorRef.current?.update(() => {
+        $getRoot().selectEnd().insertNodes([$createComposerCapsuleNode(part, `上传中：${file.name}`)])
+      })
+      void preprocessImageAttachment(file)
+        .then((ready) => uploadAttachment(ready))
+        .then((result) => resolveUpload(localId, result.reference))
+        .catch((error) => {
+          const message = error instanceof Error ? error.message : "附件上传失败"
+          failUpload(localId, message)
+          toast.error(message)
+        })
     }
+  }
+  const onPaste = (event: ClipboardEvent<HTMLDivElement>) => {
+    const files = Array.from(event.clipboardData.files)
+    if (files.length) { event.preventDefault(); appendFiles(files); return }
+    // Lexical 自己处理普通文字与应用内胶囊的公开剪贴板格式。
     const text = event.clipboardData.getData("text/plain")
-    if (!text) return
-    if (shouldInlinePastedText(text)) {
-      const ta = taRef.current
-      if (!ta) return
-      event.preventDefault()
-      const start = ta.selectionStart
-      const end = ta.selectionEnd
-      ta.setRangeText(text, start, end, "end")
-      autoGrow(ta, maxHeight)
-      return
+    if (text && !event.clipboardData.types.includes("application/x-lexical-editor") && !shouldInlinePastedText(text)) {
+      event.preventDefault(); appendFiles([createPastedTextFile(text)])
     }
-    event.preventDefault()
-    appendFiles([createPastedTextFile(text)])
   }
-
-  useEffect(() => {
-    const ta = taRef.current
-    if (!ta || !prefill || ta.value !== "") return
-    ta.value = prefill
-    autoGrow(ta, maxHeight)
-    ta.focus(canvas ? { preventScroll: true } : undefined)
-    ta.setSelectionRange(ta.value.length, ta.value.length)
-  }, [canvas, maxHeight, threadId, prefill])
-
-  const handleBoxPointerDown = (event: React.MouseEvent<HTMLDivElement>) => {
-    // 点击 box 任意位置都把焦点交给 textarea（附件卡片的交互不吞掉这个行为之外的事）。
-    if (event.target instanceof Element && event.target.closest("button, a")) {
-      if (event.target.closest('[data-slot="attachment"]')) return
-    }
-    const ta = taRef.current
-    if (!ta) return
-    const isFocused = document.activeElement === ta
-    const selection = window.getSelection()
-    if (isFocused || !selection?.isCollapsed) return
-    event.preventDefault()
-    ta.focus()
-    ta.setSelectionRange(ta.value.length, ta.value.length)
+  const onDrop = (event: DragEvent<HTMLDivElement>) => {
+    if (!event.dataTransfer.files.length) return
+    event.preventDefault(); appendFiles(event.dataTransfer.files)
   }
-
-  const textarea = (
-    <textarea
-      ref={taRef}
-      rows={1}
-      style={
-        { "--composer-max-height": `${maxHeight}px` } as React.CSSProperties
-      }
-      placeholder={
-        canvas
-          ? "就地继续这段会话…"
-          : isMain
-            ? "继续在主线提问…"
-            : "在这个分支里追问…"
-      }
-      aria-label={canvas ? "在画布节点里继续对话" : undefined}
-      onInput={(event) => autoGrow(event.currentTarget, maxHeight)}
-      onKeyDown={(event) => {
-        const nativeEvent = event.nativeEvent
-        if (
-          !shouldSubmitComposerKey({
-            key: event.key,
-            shiftKey: event.shiftKey,
-            isComposing: nativeEvent.isComposing,
-            keyCode: nativeEvent.keyCode,
-          })
-        )
-          return
-        event.preventDefault()
-        doSend()
-      }}
-    />
-  )
-
-  const selector = modelId ? (
-    <ThreadModelSelector
-      modelId={modelId}
-      disabled={modelSelectorDisabled}
-      compact={canvas}
-      disabledReason={modelSelectorDisabledReason}
-      onValueChange={(nextModelId) => onModelChange?.(nextModelId)}
-    />
-  ) : null
-  const generationSettingsControls = modelId ? (
-    <GenerationSettingsControls
-      modelId={modelId}
-      disabled={modelSelectorDisabled}
-    />
-  ) : null
-
-  const attachmentTray =
-    !canvas && attachments.length > 0 ? (
-      <AttachmentGroup
-        data-testid="composer-attachment-tray"
-        aria-label="已添加的附件"
-        className="composer-attachment-tray w-full max-w-full"
-      >
-        {attachments.map((attachment) => (
-          <Attachment
-            key={attachment.id}
-            data-testid="composer-attachment-item"
-            className="composer-attachment-item w-60 max-w-[min(15rem,80vw)] flex-nowrap"
-            size="sm"
-          >
-            <AttachmentMedia aria-hidden="true">
-              <FileIcon />
-            </AttachmentMedia>
-            <AttachmentContent className="overflow-hidden">
-              <AttachmentTitle>
-                {attachment.file.name || "未命名附件"}
-              </AttachmentTitle>
-              <AttachmentDescription>
-                {attachment.status === "uploading"
-                  ? `上传中 ${Math.round(attachment.progress * 100)}%`
-                  : attachment.status === "ready"
-                    ? "已就绪"
-                    : attachment.error ?? "上传失败"}
-              </AttachmentDescription>
-            </AttachmentContent>
-            <AttachmentActions>
-              <AttachmentAction
-                type="button"
-                aria-label={`移除 ${attachment.file.name || "未命名附件"}`}
-                data-testid="composer-remove-attachment"
-                onClick={(event) => {
-                  event.stopPropagation()
-                  setAttachments((current) =>
-                    current.filter((item) => item.id !== attachment.id)
-                  )
-                  if (attachment.serverId) {
-                    void deleteUploadedAttachment(attachment.serverId)
-                  }
-                }}
-              >
-                <XIcon />
-              </AttachmentAction>
-            </AttachmentActions>
-          </Attachment>
-        ))}
-      </AttachmentGroup>
-    ) : null
-
-  const promptStack = canvas ? (
-    <div className="cv-prompt-stack">
-      {selector}
-      {generationSettingsControls}
-      {textarea}
-    </div>
-  ) : (
-    <div className="prompt-stack">
-      {attachmentTray}
-      {textarea}
-      <div className="composer-tools">
-        <input
-          ref={fileInputRef}
-          data-testid="composer-file-input"
-          className="sr-only"
-          type="file"
-          multiple
-          accept={THREAD_COMPOSER_ACCEPT}
-          tabIndex={-1}
-          onChange={handleFileChange}
-        />
-        <button
-          type="button"
-          className="attach-btn"
-          aria-label="添加附件"
-          title="添加附件"
-          data-testid="composer-attach-button"
-          onClick={() => fileInputRef.current?.click()}
-        >
-          <PlusIcon size={14} aria-hidden="true" />
-        </button>
-        {selector}
-        {generationSettingsControls}
-      </div>
-    </div>
-  )
-
-  const button = busy ? (
-    <button
-      className={canvas ? "cv-send stop" : "send stop"}
-      title="停止生成（已收到的内容会保留）"
-      onClick={onStop}
-    >
-      停止
-    </button>
-  ) : (
-    <button
-      className={canvas ? "cv-send" : "send"}
-      onClick={doSend}
-      disabled={!canvas && !canSendThreadAttachments(attachments)}
-    >
-      发送
-    </button>
-  )
-
-  if (canvas) {
-    return (
-      <div className="cv-composer">
-        {promptStack}
-        {button}
-      </div>
-    )
-  }
-  return (
-    <div className={`composer ${isMain ? "" : "branch"}`}>
-      <div className="lane">
-        <div
-          className={`box${isDragging ? " attach-dragging" : ""}`}
-          onDragEnter={handleDragEnter}
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
-          onPaste={handlePaste}
-          onMouseDown={handleBoxPointerDown}
-        >
-          {promptStack}
-          {button}
+  const canvas = variant === "canvas"
+  return <div className={canvas ? "cv-composer" : `composer ${props.isMain ? "" : "branch"}`}>
+    <div className={canvas ? "cv-prompt-stack" : "lane"}>
+      <div className="box" onPasteCapture={onPaste} onDrop={onDrop} onDragOver={(event) => { if (event.dataTransfer.types.includes("Files")) event.preventDefault() }}>
+        <div className="prompt-stack">
+          <MessageEditor key={threadId} draft={entry.draft} revision={entry.revision} artifacts={artifacts} editorRef={editorRef} onChange={update} onSubmit={() => void submit()} placeholder={canvas ? "在画布节点里继续对话" : "输入问题，@ 引用 Artifact"} />
+          <div className="composer-tools">
+            <input ref={fileInput} type="file" multiple className="sr-only" accept={THREAD_COMPOSER_ACCEPT} onChange={(event) => { appendFiles(event.target.files ?? []); event.target.value = "" }} />
+            <button type="button" className="attach-btn" aria-label="添加附件" onClick={() => fileInput.current?.click()}><PlusIcon size={14} /></button>
+            <button type="button" className="attach-btn" aria-label="引用 Artifact" onMouseDown={(event) => event.preventDefault()} onClick={() => {
+              editorRef.current?.focus(() => editorRef.current?.update(() => {
+                const selection = $getSelection()
+                const range = $isRangeSelection(selection) ? selection : $getRoot().selectEnd()
+                range.insertText(" @")
+              }))
+            }}><AtSign size={14} /></button>
+            {modelId && <><ThreadModelSelector modelId={modelId} disabled={props.modelSelectorDisabled} compact={canvas} disabledReason={props.modelSelectorDisabledReason} onValueChange={(id) => props.onModelChange?.(id)} /><GenerationSettingsControls modelId={modelId} disabled={props.modelSelectorDisabled} /></>}
+          </div>
         </div>
+        {busy ? <button className="send stop" onClick={props.onStop}>停止</button> : <button className="send" disabled={submitting || entry.draft.parts.some((part) => part.type === "upload")} onClick={() => void submit()}>{submitting ? "发送中…" : "发送"}</button>}
       </div>
     </div>
-  )
+  </div>
 }

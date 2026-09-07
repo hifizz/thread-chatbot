@@ -72,8 +72,7 @@ const content = composerDraftToMessageContent({
         text: quote.text,
         comment: quote.comment,
         source: quote.source,
-        origin: "selection",
-        readonlySnapshot: true,
+        schemaVersion: "thread-quote-v1",
       },
     },
     {

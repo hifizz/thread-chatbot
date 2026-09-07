@@ -1,51 +1,50 @@
-# 实现记录
+# 实现与验证记录
 
-## 基线与入口核对（T1.1）
+## 基线与范围
 
-实现基线为 main `7da00ea`，提案提交为 `d063d99`。#93 仅作行为参考。
+基于 main `7da00eaba9fb116a4ff4612b08005f51e886cd45`，基础实现父提交 `a8a854b27636654b7f9d217ecf0da2203c5c3be4`。本记录对应随附代码的实现提交。2026-09-07 再次 fetch 后，main 和实现分支远端没有其他新增提交。#93 仅作行为参考，不合并或关闭。
 
-- 客户端操作入口：`app/thread-chat/net/commands/conversation-commands.ts`；目前仍有 text/files，完整 content 切换未完成。
-- 产品调用：`thread-chat-demo.tsx`，列模式 `chat-view.tsx`，画布 `canvas-expand.tsx`；消息编辑经过 `message-action-commands.ts` 与 `editable-user-message.tsx`。
-- 服务端写入：`send-message.ts`、`edit-turn.ts`、`fork-thread.ts`、`start-project.ts`；事务、所有权锁和幂等已有实现，应保留。
-- 草稿：`contracts/composer.ts`；main 输入框尚为 textarea，本地附件状态独立。
-- 历史与模型：`compile-model-context.ts` 选取冻结分叉历史及当前消息，再处理附件；最终请求在 `streaming/generation-plan.ts`。
-- Artifact 写入：`streaming/finalize.ts` 在消息 generating 状态的条件更新成功后插入产物，不覆盖同 ID；尚缺真实数据库不变量测试。
-- main 已有分叉首问与旧 Quote 保留修复，#93 相对 main 还包含 Mermaid 等不相关差异，不能整批复制。
+用户已确认旧 Quote 方案：只读可删除，保留相对顺序，不做拖动、排序、复制、新增 Quote 或修改评论。旧 `{text}` 仅在编辑时按原快照子序列校验；新消息拒绝旧版 Quote。Annotation 提问、评论及列表交互是后续范围。先前的协议暂停已解除。
 
-## 已落地的基础代码
+## 实现
 
-- 引用输入与持久快照 Schema、UI Part 类型、有序往返转换和保序规范化函数。
-- Repository 的 Project 范围批量读取与来源状态返回。
-- 单一用户内容解析函数，包括文件、Quote、引用合法性及单消息预算；尚未替换现有写入入口。
-- 模型引用展开归位应用层，接入实际上下文编译，保留固定重复标记和前向去重。
-- 有序内容及真实 AI SDK 消息转换测试。验证结果见下方。
+- `contracts/message-content.ts` 定义内容 Schema、完整草稿往返、保序规范化。文件、Quote 和引用与文本在同一序列，不按类型重拼。旧的 text/files 内部命令和自动插回 Quote 的 domain 辅助函数已移除。
+- send/edit/start/fork 都在已有锁、事务和幂等机制内调用 `resolveUserContent`。空分叉首次发送的父级 Quote 匹配数据库中冻结的分叉快照，既不重新插入，也不扩大到任意父级来源。
+- Repository 仅批量读取当前 Project 的 Artifact。新选择要求 completed Markdown；编辑保留引用使用原快照。Artifact finalization 的条件更新和插入不覆盖同 ID 内容，无表结构或 migration 改动。
+- 模型引用展开归位 application，实际历史及附件处理后前向编译，再调用真实 AI SDK 转换；固定重复标记、完整源工具核对及前缀字节稳定测试保留。
+- 最终请求边界记录总预算状态。目前模型配置没有完整输入 tokenizer 或上下文上限，明确为 `unknown`；不会声称已完成总 token 预检。纯预算函数覆盖已知总量与输出预留，提供商超限在异常和 SDK failed outcome 两条路径统一转换。字符接收预算不作为 token 估算。
+- 输入框按 Lexical 0.45.0 官方 TextNode/token、PlainText、History、OnChange、Command、Typeahead 拆分，唯一 codec 连接活动文档和完整草稿。上传占据固定 localId 位置，异步更新只替换该节点。成功清理匹配快照，迟到结果不覆盖新内容。
+- 草稿、normalized 资源订阅和历史导航使用独立 Provider。历史消息按 Parts 顺序展示，编辑恢复全部内容。引用菜单关闭时不搜索，无关流式状态不重建候选。
+- 官方默认 Typeahead 在底部单行输入框没有翻转（最小复现 y=663、菜单高240、视口700）。现通过公开 onOpen/MenuResolution/menuRenderFn 配合官方 NodeContextMenuPlugin 已使用的 Floating UI 实现：仅定位自己渲染的菜单，不修改 Lexical anchor/firstChild 或使用内部字段。Floating UI autoUpdate 仅在菜单挂载期间运行，跟踪画布 transform。
+- 直接依赖声明 lexical、@lexical/react、@floating-ui/react，锁文件 frozen/offline 安装通过；去掉未使用的直接 @lexical/utils。
 
-以上为基础提交，不代表输入框或完整功能可发布。服务端写入入口及客户端仍保留 main 行为，避免在完整切换前破坏旧消息。
+## 已执行的验证
 
-## 需要确认：旧版 Quote 的编辑协议
+环境：Node 24.19.0、pnpm 10.32.1、Linux、Chromium 149。每批 TypeScript 改动运行 `pnpm typecheck`，最后类型检查和修改文件 ESLint 均通过。未执行格式化或生成 migration。
 
-仓库 `contracts/quote.ts` 和 `domain/user-message-parts.ts` 明确允许读取旧版 `{text}` Quote，但禁止把它作为新命令输入。现有编辑通过 `buildEditedUserParts` 从旧消息自动插回；`fork-quote.test.mjs` 有专门回归用例。
+以下执行方式为 `node --import tsx e2e/thread-chat/<名称>.test.mjs`：
 
-提案同时要求完整有序内容是唯一提交来源、Quote 可以删除/排序、旧消息继续可编辑。对只有 `{text}`、没有来源快照的旧版 Quote，当前输入 Schema 无法同时满足这些要求；不能伪造 messageId/anchor 升级它，也不能静默丢失它。
+- artifact-content-core：交错内容往返、空格、重复引用、严格版本及伪造字段拒绝。
+- artifact-reference-context：真实 AI SDK 转换；自身/分叉/裁剪历史、完整与临时工具、来源身份、固定标记、前缀稳定。
+- context-budget：已知边界、输出预留、unknown、嵌套提供商错误及循环保护。
+- fork-quote、prompt-cache-contract、normalized-client-store：结构化首问、空分叉、无效首问、完整编辑、旧 Quote、命令协议与 Store 回归。
+- conversation-composer、text-attachment-slice、image-attachment-slice：Enter/Shift/IME 事件守卫、粘贴阈值、附件类型和图片数量限制。IME 守卫测试不等于系统输入法验收。
+- artifact-content-db、fork-quote-db：真实应用命令、Drizzle/postgres-js SQL 和事务在隔离 PGlite PostgreSQL 引擎中执行，通过 db:push 初始化独立内存数据库。覆盖权限、跨 Project、状态和伪造拒绝且无半消息；200,000 字符边界、合计超限、重复正文只计一次；跨 Thread/当前 Thread 引用、读取恢复、幂等、旧快照编辑、旧 Quote 保留/删除、两种分叉入口、终态不可覆盖。未使用普通 JS 数据库替身；但此环境不是独立原生 PostgreSQL 多连接部署，不能据此声明并发数据库或整链路 E2E 验收通过。
 
-建议的小范围协议补充：
+实际浏览器用例已保存为 `e2e/thread-chat/content-browser.test.mjs`，测试页面为开发环境专用 `/thread-chat-gate-3-harness/content`。可用 `TEST_BASE_URL` 和 `CHROMIUM_EXECUTABLE_PATH` 指定地址与浏览器。本环境将同一 React 组件通过 esbuild 装载运行，未假称 Next 服务端或整站 E2E。
 
-- quote 输入允许旧版 `{text}`，仅限编辑时逐项匹配原消息中的旧快照。
-- 服务端按原快照出现次数校验，允许保留/删除/排序，拒绝新增、复制和修改正文。
-- send/start/fork 的新消息继续拒绝旧版 Quote。
-- 数据库不迁移，来源不补造，持久化格式不变；客户端提交的完整内容决定最终顺序。
+浏览器已通过：中文前缀 @、上下键与 Enter 选择后继续输入、底部菜单完整可见（y=416、高240、视口700）、菜单不增加页面滚动高度；Thread 和列/画布之间草稿恢复；发送失败保留；迟到成功不清理新输入或其他 Thread；胶囊原子删除与撤销；上传过程中切换 Thread，完成后文件保持原位置，文本/引用/文件提交保序。附件 HTTP 在这组测试使用可控替身，不代表 R2 验收。
 
-该补充需要更新 design、ordered-message-content 规格与任务验收；尚未实施。依据 openspec-apply-change 的设计冲突暂停规则，等待用户确认后继续，不将部分实现标记完成。
+## 尚未完成的验收
 
-## 本轮验证结果
+任务保持未完成：4.1、4.4、4.6、5.1、5.2。核心实现和上述局部证据已提供，仍需要：
 
-基于上述提案提交的本次工作树：
+- 可用真实模型凭据及独立原生 PostgreSQL 环境，执行生成、发送、刷新、编辑、分叉、重试的整条产品链路；当前没有进行付费模型调用。
+- 实际系统中文输入法、剪贴板完整往返、手机软键盘；窄列与画布缩放/平移的完整布局矩阵。
+- 真实消息编辑页面内 Quote/File/重复引用交错的浏览器验收。目前有协议/命令测试，不能替代此项 UI 证据。
 
-- `npx --yes pnpm@10.32.1 typecheck`：通过，退出码 0。
-- `node --import tsx e2e/thread-chat/artifact-content-core.test.mjs`：通过；覆盖交错 Part 往返、严格 Schema、重复引用、原消息不变与前缀稳定。
-- `node --import tsx e2e/thread-chat/artifact-reference-context.test.mjs`：通过；调用实际 AI SDK 转换，覆盖自身/分叉来源、临时与不完整工具、错误身份、重复标记和裁剪后展开。
-- `node --import tsx e2e/thread-chat/fork-quote.test.mjs`：通过；保留 main 的分叉两入口、Quote 展示和编辑回归。
-- `openspec validate rebuild-artifact-reference-content --strict --no-interactive`：通过。
-- `git diff --check`：通过。
+因此当前为 draft PR，不宣称可发布，不归档 OpenSpec。本地组件测试、数据库引擎测试和真实模型 E2E 的证据明确分开。
 
-任务完成 3/25：1.1、3.1、3.2。没有运行真实数据库、浏览器或模型 E2E；没有数据库迁移、输入框改动或发布操作。运行环境全局 pnpm 与项目版本不同，使用项目锁定 pnpm 10.32.1 完成 frozen-lockfile 安装与类型检查，未修改锁文件。
+## 回滚
+
+无需数据库迁移。尚未保存新引用时可以回退本分支；已有引用写入后不能退回不认识 data-artifact-reference 的服务端。应关闭新引用入口，保留引用读取和模型展开，再修复。不得删掉引用或把历史指向新产物。

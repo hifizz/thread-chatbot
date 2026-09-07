@@ -1,5 +1,7 @@
 "use client"
 
+import type { MessageContentInput } from "@/lib/thread-chat/contracts/message-content"
+
 import { createContext } from "react"
 import type { ThreadTreeState } from "../../core/types"
 import type { MessageActionViewState } from "../../chat/actions/message-action-types"
@@ -7,7 +9,7 @@ import type { ThreadMessageActionCommands } from "../../chat/actions/message-act
 
 /** 壳层用 chat-controller 组装后注入画布的会话动作。 */
 export interface CanvasChatActions extends ThreadMessageActionCommands {
-  send: (threadId: string, text: string) => void
+  send: (threadId: string, content: MessageContentInput) => unknown | Promise<unknown>
   stop: (threadId: string) => void
   retry: (threadId: string, messageId: string) => void
 }

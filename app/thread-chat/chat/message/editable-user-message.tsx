@@ -1,5 +1,9 @@
 "use client"
 
+import { composerDraftToMessageContent, messagePartsToComposerDraft } from "@/lib/thread-chat/contracts/message-content"
+import { MessageEditor } from "../composer/message-editor"
+import { useArtifactResources } from "../composer/artifact-resources"
+
 import { useState } from "react"
 import { Check, Copy, Pencil, RotateCcw, X } from "lucide-react"
 import {
@@ -19,18 +23,21 @@ export function EditableUserMessage({
   commands,
 }: EditableUserMessageProps) {
   const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState(message.text)
+  const artifacts = useArtifactResources()
+  const restoreDraft = () => messagePartsToComposerDraft(message.uiParts ?? [{ type: "text", text: message.text }])
+  const [draft, setDraft] = useState(restoreDraft)
   const [submitting, setSubmitting] = useState(false)
   const [retrying, setRetrying] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const { copied, copy } = useCopyMarkdown(setError)
 
   const submit = async () => {
-    const text = draft.trim()
-    if (!text || submitting) return
+    if (submitting) return
+    const parsed = (() => { try { return composerDraftToMessageContent(draft) } catch { return null } })()
+    if (!parsed) { setError("请保留有效问题文字"); return }
     setSubmitting(true)
     setError(null)
-    const result = await commands.editAndRegenerate(threadId, message.id, text)
+    const result = await commands.editAndRegenerate(threadId, message.id, parsed)
     setSubmitting(false)
     if (result.ok) setEditing(false)
     else setError(result.message)
@@ -53,25 +60,13 @@ export function EditableUserMessage({
       >
         {editing ? (
           <>
-            {message.quote && <div className="msg-quote">{message.quote.text}</div>}
-            <textarea
-              value={draft}
-              aria-label="编辑用户消息"
-              disabled={submitting}
-              onChange={(event) => setDraft(event.target.value)}
-              onKeyDown={(event) => {
-                if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
-                  event.preventDefault()
-                  void submit()
-                }
-              }}
-            />
+            <MessageEditor disabled={submitting} draft={draft} artifacts={artifacts} onChange={setDraft} onSubmit={() => void submit()} placeholder="编辑用户消息" mentions={false} />
             <div className="user-edit-actions">
               <button
                 type="button"
                 onClick={() => {
                   setEditing(false)
-                  setDraft(message.text)
+                  setDraft(restoreDraft())
                   setError(null)
                 }}
                 disabled={submitting}
@@ -83,7 +78,7 @@ export function EditableUserMessage({
                 type="button"
                 className="primary"
                 onClick={() => void submit()}
-                disabled={submitting || draft.trim() === ""}
+                disabled={submitting || !draft.parts.some((part) => part.type === "text" && part.text.trim())}
               >
                 {submitting ? "提交中…" : "发送"}
               </button>
@@ -110,7 +105,7 @@ export function EditableUserMessage({
               label: MESSAGE_ACTION_LABELS.edit,
               icon: Pencil,
               onSelect: () => {
-                setDraft(message.text)
+                setDraft(restoreDraft())
                 setEditing(true)
               },
               disabled: !editable,

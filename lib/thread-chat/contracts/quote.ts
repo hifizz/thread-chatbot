@@ -1,5 +1,4 @@
 import { z } from "zod"
-import type { TextAnchor } from "@/lib/thread-chat/domain/text-anchor"
 
 export const THREAD_QUOTE_SCHEMA_VERSION = "thread-quote-v1" as const
 
@@ -110,13 +109,3 @@ export function quoteForModel(quote: ThreadChatQuoteData): ModelVisibleQuote {
       : {}),
   }
 }
-
-/** 为客户端草稿复用的宽化来源类型。 */
-export type ComposerQuoteSourceDraft =
-  | { type: "message"; messageId: string; anchor: TextAnchor }
-  | {
-      type: "artifact"
-      messageId: string
-      artifactId: string
-      anchor: TextAnchor
-    }

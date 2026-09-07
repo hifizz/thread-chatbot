@@ -70,10 +70,9 @@ assert.throws(
 )
 
 const composerImages = Array.from({ length: 4 }, (_, index) => ({
-  id: String(index),
-  file: { type: "image/png" },
-  status: "ready",
-  progress: 1,
+  localId: String(index),
+  type: "file",
+  file: { mediaType: "image/png", url: "/api/attachments/test" },
 }))
 assert.equal(canAddThreadImages(composerImages, 1), true)
 assert.equal(canAddThreadImages(composerImages, 2), false)

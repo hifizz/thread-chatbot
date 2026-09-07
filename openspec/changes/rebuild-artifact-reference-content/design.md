@@ -57,7 +57,7 @@ HTTP 请求仍是现有 command 字段加 parts；只有网络边界将 content.
 
 firstTurn 缺席明确表示空分叉；存在则校验完整内容，不依赖额外 text 字段。现有划选分叉需要 Quote 时，在 UI 草稿创建阶段通过统一操作加入一次，命令层不再盲目 prepend。不借此次变更开发新的无选区分叉产品入口。
 
-编辑创建替代消息，保留现有 replacesMessageId/supersededAt 与子 Thread 冻结历史；用户可删除已有 Quote、调整顺序及 comment，但不能伪造其 text/source。保留父 Thread 首问 Quote 时，依据原消息快照校验，不重新限制成当前 Thread。引用和附件不得因编辑恢复丢失或移动。
+编辑创建替代消息，保留现有 replacesMessageId/supersededAt 与子 Thread 冻结历史；用户可删除已有 Quote；胶囊正文、来源和已有 comment 只读，不提供拖动、排序、复制或新增 Quote。保留父 Thread 首问 Quote 时，依据原消息快照校验，不重新限制成当前 Thread。引用和附件不得因编辑恢复丢失或移动。
 
 重试使用已保存用户消息。发送的网络重试复用同一命令 ID；保留已有幂等和事务实现，不增加新的调度机制。
 
@@ -127,7 +127,7 @@ Artifact 候选从已有 normalized Store 的资源切片订阅；query 为 null
 
 ## Migration Plan
 
-1. 本阶段仅提交规划文档到新分支；#93 保持参考，不关闭或合并。
+1. 提案已先行提交到新分支，当前按任务实施；#93 保持参考，不关闭或合并。
 2. T1 固定协议、操作入口与测试，先打通文字加一个 Markdown 引用的纵向链路。
 3. T2/T3 归位服务端逻辑；T4 接入新编辑器，不整体复制旧 Composer。
 4. 已有 text/file/quote 消息继续可读、可编辑、可重试；如环境中存在 #93 schemaVersion:1 引用，也保留读取能力。
@@ -140,3 +140,9 @@ Artifact 候选从已有 normalized Store 的资源切片订阅；query 为 null
 - Lexical 0.45.0 公开浮层能力是否通过画布/软键盘验收。
 - 当前最终请求组装处可用的模型限制与多模态计量能力；未知项如实记录。
 - 真实数据库和模型验收环境是否可用；不可用时明确阻塞。
+
+## 已确认的 MVP 收敛
+
+用户确认：本期已有 Quote 为只读胶囊，可删除；不提供排序、拖动、复制、新增 Quote 或逐项修改评论。胶囊保持已有相对顺序，不锁定文字编辑后的绝对字符位置。旧版 `{text}` Quote 仅在编辑时允许回传原快照，服务端做原顺序子序列匹配；发送/分叉/新建拒绝新增旧版 Quote。本期编辑规则以此只读范围为准。
+
+Annotation 胶囊、划选后提问及 hover/点击列表为后续独立能力，本期不实现。Artifact 的 @ 选择仍是本次核心功能，不受“编辑时不新增 Quote”限制。

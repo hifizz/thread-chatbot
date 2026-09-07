@@ -1,4 +1,5 @@
 import { ARTIFACT_REFERENCE_COPY, ARTIFACT_REFERENCE_MAX_CHARS, ARTIFACT_REFERENCE_MAX_OCCURRENCES } from "@/constants/artifact-reference"
+import type { ThreadQuoteDataV1 } from "../contracts/quote"
 import { artifactReferenceData, artifactReferenceDataSchema } from "../contracts/artifact-reference"
 import { filesFromMessageContent, messageContentInputSchema, messageContentToUiParts, type MessageContentInput } from "../contracts/message-content"
 import type { ThreadChatUIMessage } from "../contracts/ui-message"
@@ -17,7 +18,7 @@ export async function resolveUserContent(input: {
   content: MessageContentInput
   operation:
     | { type: "create-project" }
-    | { type: "send"; sourceThreadId: string }
+    | { type: "send"; sourceThreadId: string; frozenFirstQuote?: ThreadQuoteDataV1 }
     | { type: "edit"; originalParts: ThreadChatUIMessage["parts"] }
 }): Promise<ThreadChatUIMessage["parts"]> {
   // 解析内容对象而非整条命令，避免破坏 HTTP parts 格式。
@@ -32,7 +33,7 @@ export async function resolveUserContent(input: {
   } else if (operation.type === "edit") {
     assertEditQuoteSemantics(operation.originalParts, content)
   } else {
-    await assertValidQuoteSources({ tx: input.tx, projectId: input.projectId, sourceThreadId: operation.sourceThreadId, content })
+    await assertValidQuoteSources({ tx: input.tx, projectId: input.projectId, sourceThreadId: operation.sourceThreadId, frozenFirstQuote: operation.frozenFirstQuote, content })
   }
   const ids = content.parts.flatMap((part) => part.type === "artifact-reference" ? [part.artifactId] : [])
   if (ids.length > ARTIFACT_REFERENCE_MAX_OCCURRENCES)

@@ -1,4 +1,6 @@
 "use client"
+
+import type { MessageContentInput } from "@/lib/thread-chat/contracts/message-content"
 /**
  * chat/chat-view —— 单会话视图：消息列表 + composer + who 标签。
  *
@@ -17,7 +19,6 @@ import { ConversationComposer } from "./composer/conversation-composer"
 import { ConversationMessage } from "./message/conversation-message"
 import type { MessageActionViewState } from "./actions/message-action-types"
 import type { ThreadMessageActionCommands } from "./actions/message-action-commands"
-import type { CommandFileReference } from "../net/commands/conversation-commands"
 
 export interface ChatViewProps {
   /** 会话 id：写到 .msg-list 的 data-list 上（划选气泡靠它反查消息） */
@@ -49,7 +50,7 @@ export interface ChatViewProps {
   /** 分支锁定时显示模型切换限制说明；生成期间仅禁用。 */
   modelSelectorDisabledReason?: "branch" | "busy"
   onModelChange: (modelId: string) => void
-  onSend: (text: string, files: CommandFileReference[]) => void
+  onSend: (content: MessageContentInput) => unknown | Promise<unknown>
   messageActionState?: MessageActionViewState
   messageCommands?: ThreadMessageActionCommands
   editableUserMessageId?: string

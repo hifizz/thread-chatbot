@@ -1,4 +1,4 @@
-import { buildForkUserParts } from "@/lib/thread-chat/domain/user-message-parts"
+import { resolveUserContent } from "./resolve-user-content"
 import { messages, threads } from "@/lib/db/schema"
 import type { ForkThreadCommand } from "@/lib/thread-chat/contracts/commands"
 import type {
@@ -9,13 +9,9 @@ import { buildFrozenForkContext } from "@/lib/thread-chat/domain/fork-context"
 import {
   assertAllowedGenerationSettings,
   assertAllowedModel,
-  assertOwnedReadyAttachments,
-  assertModelSupportsNewAttachments,
-  commandFiles,
   touchProjectAndThread,
 } from "@/lib/thread-chat/application/command-utils"
 import { notFound, stateConflict } from "@/lib/thread-chat/application/errors"
-import { assertValidQuoteSources } from "@/lib/thread-chat/application/quote-validation"
 import { executeIdempotentCommand } from "@/lib/thread-chat/persistence/command-repository"
 import {
   toConversationMessage,
@@ -98,15 +94,7 @@ export function forkThread(
           await touchProjectAndThread(tx, project.id, child.id)
           return { thread: toThreadDTO(child), generation: null }
         }
-        const files = commandFiles(command.firstTurn)
-        assertModelSupportsNewAttachments(command.modelId, files)
-        await assertOwnedReadyAttachments(tx, userId, files)
-        await assertValidQuoteSources({
-          tx,
-          projectId: project.id,
-          sourceThreadId: parent.id,
-          content: command.firstTurn,
-        })
+        const parts = await resolveUserContent({ tx, userId, projectId: project.id, modelId: command.modelId, content: command.firstTurn, operation: { type: "send", sourceThreadId: parent.id } })
         const [userSequence, assistantSequence] = await allocateThreadSequences(
           tx,
           child.id,
@@ -122,7 +110,7 @@ export function forkThread(
               threadId: child.id,
               sequence: userSequence,
               role: "user",
-              parts: buildForkUserParts(command.firstTurn, child, userSequence),
+              parts,
               status: "completed",
               finishedAt: now,
             },

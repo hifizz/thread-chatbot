@@ -80,6 +80,7 @@
     "@langfuse/otel": "^5.11.0",
     "@langfuse/tracing": "^5.11.0",
     "@langfuse/vercel-ai-sdk": "^5.11.0",
+    "@lexical/react": "0.45.0",
     "@openrouter/ai-sdk-provider": "^3.0.0",
     "@opentelemetry/api": "^1.9.1",
     "@opentelemetry/sdk-node": "^0.221.0",
@@ -101,6 +102,7 @@
     "embla-carousel-react": "^8.6.0",
     "heat-graph": "^0.0.12",
     "input-otp": "^1.4.2",
+    "lexical": "0.45.0",
     "lucide-react": "^1.23.0",
     "next": "16.3.1",
     "next-themes": "^0.4.6",
@@ -123,7 +125,8 @@
     "tw-shimmer": "^0.4.11",
     "unpdf": "^1.6.2",
     "zod": "^4.4.3",
-    "zustand": "^5.0.14"
+    "zustand": "^5.0.14",
+    "@floating-ui/react": "0.27.19"
   },
   "devDependencies": {
     "@ai-sdk/devtools": "^1.0.13",

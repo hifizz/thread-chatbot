@@ -27,7 +27,7 @@
 - **THEN** 返回校验错误，不悄悄创建空分叉
 
 ### Requirement: 编辑完整保序并保护来源快照
-系统 SHALL 从已保存 Parts 恢复完整草稿，并提交完整编辑结果；MUST NOT 将 Quote、File 或 Artifact 引用按类型重新分组。已有 Quote 可以删除、排序及修改 comment，但其正文与来源快照不得伪造。
+系统 SHALL 从已保存 Parts 恢复完整草稿，并提交完整编辑结果；MUST NOT 将 Quote、File 或 Artifact 引用按类型重新分组。已有 Quote 胶囊只读、可删除；本期不提供拖动、排序、复制、新增或修改 comment 的交互。旧版仅含 text 的 Quote 允许编辑时回传原快照，服务端按原顺序匹配原快照子序列，拒绝新增、复制和修改正文；新消息拒绝旧版 Quote。
 
 #### Scenario: 交错内容编辑
 - **WHEN** 原消息顺序为文字、File、引用 A、Quote、文字、引用 A，用户仅修改末段文字
