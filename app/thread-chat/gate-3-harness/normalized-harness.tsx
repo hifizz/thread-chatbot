@@ -1,4 +1,5 @@
 "use client"
+import { ArtifactComposerProvider } from "../chat/composer/artifact-composer-context"
 
 import dynamic from "next/dynamic"
 import React, { useEffect, useMemo, useRef, useState } from "react"
@@ -26,6 +27,7 @@ import type {
 import type { MessageActionViewState } from "../chat/actions/message-action-types"
 import { textFromMessageParts } from "@/lib/thread-chat/contracts/ui-message"
 import type { Message, MessageFeedback } from "../core/types"
+import type { MessageContentPartInput, FileReference } from "@/lib/thread-chat/contracts/message-content"
 import { BranchableChat } from "../branching/branchable-chat"
 import {
   SelectionBubble,
@@ -312,7 +314,7 @@ export function NormalizedGate3Harness({
     [projectId, runtime.commands, state]
   )
 
-  const send = (viewThreadId: string, text: string) => {
+  const send = (viewThreadId: string, text: string, files?: FileReference[], parts?: MessageContentPartInput[]) => {
     const threadId = fromConversationViewThreadId(state, viewThreadId)
     void runtime.commands
       .sendMessage({
@@ -320,6 +322,8 @@ export function NormalizedGate3Harness({
         modelId:
           state.threadsById[threadId]?.modelId ?? "doubao-seed-2.1-turbo",
         text,
+        files,
+        parts,
       })
       .then(({ connection }) => {
         setStatus(`${scenario}：命令已接受，等待终态`)
@@ -400,6 +404,10 @@ export function NormalizedGate3Harness({
     SCENARIOS.find((entry) => entry.id === scenario)?.label ?? scenario
 
   return (
+    <ArtifactComposerProvider artifacts={Object.values(state.artifactsById)} openArtifact={(id) => {
+      setActiveArtifactId(id)
+      setDrawerOpen(true)
+    }}>
     <div className="tc" data-gate3-normalized-harness="true">
       <ThreadChatTopbar
         viewMode={viewMode}
@@ -565,7 +573,7 @@ export function NormalizedGate3Harness({
                 onModelChange={(modelId) => setModel(viewThreadId, modelId)}
                 onRetry={(message) => retry(viewThreadId, message)}
                 onStop={() => stop(viewThreadId)}
-                onSend={(text) => send(viewThreadId, text)}
+                onSend={(text, files, parts) => send(viewThreadId, text, files, parts)}
                 messageActionState={messageActionState}
                 messageCommands={messageCommands}
               />
@@ -617,5 +625,6 @@ export function NormalizedGate3Harness({
         <div className="boot-loading">当前 Project 尚无消息。</div>
       )}
     </div>
+    </ArtifactComposerProvider>
   )
 }

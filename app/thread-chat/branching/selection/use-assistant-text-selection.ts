@@ -78,16 +78,21 @@ export function useAssistantTextSelection({
         const threadId = list?.dataset.list
         const msgId = messageElement?.dataset.msgId
         if (!threadId || !msgId) return
-        if (
-          !state.threads[threadId]?.messages.some(
-            (message) => message.id === msgId
-          )
-        ) {
+        const source = state.threads[threadId]?.messages.find(
+          (message) => message.id === msgId
+        )
+        if (!source || source.role !== "assistant" || (source.status ?? "done") !== "done") {
           closeIfUnguarded()
           return
         }
 
-        const anchor = describeRange(markdownRoot, domSelection.getRangeAt(0))
+        if (!domSelection.rangeCount) return
+        const range = domSelection.getRangeAt(0)
+        if (!markdownRoot.contains(range.startContainer) || !markdownRoot.contains(range.endContainer)) {
+          closeIfUnguarded()
+          return
+        }
+        const anchor = describeRange(markdownRoot, range)
         if (!anchor || anchor.quote.exact.trim().length < 2) {
           closeIfUnguarded()
           return

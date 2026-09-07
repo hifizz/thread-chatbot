@@ -5,12 +5,15 @@ import { createStore, useStore } from "zustand"
 import type { ArtifactDTO } from "@/lib/thread-chat/contracts/dto"
 import type { InlineComposerPart } from "@/lib/thread-chat/contracts/artifact-reference"
 import type { ThreadComposerAttachment } from "./thread-attachment-model"
+import type { ThreadQuoteDataV1 } from "@/lib/thread-chat/contracts/quote"
 
 interface ComposerState {
   parts: InlineComposerPart[]
   attachments: ThreadComposerAttachment[]
+  quotes: ThreadQuoteDataV1[]
+  focusRequest?: number
 }
-const EMPTY_DRAFT: ComposerState = { parts: [], attachments: [] }
+const EMPTY_DRAFT: ComposerState = { parts: [], attachments: [], quotes: [] }
 function createDraftStore() {
   return createStore<{ drafts: Record<string, ComposerState> }>(() => ({ drafts: {} }))
 }
