@@ -6,6 +6,7 @@ import { toast } from "sonner"
 import { PlusIcon, AtSign } from "lucide-react"
 import { composerDraftToMessageContent, forkFirstTurnContent, messageContentToUiParts, messagePartsToComposerDraft, type MessageContentInput } from "@/lib/thread-chat/contracts/message-content"
 import type { ThreadComposerDraft } from "@/lib/thread-chat/contracts/composer"
+import { LEXICAL_CLIPBOARD_MIME } from "@/constants/composer"
 import { IMAGE_MODEL_VALIDATION_MESSAGE, MESSAGE_ATTACHMENT_MAX_FILES } from "@/constants/attachment"
 import { supportsModelImageInput } from "@/constants/model"
 import { uploadAttachment, normalizeAttachmentFile, validateAttachmentFile } from "@/lib/attachments/upload"
@@ -102,7 +103,7 @@ function ThreadComposer(props: ConversationComposerProps) {
     if (files.length) { event.preventDefault(); appendFiles(files); return }
     // Lexical 自己处理普通文字与应用内胶囊的公开剪贴板格式。
     const text = event.clipboardData.getData("text/plain")
-    if (text && !event.clipboardData.types.includes("application/x-lexical-editor") && !shouldInlinePastedText(text)) {
+    if (text && !event.clipboardData.types.includes(LEXICAL_CLIPBOARD_MIME) && !shouldInlinePastedText(text)) {
       event.preventDefault(); appendFiles([createPastedTextFile(text)])
     }
   }

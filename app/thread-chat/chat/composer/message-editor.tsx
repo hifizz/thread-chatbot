@@ -10,6 +10,7 @@ import { EditorRefPlugin } from "@lexical/react/LexicalEditorRefPlugin"
 import type { LexicalEditor } from "lexical"
 import type { ThreadComposerDraft } from "@/lib/thread-chat/contracts/composer"
 import type { ArtifactDTO } from "@/lib/thread-chat/contracts/dto"
+import { ComposerClipboardPlugin } from "./composer-clipboard-plugin"
 import { ComposerCapsuleNode } from "./composer-capsule-node"
 import { $importComposerDraft } from "./composer-codec"
 import { ComposerSyncPlugin } from "./composer-sync-plugin"
@@ -31,6 +32,7 @@ export function MessageEditor({ draft, revision = 0, artifacts, onChange, onSubm
       <PlainTextPlugin contentEditable={<ContentEditable className="composer-editor" aria-label={placeholder} placeholder={null} />} placeholder={<span className="composer-placeholder">{placeholder}</span>} ErrorBoundary={LexicalErrorBoundary} />
     </div>
     <HistoryPlugin />
+    <ComposerClipboardPlugin />
     <ComposerSyncPlugin disabled={disabled} draft={draft} revision={revision} artifacts={artifacts} onChange={onChange} />
     <ComposerSubmitPlugin onSubmit={onSubmit} />
     {mentions && <ArtifactMentionPlugin artifacts={artifacts} />}

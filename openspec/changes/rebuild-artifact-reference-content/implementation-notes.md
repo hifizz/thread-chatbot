@@ -13,10 +13,11 @@
 - Repository 仅批量读取当前 Project 的 Artifact。新选择要求 completed Markdown；编辑保留引用使用原快照。Artifact finalization 的条件更新和插入不覆盖同 ID 内容，无表结构或 migration 改动。
 - 模型引用展开归位 application，实际历史及附件处理后前向编译，再调用真实 AI SDK 转换；固定重复标记、完整源工具核对及前缀字节稳定测试保留。
 - 最终请求边界记录总预算状态。目前模型配置没有完整输入 tokenizer 或上下文上限，明确为 `unknown`；不会声称已完成总 token 预检。纯预算函数覆盖已知总量与输出预留，提供商超限在异常和 SDK failed outcome 两条路径统一转换。字符接收预算不作为 token 估算。
+- PlainText 默认剪贴板会将胶囊降为普通文字；通过官方 COPY/CUT/PASTE Command 和 @lexical/clipboard 的导出/插入函数补齐应用内胶囊剪贴板。未自定义剪贴板数据协议。旧 Quote 粘贴为普通显示文字，不新增 Quote 身份。
 - 输入框按 Lexical 0.45.0 官方 TextNode/token、PlainText、History、OnChange、Command、Typeahead 拆分，唯一 codec 连接活动文档和完整草稿。上传占据固定 localId 位置，异步更新只替换该节点。成功清理匹配快照，迟到结果不覆盖新内容。
 - 草稿、normalized 资源订阅和历史导航使用独立 Provider。历史消息按 Parts 顺序展示，编辑恢复全部内容。引用菜单关闭时不搜索，无关流式状态不重建候选。
 - 官方默认 Typeahead 在底部单行输入框没有翻转（最小复现 y=663、菜单高240、视口700）。现通过公开 onOpen/MenuResolution/menuRenderFn 配合官方 NodeContextMenuPlugin 已使用的 Floating UI 实现：仅定位自己渲染的菜单，不修改 Lexical anchor/firstChild 或使用内部字段。Floating UI autoUpdate 仅在菜单挂载期间运行，跟踪画布 transform。
-- 直接依赖声明 lexical、@lexical/react、@floating-ui/react，锁文件 frozen/offline 安装通过；去掉未使用的直接 @lexical/utils。
+- 直接依赖声明 lexical、@lexical/react、@lexical/clipboard、@floating-ui/react，锁文件 frozen/offline 安装通过；去掉未使用的直接 @lexical/utils。
 
 ## 已执行的验证
 
@@ -33,15 +34,14 @@
 
 实际浏览器用例已保存为 `e2e/thread-chat/content-browser.test.mjs`，测试页面为开发环境专用 `/thread-chat-gate-3-harness/content`。可用 `TEST_BASE_URL` 和 `CHROMIUM_EXECUTABLE_PATH` 指定地址与浏览器。本环境将同一 React 组件通过 esbuild 装载运行，未假称 Next 服务端或整站 E2E。
 
-浏览器已通过：中文前缀 @、上下键与 Enter 选择后继续输入、底部菜单完整可见（y=416、高240、视口700）、菜单不增加页面滚动高度；Thread 和列/画布之间草稿恢复；发送失败保留；迟到成功不清理新输入或其他 Thread；胶囊原子删除与撤销；上传过程中切换 Thread，完成后文件保持原位置，文本/引用/文件提交保序。附件 HTTP 在这组测试使用可控替身，不代表 R2 验收。
+浏览器已通过：中文前缀 @、上下键与 Enter 选择后继续输入、底部菜单完整可见（y=416、高240、视口700）、菜单不增加页面滚动高度；Thread 和列/画布之间草稿恢复；发送失败保留；迟到成功不清理新输入或其他 Thread；胶囊原子删除与撤销、官方应用内剪贴板保留引用 ID；360 像素窄视口和画布 translate/scale 后菜单保持可见，Escape 关闭；实际 EditableUserMessage 中旧 Quote/File/重复引用混排恢复、取消恢复和末尾编辑保序；上传过程中切换 Thread，完成后文件保持原位置，文本/引用/文件提交保序。附件 HTTP 在这组测试使用可控替身，不代表 R2 验收。
 
 ## 尚未完成的验收
 
-任务保持未完成：4.1、4.4、4.6、5.1、5.2。核心实现和上述局部证据已提供，仍需要：
+任务完成 21/25，保持未完成：4.1、4.4、5.1、5.2。核心实现和上述局部证据已提供，仍需要：
 
 - 可用真实模型凭据及独立原生 PostgreSQL 环境，执行生成、发送、刷新、编辑、分叉、重试的整条产品链路；当前没有进行付费模型调用。
-- 实际系统中文输入法、剪贴板完整往返、手机软键盘；窄列与画布缩放/平移的完整布局矩阵。
-- 真实消息编辑页面内 Quote/File/重复引用交错的浏览器验收。目前有协议/命令测试，不能替代此项 UI 证据。
+- 实际系统中文输入法和手机软键盘。桌面剪贴板、窄视口、画布 transform 以及实际消息编辑组件已有浏览器证据，但不能代替系统输入设备验收。
 
 因此当前为 draft PR，不宣称可发布，不归档 OpenSpec。本地组件测试、数据库引擎测试和真实模型 E2E 的证据明确分开。
 

@@ -2,16 +2,8 @@
 export const ARTIFACT_REFERENCE_SCHEMA_VERSION = 1 as const
 export const ARTIFACT_REFERENCE_MAX_OCCURRENCES = 20
 export const ARTIFACT_REFERENCE_MAX_CHARS = 200_000
-export const ARTIFACT_REFERENCE_MENU_LIMIT = 20
-/** 候选菜单与可视区域、光标的间距（CSS 像素）。 */
-export const ARTIFACT_REFERENCE_MENU_LAYOUT = { padding: 16, gap: 4, width: 320, maxHeight: 280 } as const
 export const ARTIFACT_REFERENCE_COPY = {
   missing: "引用的 Artifact 不存在或不属于当前 Project",
   incomplete: "只能引用来源已完成的 Artifact",
   budget: "引用内容过长，请减少引用或先生成精简版 Artifact",
-  empty: "没有匹配的 Artifact",
-  placeholder: "输入消息，使用 @ 引用项目中的 Artifact",
-  action: "引用",
-  actionLabel: "引用当前 Project 的 Artifact（所有 Thread，包含自己）",
-  triggerText: " @",
 } as const
