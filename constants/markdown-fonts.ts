@@ -11,7 +11,3 @@ export type MarkdownFontId = (typeof MARKDOWN_FONTS)[number]["id"]
 export const DEFAULT_MARKDOWN_FONT: MarkdownFontId = "noto-sans"
 export const MARKDOWN_FONT_STORAGE_KEY = "thread-chat:markdown-font"
 export const MARKDOWN_FONT_SAMPLE = "中文阅读字体对比"
-
-export function isMarkdownFontId(value: unknown): value is MarkdownFontId {
-  return MARKDOWN_FONTS.some((font) => font.id === value)
-}

@@ -1,4 +1,4 @@
-import { Brawler, Geist_Mono, Inter, Lora, Noto_Sans_SC, Noto_Serif_SC } from "next/font/google"
+import { Brawler, Fira_Code, Geist_Mono, Inter, JetBrains_Mono, Lora, Noto_Sans_SC, Noto_Serif_SC } from "next/font/google"
 
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
@@ -7,6 +7,21 @@ import { TooltipProvider } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" })
+
+const firaCode = Fira_Code({
+  subsets: ["latin"],
+  variable: "--font-fira-code",
+  display: "swap",
+  preload: false,
+})
+
+const jetBrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  style: ["normal", "italic"],
+  variable: "--font-jetbrains-mono",
+  display: "swap",
+  preload: false,
+})
 
 const notoSansSC = Noto_Sans_SC({
   variable: "--font-noto-sans-sc",
@@ -53,6 +68,8 @@ export default function RootLayout({
       className={cn(
         "antialiased",
         fontMono.variable,
+        firaCode.variable,
+        jetBrainsMono.variable,
         lora.variable,
         brawler.variable,
         notoSansSC.variable,

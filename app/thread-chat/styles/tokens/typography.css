@@ -8,6 +8,7 @@
   --tc-typography-family-prose: var(--font-lora), var(--tc-typography-family-chinese), var(--tc-font-stack-read);
   --tc-typography-family-heading: var(--font-brawler), var(--tc-font-stack-ui);
   --tc-typography-family-code: var(--tc-font-stack-mono);
+  --tc-typography-family-code-block: var(--font-fira-code), var(--font-jetbrains-mono), Menlo, Monaco, "Courier New", monospace;
 }
 
 html[data-prose-font="noto-serif"] .tc {
@@ -21,4 +22,20 @@ html[data-prose-font="neo-xihei"] .tc {
 }
 html[data-prose-font="ipa-original"] .tc {
   --tc-typography-family-chinese: "IPAexGothic";
+}
+
+html[data-code-font="jetbrains-mono"] .tc {
+  --tc-typography-family-code-block: var(--font-jetbrains-mono), Menlo, Monaco, "Courier New", monospace;
+}
+html[data-code-font="menlo"] .tc {
+  --tc-typography-family-code-block: Menlo, Monaco, "Courier New", monospace;
+}
+html[data-code-font="monaco"] .tc {
+  --tc-typography-family-code-block: Monaco, Menlo, "Courier New", monospace;
+}
+html[data-code-font="courier-new"] .tc {
+  --tc-typography-family-code-block: "Courier New", Menlo, Monaco, monospace;
+}
+html[data-code-font="monospace"] .tc {
+  --tc-typography-family-code-block: monospace;
 }

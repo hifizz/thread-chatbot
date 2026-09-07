@@ -8,7 +8,7 @@
 - 英文正文与表格：Lora，加载 500、600、700 字重及对应斜体。正文 CSS 仍为 400，匹配到 Lora 500，让英文更厚实，同时保持中文原有字重。
 - 中文正文与表格：默认 Noto Sans SC，可通过右下角选择框试读 Noto Serif SC、霞鹜文楷、霞鹜新晰黑；中文标题继续使用原有系统字体。
 - 表格默认字号：16px；紧凑模式保留 12px。
-- 行内代码与代码块：继续使用等宽字体。
+- 行内代码：继续使用原有等宽字体。代码块默认 Fira Code，可独立切换其他等宽字体。
 
 ## 标题字体对比
 
@@ -54,3 +54,11 @@ Noto 系列由 `next/font/google` 提供。霞鹜文楷 v1.522 的 Regular、Med
 新晰黑使用 IPA Font License 1.0；选择框额外提供「IPAex Gothic（恢复原始字体）」，使用随项目附带的原始 IPAex Gothic 004.01，以便用户停止使用衍生字体。字体许可与恢复说明可从控件打开。该额外选项用于恢复，不属于四款试读候选。
 
 霞鹜文楷的常规与 Medium 字重、新晰黑的单一字重，与 Noto 系列的可变字重不同；加粗效果不应视为完全相同的字重对比。
+
+## 代码块字体选择
+
+同一右下角面板增加独立的「代码块」选择框：Fira Code、JetBrains Mono、Menlo、Monaco、Courier New、系统等宽字体。
+
+默认回退顺序为 Fira Code → JetBrains Mono → Menlo → Monaco → Courier New → monospace。前两款通过 `next/font/google` 自托管，JetBrains Mono 同时加载常规和斜体。后三款命名字体使用设备已有字体，未安装时按等宽字体栈回退；系统等宽选项由浏览器决定字体。
+
+选择仅应用于 `.tc-prose .md-code code`，不改变正文、标题、行内代码、代码块语言标签或其他界面文字。使用独立的 `thread-chat:code-font` 浏览器存储键，和中文字体选择互不影响。加载与记忆逻辑由 `hooks/use-preview-font.ts` 共用。
