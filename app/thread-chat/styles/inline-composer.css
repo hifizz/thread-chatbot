@@ -1,5 +1,7 @@
 /* 有序消息编辑器与官方 Typeahead 菜单；不覆盖 Lexical 内部定位。 */
-.tc .composer-editor-wrap { position: relative; width: 100%; min-width: 0; }
+/* 菜单独立渲染；空锚点不挂载 .tc 页面外壳，也不拦截鼠标。 */
+.composer-typeahead-anchor { pointer-events: none; }
+.tc .composer-editor-wrap { position: relative; width: 100%; min-width: 0; font-family: var(--tc-typography-family-ui); font-size: 14px; line-height: 1.5; }
 .tc .composer-editor { outline: none; width: 100%; min-height: 24px; max-height: 120px; overflow-y: auto; overflow-wrap: anywhere; white-space: pre-wrap; font: inherit; color: var(--tc-content-primary); }
 .tc .composer-editor p { margin: 0; }
 .tc .composer-placeholder { position: absolute; top: 0; left: 0; pointer-events: none; color: var(--tc-content-secondary); }
@@ -8,11 +10,15 @@
 .tc .cv-composer .prompt-stack { min-width: 0; flex: 1; }
 .tc .cv-composer .composer-editor { max-height: 68px; }
 .tc.composer-artifact-menu { z-index: var(--tc-z-selection); }
-.tc.composer-artifact-menu { box-sizing: border-box; width: min(280px, calc(100vw - 24px)); max-height: min(240px, 50dvh); overflow-y: auto; border: 1px solid var(--tc-border-strong); border-radius: 8px; padding: 4px; background: var(--tc-surface-plain); color: var(--tc-content-primary); }
-.tc.composer-artifact-menu button { display: flex; flex-direction: column; width: 100%; padding: 8px; border: 0; border-radius: 4px; background: transparent; text-align: left; cursor: pointer; overflow-wrap: anywhere; }
+.tc.composer-artifact-menu { box-sizing: border-box; display: block; height: auto; font-size: 14px; line-height: 20px; width: min(280px, calc(100vw - 24px)); max-height: min(240px, 50dvh); overflow-y: auto; border: 1px solid var(--tc-border-strong); border-radius: 8px; padding: 4px; background: var(--tc-surface-plain); color: var(--tc-content-primary); }
+.tc.composer-artifact-menu button { display: flex; flex-direction: column; justify-content: center; min-height: 56px; width: 100%; padding: 8px; border: 0; border-radius: 4px; background: transparent; text-align: left; cursor: pointer; overflow-wrap: anywhere; }
 .tc.composer-artifact-menu button.selected, .tc.composer-artifact-menu button:focus-visible { background: var(--tc-surface-project-selected); outline: 2px solid var(--tc-border-project-focus); outline-offset: -2px; }
 .tc.composer-artifact-menu small { color: var(--tc-content-secondary); }
+.tc.composer-artifact-menu .composer-resource-empty { display: flex; align-items: center; justify-content: center; min-height: 56px; padding: 8px; color: var(--tc-content-secondary); font-size: 14px; text-align: center; }
 .tc .user-message-content .msg-quote { display: block; }
 
 /* 冻结胶囊不暴露文本插入光标；跨胶囊选区由 Lexical 管理。 */
 .tc .composer-editor .composer-capsule { display: inline-block; user-select: none; cursor: default; vertical-align: baseline; }
+.tc .composer-editor .composer-capsule-artifact { padding: 0; font-size: 12px; }
+.tc .composer-capsule-action { padding: 2px 4px; border: 0; border-radius: inherit; background: transparent; color: inherit; font: inherit; cursor: pointer; }
+.tc .composer-capsule-action:focus-visible { outline: 2px solid var(--tc-border-project-focus); outline-offset: -2px; }

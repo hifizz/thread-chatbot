@@ -23,7 +23,8 @@ export function ArtifactMenu<T extends MenuOption & { artifact: ArtifactDTO }>({
     setPositionReference({ getBoundingClientRect: resolution.getRect, contextElement: root ?? undefined })
   }, [setPositionReference, resolution, root])
   useEffect(() => { if (selectedIndex !== null) options[selectedIndex]?.ref?.current?.scrollIntoView({ block: "nearest" }) }, [options, selectedIndex])
-  return createPortal(<div ref={setFloating} style={floatingStyles} className="tc composer-artifact-menu" role="listbox" aria-label="Artifact 候选">
+  return createPortal(<div ref={setFloating} style={floatingStyles} className="tc composer-artifact-menu" role={options.length ? "listbox" : "status"} aria-label="引用资源">
+    {!options.length && <div className="composer-resource-empty" onMouseDown={(event) => event.preventDefault()}>暂无可以 @ 的资源</div>}
     {options.map((option, index) => <button key={option.key} id={`typeahead-item-${index}`} type="button" role="option" aria-selected={selectedIndex === index}
       ref={(element) => option.setRefElement(element)} className={selectedIndex === index ? "selected" : ""}
       onMouseDown={(event) => event.preventDefault()} onMouseEnter={() => setHighlightedIndex(index)} onClick={() => selectOptionAndCleanUp(option)}>

@@ -2,9 +2,26 @@ import { createElement, type ReactNode, type MouseEvent } from "react"
 import { $applyNodeReplacement, $createTextNode, $getNodeByKey, DecoratorNode, type LexicalEditor, type NodeKey, type SerializedLexicalNode } from "lexical"
 import { messageContentPartInputSchema } from "@/lib/thread-chat/contracts/message-content"
 import type { ComposerMessagePartDraft } from "@/lib/thread-chat/contracts/composer"
+import { useArtifactNavigation } from "./artifact-resources"
 
 type CapsulePart = Exclude<ComposerMessagePartDraft, { type: "text" }>
 type SerializedCapsule = SerializedLexicalNode & { part: CapsulePart; label: string }
+
+function CapsuleContent({ part, label, editor, nodeKey }: { part: CapsulePart; label: string; editor: LexicalEditor; nodeKey: NodeKey }) {
+  const openArtifact = useArtifactNavigation()
+  const onMouseDown = (event: MouseEvent<HTMLElement>) => {
+    if (event.button !== 0 || !editor.isEditable()) return
+    event.preventDefault()
+    // 预览引用时仍保留胶囊右侧的输入位置，不选中可被打字替换的节点。
+    editor.update(() => { $getNodeByKey(nodeKey)?.selectNext() })
+  }
+  if (part.type === "artifact-reference") return createElement("button", {
+    type: "button", className: "composer-capsule-action", title: `预览 ${label}`,
+    disabled: !openArtifact, onMouseDown,
+    onClick: () => openArtifact?.(part.artifactId),
+  }, label)
+  return createElement("span", { title: part.type === "quote" ? part.quote.text : label, onMouseDown }, label)
+}
 
 /** 官方行内 DecoratorNode：Lexical 将其设为不可编辑，光标只在胶囊两侧移动。 */
 export class ComposerCapsuleNode extends DecoratorNode<ReactNode> {
@@ -37,7 +54,7 @@ export class ComposerCapsuleNode extends DecoratorNode<ReactNode> {
   exportJSON(): SerializedCapsule { return { ...super.exportJSON(), type: ComposerCapsuleNode.getType(), version: 1, part: this.getPart(), label: this.getTextContent() } }
   createDOM() {
     const dom = document.createElement("span")
-    dom.className = "composer-capsule"
+    dom.className = this.getPart().type === "artifact-reference" ? "composer-capsule composer-capsule-artifact" : "composer-capsule"
     dom.draggable = false
     return dom
   }
@@ -48,17 +65,7 @@ export class ComposerCapsuleNode extends DecoratorNode<ReactNode> {
     return { element }
   }
   decorate(editor: LexicalEditor) {
-    const part = this.getPart()
-    const key = this.getKey()
-    return createElement("span", {
-      title: part.type === "quote" ? part.quote.text : this.getTextContent(),
-      onMouseDown: (event: MouseEvent<HTMLSpanElement>) => {
-        if (event.button !== 0 || !editor.isEditable()) return
-        event.preventDefault()
-        // 点击只将输入位置移到引用之后，不选择可被打字替换的节点。
-        editor.update(() => { $getNodeByKey(key)?.selectNext() })
-      },
-    }, this.getTextContent())
+    return createElement(CapsuleContent, { part: this.getPart(), label: this.getTextContent(), editor, nodeKey: this.getKey() })
   }
   isInline() { return true }
   isKeyboardSelectable() { return false }

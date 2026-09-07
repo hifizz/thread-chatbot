@@ -38,7 +38,7 @@ export function ArtifactMentionPlugin({ artifacts }: { artifacts: Record<string,
     onOpen={setResolution}
     onClose={() => setResolution(null)}
     preselectFirstItem
-    anchorClassName="tc composer-typeahead-anchor"
+    anchorClassName="composer-typeahead-anchor"
     onSelectOption={(option, queryNode, close) => {
       editor.update(() => {
         const node = $createComposerCapsuleNode({ type: "artifact-reference", artifactId: option.artifact.id, localId: crypto.randomUUID() }, `@${option.artifact.title}`)
@@ -48,7 +48,7 @@ export function ArtifactMentionPlugin({ artifacts }: { artifacts: Record<string,
         close()
       })
     }}
-    menuRenderFn={(_anchor, props) => resolution && props.options.length
+    menuRenderFn={(_anchor, props) => resolution
       ? <ArtifactMenu resolution={resolution} root={editor.getRootElement()} {...props} /> : null}
   />
 }
