@@ -207,3 +207,80 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* 沿用 PR #96 的工具条外观；不参与正文布局。 */
+.tc .selection-toolbar {
+  position: fixed;
+  z-index: var(--tc-z-selection);
+  display: flex;
+  gap: 2px;
+  padding: 4px;
+  border-radius: 8px;
+  background: var(--tc-surface-ink);
+  box-shadow: 0 8px 18px var(--tc-shadow-pop);
+}
+.tc .selection-toolbar button {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 30px;
+  padding: 2px 4px;
+  gap: 6px;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--tc-content-on-floating);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: transform 100ms ease-out, background-color 100ms ease-out;
+}
+.tc .selection-toolbar button:active {
+  transform: scale(0.98);
+}
+@media (prefers-reduced-motion: reduce) {
+  .tc .selection-toolbar button {
+    transition: none;
+  }
+}
+.tc .selection-toolbar button:hover,
+.tc .selection-toolbar button:focus-visible {
+  filter: none;
+  background: var(--tc-onink-fill-cell-hover);
+}
+.tc .selection-toolbar button:focus-visible {
+  outline: 2px solid var(--tc-onink-border-src);
+  outline-offset: -2px;
+}
+
+/* 深色页面上用提亮底面与细描边明确浮层边界。 */
+.dark .tc .selection-toolbar {
+  background: var(--tc-surface-selection-dark);
+  /* tc-review: 1px 描边保持小型工具条边缘轻盈。 */
+  box-shadow: 0 0 0 1px var(--tc-onink-border-undo), 0 8px 18px var(--tc-shadow-deep);
+}
+.dark .tc .selection-toolbar button:hover,
+.dark .tc .selection-toolbar button:focus-visible {
+  background: var(--tc-onink-fill-undo-hover);
+}
+
+/* 浅色模式按压继续提亮；深色模式按压加深，和缩放反馈同步。 */
+.tc .selection-toolbar button:active {
+  background: var(--tc-selection-toolbar-pressed);
+}
+.dark .tc .selection-toolbar button:active {
+  background: var(--tc-surface-ink);
+}
+
+.dark .tc .sel-bubble {
+  --selection-bubble-surface: var(--tc-surface-selection-dark);
+}
+.dark .tc .sel-bubble .sb-shape path {
+  stroke: var(--tc-onink-border-undo);
+  /* tc-review: 1px 细线沿曲线及尾巴描边，避免浮层边缘过重。 */
+  stroke-width: 1px;
+}
+.dark .tc .sel-bubble .sb-shape {
+  filter: drop-shadow(0 8px 18px var(--tc-shadow-deep));
+}

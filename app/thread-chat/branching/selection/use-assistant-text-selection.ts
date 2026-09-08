@@ -1,5 +1,6 @@
 "use client"
 
+import { SELECTION_SURFACE_SELECTOR } from "@/constants/selection-toolbar"
 import { useEffect } from "react"
 import type { ThreadTreeState } from "../../core/types"
 import { describeRange, type TextAnchor } from "./text-anchor"
@@ -39,7 +40,7 @@ export function useAssistantTextSelection({
   useEffect(() => {
     let settleTimer: ReturnType<typeof setTimeout> | null = null
     const onMouseUp = (event: MouseEvent) => {
-      if ((event.target as HTMLElement).closest?.(".sel-bubble")) return
+      if ((event.target as HTMLElement).closest?.(SELECTION_SURFACE_SELECTOR)) return
       const meta = event.metaKey || event.ctrlKey
       if (settleTimer) clearTimeout(settleTimer)
       // 等浏览器把 Selection 结算完再读（与拖选结束存在竞态）。
@@ -78,11 +79,10 @@ export function useAssistantTextSelection({
         const threadId = list?.dataset.list
         const msgId = messageElement?.dataset.msgId
         if (!threadId || !msgId) return
-        if (
-          !state.threads[threadId]?.messages.some(
-            (message) => message.id === msgId
-          )
-        ) {
+        const message = state.threads[threadId]?.messages.find((message) => message.id === msgId)
+        const range = domSelection.getRangeAt(0)
+        if (!message || message.role !== "assistant" || (message.status && message.status !== "done")
+          || !markdownRoot.contains(range.startContainer) || !markdownRoot.contains(range.endContainer)) {
           closeIfUnguarded()
           return
         }
@@ -109,7 +109,7 @@ export function useAssistantTextSelection({
       }, 10)
     }
     const onMouseDown = (event: MouseEvent) => {
-      if (!(event.target as HTMLElement).closest?.(".sel-bubble") && !hasDraft)
+      if (!(event.target as HTMLElement).closest?.(SELECTION_SURFACE_SELECTOR) && !hasDraft)
         onSelectionChange(null)
     }
     const onResize = () => {
@@ -131,7 +131,7 @@ export function useAssistantTextSelection({
     const onScroll = (event: Event) => {
       const target = event.target
       if (target instanceof Element) {
-        if (target.closest(".sel-bubble")) return
+        if (target.closest(SELECTION_SURFACE_SELECTOR)) return
         const list = target.closest<HTMLElement>(".msg-list[data-list]")
         if (list && list.dataset.list !== selection.threadId) return
       }

@@ -25,3 +25,12 @@ ego-browser nodejs <<'JS'
 await completeTaskSpace('Composer 回归', { keep: false })
 JS
 ```
+
+划选工具条使用同一个开发页面，先点击“完整输入框”，再运行独立的交互检查：
+
+```js
+const { runSelectionToolbarChecks } = await import('file:///绝对路径/e2e/thread-chat/selection-toolbar-browser.test.mjs')
+await runSelectionToolbarChecks({ js, click, typeText, pressKey, cdp, wait, cliLog })
+```
+
+检查选区上下定位、两个操作入口、Lexical 引用去重和撤销、thread 草稿隔离、视图切换、发送失败保留、提问弹窗焦点和草稿保护。该检查用开发夹具记录发送与分支请求，不调用真实模型。

@@ -30,7 +30,7 @@ function ComposerContent(props: ConversationComposerProps) {
     <ComposerBar className={styles.bar} {...surfaceProps}>
       <input ref={fileInputRef} type="file" className="hidden" aria-label={COMPOSER_ATTACHMENT_COPY.add} accept={THREAD_COMPOSER_ACCEPT} multiple {...inputProps} />
       <ComposerAttachmentTray items={attachments.items} disabled={submitting} onRemove={attachments.remove} onRetry={attachments.retry} />
-      <MessageEditor className={styles.editor} draft={entry.draft} revision={entry.revision} artifacts={artifacts}
+      <MessageEditor scope={props.threadId} className={styles.editor} draft={entry.draft} revision={entry.revision} artifacts={artifacts}
         onChange={update} onSubmit={() => void submit()} editorRef={editorRef}
         placeholder={ARTIFACT_REFERENCE_COPY.placeholder} disabled={submitting} />
       <ComposerToolbar className={`${styles.toolbar} min-w-0 flex-nowrap gap-1`}>

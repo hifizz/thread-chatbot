@@ -10,6 +10,7 @@ import { EditorRefPlugin } from "@lexical/react/LexicalEditorRefPlugin"
 import type { LexicalEditor } from "lexical"
 import type { ThreadComposerDraft } from "@/lib/thread-chat/contracts/composer"
 import type { ArtifactDTO } from "@/lib/thread-chat/contracts/dto"
+import { ComposerQuotePlugin } from "./composer-quote-plugin"
 import { ComposerClipboardPlugin } from "./composer-clipboard-plugin"
 import { ComposerCapsuleNode } from "./composer-capsule-node"
 import { $importComposerDraft } from "./composer-codec"
@@ -17,8 +18,8 @@ import { ComposerSyncPlugin } from "./composer-sync-plugin"
 import { ComposerSubmitPlugin } from "./composer-submit-plugin"
 import { ArtifactMentionPlugin } from "./artifact-mention-plugin"
 
-export function MessageEditor({ draft, revision = 0, artifacts, onChange, onSubmit, editorRef, placeholder = "输入问题…", mentions = true, disabled = false, className }: {
-  draft: ThreadComposerDraft; revision?: number; artifacts: Record<string, ArtifactDTO>;
+export function MessageEditor({ scope, draft, revision = 0, artifacts, onChange, onSubmit, editorRef, placeholder = "输入问题…", mentions = true, disabled = false, className }: {
+  scope?: string; draft: ThreadComposerDraft; revision?: number; artifacts: Record<string, ArtifactDTO>;
   onChange: (draft: ThreadComposerDraft) => void; onSubmit?: () => void;
   editorRef?: RefObject<LexicalEditor | null>; placeholder?: string; mentions?: boolean; disabled?: boolean; className?: string
 }) {
@@ -34,6 +35,7 @@ export function MessageEditor({ draft, revision = 0, artifacts, onChange, onSubm
     <HistoryPlugin />
     <ComposerClipboardPlugin />
     <ComposerSyncPlugin disabled={disabled} draft={draft} revision={revision} artifacts={artifacts} onChange={onChange} />
+    {scope && <ComposerQuotePlugin scope={scope} disabled={disabled} />}
     <ComposerSubmitPlugin onSubmit={onSubmit} />
     {mentions && <ArtifactMentionPlugin artifacts={artifacts} />}
     {editorRef && <EditorRefPlugin editorRef={editorRef} />}
