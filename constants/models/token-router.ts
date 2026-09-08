@@ -7,6 +7,7 @@ const adaptiveGenerationCapabilities = {
 const gptCapabilities = { attachments: true, reasoning: true, generationSettings: GPT_5_6_GENERATION_SETTINGS }
 const astraCapabilities = { ...gptCapabilities, generationSettings: GPT_6_GENERATION_SETTINGS }
 const previousGptCapabilities = { ...gptCapabilities, generationSettings: GPT_5_4_GENERATION_SETTINGS }
+const textReasoningCapabilities = { imageInput: false, reasoning: true }
 
 /** 当前入口的唯一模型目录。publicId 保留历史会话身份，与实际 provider 解耦。 */
 export const tokenRouterModels = defineProviderModels({
@@ -19,6 +20,14 @@ export const tokenRouterModels = defineProviderModels({
   },
   // contextLabel 为暂定展示值；不得用作真实 token 预算。
   models: [
+    // 以下 id 按用户提供的中转名称保留；实验版和 GLM 横杠别名仍需通过 /v1/models 核验。
+    // 智谱官方 ID 为 glm-5.3 / glm-5.3-flash，不能未经中转确认就替换这里的上游 ID。
+    { id: "deepseek-v4.1-flash-expires-on-0910", name: "DeepSeek V4.1 Flash（临时版 · 0910）", capabilities: textReasoningCapabilities },
+    { id: "deepseek-v4-flash", name: "DeepSeek V4 Flash", capabilities: textReasoningCapabilities },
+    { id: "deepseek-v4-flash-exp", name: "DeepSeek V4 Flash Exp", capabilities: textReasoningCapabilities },
+    { id: "deepseek-v4-pro", name: "DeepSeek V4 Pro", capabilities: textReasoningCapabilities },
+    { id: "glm-5-3", name: "GLM-5.3", capabilities: textReasoningCapabilities },
+    { id: "glm-5-3-flash", name: "GLM-5.3-Flash", capabilities: { reasoning: true } },
     { id: "claude-opus-4-6", publicId: "iceland-claude-opus-4-6", name: "Claude Opus 4.6", contextLabel: "1M ctx", capabilities: adaptiveGenerationCapabilities },
     { id: "claude-sonnet-4-6", publicId: "iceland-claude-sonnet-4-6", name: "Claude Sonnet 4.6", contextLabel: "1M ctx" },
     { id: "claude-opus-4-7", publicId: "iceland-claude-opus-4-7", name: "Claude Opus 4.7", contextLabel: "1M ctx", capabilities: adaptiveGenerationCapabilities },

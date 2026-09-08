@@ -73,7 +73,7 @@ Key patterns:
 
 ## AI backend
 
-当前模型入口统一使用 **Token Router**：18 个模型集中定义在 `constants/models/token-router.ts` 的一次 `defineProviderModels` 中；服务端 `lib/ai/llm/token-router.ts` 读取 `.env.local` 的 `TOKEN_ROUTER_BASE_URL` / `TOKEN_ROUTER_API_KEY`，Claude 使用 Anthropic Messages，其余模型使用 OpenAI-compatible Chat Completions。聊天和标题默认使用 GPT-5.6 Luna。原 Iceland / Private Relay 公开 ID 保留，已保存会话无需迁移；其他 provider 代码与历史注册暂留，不出现在当前选择入口，退役另做。AI SDK is at **v7** (`ai@^7`); `ai` and `@ai-sdk/react` (`@^4`) track independent version numbers.
+当前模型入口统一使用 **Token Router**：24 个模型集中定义在 `constants/models/token-router.ts` 的一次 `defineProviderModels` 中；服务端 `lib/ai/llm/token-router.ts` 读取 `.env.local` 的 `TOKEN_ROUTER_BASE_URL` / `TOKEN_ROUTER_API_KEY`，Claude 使用 Anthropic Messages，其余模型使用 OpenAI-compatible Chat Completions。聊天和标题默认使用 GPT-5.6 Luna。原 Iceland / Private Relay 公开 ID 保留，已保存会话无需迁移；其他 provider 代码与历史注册暂留，不出现在当前选择入口，退役另做。AI SDK is at **v7** (`ai@^7`); `ai` and `@ai-sdk/react` (`@^4`) track independent version numbers.
 
 MiniMax emits chain-of-thought as literal `<think>...</think>` text rather than a dedicated reasoning stream part. The model is wrapped with `wrapLanguageModel` + `extractReasoningMiddleware({ tagName: "think" })` so it renders as a collapsible reasoning block instead of raw text in the message.
 

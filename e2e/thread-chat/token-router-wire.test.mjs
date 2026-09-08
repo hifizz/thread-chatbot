@@ -66,6 +66,25 @@ try {
   await generateText({ model: gemini.model, prompt: "Reply OK", maxOutputTokens: 8, maxRetries: 0 })
   assert.equal(requests.at(-1).body.max_tokens, 8)
   assert.equal("max_completion_tokens" in requests.at(-1).body, false)
+  for (const upstreamId of [
+    "deepseek-v4.1-flash-expires-on-0910",
+    "deepseek-v4-flash",
+    "deepseek-v4-flash-exp",
+    "deepseek-v4-pro",
+    "glm-5-3",
+    "glm-5-3-flash",
+  ]) {
+    const resolved = resolveChatModelWithRoute(`token-router-${upstreamId}`)
+    assert.equal(resolved.route.protocol, "openai-compatible")
+    await generateText({ model: resolved.model, prompt: "Reply OK", maxOutputTokens: 8, maxRetries: 0 })
+    const request = requests.at(-1)
+    assert.equal(request.url, "https://router.example.test/v1/chat/completions")
+    assert.equal(request.body.model, upstreamId)
+    assert.equal(request.body.max_tokens, 8)
+    assert.equal("max_completion_tokens" in request.body, false)
+    assert.equal("thinking" in request.body, false)
+    assert.equal(request.headers.get("authorization"), "Bearer router-test-key")
+  }
 } finally {
   globalThis.fetch = savedFetch
   for (const name of ["TOKEN_ROUTER_BASE_URL", "TOKEN_ROUTER_API_KEY", "PRIVATE_RELAY_API_KEY", "ICELAND_RELAY_API_KEY"]) {
