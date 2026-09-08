@@ -66,7 +66,13 @@ export function forkThread(
         )
         if (!source || source.supersededAt)
           stateConflict("分支来源不在当前时间线")
-        if (command.anchor.quote.exact !== command.anchorText) {
+        if (
+          !command.anchor &&
+          (source.role !== "assistant" || source.status !== "completed")
+        ) {
+          stateConflict("仅支持从已完成的 AI 回复直接创建分支")
+        }
+        if (command.anchor && command.anchor.quote.exact !== command.anchorText) {
           stateConflict("选区锚点与来源文本不一致")
         }
         const forkContext = buildFrozenForkContext({
@@ -83,8 +89,8 @@ export function forkThread(
             parentId: parent.id,
             forkMessageId: source.id,
             forkContext,
-            forkAnchor: command.anchor,
-            anchorText: command.anchorText,
+            forkAnchor: command.anchor ?? null,
+            anchorText: command.anchorText ?? null,
             footnote,
             depth: parent.depth + 1,
             modelId: command.modelId,

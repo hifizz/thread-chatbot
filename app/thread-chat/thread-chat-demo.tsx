@@ -3,12 +3,13 @@
 import { ComposerDraftProvider } from "./chat/composer/composer-drafts"
 import { ArtifactResourcesProvider, ArtifactNavigationProvider } from "./chat/composer/artifact-resources"
 
-import { messagePartsToContent, forkFirstTurnContent, type MessageContentInput } from "@/lib/thread-chat/contracts/message-content"
+import { messagePartsToContent, forkFirstTurnContent, textMessageContent, type MessageContentInput } from "@/lib/thread-chat/contracts/message-content"
 
 import dynamic from "next/dynamic"
 import { useRouter } from "next/navigation"
 import React, { useCallback, useEffect, useMemo, useState } from "react"
 
+import { MESSAGE_FORK_LABELS } from "@/constants/message-fork"
 import type { GenerationSettings } from "@/constants/generation-settings"
 import { resolveGenerationSettings } from "@/lib/thread-chat/generation-settings"
 import { COMPOSER_MODEL_COPY } from "@/constants/composer-model"
@@ -446,7 +447,12 @@ function NormalizedThreadChat({
   )
 
   const handleFork = useCallback(
-    (info: SelectionInfo, hint?: PlacementHint, question?: string) => {
+    (
+      info: Pick<SelectionInfo, "threadId" | "msgId"> &
+        Partial<Pick<SelectionInfo, "text" | "anchor">>,
+      hint?: PlacementHint,
+      question?: string
+    ) => {
       const current = runtime.store.getState()
       const parentThreadId = fromConversationViewThreadId(
         current,
@@ -455,7 +461,7 @@ function NormalizedThreadChat({
       const modelId =
         current.threadsById[parentThreadId]?.modelId ??
         DEFAULT_THREAD_CHAT_MODEL_ID
-      void runtime.commands
+      return runtime.commands
         .forkThread({
           parentThreadId,
           sourceMessageId: info.msgId,
@@ -463,11 +469,11 @@ function NormalizedThreadChat({
           anchor: info.anchor,
           modelId,
           ...generationSettingsInput(modelId, generationSettings),
-          ...(question?.trim() ? { firstTurn: forkFirstTurnContent({ text: question, sourceMessageId: info.msgId, anchorText: info.text, anchor: info.anchor }) } : {}),
+          ...(question?.trim() ? { firstTurn: info.anchor && info.text ? forkFirstTurnContent({ text: question, sourceMessageId: info.msgId, anchorText: info.text, anchor: info.anchor }) : textMessageContent(question) } : {}),
         })
         .then(({ command }) => {
-          const title =
-            info.text.length > 13 ? `${info.text.slice(0, 13)}…` : info.text
+          const text = info.text ?? MESSAGE_FORK_LABELS.untitled
+          const title = text.length > 13 ? `${text.slice(0, 13)}…` : text
           if (workspace.viewMode === "canvas") {
             workspace.focusCanvasNode(command.threadId)
             showToast(`已开启分支 · ${title}`)
@@ -476,7 +482,7 @@ function NormalizedThreadChat({
           openBranchUI(command.threadId, info.threadId, hint)
           showToast(`已开启分支 · ${title}`)
         })
-        .catch(() => showToast("创建分支失败，请重试"))
+        .catch(() => showToast(MESSAGE_FORK_LABELS.failed))
     },
     [
       generationSettings,
@@ -526,12 +532,13 @@ function NormalizedThreadChat({
     () => ({
       send,
       stop,
+      forkMessage: (threadId, msgId) => handleFork({ threadId, msgId }),
       retry(viewThreadId, messageId) {
         void messageCommands.retryAssistant(viewThreadId, messageId)
       },
       ...messageCommands,
     }),
-    [messageCommands, send, stop]
+    [handleFork, messageCommands, send, stop]
   )
 
   const renameTreeItem = useCallback(
@@ -661,6 +668,10 @@ function NormalizedThreadChat({
                   openBranchUI(target, viewThreadId, options)
                 }
                 onOpenArtifact={openArtifact}
+                onForkMessage={(message) => handleFork({
+                  threadId: viewThreadId,
+                  msgId: message.id,
+                })}
                 onCrumbNav={(target) =>
                   workspace.columns.navColumn(viewportIndex, target, "collapse")
                 }

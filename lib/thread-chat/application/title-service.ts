@@ -81,11 +81,11 @@ async function buildTitleInput(
   const question = firstUser ? textFromParts(firstUser.parts) : ""
   if (!question) return null
 
-  if (isRootThread(thread)) return { kind: "main", question }
+  if (isRootThread(thread) || !thread.anchorText) return { kind: "main", question }
 
   const firstAnswer = firstCurrentAssistantAnswer(rows)
   const answer = firstAnswer ? textFromParts(firstAnswer.parts) : ""
-  if (!thread.anchorText || !answer) return null
+  if (!answer) return null
   return {
     kind: "branch",
     anchorText: thread.anchorText,
