@@ -18,6 +18,11 @@
   --tc-veil-card: color-mix(in srgb, var(--tc-surface-plain) 56.08%, transparent); /* Project 资源卡玻璃底 */
   --tc-veil-expand: color-mix(in srgb, var(--tc-surface-plain) 96%, transparent); /* 画布外挂面板底 */
 
+  /* 深色模式划选浮层：底面提亮，与页面及选区拉开层次。 */
+  /* 浅色模式工具条的按压反馈，比悬停再亮一档。 */
+  --tc-selection-toolbar-pressed: color-mix(in srgb, var(--tc-content-on-floating) 36%, transparent);
+  --tc-surface-selection-dark: color-mix(in srgb, var(--tc-surface-ink) 88%, var(--tc-content-on-floating));
+
   /* ═══ onink 填充/描边（划选气泡、toast 墨面上的白 alpha 状态层） ═══ */
   --tc-onink-fill-ghost: color-mix(in srgb, var(--tc-content-on-floating) 5%, transparent); /* main 槽位底 */
   --tc-onink-fill-slotmap: color-mix(in srgb, var(--tc-content-on-floating) 8%, transparent); /* slotmap 容器底 */

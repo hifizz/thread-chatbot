@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, type ReactNode } from "react"
 import { createStore } from "zustand/vanilla"
 import { useStore } from "zustand"
+import type { ThreadQuoteDataV1 } from "@/lib/thread-chat/contracts/quote"
 import type { ThreadComposerDraft } from "@/lib/thread-chat/contracts/composer"
 import type { ComposerAttachmentDraft } from "@/lib/thread-chat/composer-attachments"
 
@@ -14,8 +15,9 @@ export interface ComposerDraftEntry {
 export function createComposerDraftStore() {
   return createStore<{
     entries: Record<string, ComposerDraftEntry>
+    quoteRequests: Record<string, ThreadQuoteDataV1[]>
     attachments: Record<string, ComposerAttachmentDraft[]>
-  }>(() => ({ entries: {}, attachments: {} }))
+  }>(() => ({ entries: {}, attachments: {}, quoteRequests: {} }))
 }
 type DraftStore = ReturnType<typeof createComposerDraftStore>
 const DraftContext = createContext<DraftStore | null>(null)

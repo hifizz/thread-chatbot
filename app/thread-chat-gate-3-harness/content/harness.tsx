@@ -1,4 +1,5 @@
 "use client"
+import { SelectionFixture } from "./selection-fixture"
 import { GenerationSettingsProvider } from "@/app/thread-chat/chat/composer/generation-settings-context"
 import { DEFAULT_THREAD_CHAT_MODEL_ID } from "@/constants/models"
 import { useMemo, useRef, useState } from "react"
@@ -61,6 +62,7 @@ function DraftHarness({ artifacts }: { artifacts: Record<string, ArtifactDTO> })
     <button data-testid="fail-send" onClick={() => pending.current?.reject(new Error("测试发送失败"))}>发送失败</button>
     <pre data-testid="submitted">{submitted}</pre>
     <ArtifactResourcesProvider store={store}><ComposerDraftProvider><GenerationSettingsProvider><ArtifactNavigationProvider onOpen={(id) => setSubmitted(`preview:${id}`)}>
+      <SelectionFixture threadId={threadId} />
       <section key={canvas ? "canvas" : "column"} style={{ width: 360 }}>
         {editMode ? <EditableUserMessage threadId={threadId} message={message} editable commands={{
           retryUserTurn: async () => ({ ok: false, code: "invalid_request", message: "测试页不调用模型" }),

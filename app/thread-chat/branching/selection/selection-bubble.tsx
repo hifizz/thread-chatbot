@@ -30,6 +30,9 @@ import React, {
   useState,
 } from "react"
 import "./selection-draft-guard.css"
+import { SelectionToolbar } from "./selection-toolbar"
+import { useComposerDraftStore } from "../../chat/composer/composer-drafts"
+import { THREAD_QUOTE_SCHEMA_VERSION } from "@/lib/thread-chat/contracts/quote"
 import { GitMerge } from "lucide-react"
 import type { ThreadTreeState } from "../../core/types"
 import { threadTitle } from "../../core/selectors"
@@ -81,6 +84,8 @@ export function SelectionBubble({
   maxExpanded,
   lastActiveOf,
 }: SelectionBubbleProps) {
+  const draftStore = useComposerDraftStore()
+  const [panel, setPanel] = useState<"toolbar" | "question">("toolbar")
   /** 可选首问（受控 textarea）：留空提交 = 现有预填流；非空提交 = 带问开分支 */
   const [question, setQuestion] = useState("")
   const hasQuestion = question.trim().length > 0
@@ -125,6 +130,7 @@ export function SelectionBubble({
   const [forSel, setForSel] = useState<SelectionInfo | null>(sel)
   if (forSel !== sel) {
     setForSel(sel)
+    setPanel("toolbar")
     setOverride(null)
     setMetaHeld(sel?.meta ?? false)
     setQuestion("")
@@ -147,7 +153,13 @@ export function SelectionBubble({
     const ro = new ResizeObserver(measure)
     ro.observe(el)
     return () => ro.disconnect()
-  }, [sel])
+  }, [sel, panel])
+
+  useEffect(() => {
+    if (panel === "question" && measuredH > 0 && document.activeElement === document.body) {
+      taRef.current?.focus({ preventScroll: true })
+    }
+  }, [panel, measuredH])
 
   /* 气泡打开期间跟踪 ⌘/Ctrl 起落（keydown/keyup 都带 metaKey/ctrlKey 快照） */
   useEffect(() => {
@@ -188,6 +200,17 @@ export function SelectionBubble({
   }, [sel, question, confirming])
 
   if (!sel) return null
+  if (panel === "toolbar") return <SelectionToolbar rect={sel.rect}
+    onBranch={() => { window.getSelection()?.removeAllRanges(); setPanel("question") }}
+    onContinue={() => {
+      const quote = { schemaVersion: THREAD_QUOTE_SCHEMA_VERSION, text: sel.text,
+        source: { type: "message" as const, messageId: sel.msgId, anchor: sel.anchor } }
+      draftStore.setState((state) => ({ quoteRequests: { ...state.quoteRequests,
+        [sel.threadId]: [...(state.quoteRequests[sel.threadId] ?? []), quote],
+      } }))
+      window.getSelection()?.removeAllRanges()
+      onSelChange(null)
+    }} />
 
   /* —— 落点：floating-popup 定位模型，只用上/下两向（尾巴竖直指向选区）——
      测得高度前（measuredH=0）先把气泡藏到屏外并隐藏，测完这一帧即就位，避免旧位闪现。 */
@@ -312,7 +335,7 @@ export function SelectionBubble({
           style={{ top: dir === "up" ? -BUBBLE_TAIL.ah : 0 }}
         >
           {ready && (
-            <BubbleShape
+            <BubbleShape fill="var(--selection-bubble-surface, var(--tc-surface-ink))"
               W={BUBBLE_W}
               H={measuredH}
               cx={cx}
@@ -328,7 +351,6 @@ export function SelectionBubble({
           <div className="ask">
             <textarea
               ref={taRef}
-              // 不自动聚焦：保留正文 DOM Selection，用户可以直接复制刚划选的内容。
               rows={1}
               className="scroll-slim"
               value={question}
