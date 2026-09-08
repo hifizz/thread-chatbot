@@ -130,7 +130,7 @@ export function ComposerBar({
       data-drag-active={dragActive || undefined}
       className={cn(
         paper,
-        "flex w-full flex-col gap-2 rounded-[24px] p-2.5 transition-colors",
+        "flex w-full flex-col gap-2 rounded-xl p-2.5 transition-colors bg-white",
         dragActive && "bg-blue-500/[0.04] dark:bg-blue-500/10",
         className,
       )}

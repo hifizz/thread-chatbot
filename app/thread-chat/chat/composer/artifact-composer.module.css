@@ -29,6 +29,11 @@
   width: 28px;
 }
 
+.toolbar :global([data-slot="composer-send"]:enabled) {
+  background-color: var(--tc-accent);
+  color: var(--tc-content-on-accent);
+}
+
 /* 按输入框所在列宽响应；窄列保留参数值，完整含义由按钮的 aria-label 提供。 */
 @container thread-composer (max-width: 520px) {
   .parameterLabel {
