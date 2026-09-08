@@ -182,7 +182,8 @@ export async function prepareGeneration(input: PrepareGenerationInput) {
   throwIfGenerationCancelled(input.abortSignal)
   const generationOptions = chatAnswerGenerationOptions(
     researchRoute.mode,
-    input.generationSettings
+    input.generationSettings,
+    resolvedModel.route.protocol
   )
   // 当前模型目录没有上下文上限或完整请求 tokenizer（含工具/多模态）。
   // 在所有 system、历史、附件和工具已确定的边界明确记录 unknown。

@@ -17,7 +17,7 @@ export interface ThreadTreeReadableStore {
   subscribe(listener: () => void): () => void
   getVersion(): number
   getState(): ThreadTreeState
-  setThreadModel(threadId: string, modelId: string): void
+  setThreadModel(threadId: string, modelId: string): void | Promise<unknown>
 }
 
 export function useThreadStore(store: ThreadTreeReadableStore): number {

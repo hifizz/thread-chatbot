@@ -56,7 +56,7 @@ export interface BranchableChatProps {
   /** composer 预填文案（新开分支的代拟首问，待用户回车确认），透传给 ChatView */
   composerPrefill?: string
   /** 根 Thread 模型切换意图；分支 selector 仍由本层锁定。 */
-  onModelChange: (modelId: string) => void
+  onModelChange: (modelId: string) => void | Promise<unknown>
   onSend: (content: MessageContentInput) => unknown | Promise<unknown>
   messageActionState?: MessageActionViewState
   messageCommands?: ThreadMessageActionCommands

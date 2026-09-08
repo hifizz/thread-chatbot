@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { useGenerationSettings } from "./generation-settings-context"
+import { resolveGenerationSettings } from "@/lib/thread-chat/generation-settings"
 
 export function GenerationSettingsControls({
   modelId,
@@ -23,8 +24,9 @@ export function GenerationSettingsControls({
   disabled: boolean
 }) {
   const capability = getModelGenerationSettingsCapability(modelId)
-  const { settings, setSettings } = useGenerationSettings()
-  if (!capability) return null
+  const { settings: preferredSettings, setSettings } = useGenerationSettings()
+  const settings = resolveGenerationSettings(modelId, preferredSettings)
+  if (!capability || !settings) return null
 
   return (
     <>
@@ -36,7 +38,7 @@ export function GenerationSettingsControls({
             !capability.effortLevels.includes(effort)
           )
             return
-          setSettings((current) => ({ ...current, effort }))
+          setSettings({ ...settings, effort })
         }}
       >
         <SelectTrigger
@@ -46,7 +48,7 @@ export function GenerationSettingsControls({
         >
           <SelectValue>Effort: {settings.effort}</SelectValue>
         </SelectTrigger>
-        <SelectContent side="top" align="start">
+        <SelectContent side="top" align="start" alignItemWithTrigger={false}>
           {capability.effortLevels.map((effort) => (
             <SelectItem key={effort} value={effort}>
               {effort}
@@ -64,7 +66,7 @@ export function GenerationSettingsControls({
             !capability.maxOutputTokenOptions.includes(maxOutputTokens)
           )
             return
-          setSettings((current) => ({ ...current, maxOutputTokens }))
+          setSettings({ ...settings, maxOutputTokens })
         }}
       >
         <SelectTrigger
@@ -76,7 +78,7 @@ export function GenerationSettingsControls({
             Max: {MAX_OUTPUT_TOKEN_LABELS[settings.maxOutputTokens]}
           </SelectValue>
         </SelectTrigger>
-        <SelectContent side="top" align="start">
+        <SelectContent side="top" align="start" alignItemWithTrigger={false}>
           {capability.maxOutputTokenOptions.map((maxOutputTokens) => (
             <SelectItem
               key={maxOutputTokens}

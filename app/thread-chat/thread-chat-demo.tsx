@@ -10,7 +10,8 @@ import { useRouter } from "next/navigation"
 import React, { useCallback, useEffect, useMemo, useState } from "react"
 
 import type { GenerationSettings } from "@/constants/generation-settings"
-import { getModelGenerationSettingsCapability } from "@/constants/model"
+import { resolveGenerationSettings } from "@/lib/thread-chat/generation-settings"
+import { COMPOSER_MODEL_COPY } from "@/constants/composer-model"
 import { DEFAULT_THREAD_CHAT_MODEL_ID } from "@/constants/models"
 import { PROJECT_TITLE_FALLBACK } from "@/constants/project-workspace"
 import {
@@ -105,9 +106,8 @@ function generationSettingsInput(
   modelId: string,
   settings: GenerationSettings
 ): { generationSettings?: GenerationSettings } {
-  return getModelGenerationSettingsCapability(modelId)
-    ? { generationSettings: settings }
-    : {}
+  const generationSettings = resolveGenerationSettings(modelId, settings)
+  return generationSettings ? { generationSettings } : {}
 }
 
 function actionResult(input: {
@@ -185,9 +185,9 @@ function NormalizedThreadChat({
         setDraftModelId(modelId)
         return
       }
-      void runtime.commands
+      return runtime.commands
         .updateThread(threadId, { modelId })
-        .catch(() => showToast("模型切换失败，请重试"))
+        .catch(() => showToast(COMPOSER_MODEL_COPY.failed))
     },
     [runtime.commands, runtime.store, showToast]
   )
@@ -679,7 +679,7 @@ function NormalizedThreadChat({
                 }
                 onModelChange={(modelId) => {
                   if (!state.project) setDraftModelId(modelId)
-                  else setThreadModel(threadId, modelId)
+                  else return setThreadModel(threadId, modelId)
                 }}
                 onRetry={(message) => retry(viewThreadId, message)}
                 onStop={() => stop(viewThreadId)}

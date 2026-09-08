@@ -45,7 +45,7 @@ Thread 和独立示例共用 OfficialComposerTheme，加载与官网一致的 Pu
 - `@` 搜索当前 Project 已完成的 Markdown Artifacts；首项高亮，支持上下键、Enter、Escape 和空结果提示。连续 `@@` 结束查询，退格回到单个 `@` 重新打开。
 - 选中后插入带真实 Artifact ID 的不可编辑胶囊，点击打开现有预览面板。发送沿用服务端归属校验、引用保存及 Markdown 上下文展开。
 - 成功发送清空草稿，失败保留输入与引用；已有消息重新编辑可恢复胶囊。未发送草稿的刷新恢复仍待后续 draft restore 阶段。
-- 模型展示当前会话的真实模型；模型选择、Slash/Skill 及语音业务后续接入。
+- 模型展示并切换当前会话的真实模型；Slash/Skill 及语音业务后续接入。
 
 ## Thread 附件业务接入
 
@@ -56,3 +56,21 @@ Thread 和独立示例共用 OfficialComposerTheme，加载与官网一致的 Pu
 - 附件以卡片显示在输入区上方，不插入正文胶囊；正文中的 Artifact 引用仍保持原有顺序。
 
 验证涵盖 ego-browser 实际键盘选择、胶囊光标行为、预览、失败重试、真实发送与刷新恢复，以及引用匹配、消息编解码、上下文展开和数据库集成测试。
+
+## Thread 模型选择接入
+
+- `composer-model-selector.tsx` 复用官方 ComposerMenu / ComposerModelItem / ComposerModelTrigger；Base UI 提供键盘导航、外部点击关闭、Escape、焦点归还和视口定位，长列表可滚动。不加 Provider logo 或分组，独立官方示例保留原件。
+- 模型名称、稳定公开 ID、上游 ID、能力和暂定 context 展示值集中在 `constants/models/token-router.ts` 的一次 `defineProviderModels` 中。context 仅供菜单展示，不参与真实 token 预算。
+- Thread 和其他模型选择入口只使用该目录的 18 个模型，默认 Luna。其他 provider 的代码和历史注册暂留，退役另做；旧 Iceland / Private Relay 目录从新目录派生，避免重复维护模型。
+- `lib/ai/llm/token-router.ts` 统一使用 `TOKEN_ROUTER_BASE_URL` / `TOKEN_ROUTER_API_KEY`，Claude 走 Messages，其他模型走 Chat Completions。原有公开 ID 保留，已有会话无需迁移；标题生成同样走注册路由的 Luna。
+- 选择沿用会话更新命令；模型保存期间阻止再次切换和发送，失败保留原模型与草稿。分支及回复生成中的切换限制不变。
+- 新中转的 Claude 显式缓存尚未做真实验证，不继承旧 Iceland 专属缓存白名单。
+
+验收时先切换模型并检查按钮名称与选中标记，再用 Luna 发送短消息，刷新确认模型和回复仍在；检查生成中禁用切换，以及断网切换失败后保留原模型与输入。路由与协议自动检查入口为 `pnpm test:thread-chat:model-routes`。
+
+## Thread 生成参数恢复
+
+- 新 composer 复用 `GenerationSettingsControls` 与已有会话级参数上下文，默认 `high / 32K`。按当前模型能力展示 Effort、Max；发送中和模型保存中禁用。窄列允许工具栏换行。
+- 显示与发送共用有效值解析；切换模型后，不支持的偏好回退到该模型的默认档位。服务端继续独立校验；发送、重试、编辑与分支路径沿用同一入口。
+- GPT 参数转换为 `reasoning_effort` / `max_completion_tokens`，后者包含推理 token；Claude 继续使用 adaptive thinking。Effort 不等于保证返回可显示的 reasoning，内容展示取决于中转响应。
+- 能力档位和 SDK 请求体由 generation-settings / model-routes 测试覆盖；Luna 使用真实 Markdown 与 PNG 附件、`low / 16K` 验收。

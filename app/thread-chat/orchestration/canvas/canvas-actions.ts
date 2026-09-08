@@ -19,7 +19,7 @@ export interface CanvasActions extends CanvasChatActions {
   focusThread: (threadId: string) => void
   openArtifact: (artifactId: string) => void
   getState: () => ThreadTreeState
-  setThreadModel: (threadId: string, modelId: string) => void
+  setThreadModel: (threadId: string, modelId: string) => void | Promise<unknown>
   messageActionState: MessageActionViewState
 }
 

@@ -1,11 +1,11 @@
 import assert from "node:assert/strict"
 import {
-  EFFORT_LEVELS,
+  ANTHROPIC_ADAPTIVE_GENERATION_SETTINGS,
   MAX_OUTPUT_TOKEN_OPTIONS,
 } from "../../constants/generation-settings.ts"
-import { CHAT_MODELS, isChatModelId } from "../../constants/model.ts"
+import { CHAT_MODELS, isChatModelId, DEFAULT_MODEL_ID, DEFAULT_THREAD_CHAT_MODEL_ID } from "../../constants/model.ts"
 import { THREAD_CHAT_MODEL_OPTIONS } from "../../constants/client-model.ts"
-import { icelandModels as icelandModelConfig } from "../../constants/models/index.ts"
+import { icelandModels as icelandModelConfig, tokenRouterModels, AVAILABLE_MODELS } from "../../constants/models/index.ts"
 import {
   getModelRouteProvider,
   resolveChatModel,
@@ -14,15 +14,21 @@ import {
 import { PROVIDERS } from "../../lib/ai/llm/providers.ts"
 import { resolvePromptCachePolicy } from "../../lib/thread-chat/streaming/prompt-cache-policy.ts"
 import {
-  isIcelandRelayConfigured,
-  normalizeIcelandRelayBaseURL,
-} from "../../lib/ai/llm/iceland-relay.ts"
+  isTokenRouterConfigured,
+  normalizeTokenRouterBaseURL,
+} from "../../lib/ai/llm/token-router.ts"
 
 assert.equal(
   new Set(CHAT_MODELS.map((model) => model.id)).size,
   CHAT_MODELS.length
 )
-assert.ok(THREAD_CHAT_MODEL_OPTIONS.length > 0)
+assert.equal(THREAD_CHAT_MODEL_OPTIONS.length, 18)
+assert.equal(AVAILABLE_MODELS.length, 18)
+assert.ok(AVAILABLE_MODELS.every((model) => model.providerId === tokenRouterModels.id))
+assert.ok(THREAD_CHAT_MODEL_OPTIONS.every((model) => model.groupId === tokenRouterModels.id && model.contextLabel))
+assert.equal(DEFAULT_MODEL_ID, "private-relay-gpt-5.6-luna")
+assert.equal(DEFAULT_THREAD_CHAT_MODEL_ID, DEFAULT_MODEL_ID)
+assert.ok(AVAILABLE_MODELS.every((model) => model.surfaces.includes("linear") && model.surfaces.includes("thread")))
 
 for (const option of THREAD_CHAT_MODEL_OPTIONS) {
   assert.ok(isChatModelId(option.id), `unknown public model ${option.id}`)
@@ -35,10 +41,10 @@ for (const option of THREAD_CHAT_MODEL_OPTIONS) {
 }
 
 const icelandModels = CHAT_MODELS.filter(
-  (model) => model.provider === "iceland-relay"
+  (model) => model.id.startsWith("iceland-")
 )
 const icelandOptions = THREAD_CHAT_MODEL_OPTIONS.filter(
-  (model) => model.groupName === "冰岛"
+  (model) => model.id.startsWith("iceland-")
 )
 assert.equal(icelandModels.length, icelandModelConfig.models.length)
 assert.equal(icelandOptions.length, icelandModelConfig.models.length)
@@ -65,7 +71,7 @@ for (const model of icelandModels) {
     assert.equal(capability, undefined)
     continue
   }
-  assert.deepEqual(capability.effortLevels, EFFORT_LEVELS)
+  assert.deepEqual(capability.effortLevels, ANTHROPIC_ADAPTIVE_GENERATION_SETTINGS.effortLevels)
   assert.deepEqual(capability.maxOutputTokenOptions, MAX_OUTPUT_TOKEN_OPTIONS)
 }
 assert.ok(
@@ -77,36 +83,36 @@ assert.ok(
   )
 )
 assert.equal(
-  normalizeIcelandRelayBaseURL("https://relay.example.test"),
+  normalizeTokenRouterBaseURL("https://relay.example.test"),
   "https://relay.example.test/v1"
 )
 
-const originalBaseURL = process.env.ICELAND_RELAY_BASE_URL
-const originalApiKey = process.env.ICELAND_RELAY_API_KEY
+const originalBaseURL = process.env.TOKEN_ROUTER_BASE_URL
+const originalApiKey = process.env.TOKEN_ROUTER_API_KEY
 try {
-  process.env.ICELAND_RELAY_BASE_URL = "https://relay.example.test"
-  process.env.ICELAND_RELAY_API_KEY = "test-api-key"
-  assert.equal(isIcelandRelayConfigured(), true)
+  process.env.TOKEN_ROUTER_BASE_URL = "https://relay.example.test"
+  process.env.TOKEN_ROUTER_API_KEY = "test-api-key"
+  assert.equal(isTokenRouterConfigured(), true)
   for (const name of ["claude-opus-5", "claude-sonnet-5"]) {
     const resolved = resolveChatModelWithRoute(`iceland-${name}`)
     assert.equal(resolved.model.modelId, name)
     assert.deepEqual(resolved.route, {
-      actualProvider: "iceland-relay",
+      actualProvider: "token-router",
       protocol: "anthropic",
       upstreamModel: name,
     })
     assert.equal(
       resolvePromptCachePolicy(resolved.route).explicitCacheEnabled,
-      name === "claude-sonnet-5"
+      false
     )
   }
-  delete process.env.ICELAND_RELAY_API_KEY
-  assert.equal(isIcelandRelayConfigured(), false)
+  delete process.env.TOKEN_ROUTER_API_KEY
+  assert.equal(isTokenRouterConfigured(), false)
 } finally {
-  if (originalBaseURL === undefined) delete process.env.ICELAND_RELAY_BASE_URL
-  else process.env.ICELAND_RELAY_BASE_URL = originalBaseURL
-  if (originalApiKey === undefined) delete process.env.ICELAND_RELAY_API_KEY
-  else process.env.ICELAND_RELAY_API_KEY = originalApiKey
+  if (originalBaseURL === undefined) delete process.env.TOKEN_ROUTER_BASE_URL
+  else process.env.TOKEN_ROUTER_BASE_URL = originalBaseURL
+  if (originalApiKey === undefined) delete process.env.TOKEN_ROUTER_API_KEY
+  else process.env.TOKEN_ROUTER_API_KEY = originalApiKey
 }
 
 assert.throws(() => resolveChatModel("legacy-provider-model"), /未知模型/)
@@ -135,5 +141,5 @@ assert.equal(
 )
 
 console.log(
-  "PASS  model routes, public fields, Iceland relay, and unknown model rejection"
+  "PASS  model routes, active Token Router catalog, stable IDs, and unknown model rejection"
 )

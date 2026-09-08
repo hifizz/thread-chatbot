@@ -62,7 +62,7 @@ Current directions include strengthening automated coverage, improving deploymen
 
 - Node.js `>=22`（开发、CI 与 VPS 推荐固定 Node.js 24）and [pnpm](https://pnpm.io/) (this repository declares `pnpm@10.32.1`)
 - A PostgreSQL database
-- Credentials for at least one supported model provider; the default model uses MiniMax
+- Token Router credentials; the default model is GPT-5.6 Luna
 
 Clone the repository and install dependencies:
 
@@ -80,10 +80,11 @@ DATABASE_URL=postgres://...
 DIRECT_URL=postgres://...
 BETTER_AUTH_SECRET=replace-with-a-high-entropy-secret
 BETTER_AUTH_URL=http://localhost:4040
-MINIMAX_API_KEY=...
+TOKEN_ROUTER_BASE_URL=https://your-router.example/v1
+TOKEN_ROUTER_API_KEY=...
 ```
 
-`DATABASE_URL` is required by the running application. `pnpm db:migrate` uses `DIRECT_URL` when present and otherwise falls back to `DATABASE_URL`; use a direct database URL for migrations when your runtime URL is a transaction-pooler connection. `MINIMAX_BASE_URL` and `LLM_MODEL_ID` have defaults in `.env.example`, so they are not required for the default setup. A different configured model provider may be used instead of MiniMax, but the default model selection expects `MINIMAX_API_KEY`.
+`DATABASE_URL` is required by the running application. `pnpm db:migrate` uses `DIRECT_URL` when present and otherwise falls back to `DATABASE_URL`; use a direct database URL for migrations when your runtime URL is a transaction-pooler connection. The current model entry points require `TOKEN_ROUTER_BASE_URL` and `TOKEN_ROUTER_API_KEY`. The service must support the selected upstream model ID. Legacy provider settings remain documented in `.env.example` for existing deployments.
 
 Apply migrations and start the development server:
 
@@ -142,13 +143,15 @@ pnpm test:agent-evals
 pnpm observability:check-release
 ```
 
-## OpenRouter models
+## Legacy OpenRouter models
 
-Thread Chat offers fourteen fixed OpenRouter-backed internal model IDs: `openrouter-gpt-5.6-luna`, `openrouter-gpt-5.6-luna-pro`, `openrouter-gpt-5.6-terra`, `openrouter-gpt-5.6-terra-pro`, `openrouter-gpt-5.6-sol`, `openrouter-gpt-5.6-sol-pro`, `openrouter-gpt-5.5`, `openrouter-gpt-5.5-pro`, `openrouter-kimi-k3`, `openrouter-deepseek-v4-flash-0731`, `openrouter-qwen3.8-max`, `openrouter-grok-4.5`, `openrouter-grok-4.6`, and `openrouter-ox-alpha`. Configure `OPENROUTER_API_KEY`; `OPENROUTER_HTTP_REFERER` and `OPENROUTER_APP_TITLE` are optional attribution values. These IDs always use the dedicated OpenRouter provider—arbitrary external slugs are rejected. Ox Alpha uses upstream ID `stealth/ox-alpha` and is offered as a free, unbilled preview; completed requests for the other models use OpenRouter's real per-step USD cost when complete, with conservative static pricing as fallback. Attachments remain on the existing text-extraction path.
+The retained legacy registry contains fourteen fixed OpenRouter-backed internal model IDs (hidden from current model selectors; retirement is deferred): `openrouter-gpt-5.6-luna`, `openrouter-gpt-5.6-luna-pro`, `openrouter-gpt-5.6-terra`, `openrouter-gpt-5.6-terra-pro`, `openrouter-gpt-5.6-sol`, `openrouter-gpt-5.6-sol-pro`, `openrouter-gpt-5.5`, `openrouter-gpt-5.5-pro`, `openrouter-kimi-k3`, `openrouter-deepseek-v4-flash-0731`, `openrouter-qwen3.8-max`, `openrouter-grok-4.5`, `openrouter-grok-4.6`, and `openrouter-ox-alpha`. Configure `OPENROUTER_API_KEY`; `OPENROUTER_HTTP_REFERER` and `OPENROUTER_APP_TITLE` are optional attribution values. These IDs always use the dedicated OpenRouter provider—arbitrary external slugs are rejected. Ox Alpha uses upstream ID `stealth/ox-alpha` and is offered as a free, unbilled preview; completed requests for the other models use OpenRouter's real per-step USD cost when complete, with conservative static pricing as fallback. Attachments remain on the existing text-extraction path.
 
 ## LLM provider routing
 
-The chat model catalog is an explicitly reviewed server-side allowlist. The client receives only public model options; real providers, upstream model IDs, gateway URLs, and credentials are managed by the server-side `lib/ai/llm/` routing modules. The Iceland Relay uses `ICELAND_RELAY_BASE_URL` and `ICELAND_RELAY_API_KEY`; OpenRouter, Vercel AI Gateway, Cloudflare AI Gateway, and a private Relay are also supported. Chat requests do not depend on live `/models` discovery.
+The chat model catalog is an explicitly reviewed server-side allowlist. The client receives only public model options; real providers, upstream model IDs, gateway URLs, and credentials are managed by the server-side `lib/ai/llm/` routing modules. Current model selectors expose only the 18 models declared in `constants/models/token-router.ts`. They use one Token Router service configured with `TOKEN_ROUTER_BASE_URL` and `TOKEN_ROUTER_API_KEY`; Claude uses Messages and other models use Chat Completions. Luna is the default for chat and title generation. Existing Iceland / Private Relay public IDs remain stable but resolve to Token Router. Other provider implementations and historical registry entries remain in place for a later retirement phase. Chat requests do not depend on live `/models` discovery.
+
+The Thread composer exposes model-specific effort and output limits, defaulting to `high` / `32K`. Capability declarations in `constants/generation-settings.ts` drive both controls and server validation; `lib/thread-chat/generation-settings.ts` resolves unsupported preferences after model switches. GPT requests serialize effort as `reasoning_effort` and the output budget as `max_completion_tokens` (including reasoning tokens); Claude retains adaptive thinking options. Reasoning display depends on the relay returning reasoning content, separately from effort support. GPT-5.6 Luna/Sol/Terra allow `none` through `max`; Astra excludes `none`; GPT-5.4/Mini/5.5 stop at `xhigh`. Spark remains unconfirmed and does not expose custom settings. Profiles were checked against OpenAI model documentation on 2026-09-08; only Luna has live relay verification. Run `pnpm test:thread-chat:generation-settings` and `pnpm test:thread-chat:model-routes` for capability, switch fallback, and SDK serialization coverage.
 
 ## Architecture
 

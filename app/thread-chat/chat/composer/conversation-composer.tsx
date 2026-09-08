@@ -4,11 +4,10 @@ import { useRef, useState } from "react"
 import type { LexicalEditor } from "lexical"
 import { MicIcon } from "lucide-react"
 import { toast } from "sonner"
-import { getChatModel } from "@/constants/model"
 import { ARTIFACT_REFERENCE_COPY } from "@/constants/artifact-reference"
 import { COMPOSER_ATTACHMENT_COPY } from "@/constants/attachment"
 import { composerDraftToMessageContent, forkFirstTurnContent, messageContentToUiParts, messagePartsToComposerDraft, type MessageContentInput } from "@/lib/thread-chat/contracts/message-content"
-import { Composer, ComposerActions, ComposerAttachButton, ComposerBar, ComposerModelTrigger, ComposerSend, ComposerToolbar } from "@/components/assistant-ui/elements/composer"
+import { Composer, ComposerActions, ComposerAttachButton, ComposerBar, ComposerSend, ComposerToolbar } from "@/components/assistant-ui/elements/composer"
 import { ghostButton } from "@/components/assistant-ui/elements/surfaces"
 import { OfficialComposerTheme } from "@/components/assistant-ui/official-composer-demo/theme"
 import { MessageEditor } from "./message-editor"
@@ -20,11 +19,14 @@ import { useComposerAttachments } from "./use-composer-attachments"
 import { ComposerAttachmentTray } from "./composer-attachment-tray"
 import { THREAD_COMPOSER_ACCEPT } from "./thread-attachment-model"
 import { appendComposerAttachments } from "@/lib/thread-chat/composer-attachments"
+import { COMPOSER_MODEL_COPY } from "@/constants/composer-model"
+import { ComposerModelSelector } from "./composer-model-selector"
+import { GenerationSettingsControls } from "./generation-settings-controls"
 
 type ConversationComposerProps = {
   variant: "column" | "canvas"; threadId: string; isMain: boolean; busy: boolean; prefill?: string | null;
   modelId?: string; modelSelectorDisabled: boolean; modelSelectorDisabledReason?: "branch" | "busy";
-  onModelChange?(modelId: string): void; onSend?(content: MessageContentInput): unknown | Promise<unknown>;
+  onModelChange?(modelId: string): void | Promise<unknown>; onSend?(content: MessageContentInput): unknown | Promise<unknown>;
   onStop?(): void; onBeforeSend?(): void
 }
 
@@ -33,7 +35,7 @@ export function ConversationComposer(props: ConversationComposerProps) {
   return <OfficialComposerTheme key={props.threadId} embedded><ArtifactComposer {...props} /></OfficialComposerTheme>
 }
 
-function ArtifactComposer({ threadId, busy, prefill, modelId, onSend, onStop, onBeforeSend }: ConversationComposerProps) {
+function ArtifactComposer({ threadId, busy, prefill, modelId, modelSelectorDisabled, modelSelectorDisabledReason, onModelChange, onSend, onStop, onBeforeSend }: ConversationComposerProps) {
   const artifacts = useArtifactResources()
   const thread = useComposerThread(threadId)
   const editorRef = useRef<LexicalEditor | null>(null)
@@ -41,6 +43,16 @@ function ArtifactComposer({ threadId, busy, prefill, modelId, onSend, onStop, on
   const attachments = useComposerAttachments(threadId, modelId)
   const inFlight = useRef(false)
   const [submitting, setSubmitting] = useState(false)
+  const [changingModel, setChangingModel] = useState(false)
+  const modelChangeInFlight = useRef(false)
+  const changeModel = async (nextModelId: string) => {
+    if (!onModelChange || modelChangeInFlight.current || inFlight.current || busy || modelSelectorDisabled) return
+    modelChangeInFlight.current = true
+    setChangingModel(true)
+    try { await onModelChange(nextModelId) }
+    catch { toast.error(COMPOSER_MODEL_COPY.failed) }
+    finally { modelChangeInFlight.current = false; setChangingModel(false) }
+  }
   const { entry, update, clearSubmitted } = useComposerDraft(threadId, () => {
     if (prefill && thread?.forkMessageId && thread.forkAnchor && thread.anchorText) {
       return messagePartsToComposerDraft(messageContentToUiParts(forkFirstTurnContent({ text: prefill, sourceMessageId: thread.forkMessageId, anchorText: thread.anchorText, anchor: thread.forkAnchor })))
@@ -50,7 +62,7 @@ function ArtifactComposer({ threadId, busy, prefill, modelId, onSend, onStop, on
   const hasQuestion = entry.draft.parts.some((part) => part.type === "text" && part.text.trim())
   const attachmentsReady = attachments.items.every((item) => item.status === "ready")
   const submit = async () => {
-    if (!onSend || busy || inFlight.current || !editorRef.current) return
+    if (!onSend || busy || inFlight.current || modelChangeInFlight.current || !editorRef.current) return
     const snapshot = editorRef.current.getEditorState().read($exportComposerDraft)
     const submittedAttachments = attachments.current()
     let content: MessageContentInput
@@ -76,14 +88,16 @@ function ArtifactComposer({ threadId, busy, prefill, modelId, onSend, onStop, on
       <MessageEditor className={styles.editor} draft={entry.draft} revision={entry.revision} artifacts={artifacts}
         onChange={update} onSubmit={() => void submit()} editorRef={editorRef}
         placeholder={ARTIFACT_REFERENCE_COPY.placeholder} disabled={submitting} />
-      <ComposerToolbar>
-        <ComposerActions>
+      <ComposerToolbar className="flex-wrap gap-2">
+        <ComposerActions className="min-w-0 flex-wrap">
           <ComposerAttachButton title={COMPOSER_ATTACHMENT_COPY.add} disabled={submitting} onClick={() => fileInputRef.current?.click()} />
-          <ComposerModelTrigger model={getChatModel(modelId)?.name ?? modelId ?? "当前模型"} open={false} disabled title="当前会话模型；模型选择稍后接入" />
+          <ComposerModelSelector modelId={modelId} disabled={modelSelectorDisabled || busy || submitting || changingModel || !onModelChange}
+            disabledReason={modelSelectorDisabledReason ?? (busy || submitting ? "busy" : undefined)} onValueChange={changeModel} />
+          {modelId && <GenerationSettingsControls modelId={modelId} disabled={busy || submitting || changingModel} />}
         </ComposerActions>
-        <ComposerActions>
+        <ComposerActions className="ms-auto">
           <button type="button" aria-label="语音输入" title="语音输入稍后接入" disabled className={`${ghostButton} size-8 opacity-30`}><MicIcon className="size-4" /></button>
-          <ComposerSend streaming={busy} idle={!hasQuestion} disabled={busy ? !onStop : submitting || !hasQuestion || !attachmentsReady || !onSend}
+          <ComposerSend streaming={busy} idle={!hasQuestion} disabled={busy ? !onStop : submitting || changingModel || !hasQuestion || !attachmentsReady || !onSend}
             onClick={busy ? onStop : () => void submit()} />
         </ComposerActions>
       </ComposerToolbar>

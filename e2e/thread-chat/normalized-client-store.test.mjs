@@ -1,5 +1,6 @@
 import assert from "node:assert/strict"
 import { readFile } from "node:fs/promises"
+import { createProjectedConversationStore } from "../../app/thread-chat/core/projected-store.ts"
 import { createConversationStore } from "../../app/thread-chat/core/store.ts"
 import {
   selectAllMessageEntities,
@@ -1176,6 +1177,30 @@ async function testGate3HarnessIsolation() {
   assert.doesNotMatch(productionPage, /gate-3-harness/i)
 }
 
+// 画布通过旧视图接口转发模型保存，必须把 Promise 返回给 composer 的发送门禁。
+async function testProjectedModelChangeWaitsForSave() {
+  const store = createConversationStore()
+  store.getState().upsertProject(project())
+  let finishSave
+  const saved = new Promise((resolve) => { finishSave = resolve })
+  const calls = []
+  const view = createProjectedConversationStore({
+    store,
+    setThreadModel(threadId, modelId) {
+      calls.push({ threadId, modelId })
+      return saved
+    },
+  })
+  try {
+    const pending = view.setThreadModel("main", "private-relay-gpt-5.6-luna")
+    assert.equal(pending, saved)
+    assert.deepEqual(calls, [{ threadId: project().rootThreadId, modelId: "private-relay-gpt-5.6-luna" }])
+    finishSave()
+    await pending
+  } finally { view.dispose() }
+}
+
+await testProjectedModelChangeWaitsForSave()
 await testStoreAndSelectors()
 await testAiSdkReducer()
 await testOneShotSse()

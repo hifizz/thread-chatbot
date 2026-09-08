@@ -49,7 +49,7 @@ export interface ChatViewProps {
   modelSelectorDisabled: boolean
   /** 分支锁定时显示模型切换限制说明；生成期间仅禁用。 */
   modelSelectorDisabledReason?: "branch" | "busy"
-  onModelChange: (modelId: string) => void
+  onModelChange: (modelId: string) => void | Promise<unknown>
   onSend: (content: MessageContentInput) => unknown | Promise<unknown>
   messageActionState?: MessageActionViewState
   messageCommands?: ThreadMessageActionCommands

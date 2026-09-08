@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import {
   DEFAULT_GENERATION_SETTINGS,
-  EFFORT_LEVELS,
+  ANTHROPIC_ADAPTIVE_GENERATION_SETTINGS,
   MAX_OUTPUT_TOKEN_OPTIONS,
 } from "../../constants/generation-settings.ts"
 import {
@@ -16,7 +16,7 @@ const unsupportedModelId = "iceland-claude-sonnet-5"
 const capability = getModelGenerationSettingsCapability(supportedModelId)
 
 assert(capability)
-assert.deepEqual(capability.effortLevels, EFFORT_LEVELS)
+assert.deepEqual(capability.effortLevels, ANTHROPIC_ADAPTIVE_GENERATION_SETTINGS.effortLevels)
 assert.deepEqual(
   capability.maxOutputTokenOptions,
   MAX_OUTPUT_TOKEN_OPTIONS
@@ -38,11 +38,11 @@ assert.throws(() =>
   )
 )
 
-assert.deepEqual(chatAnswerGenerationOptions("answer", undefined), {
+assert.deepEqual(chatAnswerGenerationOptions("answer", undefined, "anthropic"), {
   reasoning: "provider-default",
   maxOutputTokens: MAX_OUTPUT_TOKENS,
 })
-assert.deepEqual(chatAnswerGenerationOptions("research", undefined), {
+assert.deepEqual(chatAnswerGenerationOptions("research", undefined, "openai-compatible"), {
   reasoning: "high",
   maxOutputTokens: MAX_OUTPUT_TOKENS,
 })
@@ -53,7 +53,8 @@ const customSettings = {
 }
 const customOptions = chatAnswerGenerationOptions(
   "answer",
-  customSettings
+  customSettings,
+  "anthropic"
 )
 assert.equal("reasoning" in customOptions, false)
 assert.deepEqual(customOptions, {
@@ -70,3 +71,29 @@ assert.deepEqual(customOptions, {
 })
 
 console.log("PASS generation settings capabilities and final call options")
+
+const { resolveGenerationSettings } = await import("../../lib/thread-chat/generation-settings.ts")
+for (const [suffix, levels] of [
+  ["gpt-5.6-luna", ["none", "low", "medium", "high", "xhigh", "max"]],
+  ["gpt-5.6-sol", ["none", "low", "medium", "high", "xhigh", "max"]],
+  ["gpt-5.6-terra", ["none", "low", "medium", "high", "xhigh", "max"]],
+  ["gpt-6-astra", ["low", "medium", "high", "xhigh", "max"]],
+  ["gpt-5.5", ["none", "low", "medium", "high", "xhigh"]],
+  ["gpt-5.4", ["none", "low", "medium", "high", "xhigh"]],
+  ["gpt-5.4-mini", ["none", "low", "medium", "high", "xhigh"]],
+]) {
+  const id = `private-relay-${suffix}`
+  assert.deepEqual(getModelGenerationSettingsCapability(id).effortLevels, levels)
+  for (const effort of levels) assert.doesNotThrow(() => assertAllowedGenerationSettings(id, { effort, maxOutputTokens: 128_000 }))
+}
+assert.equal(getModelGenerationSettingsCapability("private-relay-gpt-5.3-codex-spark"), undefined)
+for (const [id, effort] of [["private-relay-gpt-6-astra", "none"], ["private-relay-gpt-5.4", "max"], [supportedModelId, "none"]]) {
+  assert.throws(() => assertAllowedGenerationSettings(id, { effort, maxOutputTokens: 16_000 }))
+  assert.deepEqual(resolveGenerationSettings(id, { effort, maxOutputTokens: 16_000 }), { effort: "high", maxOutputTokens: 16_000 })
+}
+assert.equal(resolveGenerationSettings(unsupportedModelId, DEFAULT_GENERATION_SETTINGS), undefined)
+assert.deepEqual(chatAnswerGenerationOptions("research", { effort: "none", maxOutputTokens: 16_000 }, "openai-compatible"), {
+  maxOutputTokens: 16_000,
+  providerOptions: { openaiCompatible: { reasoningEffort: "none" } },
+})
+console.log("PASS GPT 能力矩阵、模型切换回退与协议参数隔离")

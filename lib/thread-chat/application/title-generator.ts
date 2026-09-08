@@ -6,9 +6,9 @@ import {
 } from "@/constants/model"
 import { MODEL_CALL_PURPOSE } from "@/constants/model-call"
 import {
-  isPrivateRelayConfigured,
-  privateRelayChatModel,
-} from "@/lib/ai/llm/private-relay"
+  isModelConfigured,
+  resolveChatModel,
+} from "@/lib/ai/llm/providers"
 import { withModelCallLogging } from "@/lib/ai/model-call-logger"
 import type { ThreadTitleInput } from "@/lib/thread-chat/contracts/title-request"
 import { buildAiTelemetryConfig } from "@/lib/observability/ai-sdk"
@@ -58,7 +58,7 @@ export function sanitizeGeneratedTitle(raw: string): string | null {
 export async function generateThreadTitleText(
   input: ThreadTitleInput
 ): Promise<string | null> {
-  if (!isPrivateRelayConfigured()) return null
+  if (!isModelConfigured(THREAD_TITLE_MODEL_ID)) return null
 
   try {
     const trace = { requestId: crypto.randomUUID() }
@@ -69,7 +69,7 @@ export async function generateThreadTitleText(
         entrypoint: "thread-title",
       }),
       model: withModelCallLogging(
-        privateRelayChatModel(THREAD_TITLE_MODEL_ID),
+        resolveChatModel(THREAD_TITLE_MODEL_ID),
         MODEL_CALL_PURPOSE.threadTitle,
         trace
       ),

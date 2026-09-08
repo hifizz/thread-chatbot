@@ -1,5 +1,6 @@
 "use client"
 
+import { GenerationSettingsProvider } from "../chat/composer/generation-settings-context"
 import { ComposerDraftProvider } from "../chat/composer/composer-drafts"
 import { ArtifactResourcesProvider, ArtifactNavigationProvider } from "../chat/composer/artifact-resources"
 
@@ -404,7 +405,7 @@ export function NormalizedGate3Harness({
     SCENARIOS.find((entry) => entry.id === scenario)?.label ?? scenario
 
   return (
-    <ArtifactResourcesProvider store={runtime.store}><ComposerDraftProvider><ArtifactNavigationProvider onOpen={(id) => { setActiveArtifactId(id); setDrawerOpen(true) }}><div className="tc" data-gate3-normalized-harness="true">
+    <ArtifactResourcesProvider store={runtime.store}><ComposerDraftProvider><GenerationSettingsProvider><ArtifactNavigationProvider onOpen={(id) => { setActiveArtifactId(id); setDrawerOpen(true) }}><div className="tc" data-gate3-normalized-harness="true">
       <ThreadChatTopbar
         viewMode={viewMode}
         showHelp
@@ -620,6 +621,6 @@ export function NormalizedGate3Harness({
       {!rootHasMessages && state.project && (
         <div className="boot-loading">当前 Project 尚无消息。</div>
       )}
-    </div></ArtifactNavigationProvider></ComposerDraftProvider></ArtifactResourcesProvider>
+    </div></ArtifactNavigationProvider></GenerationSettingsProvider></ComposerDraftProvider></ArtifactResourcesProvider>
   )
 }
