@@ -20,14 +20,13 @@ export const tokenRouterModels = defineProviderModels({
   },
   // contextLabel 为暂定展示值；不得用作真实 token 预算。
   models: [
-    // 以下 id 按用户提供的中转名称保留；实验版和 GLM 横杠别名仍需通过 /v1/models 核验。
-    // 智谱官方 ID 为 glm-5.3 / glm-5.3-flash，不能未经中转确认就替换这里的上游 ID。
+    // 使用已核验的官方 ID；临时版保留用户提供的名称，仍需确认中转可用性。
     { id: "deepseek-v4.1-flash-expires-on-0910", name: "DeepSeek V4.1 Flash（临时版 · 0910）", capabilities: textReasoningCapabilities },
     { id: "deepseek-v4-flash", name: "DeepSeek V4 Flash", capabilities: textReasoningCapabilities },
-    { id: "deepseek-v4-flash-exp", name: "DeepSeek V4 Flash Exp", capabilities: textReasoningCapabilities },
+    { id: "deepseek-v4-flash-vision-exp", name: "DeepSeek V4 Flash Vision Exp", capabilities: { reasoning: true } },
     { id: "deepseek-v4-pro", name: "DeepSeek V4 Pro", capabilities: textReasoningCapabilities },
-    { id: "glm-5-3", name: "GLM-5.3", capabilities: textReasoningCapabilities },
-    { id: "glm-5-3-flash", name: "GLM-5.3-Flash", capabilities: { reasoning: true } },
+    { id: "glm-5.3", name: "GLM-5.3", capabilities: textReasoningCapabilities },
+    { id: "glm-5.3-flash", name: "GLM-5.3-Flash", capabilities: { reasoning: true } },
     { id: "claude-opus-4-6", publicId: "iceland-claude-opus-4-6", name: "Claude Opus 4.6", contextLabel: "1M ctx", capabilities: adaptiveGenerationCapabilities },
     { id: "claude-sonnet-4-6", publicId: "iceland-claude-sonnet-4-6", name: "Claude Sonnet 4.6", contextLabel: "1M ctx" },
     { id: "claude-opus-4-7", publicId: "iceland-claude-opus-4-7", name: "Claude Opus 4.7", contextLabel: "1M ctx", capabilities: adaptiveGenerationCapabilities },

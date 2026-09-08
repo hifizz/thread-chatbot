@@ -69,10 +69,10 @@ try {
   for (const upstreamId of [
     "deepseek-v4.1-flash-expires-on-0910",
     "deepseek-v4-flash",
-    "deepseek-v4-flash-exp",
+    "deepseek-v4-flash-vision-exp",
     "deepseek-v4-pro",
-    "glm-5-3",
-    "glm-5-3-flash",
+    "glm-5.3",
+    "glm-5.3-flash",
   ]) {
     const resolved = resolveChatModelWithRoute(`token-router-${upstreamId}`)
     assert.equal(resolved.route.protocol, "openai-compatible")
