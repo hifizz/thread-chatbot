@@ -66,11 +66,12 @@ Thread 和独立示例共用 OfficialComposerTheme，加载与官网一致的 Pu
 - 选择沿用会话更新命令；模型保存期间阻止再次切换和发送，失败保留原模型与草稿。分支及回复生成中的切换限制不变。
 - 新中转的 Claude 显式缓存尚未做真实验证，不继承旧 Iceland 专属缓存白名单。
 
-验收时先切换模型并检查按钮名称与选中标记，再用 Luna 发送短消息，刷新确认模型和回复仍在；检查生成中禁用切换，以及断网切换失败后保留原模型与输入。路由与协议自动检查入口为 `pnpm test:thread-chat:model-routes`。
+验收时先切换模型并检查按钮名称与选中标记，再用 Luna 发送短消息，刷新确认模型和回复仍在；检查生成中禁用切换，以及断网切换失败后保留原模型与输入。非主线分支的模型、Effort 和 Max 统一禁用并灰显，悬停显示禁止光标与无箭头原因提示；禁用选项的外层支持键盘聚焦读取提示。路由与协议自动检查入口为 `pnpm test:thread-chat:model-routes`。
 
 ## Thread 生成参数恢复
 
-- 新 composer 复用 `GenerationSettingsControls` 与已有会话级参数上下文，默认 `high / 32K`。按当前模型能力展示 Effort、Max；发送中和模型保存中禁用。窄列允许工具栏换行。
+- 新 composer 复用 `GenerationSettingsControls` 与已有会话级参数上下文，默认 `high / 32K`。按当前模型能力展示 Effort、Max；发送中和模型保存中禁用。工具栏始终单行，发送按钮固定在右侧；窄列隐藏参数标签前缀，左侧选项溢出时可横向滚动，菜单通过 Portal 展示。
+- 输入区初始为一行（20px），随内容增长，清空后回缩；输入区与28px工具栏之间不额外加 gap。外框悬停及内部编辑器、按钮聚焦时沿用当前列主题边框色，失焦且移开后恢复。
 - 显示与发送共用有效值解析；切换模型后，不支持的偏好回退到该模型的默认档位。服务端继续独立校验；发送、重试、编辑与分支路径沿用同一入口。
 - GPT 参数转换为 `reasoning_effort` / `max_completion_tokens`，后者包含推理 token；Claude 继续使用 adaptive thinking。Effort 不等于保证返回可显示的 reasoning，内容展示取决于中转响应。
 - 能力档位和 SDK 请求体由 generation-settings / model-routes 测试覆盖；Luna 使用真实 Markdown 与 PNG 附件、`low / 16K` 验收。

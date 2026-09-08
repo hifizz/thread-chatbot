@@ -53,8 +53,13 @@
   flex: none;
   display: flex;
   justify-content: center;
-  padding: 16px;
+  padding: 16px 18px;
   background: transparent;
+}
+
+/* 与画布内迷你消息列表的水平留白一致。 */
+:global(.canvas-expand) .embedded {
+  padding-inline: 12px;
 }
 
 /* 官方预览为弹窗预留的空白，在 Thread 中由菜单浮层直接覆盖消息区。 */

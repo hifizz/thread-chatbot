@@ -35,7 +35,7 @@ export function ConversationComposer(props: ConversationComposerProps) {
   return <OfficialComposerTheme key={props.threadId} embedded><ArtifactComposer {...props} /></OfficialComposerTheme>
 }
 
-function ArtifactComposer({ threadId, busy, prefill, modelId, modelSelectorDisabled, modelSelectorDisabledReason, onModelChange, onSend, onStop, onBeforeSend }: ConversationComposerProps) {
+function ArtifactComposer({ threadId, isMain, busy, prefill, modelId, modelSelectorDisabled, modelSelectorDisabledReason, onModelChange, onSend, onStop, onBeforeSend }: ConversationComposerProps) {
   const artifacts = useArtifactResources()
   const thread = useComposerThread(threadId)
   const editorRef = useRef<LexicalEditor | null>(null)
@@ -46,7 +46,7 @@ function ArtifactComposer({ threadId, busy, prefill, modelId, modelSelectorDisab
   const [changingModel, setChangingModel] = useState(false)
   const modelChangeInFlight = useRef(false)
   const changeModel = async (nextModelId: string) => {
-    if (!onModelChange || modelChangeInFlight.current || inFlight.current || busy || modelSelectorDisabled) return
+    if (!onModelChange || !isMain || modelChangeInFlight.current || inFlight.current || busy || modelSelectorDisabled) return
     modelChangeInFlight.current = true
     setChangingModel(true)
     try { await onModelChange(nextModelId) }
@@ -80,23 +80,24 @@ function ArtifactComposer({ threadId, busy, prefill, modelId, modelSelectorDisab
       // 发送命令负责展示错误；保留原草稿和引用以供重试。
     } finally { inFlight.current = false; setSubmitting(false) }
   }
-  return <Composer>
-    <ComposerBar>
+  return <Composer className="max-w-(--lane-max)">
+    <ComposerBar className={styles.bar}>
       <input ref={fileInputRef} type="file" className="hidden" aria-label={COMPOSER_ATTACHMENT_COPY.add} accept={THREAD_COMPOSER_ACCEPT} multiple disabled={submitting}
         onChange={(event) => { attachments.add(Array.from(event.target.files ?? [])); event.target.value = "" }} />
       <ComposerAttachmentTray items={attachments.items} disabled={submitting} onRemove={attachments.remove} onRetry={attachments.retry} />
       <MessageEditor className={styles.editor} draft={entry.draft} revision={entry.revision} artifacts={artifacts}
         onChange={update} onSubmit={() => void submit()} editorRef={editorRef}
         placeholder={ARTIFACT_REFERENCE_COPY.placeholder} disabled={submitting} />
-      <ComposerToolbar className="flex-wrap gap-2">
-        <ComposerActions className="min-w-0 flex-wrap">
+      <ComposerToolbar className={`${styles.toolbar} min-w-0 flex-nowrap gap-1`}>
+        <ComposerActions className="min-w-0 flex-1 flex-nowrap overflow-x-auto whitespace-nowrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&>*]:shrink-0">
           <ComposerAttachButton title={COMPOSER_ATTACHMENT_COPY.add} disabled={submitting} onClick={() => fileInputRef.current?.click()} />
-          <ComposerModelSelector modelId={modelId} disabled={modelSelectorDisabled || busy || submitting || changingModel || !onModelChange}
-            disabledReason={modelSelectorDisabledReason ?? (busy || submitting ? "busy" : undefined)} onValueChange={changeModel} />
-          {modelId && <GenerationSettingsControls modelId={modelId} disabled={busy || submitting || changingModel} />}
+          <ComposerModelSelector modelId={modelId} disabled={!isMain || modelSelectorDisabled || busy || submitting || changingModel || !onModelChange}
+            disabledReason={!isMain ? "branch" : modelSelectorDisabledReason ?? (busy || submitting ? "busy" : undefined)} onValueChange={changeModel} />
+          {modelId && <GenerationSettingsControls modelId={modelId} disabled={!isMain || busy || submitting || changingModel}
+            disabledReason={!isMain ? COMPOSER_MODEL_COPY.branchLocked : COMPOSER_MODEL_COPY.busy} />}
         </ComposerActions>
-        <ComposerActions className="ms-auto">
-          <button type="button" aria-label="语音输入" title="语音输入稍后接入" disabled className={`${ghostButton} size-8 opacity-30`}><MicIcon className="size-4" /></button>
+        <ComposerActions className="ms-auto shrink-0">
+          <button type="button" aria-label="语音输入" title="语音输入稍后接入" disabled className={`${ghostButton} size-7 opacity-30`}><MicIcon className="size-4" /></button>
           <ComposerSend streaming={busy} idle={!hasQuestion} disabled={busy ? !onStop : submitting || changingModel || !hasQuestion || !attachmentsReady || !onSend}
             onClick={busy ? onStop : () => void submit()} />
         </ComposerActions>

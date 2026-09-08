@@ -1,20 +1,61 @@
 /* 官方 Composer 排版只覆盖当前输入区域，历史消息编辑器沿用原样式。 */
+.bar {
+  container: thread-composer / inline-size;
+  gap: 0;
+  padding: 8px;
+}
+
+.bar:hover,
+.bar:focus-within {
+  border-color: var(--tc-accent-edge);
+}
+
+.toolbar button {
+  height: 28px;
+  font-size: 12px;
+}
+
+.toolbar :global([data-slot="composer-actions"]) {
+  gap: 4px;
+}
+
+.toolbar :global([data-slot="composer-model-trigger"]),
+.toolbar :global([data-slot="select-trigger"]) {
+  padding-inline: 8px;
+}
+
+.toolbar :global([data-slot="composer-attach"]),
+.toolbar :global([data-slot="composer-send"]) {
+  width: 28px;
+}
+
+/* 按输入框所在列宽响应；窄列保留参数值，完整含义由按钮的 aria-label 提供。 */
+@container thread-composer (max-width: 520px) {
+  .parameterLabel {
+    display: none;
+  }
+}
+
 :global(.tc) .editor {
-  padding: 8px 12px;
+  padding: 4px 8px;
   font-family: var(--font-sans);
   font-size: 14px;
-  line-height: 1.5;
+  line-height: 20px;
 }
 
 :global(.tc) .editor :global(.composer-editor) {
-  min-height: 28px;
+  min-height: 1lh;
   max-height: 160px;
   color: var(--foreground);
 }
 
 :global(.tc) .editor :global(.composer-placeholder) {
-  top: 8px;
-  left: 12px;
+  top: 4px;
+  left: 8px;
+  right: 8px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
   color: var(--muted-foreground);
 }
 

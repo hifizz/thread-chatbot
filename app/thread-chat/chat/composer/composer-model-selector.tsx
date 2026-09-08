@@ -7,6 +7,7 @@ import { OfficialComposerTheme } from "@/components/assistant-ui/official-compos
 import { getChatModel } from "@/constants/model"
 import { THREAD_CHAT_MODEL_OPTIONS } from "@/constants/models"
 import { COMPOSER_MODEL_COPY } from "@/constants/composer-model"
+import { DisabledComposerOption } from "./disabled-composer-option"
 
 type ComposerModelSelectorProps = {
   modelId?: string
@@ -24,10 +25,10 @@ export function ComposerModelSelector({ modelId, disabled, disabledReason, onVal
     : locked ? COMPOSER_MODEL_COPY.unavailable : COMPOSER_MODEL_COPY.choose
 
   return <Menu.Root open={open && !locked} onOpenChange={setOpen} modal={false}>
-    <span title={title}>
+    <DisabledComposerOption disabled={locked} reason={title}>
       <Menu.Trigger disabled={locked} aria-label={COMPOSER_MODEL_COPY.choose}
-        render={<ComposerModelTrigger model={getChatModel(modelId)?.name ?? modelId ?? COMPOSER_MODEL_COPY.current} open={open && !locked} />} />
-    </span>
+        render={<ComposerModelTrigger className="disabled:opacity-50" model={getChatModel(modelId)?.name ?? modelId ?? COMPOSER_MODEL_COPY.current} open={open && !locked} />} />
+    </DisabledComposerOption>
     <Menu.Portal>
       <OfficialComposerTheme>
         <Menu.Positioner side="top" align="start" sideOffset={8} className="z-50">

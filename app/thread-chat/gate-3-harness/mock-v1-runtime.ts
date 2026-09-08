@@ -10,6 +10,7 @@ import type {
   ThreadDTO,
 } from "@/lib/thread-chat/contracts/dto"
 import { PROJECT_TITLE_FALLBACK } from "@/constants/project-workspace"
+import { DEFAULT_THREAD_CHAT_MODEL_ID } from "@/constants/models"
 import { textFromMessageParts } from "@/lib/thread-chat/contracts/ui-message"
 import type { ThreadChatClient } from "../net/client"
 
@@ -26,7 +27,7 @@ const CHILD_ASSISTANT_ID = "00000000-0000-4000-8000-000000000202"
 const INITIAL_ARTIFACT_ID = "00000000-0000-4000-8000-000000000401"
 const BACKGROUND_USER_ID = "00000000-0000-4000-8000-000000000501"
 const BACKGROUND_ASSISTANT_ID = "00000000-0000-4000-8000-000000000502"
-const MODEL_ID = "doubao-seed-2.1-turbo"
+const MODEL_ID = DEFAULT_THREAD_CHAT_MODEL_ID
 
 function clone<T>(value: T): T {
   return structuredClone(value)
