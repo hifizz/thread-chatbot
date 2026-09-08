@@ -5,8 +5,8 @@ import { autoUpdate, flip, offset, shift, size, useFloating } from "@floating-ui
 import type { MenuOption, MenuResolution } from "@lexical/react/LexicalTypeaheadMenuPlugin"
 import type { ArtifactDTO } from "@/lib/thread-chat/contracts/dto"
 import { FileTextIcon } from "lucide-react"
-import { ComposerMenu, ComposerMenuItem } from "@/components/assistant-ui/elements/composer"
-import { OfficialComposerTheme } from "@/components/assistant-ui/official-composer-demo/theme"
+import { ComposerMenu, ComposerMenuItem } from "@/components/assistant-ui/elements/composer/menu"
+import { ComposerTheme } from "@/components/assistant-ui/elements/composer/theme"
 import { ARTIFACT_REFERENCE_COPY } from "@/constants/artifact-reference"
 
 /** 复用 Lexical 官方 NodeContextMenuPlugin 的 Floating UI 组合；只定位自己渲染的菜单。 */
@@ -29,7 +29,7 @@ export function ArtifactMenu<T extends MenuOption & { artifact: ArtifactDTO }>({
     setPositionReference(composer ?? { getBoundingClientRect: resolution.getRect, contextElement: root ?? undefined })
   }, [setPositionReference, resolution, root])
   useEffect(() => { if (selectedIndex !== null) options[selectedIndex]?.ref?.current?.scrollIntoView({ block: "nearest" }) }, [options, selectedIndex])
-  return createPortal(<OfficialComposerTheme><ComposerMenu open ref={setFloating}
+  return createPortal(<ComposerTheme><ComposerMenu open ref={setFloating}
     style={{ ...floatingStyles, bottom: "auto", marginBottom: 0, zIndex: "var(--tc-z-selection, 100)" }}
     className="overflow-y-auto" role="listbox" aria-label={ARTIFACT_REFERENCE_COPY.picker}>
     {!options.length && <div className="flex min-h-14 items-center justify-center px-2 text-center text-sm text-foreground/45" role="status" onMouseDown={(event) => event.preventDefault()}>{query ? ARTIFACT_REFERENCE_COPY.noMatches : ARTIFACT_REFERENCE_COPY.empty}</div>}
@@ -39,5 +39,5 @@ export function ArtifactMenu<T extends MenuOption & { artifact: ArtifactDTO }>({
       <FileTextIcon className="size-5 shrink-0 text-foreground/45" />
       <span className="flex min-w-0 flex-1 flex-col text-start"><span className="truncate">{option.artifact.title}</span><span className="truncate text-xs text-foreground/45">Markdown · {option.artifact.sourceThreadTitle ?? "未命名 Thread"}</span></span>
     </ComposerMenuItem>)}
-  </ComposerMenu></OfficialComposerTheme>, document.body)
+  </ComposerMenu></ComposerTheme>, document.body)
 }

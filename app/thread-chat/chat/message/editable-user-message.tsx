@@ -1,6 +1,6 @@
 "use client"
 
-import { composerDraftToMessageContent, messagePartsToComposerDraft } from "@/lib/thread-chat/contracts/message-content"
+import { composerDraftToMessageContent, messagePartsToComposerDraft } from "@/lib/thread-chat/composer-draft-adapter"
 import { MessageEditor } from "../composer/message-editor"
 import { useArtifactResources } from "../composer/artifact-resources"
 

@@ -1,15 +1,17 @@
 "use client"
+import { GenerationSettingsProvider } from "@/app/thread-chat/chat/composer/generation-settings-context"
+import { DEFAULT_THREAD_CHAT_MODEL_ID } from "@/constants/models"
 import { useMemo, useRef, useState } from "react"
 import type { ArtifactDTO } from "@/lib/thread-chat/contracts/dto"
 import type { ThreadComposerDraft } from "@/lib/thread-chat/contracts/composer"
-import { composerDraftToMessageContent } from "@/lib/thread-chat/contracts/message-content"
+import { composerDraftToMessageContent } from "@/lib/thread-chat/composer-draft-adapter"
 import { artifactReferenceData } from "@/lib/thread-chat/contracts/artifact-reference"
 import type { ConversationViewMessage } from "@/app/thread-chat/core/types"
 import { EditableUserMessage } from "@/app/thread-chat/chat/message/editable-user-message"
 import { MessageEditor } from "@/app/thread-chat/chat/composer/message-editor"
 import { ConversationComposer } from "@/app/thread-chat/chat/composer/conversation-composer"
 import { ComposerDraftProvider } from "@/app/thread-chat/chat/composer/composer-drafts"
-import { ArtifactResourcesProvider } from "@/app/thread-chat/chat/composer/artifact-resources"
+import { ArtifactResourcesProvider, ArtifactNavigationProvider } from "@/app/thread-chat/chat/composer/artifact-resources"
 import { createConversationStore } from "@/app/thread-chat/core/store"
 import "@/app/thread-chat/thread-chat.css"
 export function ContentHarness() {
@@ -23,8 +25,8 @@ export function ContentHarness() {
   })), [])
   if (full) return <DraftHarness artifacts={artifacts} />
   return <main className="tc" style={{ padding: 24 }}>
-    <button onClick={() => setFull(true)}>完整输入框</button>
-    <button onClick={() => setBottom(!bottom)}>切换底部输入框</button>
+    <button data-testid="full-composer" onClick={() => setFull(true)}>完整输入框</button>
+    <button data-testid="bottom-composer" onClick={() => setBottom(!bottom)}>切换底部输入框</button>
     <pre data-testid="submitted">{submitted}</pre>
     <section style={bottom ? { position: "fixed", bottom: 16, left: 24, width: 320 } : { marginTop: 24, width: 320 }}>
       <MessageEditor draft={draft} artifacts={artifacts} onChange={setDraft} onSubmit={() => { try { setSubmitted(JSON.stringify(composerDraftToMessageContent(draft))) } catch (error) { setSubmitted(String(error)) } }} />
@@ -52,13 +54,13 @@ function DraftHarness({ artifacts }: { artifacts: Record<string, ArtifactDTO> })
   }
   const pending = useRef<{ resolve: () => void; reject: (error: Error) => void } | null>(null)
   return <main className="tc" style={{ padding: 24 }}>
-    <button onClick={() => setEditMode(true)}>混排消息编辑</button>
-    <button onClick={() => setThreadId(threadId === "thread-a" ? "thread-b" : "thread-a")}>切换 Thread</button>
-    <button onClick={() => setCanvas(!canvas)}>切换视图</button>
-    <button onClick={() => pending.current?.resolve()}>完成发送</button>
-    <button onClick={() => pending.current?.reject(new Error("测试发送失败"))}>发送失败</button>
+    <button data-testid="edit-message" onClick={() => setEditMode(true)}>混排消息编辑</button>
+    <button data-testid="switch-thread" onClick={() => setThreadId(threadId === "thread-a" ? "thread-b" : "thread-a")}>切换 Thread</button>
+    <button data-testid="switch-view" onClick={() => setCanvas(!canvas)}>切换视图</button>
+    <button data-testid="finish-send" onClick={() => pending.current?.resolve()}>完成发送</button>
+    <button data-testid="fail-send" onClick={() => pending.current?.reject(new Error("测试发送失败"))}>发送失败</button>
     <pre data-testid="submitted">{submitted}</pre>
-    <ArtifactResourcesProvider store={store}><ComposerDraftProvider>
+    <ArtifactResourcesProvider store={store}><ComposerDraftProvider><GenerationSettingsProvider><ArtifactNavigationProvider onOpen={(id) => setSubmitted(`preview:${id}`)}>
       <section key={canvas ? "canvas" : "column"} style={{ width: 360 }}>
         {editMode ? <EditableUserMessage threadId={threadId} message={message} editable commands={{
           retryUserTurn: async () => ({ ok: false, code: "invalid_request", message: "测试页不调用模型" }),
@@ -66,11 +68,11 @@ function DraftHarness({ artifacts }: { artifacts: Record<string, ArtifactDTO> })
             setSubmitted(JSON.stringify(content))
             return { ok: true, generationId: "test-generation", userMessageId: "test-user", assistantMessageId: "test-assistant" }
           },
-        }} /> : <ConversationComposer threadId={threadId} variant={canvas ? "canvas" : "column"} busy={false} isMain modelSelectorDisabled onSend={(content) => {
+        }} /> : <ConversationComposer threadId={threadId} variant={canvas ? "canvas" : "column"} modelId={DEFAULT_THREAD_CHAT_MODEL_ID} busy={false} isMain modelSelectorDisabled onSend={(content) => {
           setSubmitted(JSON.stringify(content))
           return new Promise<void>((resolve, reject) => { pending.current = { resolve, reject } })
         }} />}
       </section>
-    </ComposerDraftProvider></ArtifactResourcesProvider>
+    </ArtifactNavigationProvider></GenerationSettingsProvider></ComposerDraftProvider></ArtifactResourcesProvider>
   </main>
 }

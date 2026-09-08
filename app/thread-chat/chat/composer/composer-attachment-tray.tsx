@@ -2,7 +2,7 @@
 
 import { RotateCcwIcon, XIcon } from "lucide-react"
 import { COMPOSER_ATTACHMENT_COPY } from "@/constants/attachment"
-import { ComposerAttachmentChip, ComposerAttachments } from "@/components/assistant-ui/elements/composer"
+import { ComposerAttachmentChip, ComposerAttachments } from "@/components/assistant-ui/elements/composer/attachments"
 import { ghostButton } from "@/components/assistant-ui/elements/surfaces"
 import { formatComposerAttachmentSize, type ComposerAttachmentDraft } from "@/lib/thread-chat/composer-attachments"
 

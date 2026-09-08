@@ -14,10 +14,10 @@ const EMPTY_ATTACHMENTS: ComposerAttachmentDraft[] = []
 
 export function useComposerAttachments(scope: string, modelId?: string) {
   const store = useComposerDraftStore()
-  const items = useStore(store, (state) => state.attachments?.[scope] ?? EMPTY_ATTACHMENTS)
-  const current = () => store.getState().attachments?.[scope] ?? EMPTY_ATTACHMENTS
+  const items = useStore(store, (state) => state.attachments[scope] ?? EMPTY_ATTACHMENTS)
+  const current = () => store.getState().attachments[scope] ?? EMPTY_ATTACHMENTS
   const change = (apply: (items: ComposerAttachmentDraft[]) => ComposerAttachmentDraft[]) => {
-    store.setState((state) => ({ attachments: { ...state.attachments, [scope]: apply(state.attachments?.[scope] ?? EMPTY_ATTACHMENTS) } }))
+    store.setState((state) => ({ attachments: { ...state.attachments, [scope]: apply(state.attachments[scope] ?? EMPTY_ATTACHMENTS) } }))
   }
   const replace = (item: ComposerAttachmentDraft) => change((all) => all.map((previous) => previous.id === item.id ? item : previous))
 

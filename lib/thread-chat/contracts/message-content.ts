@@ -9,7 +9,6 @@ import {
   persistedThreadQuotePartSchema,
   type ThreadQuoteDataV1,
 } from "@/lib/thread-chat/contracts/quote"
-import type { ThreadComposerDraft } from "@/lib/thread-chat/contracts/composer"
 
 export type FileReference = z.infer<typeof fileReferenceSchema>
 
@@ -66,19 +65,6 @@ export type MessageContentPartInput = z.infer<
 >
 export type MessageContentInput = z.infer<typeof messageContentInputSchema>
 
-/** Composer 草稿到网络命令的唯一转换，保持最终 parts 原序。 */
-export function composerDraftToMessageContent(
-  draft: ThreadComposerDraft
-): MessageContentInput {
-  return messageContentInputSchema.parse({
-    parts: normalizeMessageContentParts(draft.parts.map(({ localId, ...part }) => {
-      void localId
-      if (part.type === "upload") throw new Error("附件尚未上传完成，请等待或移除附件")
-      return part
-    })),
-  })
-}
-
 /** 网络命令到持久化 UI Message Parts 的唯一转换，禁止按类型重排。 */
 export function messageContentToUiParts(
   content: MessageContentInput,
@@ -121,25 +107,17 @@ export function normalizeMessageContentParts(parts: readonly MessageContentPartI
   return result
 }
 
-/** 已保存用户内容恢复为完整草稿，位置由原数组决定。 */
-export function messagePartsToComposerDraft(parts: ThreadChatUIMessage["parts"], createId: () => string = () => crypto.randomUUID()): ThreadComposerDraft {
-  return { parts: parts.map((part) => {
-    const localId = createId()
+/** 持久化用户消息直接还原为命令内容，不经过编辑器状态。 */
+export function messagePartsToContent(parts: ThreadChatUIMessage["parts"]): MessageContentInput {
+  return messageContentInputSchema.parse({ parts: normalizeMessageContentParts(parts.map((part): MessageContentPartInput => {
     switch (part.type) {
-      case "text": return { localId, type: "text" as const, text: part.text }
-      case "file": return { localId, type: "file" as const, file: fileReferenceSchema.parse({ url: part.url, mediaType: part.mediaType, ...(part.filename ? { filename: part.filename } : {}) }) }
-      case "data-artifact-reference": return { localId, type: "artifact-reference" as const, artifactId: artifactReferenceDataSchema.parse(part.data).artifactId }
-      case "data-quote": {
-        const quote = persistedThreadQuotePartSchema.parse(part).data
-        return { localId, type: "quote" as const, quote }
-      }
+      case "text": return { type: "text", text: part.text }
+      case "file": return { type: "file", file: { url: part.url, mediaType: part.mediaType, ...(part.filename ? { filename: part.filename } : {}) } }
+      case "data-artifact-reference": return { type: "artifact-reference", artifactId: artifactReferenceDataSchema.parse(part.data).artifactId }
+      case "data-quote": return { type: "quote", quote: persistedThreadQuotePartSchema.parse(part).data }
       default: throw new Error(`用户消息包含不支持的内容类型：${part.type}`)
     }
-  }) }
-}
-
-export function messagePartsToContent(parts: ThreadChatUIMessage["parts"]): MessageContentInput {
-  return composerDraftToMessageContent(messagePartsToComposerDraft(parts))
+  })) })
 }
 
 /** 文字入口（如划选提问弹窗）也先产生完整内容，再调用命令。 */

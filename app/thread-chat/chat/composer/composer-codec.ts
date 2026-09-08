@@ -8,7 +8,6 @@ export function capsuleLabel(part: Exclude<ComposerMessagePartDraft, {type:"text
     case "artifact-reference": return `@${artifacts[part.artifactId]?.title ?? "Artifact"}`
     case "quote": return `引用：${part.quote.text.slice(0, 40)}`
     case "file": return `附件：${part.file.filename ?? "文件"}`
-    case "upload": return `${part.error ? "上传失败，可删除后重试" : "上传中"}：${part.filename}`
   }
 }
 export function $importComposerDraft(draft: ThreadComposerDraft, artifacts: Record<string, ArtifactDTO>) {

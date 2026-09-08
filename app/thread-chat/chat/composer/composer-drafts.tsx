@@ -44,13 +44,5 @@ export function useComposerDraft(scope: string, initial: () => ThreadComposerDra
     const current = store.getState().entries[scope]?.draft ?? fallback.draft
     if (current === submitted) update({ parts: [] }, true)
   }
-  function resolveUpload(localId: string, file: import("@/lib/thread-chat/contracts/message-content").FileReference) {
-    const current = store.getState().entries[scope]?.draft ?? fallback.draft
-    update({ parts: current.parts.map((part) => part.localId === localId && part.type === "upload" ? { localId, type: "file", file } : part) })
-  }
-  function failUpload(localId: string, error: string) {
-    const current = store.getState().entries[scope]?.draft ?? fallback.draft
-    update({ parts: current.parts.map((part) => part.localId === localId && part.type === "upload" ? { ...part, error } : part) })
-  }
-  return { entry, update, clearSubmitted, resolveUpload, failUpload }
+  return { entry, update, clearSubmitted }
 }

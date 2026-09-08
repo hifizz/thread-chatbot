@@ -1,3 +1,17 @@
+/* Thread 布局由正式输入框持有，公共主题不识别列或画布。 */
+.frame {
+  position: relative;
+  flex: none;
+  display: flex;
+  justify-content: center;
+  padding: 16px 18px;
+  background: transparent;
+}
+
+.canvasFrame {
+  padding-inline: 12px;
+}
+
 /* 官方 Composer 排版只覆盖当前输入区域，历史消息编辑器沿用原样式。 */
 .bar {
   container: thread-composer / inline-size;

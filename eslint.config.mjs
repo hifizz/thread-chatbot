@@ -12,7 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
-    "components/assistant-ui/**",
+    "components/assistant-ui/**/*",
+    "!components/assistant-ui/**/*/",
+    "!components/assistant-ui/elements/composer/**",
   ]),
 ])
 

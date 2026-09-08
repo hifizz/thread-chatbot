@@ -2,8 +2,9 @@
 
 import { useState } from "react"
 import { Menu } from "@base-ui/react/menu"
-import { ComposerMenu, ComposerModelItem, ComposerModelTrigger } from "@/components/assistant-ui/elements/composer"
-import { OfficialComposerTheme } from "@/components/assistant-ui/official-composer-demo/theme"
+import { ComposerMenu } from "@/components/assistant-ui/elements/composer/menu"
+import { ComposerModelItem, ComposerModelTrigger } from "@/components/assistant-ui/elements/composer/models"
+import { ComposerTheme } from "@/components/assistant-ui/elements/composer/theme"
 import { getChatModel } from "@/constants/model"
 import { THREAD_CHAT_MODEL_OPTIONS } from "@/constants/models"
 import { COMPOSER_MODEL_COPY } from "@/constants/composer-model"
@@ -30,7 +31,7 @@ export function ComposerModelSelector({ modelId, disabled, disabledReason, onVal
         render={<ComposerModelTrigger className="disabled:opacity-50" model={getChatModel(modelId)?.name ?? modelId ?? COMPOSER_MODEL_COPY.current} open={open && !locked} />} />
     </DisabledComposerOption>
     <Menu.Portal>
-      <OfficialComposerTheme>
+      <ComposerTheme>
         <Menu.Positioner side="top" align="start" sideOffset={8} className="z-50">
           <Menu.Popup aria-label={COMPOSER_MODEL_COPY.choose}
             render={<ComposerMenu open={open && !locked} className="relative bottom-auto mb-0 max-h-[min(24rem,var(--available-height))] max-w-[calc(100vw-2rem)] overflow-y-auto outline-none" />}>
@@ -41,7 +42,7 @@ export function ComposerModelSelector({ modelId, disabled, disabledReason, onVal
             </Menu.RadioGroup>
           </Menu.Popup>
         </Menu.Positioner>
-      </OfficialComposerTheme>
+      </ComposerTheme>
     </Menu.Portal>
   </Menu.Root>
 }

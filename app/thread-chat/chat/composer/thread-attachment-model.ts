@@ -1,10 +1,8 @@
 import {
   IMAGE_ATTACHMENT_MIME_TYPES,
-  IMAGE_ATTACHMENT_LIMITS,
   INLINE_PASTED_TEXT_CHAR_LIMIT,
   TEXT_ATTACHMENT_FILE_EXTENSIONS,
 } from "@/constants/attachment"
-import type { ThreadComposerDraft } from "@/lib/thread-chat/contracts/composer"
 import {
   isTextAttachmentFile,
 } from "@/lib/attachments/upload"
@@ -40,11 +38,4 @@ export function createPastedTextFile(
   return new File([text], `pasted-text-${now}.txt`, {
     type: "text/plain",
   })
-}
-
-export function canAddThreadImages(parts: ThreadComposerDraft["parts"], incomingCount: number): boolean {
-  const currentCount = parts.filter((part) =>
-    part.type === "file" ? part.file.mediaType.startsWith("image/") : part.type === "upload" && part.mediaType.startsWith("image/")
-  ).length
-  return currentCount + incomingCount <= IMAGE_ATTACHMENT_LIMITS.maxFilesPerMessage
 }

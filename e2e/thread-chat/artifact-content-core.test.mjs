@@ -1,5 +1,6 @@
 import assert from "node:assert/strict"
-import { messageContentInputSchema, messageContentToUiParts, composerDraftToMessageContent, messagePartsToComposerDraft, normalizeMessageContentParts } from "../../lib/thread-chat/contracts/message-content.ts"
+import { messageContentInputSchema, messageContentToUiParts, normalizeMessageContentParts } from "../../lib/thread-chat/contracts/message-content.ts"
+import { composerDraftToMessageContent, messagePartsToComposerDraft } from "../../lib/thread-chat/composer-draft-adapter.ts"
 import { artifactReferenceData, artifactReferenceDataSchema } from "../../lib/thread-chat/contracts/artifact-reference.ts"
 import { expandArtifactReferencesInContext } from "../../lib/thread-chat/application/artifact-reference-context.ts"
 const id = () => crypto.randomUUID()

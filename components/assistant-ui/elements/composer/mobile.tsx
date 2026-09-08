@@ -3,7 +3,7 @@
 import type { ComponentProps } from "react";
 import { ArrowUpIcon, MicIcon, PlusIcon, SquareIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { field, ghostButton, inkButton, mono } from "./surfaces";
+import { field, ghostButton, inkButton, mono } from "../surfaces";
 
 export function MobileComposer({
   value,

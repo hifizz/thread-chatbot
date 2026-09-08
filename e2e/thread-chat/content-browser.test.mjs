@@ -1,128 +1,199 @@
 import assert from "node:assert/strict"
-import { pathToFileURL } from "node:url"
-import { chromium } from "playwright-core"
+import { installComposerUploadStub } from "./composer-upload-stub.mjs"
 
-/** 真实 React/Lexical 输入框检查。仅附件 HTTP 使用替身；不是模型 E2E。 */
-export async function runContentChecks(page) {
- const editor=page.locator('[contenteditable="true"]');await editor.waitFor({timeout:15000})
- const initialHeight=await page.evaluate(()=>document.documentElement.scrollHeight)
- await editor.fill('比较 @');await page.locator('.composer-artifact-menu').waitFor()
- assert.equal(await page.evaluate(()=>document.documentElement.scrollHeight),initialHeight)
- const options=page.getByRole('option')
- assert.equal(await options.first().getAttribute('aria-selected'),'true')
- assert.deepEqual(await options.first().evaluate(element=>{const style=getComputedStyle(element);return [style.outlineStyle,style.outlineWidth]}),['solid','2px'])
- assert.equal(await editor.evaluate(element=>document.activeElement===element),true)
- await page.keyboard.press('ArrowDown');assert.equal(await options.nth(1).getAttribute('aria-selected'),'true')
- await page.keyboard.press('ArrowUp');assert.equal(await options.first().getAttribute('aria-selected'),'true')
- console.log('TOP_MENU' ,await page.locator('.composer-artifact-menu').boundingBox())
- await page.keyboard.press('ArrowDown');await page.keyboard.press('Enter');console.log('SELECTED',await editor.textContent())
- const capsule=editor.locator('.composer-capsule').first()
- const caretSide=()=>capsule.evaluate(element=>{
-   const selection=window.getSelection()
-   if(!selection?.isCollapsed||!selection.anchorNode||element.contains(selection.anchorNode)) return 'inside-or-selected'
-   const caret=selection.getRangeAt(0), boundary=document.createRange()
-   boundary.setStartAfter(element);boundary.collapse(true)
-   if(caret.compareBoundaryPoints(Range.START_TO_START,boundary)>=0) return 'after'
-   boundary.setStartBefore(element);boundary.collapse(true)
-   return caret.compareBoundaryPoints(Range.START_TO_START,boundary)<=0?'before':'inside'
- })
- assert.equal(await capsule.getAttribute('contenteditable'),'false')
- assert.equal(await caretSide(),'after')
- await page.keyboard.press('ArrowLeft');assert.equal(await caretSide(),'before')
- await page.keyboard.press('ArrowRight');assert.equal(await caretSide(),'after')
- await capsule.click();assert.equal(await caretSide(),'after')
- const frozenLabel=await capsule.textContent()
- await page.keyboard.type(' X')
- assert.equal(await capsule.textContent(),frozenLabel)
- assert.equal(await editor.locator('.composer-capsule').count(),1)
- assert.equal(await caretSide(),'after')
- console.log('PASS 首项 outline/上下键选择；Enter、左右键与点击光标均在胶囊外，空格和文字不替换引用')
- await page.keyboard.type(' 继续');await page.keyboard.press('Enter');console.log('SUBMITTED',await page.getByTestId('submitted').textContent())
- await page.context().grantPermissions(['clipboard-read','clipboard-write'])
- const copiedText=await editor.textContent()
- await editor.press('Control+a');await editor.press('Control+c')
- await page.waitForFunction(async text=>(await navigator.clipboard.readText()).includes(text),copiedText)
- await editor.press('ArrowRight')
- await page.waitForFunction(()=>window.getSelection()?.isCollapsed)
- await page.evaluate(()=>new Promise(requestAnimationFrame))
- await editor.press('Control+v')
- await page.waitForFunction(()=>document.querySelectorAll('[contenteditable] .composer-capsule').length===2, null, {timeout:5000}).catch(async error=>{console.log('PASTE_DIAGNOSTIC',await editor.textContent(),await page.evaluate(()=>window.getSelection()?.toString()));throw error})
- assert.equal(await editor.locator('.composer-capsule').count(),2)
- await page.keyboard.press('Enter')
- const pasted=JSON.parse(await page.getByTestId('submitted').textContent()).parts.filter(part=>part.type==='artifact-reference')
- assert.equal(pasted.length,2);assert.equal(pasted[0].artifactId,pasted[1].artifactId)
- console.log('PASS 官方剪贴板：应用内复制粘贴保留重复引用身份')
- await page.getByText('切换底部输入框').click();await editor.fill('比较 @');await page.locator('.composer-artifact-menu').waitFor()
- const rect=await page.locator('.composer-artifact-menu').boundingBox()
- console.log('BOTTOM_MENU',JSON.stringify({rect,viewport:700,visible:rect.y>=0&&rect.y+rect.height<=700,scrollHeight:await page.evaluate(()=>document.documentElement.scrollHeight)}))
- await page.setViewportSize({width:360,height:700})
- await page.waitForFunction(()=>{const r=document.querySelector('.composer-artifact-menu')?.getBoundingClientRect();return r&&r.x>=0&&r.right<=innerWidth&&r.y>=0&&r.bottom<=innerHeight})
- await page.locator('section').evaluate(element=>{element.style.transformOrigin='bottom left';element.style.transform='translate(20px,-60px) scale(0.75)'})
- await page.waitForFunction(()=>{const menu=document.querySelector('.composer-artifact-menu')?.getBoundingClientRect();const input=document.querySelector('[contenteditable]')?.getBoundingClientRect();return menu&&input&&menu.bottom<=input.top&&menu.x>=0&&menu.right<=innerWidth})
- await page.keyboard.press('Escape')
- assert.equal(await page.locator('.composer-artifact-menu').count(),0)
- await page.setViewportSize({width:900,height:700})
- console.log('PASS 窄视口与画布 transform：菜单可见、跟随位置、Escape 关闭')
- await page.getByText('完整输入框',{exact:true}).click()
- await editor.fill('A 草稿');await page.getByText('切换 Thread',{exact:true}).click()
- assert.equal(await editor.textContent(),'')
- await editor.fill('B 草稿');await page.getByText('切换 Thread',{exact:true}).click()
- assert.equal(await editor.textContent(),'A 草稿')
- await page.getByText('切换视图',{exact:true}).click();assert.equal(await editor.textContent(),'A 草稿')
- await page.getByRole('button',{name:'发送',exact:true}).click()
- await editor.press('Control+End');await page.keyboard.type(' 后续输入')
- await page.getByText('完成发送',{exact:true}).click()
- assert.equal(await editor.textContent(),'A 草稿 后续输入')
- await page.getByRole('button',{name:'发送',exact:true}).click();await page.getByText('发送失败',{exact:true}).click()
- assert.equal(await editor.textContent(),'A 草稿 后续输入')
- await page.getByRole('button',{name:'发送',exact:true}).click();await page.getByText('切换 Thread',{exact:true}).click()
- await page.getByText('完成发送',{exact:true}).click();assert.equal(await editor.textContent(),'B 草稿')
- await page.getByText('切换 Thread',{exact:true}).click();assert.equal(await editor.textContent(),'')
- await editor.fill('问题 @');await page.locator('.composer-artifact-menu').waitFor();await page.keyboard.press('Enter')
- assert.equal(await editor.locator('.composer-capsule').count(),1)
- await page.keyboard.press('Backspace');assert.equal(await editor.locator('.composer-capsule').count(),0)
- await page.keyboard.press('Control+z');assert.equal(await editor.locator('.composer-capsule').count(),1)
- await page.route('**/api/attachments',route=>route.fulfill({json:{id:'10000000-0000-4000-8000-000000000050',uploadUrl:new URL('/test-upload',page.url()).href}}))
- await page.route('**/test-upload',route=>route.fulfill({status:200,body:''}))
- let ingest
- await page.route('**/api/attachments/*/ingest',route=>{ingest=route})
- await page.locator('input[type=file]').setInputFiles({name:'notes.txt',mimeType:'text/plain',buffer:Buffer.from('附件正文')})
- await page.waitForFunction(()=>document.querySelector('[contenteditable]')?.textContent?.includes('上传中'))
- await page.getByText('切换 Thread',{exact:true}).click()
- for(let attempts=0;!ingest&&attempts<500;attempts++) await new Promise(r=>setTimeout(r,20))
- assert.ok(ingest,"附件处理请求应已发出")
- await ingest.fulfill({json:{}})
- await page.getByText('切换 Thread',{exact:true}).click()
- await page.waitForFunction(()=>!document.querySelector('[contenteditable]')?.textContent?.includes('上传中'))
- assert.equal(await editor.locator('.composer-capsule').count(),2)
- await editor.press('Control+End');await page.keyboard.type(' 文件之后')
- await page.getByRole('button',{name:'发送',exact:true}).click()
- assert.deepEqual(JSON.parse(await page.getByTestId('submitted').textContent()).parts.map(part=>part.type),['text','artifact-reference','file','text'])
- await page.getByText('完成发送',{exact:true}).click()
- console.log('PASS 原子删除/撤销、跨 Thread 上传完成与正文/引用/附件提交保序（上传网络替身）')
- await page.getByText('混排消息编辑',{exact:true}).click()
- await page.getByRole('button',{name:'重新编辑',exact:true}).click()
- assert.equal(await editor.locator('.composer-capsule').count(),4)
- const original=await editor.textContent()
- await editor.press('Control+End');await page.keyboard.type(' 修改末尾')
- await page.getByRole('button',{name:'取消',exact:true}).click()
- await page.getByRole('button',{name:'重新编辑',exact:true}).click()
- assert.equal(await editor.textContent(),original)
- await editor.press('Control+End');await page.keyboard.type(' 修改末尾')
- await page.getByRole('button',{name:'发送',exact:true}).click()
- const edited=JSON.parse(await page.getByTestId('submitted').textContent()).parts
- assert.deepEqual(edited.map(part=>part.type),['text','file','artifact-reference','quote','text','artifact-reference','text'])
- assert.equal(edited[2].artifactId,edited[5].artifactId)
- assert.deepEqual(edited[3].quote,{text:'旧 Quote 原文'})
- console.log('PASS 实际消息编辑组件：混排旧 Quote/File/重复引用恢复、取消恢复和编辑提交保序')
- console.log('PASS 实际输入框：Thread/列画布草稿恢复、发送失败保留、迟到成功不清除新输入或其他 Thread')
-}
+/**
+ * 通过 ego-browser nodejs 注入其 helper 后运行，禁止独立启动 Playwright。
+ * 入口与分段执行示例见 content-browser.md；分段避免长时间没有进度反馈。
+ */
+export async function runContentChecks({ js, click: clickElement, typeText: insertText, pressKey: pressSingleKey, wait, cdp, cliLog }, section) {
+  const click = async (target) => { await clickElement(target); await wait(0.15) }
+  const typeText = async (value) => { await insertText(value); await wait(0.15) }
+  const pressKey = async (key) => {
+    if (key.startsWith('Meta+')) {
+      const name = key.slice(5)
+      const command = { A: 'selectAll', Z: 'undo', End: 'moveToEndOfDocument' }[name]
+      await cdp('Input.dispatchKeyEvent', { type: 'keyDown', key: name, modifiers: 4, commands: [command] })
+      await cdp('Input.dispatchKeyEvent', { type: 'keyUp', key: name, modifiers: 4 })
+    } else await pressSingleKey(key)
+    await wait(0.15)
+  }
+  const editor = '[contenteditable="true"]'
+  const text = () => js('document.querySelector("[contenteditable]")?.textContent')
+  const check = async (expression, description) => {
+    for (let attempt = 0; attempt < 50; attempt++) {
+      if (await js(expression)) return
+      await wait(0.1)
+    }
+    assert.fail(description)
+  }
+  const fill = async (value) => {
+    await click(editor)
+    await pressKey('Meta+A')
+    await pressKey('Backspace')
+    await typeText(value)
+    await check(`document.querySelector('[contenteditable]').textContent === ${JSON.stringify(value)}`, '输入值应落在编辑器中')
+  }
+  const control = (id) => click(`[data-testid="${id}"]`)
+  const capsuleCount = (count) => check(`document.querySelectorAll('[contenteditable] .composer-capsule').length === ${count}`, `胶囊数量应为 ${count}`)
+  const send = () => click('[data-slot="composer-send"]')
+  const paste = (setup) => js(`(() => {
+    const data = new DataTransfer(); ${setup}
+    document.querySelector('[contenteditable]').dispatchEvent(new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: data }));
+    return true;
+  })()`)
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_EXECUTABLE_PATH || undefined })
-  try {
-    const page = await browser.newPage({ viewport: { width: 900, height: 700 } })
-    await page.goto(process.env.TEST_BASE_URL || "http://localhost:3000/thread-chat-gate-3-harness/content")
-    await runContentChecks(page)
-  } finally { await browser.close() }
+  if (section === 'references') {
+    await control('full-composer')
+    await fill('比较 @')
+    await check(`document.querySelector('[role="listbox"] [role="option"]')?.getAttribute('aria-selected') === 'true'`, '首项应高亮')
+    await pressKey('ArrowDown')
+    await check(`document.querySelectorAll('[role="option"]')[1]?.getAttribute('aria-selected') === 'true'`, '向下键应选择第二项')
+    await pressKey('Enter')
+    await capsuleCount(1)
+    await typeText(' 后续文字')
+    assert.match(await text(), /测试文档 2.*后续文字/)
+    await click('[contenteditable] .composer-capsule-action')
+    await check(`document.querySelector('[data-testid="submitted"]').textContent.startsWith('preview:')`, '胶囊点击应打开对应 Artifact')
+    await typeText('X')
+    await capsuleCount(1)
+    // 应用内剪贴板协议经过真实 Lexical copy/paste，不把引用退化为普通文字。
+    await click(editor)
+    await pressKey('Meta+A')
+    await js(`(() => {
+      const data = new DataTransfer();
+      document.querySelector('[contenteditable]').dispatchEvent(new ClipboardEvent('copy', { bubbles: true, cancelable: true, clipboardData: data }));
+      window.__composerClipboard = data;
+      return data.types;
+    })()`)
+    await pressKey('Meta+End')
+    await check('window.getSelection()?.isCollapsed === true', '粘贴前选区应折叠到正文末尾')
+    await js(`document.querySelector('[contenteditable]').dispatchEvent(new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: window.__composerClipboard }))`)
+    await capsuleCount(2)
+    await fill('问题 @不存在的标题')
+    await check(`document.querySelector('[role="listbox"] [role="status"]') !== null`, '空候选应显示提示')
+    await pressKey('Enter')
+    assert.equal(await text(), '问题 @不存在的标题')
+    await pressKey('Escape')
+    await check(`!document.querySelector('[role="listbox"]')`, 'Escape 应关闭菜单')
+    await fill('问题 @')
+    await pressKey('Enter')
+    await capsuleCount(1)
+    await pressKey('Backspace') // 先删除插入胶囊时保留的文字落点空格。
+    await capsuleCount(1)
+    await pressKey('Backspace')
+    await capsuleCount(0)
+    await pressKey('Meta+Z')
+    await capsuleCount(1)
+    await cdp('Emulation.setDeviceMetricsOverride', { width: 360, height: 700, deviceScaleFactor: 1, mobile: false })
+    await fill('问题 @')
+    await check(`(() => { const r = document.querySelector('[role="listbox"]')?.getBoundingClientRect(); return r && r.x >= 0 && r.right <= innerWidth && r.y >= 0 && r.bottom <= innerHeight })()`, '窄视口菜单应完整可见')
+    await js(`document.querySelector('section').style.transform = 'translate(12px, 40px) scale(0.75)'`)
+    await check(`(() => { const r = document.querySelector('[role="listbox"]')?.getBoundingClientRect(); return r && r.x >= 0 && r.right <= innerWidth && r.y >= 0 && r.bottom <= innerHeight })()`, '画布缩放下菜单应完整可见')
+    await pressKey('Escape')
+    await js(`document.querySelector('section').style.transform = ''`)
+    await cdp('Emulation.clearDeviceMetricsOverride')
+    cliLog('PASS 引用候选、空结果、点击预览、原子删除/撤销、应用内剪贴板与窄屏定位')
+  }
+
+  if (section === 'drafts') {
+    await fill('A 草稿')
+    await control('switch-thread')
+    assert.equal(await text(), '')
+    await fill('B 草稿')
+    await control('switch-thread')
+    assert.equal(await text(), 'A 草稿')
+    await control('switch-view')
+    assert.equal(await text(), 'A 草稿')
+    await send()
+    await check(`document.querySelector('[contenteditable]')?.getAttribute('contenteditable') === 'false'`, '提交期间应禁用编辑')
+    await control('fail-send')
+    await check(`document.querySelector('[contenteditable="true"]') !== null`, '失败应恢复编辑')
+    assert.equal(await text(), 'A 草稿')
+    await send()
+    await control('switch-thread')
+    await control('finish-send')
+    assert.equal(await text(), 'B 草稿')
+    await control('switch-thread')
+    await check(`document.querySelector('[contenteditable]').textContent === ''`, '成功应清空原 Thread 草稿')
+    // 旧视图提交后卸载，新视图继续编辑：迟到成功不得清除新草稿。
+    await fill('原草稿')
+    await send()
+    await control('switch-view')
+    await fill('新草稿')
+    await control('finish-send')
+    assert.equal(await text(), '新草稿')
+    cliLog('PASS Thread/视图切换、提交禁用、失败保留与迟到成功保护')
+  }
+
+  if (section === 'attachments') {
+    await js(`(${installComposerUploadStub.toString()})()`)
+    await fill('阅读附件 ')
+    await paste(`data.setData('text/plain', '短文本')`)
+    await check(`document.querySelector('[contenteditable]').textContent.includes('短文本')`, '短文本应插入正文')
+    assert.equal(await js('window.__composerUploads.created.length'), 0)
+    await paste(`data.setData('text/plain', '长'.repeat(4001))`)
+    await check(`document.querySelector('[data-slot="composer-attachment"][data-state="done"]') !== null`, '长文本应通过真实上传队列形成附件')
+    assert.ok(!(await text()).includes('长'))
+    await js(`window.__composerUploads.hold = true`)
+    await paste(`data.items.add(new File(['正文'], 'same.txt', {type:'text/plain'}))`)
+    await check(`window.__composerUploads.pending.length === 1`, '粘贴文件应启动上传')
+    await check(`document.querySelector('[data-slot="composer-send"]').disabled`, '上传未完成应禁止发送')
+    await control('switch-thread')
+    await js(`window.__composerUploads.hold = false; window.__composerUploads.pending.splice(0).forEach(resolve => resolve())`)
+    await control('switch-thread')
+    await check(`document.querySelectorAll('[data-slot="composer-attachment"][data-state="done"]').length === 2`, '切换 Thread 后上传结果应保留')
+    await js(`(() => {
+      const data = new DataTransfer(); data.items.add(new File(['拖入'], 'same.txt', {type:'text/plain'}));
+      document.querySelector('[data-slot="composer-bar"]').dispatchEvent(new DragEvent('drop', {bubbles:true,cancelable:true,dataTransfer:data}));
+    })()`)
+    await check(`document.querySelectorAll('[data-slot="composer-attachment"][data-state="done"]').length === 3`, '同名拖入附件应独立上传')
+    await js(`window.__composerUploads.failNext = true`)
+    await paste(`data.items.add(new File(['重试'], 'retry.txt', {type:'text/plain'}))`)
+    await check(`document.querySelector('[data-state="error"]') !== null`, '上传失败应显示失败卡片')
+    await click('button[aria-label="重试上传 retry.txt"]')
+    await check(`document.querySelectorAll('[data-slot="composer-attachment"][data-state="done"]').length === 4`, '重试应恢复就绪')
+    await click('button[aria-label="移除 retry.txt"]')
+    await check(`window.__composerUploads.deleted.length === 1`, '移除就绪附件应清理服务器文件')
+    await paste(`const canvas = document.createElement('canvas'); canvas.width = 1; canvas.height = 1; const bytes = Uint8Array.from(atob(canvas.toDataURL('image/png').split(',')[1]), c => c.charCodeAt(0)); data.items.add(new File([bytes], 'pixel.png', {type:'image/png'}))`)
+    await check(`document.querySelectorAll('[data-slot="composer-attachment"][data-state="done"]').length === 4`, '图片粘贴应完成图片预处理与上传')
+    await click(editor)
+    await pressKey('Meta+End')
+    await typeText(' @')
+    await pressKey('Enter')
+    await capsuleCount(1)
+    await send()
+    const submitted = await js(`JSON.parse(document.querySelector('[data-testid="submitted"]').textContent)`)
+    assert.equal(submitted.parts.filter(part => part.type === 'file').length, 4)
+    assert.equal(submitted.parts.filter(part => part.type === 'artifact-reference').length, 1)
+    assert.equal(submitted.parts.filter(part => part.type === 'file' && part.file.filename === 'same.txt').length, 2)
+    await control('fail-send')
+    await check(`document.querySelector('[contenteditable="true"]') !== null`, '发送失败应恢复输入')
+    assert.equal(await js(`document.querySelectorAll('[data-slot="composer-attachment"]').length`), 4)
+    await send()
+    await control('finish-send')
+    await check(`document.querySelectorAll('[data-slot="composer-attachment"]').length === 0 && document.querySelector('[contenteditable]').textContent === ''`, '发送成功应清空文字及附件')
+    cliLog('PASS 长短文本/文件/图片粘贴、同名拖入、跨 Thread 上传、重试移除、真实发送内容及成功/失败清理')
+  }
+
+  if (section === 'editing') {
+    await control('edit-message')
+    await click('button[aria-label="重新编辑"]')
+    await capsuleCount(4)
+    const original = await text()
+    await click(editor)
+    await pressKey('Meta+End')
+    await typeText(' 修改末尾')
+    await click('.user-edit-actions button:not(.primary)')
+    await click('button[aria-label="重新编辑"]')
+    assert.equal(await text(), original)
+    await click(editor)
+    await pressKey('Meta+End')
+    await typeText(' 修改末尾')
+    await click('.user-edit-actions button.primary')
+    const content = await js(`JSON.parse(document.querySelector('[data-testid="submitted"]').textContent)`)
+    assert.deepEqual(content.parts.map(part => part.type), ['text', 'file', 'artifact-reference', 'quote', 'text', 'artifact-reference', 'text'])
+    assert.equal(content.parts[2].artifactId, content.parts[5].artifactId)
+    assert.deepEqual(content.parts[3].quote, { text: '旧 Quote 原文' })
+    cliLog('PASS 旧 Quote、文件及重复 Artifact 混排编辑、取消恢复和提交保序')
+  }
 }

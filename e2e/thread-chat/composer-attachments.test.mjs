@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { appendComposerAttachments } from "../../lib/thread-chat/composer-attachments.ts"
-import { composerDraftToMessageContent } from "../../lib/thread-chat/contracts/message-content.ts"
+import { composerDraftToMessageContent } from "../../lib/thread-chat/composer-draft-adapter.ts"
 
 const file = new File(["验收文件"], "same-name.txt", { type: "text/plain" })
 const ready = (id) => ({ id, file, status: "ready", uploaded: { serverId: id, reference: { url: `/api/attachments/${id}`, mediaType: file.type, filename: file.name } } })

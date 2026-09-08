@@ -19,7 +19,6 @@ import {
   imageResizeDimensions,
   resizedImageOutput,
 } from "../../lib/attachments/image.ts"
-import { canAddThreadImages } from "../../app/thread-chat/chat/composer/thread-attachment-model.ts"
 import {
   applyImageFileMaterializations,
   resolveAttachmentContext,
@@ -68,14 +67,6 @@ assert.throws(
     }),
   /文件超过大小上限（10MB）/
 )
-
-const composerImages = Array.from({ length: 4 }, (_, index) => ({
-  localId: String(index),
-  type: "file",
-  file: { mediaType: "image/png", url: "/api/attachments/test" },
-}))
-assert.equal(canAddThreadImages(composerImages, 1), true)
-assert.equal(canAddThreadImages(composerImages, 2), false)
 
 const files = [
   {

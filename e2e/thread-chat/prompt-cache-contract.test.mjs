@@ -4,10 +4,8 @@ import {
   quoteForModel,
   threadQuotePartV1Schema,
 } from "../../lib/thread-chat/contracts/quote.ts"
-import {
-  composerDraftToMessageContent,
-  messageContentToUiParts,
-} from "../../lib/thread-chat/contracts/message-content.ts"
+import { messageContentToUiParts } from "../../lib/thread-chat/contracts/message-content.ts"
+import { composerDraftToMessageContent } from "../../lib/thread-chat/composer-draft-adapter.ts"
 import {
   sendMessageCommandSchema,
   editLatestTurnCommandSchema,

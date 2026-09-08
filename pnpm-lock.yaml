@@ -182,9 +182,6 @@ importers:
       react-resizable-panels:
         specifier: ^4.12.0
         version: 4.12.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      react-shiki:
-        specifier: ^0.11.1
-        version: 0.11.1(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       recharts:
         specifier: 3.8.0
         version: 3.8.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react-is@16.13.1)(react@19.2.8)(redux@5.0.1)
@@ -6519,19 +6516,6 @@ packages:
     peerDependencies:
       react: ^18.0.0 || ^19.0.0
       react-dom: ^18.0.0 || ^19.0.0
-
-  react-shiki@0.11.1:
-    resolution: {integrity: sha512-LCxMH0pij36TApfGq6QN22xAv1ndUDI0aA7OoIFhZBPaeqPdlDE97Zp7A7dVUp4q8+Nst4Jv/p9lfOa3v+BA6A==}
-    peerDependencies:
-      '@types/react': 19.2.18
-      '@types/react-dom': 19.2.4
-      react: '>=16.14.0'
-      react-dom: '>=16.14.0'
-    peerDependenciesMeta:
-      '@types/react':
-        optional: true
-      '@types/react-dom':
-        optional: true
 
   react-style-singleton@2.2.3:
     resolution: {integrity: sha512-b6jSvxvVnyptAiLjbkWLE/lOnR4lfTtDAl+eUC7RZy+QQWc6wRzIV2CE6xBuMmDxc2qIihtDCZD5NPOFl7fRBQ==}
@@ -13944,21 +13928,6 @@ snapshots:
     dependencies:
       react: 19.2.8
       react-dom: 19.2.8(react@19.2.8)
-
-  react-shiki@0.11.1(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8):
-    dependencies:
-      clsx: 2.1.1
-      dequal: 2.0.3
-      hast-util-to-jsx-runtime: 2.3.6
-      react: 19.2.8
-      react-dom: 19.2.8(react@19.2.8)
-      shiki: 4.3.1
-      unist-util-visit: 5.1.0
-    optionalDependencies:
-      '@types/react': 19.2.18
-      '@types/react-dom': 19.2.4(@types/react@19.2.18)
-    transitivePeerDependencies:
-      - supports-color
 
   react-style-singleton@2.2.3(@types/react@19.2.18)(react@19.2.8):
     dependencies:

@@ -36,17 +36,11 @@ export class ComposerCapsuleNode extends DecoratorNode<ReactNode> {
   }
   getPart() { return this.getLatest().__part }
   getTextContent() { return this.getLatest().__label }
-  setPart(part: CapsulePart, label: string) {
-    const node = this.getWritable()
-    node.__part = part
-    node.__label = label
-    return node
-  }
   static importJSON(serialized: SerializedCapsule) {
     const { localId, ...input } = serialized.part
     void localId
-    // 未完成上传和 Quote 不通过剪贴板复制身份。
-    if (input.type === "upload" || input.type === "quote") return $createTextNode(serialized.label)
+    // Quote 不通过剪贴板复制身份。
+    if (input.type === "quote") return $createTextNode(serialized.label)
     const part = messageContentPartInputSchema.parse(input)
     if (part.type === "text") throw new Error("胶囊不能包含可编辑文字")
     return $createComposerCapsuleNode({ ...part, localId: crypto.randomUUID() }, serialized.label)
