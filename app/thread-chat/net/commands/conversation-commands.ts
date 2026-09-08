@@ -1,3 +1,4 @@
+import { resolveForkOrigin } from "@/lib/thread-chat/domain/fork-origin"
 import type { GenerationSettings } from "@/constants/generation-settings"
 import type {
   AddProjectFileCommand,
@@ -354,6 +355,7 @@ export function createConversationCommands(
     const parent = state.threadsById[input.parentThreadId]
     if (!project || !parent) throw new Error("来源会话尚未加载")
     const firstTurn = input.firstTurn === undefined ? undefined : messageContentInputSchema.parse(input.firstTurn)
+    const origin = resolveForkOrigin(input)
     const command: ForkThreadCommand = Object.freeze({
       commandId: createId(),
       threadId: createId(),
@@ -387,8 +389,8 @@ export function createConversationCommands(
         parentId: parent.id,
         forkMessageId: command.sourceMessageId,
         forkContext: [],
-        forkAnchor: command.anchor ?? null,
-        anchorText: command.anchorText ?? null,
+        forkAnchor: origin.forkAnchor,
+        anchorText: origin.anchorText,
         footnote,
         depth: parent.depth + 1,
         modelId: command.modelId,

@@ -13,7 +13,7 @@
 
 ## 数据契约
 
-复用现有分叉接口。`sourceMessageId` 必填，`anchor` 与 `anchorText` 同时提供或同时省略，也支持两者均为 `null`。持久化时，无引用分支的 `forkAnchor` 和 `anchorText` 均为 `null`。
+复用现有分叉接口。`sourceMessageId` 必填，`anchor` 与 `anchorText` 同时提供或同时省略，也支持两者均为 `null`。提供选区时，文本必须与 `anchor.quote.exact` 一致。持久化时，无引用分支的 `forkAnchor` 和 `anchorText` 均为 `null`。
 
 不新增 Thread 类型、Quote 表或额外模型调用。原有划选分叉继续保存引用文本和锚点，并支持携带首问。
 
@@ -26,9 +26,28 @@
 
 ## 发布前置条件
 
-`threads_root_or_fork_shape` 原约束要求子分支必须携带锚点。此变更只修改 `lib/db/schema.ts` 中的约束源码，允许两个锚点字段同时为空，继续保留来源消息、父分支、编号和历史非空的约束。
+`threads_root_or_fork_shape` 允许两个锚点字段同时为空，继续保留来源消息、父分支、编号和历史非空的约束。
 
-遵循仓库规则：功能分支不生成或修改 `drizzle/` 迁移文件。集成到 `develop` 后，需要统一生成并检查迁移，在上一版本结构的测试数据库上验证升级，并运行数据库测试。必须先应用约束变更，再发布新入口；不能把当前功能分支直接当作可发布版本。
+迁移 `0008_motionless_wong.sql` 已在本地 `develop` 集成分支通过 `corepack pnpm db:generate` 生成，连同 snapshot、journal 纳入本次集成提交。SQL 只替换 CHECK 约束，不改写现有记录。远端没有 `develop` 分支；此处没有向远端创建或发布 `develop`。
+
+已用 PGlite 0.5.8（PostgreSQL 18.3 WASM）验证从旧迁移 0004 中的原始 threads 建表 SQL 升级到 0008：旧约束拒绝无选区分叉，新约束接受；原有主线和划选分支数据不变；半套锚点、缺来源、空继承历史和非法主线继续被拒绝。验证范围是独立 threads 表及 CHECK 约束，没有执行完整迁移链、外键或真实应用事务。
+
+仍需在配置好连接的隔离 PostgreSQL 测试库上完成旧版本升级、`pnpm test:thread-chat:gate1-db` 和 `node --import tsx e2e/thread-chat/fork-quote-db.test.mjs`。迁移必须先于新入口发布。当前环境无数据库连接或原生 PostgreSQL 服务，不能将嵌入式引擎检查视作完整数据库验收。
+
+真实浏览器验收未完成：本地 Next 开发服务可启动，但浏览器访问本地服务返回 `ERR_BLOCKED_BY_CLIENT`。提供可访问且连接隔离测试库的验收环境后，需要覆盖列/画布入口、请求失败提示与重试、创建后刷新恢复、历史截止、划选 Quote 编辑/删除。保持草稿状态。
+
+## 维护边界
+
+分叉来源规则集中在 `lib/thread-chat/domain/fork-origin.ts`：
+
+- `isConsistentForkSelection`：接口边界检查引用和锚点配对、原文一致。
+- `resolveForkOrigin`：返回 message / selection 判别联合，统一持久化空值；服务端、客户端乐观更新和 mock 共用。
+- `hasSelectedForkText`：用于已校验 Thread 的来源展示和标题策略。
+- `isMessageFork`：适配旧视图的空字符串表示；有文本但缺锚点的旧划选不会被误认成整条消息分叉。
+
+Quote 内容由消息 parts 管理，Thread 来源只负责定位与展示。不要用 Thread 来源判断用户是否保留了 Quote。
+
+共享 `handleFork` 返回失败的 Promise；消息按钮负责局部错误和重试，划选入口在自己的调用边界显示 Toast。两条 UI 路径各自处理错误，避免共享函数吞错导致上层误判成功。
 
 ## Rebase 到 main（b3dae83）
 

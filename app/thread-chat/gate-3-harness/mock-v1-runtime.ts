@@ -1,3 +1,4 @@
+import { resolveForkOrigin } from "@/lib/thread-chat/domain/fork-origin"
 import { artifactReferenceData } from "@/lib/thread-chat/contracts/artifact-reference"
 import { messageContentToUiParts, type MessageContentInput } from "@/lib/thread-chat/contracts/message-content"
 
@@ -638,6 +639,7 @@ export function createGate3MockRuntime(
       const parent = threads.get(parentThreadId)
       if (!parent) throw new Error("THREAD_NOT_FOUND")
       const stamp = now()
+      const origin = resolveForkOrigin(input)
       const thread: ThreadDTO = {
         id: input.threadId,
         projectId,
@@ -648,8 +650,8 @@ export function createGate3MockRuntime(
           parentMessages: [...messages.values()].filter((message) => message.threadId === parentThreadId),
           sourceMessageId: input.sourceMessageId,
         }),
-        forkAnchor: input.anchor ?? null,
-        anchorText: input.anchorText ?? null,
+        forkAnchor: origin.forkAnchor,
+        anchorText: origin.anchorText,
         footnote:
           Math.max(
             0,

@@ -1,3 +1,4 @@
+import { hasSelectedForkText } from "@/lib/thread-chat/domain/fork-origin"
 import { and, eq } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { projects, threads } from "@/lib/db/schema"
@@ -81,7 +82,7 @@ async function buildTitleInput(
   const question = firstUser ? textFromParts(firstUser.parts) : ""
   if (!question) return null
 
-  if (isRootThread(thread) || !thread.anchorText) return { kind: "main", question }
+  if (isRootThread(thread) || !hasSelectedForkText(thread)) return { kind: "main", question }
 
   const firstAnswer = firstCurrentAssistantAnswer(rows)
   const answer = firstAnswer ? textFromParts(firstAnswer.parts) : ""

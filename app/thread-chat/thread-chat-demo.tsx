@@ -10,6 +10,7 @@ import { useRouter } from "next/navigation"
 import React, { useCallback, useEffect, useMemo, useState } from "react"
 
 import { MESSAGE_FORK_LABELS } from "@/constants/message-fork"
+import { resolveForkOrigin } from "@/lib/thread-chat/domain/fork-origin"
 import type { GenerationSettings } from "@/constants/generation-settings"
 import { resolveGenerationSettings } from "@/lib/thread-chat/generation-settings"
 import { COMPOSER_MODEL_COPY } from "@/constants/composer-model"
@@ -461,6 +462,7 @@ function NormalizedThreadChat({
       const modelId =
         current.threadsById[parentThreadId]?.modelId ??
         DEFAULT_THREAD_CHAT_MODEL_ID
+      const origin = resolveForkOrigin({ anchor: info.anchor, anchorText: info.text })
       return runtime.commands
         .forkThread({
           parentThreadId,
@@ -469,7 +471,7 @@ function NormalizedThreadChat({
           anchor: info.anchor,
           modelId,
           ...generationSettingsInput(modelId, generationSettings),
-          ...(question?.trim() ? { firstTurn: info.anchor && info.text ? forkFirstTurnContent({ text: question, sourceMessageId: info.msgId, anchorText: info.text, anchor: info.anchor }) : textMessageContent(question) } : {}),
+          ...(question?.trim() ? { firstTurn: origin.kind === "selection" ? forkFirstTurnContent({ text: question, sourceMessageId: info.msgId, anchorText: origin.anchorText, anchor: origin.forkAnchor }) : textMessageContent(question) } : {}),
         })
         .then(({ command }) => {
           const text = info.text ?? MESSAGE_FORK_LABELS.untitled
@@ -482,7 +484,6 @@ function NormalizedThreadChat({
           openBranchUI(command.threadId, info.threadId, hint)
           showToast(`已开启分支 · ${title}`)
         })
-        .catch(() => showToast(MESSAGE_FORK_LABELS.failed))
     },
     [
       generationSettings,
@@ -718,7 +719,11 @@ function NormalizedThreadChat({
         state={tree}
         sel={selection}
         onSelChange={setSelection}
-        onFork={handleFork}
+        onFork={(info, hint, question) => {
+          void handleFork(info, hint, question).catch(() =>
+            showToast(MESSAGE_FORK_LABELS.failed)
+          )
+        }}
         slots={
           workspace.viewMode === "canvas"
             ? EMPTY_SLOTS

@@ -1,3 +1,4 @@
+import { resolveForkOrigin } from "@/lib/thread-chat/domain/fork-origin"
 import { resolveUserContent } from "./resolve-user-content"
 import { messages, threads } from "@/lib/db/schema"
 import type { ForkThreadCommand } from "@/lib/thread-chat/contracts/commands"
@@ -66,14 +67,12 @@ export function forkThread(
         )
         if (!source || source.supersededAt)
           stateConflict("分支来源不在当前时间线")
+        const origin = resolveForkOrigin(command)
         if (
-          !command.anchor &&
+          origin.kind === "message" &&
           (source.role !== "assistant" || source.status !== "completed")
         ) {
           stateConflict("仅支持从已完成的 AI 回复直接创建分支")
-        }
-        if (command.anchor && command.anchor.quote.exact !== command.anchorText) {
-          stateConflict("选区锚点与来源文本不一致")
         }
         const forkContext = buildFrozenForkContext({
           parentForkContext: parent.forkContext,
@@ -89,8 +88,8 @@ export function forkThread(
             parentId: parent.id,
             forkMessageId: source.id,
             forkContext,
-            forkAnchor: command.anchor ?? null,
-            anchorText: command.anchorText ?? null,
+            forkAnchor: origin.forkAnchor,
+            anchorText: origin.anchorText,
             footnote,
             depth: parent.depth + 1,
             modelId: command.modelId,

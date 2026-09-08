@@ -3,6 +3,7 @@
 import { useRef, useState } from "react"
 import { GitBranch } from "lucide-react"
 import { MESSAGE_FORK_LABELS } from "@/constants/message-fork"
+import { isMessageFork } from "@/lib/thread-chat/domain/fork-origin"
 import type { Message, ThreadTreeState } from "../core/types"
 import { threadTitle } from "../core/selectors"
 import { hasCompletedAssistantActions } from "../chat/actions/message-action-types"
@@ -16,14 +17,14 @@ export function MessageForkActions({
 }: {
   state: ThreadTreeState
   message: Message
-  onFork?: () => Promise<unknown>
+  onFork?: () => Promise<void>
   onOpenThread: (id: string, options?: { keepSource?: boolean }) => void
 }) {
   const pending = useRef(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   if (!hasCompletedAssistantActions(message)) return null
-  const branches = message.forks.filter((fork) => !fork.anchor && !fork.text)
+  const branches = message.forks.filter(isMessageFork)
   if (!onFork && branches.length === 0) return null
 
   const createBranch = async () => {

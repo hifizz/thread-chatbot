@@ -10,6 +10,7 @@ import { projectConversationTree } from "../../app/thread-chat/core/projections.
 import { createConversationCommands } from "../../app/thread-chat/net/commands/conversation-commands.ts"
 import { createGate3MockRuntime } from "../../app/thread-chat/gate-3-harness/mock-v1-runtime.ts"
 import { MessageForkActions } from "../../app/thread-chat/branching/message-fork-actions.tsx"
+import { isMessageFork, resolveForkOrigin } from "../../lib/thread-chat/domain/fork-origin.ts"
 
 const id = () => crypto.randomUUID()
 const bareCommand = {
@@ -18,8 +19,12 @@ const bareCommand = {
 assert.equal(forkThreadCommandSchema.safeParse(bareCommand).success, true)
 assert.equal(forkThreadCommandSchema.safeParse({ ...bareCommand, anchor: null, anchorText: null }).success, true)
 const anchor = { quote: { exact: "选区", prefix: "", suffix: "" } }
+assert.deepEqual(resolveForkOrigin({}), { kind: "message", anchorText: null, forkAnchor: null })
+assert.deepEqual(resolveForkOrigin({ anchor, anchorText: "选区" }), { kind: "selection", anchorText: "选区", forkAnchor: anchor })
+assert.equal(isMessageFork({ text: "" }), true)
+assert.equal(isMessageFork({ text: "旧划选，锚点采集失败" }), false)
 assert.equal(forkThreadCommandSchema.safeParse({ ...bareCommand, anchor, anchorText: "选区" }).success, true)
-for (const fields of [{ anchor }, { anchorText: "选区" }, { anchor, anchorText: null }, { anchorText: "" }]) {
+for (const fields of [{ anchor }, { anchorText: "选区" }, { anchor, anchorText: null }, { anchorText: "" }, { anchor, anchorText: "另一段内容" }]) {
   assert.equal(forkThreadCommandSchema.safeParse({ ...bareCommand, ...fields }).success, false)
 }
 
@@ -53,6 +58,10 @@ const commands = createConversationCommands({
   fetch: async () => { throw new Error("空分叉不得启动模型流") },
 })
 const before = Object.keys(store.getState().messagesById).length
+const unchanged = store.getState()
+await assert.rejects(() => commands.forkThread({ parentThreadId: parent.id, sourceMessageId: source.id, modelId: parent.modelId, anchor, anchorText: "不一致的引用" }))
+assert.equal(requests, 0)
+assert.equal(store.getState(), unchanged)
 const result = await commands.forkThread({ parentThreadId: parent.id, sourceMessageId: source.id, modelId: parent.modelId })
 assert.equal(requests, 1)
 assert.equal(result.connection, null)

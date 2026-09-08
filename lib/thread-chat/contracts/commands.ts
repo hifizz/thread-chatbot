@@ -1,3 +1,4 @@
+import { isConsistentForkSelection } from "@/lib/thread-chat/domain/fork-origin"
 import { z } from "zod"
 import {
   EFFORT_LEVELS,
@@ -112,8 +113,8 @@ export const forkThreadCommandSchema = z
     firstTurn: firstForkTurnSchema.optional(),
   })
   .strict()
-  .refine((command) => (command.anchor == null) === (command.anchorText == null), {
-    message: "引用文本与选区锚点必须同时提供或同时省略",
+  .refine(isConsistentForkSelection, {
+    message: "引用文本与选区锚点必须同时提供且原文一致，或同时省略",
   })
 
 export const editLatestTurnCommandSchema = z
