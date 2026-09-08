@@ -224,11 +224,11 @@ try {
   await db.insert(schema.attachments).values({
     id: foreignAttachmentId,
     userId: userB,
-    key: `attachments/${foreignAttachmentId}.pdf`,
-    filename: "foreign.pdf",
-    mimeType: "application/pdf",
+    key: `attachments/${foreignAttachmentId}.png`,
+    filename: "foreign.png",
+    mimeType: "image/png",
     size: 10,
-    kind: "document",
+    kind: "image",
     status: "ready",
   })
   await settle(editResult.result.generation.assistantMessage.id)
@@ -243,8 +243,8 @@ try {
           { type: "text", text: "尝试引用他人的附件" },
           { type: "file", file: {
             url: `/api/attachments/${foreignAttachmentId}`,
-            mediaType: "application/pdf",
-            filename: "foreign.pdf",
+            mediaType: "image/png",
+            filename: "foreign.png",
           } },
         ],
       }),
@@ -459,7 +459,7 @@ try {
     {
       type: "file",
       url: "/api/attachments/00000000-0000-4000-8000-000000000000",
-      mediaType: "application/pdf",
+      mediaType: "image/png",
       filename: "fixture.pdf",
     },
     {
