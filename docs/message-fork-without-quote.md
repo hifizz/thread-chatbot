@@ -32,9 +32,9 @@
 
 已用 PGlite 0.5.8（PostgreSQL 18.3 WASM）验证从旧迁移 0004 中的原始 threads 建表 SQL 升级到 0008：旧约束拒绝无选区分叉，新约束接受；原有主线和划选分支数据不变；半套锚点、缺来源、空继承历史和非法主线继续被拒绝。验证范围是独立 threads 表及 CHECK 约束，没有执行完整迁移链、外键或真实应用事务。
 
-仍需在配置好连接的隔离 PostgreSQL 测试库上完成旧版本升级、`pnpm test:thread-chat:gate1-db` 和 `node --import tsx e2e/thread-chat/fork-quote-db.test.mjs`。迁移必须先于新入口发布。当前环境无数据库连接或原生 PostgreSQL 服务，不能将嵌入式引擎检查视作完整数据库验收。
+已在 GitHub Actions 的独立 PostgreSQL 17 环境完成真实数据库验收：[运行记录](https://github.com/hifizz/thread-chatbot/actions/runs/34260452154)，受测提交 `cbd2eee`。`message-fork-migration-db.test.mjs` 执行完整旧迁移链，保存真实主线和划选分支，再应用新迁移；验证旧数据不变、旧约束拒绝直接分叉、新约束允许、失败事务重试、幂等和重复迁移。`pnpm test:thread-chat:gate1-db` 与 `fork-quote-db.test.mjs` 均通过。此结果验证隔离测试库，不表示线上数据库已经应用迁移；迁移仍必须先于新入口发布。
 
-真实浏览器验收未完成：本地 Next 开发服务可启动，但浏览器访问本地服务返回 `ERR_BLOCKED_BY_CLIENT`。提供可访问且连接隔离测试库的验收环境后，需要覆盖列/画布入口、请求失败提示与重试、创建后刷新恢复、历史截止、划选 Quote 编辑/删除。保持草稿状态。
+真实浏览器验收未完成：本地服务访问返回 `ERR_BLOCKED_BY_CLIENT`；PR 预览的 Vercel 部署失败，日志需要登录。浏览器已进入 GitHub 登录后的手机二次验证，但该验证超时，尚未取得 Vercel 登录态。提供可访问且连接隔离测试库的验收环境后，需要覆盖列/画布入口、请求失败提示与重试、创建后刷新恢复、历史截止、划选 Quote 编辑/删除。保持草稿状态。
 
 ## 维护边界
 
@@ -53,4 +53,4 @@ Quote 内容由消息 parts 管理，Thread 来源只负责定位与展示。不
 
 沿用 main 的完整有序内容契约及新版 Composer，不恢复已被替代的引用修复提交。分叉命令通过可选 `firstTurn.parts` 携带首问；无引用首问不构造 Quote。发送和编辑按用户提交的内容保存，不从 Thread 自动补回已删除的引用。保留 main 的划选工具条、生成设置、Artifact 引用和提示缓存实现。
 
-验证包含无引用空分叉、无引用带首问及失败回滚，并复用 main 的 Quote 和客户端状态回归。数据库迁移和真实浏览器验收仍为发布前置事项。
+验证包含无引用空分叉、无引用带首问及失败回滚，并复用 main 的 Quote 和客户端状态回归。数据库迁移的隔离验收已完成；部署应用迁移与真实浏览器验收仍为发布前置事项。
