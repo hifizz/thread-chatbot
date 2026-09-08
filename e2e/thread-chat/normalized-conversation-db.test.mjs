@@ -77,8 +77,7 @@ try {
     userMessageId: id(),
     assistantMessageId: id(),
     modelId,
-    text: "项目 A 的第一问",
-    files: [],
+    parts: [{ type: "text", text: "项目 A 的第一问" }],
   }
   const firstStart = await commands.startProject(userA, startACommand)
   assert.equal(firstStart.replayed, false)
@@ -93,7 +92,7 @@ try {
     () =>
       commands.startProject(userA, {
         ...startACommand,
-        text: "同 ID 的不同语义",
+        parts: [{ type: "text", text: "同 ID 的不同语义" }],
       }),
     (error) => error.name === "CommandIdConflictError"
   )
@@ -134,8 +133,7 @@ try {
     userMessageId: id(),
     assistantMessageId: id(),
     modelId,
-    text: "项目 B 的第一问",
-    files: [],
+    parts: [{ type: "text", text: "项目 B 的第一问" }],
   }
   await commands.startProject(userA, startBCommand)
 
@@ -210,8 +208,7 @@ try {
       userMessageId: id(),
       assistantMessageId: id(),
       modelId,
-      text: "编辑后的第一问",
-      files: [],
+      parts: [{ type: "text", text: "编辑后的第一问" }],
     }
   )
   assert.equal(
@@ -242,13 +239,13 @@ try {
         userMessageId: id(),
         assistantMessageId: id(),
         modelId,
-        text: "尝试引用他人的附件",
-        files: [
-          {
+        parts: [
+          { type: "text", text: "尝试引用他人的附件" },
+          { type: "file", file: {
             url: `/api/attachments/${foreignAttachmentId}`,
             mediaType: "application/pdf",
             filename: "foreign.pdf",
-          },
+          } },
         ],
       }),
     (error) => error.code === "NOT_FOUND"
@@ -259,8 +256,7 @@ try {
     userMessageId: id(),
     assistantMessageId: id(),
     modelId,
-    text: "验证 send、stop、feedback 和 fork",
-    files: [],
+    parts: [{ type: "text", text: "验证 send、stop、feedback 和 fork" }],
   }
   const sent = await commands.sendMessage(userA, rootA, sendCommand)
   assert.equal(sent.replayed, false)
@@ -531,8 +527,7 @@ try {
     userMessageId: id(),
     assistantMessageId: id(),
     modelId,
-    text: "删除竞态",
-    files: [],
+    parts: [{ type: "text", text: "删除竞态" }],
   }
   await commands.startProject(userA, raceStart)
   const deleteRace = await Promise.allSettled([
