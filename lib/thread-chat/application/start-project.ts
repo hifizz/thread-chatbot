@@ -1,3 +1,4 @@
+import { resolveUserContent } from "./resolve-user-content"
 import { eq } from "drizzle-orm"
 import { messages, projects, threads } from "@/lib/db/schema"
 import type { StartProjectCommand } from "@/lib/thread-chat/contracts/commands"
@@ -5,10 +6,6 @@ import type { GenerationAcceptedDTO } from "@/lib/thread-chat/contracts/dto"
 import {
   assertAllowedGenerationSettings,
   assertAllowedModel,
-  assertOwnedReadyAttachments,
-  assertModelSupportsNewAttachments,
-  buildUserParts,
-  commandFiles,
 } from "@/lib/thread-chat/application/command-utils"
 import { notFound, stateConflict } from "@/lib/thread-chat/application/errors"
 import { executeIdempotentCommand } from "@/lib/thread-chat/persistence/command-repository"
@@ -43,12 +40,7 @@ export function startProject(userId: string, command: StartProjectCommand) {
           if (existing.userId !== userId) notFound()
           stateConflict("Project 已存在")
         }
-        const files = commandFiles(command)
-        assertModelSupportsNewAttachments(command.modelId, files)
-        await assertOwnedReadyAttachments(tx, userId, files)
-        if (command.parts.some((part) => part.type === "quote")) {
-          stateConflict("新建 Project 时不能引用尚不属于该 Project 的内容")
-        }
+        const parts = await resolveUserContent({ tx, userId, projectId: command.projectId, modelId: command.modelId, content: command, operation: { type: "create-project" } })
         const now = new Date()
         const [project] = await tx
           .insert(projects)
@@ -77,7 +69,7 @@ export function startProject(userId: string, command: StartProjectCommand) {
               threadId: thread.id,
               sequence: userSequence,
               role: "user",
-              parts: buildUserParts(command),
+              parts,
               status: "completed",
               finishedAt: now,
             },

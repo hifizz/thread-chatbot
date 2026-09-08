@@ -3,11 +3,10 @@ import type { ModelProviderId } from "@/constants/models"
 import type { ModelRoute } from "@/lib/ai/llm/create-models"
 import { arkModelProvider } from "@/lib/ai/llm/ark"
 import { deepseekModelProvider } from "@/lib/ai/llm/deepseek"
-import { icelandModelProvider } from "@/lib/ai/llm/iceland"
 import { minimaxModelProvider } from "@/lib/ai/llm/minimax"
 import { openaiModelProvider } from "@/lib/ai/llm/openai"
 import { openrouterModelProvider } from "@/lib/ai/llm/openrouter"
-import { privateRelayModelProvider } from "@/lib/ai/llm/private-relay"
+import { tokenRouterModelProvider } from "@/lib/ai/llm/token-router"
 
 export const PROVIDERS = {
   minimax: minimaxModelProvider,
@@ -15,8 +14,7 @@ export const PROVIDERS = {
   openai: openaiModelProvider,
   ark: arkModelProvider,
   openrouter: openrouterModelProvider,
-  "private-relay": privateRelayModelProvider,
-  "iceland-relay": icelandModelProvider,
+  "token-router": tokenRouterModelProvider,
 } satisfies Record<ModelProviderId, { id: ModelProviderId }>
 
 const routes = Object.values(PROVIDERS).flatMap((provider) => provider.routes)

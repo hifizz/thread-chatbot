@@ -1,4 +1,4 @@
-import type { Message, MessageFeedback } from "../../core/types"
+import type { Message, ConversationViewMessage, MessageFeedback } from "../../core/types"
 import type { ThreadMessageActionCommands } from "./message-action-commands"
 import type { SourceProvenance } from "../../core/message-graph"
 
@@ -49,7 +49,7 @@ export interface MessageActionViewState {
 
 export interface EditableUserMessageProps {
   threadId: string
-  message: Message
+  message: ConversationViewMessage
   editable: boolean
   recovery?: RecoverableTurn
   commands: Pick<

@@ -1,22 +1,22 @@
 import { and, eq } from "drizzle-orm"
 import { artifacts, messages } from "@/lib/db/schema"
 import type { MessageContentInput } from "@/lib/thread-chat/contracts/message-content"
-import type { ThreadQuoteDataV1 } from "@/lib/thread-chat/contracts/quote"
+import type { ThreadChatQuoteData, ThreadQuoteDataV1 } from "@/lib/thread-chat/contracts/quote"
 import type { ThreadChatUIMessage } from "@/lib/thread-chat/contracts/ui-message"
 import type { ConversationTransaction } from "@/lib/thread-chat/persistence/transaction"
 import { stateConflict } from "@/lib/thread-chat/application/errors"
 import { persistedThreadQuotePartSchema } from "@/lib/thread-chat/contracts/quote"
 
-function quotesFromContent(content: MessageContentInput): ThreadQuoteDataV1[] {
+function quotesFromContent(content: MessageContentInput): ThreadChatQuoteData[] {
   return content.parts.flatMap((part) =>
     part.type === "quote" ? [part.quote] : []
   )
 }
 
-function snapshotKey(quote: ThreadQuoteDataV1): string {
+function snapshotKey(quote: ThreadChatQuoteData): string {
   return JSON.stringify({
     text: quote.text,
-    source: quote.source,
+    ...("schemaVersion" in quote ? { schemaVersion: quote.schemaVersion, source: quote.source, comment: quote.comment } : {}),
   })
 }
 
@@ -25,8 +25,16 @@ export async function assertValidQuoteSources(input: {
   projectId: string
   sourceThreadId: string
   content: MessageContentInput
+  frozenFirstQuote?: ThreadQuoteDataV1
 }): Promise<void> {
+  let usedFrozenQuote = false
   for (const quote of quotesFromContent(input.content)) {
+    if (input.frozenFirstQuote && snapshotKey(quote) === snapshotKey(input.frozenFirstQuote)) {
+      if (usedFrozenQuote) stateConflict("不能重复添加分叉引用")
+      usedFrozenQuote = true
+      continue
+    }
+    if (!("schemaVersion" in quote)) stateConflict("旧版 Quote 仅可在原消息编辑时保留")
     const [sourceMessage] = await input.tx
       .select({
         id: messages.id,
@@ -66,23 +74,17 @@ export async function assertValidQuoteSources(input: {
   }
 }
 
-/** Edit 只能保留、删除、排序旧 V1 Quote 并修改 comment，不能新增或复制。 */
+/** 原快照子序列检查：可删除，不可新增、复制、重排或改写胶囊。 */
 export function assertEditQuoteSemantics(
   oldParts: ThreadChatUIMessage["parts"],
   content: MessageContentInput
 ): void {
-  const available = new Map<string, number>()
-  for (const part of oldParts) {
-    if (part.type !== "data-quote") continue
-    const parsed = persistedThreadQuotePartSchema.safeParse(part)
-    if (!parsed.success || !("schemaVersion" in parsed.data.data)) continue
-    const key = snapshotKey(parsed.data.data)
-    available.set(key, (available.get(key) ?? 0) + 1)
-  }
+  const available = oldParts.flatMap((part) => part.type === "data-quote"
+    ? [snapshotKey(persistedThreadQuotePartSchema.parse(part).data)] : [])
+  let next = 0
   for (const quote of quotesFromContent(content)) {
-    const key = snapshotKey(quote)
-    const count = available.get(key) ?? 0
-    if (count <= 0) stateConflict("编辑消息不能新增或复制 Quote")
-    available.set(key, count - 1)
+    const index = available.indexOf(snapshotKey(quote), next)
+    if (index < 0) stateConflict("引用内容发生变化，请重新打开编辑")
+    next = index + 1
   }
 }

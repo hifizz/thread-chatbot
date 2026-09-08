@@ -15,10 +15,7 @@ import {
 } from "@/constants/model"
 import type { ThreadChatUIMessage } from "@/lib/thread-chat/contracts/ui-message"
 import {
-  filesFromMessageContent,
-  messageContentToUiParts,
   type FileReference,
-  type MessageContentInput,
 } from "@/lib/thread-chat/contracts/message-content"
 import type { ConversationTransaction } from "@/lib/thread-chat/persistence/transaction"
 import { persistentMessageParts } from "@/lib/thread-chat/persistence/message-parts"
@@ -156,16 +153,6 @@ export async function assertOwnedReadyAttachments(
       "附件 mediaType 与服务端记录不一致"
     )
   }
-}
-
-export function buildUserParts(
-  content: MessageContentInput
-): ThreadChatUIMessage["parts"] {
-  return messageContentToUiParts(content)
-}
-
-export function commandFiles(content: MessageContentInput): FileReference[] {
-  return filesFromMessageContent(content)
 }
 
 export function stripTransientParts(

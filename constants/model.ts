@@ -8,7 +8,7 @@ import {
   type ModelSurface,
 } from "@/constants/models"
 
-export const THREAD_TITLE_MODEL_ID = "gpt-5.6-luna"
+export const THREAD_TITLE_MODEL_ID = DEFAULT_THREAD_CHAT_MODEL_ID
 export const THREAD_TITLE_MAX_OUTPUT_TOKENS = 36
 
 export type ChatModelProvider = ModelProviderId

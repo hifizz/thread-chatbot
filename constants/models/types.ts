@@ -11,14 +11,18 @@ export type ModelCapabilities = {
 
 export type ModelDefinition = {
   id: string
+  /** 稳定的应用内 ID；与中转服务接受的上游 id 分开维护。 */
+  publicId?: string
   name?: string
+  /** 暂定的菜单展示值，不参与上下文裁剪或请求限制。 */
+  contextLabel?: string
   description?: string
   surfaces?: readonly ModelSurface[]
   capabilities?: ModelCapabilities
   unbilledPreview?: true
 }
 
-export type ProviderModelDefaults = Omit<ModelDefinition, "id" | "name">
+export type ProviderModelDefaults = Omit<ModelDefinition, "id" | "publicId" | "name" | "contextLabel">
 
 export type ProviderModelsDefinition = {
   id: string
@@ -31,6 +35,7 @@ export type ProviderModelsDefinition = {
 export type PublicModel = {
   id: string
   name: string
+  contextLabel?: string
   description?: string
   providerId: string
   providerName: string
@@ -42,6 +47,7 @@ export type PublicModel = {
 export type ClientModelOption = {
   id: string
   name: string
+  contextLabel?: string
   description?: string
   groupId: string
   groupName: string
@@ -58,7 +64,7 @@ export function publicModelId(
   provider: ProviderModelsDefinition,
   model: ModelDefinition
 ): string {
-  return provider.toPublicModelId?.(model.id) ?? model.id
+  return model.publicId ?? provider.toPublicModelId?.(model.id) ?? model.id
 }
 
 export function expandProviderModels(
@@ -67,6 +73,7 @@ export function expandProviderModels(
   return provider.models.map((model) => ({
     id: publicModelId(provider, model),
     name: model.name ?? model.id,
+    ...(model.contextLabel ? { contextLabel: model.contextLabel } : {}),
     ...(model.description ?? provider.defaults.description
       ? { description: model.description ?? provider.defaults.description }
       : {}),

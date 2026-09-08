@@ -1,5 +1,6 @@
 import assert from "node:assert/strict"
 import { readFile } from "node:fs/promises"
+import { createProjectedConversationStore } from "../../app/thread-chat/core/projected-store.ts"
 import { createConversationStore } from "../../app/thread-chat/core/store.ts"
 import {
   selectAllMessageEntities,
@@ -722,8 +723,7 @@ async function testCommandFilesPassThrough() {
     threadId: thread().id,
     modelId: "test/model",
     generationSettings,
-    text: "读取附件",
-    files: [file],
+    content: { parts: [{ type: "text", text: "读取附件" }, { type: "file", file }] },
   })
   assert.deepEqual(seen.parts, [
     { type: "text", text: "读取附件" },
@@ -822,7 +822,7 @@ async function testCommandNetworkRetryReusesFrozenPayload() {
   const result = await commands.sendMessage({
     threadId: thread().id,
     modelId: "test/model",
-    text: "同一负载",
+    content: { parts: [{ type: "text", text: "同一负载" }] },
   })
   await result.connection.finished
   assert.equal(seen.length, 2)
@@ -989,7 +989,7 @@ async function testCommandTitleGenerationUpdatesStore() {
   const started = await commands.startProject({
     projectId: project().id,
     modelId: "test/model",
-    text: "研究主线标题",
+    content: { parts: [{ type: "text", text: "研究主线标题" }] },
   })
   await Promise.resolve()
   await started.connection.finished
@@ -1005,7 +1005,7 @@ async function testCommandTitleGenerationUpdatesStore() {
     anchorText: "锚点",
     anchor: { quote: { exact: "锚点", prefix: "", suffix: "" } },
     modelId: "test/model",
-    text: "解释锚点",
+    firstTurn: { parts: [{ type: "text", text: "解释锚点" }] },
   })
   await forked.connection.finished
   assert.equal(
@@ -1177,6 +1177,30 @@ async function testGate3HarnessIsolation() {
   assert.doesNotMatch(productionPage, /gate-3-harness/i)
 }
 
+// 画布通过旧视图接口转发模型保存，必须把 Promise 返回给 composer 的发送门禁。
+async function testProjectedModelChangeWaitsForSave() {
+  const store = createConversationStore()
+  store.getState().upsertProject(project())
+  let finishSave
+  const saved = new Promise((resolve) => { finishSave = resolve })
+  const calls = []
+  const view = createProjectedConversationStore({
+    store,
+    setThreadModel(threadId, modelId) {
+      calls.push({ threadId, modelId })
+      return saved
+    },
+  })
+  try {
+    const pending = view.setThreadModel("main", "private-relay-gpt-5.6-luna")
+    assert.equal(pending, saved)
+    assert.deepEqual(calls, [{ threadId: project().rootThreadId, modelId: "private-relay-gpt-5.6-luna" }])
+    finishSave()
+    await pending
+  } finally { view.dispose() }
+}
+
+await testProjectedModelChangeWaitsForSave()
 await testStoreAndSelectors()
 await testAiSdkReducer()
 await testOneShotSse()

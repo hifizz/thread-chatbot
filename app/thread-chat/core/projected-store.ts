@@ -13,7 +13,7 @@ export interface ProjectedConversationStore extends ThreadTreeReadableStore {
 /** Read-only UI facade for components that still consume the established tree view model. */
 export function createProjectedConversationStore(input: {
   store: ConversationStore
-  setThreadModel(threadId: string, modelId: string): void
+  setThreadModel(threadId: string, modelId: string): void | Promise<unknown>
   emptyRootModelId?: string
 }): ProjectedConversationStore {
   let version = 0
@@ -50,7 +50,7 @@ export function createProjectedConversationStore(input: {
     },
     setThreadModel(viewThreadId, modelId) {
       const state = input.store.getState()
-      input.setThreadModel(
+      return input.setThreadModel(
         fromConversationViewThreadId(state, viewThreadId),
         modelId
       )

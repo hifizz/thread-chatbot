@@ -14,21 +14,29 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { useGenerationSettings } from "./generation-settings-context"
+import { resolveGenerationSettings } from "@/lib/thread-chat/generation-settings"
+import styles from "./artifact-composer.module.css"
+import { DisabledComposerOption } from "./disabled-composer-option"
+import { COMPOSER_MODEL_COPY } from "@/constants/composer-model"
 
 export function GenerationSettingsControls({
   modelId,
   disabled,
+  disabledReason = COMPOSER_MODEL_COPY.unavailable,
 }: {
   modelId: string
   disabled: boolean
+  disabledReason?: string
 }) {
   const capability = getModelGenerationSettingsCapability(modelId)
-  const { settings, setSettings } = useGenerationSettings()
-  if (!capability) return null
+  const { settings: preferredSettings, setSettings } = useGenerationSettings()
+  const settings = resolveGenerationSettings(modelId, preferredSettings)
+  if (!capability || !settings) return null
 
   return (
     <>
       <Select
+        disabled={disabled}
         value={settings.effort}
         onValueChange={(effort) => {
           if (
@@ -36,17 +44,19 @@ export function GenerationSettingsControls({
             !capability.effortLevels.includes(effort)
           )
             return
-          setSettings((current) => ({ ...current, effort }))
+          setSettings({ ...settings, effort })
         }}
       >
+        <DisabledComposerOption disabled={disabled} reason={disabledReason}>
         <SelectTrigger
           size="sm"
           disabled={disabled}
           aria-label="选择推理强度"
         >
-          <SelectValue>Effort: {settings.effort}</SelectValue>
+          <SelectValue><span className={styles.parameterLabel}>Effort:</span> {settings.effort}</SelectValue>
         </SelectTrigger>
-        <SelectContent side="top" align="start">
+        </DisabledComposerOption>
+        <SelectContent side="top" align="start" alignItemWithTrigger={false}>
           {capability.effortLevels.map((effort) => (
             <SelectItem key={effort} value={effort}>
               {effort}
@@ -56,6 +66,7 @@ export function GenerationSettingsControls({
       </Select>
 
       <Select
+        disabled={disabled}
         value={String(settings.maxOutputTokens)}
         onValueChange={(value) => {
           const maxOutputTokens = Number(value)
@@ -64,19 +75,21 @@ export function GenerationSettingsControls({
             !capability.maxOutputTokenOptions.includes(maxOutputTokens)
           )
             return
-          setSettings((current) => ({ ...current, maxOutputTokens }))
+          setSettings({ ...settings, maxOutputTokens })
         }}
       >
+        <DisabledComposerOption disabled={disabled} reason={disabledReason}>
         <SelectTrigger
           size="sm"
           disabled={disabled}
           aria-label="选择最大输出 token"
         >
           <SelectValue>
-            Max: {MAX_OUTPUT_TOKEN_LABELS[settings.maxOutputTokens]}
+            <span className={styles.parameterLabel}>Max:</span> {MAX_OUTPUT_TOKEN_LABELS[settings.maxOutputTokens]}
           </SelectValue>
         </SelectTrigger>
-        <SelectContent side="top" align="start">
+        </DisabledComposerOption>
+        <SelectContent side="top" align="start" alignItemWithTrigger={false}>
           {capability.maxOutputTokenOptions.map((maxOutputTokens) => (
             <SelectItem
               key={maxOutputTokens}

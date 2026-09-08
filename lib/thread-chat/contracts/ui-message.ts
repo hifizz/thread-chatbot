@@ -1,3 +1,4 @@
+import type { ArtifactReferenceData } from "./artifact-reference"
 import type { UIMessage, UIMessageChunk } from "ai"
 import type {
   MarkdownArtifactInput,
@@ -14,6 +15,7 @@ export interface ThreadChatMessageMetadata {
 }
 
 export type ThreadChatDataParts = {
+  "artifact-reference": ArtifactReferenceData
   quote: ThreadChatQuoteData
   "research-activity": WebResearchActivity
   "research-route": ResearchRoute

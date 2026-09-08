@@ -1,19 +1,23 @@
 "use client"
 
+import { ComposerDraftProvider } from "./chat/composer/composer-drafts"
+import { ArtifactResourcesProvider, ArtifactNavigationProvider } from "./chat/composer/artifact-resources"
+
+import { messagePartsToContent, forkFirstTurnContent, type MessageContentInput } from "@/lib/thread-chat/contracts/message-content"
+
 import dynamic from "next/dynamic"
 import { useRouter } from "next/navigation"
 import React, { useCallback, useEffect, useMemo, useState } from "react"
 
 import type { GenerationSettings } from "@/constants/generation-settings"
-import { getModelGenerationSettingsCapability } from "@/constants/model"
+import { resolveGenerationSettings } from "@/lib/thread-chat/generation-settings"
+import { COMPOSER_MODEL_COPY } from "@/constants/composer-model"
 import { DEFAULT_THREAD_CHAT_MODEL_ID } from "@/constants/models"
 import { PROJECT_TITLE_FALLBACK } from "@/constants/project-workspace"
 import {
   GenerationSettingsProvider,
   useGenerationSettings,
 } from "./chat/composer/generation-settings-context"
-import type { MessageDTO } from "@/lib/thread-chat/contracts/dto"
-import { textFromMessageParts } from "@/lib/thread-chat/contracts/ui-message"
 import {
   activePathArtifacts,
   threadTitle,
@@ -43,7 +47,6 @@ import type {
 } from "./chat/actions/message-action-commands"
 import type { MessageActionViewState } from "./chat/actions/message-action-types"
 import { kickoffQuestion } from "./net/prompt/prompt-pure"
-import type { CommandFileReference } from "./net/commands/conversation-commands"
 import { removeWorkspaceState } from "./net/persistence/workspace-state"
 import { ThreadColumns } from "./orchestration/columns/thread-columns"
 import type {
@@ -89,20 +92,6 @@ function compactTitle(text: string, maxLength: number): string {
   return text.length > maxLength ? `${text.slice(0, maxLength)}…` : text
 }
 
-function messageFileReferences(message: MessageDTO): CommandFileReference[] {
-  return message.parts.flatMap((part) =>
-    part.type === "file"
-      ? [
-          {
-            url: part.url,
-            mediaType: part.mediaType,
-            ...(part.filename ? { filename: part.filename } : {}),
-          },
-        ]
-      : []
-  )
-}
-
 function legacyFeedback(value: "up" | "down" | null): MessageFeedback | null {
   return value === "up" ? "positive" : value === "down" ? "negative" : null
 }
@@ -117,9 +106,8 @@ function generationSettingsInput(
   modelId: string,
   settings: GenerationSettings
 ): { generationSettings?: GenerationSettings } {
-  return getModelGenerationSettingsCapability(modelId)
-    ? { generationSettings: settings }
-    : {}
+  const generationSettings = resolveGenerationSettings(modelId, settings)
+  return generationSettings ? { generationSettings } : {}
 }
 
 function actionResult(input: {
@@ -197,9 +185,9 @@ function NormalizedThreadChat({
         setDraftModelId(modelId)
         return
       }
-      void runtime.commands
+      return runtime.commands
         .updateThread(threadId, { modelId })
-        .catch(() => showToast("模型切换失败，请重试"))
+        .catch(() => showToast(COMPOSER_MODEL_COPY.failed))
     },
     [runtime.commands, runtime.store, showToast]
   )
@@ -306,8 +294,7 @@ function NormalizedThreadChat({
             assistantMessageId: assistant?.id,
             modelId,
             ...generationSettingsInput(modelId, generationSettings),
-            text: textFromMessageParts(source.parts),
-            files: messageFileReferences(source),
+            content: messagePartsToContent(source.parts),
           })
           return actionResult({
             userMessageId: result.command.userMessageId,
@@ -319,7 +306,7 @@ function NormalizedThreadChat({
           return actionFailure(error)
         }
       },
-      async editAndRegenerate(viewThreadId, userMessageId, text) {
+      async editAndRegenerate(viewThreadId, userMessageId, content) {
         try {
           const threadId = fromConversationViewThreadId(state, viewThreadId)
           const source = state.messagesById[userMessageId]
@@ -338,8 +325,7 @@ function NormalizedThreadChat({
             assistantMessageId: assistant?.id,
             modelId,
             ...generationSettingsInput(modelId, generationSettings),
-            text,
-            files: source ? messageFileReferences(source) : [],
+            content,
           })
           return actionResult({
             userMessageId: result.command.userMessageId,
@@ -370,7 +356,7 @@ function NormalizedThreadChat({
   )
 
   const send = useCallback(
-    (viewThreadId: string, text: string, files: CommandFileReference[] = []) => {
+    (viewThreadId: string, content: MessageContentInput) => {
       const current = runtime.store.getState()
       const normalizedThreadId = fromConversationViewThreadId(
         current,
@@ -388,19 +374,18 @@ function NormalizedThreadChat({
             threadId: normalizedThreadId,
             modelId,
             ...settingsInput,
-            text,
-            files,
+            content,
           })
         : runtime.commands.startProject({
             projectId: treeId,
             modelId,
             ...settingsInput,
-            text,
-            files,
+            content,
           })
-      void operation.catch((error) =>
+      return operation.catch((error) => {
         showToast(error instanceof Error ? error.message : "发送失败，请重试")
-      )
+        throw error
+      })
     },
     [
       draftModelId,
@@ -478,7 +463,7 @@ function NormalizedThreadChat({
           anchor: info.anchor,
           modelId,
           ...generationSettingsInput(modelId, generationSettings),
-          ...(question?.trim() ? { text: question.trim() } : {}),
+          ...(question?.trim() ? { firstTurn: forkFirstTurnContent({ text: question, sourceMessageId: info.msgId, anchorText: info.text, anchor: info.anchor }) } : {}),
         })
         .then(({ command }) => {
           const title =
@@ -637,7 +622,7 @@ function NormalizedThreadChat({
   }
 
   return (
-    <div
+    <ArtifactResourcesProvider store={runtime.store}><ComposerDraftProvider key={treeId}><ArtifactNavigationProvider onOpen={openArtifact}><div
       className="tc"
       data-view-mode={workspace.viewMode}
       ref={rootRef}
@@ -694,11 +679,11 @@ function NormalizedThreadChat({
                 }
                 onModelChange={(modelId) => {
                   if (!state.project) setDraftModelId(modelId)
-                  else setThreadModel(threadId, modelId)
+                  else return setThreadModel(threadId, modelId)
                 }}
                 onRetry={(message) => retry(viewThreadId, message)}
                 onStop={() => stop(viewThreadId)}
-                onSend={(text, files) => send(viewThreadId, text, files)}
+                onSend={(content) => send(viewThreadId, content)}
                 messageActionState={messageActionState}
                 messageCommands={messageCommands}
               />
@@ -792,6 +777,6 @@ function NormalizedThreadChat({
         onLocate={(threadId) => openBranchUI(threadId, null)}
       />
       <WorkspaceToast toast={toast} onDismiss={dismissToast} />
-    </div>
+    </div></ArtifactNavigationProvider></ComposerDraftProvider></ArtifactResourcesProvider>
   )
 }

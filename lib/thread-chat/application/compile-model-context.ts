@@ -1,3 +1,6 @@
+import { artifactReferenceDataSchema } from "../contracts/artifact-reference"
+import { loadProjectReferenceArtifactRows } from "../persistence/artifact-repository"
+import { expandArtifactReferencesInContext } from "./artifact-reference-context"
 import { convertToModelMessages, type ModelMessage } from "ai"
 import { db } from "@/lib/db"
 import { supportsModelImageInput } from "@/constants/model"
@@ -115,7 +118,13 @@ export async function compileModelContextWithProject({
     // generic UIMessage-shaped, so restore the narrower ThreadChat type here.
     ...(resolved.messages as ThreadChatUIMessage[]),
   ]
-  const modelMessages = await convertToModelMessages(withProjectContext, {
+  const referenceIds = withProjectContext.flatMap((message) => message.parts.flatMap((part) =>
+    part.type === "data-artifact-reference" ? [artifactReferenceDataSchema.parse(part.data).artifactId] : []
+  ))
+  const referenceRows = await loadProjectReferenceArtifactRows(db, thread.projectId, referenceIds)
+  if (referenceRows.length !== new Set(referenceIds).size) stateConflict("Artifact 引用目标不完整")
+  const expanded = expandArtifactReferencesInContext(withProjectContext, new Map(referenceRows.map(({ artifact }) => [artifact.id, artifact])))
+  const modelMessages = await convertToModelMessages(expanded, {
     ignoreIncompleteToolCalls: true,
     convertDataPart: (part) => {
       if (part.type !== "data-quote") return undefined

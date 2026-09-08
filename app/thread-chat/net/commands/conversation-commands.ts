@@ -16,11 +16,10 @@ import type {
 } from "@/lib/thread-chat/contracts/dto"
 import type { TextAnchor } from "@/lib/thread-chat/domain/text-anchor"
 import type {
-  MessageContentPartInput,
+  MessageContentInput,
 } from "@/lib/thread-chat/contracts/message-content"
-import { buildForkUserParts, buildEditedUserParts, editUserMessageContent } from "@/lib/thread-chat/domain/user-message-parts"
-import { messageContentToUiParts } from "@/lib/thread-chat/contracts/message-content"
-import { THREAD_QUOTE_SCHEMA_VERSION } from "@/lib/thread-chat/contracts/quote"
+import { messageContentToUiParts, messageContentInputSchema } from "@/lib/thread-chat/contracts/message-content"
+import { artifactReferenceData } from "@/lib/thread-chat/contracts/artifact-reference"
 import type { ConversationStore } from "../../core/store"
 import type { ConversationEntitySnapshot } from "../../core/types"
 import { ThreadChatApiError, type ThreadChatClient } from "../client"
@@ -28,12 +27,6 @@ import {
   followAcceptedGeneration,
   type GenerationConnection,
 } from "../stream/generation-connection"
-
-export interface CommandFileReference {
-  url: string
-  mediaType: string
-  filename?: string
-}
 
 export interface ConversationCommandOptions {
   store: ConversationStore
@@ -52,25 +45,12 @@ export interface ForkCommandInput {
   anchor: TextAnchor
   modelId: string
   generationSettings?: GenerationSettings
-  text?: string
-  files?: CommandFileReference[]
+  firstTurn?: MessageContentInput
 }
 
 function generationSettingsField(settings: GenerationSettings | undefined) {
   return settings ? { generationSettings: Object.freeze({ ...settings }) } : {}
 }
-
-function commandParts(
-  text: string,
-  files: CommandFileReference[]
-): MessageContentPartInput[] {
-  return [
-    { type: "text", text },
-    ...files.map((file) => ({ type: "file" as const, file })),
-  ]
-}
-
-const userParts = messageContentToUiParts
 
 function temporaryMessage(input: {
   id: string
@@ -217,15 +197,21 @@ export function createConversationCommands(
     }
   }
 
+  function userParts(content: MessageContentInput) {
+    return messageContentToUiParts(content, (id) => {
+      const artifact = store.getState().artifactsById[id]
+      if (!artifact) throw new Error("引用的 Artifact 尚未加载")
+      return artifactReferenceData(artifact)
+    })
+  }
+
   async function startProject(input: {
     projectId: string
     rootThreadId?: string
     modelId: string
     generationSettings?: GenerationSettings
-    text: string
-    files?: CommandFileReference[]
+    content: MessageContentInput
   }) {
-    const files = input.files ?? []
     const command: StartProjectCommand = Object.freeze({
       commandId: createId(),
       projectId: input.projectId,
@@ -234,7 +220,7 @@ export function createConversationCommands(
       assistantMessageId: createId(),
       modelId: input.modelId,
       ...generationSettingsField(input.generationSettings),
-      parts: commandParts(input.text, files),
+      parts: messageContentInputSchema.parse(input.content).parts,
     })
     const now = new Date().toISOString()
     const project: ProjectDTO = {
@@ -312,20 +298,18 @@ export function createConversationCommands(
     threadId: string
     modelId: string
     generationSettings?: GenerationSettings
-    text: string
-    files?: CommandFileReference[]
+    content: MessageContentInput
   }) {
     const state = store.getState()
     const project = state.project
     if (!project) throw new Error("Project 尚未加载")
-    const files = input.files ?? []
     const command: SendMessageCommand = Object.freeze({
       commandId: createId(),
       userMessageId: createId(),
       assistantMessageId: createId(),
       modelId: input.modelId,
       ...generationSettingsField(input.generationSettings),
-      parts: commandParts(input.text, files),
+      parts: messageContentInputSchema.parse(input.content).parts,
     })
     store.getState().beginOptimisticCommand(command.commandId, (snapshot) => {
       const sequence = nextSequence(snapshot, input.threadId)
@@ -336,7 +320,7 @@ export function createConversationCommands(
           threadId: input.threadId,
           sequence,
           role: "user",
-          parts: buildForkUserParts(command, snapshot.threadsById[input.threadId], sequence),
+          parts: userParts(command),
         }),
         temporaryMessage({
           id: command.assistantMessageId,
@@ -369,8 +353,7 @@ export function createConversationCommands(
     const project = state.project
     const parent = state.threadsById[input.parentThreadId]
     if (!project || !parent) throw new Error("来源会话尚未加载")
-    const hasFirstTurn = Boolean(input.text?.trim())
-    const files = input.files ?? []
+    const firstTurn = input.firstTurn === undefined ? undefined : messageContentInputSchema.parse(input.firstTurn)
     const command: ForkThreadCommand = Object.freeze({
       commandId: createId(),
       threadId: createId(),
@@ -379,26 +362,12 @@ export function createConversationCommands(
       anchor: input.anchor,
       modelId: input.modelId,
       ...generationSettingsField(input.generationSettings),
-      ...(hasFirstTurn
+      ...(firstTurn
         ? {
             firstTurn: {
               userMessageId: createId(),
               assistantMessageId: createId(),
-              parts: [
-                {
-                  type: "quote" as const,
-                  quote: {
-                    schemaVersion: THREAD_QUOTE_SCHEMA_VERSION,
-                    text: input.anchorText,
-                    source: {
-                      type: "message" as const,
-                      messageId: input.sourceMessageId,
-                      anchor: input.anchor,
-                    },
-                  },
-                },
-                ...commandParts(input.text!.trim(), files),
-              ],
+              parts: firstTurn.parts,
             },
           }
         : {}),
@@ -525,19 +494,17 @@ export function createConversationCommands(
     assistantMessageId?: string
     modelId: string
     generationSettings?: GenerationSettings
-    text: string
-    files?: CommandFileReference[]
+    content: MessageContentInput
   }) {
     const source = store.getState().messagesById[input.userMessageId]
     if (!source) throw new Error("原消息尚未加载")
-    const files = input.files ?? []
     const command: EditLatestTurnCommand = Object.freeze({
       commandId: createId(),
       userMessageId: createId(),
       assistantMessageId: createId(),
       modelId: input.modelId,
       ...generationSettingsField(input.generationSettings),
-      ...editUserMessageContent(source.parts, input.text, files),
+      parts: messageContentInputSchema.parse(input.content).parts,
     })
     store.getState().beginOptimisticCommand(command.commandId, (snapshot) => {
       const now = new Date().toISOString()
@@ -556,7 +523,7 @@ export function createConversationCommands(
           threadId: source.threadId,
           sequence,
           role: "user",
-          parts: buildEditedUserParts(command, source.parts),
+          parts: userParts(command),
           replacesMessageId: source.id,
         }),
         temporaryMessage({

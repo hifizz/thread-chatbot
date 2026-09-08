@@ -1,4 +1,6 @@
 "use client"
+
+import type { MessageContentInput } from "@/lib/thread-chat/contracts/message-content"
 /**
  * branching/branchable-chat —— 装饰层：把「分支能力」注入单会话 ChatView。
  *
@@ -25,7 +27,6 @@ import { MessageArtifacts } from "../orchestration/artifacts/message-artifacts"
 import { AnchoredAssistantBody } from "./assistant/anchored-assistant-body"
 import type { MessageActionViewState } from "../chat/actions/message-action-types"
 import type { ThreadMessageActionCommands } from "../chat/actions/message-action-commands"
-import type { CommandFileReference } from "../net/commands/conversation-commands"
 
 export interface BranchableChatProps {
   state: ThreadTreeState
@@ -55,8 +56,8 @@ export interface BranchableChatProps {
   /** composer 预填文案（新开分支的代拟首问，待用户回车确认），透传给 ChatView */
   composerPrefill?: string
   /** 根 Thread 模型切换意图；分支 selector 仍由本层锁定。 */
-  onModelChange: (modelId: string) => void
-  onSend: (text: string, files: CommandFileReference[]) => void
+  onModelChange: (modelId: string) => void | Promise<unknown>
+  onSend: (content: MessageContentInput) => unknown | Promise<unknown>
   messageActionState?: MessageActionViewState
   messageCommands?: ThreadMessageActionCommands
 }

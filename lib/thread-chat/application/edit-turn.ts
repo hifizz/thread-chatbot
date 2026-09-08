@@ -1,5 +1,5 @@
+import { resolveUserContent } from "./resolve-user-content"
 import { and, inArray, isNull } from "drizzle-orm"
-import { buildEditedUserParts } from "@/lib/thread-chat/domain/user-message-parts"
 import { messages } from "@/lib/db/schema"
 import type { EditLatestTurnCommand } from "@/lib/thread-chat/contracts/commands"
 import type { GenerationAcceptedDTO } from "@/lib/thread-chat/contracts/dto"
@@ -7,15 +7,9 @@ import { latestTurn } from "@/lib/thread-chat/domain/timeline"
 import {
   assertAllowedGenerationSettings,
   assertAllowedModel,
-  assertOwnedReadyAttachments,
-  assertModelSupportsNewAttachments,
-  commandFiles,
   touchProjectAndThread,
 } from "@/lib/thread-chat/application/command-utils"
 import { notFound, stateConflict } from "@/lib/thread-chat/application/errors"
-import {
-  assertEditQuoteSemantics,
-} from "@/lib/thread-chat/application/quote-validation"
 import { executeIdempotentCommand } from "@/lib/thread-chat/persistence/command-repository"
 import {
   toConversationMessage,
@@ -74,12 +68,7 @@ export function editLatestTurn(
         if (turn?.userMessage.id !== source.id) {
           stateConflict("只能编辑最新一轮用户消息")
         }
-        const files = commandFiles(command)
-        assertModelSupportsNewAttachments(command.modelId, files)
-        await assertOwnedReadyAttachments(tx, userId, files)
-        assertEditQuoteSemantics(source.parts, command)
-        // 上面已校验仅保留旧引用快照；分叉引用来自父 Thread，不能按当前
-        // Thread 重新校验来源。新增、复制或修改来源仍由快照校验拒绝。
+        const parts = await resolveUserContent({ tx, userId, projectId: project.id, modelId: command.modelId, content: command, operation: { type: "edit", originalParts: source.parts } })
         const [userSequence, assistantSequence] = await allocateThreadSequences(
           tx,
           thread.id,
@@ -108,7 +97,7 @@ export function editLatestTurn(
               threadId: source.threadId,
               sequence: userSequence,
               role: "user",
-              parts: buildEditedUserParts(command, source.parts),
+              parts,
               status: "completed",
               replacesMessageId: source.id,
               finishedAt: now,

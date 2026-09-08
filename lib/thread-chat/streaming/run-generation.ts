@@ -1,3 +1,4 @@
+import { contextLimitFailure } from "../application/context-budget"
 import type { LanguageModelUsage, TextStreamPart, ToolSet } from "ai"
 import type { GenerationSettings } from "@/constants/generation-settings"
 import { db } from "@/lib/db"
@@ -262,7 +263,7 @@ async function runGenerationCore({
         providerUsage,
         ...(outcome.failed
           ? {
-              error: {
+              error: contextLimitFailure(thrown ?? protocolError ?? (pipelineEnd?.outcome.status === "failed" ? pipelineEnd.outcome.error : null)) ?? {
                 code: "GENERATION_FAILED",
                 message: "生成过程中发生错误",
               },

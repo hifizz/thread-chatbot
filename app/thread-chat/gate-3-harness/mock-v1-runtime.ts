@@ -1,5 +1,6 @@
-import { messageContentToUiParts } from "@/lib/thread-chat/contracts/message-content"
-import { buildForkUserParts, buildEditedUserParts } from "@/lib/thread-chat/domain/user-message-parts"
+import { artifactReferenceData } from "@/lib/thread-chat/contracts/artifact-reference"
+import { messageContentToUiParts, type MessageContentInput } from "@/lib/thread-chat/contracts/message-content"
+
 import type {
   ArtifactDTO,
   GenerationAcceptedDTO,
@@ -9,6 +10,7 @@ import type {
   ThreadDTO,
 } from "@/lib/thread-chat/contracts/dto"
 import { PROJECT_TITLE_FALLBACK } from "@/constants/project-workspace"
+import { DEFAULT_THREAD_CHAT_MODEL_ID } from "@/constants/models"
 import { textFromMessageParts } from "@/lib/thread-chat/contracts/ui-message"
 import type { ThreadChatClient } from "../net/client"
 
@@ -25,7 +27,7 @@ const CHILD_ASSISTANT_ID = "00000000-0000-4000-8000-000000000202"
 const INITIAL_ARTIFACT_ID = "00000000-0000-4000-8000-000000000401"
 const BACKGROUND_USER_ID = "00000000-0000-4000-8000-000000000501"
 const BACKGROUND_ASSISTANT_ID = "00000000-0000-4000-8000-000000000502"
-const MODEL_ID = "doubao-seed-2.1-turbo"
+const MODEL_ID = DEFAULT_THREAD_CHAT_MODEL_ID
 
 function clone<T>(value: T): T {
   return structuredClone(value)
@@ -319,6 +321,12 @@ export function createGate3MockRuntime(
   const artifacts = new Map(
     seed.artifacts.map((artifact) => [artifact.id, clone(artifact)])
   )
+  const userParts = (content: MessageContentInput) => messageContentToUiParts(content, (id) => {
+    const artifact = artifacts.get(id)
+    if (!artifact) throw new Error("引用的 Artifact 不存在")
+    return artifactReferenceData(artifact)
+  })
+
   const scenarioByMessageId = new Map<string, Gate3HarnessScenario>()
   const backgroundPolls = new Map<string, number>()
   for (const messageId of seed.activeGenerationIds)
@@ -558,7 +566,7 @@ export function createGate3MockRuntime(
         id: input.userMessageId,
         threadId: thread.id,
         sequence: nextSequence(thread.id),
-        parts: messageContentToUiParts(input),
+        parts: userParts(input),
       })
       const assistant = makeAssistant({
         id: input.assistantMessageId,
@@ -578,7 +586,7 @@ export function createGate3MockRuntime(
         id: input.userMessageId,
         threadId,
         sequence: nextSequence(threadId),
-        parts: buildForkUserParts(input, thread, nextSequence(threadId)),
+        parts: userParts(input),
       })
       const assistant = makeAssistant({
         id: input.assistantMessageId,
@@ -658,7 +666,7 @@ export function createGate3MockRuntime(
         id: input.firstTurn.userMessageId,
         threadId: thread.id,
         sequence: 1,
-        parts: buildForkUserParts(input.firstTurn, thread, 1),
+        parts: userParts(input.firstTurn),
       })
       const assistant = makeAssistant({
         id: input.firstTurn.assistantMessageId,
@@ -697,7 +705,7 @@ export function createGate3MockRuntime(
         id: input.userMessageId,
         threadId: source.threadId,
         sequence: nextSequence(source.threadId),
-        parts: buildEditedUserParts(input, source.parts),
+        parts: userParts(input),
       })
       user.replacesMessageId = source.id
       const assistant = makeAssistant({

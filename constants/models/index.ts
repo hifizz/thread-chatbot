@@ -1,3 +1,4 @@
+import { tokenRouterModels } from "@/constants/models/token-router"
 import { arkModels } from "@/constants/models/ark"
 import { deepseekModels } from "@/constants/models/deepseek"
 import { icelandModels } from "@/constants/models/iceland"
@@ -16,8 +17,7 @@ const MODEL_PROVIDER_REGISTRY = [
   minimaxModels,
   deepseekModels,
   openaiModels,
-  icelandModels,
-  privateRelayModels,
+  tokenRouterModels,
   openrouterModels,
   arkModels,
 ] as const
@@ -32,15 +32,20 @@ export const MODELS: readonly PublicModel[] = MODEL_PROVIDERS.flatMap(
   expandProviderModels
 )
 
-export const DEFAULT_MODEL_ID: ModelId = "minimax-m2"
-export const DEFAULT_THREAD_CHAT_MODEL_ID: ModelId =
-  "openrouter-gpt-5.6-luna"
+/** 其他 provider 暂留注册表供历史记录使用，本期只收敛选择入口与默认模型。 */
+export const AVAILABLE_MODELS: readonly PublicModel[] = MODELS.filter(
+  (model) => model.providerId === tokenRouterModels.id
+)
 
-export const THREAD_CHAT_MODEL_OPTIONS: readonly ClientModelOption[] = MODELS
+export const DEFAULT_MODEL_ID: ModelId = "private-relay-gpt-5.6-luna"
+export const DEFAULT_THREAD_CHAT_MODEL_ID: ModelId = DEFAULT_MODEL_ID
+
+export const THREAD_CHAT_MODEL_OPTIONS: readonly ClientModelOption[] = AVAILABLE_MODELS
   .filter((model) => model.surfaces.includes("thread"))
   .map((model) => ({
     id: model.id,
     name: model.name,
+    ...(model.contextLabel ? { contextLabel: model.contextLabel } : {}),
     ...(model.description ? { description: model.description } : {}),
     groupId: model.providerId,
     groupName: model.providerName,
@@ -48,6 +53,7 @@ export const THREAD_CHAT_MODEL_OPTIONS: readonly ClientModelOption[] = MODELS
   }))
 
 export {
+  tokenRouterModels,
   arkModels,
   deepseekModels,
   icelandModels,

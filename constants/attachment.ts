@@ -155,3 +155,22 @@ export type AttachmentStatus = (typeof ATTACHMENT_STATUSES)[number]
 export const INSIGHTS_INPUT_CHAR_LIMIT = 20_000
 /** 建议问题数量 */
 export const SUGGESTED_QUESTION_COUNT = 3
+
+/** 单条消息的附件数量上限，供输入协议和上传入口共用。 */
+export const MESSAGE_ATTACHMENT_MAX_FILES = 20
+
+/** Thread Composer 附件入口、上传状态与校验提示。 */
+export const COMPOSER_ATTACHMENT_COPY = {
+  add: "添加附件",
+  tray: "消息附件",
+  uploading: "上传中",
+  failed: "上传失败",
+  retry: "重试上传",
+  remove: "移除",
+  unsupported: "支持文本文件、源码文件及 PNG、JPEG、WebP 图片",
+  empty: "不能添加空文件",
+  blocked: "请等待附件上传完成，或移除失败的附件",
+  uploadFailed: "上传失败，请重试",
+  addFailed: "无法添加附件",
+  cleanupFailed: "附件已移出草稿，但云端文件清理失败",
+} as const

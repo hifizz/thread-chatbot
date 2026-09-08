@@ -25,8 +25,11 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null
 }
 
-function anthropicEffort(providerOptions: unknown): string | undefined {
+function generationEffort(providerOptions: unknown): string | undefined {
   if (!isRecord(providerOptions)) return undefined
+  const compatible = providerOptions.openaiCompatible
+  if (isRecord(compatible) && typeof compatible.reasoningEffort === "string")
+    return compatible.reasoningEffort
   const anthropic = providerOptions.anthropic
   if (!isRecord(anthropic) || typeof anthropic.effort !== "string")
     return undefined
@@ -111,7 +114,7 @@ export function withModelCallLogging(
           ...summarizePrompt(params.prompt),
           availableToolCount: params.tools?.length ?? 0,
           maxOutputTokens: params.maxOutputTokens,
-          effort: anthropicEffort(params.providerOptions),
+          effort: generationEffort(params.providerOptions),
         },
       })
       return doGenerate()
@@ -127,7 +130,7 @@ export function withModelCallLogging(
           ...summarizePrompt(params.prompt),
           availableToolCount: params.tools?.length ?? 0,
           maxOutputTokens: params.maxOutputTokens,
-          effort: anthropicEffort(params.providerOptions),
+          effort: generationEffort(params.providerOptions),
         },
       })
       return doStream()
