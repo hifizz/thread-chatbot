@@ -18,7 +18,7 @@
  * · 输入后提交 = 带问开分支：问题经 onFork 第三参传给壳层，fork 后直接 chat.send
  *   成为新分支第 1 条 user 消息（不进 composer 预填流）；
  * · 留空提交 = 现有预填流原样保留（空分支 + composer 预填代拟问题 + 回车确认）；
- * · 键位：Enter 提交 / Shift+Enter 换行 / ⌘Ctrl+Enter 提交且保留来源列 /
+ * · 键位：移动端 Enter 换行；桌面端 Enter 提交 / Shift+Enter 换行 / ⌘Ctrl+Enter 提交且保留来源列 /
  *   Esc 交由壳层关闭链关气泡；Enter 有 IME 守卫（isComposing / keyCode 229）。
  */
 
@@ -33,6 +33,7 @@ import "./selection-draft-guard.css"
 import { SelectionToolbar } from "./selection-toolbar"
 import { useComposerDraftStore } from "../../chat/composer/composer-drafts"
 import { THREAD_QUOTE_SCHEMA_VERSION } from "@/lib/thread-chat/contracts/quote"
+import { shouldSubmitComposerKey } from "@/lib/chat/composer-keyboard"
 import { GitMerge } from "lucide-react"
 import type { ThreadTreeState } from "../../core/types"
 import { threadTitle } from "../../core/selectors"
@@ -360,6 +361,7 @@ export function SelectionBubble({
                 } as React.CSSProperties
               }
               placeholder="就这段问点什么…（可留空）"
+              enterKeyHint="enter"
               aria-label="就这段划选文字提出你的问题（可留空，留空则预填代拟问题待确认）"
               onChange={(e) => {
                 setQuestion(e.target.value)
@@ -376,13 +378,7 @@ export function SelectionBubble({
                   ) + "px"
               }}
               onKeyDown={(e) => {
-                if (e.key !== "Enter") return
-                // IME 守卫（同 chat-view composer）：输入法组合态按 Enter 只做「上屏」，
-                // 不提交、也不 preventDefault。isComposing 覆盖 Chrome/Firefox；
-                // keyCode 229 兜底 Safari（compositionend 后才派发的 Enter keydown）。
-                const ne = e.nativeEvent
-                if (ne.isComposing || ne.keyCode === 229) return
-                if (e.shiftKey) return // Shift+Enter = 换行（浏览器默认行为）
+                if (!shouldSubmitComposerKey(e.nativeEvent)) return
                 e.preventDefault()
                 submit(e.metaKey || e.ctrlKey)
               }}

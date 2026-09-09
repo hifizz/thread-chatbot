@@ -95,19 +95,15 @@ export function MobileComposer({
             "flex min-w-0 flex-1 items-center gap-2 rounded-[18px] px-3 py-2",
           )}
         >
-          <input
+          <textarea
+            rows={1}
+            enterKeyHint="enter"
             value={value}
             onChange={(event) => onValueChange?.(event.target.value)}
             onFocus={onFocus}
-            onKeyDown={(event) => {
-              if (event.key !== "Enter" || event.shiftKey) return;
-              if (event.nativeEvent.isComposing) return;
-              event.preventDefault();
-              if (!running && value !== "") onSend?.();
-            }}
             placeholder="Message"
             aria-label="Message"
-            className="text-foreground/85 placeholder:text-foreground/30 min-w-0 flex-1 bg-transparent text-[16px] outline-none"
+            className="text-foreground/85 placeholder:text-foreground/30 min-w-0 flex-1 resize-none bg-transparent text-[16px] outline-none"
           />
           {value === "" && (
             <MicIcon className="text-foreground/35 size-4 shrink-0" />
@@ -141,7 +137,7 @@ export function MobileComposer({
 
       {keyboardOpen && (
         <span className={cn(mono, "text-foreground/25 text-center")}>
-          return to send
+          tap ↑ to send
         </span>
       )}
     </div>
