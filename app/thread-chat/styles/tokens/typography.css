@@ -5,10 +5,10 @@
   --tc-typography-family-ui: var(--tc-font-stack-ui);
   --tc-typography-family-read: var(--tc-font-stack-read);
   --tc-typography-family-chinese: var(--font-noto-sans-sc);
-  --tc-typography-family-prose: var(--font-google-english, var(--font-gelasio)), var(--font-google-chinese, var(--tc-typography-family-chinese)), var(--tc-font-stack-read);
-  --tc-typography-family-heading: var(--font-google-heading, var(--font-brawler)), var(--tc-font-stack-ui);
+  --tc-typography-family-prose: var(--font-google-english, var(--font-merriweather)), var(--font-google-chinese, var(--tc-typography-family-chinese)), var(--tc-font-stack-read);
+  --tc-typography-family-heading: var(--font-google-heading, var(--font-pt-serif)), var(--font-google-chinese, var(--tc-typography-family-chinese)), var(--tc-font-stack-ui);
   --tc-typography-family-code: var(--tc-font-stack-mono);
-  --tc-typography-family-code-block: var(--font-fira-code), var(--font-jetbrains-mono), Menlo, Monaco, "Courier New", monospace;
+  --tc-typography-family-code-block: var(--font-hack), Menlo, Monaco, "Courier New", monospace;
 }
 
 html[data-prose-font="noto-serif"] .tc {
@@ -30,6 +30,9 @@ html[data-code-font="jetbrains-mono"] .tc {
 html[data-code-font="menlo"] .tc {
   --tc-typography-family-code-block: Menlo, Monaco, "Courier New", monospace;
 }
+html[data-code-font="hack"] .tc {
+  --tc-typography-family-code-block: var(--font-hack), Menlo, Monaco, "Courier New", monospace;
+}
 html[data-code-font="monaco"] .tc {
   --tc-typography-family-code-block: Monaco, Menlo, "Courier New", monospace;
 }
@@ -38,4 +41,8 @@ html[data-code-font="courier-new"] .tc {
 }
 html[data-code-font="monospace"] .tc {
   --tc-typography-family-code-block: monospace;
+}
+
+html[data-code-font="fira-code"] .tc {
+  --tc-typography-family-code-block: var(--font-fira-code), Menlo, Monaco, "Courier New", monospace;
 }

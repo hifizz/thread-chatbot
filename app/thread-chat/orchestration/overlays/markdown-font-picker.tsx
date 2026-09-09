@@ -1,5 +1,9 @@
 "use client"
 
+import { useLayoutEffect } from "react"
+import { previewFontClasses } from "./preview-fonts"
+import "../../styles/font-picker.css"
+
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
 import {
   DEFAULT_MARKDOWN_FONT,
@@ -13,7 +17,18 @@ import { CodeFontPicker } from "./code-font-picker"
 import { GoogleFontPicker } from "./google-font-picker"
 import { CUSTOM_GOOGLE_FONT_OPTION } from "@/constants/google-fonts"
 
-export function MarkdownFontPicker() {
+export function LocalFontDebugPanel() {
+  const hostname = window.location.hostname
+  if (process.env.NODE_ENV !== "development" ||
+      !["localhost", "127.0.0.1", "[::1]"].includes(hostname)) return null
+  return <MarkdownFontPicker />
+}
+
+function MarkdownFontPicker() {
+  useLayoutEffect(() => {
+    document.documentElement.classList.add(...previewFontClasses)
+    return () => document.documentElement.classList.remove(...previewFontClasses)
+  }, [])
   const { selected, override, loading, failed, selectFont } = usePreviewFont(
     MARKDOWN_FONTS, DEFAULT_MARKDOWN_FONT, MARKDOWN_FONT_STORAGE_KEY, "proseFont", MARKDOWN_FONT_SAMPLE
   )

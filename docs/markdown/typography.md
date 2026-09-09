@@ -1,18 +1,45 @@
 # Markdown 字体选择记录
 
-记录日期：2026-09-07。
+更新日期：2026-09-09。
 
-## 当前选择
+## 正式默认配置
 
-- 英文标题（h1–h6）：Brawler，加载 400、700 字重。
-- 英文正文、表格与用户消息气泡：默认 Gelasio，可变字重 400–700，支持常规与斜体。此前试用过 Lora（常规匹配 500）和 PT Serif（400、700），目前按用户要求改为 Gelasio。
-- 中文正文、表格与用户消息气泡：默认 Noto Sans SC，可通过右下角选择框试读 Noto Serif SC、霞鹜文楷、霞鹜新晰黑；中文标题继续使用原有系统字体。
-- 表格默认字号：16px；紧凑模式保留 12px。
-- 行内代码：继续使用原有等宽字体。代码块默认 Fira Code，可独立切换其他等宽字体。
+| 用途 | 字体 | 加载方式 |
+| --- | --- | --- |
+| 中文正文、表格、用户消息及中文标题回退 | Noto Sans SC | `next/font/google` |
+| 英文正文、表格、用户消息 | Merriweather | `next/font/google`，常规与斜体 |
+| 英文标题 h1–h6 | PT Serif | `next/font/google`，400、700，常规与斜体 |
+| 代码块 | Hack 3.3.0 | `next/font/local`，400、700，常规与斜体 |
+
+正文常规字重保持 400；表格默认 16px，紧凑模式 12px。表格保留外框与行分隔线，移除列间竖线。行内代码及界面字体保持原有配置。
+
+`app/fonts.ts` 集中声明正式字体，`app/layout.tsx` 只挂载变量；语义用途在 `styles/tokens/typography.css` 定义。英文和标题字体关闭自动 Arial 回退，让中文字符落到显式配置的 Noto Sans SC。中文分片与代码字体按需加载，避免预加载整套中文字体。
+
+Google 字体由 Next.js 在构建时下载，随静态资源由本站提供。构建机器需能连接 Google Fonts；访问网站的浏览器无需连接 Google，不配置第三方字体代理。云服务器运行阶段不需要从 Google 拉取正式字体。
+
+## 开发面板边界
+
+字体面板只在 `NODE_ENV=development` 且页面地址为 `localhost`、`127.0.0.1` 或 `[::1]` 时挂载。生产构建不挂载面板，也不读取字体试读存储，不恢复开发时的覆盖设置。非本地地址即使运行开发服务器也不显示面板。
+
+候选字体声明独立于正式配置，位于 `orchestration/overlays/preview-fonts.ts`，由开发面板加载；试读控件、动态 Google 加载与浏览器偏好仍各自保留现有职责。开发环境已有偏好会继续生效，可在面板恢复预设后比较正式默认效果。
+
+## 正式字体许可证
+
+Noto Sans SC、PT Serif、Merriweather 采用 SIL OFL 1.1，允许商业网站使用及嵌入分发；分发须保留版权和许可证，不能单独销售字体，修改字体还需遵守保留名称等限制。原始文本保存在 `public/fonts/licenses/`。
+
+Hack 使用其组合许可（MIT、Bitstream Vera 条款及 DejaVu 的公有领域声明），允许网站使用及分发，完整未修改声明保存在 `public/fonts/hack/LICENSE.md`。字体许可独立于项目代码的 AGPL 许可。
+
+- [Next.js 字体优化](https://nextjs.org/docs/app/getting-started/fonts)
+- [Noto Sans SC 许可](https://github.com/google/fonts/blob/main/ofl/notosanssc/OFL.txt)
+- [PT Serif 许可](https://github.com/google/fonts/blob/main/ofl/ptserif/OFL.txt)
+- [Merriweather 许可](https://github.com/google/fonts/blob/main/ofl/merriweather/OFL.txt)
+- [Hack 许可](https://github.com/source-foundry/Hack/blob/master/LICENSE.md)
+
+以下保留前期试读对比记录，正式默认值以上表为准。
 
 ## 标题字体对比
 
-在相同的 Markdown 标题样式下先试用 Alike，再试用 Brawler，最终选择 Brawler。
+在相同的 Markdown 标题样式下先试用 Alike，再试用 Brawler，当时选择 Brawler（现已改为 PT Serif）。
 
 | 比较项 | Alike | Brawler |
 | --- | --- | --- |
@@ -38,7 +65,7 @@
 
 ## 实现位置
 
-- `app/layout.tsx`：字体加载和 CSS 变量注册。
+- `app/fonts.ts`：正式字体加载；`app/layout.tsx`：CSS 变量挂载。
 - `app/thread-chat/styles/tokens/typography.css`：正文、标题字体 token 与中文回退。
 - `app/thread-chat/styles/markdown.css`：Markdown 标题、正文、表格应用字体。
 - `app/thread-chat/styles/tokens/prose.css`：表格字号。
@@ -59,9 +86,11 @@ Noto 系列由 `next/font/google` 提供。霞鹜文楷 v1.522 的 Regular、Med
 
 ## 代码块字体选择
 
-同一右下角面板增加独立的「代码块」选择框：Fira Code、JetBrains Mono、Menlo、Monaco、Courier New、系统等宽字体。
+同一右下角面板增加独立的「代码块」选择框：Fira Code、JetBrains Mono、Hack、Menlo、Monaco、Courier New、系统等宽字体。
 
-默认回退顺序为 Fira Code → JetBrains Mono → Menlo → Monaco → Courier New → monospace。前两款通过 `next/font/google` 自托管，JetBrains Mono 同时加载常规和斜体。后三款命名字体使用设备已有字体，未安装时按等宽字体栈回退；系统等宽选项由浏览器决定字体。
+Hack 使用官方推荐 jsDelivr 提供的 `hack-font@3.3.0`，四款 WOFF2（常规、粗体、斜体、粗斜体）及完整许可保存在 `public/fonts/hack/`，由本站按需加载。正式默认代码字体为 Hack。
+
+默认回退顺序为 Hack → Menlo → Monaco → Courier New → monospace。调试候选 Fira Code 与 JetBrains Mono 通过 `next/font/google` 自托管，JetBrains Mono 同时加载常规和斜体。后三款命名字体使用设备已有字体，未安装时按等宽字体栈回退；系统等宽选项由浏览器决定字体。
 
 选择仅应用于 `.tc-prose .md-code code`，不改变正文、标题、行内代码、代码块语言标签或其他界面文字。使用独立的 `thread-chat:code-font` 浏览器存储键，和中文字体选择互不影响。加载与记忆逻辑由 `hooks/use-preview-font.ts` 共用。
 

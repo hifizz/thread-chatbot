@@ -30,13 +30,13 @@
 .tc .tc-prose h3,
 .tc .tc-prose h4 {
   color: var(--tc-content-primary);
-  font-weight: 600;
+  font-weight: 700;
   line-height: 1.35;
   margin: var(--tc-prose-heading-gap-before) 0 var(--tc-prose-heading-gap-after);
 }
 .tc .tc-prose h1 {
   font-size: var(--tc-prose-heading-size-1);
-  font-weight: 800;
+  font-weight: 700;
 }
 .tc .tc-prose h2 {
   font-size: var(--tc-prose-heading-size-2);
@@ -50,7 +50,8 @@
 }
 .tc .tc-prose ul,
 .tc .tc-prose ol {
-  margin: 0 0 var(--tc-prose-paragraph-gap);
+  margin: var(--tc-prose-paragraph-gap) 0 20px 0;
+  list-style-position: inside;
   padding-left: var(--tc-prose-list-indent);
 }
 /* Tailwind preflight 全局 list-style:none 会吞掉 marker——正文列表必须显式恢复 */
@@ -66,6 +67,18 @@
 .tc .tc-prose li {
   margin: var(--tc-prose-list-item-gap) 0;
 }
+.tc .tc-prose ul li>p,
+.tc .tc-prose ol li>p {
+  margin: 0;
+}
+.tc .tc-prose p {
+  /*p(strong) ~ li 的内容，需要看起来舒服一点*/
+  margin: 12px 0 4px;
+}
+.tc .message.assistant .bubble p:last-child {
+  margin-bottom: 0;
+}
+
 /* .tc .tc-prose li::marker {
   color: var(--tc-content-muted);
 } */
@@ -73,7 +86,7 @@
   margin: 0 0 var(--tc-prose-quote-gap);
   padding: 6px 0 6px var(--tc-prose-quote-indent);
   border-left: 3px solid var(--tc-border-strong);
-  color: var(--tc-content-secondary);
+  color: var(--tc-content-primary);
 }
 .tc .tc-prose blockquote > p {
   margin: 0 !important;
@@ -130,15 +143,10 @@
 .tc .tc-prose th,
 .tc .tc-prose td {
   border: 0;
-  border-right: 1px solid var(--tc-border-subtle);
   border-bottom: 1px solid var(--tc-border-subtle);
   padding: 6px 12px;
   text-align: left;
   vertical-align: top;
-}
-.tc .tc-prose th:last-child,
-.tc .tc-prose td:last-child {
-  border-right: 0;
 }
 .tc .tc-prose tr:last-child td {
   border-bottom: 0;
