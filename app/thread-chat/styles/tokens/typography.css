@@ -4,5 +4,8 @@
 .tc {
   --tc-typography-family-ui: var(--tc-font-stack-ui);
   --tc-typography-family-read: var(--tc-font-stack-read);
+  --tc-typography-family-prose: var(--font-merriweather), var(--font-noto-sans-sc), var(--tc-font-stack-read);
+  --tc-typography-family-heading: var(--font-pt-serif), var(--font-noto-sans-sc), var(--tc-font-stack-ui);
+  --tc-typography-family-code-block: var(--font-hack), Menlo, Monaco, "Courier New", monospace;
   --tc-typography-family-code: var(--tc-font-stack-mono);
 }
