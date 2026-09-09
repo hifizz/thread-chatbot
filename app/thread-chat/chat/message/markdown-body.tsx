@@ -25,6 +25,9 @@ import React, {
 } from "react"
 import Markdown, { type Components, type ExtraProps } from "react-markdown"
 import remarkGfm from "remark-gfm"
+import remarkMath from "remark-math"
+import rehypeKatex from "rehype-katex"
+import "katex/dist/katex.min.css"
 import { Check, Copy } from "lucide-react"
 import { useTheme } from "next-themes"
 
@@ -220,7 +223,11 @@ export const MarkdownBody = memo(function MarkdownBody({
       data-content-settled={snapshot.settled && !streaming ? "true" : "false"}
     >
       <MarkdownSettlementContext.Provider value={contextValue}>
-        <Markdown remarkPlugins={[remarkGfm]} components={components}>
+        <Markdown
+          remarkPlugins={[remarkGfm, remarkMath]}
+          rehypePlugins={[rehypeKatex]}
+          components={components}
+        >
           {source}
         </Markdown>
       </MarkdownSettlementContext.Provider>
