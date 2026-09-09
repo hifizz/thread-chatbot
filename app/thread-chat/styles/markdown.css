@@ -108,6 +108,19 @@
   border-radius: 4px;
   padding: 1px 5px;
 }
+/* 长公式只在自身滚动，避免撑开分栏；上下留白保护分数和上下标。 */
+.tc .tc-prose .katex-display {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 4px 0;
+  scrollbar-color: var(--tc-border-scrollbar) transparent;
+}
+.tc .tc-prose .katex-display > .katex {
+  display: block;
+  width: max-content;
+  min-width: 100%;
+}
 /* 表格 */
 /* 让表格的最小内容宽度留在独立滚动区内，不撑开正文和消息列表。 */
 .tc .md-table-scroll {
