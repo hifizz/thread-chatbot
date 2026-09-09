@@ -50,6 +50,7 @@
 @container tc-prose (width < 480px) {
   .tc .tc-prose {
     --tc-prose-size: 14px;
+    --tc-prose-table-size: var(--tc-prose-size);
     --tc-prose-heading-size-1: 20px;
     --tc-prose-heading-size-2: 16px;
     --tc-prose-heading-size-3: 14px;
