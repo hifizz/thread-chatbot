@@ -5,6 +5,7 @@
   --col-min: 340px;
   --lane-max: 760px;
 
+  height: 100vh;
   height: 100dvh;
   display: flex;
   flex-direction: column;
@@ -12,6 +13,14 @@
   background: var(--tc-surface-base);
   color: var(--tc-content-primary);
   font-family: var(--tc-typography-family-ui);
+}
+
+/* 不使用 transform，避免改变挂载在工作区内的 fixed 弹层坐标系。 */
+.tc[data-input-viewport="true"] {
+  position: fixed;
+  inset-inline: 0;
+  top: var(--tc-input-top);
+  height: var(--tc-input-height);
 }
 .tc *,
 .tc *::before,
