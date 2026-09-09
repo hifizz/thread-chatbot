@@ -19,6 +19,12 @@
   padding: 8px;
 }
 
+.bar,
+.modelMenu {
+  border-color: var(--border);
+  box-shadow: 0 4px 24px -4px var(--tc-shadow-composer);
+}
+
 .bar:hover,
 .bar:focus-within {
   border-color: var(--tc-accent-edge);
@@ -36,6 +42,35 @@
 .toolbar :global([data-slot="composer-model-trigger"]),
 .toolbar :global([data-slot="select-trigger"]) {
   padding-inline: 8px;
+}
+
+.toolbar :global([data-slot="select-trigger"]) {
+  background: transparent;
+  color: var(--muted-foreground);
+}
+
+.toolbar :global([data-slot="select-trigger"]:hover:not(:disabled)) {
+  background: var(--muted);
+  color: var(--foreground);
+}
+
+.parameterMenu {
+  padding: 6px;
+  background: var(--popover);
+}
+
+.parameterMenu :global([data-slot="select-item"]) {
+  padding: 8px 32px 8px 10px;
+  border-radius: 10px;
+  background: transparent;
+}
+
+.parameterMenu :global([data-slot="select-item"] + [data-slot="select-item"]) {
+  margin-top: 2px;
+}
+
+.parameterMenu :global([data-slot="select-item"][data-highlighted]) {
+  background: var(--muted);
 }
 
 .toolbar :global([data-slot="composer-attach"]),

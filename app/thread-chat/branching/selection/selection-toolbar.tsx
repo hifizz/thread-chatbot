@@ -25,7 +25,7 @@ export function SelectionToolbar({ rect, onContinue, onBranch }: {
   const position = height ? computePopupPosition(rect, { width, height }, {
     left: 0, top: 0, width: window.innerWidth, height: window.innerHeight,
   }, { sides: ["top", "bottom"], gap: BUBBLE_GAP, safePadding: BUBBLE_SAFE_PADDING }) : null
-  return <div ref={ref} className="selection-toolbar" role="toolbar" aria-label={COPY.label}
+  return <div ref={ref} className="selection-toolbar" data-positioned={Boolean(position)} role="toolbar" aria-label={COPY.label}
     style={{ width, left: position?.left, top: position?.top, visibility: position ? "visible" : "hidden" }}
     onPointerDown={(event) => event.preventDefault()}
     onKeyDown={(event) => {
