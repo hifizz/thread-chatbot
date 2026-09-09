@@ -1,5 +1,4 @@
-import { Geist_Mono, Inter, Merriweather, Noto_Sans_SC, PT_Serif } from "next/font/google"
-import localFont from "next/font/local"
+import { Fira_Code, Geist_Mono, Inter, Merriweather, Noto_Sans_SC, PT_Serif } from "next/font/google"
 
 // 正式字体统一在这里声明一次；布局只负责挂载 CSS 变量。
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" })
@@ -27,14 +26,9 @@ const heading = PT_Serif({
   display: "swap",
   adjustFontFallback: false,
 })
-const code = localFont({
-  src: [
-    { path: "../public/fonts/hack/hack-regular.woff2", weight: "400", style: "normal" },
-    { path: "../public/fonts/hack/hack-bold.woff2", weight: "700", style: "normal" },
-    { path: "../public/fonts/hack/hack-italic.woff2", weight: "400", style: "italic" },
-    { path: "../public/fonts/hack/hack-bolditalic.woff2", weight: "700", style: "italic" },
-  ],
-  variable: "--font-hack",
+const code = Fira_Code({
+  subsets: ["latin"],
+  variable: "--font-fira-code",
   display: "swap",
   preload: false,
   adjustFontFallback: false,
