@@ -15,6 +15,7 @@ import {
 import { cva, type VariantProps } from "class-variance-authority"
 import { CheckIcon, ChevronDownIcon } from "lucide-react"
 import { useAui } from "@assistant-ui/react"
+import { ModelLogo } from "@/components/assistant-ui/model-logo"
 import { cn } from "@/lib/utils"
 import {
   Popover,
@@ -604,7 +605,7 @@ function ModelSelectorItem({
     >
       {children ?? (
         <>
-          {model.icon && <ModelIcon>{model.icon}</ModelIcon>}
+          {model.icon ? <ModelIcon>{model.icon}</ModelIcon> : <ModelLogo modelId={model.id} />}
           <span className="min-w-0 font-medium break-words whitespace-normal">
             {model.name}
           </span>

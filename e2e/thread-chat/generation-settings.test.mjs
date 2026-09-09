@@ -97,3 +97,17 @@ assert.deepEqual(chatAnswerGenerationOptions("research", { effort: "none", maxOu
   providerOptions: { openaiCompatible: { reasoningEffort: "none" } },
 })
 console.log("PASS GPT 能力矩阵、模型切换回退与协议参数隔离")
+
+for (const suffix of ["deepseek-v4-flash", "deepseek-v4-flash-vision-exp", "deepseek-v4-pro", "glm-5.3", "glm-5.3-flash"]) {
+  const id = `token-router-${suffix}`
+  const levels = suffix.startsWith("deepseek-") ? ["none", "low", "high", "max"] : ["low", "high", "max"]
+  assert.deepEqual(getModelGenerationSettingsCapability(id).effortLevels, levels)
+  for (const effort of levels) assert.doesNotThrow(() => assertAllowedGenerationSettings(id, { effort, maxOutputTokens: 128_000 }))
+  assert.throws(() => assertAllowedGenerationSettings(id, { effort: "medium", maxOutputTokens: 16_000 }))
+  if (suffix.startsWith("glm-")) {
+    assert.throws(() => assertAllowedGenerationSettings(id, { effort: "none", maxOutputTokens: 16_000 }))
+    assert.equal(resolveGenerationSettings(id, { effort: "none", maxOutputTokens: 16_000 }).effort, "high")
+  }
+}
+assert.equal(getModelGenerationSettingsCapability("token-router-deepseek-v4.1-flash-expires-on-0910"), undefined)
+console.log("PASS DeepSeek / GLM 思考能力、输出选项及切换回退")

@@ -1,8 +1,8 @@
 import assert from "node:assert/strict"
 import { chatAnswerGenerationOptions } from "../../lib/thread-chat/streaming/generation-settings.ts"
-import { generateText } from "ai"
+import { generateText, tool, jsonSchema } from "ai"
 import { resolveChatModelWithRoute } from "../../lib/ai/llm/providers.ts"
-import { isTokenRouterConfigured, normalizeTokenRouterBaseURL } from "../../lib/ai/llm/token-router.ts"
+import { isTokenRouterConfigured, normalizeTokenRouterBaseURL, normalizeTokenRouterRequest } from "../../lib/ai/llm/token-router.ts"
 
 // 拦截 SDK 最终请求，不调用付费服务。验证真实路由、协议、凭据和上游模型 ID。
 const savedFetch = globalThis.fetch
@@ -82,8 +82,32 @@ try {
     assert.equal(request.body.model, upstreamId)
     assert.equal(request.body.max_tokens, 8)
     assert.equal("max_completion_tokens" in request.body, false)
-    assert.equal("thinking" in request.body, false)
+    assert.deepEqual(request.body.thinking, { type: "enabled" })
+    assert.equal(request.body.reasoning_effort, "high")
     assert.equal(request.headers.get("authorization"), "Bearer router-test-key")
+    const tools = Object.fromEntries(["search", "fetch"].map((name) => [name, tool({
+      description: name, inputSchema: jsonSchema({ type: "object", properties: {} }),
+    })]))
+    for (const toolChoice of ["auto", "required", "none", { type: "tool", toolName: "search" }]) {
+      await generateText({ model: resolved.model, prompt: "Find information", tools, toolChoice, maxRetries: 0 })
+      const body = requests.at(-1).body
+      if (toolChoice === "none") {
+        assert.equal("tools" in body, false)
+        assert.equal("tool_choice" in body, false)
+      } else {
+        assert.equal(body.tool_choice, upstreamId.startsWith("glm-") ? "auto" : undefined)
+        assert.deepEqual(body.tools.map((entry) => entry.function.name), typeof toolChoice === "object" ? ["search"] : ["search", "fetch"])
+      }
+    }
+    for (const [effort, expected] of [["none", "low"], ["medium", "high"], ["xhigh", "max"], ["max", "max"]]) {
+      await generateText({ model: resolved.model, prompt: "Reply OK", maxRetries: 0,
+        ...chatAnswerGenerationOptions("answer", { effort, maxOutputTokens: 16_000 }, resolved.route.protocol) })
+      const body = requests.at(-1).body
+      const disabled = effort === "none" && upstreamId.startsWith("deepseek-v4-")
+      assert.deepEqual(body.thinking, { type: disabled ? "disabled" : "enabled" })
+      assert.equal(body.reasoning_effort, disabled ? undefined : expected)
+    }
+
   }
 } finally {
   globalThis.fetch = savedFetch
@@ -93,3 +117,13 @@ try {
   }
 }
 console.log("PASS Token Router 原生协议、统一凭据、稳定公开 ID 与真实请求体")
+
+// 思考工具回合必须完整保留，且转换不能修改调用方原始对象。
+const history = [{ role: "assistant", content: null, reasoning_content: "Need a source", tool_calls: [{ id: "call_1", type: "function", function: { name: "search", arguments: "{}" } }] }, { role: "tool", tool_call_id: "call_1", content: "Source" }]
+const original = { model: "deepseek-v4-flash", messages: history, reasoning_effort: "medium", tools: [{ type: "function", function: { name: "search" } }], tool_choice: "none" }
+const snapshot = structuredClone(original)
+assert.deepEqual(normalizeTokenRouterRequest(original).messages, history)
+assert.deepEqual(original, snapshot)
+assert.equal(normalizeTokenRouterRequest({ model: "gemini-3.7-flash", tool_choice: "required" }).tool_choice, "required")
+assert.throws(() => normalizeTokenRouterRequest({ model: "glm-5.3-flash", reasoning_effort: "invalid" }), /不支持推理强度/)
+console.log("PASS 思考工具历史保留及请求转换无副作用")
