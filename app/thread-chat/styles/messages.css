@@ -11,6 +11,7 @@
   position: relative;
   flex: 1;
   min-height: 0;
+  min-width: 0;
   display: flex;
   flex-direction: column;
 }
@@ -19,6 +20,24 @@
   min-height: 0;
   overflow-y: auto;
   padding: 16px 18px 8px;
+  scroll-padding-bottom: var(--tc-composer-inset, 0px);
+}
+
+/* 留白属于 Content，使 MessageScroller 的尺寸观察能维持原有贴底策略。 */
+.tc .msg-scroll-content {
+  padding-bottom: var(--tc-composer-inset, 0px);
+}
+.tc .chat-composer-dock {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  z-index: var(--tc-z-column-raised);
+  max-height: 100%;
+  overflow-y: auto;
+  pointer-events: none;
+}
+.tc .chat-composer-dock [data-slot="composer"] {
+  pointer-events: auto;
 }
 
 /* 「滚到底」按钮：流式中贴底时隐藏，用户上滑释放后淡入。奶黄纸面 + 墨色描边，
@@ -26,7 +45,7 @@
 .tc .scroll-end-btn {
   position: absolute;
   left: 50%;
-  bottom: 14px;
+  bottom: calc(var(--tc-composer-inset, 0px) + 14px);
   z-index: var(--tc-z-column-raised);
   width: 34px;
   height: 34px;

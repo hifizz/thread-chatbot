@@ -1,5 +1,7 @@
 "use client"
 
+import { useInputViewport } from "../orchestration/use-input-viewport"
+
 import { GenerationSettingsProvider } from "../chat/composer/generation-settings-context"
 import { ComposerDraftProvider } from "../chat/composer/composer-drafts"
 import { ArtifactResourcesProvider, ArtifactNavigationProvider } from "../chat/composer/artifact-resources"
@@ -191,6 +193,8 @@ export function NormalizedGate3Harness({
 
   const rootId = state.project?.rootThreadId ?? GATE3_HARNESS_IDS.rootThreadId
   const viewMode = state.workspace.view
+  const viewportRootRef = useRef<HTMLDivElement>(null)
+  useInputViewport(viewportRootRef, viewMode === "columns")
   const slots: Slot[] = state.workspace.openThreadIds
     .filter(
       (threadId) => threadId !== rootId && Boolean(state.threadsById[threadId])
@@ -405,7 +409,7 @@ export function NormalizedGate3Harness({
     SCENARIOS.find((entry) => entry.id === scenario)?.label ?? scenario
 
   return (
-    <ArtifactResourcesProvider store={runtime.store}><ComposerDraftProvider><GenerationSettingsProvider><ArtifactNavigationProvider onOpen={(id) => { setActiveArtifactId(id); setDrawerOpen(true) }}><div className="tc" data-gate3-normalized-harness="true">
+    <ArtifactResourcesProvider store={runtime.store}><ComposerDraftProvider><GenerationSettingsProvider><ArtifactNavigationProvider onOpen={(id) => { setActiveArtifactId(id); setDrawerOpen(true) }}><div className="tc" ref={viewportRootRef} data-gate3-normalized-harness="true">
       <ThreadChatTopbar
         viewMode={viewMode}
         showHelp

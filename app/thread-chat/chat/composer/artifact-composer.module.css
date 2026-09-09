@@ -12,6 +12,12 @@
   padding-inline: 12px;
 }
 
+@media (any-pointer: coarse) {
+  .frame:not(.canvasFrame) {
+    padding-bottom: max(16px, env(safe-area-inset-bottom, 0px));
+  }
+}
+
 /* 官方 Composer 排版只覆盖当前输入区域，历史消息编辑器沿用原样式。 */
 .bar {
   container: thread-composer / inline-size;
@@ -122,4 +128,12 @@
 
 :global(.tc) .editor :global(.composer-capsule-action:focus-visible) {
   outline-color: var(--ring);
+}
+
+/* iOS 聚焦编辑区时避免小字号触发自动放大；桌面窄列仍保留原字号。 */
+@media (any-pointer: coarse) {
+  :global(.tc) .editor {
+    font-size: 16px;
+    line-height: 24px;
+  }
 }

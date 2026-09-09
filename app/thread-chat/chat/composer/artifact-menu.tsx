@@ -8,6 +8,7 @@ import { FileTextIcon } from "lucide-react"
 import { ComposerMenu, ComposerMenuItem } from "@/components/assistant-ui/elements/composer/menu"
 import { ComposerTheme } from "@/components/assistant-ui/elements/composer/theme"
 import { ARTIFACT_REFERENCE_COPY } from "@/constants/artifact-reference"
+import { scrollMenuOptionIntoView } from "@/lib/thread-chat/scroll-menu-option"
 
 /** 复用 Lexical 官方 NodeContextMenuPlugin 的 Floating UI 组合；只定位自己渲染的菜单。 */
 export function ArtifactMenu<T extends MenuOption & { artifact: ArtifactDTO }>({ resolution, root, query, options, selectedIndex, setHighlightedIndex, selectOptionAndCleanUp }: {
@@ -15,7 +16,7 @@ export function ArtifactMenu<T extends MenuOption & { artifact: ArtifactDTO }>({
   query: string;
   setHighlightedIndex: (index: number) => void; selectOptionAndCleanUp: (option: T) => void
 }) {
-  const { refs: { setFloating, setPositionReference }, floatingStyles } = useFloating({
+  const { refs: { setFloating, setPositionReference, floating }, floatingStyles, update } = useFloating({
     open: true, placement: "top-start", strategy: "fixed",
     middleware: [offset(8), flip({ padding: 12 }), shift({ padding: 12 }), size({ padding: 12, apply({ availableHeight, availableWidth, elements }) {
       elements.floating.style.maxHeight = `${Math.max(0, Math.min(240, availableHeight))}px`
@@ -28,12 +29,25 @@ export function ArtifactMenu<T extends MenuOption & { artifact: ArtifactDTO }>({
     const composer = root?.closest<HTMLElement>('[data-slot="composer"]')
     setPositionReference(composer ?? { getBoundingClientRect: resolution.getRect, contextElement: root ?? undefined })
   }, [setPositionReference, resolution, root])
-  useEffect(() => { if (selectedIndex !== null) options[selectedIndex]?.ref?.current?.scrollIntoView({ block: "nearest" }) }, [options, selectedIndex])
+  // VisualViewport 的键盘动画/平移可能不改变布局视口，显式通知现有定位器。
+  useEffect(() => {
+    const viewport = window.visualViewport
+    viewport?.addEventListener("resize", update)
+    viewport?.addEventListener("scroll", update)
+    return () => {
+      viewport?.removeEventListener("resize", update)
+      viewport?.removeEventListener("scroll", update)
+    }
+  }, [update])
+  useEffect(() => {
+    const option = selectedIndex === null ? null : options[selectedIndex]?.ref?.current
+    if (option && floating.current) scrollMenuOptionIntoView(floating.current, option)
+  }, [options, selectedIndex, floating])
   return createPortal(<ComposerTheme><ComposerMenu open ref={setFloating}
     style={{ ...floatingStyles, bottom: "auto", marginBottom: 0, zIndex: "var(--tc-z-selection, 100)" }}
-    className="overflow-y-auto" role="listbox" aria-label={ARTIFACT_REFERENCE_COPY.picker}>
+    className="overflow-y-auto overscroll-contain" role="listbox" aria-label={ARTIFACT_REFERENCE_COPY.picker}>
     {!options.length && <div className="flex min-h-14 items-center justify-center px-2 text-center text-sm text-foreground/45" role="status" onMouseDown={(event) => event.preventDefault()}>{query ? ARTIFACT_REFERENCE_COPY.noMatches : ARTIFACT_REFERENCE_COPY.empty}</div>}
-    {options.map((option, index) => <ComposerMenuItem key={option.key} id={`typeahead-item-${index}`} role="option" aria-selected={selectedIndex === index}
+    {options.map((option, index) => <ComposerMenuItem key={option.key} className="shrink-0" id={`typeahead-item-${index}`} role="option" aria-selected={selectedIndex === index}
       ref={(element) => option.setRefElement(element)} active={selectedIndex === index}
       onMouseDown={(event) => event.preventDefault()} onMouseEnter={() => setHighlightedIndex(index)} onClick={() => selectOptionAndCleanUp(option)}>
       <FileTextIcon className="size-5 shrink-0 text-foreground/45" />

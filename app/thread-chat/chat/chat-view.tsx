@@ -16,6 +16,7 @@ import React from "react"
 import { MessageScroller } from "@shadcn/react/message-scroller"
 import type { ConversationViewMessage } from "../core/types"
 import { ConversationComposer } from "./composer/conversation-composer"
+import { useComposerInset } from "./use-composer-inset"
 import { ConversationMessage } from "./message/conversation-message"
 import type { MessageActionViewState } from "./actions/message-action-types"
 import type { ThreadMessageActionCommands } from "./actions/message-action-commands"
@@ -80,6 +81,7 @@ export function ChatView({
   editableUserMessageId,
   regeneratableAssistantMessageId,
 }: ChatViewProps) {
+  const { rootRef, dockRef } = useComposerInset()
   return (
     <>
       {header}
@@ -88,9 +90,9 @@ export function ChatView({
           见 §5 注释（下方 Provider）。.msg-list + data-list 必须保留——划选气泡靠
           .closest(".msg-list") + data-list 反查会话。 */}
       <MessageScroller.Provider autoScroll defaultScrollPosition="end">
-        <MessageScroller.Root className="msg-scroll-root">
+        <MessageScroller.Root className="msg-scroll-root" ref={rootRef}>
           <MessageScroller.Viewport className="msg-list" data-list={threadId}>
-            <MessageScroller.Content>
+            <MessageScroller.Content className="msg-scroll-content">
               <div className="lane">
                 {intro}
                 {messages.map((msg) => (
@@ -120,21 +122,23 @@ export function ChatView({
           <MessageScroller.Button direction="end" className="scroll-end-btn">
             <span className="scroll-end-icon">↓</span>
           </MessageScroller.Button>
+          <div className="chat-composer-dock" ref={dockRef}>
+            <ConversationComposer
+              variant="column"
+              threadId={threadId}
+              isMain={isMain}
+              busy={busy}
+              prefill={composerPrefill}
+              modelId={modelId}
+              modelSelectorDisabled={modelSelectorDisabled}
+              modelSelectorDisabledReason={modelSelectorDisabledReason}
+              onModelChange={onModelChange}
+              onSend={onSend}
+              onStop={onStop}
+            />
+          </div>
         </MessageScroller.Root>
       </MessageScroller.Provider>
-      <ConversationComposer
-        variant="column"
-        threadId={threadId}
-        isMain={isMain}
-        busy={busy}
-        prefill={composerPrefill}
-        modelId={modelId}
-        modelSelectorDisabled={modelSelectorDisabled}
-        modelSelectorDisabledReason={modelSelectorDisabledReason}
-        onModelChange={onModelChange}
-        onSend={onSend}
-        onStop={onStop}
-      />
     </>
   )
 }

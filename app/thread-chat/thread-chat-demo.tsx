@@ -1,5 +1,7 @@
 "use client"
 
+import { useInputViewport } from "./orchestration/use-input-viewport"
+
 import { ComposerDraftProvider } from "./chat/composer/composer-drafts"
 import { ArtifactResourcesProvider, ArtifactNavigationProvider } from "./chat/composer/artifact-resources"
 
@@ -233,6 +235,7 @@ function NormalizedThreadChat({
     toggleDrawer,
     closeDrawer,
   } = useWorkspaceOverlays()
+  useInputViewport(rootRef, workspace.viewMode === "columns")
   const [hintDismissed, setHintDismissed] = useState(false)
 
   const feedbackByMessageId = useMemo(
