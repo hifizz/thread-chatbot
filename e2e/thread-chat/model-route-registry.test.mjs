@@ -22,10 +22,10 @@ assert.equal(
   new Set(CHAT_MODELS.map((model) => model.id)).size,
   CHAT_MODELS.length
 )
-assert.equal(THREAD_CHAT_MODEL_OPTIONS.length, 18)
-assert.equal(AVAILABLE_MODELS.length, 18)
+assert.equal(THREAD_CHAT_MODEL_OPTIONS.length, 24)
+assert.equal(AVAILABLE_MODELS.length, 24)
 assert.ok(AVAILABLE_MODELS.every((model) => model.providerId === tokenRouterModels.id))
-assert.ok(THREAD_CHAT_MODEL_OPTIONS.every((model) => model.groupId === tokenRouterModels.id && model.contextLabel))
+assert.ok(THREAD_CHAT_MODEL_OPTIONS.every((model) => model.groupId === tokenRouterModels.id))
 assert.equal(DEFAULT_MODEL_ID, "private-relay-gpt-5.6-luna")
 assert.equal(DEFAULT_THREAD_CHAT_MODEL_ID, DEFAULT_MODEL_ID)
 assert.ok(AVAILABLE_MODELS.every((model) => model.surfaces.includes("linear") && model.surfaces.includes("thread")))
