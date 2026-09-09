@@ -35,7 +35,7 @@ export function ComposerModelSelector({ modelId, disabled, disabledReason, onVal
       <ComposerTheme>
         <Menu.Positioner side="top" align="start" sideOffset={8} className="z-50">
           <Menu.Popup aria-label={COMPOSER_MODEL_COPY.choose}
-            render={<ComposerMenu open={open && !locked} className="relative bottom-auto w-[28rem] mb-0 max-h-[min(24rem,var(--available-height))] max-w-[calc(100vw-2rem)] overflow-y-auto outline-none" />}>
+            render={<ComposerMenu open={open && !locked} className="relative bottom-auto w-[32rem] mb-0 max-h-[min(24rem,var(--available-height))] max-w-[calc(100vw-2rem)] overflow-y-auto outline-none" />}>
             <Menu.RadioGroup value={modelId} onValueChange={onValueChange} className="flex flex-col gap-0.5">
               {THREAD_CHAT_MODEL_OPTIONS.map((model) => <Menu.RadioItem key={model.id} value={model.id} label={model.name} nativeButton closeOnClick
                 render={<ComposerModelItem entry={{ name: model.name, meta: model.contextLabel ?? "", icon: <ModelLogo modelId={model.id} /> }} selected={model.id === modelId}
