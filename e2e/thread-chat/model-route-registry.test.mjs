@@ -143,3 +143,16 @@ assert.equal(
 console.log(
   "PASS  model routes, active Token Router catalog, stable IDs, and unknown model rejection"
 )
+
+for (const [suffix, imageInput] of [["deepseek-v4-flash", false], ["deepseek-v4-flash-vision-exp", true], ["deepseek-v4-pro", false], ["glm-5.3", false], ["glm-5.3-flash", true]]) {
+  const model = AVAILABLE_MODELS.find((entry) => entry.id === `token-router-${suffix}`)
+  assert.equal(model.contextLabel, "1M ctx")
+  assert.equal(model.capabilities.imageInput, imageInput)
+  assert.equal(model.capabilities.reasoning, true)
+}
+const preview = AVAILABLE_MODELS.find((entry) => entry.id === "token-router-deepseek-v4.1-flash-expires-on-0910")
+assert.equal(preview.name, "deepseek-v4.1-flash-expires-on-0910")
+assert.equal(preview.contextLabel, "Unknown ctx")
+assert.ok(AVAILABLE_MODELS.every((model) => !("requestPolicy" in model)))
+assert.ok(THREAD_CHAT_MODEL_OPTIONS.every((model) => !("requestPolicy" in model)))
+console.log("PASS 新模型上下文、图像能力和服务端策略隔离")

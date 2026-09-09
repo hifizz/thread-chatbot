@@ -1,4 +1,5 @@
 import { ANTHROPIC_ADAPTIVE_GENERATION_SETTINGS, GPT_5_6_GENERATION_SETTINGS, GPT_6_GENERATION_SETTINGS, GPT_5_4_GENERATION_SETTINGS } from "@/constants/generation-settings"
+import { MAX_OUTPUT_TOKEN_OPTIONS, type GenerationSettingsCapability } from "@/constants/generation-settings"
 import { defineProviderModels } from "@/constants/models/types"
 
 const adaptiveGenerationCapabilities = {
@@ -7,7 +8,21 @@ const adaptiveGenerationCapabilities = {
 const gptCapabilities = { attachments: true, reasoning: true, generationSettings: GPT_5_6_GENERATION_SETTINGS }
 const astraCapabilities = { ...gptCapabilities, generationSettings: GPT_6_GENERATION_SETTINGS }
 const previousGptCapabilities = { ...gptCapabilities, generationSettings: GPT_5_4_GENERATION_SETTINGS }
-const textReasoningCapabilities = { imageInput: false, reasoning: true }
+// 官方 V4 与 GLM-5.3 均覆盖产品现有的 16K–128K 输出选项。
+const alwaysThinkingSettings = {
+  effortLevels: ["low", "high", "max"],
+  maxOutputTokenOptions: MAX_OUTPUT_TOKEN_OPTIONS,
+} as const satisfies GenerationSettingsCapability
+const deepseekSettings = {
+  ...alwaysThinkingSettings,
+  effortLevels: ["none", "low", "high", "max"],
+} as const satisfies GenerationSettingsCapability
+const deepseekCapabilities = { imageInput: false, reasoning: true, generationSettings: deepseekSettings }
+const glmCapabilities = { imageInput: false, reasoning: true, generationSettings: alwaysThinkingSettings }
+// 请求兼容规则仅在 Token Router 声明，由服务端统一应用。
+const deepseekRequestPolicy = { thinking: "optional", toolChoice: "omit" } as const
+const glmRequestPolicy = { thinking: "required", toolChoice: "auto" } as const
+const previewRequestPolicy = { thinking: "required", toolChoice: "omit" } as const
 
 /** 当前入口的唯一模型目录。publicId 保留历史会话身份，与实际 provider 解耦。 */
 export const tokenRouterModels = defineProviderModels({
@@ -20,13 +35,15 @@ export const tokenRouterModels = defineProviderModels({
   },
   // contextLabel 为暂定展示值；不得用作真实 token 预算。
   models: [
-    // 使用已核验的官方 ID；临时版保留用户提供的名称，仍需确认中转可用性。
-    { id: "deepseek-v4.1-flash-expires-on-0910", publicId: "token-router-deepseek-v4.1-flash-expires-on-0910", name: "DeepSeek V4.1 Flash（临时版 · 0910）", capabilities: textReasoningCapabilities },
-    { id: "deepseek-v4-flash", publicId: "token-router-deepseek-v4-flash", name: "DeepSeek V4 Flash", capabilities: textReasoningCapabilities },
-    { id: "deepseek-v4-flash-vision-exp", publicId: "token-router-deepseek-v4-flash-vision-exp", name: "DeepSeek V4 Flash Vision Exp", capabilities: { reasoning: true } },
-    { id: "deepseek-v4-pro", publicId: "token-router-deepseek-v4-pro", name: "DeepSeek V4 Pro", capabilities: textReasoningCapabilities },
-    { id: "glm-5.3", publicId: "token-router-glm-5.3", name: "GLM-5.3", capabilities: textReasoningCapabilities },
-    { id: "glm-5.3-flash", publicId: "token-router-glm-5.3-flash", name: "GLM-5.3-Flash", capabilities: { reasoning: true } },
+    // 临时版缺少公开规格：不宣称已知上下文，也不开放未经确认的输出上限选项。
+    { id: "deepseek-v4.1-flash-expires-on-0910", publicId: "token-router-deepseek-v4.1-flash-expires-on-0910", name: "deepseek-v4.1-flash-expires-on-0910", contextLabel: "Unknown ctx", capabilities: { imageInput: false, reasoning: true }, requestPolicy: previewRequestPolicy },
+    // https://api-docs.deepseek.com/quick_start/pricing/：1M 上下文，支持关闭思考。
+    { id: "deepseek-v4-flash", publicId: "token-router-deepseek-v4-flash", name: "DeepSeek V4 Flash", contextLabel: "1M ctx", capabilities: deepseekCapabilities, requestPolicy: deepseekRequestPolicy },
+    { id: "deepseek-v4-flash-vision-exp", publicId: "token-router-deepseek-v4-flash-vision-exp", name: "DeepSeek V4 Flash Vision Exp", contextLabel: "1M ctx", capabilities: { ...deepseekCapabilities, imageInput: true }, requestPolicy: deepseekRequestPolicy },
+    { id: "deepseek-v4-pro", publicId: "token-router-deepseek-v4-pro", name: "DeepSeek V4 Pro", contextLabel: "1M ctx", capabilities: deepseekCapabilities, requestPolicy: deepseekRequestPolicy },
+    // https://docs.bigmodel.cn/cn/guide/models/text/glm-5.3：始终思考，仅 low/high/max。
+    { id: "glm-5.3", publicId: "token-router-glm-5.3", name: "GLM-5.3", contextLabel: "1M ctx", capabilities: glmCapabilities, requestPolicy: glmRequestPolicy },
+    { id: "glm-5.3-flash", publicId: "token-router-glm-5.3-flash", name: "GLM-5.3-Flash", contextLabel: "1M ctx", capabilities: { ...glmCapabilities, imageInput: true }, requestPolicy: glmRequestPolicy },
     { id: "claude-opus-4-6", publicId: "iceland-claude-opus-4-6", name: "Claude Opus 4.6", contextLabel: "1M ctx", capabilities: adaptiveGenerationCapabilities },
     { id: "claude-sonnet-4-6", publicId: "iceland-claude-sonnet-4-6", name: "Claude Sonnet 4.6", contextLabel: "1M ctx" },
     { id: "claude-opus-4-7", publicId: "iceland-claude-opus-4-7", name: "Claude Opus 4.7", contextLabel: "1M ctx", capabilities: adaptiveGenerationCapabilities },

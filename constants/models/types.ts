@@ -19,6 +19,11 @@ export type ModelDefinition = {
   description?: string
   surfaces?: readonly ModelSurface[]
   capabilities?: ModelCapabilities
+  /** 服务端请求兼容规则；不进入 PublicModel 或菜单选项。 */
+  requestPolicy?: {
+    thinking: "optional" | "required"
+    toolChoice: "omit" | "auto"
+  }
   unbilledPreview?: true
 }
 
