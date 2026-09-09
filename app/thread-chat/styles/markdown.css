@@ -8,7 +8,7 @@
 .tc .tc-prose {
   min-width: 0;
   max-width: 100%;
-  font-family: var(--tc-typography-family-read);
+  font-family: var(--tc-typography-family-prose);
   font-size: var(--tc-prose-size);
   line-height: var(--tc-prose-leading);
   color: var(--tc-content-primary);
@@ -22,19 +22,21 @@
 .tc .tc-prose p {
   margin: 0 0 var(--tc-prose-paragraph-gap);
 }
+.tc .tc-prose :is(h1, h2, h3, h4, h5, h6) {
+  font-family: var(--tc-typography-family-heading);
+}
 .tc .tc-prose h1,
 .tc .tc-prose h2,
 .tc .tc-prose h3,
 .tc .tc-prose h4 {
-  font-family: var(--tc-typography-family-ui);
   color: var(--tc-content-primary);
-  font-weight: 600;
+  font-weight: 700;
   line-height: 1.35;
   margin: var(--tc-prose-heading-gap-before) 0 var(--tc-prose-heading-gap-after);
 }
 .tc .tc-prose h1 {
   font-size: var(--tc-prose-heading-size-1);
-  font-weight: 800;
+  font-weight: 700;
 }
 .tc .tc-prose h2 {
   font-size: var(--tc-prose-heading-size-2);
@@ -120,7 +122,7 @@
   width: 100%;
   margin: 0;
   font-size: var(--tc-prose-table-size);
-  font-family: var(--tc-typography-family-ui);
+  font-family: var(--tc-typography-family-prose);
   border: 1px solid var(--tc-border-subtle);
   border-radius: 8px;
   overflow: hidden;
@@ -128,15 +130,10 @@
 .tc .tc-prose th,
 .tc .tc-prose td {
   border: 0;
-  border-right: 1px solid var(--tc-border-subtle);
   border-bottom: 1px solid var(--tc-border-subtle);
   padding: 6px 12px;
   text-align: left;
   vertical-align: top;
-}
-.tc .tc-prose th:last-child,
-.tc .tc-prose td:last-child {
-  border-right: 0;
 }
 .tc .tc-prose tr:last-child td {
   border-bottom: 0;
@@ -223,7 +220,7 @@
 .tc .tc-prose .md-code code {
   display: block;
   min-width: max-content;
-  font-family: var(--tc-typography-family-code);
+  font-family: var(--tc-typography-family-code-block);
   font-size: var(--tc-prose-code-size);
   line-height: var(--tc-prose-code-leading);
   color: var(--tc-content-primary);
