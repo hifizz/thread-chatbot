@@ -40,6 +40,7 @@
   --tc-onink-border-src: color-mix(in srgb, var(--tc-content-on-floating) 85%, transparent); /* src 高亮描边 */
 
   /* ═══ 墨影（阴影/遮罩的颜色位，偏移量留在区块文件） ═══ */
+  --tc-shadow-composer: color-mix(in srgb, var(--tc-surface-shadow-source) 8%, transparent); /* 输入框轻柔外扩阴影 */
   --tc-shadow-scrim: color-mix(in srgb, var(--tc-surface-shadow-source) 18%, transparent); /* swx-scrim 全局遮罩 */
   --tc-shadow-confirm-mask: color-mix(in srgb, var(--tc-surface-shadow-source) 32%, transparent);
   --tc-shadow-confirm: color-mix(in srgb, var(--tc-surface-shadow-source) 28%, transparent);

@@ -27,7 +27,14 @@ function ComposerContent(props: ConversationComposerProps) {
   const { artifacts, editorRef, attachments, submitting, changingModel, changeModel, entry, update, hasQuestion, attachmentsReady, submit } = useConversationComposer(props)
   const { fileInputRef, inputProps, surfaceProps, openFilePicker } = useComposerAttachmentInput(attachments.add, submitting)
   return <Composer className="max-w-(--lane-max)">
-    <ComposerBar className={styles.bar} {...surfaceProps}>
+    <ComposerBar className={styles.bar} {...surfaceProps} onClick={(event) => {
+      const target = event.target
+      // 空白处沿用编辑器光标；按钮、原生输入和弹层保留自己的交互。
+      if (submitting || event.defaultPrevented || !(target instanceof Element) || !event.currentTarget.contains(target)) return
+      const control = target.closest("button, a, input, select, textarea, [contenteditable], [role='button'], [role='combobox'], [tabindex]")
+      if (control && event.currentTarget.contains(control)) return
+      editorRef.current?.focus()
+    }}>
       <input ref={fileInputRef} type="file" className="hidden" aria-label={COMPOSER_ATTACHMENT_COPY.add} accept={THREAD_COMPOSER_ACCEPT} multiple {...inputProps} />
       <ComposerAttachmentTray items={attachments.items} disabled={submitting} onRemove={attachments.remove} onRetry={attachments.retry} />
       <MessageEditor scope={props.threadId} className={styles.editor} draft={entry.draft} revision={entry.revision} artifacts={artifacts}

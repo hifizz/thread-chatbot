@@ -56,7 +56,7 @@ export function GenerationSettingsControls({
           <SelectValue><span className={styles.parameterLabel}>Effort:</span> {settings.effort}</SelectValue>
         </SelectTrigger>
         </DisabledComposerOption>
-        <SelectContent side="top" align="start" alignItemWithTrigger={false}>
+        <SelectContent className={styles.parameterMenu} side="top" sideOffset={8} align="start" alignItemWithTrigger={false}>
           {capability.effortLevels.map((effort) => (
             <SelectItem key={effort} value={effort}>
               {effort}
@@ -89,7 +89,7 @@ export function GenerationSettingsControls({
           </SelectValue>
         </SelectTrigger>
         </DisabledComposerOption>
-        <SelectContent side="top" align="start" alignItemWithTrigger={false}>
+        <SelectContent className={styles.parameterMenu} side="top" sideOffset={8} align="start" alignItemWithTrigger={false}>
           {capability.maxOutputTokenOptions.map((maxOutputTokens) => (
             <SelectItem
               key={maxOutputTokens}

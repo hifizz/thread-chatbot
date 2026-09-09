@@ -219,6 +219,10 @@
   background: var(--tc-surface-ink);
   box-shadow: 0 8px 18px var(--tc-shadow-pop);
 }
+/* 完成测量定位后再播放，复用提问弹窗的入场关键帧。 */
+.tc .selection-toolbar[data-positioned="true"] {
+  animation: tc-pop 0.14s ease;
+}
 .tc .selection-toolbar button {
   flex: 1 1 auto;
   min-width: 0;
@@ -240,6 +244,9 @@
   transform: scale(0.98);
 }
 @media (prefers-reduced-motion: reduce) {
+  .tc .selection-toolbar[data-positioned="true"] {
+    animation: none;
+  }
   .tc .selection-toolbar button {
     transition: none;
   }
