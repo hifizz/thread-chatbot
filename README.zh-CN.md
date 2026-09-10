@@ -16,9 +16,9 @@
 
 ### 前置条件
 
-- Node.js `>=20.9.0` 和 [pnpm](https://pnpm.io/)（本仓库声明 `pnpm@10.32.1`）
+- Node.js `>=22` 和 [pnpm](https://pnpm.io/)（本仓库声明 `pnpm@10.32.1`）
 - PostgreSQL 数据库
-- 至少一个受支持模型提供商的凭据；默认模型使用 MiniMax
+- Token Router 中转服务凭据；初始默认模型为 GPT-5.6 Luna
 
 克隆仓库并安装依赖：
 
@@ -36,15 +36,17 @@ DATABASE_URL=postgres://...
 DIRECT_URL=postgres://...
 BETTER_AUTH_SECRET=replace-with-a-high-entropy-secret
 BETTER_AUTH_URL=http://localhost:4040
-MINIMAX_API_KEY=...
+TOKEN_ROUTER_BASE_URL=https://your-router.example/v1
+TOKEN_ROUTER_API_KEY=...
 ```
 
-运行中的应用需要 `DATABASE_URL`。`pnpm db:migrate` 优先使用 `DIRECT_URL`，未设置时回退到 `DATABASE_URL`；如果运行时 URL 是事务连接池地址，请为迁移使用数据库直连 URL。`.env.example` 已为 `MINIMAX_BASE_URL` 和 `LLM_MODEL_ID` 提供默认值，因此默认配置无需填写它们。也可以使用其他已配置的模型提供商替代 MiniMax，但默认模型选择需要 `MINIMAX_API_KEY`。
+运行中的应用需要 `DATABASE_URL`。`pnpm db:migrate` 优先使用 `DIRECT_URL`，未设置时回退到 `DATABASE_URL`；如果运行时 URL 是事务连接池地址，请为迁移使用数据库直连 URL。当前聊天和标题生成使用 Token Router，中转服务须支持后台配置的上游模型 ID。
 
-执行迁移并启动开发服务器：
+模型目录 migration 在 develop 集成并验证后，执行迁移、初始化目录并启动开发服务器：
 
 ```bash
 pnpm db:migrate
+pnpm model-catalog:seed
 pnpm dev
 ```
 
@@ -87,13 +89,13 @@ bash scripts/wt-rm.sh feature/example
 
 请勿提交 `.env.local` 或任何凭据。
 
-## OpenRouter 模型
+## 历史 OpenRouter 模型
 
-Thread Chat 提供 14 个固定走 OpenRouter 的内部模型 id：`openrouter-gpt-5.6-luna`、`openrouter-gpt-5.6-luna-pro`、`openrouter-gpt-5.6-terra`、`openrouter-gpt-5.6-terra-pro`、`openrouter-gpt-5.6-sol`、`openrouter-gpt-5.6-sol-pro`、`openrouter-gpt-5.5`、`openrouter-gpt-5.5-pro`、`openrouter-kimi-k3`、`openrouter-deepseek-v4-flash-0731`、`openrouter-qwen3.8-max`、`openrouter-grok-4.5`、`openrouter-grok-4.6` 和 `openrouter-ox-alpha`。必须配置 `OPENROUTER_API_KEY`；`OPENROUTER_HTTP_REFERER` 与 `OPENROUTER_APP_TITLE` 是可选归因信息。这些 id 固定使用专属 OpenRouter provider，API 会拒绝任意外部 slug。Ox Alpha 使用上游 id `stealth/ox-alpha`，作为不扣额度的免费预览提供；其他模型成功请求在每个 step 的成本元数据完整时按真实美元成本计费，否则使用保守静态价回退。附件仍沿用现有文本提取路径。
+历史注册表保留 14 个 OpenRouter 内部模型 id（当前目录不展示）：`openrouter-gpt-5.6-luna`、`openrouter-gpt-5.6-luna-pro`、`openrouter-gpt-5.6-terra`、`openrouter-gpt-5.6-terra-pro`、`openrouter-gpt-5.6-sol`、`openrouter-gpt-5.6-sol-pro`、`openrouter-gpt-5.5`、`openrouter-gpt-5.5-pro`、`openrouter-kimi-k3`、`openrouter-deepseek-v4-flash-0731`、`openrouter-qwen3.8-max`、`openrouter-grok-4.5`、`openrouter-grok-4.6` 和 `openrouter-ox-alpha`。必须配置 `OPENROUTER_API_KEY`；`OPENROUTER_HTTP_REFERER` 与 `OPENROUTER_APP_TITLE` 是可选归因信息。这些 id 固定使用专属 OpenRouter provider，API 会拒绝任意外部 slug。Ox Alpha 使用上游 id `stealth/ox-alpha`，作为不扣额度的免费预览提供；其他模型成功请求在每个 step 的成本元数据完整时按真实美元成本计费，否则使用保守静态价回退。附件仍沿用现有文本提取路径。
 
 ## LLM provider 路由
 
-聊天模型目录由服务端人工审核的 allowlist 提供。客户端只接收公开模型选项；真实 provider、上游模型 ID、网关地址和密钥均由 `lib/ai/llm/` 服务端路由管理。当前支持冰岛 Relay、OpenRouter、Vercel AI Gateway、Cloudflare AI Gateway 与私有 Relay；冰岛使用 `ICELAND_RELAY_BASE_URL` 和 `ICELAND_RELAY_API_KEY`。模型调用不会依赖实时 `/models` 请求。
+当前聊天模型目录存储在 PostgreSQL，由 `/admin/models` 管理上游 ID、兼容策略、视觉/工具/推理能力、effort 档位和输出默认值。聊天与标题生成读取数据库目录，源码配置只用于初始化及保留旧实现。现有协议内新增模型无需发版；网关地址和密钥仍保留在服务端环境变量中。详见[后台初始化、扩展方式与验收说明](./docs/admin/README.md)，上线前必须完成 develop 的正式 migration 集成验证。
 
 ## 架构
 

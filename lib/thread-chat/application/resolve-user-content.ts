@@ -1,3 +1,4 @@
+import type { ModelCatalog } from "@/lib/model-catalog/schema"
 import { ARTIFACT_REFERENCE_COPY, ARTIFACT_REFERENCE_MAX_CHARS, ARTIFACT_REFERENCE_MAX_OCCURRENCES } from "@/constants/artifact-reference"
 import type { ThreadQuoteDataV1 } from "../contracts/quote"
 import { artifactReferenceData, artifactReferenceDataSchema } from "../contracts/artifact-reference"
@@ -11,6 +12,7 @@ import { assertEditQuoteSemantics, assertValidQuoteSources } from "./quote-valid
 
 /** 在命令已有的所有权锁和事务内，将有序输入解析成权威持久化内容。 */
 export async function resolveUserContent(input: {
+  catalog: ModelCatalog
   tx: ConversationTransaction
   userId: string
   projectId: string
@@ -24,7 +26,7 @@ export async function resolveUserContent(input: {
   // 解析内容对象而非整条命令，避免破坏 HTTP parts 格式。
   const content = messageContentInputSchema.parse({ parts: input.content.parts })
   const files = filesFromMessageContent(content)
-  assertModelSupportsNewAttachments(input.modelId, files)
+  assertModelSupportsNewAttachments(input.catalog, input.modelId, files)
   await assertOwnedReadyAttachments(input.tx, input.userId, files)
   const operation = input.operation
   if (operation.type === "create-project") {

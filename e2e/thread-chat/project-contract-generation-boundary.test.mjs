@@ -1,3 +1,4 @@
+import { fixtureModelCatalog } from "../fixtures/model-catalog.ts"
 import assert from "node:assert/strict"
 import { config } from "dotenv"
 
@@ -79,6 +80,7 @@ async function runAndCapture({ messageId, threadId, beforeRelease }) {
     }),
     run: (session) =>
       streaming.runGeneration({
+    catalog: fixtureModelCatalog,
         userId,
         messageId,
         session,
@@ -114,7 +116,7 @@ try {
     modelId,
     text: "建立 Project",
     files: [],
-  })
+  }, fixtureModelCatalog)
 
   let project = await application.updateProjectContract(userId, projectId, {
     commandId: id(),
@@ -153,7 +155,7 @@ try {
     modelId,
     text: "第二轮",
     files: [],
-  })
+  }, fixtureModelCatalog)
   const secondSnapshot = await runAndCapture({
     messageId: secondTurn.result.assistantMessage.id,
     threadId: rootThreadId,
@@ -175,7 +177,7 @@ try {
       quote: { exact: "建立 Project", prefix: "", suffix: "" },
     },
     modelId,
-  })
+  }, fixtureModelCatalog)
   const frozenBefore = structuredClone(fork.result.thread.forkContext)
   assert.ok(frozenBefore.length > 0)
 
@@ -194,7 +196,7 @@ try {
     modelId,
     text: "旧 Fork 中的新请求",
     files: [],
-  })
+  }, fixtureModelCatalog)
   const childSnapshot = await runAndCapture({
     messageId: childTurn.result.assistantMessage.id,
     threadId: childThreadId,

@@ -1,3 +1,6 @@
+import { getModelConfig } from "@/lib/model-catalog/config"
+import { toPublicModelCatalog } from "@/lib/model-catalog/public"
+import { ModelCatalogProvider } from "@/lib/model-catalog/context"
 import { redirect } from "next/navigation"
 import { getSession } from "@/lib/auth/server"
 import { ROUTES, signInWithRedirect } from "@/constants/routes"
@@ -16,5 +19,5 @@ export default async function ThreadChatLayout({
 }) {
   const session = await getSession()
   if (!session) redirect(signInWithRedirect(ROUTES.flagship))
-  return <ProjectListStoreProvider>{children}</ProjectListStoreProvider>
+  return <ModelCatalogProvider initial={toPublicModelCatalog(await getModelConfig())}><ProjectListStoreProvider>{children}</ProjectListStoreProvider></ModelCatalogProvider>
 }

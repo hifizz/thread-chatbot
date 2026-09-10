@@ -1,3 +1,4 @@
+import { fixtureModelCatalog } from "../fixtures/model-catalog.ts"
 import assert from "node:assert/strict"
 import { config } from "dotenv"
 
@@ -52,7 +53,7 @@ async function createProject(ownerId, projectId, rootThreadId) {
     modelId,
     text: "Project workspace test",
     files: [],
-  })
+  }, fixtureModelCatalog)
 }
 
 async function insertAttachment(ownerId, attachmentId, filename = "reference.pdf") {

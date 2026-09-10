@@ -1,3 +1,4 @@
+import type { ModelCatalog } from "@/lib/model-catalog/schema"
 import { resolveUserContent } from "./resolve-user-content"
 import { messages, threads } from "@/lib/db/schema"
 import type { ForkThreadCommand } from "@/lib/thread-chat/contracts/commands"
@@ -38,10 +39,11 @@ export type ForkThreadResult =
 export function forkThread(
   userId: string,
   parentThreadId: string,
-  command: ForkThreadCommand
+  command: ForkThreadCommand,
+  catalog: ModelCatalog
 ) {
-  assertAllowedModel(command.modelId)
-  assertAllowedGenerationSettings(command.modelId, command.generationSettings)
+  assertAllowedModel(catalog, command.modelId)
+  assertAllowedGenerationSettings(catalog, command.modelId, command.generationSettings)
   return withConversationTransaction(async (tx) =>
     executeIdempotentCommand({
       tx,
@@ -94,7 +96,7 @@ export function forkThread(
           await touchProjectAndThread(tx, project.id, child.id)
           return { thread: toThreadDTO(child), generation: null }
         }
-        const parts = await resolveUserContent({ tx, userId, projectId: project.id, modelId: command.modelId, content: command.firstTurn, operation: { type: "send", sourceThreadId: parent.id } })
+        const parts = await resolveUserContent({ catalog, tx, userId, projectId: project.id, modelId: command.modelId, content: command.firstTurn, operation: { type: "send", sourceThreadId: parent.id } })
         const [userSequence, assistantSequence] = await allocateThreadSequences(
           tx,
           child.id,

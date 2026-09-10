@@ -1,3 +1,4 @@
+import type { ModelCatalog } from "@/lib/model-catalog/schema"
 import { and, eq, isNull } from "drizzle-orm"
 import { messages } from "@/lib/db/schema"
 import type { RetryMessageCommand } from "@/lib/thread-chat/contracts/commands"
@@ -33,10 +34,12 @@ import {
 export function retryMessage(
   userId: string,
   messageId: string,
-  command: RetryMessageCommand
+  command: RetryMessageCommand,
+  catalog: ModelCatalog
 ) {
-  assertAllowedModel(command.modelId)
+  assertAllowedModel(catalog, command.modelId)
   assertAllowedGenerationSettings(
+    catalog,
     command.modelId,
     command.generationSettings
   )

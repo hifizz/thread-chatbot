@@ -1,3 +1,4 @@
+import { fixtureModelCatalog } from "../fixtures/model-catalog.ts"
 import assert from "node:assert/strict"
 import { config } from "dotenv"
 
@@ -80,10 +81,10 @@ try {
     text: "项目 A 的第一问",
     files: [],
   }
-  const firstStart = await commands.startProject(userA, startACommand)
+  const firstStart = await commands.startProject(userA, startACommand, fixtureModelCatalog)
   assert.equal(firstStart.replayed, false)
   assert.equal(firstStart.result.assistantMessage.status, "generating")
-  const replayedStart = await commands.startProject(userA, startACommand)
+  const replayedStart = await commands.startProject(userA, startACommand, fixtureModelCatalog)
   assert.equal(replayedStart.replayed, true)
   assert.equal(
     replayedStart.result.assistantMessage.id,
@@ -94,7 +95,7 @@ try {
       commands.startProject(userA, {
         ...startACommand,
         text: "同 ID 的不同语义",
-      }),
+      }, fixtureModelCatalog),
     (error) => error.name === "CommandIdConflictError"
   )
   await assert.rejects(() =>
@@ -137,7 +138,7 @@ try {
     text: "项目 B 的第一问",
     files: [],
   }
-  await commands.startProject(userA, startBCommand)
+  await commands.startProject(userA, startBCommand, fixtureModelCatalog)
 
   const allocatedSequences = await Promise.all([
     repositories.withConversationTransaction((tx) =>
@@ -167,7 +168,7 @@ try {
         anchorText: "跨项目",
         anchor: { quote: { exact: "跨项目", prefix: "", suffix: "" } },
         modelId,
-      }),
+      }, fixtureModelCatalog),
     (error) => error.code === "STATE_CONFLICT"
   )
 
@@ -183,8 +184,8 @@ try {
     modelId,
   }
   const retryRace = await Promise.allSettled([
-    commands.retryMessage(userA, startACommand.assistantMessageId, retryOne),
-    commands.retryMessage(userA, startACommand.assistantMessageId, retryTwo),
+    commands.retryMessage(userA, startACommand.assistantMessageId, retryOne, fixtureModelCatalog),
+    commands.retryMessage(userA, startACommand.assistantMessageId, retryTwo, fixtureModelCatalog),
   ])
   assert.equal(
     retryRace.filter((result) => result.status === "fulfilled").length,
@@ -212,7 +213,7 @@ try {
       modelId,
       text: "编辑后的第一问",
       files: [],
-    }
+    }, fixtureModelCatalog
   )
   assert.equal(
     editResult.result.generation.assistantMessage.status,
@@ -250,7 +251,7 @@ try {
             filename: "foreign.pdf",
           },
         ],
-      }),
+      }, fixtureModelCatalog),
     (error) => error.code === "NOT_FOUND"
   )
 
@@ -262,9 +263,9 @@ try {
     text: "验证 send、stop、feedback 和 fork",
     files: [],
   }
-  const sent = await commands.sendMessage(userA, rootA, sendCommand)
+  const sent = await commands.sendMessage(userA, rootA, sendCommand, fixtureModelCatalog)
   assert.equal(sent.replayed, false)
-  const sentReplay = await commands.sendMessage(userA, rootA, sendCommand)
+  const sentReplay = await commands.sendMessage(userA, rootA, sendCommand, fixtureModelCatalog)
   assert.equal(sentReplay.replayed, true)
   assert.equal(
     sentReplay.result.assistantMessage.id,
@@ -370,16 +371,17 @@ try {
     },
     modelId,
   }
-  const forked = await commands.forkThread(userA, rootA, forkCommand)
+  const forked = await commands.forkThread(userA, rootA, forkCommand, fixtureModelCatalog)
   assert.equal(forked.replayed, false)
   assert.equal(forked.result.thread.parentId, rootA)
   assert.ok(
     forked.result.thread.forkContext.includes(sendCommand.assistantMessageId)
   )
-  const forkReplay = await commands.forkThread(userA, rootA, forkCommand)
+  const forkReplay = await commands.forkThread(userA, rootA, forkCommand, fixtureModelCatalog)
   assert.equal(forkReplay.replayed, true)
   assert.equal(forkReplay.result.thread.id, forked.result.thread.id)
   const compiledContext = await commands.compileModelContext({
+    modelSnapshot: fixtureModelCatalog.models.find((m) => m.id === constants.DEFAULT_MODEL_ID),
     userId: userA,
     threadId: forkCommand.threadId,
   })
@@ -495,7 +497,7 @@ try {
     text: "删除竞态",
     files: [],
   }
-  await commands.startProject(userA, raceStart)
+  await commands.startProject(userA, raceStart, fixtureModelCatalog)
   const deleteRace = await Promise.allSettled([
     commands.deleteProject(userA, raceProject, { commandId: id() }),
     commands.deleteProject(userA, raceProject, { commandId: id() }),

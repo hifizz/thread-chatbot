@@ -1,3 +1,4 @@
+import { fixtureModelCatalog } from "../fixtures/model-catalog.ts"
 import assert from "node:assert/strict"
 import { config } from "dotenv"
 
@@ -27,33 +28,33 @@ const settle = (messageId) => db.update(schema.messages).set({ status: "complete
 try {
   await db.insert(schema.user).values({ id: userId, name: "分叉引用测试", email: `${userId}@example.test`, emailVerified: true, createdAt: new Date(), updatedAt: new Date() })
   const start = { ...turn("测试来源"), projectId, rootThreadId }
-  await commands.startProject(userId, start)
+  await commands.startProject(userId, start, fixtureModelCatalog)
   await db.update(schema.messages).set({ parts: [{ type: "text", text: "被划选的原文" }] }).where(eq(schema.messages.id, start.assistantMessageId))
   await settle(start.assistantMessageId)
   const fork = {
     commandId: id(), threadId: id(), sourceMessageId: start.assistantMessageId,
     anchorText: "被划选的原文", anchor: { quote: { exact: "被划选的原文", prefix: "", suffix: "" } }, modelId,
   }
-  await commands.forkThread(userId, rootThreadId, fork)
+  await commands.forkThread(userId, rootThreadId, fork, fixtureModelCatalog)
   const first = turn("先分叉后发送")
   const expectedQuote = { type: "data-quote", data: {
     schemaVersion: "thread-quote-v1", text: fork.anchorText,
     source: { type: "message", messageId: fork.sourceMessageId, anchor: fork.anchor },
   } }
   first.parts.unshift({ type: "quote", quote: expectedQuote.data })
-  const sent = await commands.sendMessage(userId, fork.threadId, first)
+  const sent = await commands.sendMessage(userId, fork.threadId, first, fixtureModelCatalog)
   assert.deepEqual(sent.result.userMessage.parts[0], expectedQuote)
   const reloaded = await commands.getProjectBootstrap(userId, projectId)
   assert.deepEqual(reloaded.messages.find((message) => message.id === first.userMessageId).parts[0], expectedQuote)
   await settle(first.assistantMessageId)
   const edit = { ...turn("修改正文"), parts: [{ type: "quote", quote: expectedQuote.data }, { type: "text", text: "修改正文" }] }
-  const edited = await commands.editLatestTurn(userId, first.userMessageId, edit)
+  const edited = await commands.editLatestTurn(userId, first.userMessageId, edit, fixtureModelCatalog)
   assert.deepEqual(edited.result.generation.userMessage.parts[0], expectedQuote)
   await settle(edit.assistantMessageId)
   await assert.rejects(() => commands.editLatestTurn(userId, edit.userMessageId, {
     ...turn("不能新增引用"), parts: [{ type: "quote", quote: { ...expectedQuote.data, source: { ...expectedQuote.data.source, messageId: id() } } }, { type: "text", text: "不能新增引用" }],
-  }))
-  const followup = await commands.sendMessage(userId, fork.threadId, turn("第二轮不附加引用"))
+  }, fixtureModelCatalog))
+  const followup = await commands.sendMessage(userId, fork.threadId, turn("第二轮不附加引用"), fixtureModelCatalog)
   assert.equal(followup.result.userMessage.parts.some((part) => part.type === "data-quote"), false)
   await settle(followup.result.assistantMessage.id)
   const immediate = turn("带首问分叉")
@@ -61,10 +62,10 @@ try {
   const forked = await commands.forkThread(userId, rootThreadId, {
     ...fork, commandId: id(), threadId: id(),
     firstTurn: { userMessageId: immediate.userMessageId, assistantMessageId: immediate.assistantMessageId, parts: immediate.parts },
-  })
+  }, fixtureModelCatalog)
   assert.deepEqual(forked.result.generation.userMessage.parts[0], expectedQuote)
   await settle(immediate.assistantMessageId)
-  const removed = await commands.editLatestTurn(userId, immediate.userMessageId, turn("显式删除引用"))
+  const removed = await commands.editLatestTurn(userId, immediate.userMessageId, turn("显式删除引用"), fixtureModelCatalog)
   assert.equal(removed.result.generation.userMessage.parts.some((part) => part.type === "data-quote"), false)
   console.log("PASS 分叉引用数据库回归：两条入口、读取恢复、编辑保留、拒绝伪造、后续追问与显式删除")
 } finally {

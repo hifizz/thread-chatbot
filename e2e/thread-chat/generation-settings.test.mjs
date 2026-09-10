@@ -8,7 +8,8 @@ import {
   getModelGenerationSettingsCapability,
   MAX_OUTPUT_TOKENS,
 } from "../../constants/model.ts"
-import { assertAllowedGenerationSettings } from "../../lib/thread-chat/application/command-utils.ts"
+import { assertGenerationSettingsCapability } from "../../lib/model-catalog/validation.ts"
+const assertAllowedGenerationSettings = (id, settings) => assertGenerationSettingsCapability(getModelGenerationSettingsCapability(id), settings)
 import { chatAnswerGenerationOptions } from "../../lib/thread-chat/streaming/generation-settings.ts"
 
 const supportedModelId = "iceland-claude-fable-5-1"

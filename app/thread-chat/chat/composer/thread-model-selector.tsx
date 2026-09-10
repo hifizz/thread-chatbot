@@ -2,7 +2,6 @@
 
 import {
   ModelSelector,
-  type ModelOption,
 } from "@/components/assistant-ui/model-selector"
 import {
   Tooltip,
@@ -10,11 +9,11 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { THREAD_CHAT_MODEL_OPTIONS as PUBLIC_MODEL_OPTIONS } from "@/constants/models"
+import { useModelCatalog } from "@/lib/model-catalog/context"
 import { Bot } from "lucide-react"
 
 /** Thread Chat 仅展示公开模型选项，不读取服务端路由表。 */
-const THREAD_CHAT_MODEL_OPTIONS: readonly ModelOption[] = PUBLIC_MODEL_OPTIONS
+
 
 export interface ThreadModelSelectorProps {
   modelId: string
@@ -40,6 +39,7 @@ export function ThreadModelSelector({
   disabledReason,
   onValueChange,
 }: ThreadModelSelectorProps) {
+  const { models } = useModelCatalog()
   const isBranchLocked = disabledReason === "branch"
   const trigger = (
     <ModelSelector.Trigger
@@ -56,7 +56,7 @@ export function ThreadModelSelector({
 
   return (
     <ModelSelector.Root
-      models={THREAD_CHAT_MODEL_OPTIONS}
+      models={models}
       value={modelId}
       onValueChange={onValueChange}
     >

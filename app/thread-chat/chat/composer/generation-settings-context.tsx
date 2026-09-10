@@ -10,13 +10,12 @@ import {
   type SetStateAction,
 } from "react"
 import {
-  DEFAULT_GENERATION_SETTINGS,
   type GenerationSettings,
 } from "@/constants/generation-settings"
 
 interface GenerationSettingsContextValue {
-  settings: GenerationSettings
-  setSettings: Dispatch<SetStateAction<GenerationSettings>>
+  settings: GenerationSettings | undefined
+  setSettings: Dispatch<SetStateAction<GenerationSettings | undefined>>
 }
 
 const GenerationSettingsContext =
@@ -27,9 +26,7 @@ export function GenerationSettingsProvider({
 }: {
   children: ReactNode
 }) {
-  const [settings, setSettings] = useState<GenerationSettings>(
-    DEFAULT_GENERATION_SETTINGS
-  )
+  const [settings, setSettings] = useState<GenerationSettings | undefined>(undefined)
   const value = useMemo(() => ({ settings, setSettings }), [settings])
 
   return (

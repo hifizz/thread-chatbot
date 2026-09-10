@@ -1,3 +1,4 @@
+import type { ModelCatalog } from "@/lib/model-catalog/schema"
 import { resolveUserContent } from "./resolve-user-content"
 import { and, inArray, isNull } from "drizzle-orm"
 import { messages } from "@/lib/db/schema"
@@ -39,10 +40,11 @@ export interface EditTurnResult {
 export function editLatestTurn(
   userId: string,
   messageId: string,
-  command: EditLatestTurnCommand
+  command: EditLatestTurnCommand,
+  catalog: ModelCatalog
 ) {
-  assertAllowedModel(command.modelId)
-  assertAllowedGenerationSettings(command.modelId, command.generationSettings)
+  assertAllowedModel(catalog, command.modelId)
+  assertAllowedGenerationSettings(catalog, command.modelId, command.generationSettings)
   return withConversationTransaction(async (tx) =>
     executeIdempotentCommand({
       tx,
@@ -68,7 +70,7 @@ export function editLatestTurn(
         if (turn?.userMessage.id !== source.id) {
           stateConflict("只能编辑最新一轮用户消息")
         }
-        const parts = await resolveUserContent({ tx, userId, projectId: project.id, modelId: command.modelId, content: command, operation: { type: "edit", originalParts: source.parts } })
+        const parts = await resolveUserContent({ catalog, tx, userId, projectId: project.id, modelId: command.modelId, content: command, operation: { type: "edit", originalParts: source.parts } })
         const [userSequence, assistantSequence] = await allocateThreadSequences(
           tx,
           thread.id,

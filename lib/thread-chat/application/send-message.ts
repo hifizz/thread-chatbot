@@ -1,3 +1,4 @@
+import type { ModelCatalog } from "@/lib/model-catalog/schema"
 import { THREAD_QUOTE_SCHEMA_VERSION } from "@/lib/thread-chat/contracts/quote"
 import { resolveUserContent } from "./resolve-user-content"
 import { messages } from "@/lib/db/schema"
@@ -29,10 +30,11 @@ import {
 export function sendMessage(
   userId: string,
   threadId: string,
-  command: SendMessageCommand
+  command: SendMessageCommand,
+  catalog: ModelCatalog
 ) {
-  assertAllowedModel(command.modelId)
-  assertAllowedGenerationSettings(command.modelId, command.generationSettings)
+  assertAllowedModel(catalog, command.modelId)
+  assertAllowedGenerationSettings(catalog, command.modelId, command.generationSettings)
   return withConversationTransaction(async (tx) =>
     executeIdempotentCommand({
       tx,
@@ -48,7 +50,7 @@ export function sendMessage(
         if (!project) notFound()
         if (project.archivedAt) stateConflict("已归档 Project 不可发送消息")
         await assertThreadReadyForTurn(tx, project.id, thread.id)
-        const parts = await resolveUserContent({ tx, userId, projectId: project.id, modelId: command.modelId, content: command, operation: { type: "send", sourceThreadId: thread.id,
+        const parts = await resolveUserContent({ catalog, tx, userId, projectId: project.id, modelId: command.modelId, content: command, operation: { type: "send", sourceThreadId: thread.id,
           ...(thread.nextSequence === 1 && thread.forkMessageId && thread.forkAnchor && thread.anchorText ? { frozenFirstQuote: {
             schemaVersion: THREAD_QUOTE_SCHEMA_VERSION, text: thread.anchorText,
             source: { type: "message", messageId: thread.forkMessageId, anchor: thread.forkAnchor },

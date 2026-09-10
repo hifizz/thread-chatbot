@@ -16,7 +16,7 @@ const modelIdSchema = z.string().trim().min(1).max(160)
 
 export const generationSettingsSchema = z
   .object({
-    effort: z.enum(EFFORT_LEVELS),
+    effort: z.enum(EFFORT_LEVELS).optional(),
     maxOutputTokens: z.custom<MaxOutputTokens>(isMaxOutputTokens),
   })
   .strict()

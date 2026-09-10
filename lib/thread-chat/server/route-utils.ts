@@ -1,3 +1,4 @@
+import { ModelCatalogError } from "@/lib/model-catalog/errors"
 import { ZodError, type ZodType } from "zod"
 import type {
   ApiErrorCode,
@@ -70,6 +71,8 @@ function errorResponse(
 }
 
 export function mapRouteError(error: unknown): Response {
+  if (error instanceof ModelCatalogError)
+    return errorResponse(error.status, "MODEL_NOT_ALLOWED", error.message)
   if (error instanceof ThreadChatUnauthorizedError)
     return errorResponse(401, "NOT_FOUND", error.message)
   if (error instanceof ZodError) {

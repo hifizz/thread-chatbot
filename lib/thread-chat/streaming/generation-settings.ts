@@ -19,6 +19,8 @@ export function chatAnswerGenerationOptions(
     }
   }
 
+  if (!settings.effort) return { maxOutputTokens: settings.maxOutputTokens }
+
   if (protocol === "openai-compatible") {
     return {
       maxOutputTokens: settings.maxOutputTokens,

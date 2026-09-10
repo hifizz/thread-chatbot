@@ -5,7 +5,7 @@ import {
   isMaxOutputTokens,
   MAX_OUTPUT_TOKEN_LABELS,
 } from "@/constants/generation-settings"
-import { getModelGenerationSettingsCapability } from "@/constants/model"
+import { useModelCatalog } from "@/lib/model-catalog/context"
 import {
   Select,
   SelectContent,
@@ -28,14 +28,15 @@ export function GenerationSettingsControls({
   disabled: boolean
   disabledReason?: string
 }) {
-  const capability = getModelGenerationSettingsCapability(modelId)
+  const { models } = useModelCatalog()
+  const capability = models.find((m) => m.id === modelId)?.capabilities.generationSettings
   const { settings: preferredSettings, setSettings } = useGenerationSettings()
-  const settings = resolveGenerationSettings(modelId, preferredSettings)
+  const settings = resolveGenerationSettings(modelId, preferredSettings, capability)
   if (!capability || !settings) return null
 
   return (
     <>
-      <Select
+      {capability.effortLevels.length > 0 && <Select
         disabled={disabled}
         value={settings.effort}
         onValueChange={(effort) => {
@@ -63,7 +64,7 @@ export function GenerationSettingsControls({
             </SelectItem>
           ))}
         </SelectContent>
-      </Select>
+      </Select>}
 
       <Select
         disabled={disabled}
@@ -85,7 +86,7 @@ export function GenerationSettingsControls({
           aria-label="选择最大输出 token"
         >
           <SelectValue>
-            <span className={styles.parameterLabel}>Max:</span> {MAX_OUTPUT_TOKEN_LABELS[settings.maxOutputTokens]}
+            <span className={styles.parameterLabel}>Max:</span> {MAX_OUTPUT_TOKEN_LABELS[settings.maxOutputTokens] ?? settings.maxOutputTokens.toLocaleString()}
           </SelectValue>
         </SelectTrigger>
         </DisabledComposerOption>
@@ -95,7 +96,7 @@ export function GenerationSettingsControls({
               key={maxOutputTokens}
               value={String(maxOutputTokens)}
             >
-              {MAX_OUTPUT_TOKEN_LABELS[maxOutputTokens]}
+              {MAX_OUTPUT_TOKEN_LABELS[maxOutputTokens] ?? maxOutputTokens.toLocaleString()}
             </SelectItem>
           ))}
         </SelectContent>

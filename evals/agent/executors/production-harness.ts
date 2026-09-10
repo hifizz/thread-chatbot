@@ -322,6 +322,9 @@ export async function executeProductionGeneration(input: {
       }
       await tx.insert(schema.messages).values(seed.messages)
     })
+    const catalog = input.prepare
+      ? (await import("@/e2e/fixtures/model-catalog")).fixtureModelCatalog
+      : await (await import("@/lib/model-catalog/repository")).readModelCatalog()
     const run = store.start({
       messageId: seed.assistantMessageId,
       initialSnapshot: streaming.initialAssistantSnapshot({
@@ -331,6 +334,7 @@ export async function executeProductionGeneration(input: {
       }),
       run: (session) =>
         streaming.runGeneration({
+          catalog,
           userId: seed.user.id,
           messageId: seed.assistantMessageId,
           session,

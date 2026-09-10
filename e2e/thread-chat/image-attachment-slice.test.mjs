@@ -1,3 +1,5 @@
+import { assertImageInputCapability } from "../../lib/model-catalog/validation.ts"
+const assertModelSupportsNewAttachments = (id, files) => assertImageInputCapability(supportsModelImageInput(id), files.filter((f) => f.mediaType.startsWith("image/")).length)
 import assert from "node:assert/strict"
 import { convertToModelMessages } from "ai"
 import {
@@ -24,7 +26,6 @@ import {
   resolveAttachmentContext,
 } from "../../lib/chat/resolve-attachments.ts"
 import {
-  assertModelSupportsNewAttachments,
   hasImageFileReferences,
 } from "../../lib/thread-chat/application/command-utils.ts"
 
