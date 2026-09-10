@@ -1,3 +1,4 @@
+import { resolveForkOrigin } from "@/lib/thread-chat/domain/fork-origin"
 import { artifactReferenceData } from "@/lib/thread-chat/contracts/artifact-reference"
 import { messageContentToUiParts, type MessageContentInput } from "@/lib/thread-chat/contracts/message-content"
 
@@ -12,6 +13,7 @@ import type {
 import { PROJECT_TITLE_FALLBACK } from "@/constants/project-workspace"
 import { DEFAULT_THREAD_CHAT_MODEL_ID } from "@/constants/models"
 import { textFromMessageParts } from "@/lib/thread-chat/contracts/ui-message"
+import { buildFrozenForkContext } from "@/lib/thread-chat/domain/fork-context"
 import type { ThreadChatClient } from "../net/client"
 
 export type Gate3HarnessScenario =
@@ -637,14 +639,19 @@ export function createGate3MockRuntime(
       const parent = threads.get(parentThreadId)
       if (!parent) throw new Error("THREAD_NOT_FOUND")
       const stamp = now()
+      const origin = resolveForkOrigin(input)
       const thread: ThreadDTO = {
         id: input.threadId,
         projectId,
         parentId: parentThreadId,
         forkMessageId: input.sourceMessageId,
-        forkContext: [],
-        forkAnchor: input.anchor,
-        anchorText: input.anchorText,
+        forkContext: buildFrozenForkContext({
+          parentForkContext: parent.forkContext,
+          parentMessages: [...messages.values()].filter((message) => message.threadId === parentThreadId),
+          sourceMessageId: input.sourceMessageId,
+        }),
+        forkAnchor: origin.forkAnchor,
+        anchorText: origin.anchorText,
         footnote:
           Math.max(
             0,
@@ -652,7 +659,7 @@ export function createGate3MockRuntime(
           ) + 1,
         depth: parent.depth + 1,
         modelId: input.modelId,
-        autoTitle: input.anchorText.slice(0, 13),
+        autoTitle: input.anchorText?.slice(0, 13) ?? null,
         customTitle: null,
         titleGenerationAttempted: false,
         titleGenerated: false,

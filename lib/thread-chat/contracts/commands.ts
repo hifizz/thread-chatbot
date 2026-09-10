@@ -1,3 +1,4 @@
+import { isConsistentForkSelection } from "@/lib/thread-chat/domain/fork-origin"
 import { z } from "zod"
 import {
   EFFORT_LEVELS,
@@ -105,13 +106,16 @@ export const forkThreadCommandSchema = z
     commandId: commandIdSchema,
     threadId: entityIdSchema,
     sourceMessageId: entityIdSchema,
-    anchorText: z.string().trim().min(1).max(20_000),
-    anchor: textAnchorSchema,
+    anchorText: z.string().trim().min(1).max(20_000).nullish(),
+    anchor: textAnchorSchema.nullish(),
     modelId: modelIdSchema,
     ...generationSettingsField,
     firstTurn: firstForkTurnSchema.optional(),
   })
   .strict()
+  .refine(isConsistentForkSelection, {
+    message: "引用文本与选区锚点必须同时提供且原文一致，或同时省略",
+  })
 
 export const editLatestTurnCommandSchema = z
   .object(baseGenerationFields)

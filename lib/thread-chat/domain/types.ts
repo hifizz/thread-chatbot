@@ -38,7 +38,7 @@ export type ArtifactSeed = Omit<
 
 /** 挂在消息原文上的分支锚点：一段被划选的文字 + 对应脚注号 + 目标会话 */
 export interface Fork {
-  /** 被划选的文字（= anchor.quote.exact），标题 / system 提示仍用它 */
+  /** 被划选的文字（= anchor.quote.exact），用于来源展示；无选区分叉为空字符串 */
   text: string
   num: number
   threadId: string

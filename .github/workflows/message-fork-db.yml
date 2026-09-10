@@ -1,0 +1,46 @@
+name: Message Fork Database Acceptance
+
+on:
+  push:
+    branches: [codex/feat-message-fork-without-quote]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  postgres:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports: [5432:5432]
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 10s --health-timeout 5s --health-retries 5
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
+      DIRECT_URL: postgres://postgres:postgres@localhost:5432/postgres
+      BETTER_AUTH_SECRET: message-fork-ci-only-secret-at-least-32-characters
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - name: Prepare isolated database
+        run: pnpm db:test:setup
+      - name: Upgrade previous database through committed migrations
+        run: node --import tsx e2e/thread-chat/message-fork-migration-db.test.mjs
+      - name: Conversation persistence and authorization
+        run: pnpm test:thread-chat:gate1-db
+      - name: Quote persistence and editing
+        run: node --import tsx e2e/thread-chat/fork-quote-db.test.mjs
