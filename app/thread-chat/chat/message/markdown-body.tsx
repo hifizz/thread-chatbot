@@ -161,6 +161,11 @@ function MarkdownCode({
 }
 
 const components: Components = {
+  a: ({ children, href, title }) => (
+    <a href={href} title={title} target="_blank" rel="noopener noreferrer">
+      {children}
+    </a>
+  ),
   // 代码块被默认包在 <pre> 里；把 <pre> 透传成 children，让 code 自己产出完整卡片，
   // 避免出现 <pre><div class=md-code> 的多余嵌套。
   pre: ({ children }) => <>{children}</>,
