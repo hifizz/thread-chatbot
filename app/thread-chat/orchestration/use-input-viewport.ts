@@ -1,9 +1,9 @@
 "use client"
 
 import { useEffect, type RefObject } from "react"
-import { KEYBOARD_BLUR_SETTLE_MS, VIEWPORT_SCALE_TOLERANCE } from "@/constants/thread-viewport"
+import { VIEWPORT_SETTLE_MS, VIEWPORT_SCALE_TOLERANCE } from "@/constants/thread-viewport"
 
-/** 一个工作区统一跟随输入期间的可见视口；不对各列分别做键盘位移。 */
+/** 移动端工作区跟随可见视口，包含键盘、浏览器工具栏及页面唤醒。 */
 export function useInputViewport(rootRef: RefObject<HTMLDivElement | null>, enabled: boolean) {
   useEffect(() => {
     const root = rootRef.current
@@ -11,13 +11,8 @@ export function useInputViewport(rootRef: RefObject<HTMLDivElement | null>, enab
     if (!enabled || !root || !viewport) return
     const touch = window.matchMedia("(any-pointer: coarse)")
     let frame = 0
-    let blurTimer = 0
-    let watching = false
-    const isColumnInput = () => {
-      const active = document.activeElement
-      return active instanceof HTMLElement && root.contains(active) &&
-        active.matches('.column .composer-editor[contenteditable="true"]')
-    }
+    let settleTimer = 0
+    let suspended = document.visibilityState === "hidden"
     const reset = () => {
       delete root.dataset.inputViewport
       root.style.removeProperty("--tc-input-height")
@@ -25,7 +20,8 @@ export function useInputViewport(rootRef: RefObject<HTMLDivElement | null>, enab
     }
     const update = () => {
       frame = 0
-      if (!touch.matches || Math.abs(viewport.scale - 1) > VIEWPORT_SCALE_TOLERANCE) {
+      if (suspended || document.visibilityState === "hidden" || !touch.matches ||
+        Math.abs(viewport.scale - 1) > VIEWPORT_SCALE_TOLERANCE || viewport.height <= 0) {
         reset()
         return
       }
@@ -33,44 +29,55 @@ export function useInputViewport(rootRef: RefObject<HTMLDivElement | null>, enab
       root.style.setProperty("--tc-input-top", `${viewport.offsetTop}px`)
       root.dataset.inputViewport = "true"
     }
-    const schedule = () => { if (!frame) frame = requestAnimationFrame(update) }
-    const stop = () => {
-      window.clearTimeout(blurTimer)
+    const schedule = () => {
+      if (!suspended && document.visibilityState !== "hidden" && !frame) {
+        frame = requestAnimationFrame(update)
+      }
+    }
+    const suspend = () => {
+      suspended = true
+      window.clearTimeout(settleTimer)
+      cancelAnimationFrame(frame)
+      frame = 0
+      reset()
+    }
+    // 恢复瞬间可能仍读到旧尺寸；动画结束后再读一次，不依赖浏览器补发 resize。
+    const settle = () => {
+      window.clearTimeout(settleTimer)
+      if (suspended || document.visibilityState === "hidden") return
+      schedule()
+      settleTimer = window.setTimeout(schedule, VIEWPORT_SETTLE_MS)
+    }
+    const resume = () => {
+      suspend()
+      suspended = document.visibilityState === "hidden"
+      settle()
+    }
+    const visibilityChange = () => {
+      if (document.visibilityState === "hidden") suspend()
+      else resume()
+    }
+    viewport.addEventListener("resize", schedule)
+    viewport.addEventListener("scroll", schedule)
+    window.addEventListener("resize", schedule)
+    touch.addEventListener("change", schedule)
+    document.addEventListener("focusin", settle)
+    document.addEventListener("focusout", settle)
+    document.addEventListener("visibilitychange", visibilityChange)
+    window.addEventListener("pagehide", suspend)
+    window.addEventListener("pageshow", resume)
+    settle()
+    return () => {
+      suspend()
       viewport.removeEventListener("resize", schedule)
       viewport.removeEventListener("scroll", schedule)
       window.removeEventListener("resize", schedule)
-      cancelAnimationFrame(frame)
-      frame = 0
-      watching = false
-      reset()
-    }
-    const focus = () => {
-      if (!touch.matches || !isColumnInput()) return
-      window.clearTimeout(blurTimer)
-      if (!watching) {
-        viewport.addEventListener("resize", schedule)
-        viewport.addEventListener("scroll", schedule)
-        window.addEventListener("resize", schedule)
-        watching = true
-      }
-      schedule()
-    }
-    const blur = () => {
-      window.clearTimeout(blurTimer)
-      blurTimer = window.setTimeout(() => { if (!isColumnInput()) stop() }, KEYBOARD_BLUR_SETTLE_MS)
-    }
-    const pageShow = () => { if (isColumnInput()) focus(); else stop() }
-    document.addEventListener("focusin", focus)
-    document.addEventListener("focusout", blur)
-    window.addEventListener("pagehide", stop)
-    window.addEventListener("pageshow", pageShow)
-    focus()
-    return () => {
-      stop()
-      document.removeEventListener("focusin", focus)
-      document.removeEventListener("focusout", blur)
-      window.removeEventListener("pagehide", stop)
-      window.removeEventListener("pageshow", pageShow)
+      touch.removeEventListener("change", schedule)
+      document.removeEventListener("focusin", settle)
+      document.removeEventListener("focusout", settle)
+      document.removeEventListener("visibilitychange", visibilityChange)
+      window.removeEventListener("pagehide", suspend)
+      window.removeEventListener("pageshow", resume)
     }
   }, [rootRef, enabled])
 }
