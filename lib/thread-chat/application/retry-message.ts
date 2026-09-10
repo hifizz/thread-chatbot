@@ -30,13 +30,13 @@ import {
   withConversationTransaction,
 } from "@/lib/thread-chat/persistence/transaction"
 
-export function retryMessage(
+export async function retryMessage(
   userId: string,
   messageId: string,
   command: RetryMessageCommand
 ) {
-  assertAllowedModel(command.modelId)
-  assertAllowedGenerationSettings(
+  await assertAllowedModel(command.modelId)
+  await assertAllowedGenerationSettings(
     command.modelId,
     command.generationSettings
   )

@@ -1,3 +1,5 @@
+import { MODEL_TOKEN_LIMIT } from "@/constants/model-catalog"
+
 /** Thread Chat 可由用户调整的最终回答生成参数。 */
 export const EFFORT_LEVELS = ["none", "low", "medium", "high", "xhigh", "max"] as const
 
@@ -10,14 +12,15 @@ export const MAX_OUTPUT_TOKEN_OPTIONS = [
   128_000,
 ] as const
 
-export type MaxOutputTokens = (typeof MAX_OUTPUT_TOKEN_OPTIONS)[number]
+export type MaxOutputTokens = number
 
 export interface GenerationSettings {
-  effort: EffortLevel
+  effort?: EffortLevel
   maxOutputTokens: MaxOutputTokens
 }
 
 export interface GenerationSettingsCapability {
+  defaults?: GenerationSettings
   effortLevels: readonly EffortLevel[]
   maxOutputTokenOptions: readonly MaxOutputTokens[]
 }
@@ -61,5 +64,5 @@ export function isEffortLevel(value: unknown): value is EffortLevel {
 }
 
 export function isMaxOutputTokens(value: unknown): value is MaxOutputTokens {
-  return MAX_OUTPUT_TOKEN_OPTIONS.includes(value as MaxOutputTokens)
+  return typeof value === "number" && Number.isSafeInteger(value) && value > 0 && value <= MODEL_TOKEN_LIMIT
 }

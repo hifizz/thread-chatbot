@@ -3,7 +3,8 @@ import { loadProjectReferenceArtifactRows } from "../persistence/artifact-reposi
 import { expandArtifactReferencesInContext } from "./artifact-reference-context"
 import { convertToModelMessages, type ModelMessage } from "ai"
 import { db } from "@/lib/db"
-import { supportsModelImageInput } from "@/constants/model"
+import { requireCatalogModel } from "@/lib/model-catalog/repository"
+import type { CatalogModel } from "@/lib/model-catalog/schema"
 import {
   applyImageFileMaterializations,
   resolveAttachmentContext,
@@ -51,11 +52,13 @@ export async function compileModelContextWithProject({
   userId,
   threadId,
   modelId,
+  modelSnapshot,
   excludeAssistantMessageId,
 }: {
   userId: string
   threadId: string
   modelId: string
+  modelSnapshot?: CatalogModel
   excludeAssistantMessageId?: string
 }): Promise<CompiledModelContext> {
   const thread = await findOwnedThread(db, userId, threadId)
@@ -92,7 +95,7 @@ export async function compileModelContextWithProject({
     messages: uiMessages,
     userId,
     projectFiles,
-    supportsImageInput: supportsModelImageInput(modelId),
+    supportsImageInput: (modelSnapshot ?? await requireCatalogModel(modelId)).config.imageInput,
   })
   const withProjectContext: ThreadChatUIMessage[] = [
     ...(resolved.projectContext
@@ -157,6 +160,7 @@ export async function compileModelContext(input: {
   userId: string
   threadId: string
   modelId: string
+  modelSnapshot?: CatalogModel
   excludeAssistantMessageId?: string
 }): Promise<ModelMessage[]> {
   return (await compileModelContextWithProject(input)).messages

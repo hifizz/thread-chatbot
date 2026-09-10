@@ -24,7 +24,7 @@ export async function resolveUserContent(input: {
   // 解析内容对象而非整条命令，避免破坏 HTTP parts 格式。
   const content = messageContentInputSchema.parse({ parts: input.content.parts })
   const files = filesFromMessageContent(content)
-  assertModelSupportsNewAttachments(input.modelId, files)
+  await assertModelSupportsNewAttachments(input.modelId, files, input.tx)
   await assertOwnedReadyAttachments(input.tx, input.userId, files)
   const operation = input.operation
   if (operation.type === "create-project") {

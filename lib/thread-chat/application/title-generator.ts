@@ -2,13 +2,11 @@ import { generateText } from "ai"
 
 import {
   THREAD_TITLE_MAX_OUTPUT_TOKENS,
-  THREAD_TITLE_MODEL_ID,
 } from "@/constants/model"
 import { MODEL_CALL_PURPOSE } from "@/constants/model-call"
-import {
-  isModelConfigured,
-  resolveChatModel,
-} from "@/lib/ai/llm/providers"
+import { readModelCatalog, requireCatalogModel } from "@/lib/model-catalog/repository"
+import { resolveCatalogLanguageModel } from "@/lib/model-catalog/runtime"
+
 import { withModelCallLogging } from "@/lib/ai/model-call-logger"
 import type { ThreadTitleInput } from "@/lib/thread-chat/contracts/title-request"
 import { buildAiTelemetryConfig } from "@/lib/observability/ai-sdk"
@@ -58,18 +56,19 @@ export function sanitizeGeneratedTitle(raw: string): string | null {
 export async function generateThreadTitleText(
   input: ThreadTitleInput
 ): Promise<string | null> {
-  if (!isModelConfigured(THREAD_TITLE_MODEL_ID)) return null
-
   try {
+    const { defaultModelId } = await readModelCatalog()
+    const snapshot = await requireCatalogModel(defaultModelId)
+    const { model } = resolveCatalogLanguageModel(snapshot)
     const trace = { requestId: crypto.randomUUID() }
     const { text } = await generateText({
       ...buildAiTelemetryConfig(MODEL_CALL_PURPOSE.threadTitle, {
         ...trace,
-        modelId: THREAD_TITLE_MODEL_ID,
+        modelId: defaultModelId,
         entrypoint: "thread-title",
       }),
       model: withModelCallLogging(
-        resolveChatModel(THREAD_TITLE_MODEL_ID),
+        model,
         MODEL_CALL_PURPOSE.threadTitle,
         trace
       ),

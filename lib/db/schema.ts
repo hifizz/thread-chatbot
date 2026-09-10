@@ -35,6 +35,7 @@ export { dbSchema }
 export * from "./auth-schema"
 export * from "./billing-schema"
 export * from "./payment-schema"
+export * from "./model-catalog-schema"
 
 export const attachments = dbSchema.table(
   "attachments",

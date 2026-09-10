@@ -14,7 +14,8 @@ import React, { useCallback, useEffect, useMemo, useState } from "react"
 import type { GenerationSettings } from "@/constants/generation-settings"
 import { resolveGenerationSettings } from "@/lib/thread-chat/generation-settings"
 import { COMPOSER_MODEL_COPY } from "@/constants/composer-model"
-import { DEFAULT_THREAD_CHAT_MODEL_ID } from "@/constants/models"
+import { useModelCatalog } from "@/lib/model-catalog/context"
+import type { PublicModelCatalog } from "@/lib/model-catalog/public"
 import { PROJECT_TITLE_FALLBACK } from "@/constants/project-workspace"
 import {
   GenerationSettingsProvider,
@@ -106,9 +107,11 @@ function normalizedFeedback(
 
 function generationSettingsInput(
   modelId: string,
-  settings: GenerationSettings
+  settings: GenerationSettings | undefined,
+  models: PublicModelCatalog["models"]
 ): { generationSettings?: GenerationSettings } {
-  const generationSettings = resolveGenerationSettings(modelId, settings)
+  if (!settings) return {}
+  const generationSettings = resolveGenerationSettings(modelId, settings, models.find((m) => m.id === modelId)?.capabilities.generationSettings)
   return generationSettings ? { generationSettings } : {}
 }
 
@@ -170,11 +173,12 @@ function NormalizedThreadChat({
   treeId: string
   runtime: ReturnType<typeof useConversationRuntime>
 }) {
+  const { models, defaultModelId } = useModelCatalog()
   const router = useRouter()
   const state = useConversationStore(runtime.store, (value) => value)
   const { settings: generationSettings } = useGenerationSettings()
   const [draftModelId, setDraftModelId] = useState<string>(
-    DEFAULT_THREAD_CHAT_MODEL_ID
+    defaultModelId
   )
   const projectListStore = useProjectListStoreApi()
   const projectList = useProjectListStore((value) => value)
@@ -265,11 +269,11 @@ function NormalizedThreadChat({
           const threadId = fromConversationViewThreadId(state, viewThreadId)
           const modelId =
             state.threadsById[threadId]?.modelId ??
-            DEFAULT_THREAD_CHAT_MODEL_ID
+            defaultModelId
           const result = await runtime.commands.retryMessage({
             messageId: assistantMessageId,
             modelId,
-            ...generationSettingsInput(modelId, generationSettings),
+            ...generationSettingsInput(modelId, generationSettings, models),
           })
           return actionResult({
             assistantMessageId: result.command.assistantMessageId,
@@ -291,12 +295,12 @@ function NormalizedThreadChat({
           )
           const modelId =
             state.threadsById[threadId]?.modelId ??
-            DEFAULT_THREAD_CHAT_MODEL_ID
+            defaultModelId
           const result = await runtime.commands.editLatestTurn({
             userMessageId,
             assistantMessageId: assistant?.id,
             modelId,
-            ...generationSettingsInput(modelId, generationSettings),
+            ...generationSettingsInput(modelId, generationSettings, models),
             content: messagePartsToContent(source.parts),
           })
           return actionResult({
@@ -322,12 +326,12 @@ function NormalizedThreadChat({
             : undefined
           const modelId =
             state.threadsById[threadId]?.modelId ??
-            DEFAULT_THREAD_CHAT_MODEL_ID
+            defaultModelId
           const result = await runtime.commands.editLatestTurn({
             userMessageId,
             assistantMessageId: assistant?.id,
             modelId,
-            ...generationSettingsInput(modelId, generationSettings),
+            ...generationSettingsInput(modelId, generationSettings, models),
             content,
           })
           return actionResult({
@@ -355,7 +359,7 @@ function NormalizedThreadChat({
         }
       },
     }),
-    [generationSettings, runtime.commands, state, treeId]
+    [generationSettings, runtime.commands, state, treeId, models, defaultModelId]
   )
 
   const send = useCallback(
@@ -370,7 +374,8 @@ function NormalizedThreadChat({
         : draftModelId
       const settingsInput = generationSettingsInput(
         modelId,
-        generationSettings
+        generationSettings,
+        models
       )
       const operation = current.project
         ? runtime.commands.sendMessage({
@@ -392,6 +397,7 @@ function NormalizedThreadChat({
     },
     [
       draftModelId,
+      models,
       generationSettings,
       runtime.commands,
       runtime.store,
@@ -457,7 +463,7 @@ function NormalizedThreadChat({
       )
       const modelId =
         current.threadsById[parentThreadId]?.modelId ??
-        DEFAULT_THREAD_CHAT_MODEL_ID
+        defaultModelId
       void runtime.commands
         .forkThread({
           parentThreadId,
@@ -465,7 +471,7 @@ function NormalizedThreadChat({
           anchorText: info.text,
           anchor: info.anchor,
           modelId,
-          ...generationSettingsInput(modelId, generationSettings),
+          ...generationSettingsInput(modelId, generationSettings, models),
           ...(question?.trim() ? { firstTurn: forkFirstTurnContent({ text: question, sourceMessageId: info.msgId, anchorText: info.text, anchor: info.anchor }) } : {}),
         })
         .then(({ command }) => {
@@ -483,6 +489,8 @@ function NormalizedThreadChat({
     },
     [
       generationSettings,
+      models,
+      defaultModelId,
       openBranchUI,
       runtime.commands,
       runtime.store,

@@ -86,10 +86,11 @@ TOKEN_ROUTER_API_KEY=...
 
 `DATABASE_URL` is required by the running application. `pnpm db:migrate` uses `DIRECT_URL` when present and otherwise falls back to `DATABASE_URL`; use a direct database URL for migrations when your runtime URL is a transaction-pooler connection. The current model entry points require `TOKEN_ROUTER_BASE_URL` and `TOKEN_ROUTER_API_KEY`. The service must support the selected upstream model ID. Legacy provider settings remain documented in `.env.example` for existing deployments.
 
-Apply migrations and start the development server:
+After the model-catalog migration has been integrated and verified on develop, apply migrations, initialize the catalog, and start the development server:
 
 ```bash
 pnpm db:migrate
+pnpm model-catalog:seed
 pnpm dev
 ```
 
@@ -149,9 +150,9 @@ The retained legacy registry contains fourteen fixed OpenRouter-backed internal 
 
 ## LLM provider routing
 
-The chat model catalog is an explicitly reviewed server-side allowlist. The client receives only public model options; real providers, upstream model IDs, gateway URLs, and credentials are managed by the server-side `lib/ai/llm/` routing modules. Current model selectors expose only the 18 models declared in `constants/models/token-router.ts`. They use one Token Router service configured with `TOKEN_ROUTER_BASE_URL` and `TOKEN_ROUTER_API_KEY`; Claude uses Messages and other models use Chat Completions. Luna is the default for chat and title generation. Existing Iceland / Private Relay public IDs remain stable but resolve to Token Router. Other provider implementations and historical registry entries remain in place for a later retirement phase. Chat requests do not depend on live `/models` discovery.
+The active model catalog is stored in PostgreSQL and managed at `/admin/models`. Administrators configure upstream IDs, request compatibility profiles, image/tool/reasoning abilities, effort options, and output limits/defaults. Chat and title generation read this catalog; the source registry only seeds initial data and retains legacy test/provider definitions. Existing public IDs stay stable. Gateway URLs and credentials remain server-only environment variables (`TOKEN_ROUTER_BASE_URL`, `TOKEN_ROUTER_API_KEY`).
 
-The Thread composer exposes model-specific effort and output limits, defaulting to `high` / `32K`. Capability declarations in `constants/generation-settings.ts` drive both controls and server validation; `lib/thread-chat/generation-settings.ts` resolves unsupported preferences after model switches. GPT requests serialize effort as `reasoning_effort` and the output budget as `max_completion_tokens` (including reasoning tokens); Claude retains adaptive thinking options. Reasoning display depends on the relay returning reasoning content, separately from effort support. GPT-5.6 Luna/Sol/Terra allow `none` through `max`; Astra excludes `none`; GPT-5.4/Mini/5.5 stop at `xhigh`. Spark remains unconfirmed and does not expose custom settings. Profiles were checked against OpenAI model documentation on 2026-09-08; only Luna has live relay verification. Run `pnpm test:thread-chat:generation-settings` and `pnpm test:thread-chat:model-routes` for capability, switch fallback, and SDK serialization coverage.
+A new model using an existing compatibility profile can be enabled without deploying application code. Each generation captures one configuration snapshot; menu data refreshes periodically, while the server validates enabled models and parameters on every new request. See [Admin setup, extension points and verification](./docs/admin/README.md), including the required develop migration integration before release.
 
 ## Architecture
 

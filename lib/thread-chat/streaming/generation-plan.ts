@@ -3,9 +3,12 @@ import { isStepCount, streamText, type ModelMessage, type ToolSet } from "ai"
 import type { GenerationSettings } from "@/constants/generation-settings"
 import { THREAD_CHAT_PROMPT_SCHEMA_VERSION } from "@/constants/thread-chat-prompt"
 import { MODEL_CALL_PURPOSE } from "@/constants/model-call"
-import { getChatModel } from "@/constants/model"
+import { requireCatalogModel } from "@/lib/model-catalog/repository"
+import { resolveCatalogLanguageModel } from "@/lib/model-catalog/runtime"
+import { toPublicCatalogModel } from "@/lib/model-catalog/public"
+import { resolveGenerationSettings } from "@/lib/thread-chat/generation-settings"
+import type { CatalogModel } from "@/lib/model-catalog/schema"
 import { isSearchConfigured } from "@/lib/ai/search"
-import { resolveChatModelWithRoute } from "@/lib/ai/llm/model-routes"
 import { withModelCallLogging } from "@/lib/ai/model-call-logger"
 import { isExplicitMarkdownArtifactRequest } from "@/lib/chat/markdown-artifact"
 import {
@@ -38,6 +41,7 @@ export interface PrepareGenerationInput {
   projectId: string
   threadId: string
   modelId: string
+  modelSnapshot?: CatalogModel
   generationSettings?: GenerationSettings
   observabilityContext: ObservabilityContext
   latestUserText: string
@@ -50,9 +54,9 @@ export interface PrepareGenerationInput {
 }
 
 export async function prepareGeneration(input: PrepareGenerationInput) {
-  const registeredModel = getChatModel(input.modelId)
-  if (!registeredModel) throw new Error("MODEL_NOT_ALLOWED")
-  const resolvedModel = resolveChatModelWithRoute(input.modelId)
+  const registeredModel = input.modelSnapshot ?? await requireCatalogModel(input.modelId)
+  const resolvedModel = resolveCatalogLanguageModel(registeredModel)
+  const settings = resolveGenerationSettings(input.modelId, input.generationSettings, toPublicCatalogModel(registeredModel).capabilities.generationSettings)
   const model = resolvedModel.model
   const trace = {
     requestId: crypto.randomUUID(),
@@ -74,7 +78,7 @@ export async function prepareGeneration(input: PrepareGenerationInput) {
         }
       : {}),
   }
-  const searchReady = isSearchConfigured()
+  const searchReady = registeredModel.config.toolCalling && isSearchConfigured()
   const researchRoute = await observeAppOperation(
     OBSERVATION_NAMES.researchRoute,
     {
@@ -134,7 +138,7 @@ export async function prepareGeneration(input: PrepareGenerationInput) {
           }
         )
       : null
-  const artifactRequested = isExplicitMarkdownArtifactRequest(
+  const artifactRequested = registeredModel.config.toolCalling && isExplicitMarkdownArtifactRequest(
     input.latestUserText
   )
   const generationMode = resolveGenerationMode({
@@ -143,7 +147,7 @@ export async function prepareGeneration(input: PrepareGenerationInput) {
   })
   const tools = buildGenerationTools({
     messageId: input.messageId,
-    toolNames: searchReady
+    toolNames: !registeredModel.config.toolCalling ? [] : searchReady
       ? generationMode.toolNames
       : generationMode.toolNames.filter(
           (name) => name === "createMarkdownArtifact"
@@ -182,12 +186,12 @@ export async function prepareGeneration(input: PrepareGenerationInput) {
   throwIfGenerationCancelled(input.abortSignal)
   const generationOptions = chatAnswerGenerationOptions(
     researchRoute.mode,
-    input.generationSettings,
+    settings,
     resolvedModel.route.protocol
   )
   // 当前模型目录没有上下文上限或完整请求 tokenizer（含工具/多模态）。
   // 在所有 system、历史、附件和工具已确定的边界明确记录 unknown。
-  const contextBudget = evaluateContextBudget({ inputTokens: null, contextWindow: null, outputTokens: generationOptions.maxOutputTokens ?? 0 })
+  const contextBudget = evaluateContextBudget({ inputTokens: null, contextWindow: registeredModel.config.contextWindow, outputTokens: generationOptions.maxOutputTokens ?? 0 })
   if (contextBudget.status === "exceeded") throw new Error("context_length_exceeded")
   const result = streamText({
     ...buildAiTelemetryConfig(MODEL_CALL_PURPOSE.chatAnswer, {
@@ -243,6 +247,8 @@ export async function prepareGeneration(input: PrepareGenerationInput) {
     usage: result.usage,
     contextMetadata: {
       ...contextMetadata,
+      modelConfigVersion: registeredModel.version,
+      effectiveGenerationSettings: settings,
       contextBudget,
       generationMode: generationMode.id,
       promptSchemaVersion: THREAD_CHAT_PROMPT_SCHEMA_VERSION,

@@ -19,9 +19,9 @@ import {
   withConversationTransaction,
 } from "@/lib/thread-chat/persistence/transaction"
 
-export function startProject(userId: string, command: StartProjectCommand) {
-  assertAllowedModel(command.modelId)
-  assertAllowedGenerationSettings(command.modelId, command.generationSettings)
+export async function startProject(userId: string, command: StartProjectCommand) {
+  await assertAllowedModel(command.modelId)
+  await assertAllowedGenerationSettings(command.modelId, command.generationSettings)
   return withConversationTransaction(async (tx) =>
     executeIdempotentCommand({
       tx,

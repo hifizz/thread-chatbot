@@ -1,18 +1,15 @@
+import { ModelCatalogError } from "@/lib/model-catalog/errors"
+import { assertGenerationSettingsCapability, assertImageInputCapability } from "@/lib/model-catalog/validation"
 import { and, eq, inArray, isNull } from "drizzle-orm"
 import { attachments, messages, projects, threads } from "@/lib/db/schema"
 import {
   ATTACHMENT_URL_PREFIX,
-  IMAGE_ATTACHMENT_LIMITS,
   IMAGE_ATTACHMENT_MIME_TYPES,
-  IMAGE_MODEL_VALIDATION_MESSAGE,
 } from "@/constants/attachment"
 
 import type { GenerationSettings } from "@/constants/generation-settings"
-import {
-  getModelGenerationSettingsCapability,
-  isThreadChatModelId,
-  supportsModelImageInput,
-} from "@/constants/model"
+import { requireCatalogModel } from "@/lib/model-catalog/repository"
+
 import type { ThreadChatUIMessage } from "@/lib/thread-chat/contracts/ui-message"
 import {
   type FileReference,
@@ -43,8 +40,9 @@ const IMAGE_ATTACHMENT_MIME_TYPE_SET = new Set<string>(
   IMAGE_ATTACHMENT_MIME_TYPES
 )
 
-export function assertAllowedModel(modelId: string): void {
-  if (!isThreadChatModelId(modelId)) {
+export async function assertAllowedModel(modelId: string): Promise<void> {
+  try { await requireCatalogModel(modelId) } catch (error) {
+    if (!(error instanceof ModelCatalogError) || error.status !== 400) throw error
     throw new ConversationApplicationError(
       "MODEL_NOT_ALLOWED",
       "当前模型不可用于 ThreadChat"
@@ -52,22 +50,13 @@ export function assertAllowedModel(modelId: string): void {
   }
 }
 
-export function assertAllowedGenerationSettings(
+export async function assertAllowedGenerationSettings(
   modelId: string,
   settings: GenerationSettings | undefined
-): void {
+): Promise<void> {
   if (!settings) return
-  const capability = getModelGenerationSettingsCapability(modelId)
-  if (
-    !capability ||
-    !capability.effortLevels.includes(settings.effort) ||
-    !capability.maxOutputTokenOptions.includes(settings.maxOutputTokens)
-  ) {
-    throw new ConversationApplicationError(
-      "VALIDATION_ERROR",
-      "当前模型不支持所选生成参数"
-    )
-  }
+  const { config } = await requireCatalogModel(modelId)
+  assertGenerationSettingsCapability({ effortLevels: config.effortLevels, maxOutputTokenOptions: config.outputTokenOptions }, settings)
 }
 
 export function hasImageFileReferences(
@@ -79,25 +68,17 @@ export function hasImageFileReferences(
 }
 
 /** 必须在创建生成消息及进入付费模型调用前执行。 */
-export function assertModelSupportsNewAttachments(
+export async function assertModelSupportsNewAttachments(
   modelId: string,
-  files: readonly FileReference[]
-): void {
+  files: readonly FileReference[],
+  connection?: ConversationTransaction
+): Promise<void> {
   const imageCount = files.filter((file) =>
     IMAGE_ATTACHMENT_MIME_TYPE_SET.has(file.mediaType)
   ).length
-  if (imageCount > IMAGE_ATTACHMENT_LIMITS.maxFilesPerMessage) {
-    throw new ConversationApplicationError(
-      "VALIDATION_ERROR",
-      `单次最多添加 ${IMAGE_ATTACHMENT_LIMITS.maxFilesPerMessage} 张图片`
-    )
-  }
-  if (imageCount > 0 && !supportsModelImageInput(modelId)) {
-    throw new ConversationApplicationError(
-      "VALIDATION_ERROR",
-      IMAGE_MODEL_VALIDATION_MESSAGE
-    )
-  }
+  if (!imageCount) return
+  const snapshot = await requireCatalogModel(modelId, connection)
+  assertImageInputCapability(snapshot.config.imageInput, imageCount)
 }
 
 function attachmentIdFromUrl(url: string): string | null {

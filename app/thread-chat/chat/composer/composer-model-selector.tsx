@@ -6,8 +6,7 @@ import { Menu } from "@base-ui/react/menu"
 import { ComposerMenu } from "@/components/assistant-ui/elements/composer/menu"
 import { ComposerModelItem, ComposerModelTrigger } from "@/components/assistant-ui/elements/composer/models"
 import { ComposerTheme } from "@/components/assistant-ui/elements/composer/theme"
-import { getChatModel } from "@/constants/model"
-import { THREAD_CHAT_MODEL_OPTIONS } from "@/constants/models"
+import { useModelCatalog } from "@/lib/model-catalog/context"
 import { COMPOSER_MODEL_COPY } from "@/constants/composer-model"
 import { DisabledComposerOption } from "./disabled-composer-option"
 import styles from "./artifact-composer.module.css"
@@ -21,6 +20,7 @@ type ComposerModelSelectorProps = {
 
 /** 官方菜单负责外观，Base UI 负责定位、键盘导航、关闭与焦点归还。 */
 export function ComposerModelSelector({ modelId, disabled, disabledReason, onValueChange }: ComposerModelSelectorProps) {
+  const { models } = useModelCatalog()
   const [open, setOpen] = useState(false)
   const portalContainer = useRef<HTMLElement | null>(null)
   const locked = disabled || !onValueChange
@@ -32,7 +32,7 @@ export function ComposerModelSelector({ modelId, disabled, disabledReason, onVal
     <DisabledComposerOption disabled={locked} reason={title}>
       <Menu.Trigger disabled={locked} aria-label={COMPOSER_MODEL_COPY.choose}
         ref={(node: HTMLButtonElement | null) => { portalContainer.current = node?.closest<HTMLElement>(".tc") ?? null }}
-        render={<ComposerModelTrigger className="disabled:opacity-50" model={getChatModel(modelId)?.name ?? modelId ?? COMPOSER_MODEL_COPY.current} open={open && !locked} />} />
+        render={<ComposerModelTrigger className="disabled:opacity-50" model={models.find((m) => m.id === modelId)?.name ?? modelId ?? COMPOSER_MODEL_COPY.current} open={open && !locked} />} />
     </DisabledComposerOption>
     <Menu.Portal container={portalContainer}>
       <ComposerTheme>
@@ -40,8 +40,8 @@ export function ComposerModelSelector({ modelId, disabled, disabledReason, onVal
           <Menu.Popup aria-label={COMPOSER_MODEL_COPY.choose}
             render={<ComposerMenu open={open && !locked} className={`${styles.modelMenu} relative bottom-auto w-[32rem] mb-0 max-h-[min(24rem,var(--available-height))] max-w-[calc(100vw-2rem)] overflow-y-auto outline-none`} />}>
             <Menu.RadioGroup value={modelId} onValueChange={onValueChange} className="flex flex-col gap-0.5">
-              {THREAD_CHAT_MODEL_OPTIONS.map((model) => <Menu.RadioItem key={model.id} value={model.id} label={model.name} nativeButton closeOnClick
-                render={<ComposerModelItem entry={{ name: model.name, meta: model.contextLabel ?? "", icon: <ModelLogo modelId={model.id} /> }} selected={model.id === modelId}
+              {models.map((model) => <Menu.RadioItem key={model.id} value={model.id} label={model.name} nativeButton closeOnClick
+                render={<ComposerModelItem entry={{ name: model.name, meta: model.contextLabel ?? "", icon: <ModelLogo modelId={model.logo === "auto" ? model.id : model.logo} /> }} selected={model.id === modelId}
                   className="outline-none data-highlighted:bg-foreground/[0.04]" />} />)}
             </Menu.RadioGroup>
           </Menu.Popup>

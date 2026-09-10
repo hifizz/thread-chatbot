@@ -1,24 +1,20 @@
-import {
-  DEFAULT_GENERATION_SETTINGS,
-  type GenerationSettings,
-} from "@/constants/generation-settings"
+import { DEFAULT_GENERATION_SETTINGS, type GenerationSettings, type GenerationSettingsCapability } from "@/constants/generation-settings"
 import { getModelGenerationSettingsCapability } from "@/constants/model"
 
-/** 显示与发送共用同一组有效值；切换模型时不把上一模型的无效档位发给服务端。 */
+/** 浏览器与服务端共享：未选择时采用模型默认，切换模型后回退不兼容的偏好。 */
 export function resolveGenerationSettings(
   modelId: string | undefined,
-  settings: GenerationSettings
+  settings: GenerationSettings | undefined,
+  capability: GenerationSettingsCapability | undefined = getModelGenerationSettingsCapability(modelId)
 ): GenerationSettings | undefined {
-  const capability = getModelGenerationSettingsCapability(modelId)
   if (!capability) return undefined
   const { effortLevels, maxOutputTokenOptions } = capability
-  const fallbackEffort = effortLevels.includes(DEFAULT_GENERATION_SETTINGS.effort)
-    ? DEFAULT_GENERATION_SETTINGS.effort : effortLevels[0]
-  const fallbackTokens = maxOutputTokenOptions.includes(DEFAULT_GENERATION_SETTINGS.maxOutputTokens)
-    ? DEFAULT_GENERATION_SETTINGS.maxOutputTokens : maxOutputTokenOptions[0]
-  if (fallbackEffort === undefined || fallbackTokens === undefined) return undefined
+  const defaults = capability.defaults ?? DEFAULT_GENERATION_SETTINGS
+  const fallbackEffort = defaults.effort && effortLevels.includes(defaults.effort) ? defaults.effort : effortLevels[0]
+  const fallbackTokens = maxOutputTokenOptions.includes(defaults.maxOutputTokens) ? defaults.maxOutputTokens : maxOutputTokenOptions[0]
+  if (fallbackTokens === undefined) return undefined
   return {
-    effort: effortLevels.includes(settings.effort) ? settings.effort : fallbackEffort,
-    maxOutputTokens: maxOutputTokenOptions.includes(settings.maxOutputTokens) ? settings.maxOutputTokens : fallbackTokens,
+    ...(fallbackEffort !== undefined ? { effort: settings?.effort && effortLevels.includes(settings.effort) ? settings.effort : fallbackEffort } : {}),
+    maxOutputTokens: settings && maxOutputTokenOptions.includes(settings.maxOutputTokens) ? settings.maxOutputTokens : fallbackTokens,
   }
 }

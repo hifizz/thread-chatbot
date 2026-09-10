@@ -35,13 +35,13 @@ export type ForkThreadResult =
   | { thread: ThreadDTO; generation: null }
   | { thread: ThreadDTO; generation: GenerationAcceptedDTO }
 
-export function forkThread(
+export async function forkThread(
   userId: string,
   parentThreadId: string,
   command: ForkThreadCommand
 ) {
-  assertAllowedModel(command.modelId)
-  assertAllowedGenerationSettings(command.modelId, command.generationSettings)
+  await assertAllowedModel(command.modelId)
+  await assertAllowedGenerationSettings(command.modelId, command.generationSettings)
   return withConversationTransaction(async (tx) =>
     executeIdempotentCommand({
       tx,

@@ -271,12 +271,12 @@ export function deleteProject(
   )
 }
 
-export function updateThread(
+export async function updateThread(
   userId: string,
   threadId: string,
   command: UpdateThreadCommand
 ) {
-  if (command.modelId) assertAllowedModel(command.modelId)
+  if (command.modelId) await assertAllowedModel(command.modelId)
   return withConversationTransaction(async (tx) =>
     executeIdempotentCommand({
       tx,

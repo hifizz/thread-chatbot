@@ -36,13 +36,13 @@ export interface EditTurnResult {
   abortMessageId: string | null
 }
 
-export function editLatestTurn(
+export async function editLatestTurn(
   userId: string,
   messageId: string,
   command: EditLatestTurnCommand
 ) {
-  assertAllowedModel(command.modelId)
-  assertAllowedGenerationSettings(command.modelId, command.generationSettings)
+  await assertAllowedModel(command.modelId)
+  await assertAllowedGenerationSettings(command.modelId, command.generationSettings)
   return withConversationTransaction(async (tx) =>
     executeIdempotentCommand({
       tx,

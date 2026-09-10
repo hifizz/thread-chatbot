@@ -3,6 +3,7 @@ import type { GenerationSettingsCapability } from "@/constants/generation-settin
 export type ModelSurface = "linear" | "thread"
 
 export type ModelCapabilities = {
+  toolCalling?: boolean
   reasoning?: boolean
   attachments?: boolean
   imageInput?: boolean

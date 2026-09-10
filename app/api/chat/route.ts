@@ -1,3 +1,7 @@
+import { resolveCatalogLanguageModel } from "@/lib/model-catalog/runtime"
+import { toPublicCatalogModel } from "@/lib/model-catalog/public"
+import { resolveGenerationSettings } from "@/lib/thread-chat/generation-settings"
+import { chatAnswerGenerationOptions } from "@/lib/thread-chat/streaming/generation-settings"
 import {
   convertToModelMessages,
   consumeStream,
@@ -46,14 +50,16 @@ export async function POST(req: Request) {
     modelId,
     model,
     isUnbilledPreview,
+    catalogModel,
   } = requestContext
 
   try {
     // AnySearch 是当前统一联网层：所有模型都获得相同的搜索与网页深读工具。
     // deepResearch 只控制研究提示强度，不再决定工具是否存在。
     const research = deepResearch === true
-    const searchReady = isSearchConfigured()
-    const chatModel = resolveChatModel(modelId)
+    const searchReady = catalogModel?.config.toolCalling !== false && isSearchConfigured()
+    const resolved = catalogModel ? resolveCatalogLanguageModel(catalogModel) : null
+    const chatModel = resolved?.model ?? resolveChatModel(modelId)
     const modelCallTrace: ModelCallTrace = {
       requestId: crypto.randomUUID(),
       ...(linearThreadId ? { threadId: linearThreadId } : {}),
@@ -75,12 +81,14 @@ export async function POST(req: Request) {
             searchReady,
             modelCallTrace,
           })
-          const { tools: allTools, webToolsEnabled } = buildChatToolSet({
+          const { tools: configuredTools, webToolsEnabled } = buildChatToolSet({
             researchMode: researchRoute.mode,
             routeReason: researchRoute.reasonCode,
             searchReady,
             frontendToolSet: frontendTools(tools ?? {}),
           })
+
+          const allTools = catalogModel?.config.toolCalling === false ? {} : configuredTools
 
           // MiniMax 不接受 file part：先把附件（PDF→提取文本，其余→占位说明）转换为 text part
           const resolvedMessages = await resolveAttachmentParts(
@@ -127,7 +135,9 @@ export async function POST(req: Request) {
               markdownArtifactRequested: false,
               researchMode: researchRoute.mode,
             }),
-            maxOutputTokens: MAX_OUTPUT_TOKENS,
+            ...(catalogModel && resolved ? chatAnswerGenerationOptions(researchRoute.mode,
+              resolveGenerationSettings(modelId, undefined, toPublicCatalogModel(catalogModel).capabilities.generationSettings), resolved.route.protocol)
+              : { maxOutputTokens: MAX_OUTPUT_TOKENS }),
             stopWhen: isStepCount(webToolsEnabled ? RESEARCH_MAX_STEPS : 5),
             onError: streamLifecycle.onError,
             onAbort: streamLifecycle.onAbort,

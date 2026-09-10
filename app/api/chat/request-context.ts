@@ -1,3 +1,7 @@
+import { readModelCatalog } from "@/lib/model-catalog/repository"
+import { toPublicCatalogModel } from "@/lib/model-catalog/public"
+import type { CatalogModel } from "@/lib/model-catalog/schema"
+import { isTokenRouterConfigured } from "@/lib/ai/llm/token-router-config"
 import { safeValidateUIMessages, type UIMessage } from "ai"
 import type { ToolJSONSchema } from "assistant-stream"
 import { z } from "zod"
@@ -68,6 +72,28 @@ export async function prepareChatRequestContext(
     }
   }
 
+  let defaultModelId = DEFAULT_MODEL_ID
+  let catalogModels: CatalogModel[] | undefined
+  if (dependencies === defaultDependencies) {
+    try {
+      const catalog = await readModelCatalog()
+      catalogModels = catalog.models.filter((m) => m.enabled)
+      defaultModelId = catalog.defaultModelId
+      dependencies = {
+        ...dependencies,
+        getModel: (id) => {
+          const entry = catalogModels?.find((m) => m.id === id)
+          if (!entry) return undefined
+          return { id: entry.id, name: entry.config.name, provider: "token-router", capabilities: toPublicCatalogModel(entry).capabilities, supportsImageInput: entry.config.imageInput, surfaces: ["linear", "thread"], unbilledPreview: true }
+        },
+        linearModelAllowed: (id): id is string => catalogModels!.some((m) => m.id === id),
+        modelConfigured: () => isTokenRouterConfigured(),
+      }
+    } catch {
+      return { kind: "response" as const, response: Response.json({ error: "模型目录暂不可用" }, { status: 503 }) }
+    }
+  }
+
   let input: unknown
   try {
     input = await req.json()
@@ -112,8 +138,10 @@ export async function prepareChatRequestContext(
     }
   }
 
-  const modelId = typeof rawModelId === "string" ? rawModelId : DEFAULT_MODEL_ID
-  const model = dependencies.getModel(modelId)!
+  const modelId = typeof rawModelId === "string" ? rawModelId : defaultModelId
+  const model = dependencies.getModel(modelId)
+  if (!model) return invalidChatRequest("默认模型不可用，请联系管理员")
+  const catalogModel = catalogModels?.find((m) => m.id === modelId)
   if (!dependencies.linearModelAllowed(modelId)) {
     return {
       kind: "response" as const,
@@ -156,5 +184,6 @@ export async function prepareChatRequestContext(
     modelId,
     model,
     isUnbilledPreview,
+    catalogModel,
   }
 }

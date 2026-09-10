@@ -3,7 +3,7 @@
 import { useStore } from "zustand"
 import { toast } from "sonner"
 import { COMPOSER_ATTACHMENT_COPY, IMAGE_ATTACHMENT_LIMITS, IMAGE_MODEL_VALIDATION_MESSAGE, MESSAGE_ATTACHMENT_MAX_FILES } from "@/constants/attachment"
-import { supportsModelImageInput } from "@/constants/model"
+import { useModelCatalog } from "@/lib/model-catalog/context"
 import { deleteUploadedAttachment, uploadAttachment, validateAttachmentFile } from "@/lib/attachments/upload"
 import { preprocessImageAttachment } from "@/lib/attachments/image"
 import type { ComposerAttachmentDraft } from "@/lib/thread-chat/composer-attachments"
@@ -13,6 +13,7 @@ import { isThreadComposerFile, isThreadComposerImageFile } from "./thread-attach
 const EMPTY_ATTACHMENTS: ComposerAttachmentDraft[] = []
 
 export function useComposerAttachments(scope: string, modelId?: string) {
+  const { models } = useModelCatalog()
   const store = useComposerDraftStore()
   const items = useStore(store, (state) => state.attachments[scope] ?? EMPTY_ATTACHMENTS)
   const current = () => store.getState().attachments[scope] ?? EMPTY_ATTACHMENTS
@@ -45,7 +46,7 @@ export function useComposerAttachments(scope: string, modelId?: string) {
         validateAttachmentFile(file)
         if (current().length >= MESSAGE_ATTACHMENT_MAX_FILES) throw new Error(`附件不能超过 ${MESSAGE_ATTACHMENT_MAX_FILES} 个`)
         if (isThreadComposerImageFile(file)) {
-          if (!supportsModelImageInput(modelId)) throw new Error(IMAGE_MODEL_VALIDATION_MESSAGE)
+          if (!models.find((m) => m.id === modelId)?.capabilities.imageInput) throw new Error(IMAGE_MODEL_VALIDATION_MESSAGE)
           if (current().filter((item) => isThreadComposerImageFile(item.file)).length >= IMAGE_ATTACHMENT_LIMITS.maxFilesPerMessage) {
             throw new Error(`单次最多添加 ${IMAGE_ATTACHMENT_LIMITS.maxFilesPerMessage} 张图片`)
           }

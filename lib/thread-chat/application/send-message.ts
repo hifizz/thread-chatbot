@@ -26,13 +26,13 @@ import {
   withConversationTransaction,
 } from "@/lib/thread-chat/persistence/transaction"
 
-export function sendMessage(
+export async function sendMessage(
   userId: string,
   threadId: string,
   command: SendMessageCommand
 ) {
-  assertAllowedModel(command.modelId)
-  assertAllowedGenerationSettings(command.modelId, command.generationSettings)
+  await assertAllowedModel(command.modelId)
+  await assertAllowedGenerationSettings(command.modelId, command.generationSettings)
   return withConversationTransaction(async (tx) =>
     executeIdempotentCommand({
       tx,

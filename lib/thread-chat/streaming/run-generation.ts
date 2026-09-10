@@ -1,3 +1,4 @@
+import { requireCatalogModel } from "@/lib/model-catalog/repository"
 import { contextLimitFailure } from "../application/context-budget"
 import type { LanguageModelUsage, TextStreamPart, ToolSet } from "ai"
 import type { GenerationSettings } from "@/constants/generation-settings"
@@ -130,6 +131,7 @@ async function runGenerationCore({
   dependencies?: RunGenerationDependencies
 }): Promise<GenerationRunResult> {
   const { message, thread, project } = identity
+  const modelSnapshot = await requireCatalogModel(message.modelId)
   const rows = await listThreadMessageRows(
     db,
     message.projectId,
@@ -146,6 +148,7 @@ async function runGenerationCore({
     userId,
     threadId: thread.id,
     modelId: message.modelId,
+    modelSnapshot,
     excludeAssistantMessageId: message.id,
   })
   const prepare = dependencies.prepare ?? prepareGeneration
@@ -163,6 +166,7 @@ async function runGenerationCore({
       projectId: message.projectId,
       threadId: thread.id,
       modelId: message.modelId,
+      modelSnapshot,
       ...(generationSettings ? { generationSettings } : {}),
       observabilityContext,
       latestUserText: textFromParts(latestUser.parts),
