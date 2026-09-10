@@ -73,6 +73,7 @@ export function ConversationMessage({
   regeneratableAssistantMessageId,
 }: ConversationMessageProps) {
   const presentation = assistantMessagePresentation(message)
+  const regeneratable = message.id === regeneratableAssistantMessageId
 
   return (
     <div className={`message ${message.role}`} data-msg-id={message.id}>
@@ -127,17 +128,21 @@ export function ConversationMessage({
           {message.status === "error" && (
             <div className="msg-error">
               {message.error ?? "生成失败"}
-              <button className="retry" onClick={() => onRetry?.(message)}>
-                重试
-              </button>
+              {regeneratable && onRetry && (
+                <button className="retry" onClick={() => onRetry(message)}>
+                  重试
+                </button>
+              )}
             </div>
           )}
           {message.status === "stopped" && (
             <div className="msg-stopped" role="status">
               <span>{GENERATION_STOPPED_LABEL}</span>
-              <button className="retry" onClick={() => onRetry?.(message)}>
-                重试
-              </button>
+              {regeneratable && onRetry && (
+                <button className="retry" onClick={() => onRetry(message)}>
+                  重试
+                </button>
+              )}
             </div>
           )}
           {messageCommands && hasCompletedAssistantActions(message) && (
@@ -145,7 +150,7 @@ export function ConversationMessage({
               <AssistantMessageToolbar
                 threadId={threadId}
                 message={message}
-                regeneratable={message.id === regeneratableAssistantMessageId}
+                regeneratable={regeneratable}
                 feedback={messageActionState?.feedbackByMessageId.get(
                   message.id
                 )}
