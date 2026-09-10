@@ -3,7 +3,6 @@ import { isStepCount, streamText, type ModelMessage, type ToolSet } from "ai"
 import type { GenerationSettings } from "@/constants/generation-settings"
 import { THREAD_CHAT_PROMPT_SCHEMA_VERSION } from "@/constants/thread-chat-prompt"
 import { MODEL_CALL_PURPOSE } from "@/constants/model-call"
-import { requireCatalogModel } from "@/lib/model-catalog/repository"
 import { resolveCatalogLanguageModel } from "@/lib/model-catalog/runtime"
 import { toPublicCatalogModel } from "@/lib/model-catalog/public"
 import { resolveGenerationSettings } from "@/lib/thread-chat/generation-settings"
@@ -41,7 +40,7 @@ export interface PrepareGenerationInput {
   projectId: string
   threadId: string
   modelId: string
-  modelSnapshot?: CatalogModel
+  modelSnapshot: CatalogModel
   generationSettings?: GenerationSettings
   observabilityContext: ObservabilityContext
   latestUserText: string
@@ -54,7 +53,7 @@ export interface PrepareGenerationInput {
 }
 
 export async function prepareGeneration(input: PrepareGenerationInput) {
-  const registeredModel = input.modelSnapshot ?? await requireCatalogModel(input.modelId)
+  const registeredModel = input.modelSnapshot
   const resolvedModel = resolveCatalogLanguageModel(registeredModel)
   const settings = resolveGenerationSettings(input.modelId, input.generationSettings, toPublicCatalogModel(registeredModel).capabilities.generationSettings)
   const model = resolvedModel.model

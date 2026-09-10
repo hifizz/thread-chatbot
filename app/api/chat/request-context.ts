@@ -1,4 +1,4 @@
-import { readModelCatalog } from "@/lib/model-catalog/repository"
+import { getModelConfig } from "@/lib/model-catalog/config"
 import { toPublicCatalogModel } from "@/lib/model-catalog/public"
 import type { CatalogModel } from "@/lib/model-catalog/schema"
 import { isTokenRouterConfigured } from "@/lib/ai/llm/token-router-config"
@@ -76,7 +76,7 @@ export async function prepareChatRequestContext(
   let catalogModels: CatalogModel[] | undefined
   if (dependencies === defaultDependencies) {
     try {
-      const catalog = await readModelCatalog()
+      const catalog = await getModelConfig()
       catalogModels = catalog.models.filter((m) => m.enabled)
       defaultModelId = catalog.defaultModelId
       dependencies = {

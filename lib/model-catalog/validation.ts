@@ -5,7 +5,7 @@ import { ConversationApplicationError } from "@/lib/thread-chat/application/erro
 export function assertGenerationSettingsCapability(capability: GenerationSettingsCapability | undefined, settings: GenerationSettings | undefined) {
   if (!settings) return
   if (!capability || (settings.effort !== undefined && !capability.effortLevels.includes(settings.effort)) || !capability.maxOutputTokenOptions.includes(settings.maxOutputTokens)) {
-    throw new ConversationApplicationError("VALIDATION_ERROR", "当前模型不支持所选生成参数")
+    throw new ConversationApplicationError("VALIDATION_ERROR", "当前模型不支持所选生成参数，请刷新页面并重新选择")
   }
 }
 export function assertImageInputCapability(supportsImages: boolean, imageCount: number) {

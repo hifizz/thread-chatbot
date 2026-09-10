@@ -1,4 +1,5 @@
-import { requireCatalogModel } from "@/lib/model-catalog/repository"
+import { requireCatalogModel } from "@/lib/model-catalog/lookup"
+import type { ModelCatalog } from "@/lib/model-catalog/schema"
 import { contextLimitFailure } from "../application/context-budget"
 import type { LanguageModelUsage, TextStreamPart, ToolSet } from "ai"
 import type { GenerationSettings } from "@/constants/generation-settings"
@@ -121,17 +122,19 @@ async function runGenerationCore({
   identity,
   observabilityContext,
   generationSettings,
+  catalog,
   dependencies = {},
 }: {
   userId: string
   session: StreamSessionController
   identity: GenerationIdentity
   observabilityContext: ObservabilityContext
+  catalog: ModelCatalog
   generationSettings?: GenerationSettings
   dependencies?: RunGenerationDependencies
 }): Promise<GenerationRunResult> {
   const { message, thread, project } = identity
-  const modelSnapshot = await requireCatalogModel(message.modelId)
+  const modelSnapshot = requireCatalogModel(catalog, message.modelId)
   const rows = await listThreadMessageRows(
     db,
     message.projectId,
@@ -147,7 +150,6 @@ async function runGenerationCore({
   const compiledContext = await compileModelContextWithProject({
     userId,
     threadId: thread.id,
-    modelId: message.modelId,
     modelSnapshot,
     excludeAssistantMessageId: message.id,
   })
@@ -308,6 +310,7 @@ export async function runGeneration(input: {
   userId: string
   messageId: string
   session: StreamSessionController
+  catalog: ModelCatalog
   generationSettings?: GenerationSettings
   dependencies?: RunGenerationDependencies
 }): Promise<void> {
@@ -322,6 +325,7 @@ export async function runGeneration(input: {
     })
     await runAgentTrace(traceInput, async (observation) => {
       const result = await runGenerationCore({
+        catalog: input.catalog,
         userId: input.userId,
         session: input.session,
         identity,

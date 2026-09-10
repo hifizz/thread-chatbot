@@ -1,9 +1,11 @@
+import { requireCatalogModel } from "../../lib/model-catalog/lookup.ts"
+import { toPublicModelCatalog } from "../../lib/model-catalog/public.ts"
 import assert from "node:assert/strict"
 import { eq } from "drizzle-orm"
 import { db } from "../../lib/db/index.ts"
 import { user, modelCatalogAudit, modelCatalog } from "../../lib/db/schema.ts"
 import { seedModelCatalog } from "../../lib/model-catalog/seed.ts"
-import { readModelCatalog, readPublicModelCatalog, saveCatalogModel, setDefaultCatalogModel, requireCatalogModel } from "../../lib/model-catalog/repository.ts"
+import { readModelCatalog, saveCatalogModel, setDefaultCatalogModel } from "../../lib/model-catalog/repository.ts"
 import { assertAllowedModel, assertAllowedGenerationSettings, assertModelSupportsNewAttachments } from "../../lib/thread-chat/application/command-utils.ts"
 const url = new URL(process.env.DATABASE_URL)
 assert(["localhost", "127.0.0.1"].includes(url.hostname), "仅允许独立本地测试库")
@@ -20,17 +22,18 @@ const value = {
 try {
   const saved = await saveCatalogModel(actorId, value)
   assert.equal(saved.version, 1)
-  assert.equal((await requireCatalogModel(id)).config.defaultEffort, "low")
-  await assertAllowedModel(id)
-  await assertAllowedGenerationSettings(id, { effort: "low", maxOutputTokens: 8192 })
-  await assert.rejects(assertAllowedGenerationSettings(id, { effort: "max", maxOutputTokens: 8192 }))
-  await assert.rejects(assertModelSupportsNewAttachments(id, [{ mediaType: "image/png", url: "fixture" }]))
-  const snapshot = await requireCatalogModel(id)
+  assert.equal((requireCatalogModel(await readModelCatalog(), id)).config.defaultEffort, "low")
+  assertAllowedModel(await readModelCatalog(), id)
+  assertAllowedGenerationSettings(await readModelCatalog(), id, { effort: "low", maxOutputTokens: 8192 })
+  const validationCatalog = await readModelCatalog()
+  assert.throws(() => assertAllowedGenerationSettings(validationCatalog, id, { effort: "max", maxOutputTokens: 8192 }))
+  assert.throws(() => assertModelSupportsNewAttachments(validationCatalog, id, [{ mediaType: "image/png", url: "fixture" }]))
+  const snapshot = requireCatalogModel(await readModelCatalog(), id)
   const updated = await saveCatalogModel(actorId, { ...value, version: 1, config: { ...value.config, defaultEffort: "high", imageInput: true } })
   assert.equal(updated.version, 2)
-  await assertModelSupportsNewAttachments(id, [{ mediaType: "image/png", url: "fixture" }])
+  assertModelSupportsNewAttachments(await readModelCatalog(), id, [{ mediaType: "image/png", url: "fixture" }])
   assert.equal(snapshot.config.defaultEffort, "low", "已读取快照保持旧值")
-  assert.equal((await requireCatalogModel(id)).config.defaultEffort, "high")
+  assert.equal((requireCatalogModel(await readModelCatalog(), id)).config.defaultEffort, "high")
   await assert.rejects(saveCatalogModel(actorId, { ...value, version: 1 }), (error) => error.status === 409)
   const audit = await db.select().from(modelCatalogAudit).where(eq(modelCatalogAudit.targetId, id))
   assert.equal(audit.length, 2, "失败写入不产生审计记录")
@@ -39,8 +42,9 @@ try {
   await assert.rejects(saveCatalogModel(actorId, { ...value, enabled: false, version: 2 }), (error) => error.status === 409)
   await setDefaultCatalogModel(actorId, initial.defaultModelId, selected.version)
   await saveCatalogModel(actorId, { ...value, enabled: false, version: 2 })
-  await assert.rejects(requireCatalogModel(id))
-  assert(!(await readPublicModelCatalog()).models.some((m) => m.id === id))
+  const catalogAfterDisable = await readModelCatalog()
+  assert.throws(() => requireCatalogModel(catalogAfterDisable, id))
+  assert(!(toPublicModelCatalog(await readModelCatalog())).models.some((m) => m.id === id))
   await seedModelCatalog()
   assert.equal((await readModelCatalog()).models.find((m) => m.id === id).enabled, false)
   console.log("PASS 独立数据库：新增、更新、能力校验、快照、审计、版本冲突、默认保护、停用与幂等初始化")

@@ -1,3 +1,4 @@
+import { fixtureModelCatalog } from "../fixtures/model-catalog.ts"
 import assert from "node:assert/strict"
 import { config } from "dotenv"
 
@@ -47,7 +48,7 @@ try {
     modelId,
     text: "历史稳定性基线",
     files: [],
-  })
+  }, fixtureModelCatalog)
 
   const sourceAssistantId = started.result.assistantMessage.id
   const finishedAt = now()
@@ -87,7 +88,7 @@ try {
       },
     },
     modelId,
-  })
+  }, fixtureModelCatalog)
 
   const before = await application.getProjectBootstrap(userId, projectId)
   const beforeMessage = structuredClone(
@@ -128,6 +129,7 @@ try {
   // A compiled generation context is a value snapshot. Removing the Project File later
   // cannot mutate the already-returned snapshot, while the next compilation no longer sees it.
   const compiledBeforeRemove = await compiler.compileModelContextWithProject({
+    modelSnapshot: fixtureModelCatalog.models.find((m) => m.id === modelId),
     userId,
     threadId: childThreadId,
   })
@@ -142,6 +144,7 @@ try {
     "已启动 generation 的 Project File 快照不得被后续 remove 改写"
   )
   const compiledAfterRemove = await compiler.compileModelContextWithProject({
+    modelSnapshot: fixtureModelCatalog.models.find((m) => m.id === modelId),
     userId,
     threadId: childThreadId,
   })

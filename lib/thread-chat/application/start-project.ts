@@ -1,3 +1,4 @@
+import type { ModelCatalog } from "@/lib/model-catalog/schema"
 import { resolveUserContent } from "./resolve-user-content"
 import { eq } from "drizzle-orm"
 import { messages, projects, threads } from "@/lib/db/schema"
@@ -19,9 +20,9 @@ import {
   withConversationTransaction,
 } from "@/lib/thread-chat/persistence/transaction"
 
-export async function startProject(userId: string, command: StartProjectCommand) {
-  await assertAllowedModel(command.modelId)
-  await assertAllowedGenerationSettings(command.modelId, command.generationSettings)
+export function startProject(userId: string, command: StartProjectCommand, catalog: ModelCatalog) {
+  assertAllowedModel(catalog, command.modelId)
+  assertAllowedGenerationSettings(catalog, command.modelId, command.generationSettings)
   return withConversationTransaction(async (tx) =>
     executeIdempotentCommand({
       tx,
@@ -40,7 +41,7 @@ export async function startProject(userId: string, command: StartProjectCommand)
           if (existing.userId !== userId) notFound()
           stateConflict("Project 已存在")
         }
-        const parts = await resolveUserContent({ tx, userId, projectId: command.projectId, modelId: command.modelId, content: command, operation: { type: "create-project" } })
+        const parts = await resolveUserContent({ catalog, tx, userId, projectId: command.projectId, modelId: command.modelId, content: command, operation: { type: "create-project" } })
         const now = new Date()
         const [project] = await tx
           .insert(projects)

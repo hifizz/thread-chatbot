@@ -1,5 +1,5 @@
 import type { ClientModelOption } from "@/constants/models"
-import type { CatalogModel } from "./schema"
+import type { CatalogModel, ModelCatalog } from "./schema"
 
 /** 浏览器只接收展示和能力；上游 ID、请求适配、审计数据留在服务端。 */
 export type PublicCatalogModel = ClientModelOption & {
@@ -23,4 +23,8 @@ export function toPublicCatalogModel(model: CatalogModel): PublicCatalogModel {
       },
     },
   }
+}
+
+export function toPublicModelCatalog(catalog: ModelCatalog): PublicModelCatalog {
+  return { models: catalog.models.filter((model) => model.enabled).map(toPublicCatalogModel), defaultModelId: catalog.defaultModelId }
 }

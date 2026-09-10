@@ -1,3 +1,4 @@
+import { fixtureModelCatalog } from "../fixtures/model-catalog.ts"
 import assert from "node:assert/strict"
 import { config } from "dotenv"
 
@@ -75,7 +76,7 @@ async function send(threadId, text) {
     modelId,
     text,
     files: [],
-  })
+  }, fixtureModelCatalog)
 }
 
 try {
@@ -92,7 +93,7 @@ try {
     modelId,
     text: "创建一份 Markdown 文档",
     files: [],
-  })
+  }, fixtureModelCatalog)
   const assistantId = start.result.assistantMessage.id
   const store = new streaming.SessionStore({ startCleanupTimer: false })
   let prepareCount = 0
@@ -109,6 +110,7 @@ try {
     }),
     run: (session) =>
       streaming.runGeneration({
+    catalog: fixtureModelCatalog,
         userId,
         messageId: assistantId,
         session,
@@ -222,6 +224,7 @@ try {
     }),
     run: (session) =>
       streaming.runGeneration({
+    catalog: fixtureModelCatalog,
         userId,
         messageId: cancelledId,
         session,

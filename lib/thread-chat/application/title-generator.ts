@@ -4,7 +4,8 @@ import {
   THREAD_TITLE_MAX_OUTPUT_TOKENS,
 } from "@/constants/model"
 import { MODEL_CALL_PURPOSE } from "@/constants/model-call"
-import { readModelCatalog, requireCatalogModel } from "@/lib/model-catalog/repository"
+import { getModelConfig } from "@/lib/model-catalog/config"
+import { requireCatalogModel } from "@/lib/model-catalog/lookup"
 import { resolveCatalogLanguageModel } from "@/lib/model-catalog/runtime"
 
 import { withModelCallLogging } from "@/lib/ai/model-call-logger"
@@ -57,8 +58,9 @@ export async function generateThreadTitleText(
   input: ThreadTitleInput
 ): Promise<string | null> {
   try {
-    const { defaultModelId } = await readModelCatalog()
-    const snapshot = await requireCatalogModel(defaultModelId)
+    const catalog = await getModelConfig()
+    const { defaultModelId } = catalog
+    const snapshot = requireCatalogModel(catalog, defaultModelId)
     const { model } = resolveCatalogLanguageModel(snapshot)
     const trace = { requestId: crypto.randomUUID() }
     const { text } = await generateText({

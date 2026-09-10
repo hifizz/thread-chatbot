@@ -1,3 +1,4 @@
+import { fixtureModelCatalog } from "../fixtures/model-catalog.ts"
 import assert from "node:assert/strict"
 import { readFile } from "node:fs/promises"
 import { config } from "dotenv"
@@ -113,7 +114,7 @@ try {
     modelId: constants.DEFAULT_THREAD_CHAT_MODEL_ID,
     text: "cutover 后第一条新消息",
     files: [],
-  })
+  }, fixtureModelCatalog)
   assert.equal(started.replayed, false)
   assert.equal(await count("projects"), 1)
   assert.equal(await count("messages"), 2)

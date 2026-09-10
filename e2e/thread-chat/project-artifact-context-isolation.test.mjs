@@ -1,3 +1,4 @@
+import { fixtureModelCatalog } from "../fixtures/model-catalog.ts"
 import assert from "node:assert/strict"
 import { config } from "dotenv"
 
@@ -52,7 +53,7 @@ try {
     modelId,
     text: "ROOT_USER_BOUNDARY",
     files: [],
-  })
+  }, fixtureModelCatalog)
   const userMessageId = started.result.userMessage.id
   const assistantMessageId = started.result.assistantMessage.id
   const terminalAt = new Date()
@@ -90,8 +91,9 @@ try {
       quote: { exact: "ROOT_USER_BOUNDARY", prefix: "", suffix: "" },
     },
     modelId,
-  })
+  }, fixtureModelCatalog)
   const isolatedContext = await compiler.compileModelContextWithProject({
+    modelSnapshot: fixtureModelCatalog.models.find((m) => m.id === modelId),
     userId,
     threadId: isolatedThreadId,
   })
@@ -118,8 +120,9 @@ try {
       quote: { exact: SOURCE_MESSAGE_MARKER, prefix: "", suffix: "" },
     },
     modelId,
-  })
+  }, fixtureModelCatalog)
   const inheritedContext = await compiler.compileModelContextWithProject({
+    modelSnapshot: fixtureModelCatalog.models.find((m) => m.id === modelId),
     userId,
     threadId: inheritedThreadId,
   })

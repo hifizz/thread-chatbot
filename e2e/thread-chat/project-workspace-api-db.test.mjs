@@ -1,3 +1,4 @@
+import { fixtureModelCatalog } from "../fixtures/model-catalog.ts"
 import assert from "node:assert/strict"
 import { config } from "dotenv"
 
@@ -105,7 +106,7 @@ async function createProject(ownerIdValue, projectId, rootThreadId) {
     modelId,
     text: "Workspace API seed",
     files: [],
-  })
+  }, fixtureModelCatalog)
 }
 
 try {

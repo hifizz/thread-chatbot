@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { createServer } from "node:http"
-import { mkdir } from "node:fs/promises"
+import { mkdir, writeFile } from "node:fs/promises"
 import { chromium, request } from "playwright-core"
 import { db } from "../../lib/db/index.ts"
 import { adminMembers } from "../../lib/db/schema.ts"
@@ -12,7 +12,11 @@ assert.equal(process.env.TOKEN_ROUTER_BASE_URL, "http://127.0.0.1:55433", "必�
 const executablePath = process.env.ADMIN_TEST_CHROMIUM
 assert(executablePath, "需要 ADMIN_TEST_CHROMIUM")
 const browser = await chromium.launch({ executablePath, headless: true, args: ["--no-sandbox", "--no-zygote", "--single-process", "--disable-dev-shm-usage", "--disable-gpu"] })
-const shots = "docs/admin/screenshots"
+const shots = process.env.ADMIN_TEST_SCREENSHOTS ?? "docs/admin/screenshots"
+const clockFile = process.env.ADMIN_TEST_CLOCK_FILE
+assert(clockFile, "需要本地测试时钟文件，配合 server-clock.cjs 使用")
+let offset = 0
+async function expireCache() { offset += 301_000; await writeFile(clockFile, String(offset)) }
 await mkdir(shots, { recursive: true })
 const calls = []
 const upstream = createServer(async (req, res) => {
@@ -40,7 +44,7 @@ let initial
 try {
   const guest = await request.newContext()
   assert.equal((await guest.get(`${base}/api/admin/models`)).status(), 401)
-  assert.equal((await guest.get(`${base}/api/models`)).status(), 401)
+  assert.equal((await guest.get(`${base}/api/models`)).status(), 404)
   await guest.dispose()
   const signUp = await context.request.post(`${base}/api/auth/sign-up/email`, { headers: { origin: base }, data: { email, password, name: "Admin 验收" } })
   assert.equal(signUp.status(), 200, await signUp.text())
@@ -59,6 +63,12 @@ try {
   await page.waitForLoadState("networkidle")
   initial = await (await context.request.get(`${base}/api/admin/models`)).json()
   await page.screenshot({ animations: "disabled", path: `${shots}/models-desktop.png`, fullPage: true })
+  const chatPage = await context.newPage()
+  let modelRequests = 0
+  chatPage.on("request", (req) => { if (new URL(req.url()).pathname === "/api/models") modelRequests++ })
+  await chatPage.goto(`${base}/thread-chat/${crypto.randomUUID()}`)
+  await chatPage.locator('[contenteditable="true"]').first().waitFor({ timeout: 90000 })
+  assert(!(await chatPage.content()).includes('brand-new-upstream-model'), "初始化不得泄漏上游 ID")
   await page.getByRole("button", { name: "新增模型", exact: true }).click()
   await page.getByLabel("展示名称", { exact: true }).fill("验收新模型")
   await page.getByLabel("内部 ID", { exact: true }).fill(id)
@@ -110,6 +120,24 @@ try {
   await page.keyboard.press("Escape")
   assert(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), "移动端页面不得撑出横向滚动")
   await page.setViewportSize({ width: 1440, height: 1000 })
+  await chatPage.evaluate(() => window.dispatchEvent(new Event("focus")))
+  assert.equal(modelRequests, 0)
+  assert.equal(await chatPage.getByText("验收新模型", { exact: true }).count(), 0, "已打开页面保留旧配置")
+  await chatPage.reload()
+  await chatPage.locator('[contenteditable="true"]').first().waitFor()
+  assert.equal(await chatPage.getByText("验收新模型", { exact: true }).count(), 0, "有效缓存不因保存而清空")
+  await expireCache()
+  await chatPage.reload()
+  await chatPage.locator('[contenteditable="true"]').first().waitFor()
+  assert.equal(await chatPage.getByText("验收新模型", { exact: true }).count(), 0, "过期首次初始化仍返回旧值")
+  // 响应结束后 after 刷新；后续初始化最终取得新目录。
+  for (let attempt = 0; attempt < 10; attempt++) {
+    await chatPage.reload()
+    await chatPage.locator('[contenteditable="true"]').first().waitFor()
+    if (await chatPage.getByText("验收新模型", { exact: true }).count()) break
+  }
+  assert(await chatPage.getByText("验收新模型", { exact: true }).count(), "after 刷新应在响应后完成")
+  assert.equal(modelRequests, 0)
   await page.goto(`${base}/thread-chat/${crypto.randomUUID()}`)
   const editor = page.locator('[contenteditable="true"]').first()
   await editor.waitFor({ timeout: 90000 })
@@ -122,6 +150,10 @@ try {
   assert.equal(stream.reasoning_effort, "high")
   assert.equal(stream.tools, undefined)
   await page.screenshot({ animations: "disabled", path: `${shots}/chat-config-applied.png` })
+  const activeChat = await context.newPage()
+  await activeChat.goto(page.url())
+  const oldEditor = activeChat.locator('[contenteditable="true"]').first()
+  await oldEditor.waitFor()
   await page.goto(`${base}/admin/models`)
   await page.getByLabel("搜索模型", { exact: true }).fill(id)
   await page.getByRole("button", { name: "验收新模型 操作", exact: true }).click()
@@ -133,9 +165,26 @@ try {
   await page.getByRole("button", { name: "验收新模型 操作", exact: true }).click()
   await page.getByRole("menuitem", { name: "停用模型", exact: true }).click()
   await page.getByText("停用", { exact: true }).waitFor()
-  assert(!(await (await context.request.get(`${base}/api/models`)).json()).models.some((m) => m.id === id))
+  const beforeDisableCalls = calls.filter((c) => c.stream).length
+  await oldEditor.fill("旧缓存仍应允许这一轮")
+  await oldEditor.press("Enter")
+  await activeChat.getByText("模型配置已生效。这是本地模拟上游的验收回复。", { exact: true }).nth(1).waitFor({ timeout: 90000 })
+  assert(calls.filter((c) => c.stream).length > beforeDisableCalls)
+  await expireCache()
+  await oldEditor.fill("过期的第一轮仍使用旧配置")
+  await oldEditor.press("Enter")
+  await activeChat.getByText("模型配置已生效。这是本地模拟上游的验收回复。", { exact: true }).nth(2).waitFor({ timeout: 90000 })
+  const countBeforeRejected = calls.filter((c) => c.stream).length
+  await oldEditor.fill("刷新缓存后应拒绝停用模型")
+  await oldEditor.press("Enter")
+  await activeChat.getByText(/刷新页面并重新选择模型/).first().waitFor({ timeout: 90000 })
+  assert.equal(calls.filter((c) => c.stream).length, countBeforeRejected, "失效模型不能触发上游调用")
+  await activeChat.screenshot({ animations: "disabled", path: `${shots}/stale-model-rejected.png` })
+  assert.equal(modelRequests, 0)
+  await activeChat.close()
+  await chatPage.close()
   assert.deepEqual(pageErrors, [])
-  console.log("PASS 浏览器：真实登录、管理员门禁、模型新增/编辑/默认/停用、移动导航、聊天读取配置并调用模拟上游；无页面异常")
+  console.log("PASS 浏览器：初始化无独立请求、保存不清缓存、页面快照、过期旧值与 after 刷新、停用延迟及旧页面拒绝、管理员门禁、移动导航、真实请求参数（模拟上游）；无页面异常")
 } finally {
   if (initial) {
     const response = await context.request.get(`${base}/api/admin/models`)

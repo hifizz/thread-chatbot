@@ -45,3 +45,5 @@ export const modelCatalogWriteSchema = z.object({
 export type ModelCatalogConfig = z.infer<typeof modelCatalogConfigSchema>
 export type ModelCatalogWrite = z.infer<typeof modelCatalogWriteSchema>
 export type CatalogModel = Omit<ModelCatalogWrite, "version"> & { version: number }
+
+export type ModelCatalog = { models: CatalogModel[]; defaultModelId: string; version: number }

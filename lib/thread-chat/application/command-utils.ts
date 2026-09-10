@@ -8,7 +8,8 @@ import {
 } from "@/constants/attachment"
 
 import type { GenerationSettings } from "@/constants/generation-settings"
-import { requireCatalogModel } from "@/lib/model-catalog/repository"
+import { requireCatalogModel } from "@/lib/model-catalog/lookup"
+import type { ModelCatalog } from "@/lib/model-catalog/schema"
 
 import type { ThreadChatUIMessage } from "@/lib/thread-chat/contracts/ui-message"
 import {
@@ -40,22 +41,23 @@ const IMAGE_ATTACHMENT_MIME_TYPE_SET = new Set<string>(
   IMAGE_ATTACHMENT_MIME_TYPES
 )
 
-export async function assertAllowedModel(modelId: string): Promise<void> {
-  try { await requireCatalogModel(modelId) } catch (error) {
+export function assertAllowedModel(catalog: ModelCatalog, modelId: string): void {
+  try { requireCatalogModel(catalog, modelId) } catch (error) {
     if (!(error instanceof ModelCatalogError) || error.status !== 400) throw error
     throw new ConversationApplicationError(
       "MODEL_NOT_ALLOWED",
-      "当前模型不可用于 ThreadChat"
+      "当前模型不可用，请刷新页面并重新选择模型"
     )
   }
 }
 
-export async function assertAllowedGenerationSettings(
+export function assertAllowedGenerationSettings(
+  catalog: ModelCatalog,
   modelId: string,
   settings: GenerationSettings | undefined
-): Promise<void> {
+): void {
   if (!settings) return
-  const { config } = await requireCatalogModel(modelId)
+  const { config } = requireCatalogModel(catalog, modelId)
   assertGenerationSettingsCapability({ effortLevels: config.effortLevels, maxOutputTokenOptions: config.outputTokenOptions }, settings)
 }
 
@@ -68,16 +70,16 @@ export function hasImageFileReferences(
 }
 
 /** 必须在创建生成消息及进入付费模型调用前执行。 */
-export async function assertModelSupportsNewAttachments(
+export function assertModelSupportsNewAttachments(
+  catalog: ModelCatalog,
   modelId: string,
-  files: readonly FileReference[],
-  connection?: ConversationTransaction
-): Promise<void> {
+  files: readonly FileReference[]
+): void {
   const imageCount = files.filter((file) =>
     IMAGE_ATTACHMENT_MIME_TYPE_SET.has(file.mediaType)
   ).length
   if (!imageCount) return
-  const snapshot = await requireCatalogModel(modelId, connection)
+  const snapshot = requireCatalogModel(catalog, modelId)
   assertImageInputCapability(snapshot.config.imageInput, imageCount)
 }
 

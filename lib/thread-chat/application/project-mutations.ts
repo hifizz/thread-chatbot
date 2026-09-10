@@ -1,3 +1,4 @@
+import type { ModelCatalog } from "@/lib/model-catalog/schema"
 import { and, eq } from "drizzle-orm"
 import {
   projectFiles,
@@ -271,12 +272,13 @@ export function deleteProject(
   )
 }
 
-export async function updateThread(
+export function updateThread(
   userId: string,
   threadId: string,
-  command: UpdateThreadCommand
+  command: UpdateThreadCommand,
+  catalog: ModelCatalog
 ) {
-  if (command.modelId) await assertAllowedModel(command.modelId)
+  if (command.modelId) assertAllowedModel(catalog, command.modelId)
   return withConversationTransaction(async (tx) =>
     executeIdempotentCommand({
       tx,

@@ -2,9 +2,8 @@ import { asc, eq } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { modelCatalog, modelCatalogAudit, modelCatalogSettings } from "@/lib/db/schema"
 import { MODEL_CATALOG_SETTINGS_ID } from "@/constants/model-catalog"
-import { modelCatalogConfigSchema, modelCatalogWriteSchema, type CatalogModel, type ModelCatalogWrite } from "./schema"
+import { modelCatalogConfigSchema, modelCatalogWriteSchema, type ModelCatalogWrite } from "./schema"
 import { ModelCatalogError } from "./errors"
-import { toPublicCatalogModel } from "./public"
 
 export async function readModelCatalog() {
   // 一个 SELECT 同时读取模型与默认值，避免两次读取跨过并发修改。
@@ -15,16 +14,6 @@ export async function readModelCatalog() {
   if (!rows[0]) throw new ModelCatalogError("模型目录尚未初始化，请联系管理员", 503)
   return { models: rows.map(({ model }) => ({ ...model, config: modelCatalogConfigSchema.parse(model.config) })), ...rows[0].settings }
 }
-export async function readPublicModelCatalog() {
-  const catalog = await readModelCatalog()
-  return { models: catalog.models.filter((m) => m.enabled).map(toPublicCatalogModel), defaultModelId: catalog.defaultModelId }
-}
-export async function requireCatalogModel(id: string, connection: Pick<typeof db, "select"> = db): Promise<CatalogModel> {
-  const [row] = await connection.select().from(modelCatalog).where(eq(modelCatalog.id, id))
-  if (!row?.enabled) throw new ModelCatalogError("模型已停用或不存在，请重新选择模型", 400)
-  return { ...row, config: modelCatalogConfigSchema.parse(row.config) }
-}
-
 /** 共享设置行先加锁，使设置默认与停用在并发操作下仍保持一致。 */
 export async function saveCatalogModel(actorId: string, input: ModelCatalogWrite) {
   const value = modelCatalogWriteSchema.parse(input)

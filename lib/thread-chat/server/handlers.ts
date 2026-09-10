@@ -1,3 +1,4 @@
+import { getModelConfig } from "@/lib/model-catalog/config"
 import { z } from "zod"
 import {
   addProjectFileCommandSchema,
@@ -95,11 +96,13 @@ export function handleStartProject(
     const command = await parseJson(request, startProjectCommandSchema)
     if (command.projectId !== parseId(projectId))
       validation("path projectId 与请求体不一致")
-    const result = await startProject(userId, command)
+    const catalog = await getModelConfig()
+    const result = await startProject(userId, command, catalog)
     if (!result.replayed)
       startSessionAfterCommit(
         userId,
         result.result,
+        catalog,
         command.generationSettings
       )
     return commandResponse(result)
@@ -202,7 +205,8 @@ export function handlePatchThread(
       await updateThread(
         userId,
         parseId(threadId),
-        await parseJson(request, updateThreadCommandSchema)
+        await parseJson(request, updateThreadCommandSchema),
+        await getModelConfig()
       )
     )
   )
@@ -223,11 +227,13 @@ export function handleSendMessage(
 ): Promise<Response> {
   return withThreadChatRoute(request, async (userId) => {
     const command = await parseJson(request, sendMessageCommandSchema)
-    const result = await sendMessage(userId, parseId(threadId), command)
+    const catalog = await getModelConfig()
+    const result = await sendMessage(userId, parseId(threadId), command, catalog)
     if (!result.replayed)
       startSessionAfterCommit(
         userId,
         result.result,
+        catalog,
         command.generationSettings
       )
     return commandResponse(result)
@@ -240,11 +246,13 @@ export function handleForkThread(
 ): Promise<Response> {
   return withThreadChatRoute(request, async (userId) => {
     const command = await parseJson(request, forkThreadCommandSchema)
-    const result = await forkThread(userId, parseId(threadId), command)
+    const catalog = await getModelConfig()
+    const result = await forkThread(userId, parseId(threadId), command, catalog)
     if (!result.replayed && result.result.generation)
       startSessionAfterCommit(
         userId,
         result.result.generation,
+        catalog,
         command.generationSettings
       )
     return commandResponse(result)
@@ -257,7 +265,8 @@ export function handleEditMessage(
 ): Promise<Response> {
   return withThreadChatRoute(request, async (userId) => {
     const command = await parseJson(request, editLatestTurnCommandSchema)
-    const result = await editLatestTurn(userId, parseId(messageId), command)
+    const catalog = await getModelConfig()
+    const result = await editLatestTurn(userId, parseId(messageId), command, catalog)
     if (!result.replayed) {
       if (result.result.abortMessageId)
         if (
@@ -270,6 +279,7 @@ export function handleEditMessage(
       startSessionAfterCommit(
         userId,
         result.result.generation,
+        catalog,
         command.generationSettings
       )
     }
@@ -283,11 +293,13 @@ export function handleRetryMessage(
 ): Promise<Response> {
   return withThreadChatRoute(request, async (userId) => {
     const command = await parseJson(request, retryMessageCommandSchema)
-    const result = await retryMessage(userId, parseId(messageId), command)
+    const catalog = await getModelConfig()
+    const result = await retryMessage(userId, parseId(messageId), command, catalog)
     if (!result.replayed)
       startSessionAfterCommit(
         userId,
         result.result,
+        catalog,
         command.generationSettings
       )
     return commandResponse(result)

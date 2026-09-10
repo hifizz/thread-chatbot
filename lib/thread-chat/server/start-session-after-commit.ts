@@ -1,3 +1,4 @@
+import type { ModelCatalog } from "@/lib/model-catalog/schema"
 import type { GenerationSettings } from "@/constants/generation-settings"
 import type { GenerationAcceptedDTO } from "@/lib/thread-chat/contracts/dto"
 import { getSessionStore } from "@/lib/thread-chat/streaming/session-store"
@@ -7,6 +8,7 @@ import { runGeneration } from "@/lib/thread-chat/streaming/run-generation"
 export function startSessionAfterCommit(
   userId: string,
   generation: GenerationAcceptedDTO,
+  catalog: ModelCatalog,
   generationSettings?: GenerationSettings
 ): boolean {
   const assistant = generation.assistantMessage
@@ -22,6 +24,7 @@ export function startSessionAfterCommit(
         userId,
         messageId: assistant.id,
         session,
+        catalog,
         ...(generationSettings ? { generationSettings } : {}),
       }),
   }).started

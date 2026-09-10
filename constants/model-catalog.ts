@@ -11,5 +11,6 @@ export const MODEL_PROFILE_LABELS: Record<(typeof MODEL_REQUEST_PROFILES)[number
 }
 export const MODEL_LOGOS = ["auto", "generic", "gpt", "claude", "gemini", "deepseek", "glm"] as const
 export const MODEL_CATALOG_SETTINGS_ID = "global"
-export const MODEL_CATALOG_REFRESH_MS = 30_000
+export const MODEL_CATALOG_REFRESH_MS = 5 * 60_000
+export const MODEL_CATALOG_RETRY_MS = 30_000
 export const MODEL_TOKEN_LIMIT = 16_000_000
