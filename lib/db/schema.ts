@@ -33,6 +33,7 @@ export { dbSchema }
 
 // 认证与计费表在独立文件中定义，这里统一 re-export，使 drizzle 客户端与迁移能感知它们。
 export * from "./auth-schema"
+export * from "./admin-schema"
 export * from "./billing-schema"
 export * from "./payment-schema"
 
