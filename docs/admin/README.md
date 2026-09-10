@@ -6,7 +6,7 @@
 
 ## 初始化
 
-功能分支仅提供 schema，正式 migration 留待 develop 集成生成并验证。应用迁移后，先注册普通账号，再运行：
+正式迁移 `drizzle/0008_admin_members.sql` 已在 develop 生成，只有新增管理员表和外键，无既有数据变更。先应用迁移，再部署后台；应用迁移后，先注册普通账号，再运行：
 
 ```bash
 pnpm admin:grant --email admin@example.com
@@ -31,3 +31,11 @@ ADMIN_SHELL_TEST_WRITES=1 ADMIN_TEST_CHROMIUM=/path/to/chromium node --env-file=
 浏览器脚本只允许本地隔离数据库和本地应用，创建专用测试账号并在结束时删除。正式 PostgreSQL 迁移与生产部署另行验证。
 
 本次已通过 TypeScript、受影响文件 ESLint、OpenSpec 严格校验，以及 Chromium + 独立 PGlite 的完整权限与手机导航验收。PGlite 验收设置 `DB_POOL_MAX=1`，不代表正式 PostgreSQL 迁移已验证。
+
+## 迁移集成验收
+
+2026-09-10：在隔离 PGlite 中执行已有 0000–0007 迁移，插入旧用户，再通过 Drizzle migrator 升级到 0008。验证旧用户内容不变、成员表初始为空、外键有效、重复迁移及授权安全、删除用户会清除成员记录。类型检查通过。未连接生产库，未验证托管 PostgreSQL 的连接权限或实际部署。
+
+复验脚本：`node e2e/admin/admin-migration.test.mjs`。需要测试环境提供 `@electric-sql/pglite` 和 `@electric-sql/pglite-pgvector`（前者也需能被 Drizzle 解析）；它们不是产品依赖。脚本仅使用内存数据库，不读取生产连接配置。
+
+上线时确认构建命令为 `pnpm vercel-build`，数据库连接正确且预览库与生产库隔离。该命令先迁移再构建；迁移失败会中断部署。上线前确认备份，不对生产执行 `db:push`。

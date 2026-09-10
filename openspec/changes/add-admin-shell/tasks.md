@@ -7,4 +7,4 @@
 - [x] 2.1 类型、受影响文件 ESLint 和 OpenSpec 严格校验
 - [x] 2.2 隔离库与浏览器验证未登录、普通用户、管理员、授权/撤销和手机导航
 - [x] 2.3 提交独立分支及目标为 admin 的草稿 PR
-- [ ] 2.4 develop 集成时生成并验证正式 migration（发布门禁）
+- [x] 2.4 develop 生成 0008 migration，审查 SQL 并通过隔离 PGlite 的旧版结构升级、数据保留及重复执行验证；生产 PostgreSQL 执行结果仍须部署时确认
