@@ -34,7 +34,7 @@ export function ModelEditor({ initial, onClose, onSave }: { initial: ModelCatalo
   }
   return <Sheet open onOpenChange={(open) => { if (!open && !busy) onClose() }}>
     <SheetContent className="data-[side=right]:w-full data-[side=right]:sm:max-w-2xl" showCloseButton={!busy}>
-      <SheetHeader><SheetTitle>{initial.version ? "编辑模型" : "新增模型"}</SheetTitle><SheetDescription>保存后用于新的聊天请求。能力声明应与中转服务实际支持一致。</SheetDescription></SheetHeader>
+      <SheetHeader><SheetTitle>{initial.version ? "编辑模型" : "新增模型"}</SheetTitle><SheetDescription>配置随服务端缓存刷新逐步生效。能力声明应与中转服务实际支持一致。</SheetDescription></SheetHeader>
       <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col">
         <fieldset disabled={busy} className="min-h-0 flex-1 space-y-6 overflow-y-auto px-6 pb-6">
           <div className="grid gap-4 sm:grid-cols-2">

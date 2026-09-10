@@ -152,7 +152,7 @@ The retained legacy registry contains fourteen fixed OpenRouter-backed internal 
 
 The active model catalog is stored in PostgreSQL and managed at `/admin/models`. Administrators configure upstream IDs, request compatibility profiles, image/tool/reasoning abilities, effort options, and output limits/defaults. Chat and title generation read this catalog; the source registry only seeds initial data and retains legacy test/provider definitions. Existing public IDs stay stable. Gateway URLs and credentials remain server-only environment variables (`TOKEN_ROUTER_BASE_URL`, `TOKEN_ROUTER_API_KEY`).
 
-A new model using an existing compatibility profile can be enabled without deploying application code. Each generation captures one configuration snapshot; menu data refreshes periodically, while the server validates enabled models and parameters on every new request. See [Admin setup, extension points and verification](./docs/admin/README.md), including the required develop migration integration before release.
+A new model using an existing compatibility profile can be enabled without deploying application code. Each request captures one configuration snapshot from a five-minute server cache. Expired entries are served while a background refresh is scheduled. Menus keep their page-initialization snapshot without polling; model status and parameter changes take effect gradually. See [Admin setup, extension points and verification](./docs/admin/README.md), including the required develop migration integration before release.
 
 ## Architecture
 

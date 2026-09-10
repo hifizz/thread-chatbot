@@ -2,7 +2,7 @@
 模型目录、能力及生成默认参数目前固定在源码中，新增中转模型需要重新发版。需要独立可扩展的后台框架，以及数据库驱动的统一模型目录。
 
 ## Revision Status
-已按五分钟缓存与同步业务校验方案完成实现及本地验收。正式 PostgreSQL migration 仍待 develop 集成生成和验证，PR 保持 draft。
+五分钟缓存、入口显式传参和同步业务校验已应用到代码。修订验收状态见 tasks.md；正式 migration 仍属于 develop 发布门禁。
 
 ## What Changes
 - 基于 shadcn sidebar-08 Base UI 官方源码建立 /admin 公共布局，模型管理独立在 /admin/models。

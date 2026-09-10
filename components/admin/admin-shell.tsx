@@ -24,7 +24,7 @@ function AdminSidebar() {
       <SidebarGroup><SidebarGroupLabel>管理</SidebarGroupLabel><SidebarMenu>
         {ADMIN_NAVIGATION.map((item) => <SidebarMenuItem key={item.href}><SidebarMenuButton isActive={pathname.startsWith(item.href)} render={<Link href={item.href} />} onClick={() => { if (isMobile) setOpenMobile(false) }}><Bot /><span>{item.title}</span></SidebarMenuButton></SidebarMenuItem>)}
       </SidebarMenu></SidebarGroup>
-      <SidebarGroup className="mt-auto"><SidebarMenu><SidebarMenuItem><SidebarMenuButton render={<Link href="/thread-chat" />}><ArrowLeft /><span>返回对话</span></SidebarMenuButton></SidebarMenuItem></SidebarMenu></SidebarGroup>
+      <SidebarGroup className="mt-auto"><SidebarMenu><SidebarMenuItem><SidebarMenuButton render={<Link href="/thread-chat" prefetch={false} />}><ArrowLeft /><span>返回对话</span></SidebarMenuButton></SidebarMenuItem></SidebarMenu></SidebarGroup>
     </SidebarContent>
     <SidebarFooter><UserMenu /></SidebarFooter>
   </Sidebar>

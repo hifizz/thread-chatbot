@@ -57,7 +57,7 @@
     "test:attachment-composer-demo:model": "node --import tsx e2e/thread-chat/attachment-composer-demo-model.test.mjs",
     "test:attachment-composer-demo:browser": "node e2e/thread-chat/verify-attachment-composer-demo.mjs",
     "test:attachment-composer-demo": "node --import tsx e2e/thread-chat/attachment-composer-demo-model.test.mjs && node e2e/thread-chat/verify-attachment-composer-demo.mjs",
-    "test:admin:models": "node --import tsx e2e/admin/model-catalog.test.mjs",
+    "test:admin:models": "node --import tsx e2e/admin/model-catalog.test.mjs && node --import tsx e2e/admin/model-catalog-cache.test.mjs",
     "model-catalog:seed": "node --env-file=.env.local --import tsx scripts/admin/seed-model-catalog.ts",
     "admin:grant": "node --env-file=.env.local --import tsx scripts/admin/grant-admin.ts",
     "db:studio": "drizzle-kit studio",

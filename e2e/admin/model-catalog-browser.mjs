@@ -14,9 +14,16 @@ assert(executablePath, "需要 ADMIN_TEST_CHROMIUM")
 const browser = await chromium.launch({ executablePath, headless: true, args: ["--no-sandbox", "--no-zygote", "--single-process", "--disable-dev-shm-usage", "--disable-gpu"] })
 const shots = process.env.ADMIN_TEST_SCREENSHOTS ?? "docs/admin/screenshots"
 const clockFile = process.env.ADMIN_TEST_CLOCK_FILE
-assert(clockFile, "需要本地测试时钟文件，配合 server-clock.cjs 使用")
 let offset = 0
-async function expireCache() { offset += 301_000; await writeFile(clockFile, String(offset)) }
+async function expireCache() {
+  if (clockFile) {
+    offset += 301_000
+    await writeFile(clockFile, String(offset))
+  } else {
+    console.log("等待真实五分钟缓存过期")
+    await new Promise((resolve) => setTimeout(resolve, 301_000))
+  }
+}
 await mkdir(shots, { recursive: true })
 const calls = []
 const upstream = createServer(async (req, res) => {
