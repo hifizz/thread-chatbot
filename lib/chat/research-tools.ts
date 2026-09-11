@@ -1,4 +1,5 @@
 import { tool } from "ai"
+import { RESEARCH_SUBQUESTION_ID_DESCRIPTION } from "@/constants/assistant-trace"
 import { z } from "zod"
 import { webSearch, extractUrl } from "@/lib/ai/search"
 import { EXTRACT_CHAR_LIMIT, SEARCH_MAX_RESULTS } from "@/constants/research"
@@ -16,6 +17,7 @@ export function createResearchTools(
       "联网搜索以获取实时或事实性信息。用于回答需要最新资料、外部知识的问题。可多次调用以覆盖不同子问题。",
     inputSchema: z.object({
       query: z.string().describe("检索关键词或问题，尽量具体"),
+      subquestionId: z.string().max(40).optional().describe(RESEARCH_SUBQUESTION_ID_DESCRIPTION),
     }),
     execute: async ({ query }, { abortSignal }) => {
       const { results } = await webSearch(
@@ -41,6 +43,7 @@ export function createResearchTools(
       "深读某个网页的完整正文。URL 可以由用户直接提供，也可以来自搜索结果；翻译、总结或分析指定页面时应直接调用。",
     inputSchema: z.object({
       url: z.string().describe("要深读的网页 URL（来自搜索结果）"),
+      subquestionId: z.string().max(40).optional().describe(RESEARCH_SUBQUESTION_ID_DESCRIPTION),
     }),
     execute: async ({ url }, { abortSignal }) => {
       const content = await extractUrl(url, abortSignal, context)

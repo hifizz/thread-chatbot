@@ -79,6 +79,7 @@
     "@base-ui/react": "^1.6.0",
     "@dagrejs/dagre": "^3.0.0",
     "@floating-ui/react": "0.27.19",
+    "@heroui/react": "3.2.5",
     "@langfuse/client": "^5.11.0",
     "@langfuse/otel": "^5.11.0",
     "@langfuse/tracing": "^5.11.0",

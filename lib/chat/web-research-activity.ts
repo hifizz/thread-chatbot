@@ -9,7 +9,8 @@ export interface WebResearchSource {
 export interface WebResearchActivity {
   toolCallId: string
   kind: "search" | "read"
-  status: "running" | "complete"
+  status: "running" | "complete" | "error" | "cancelled"
+  subquestionId?: string
   query?: string
   url?: string
   sources: WebResearchSource[]
@@ -63,7 +64,23 @@ export function createWebResearchActivityDispatcher(
   const calls = new Map<string, TrackedCall>()
 
   return (chunk) => {
-    if (!isRecord(chunk) || typeof chunk.toolCallId !== "string") return false
+    if (!isRecord(chunk)) return false
+    if (chunk.type === "abort") {
+      for (const [toolCallId, call] of calls) {
+        onActivity({
+          toolCallId,
+          kind: call.toolName === "webSearch" ? "search" : "read",
+          status: "cancelled",
+          subquestionId: textField(call.input, "subquestionId"),
+          query: textField(call.input, "query"),
+          url: textField(call.input, "url"),
+          sources: [],
+        })
+      }
+      calls.clear()
+      return true
+    }
+    if (typeof chunk.toolCallId !== "string") return false
     const toolCallId = chunk.toolCallId
 
     if (
@@ -78,6 +95,7 @@ export function createWebResearchActivityDispatcher(
         toolCallId,
         kind: chunk.toolName === "webSearch" ? "search" : "read",
         status: "running",
+        subquestionId: textField(input, "subquestionId"),
         query:
           chunk.toolName === "webSearch"
             ? textField(input, "query")
@@ -92,11 +110,13 @@ export function createWebResearchActivityDispatcher(
     if (!call) return false
 
     if (chunk.type === "tool-output-available") {
+      calls.delete(toolCallId)
       const output = chunk.output
       onActivity({
         toolCallId,
         kind: call.toolName === "webSearch" ? "search" : "read",
         status: "complete",
+        subquestionId: textField(call.input, "subquestionId"),
         query:
           call.toolName === "webSearch"
             ? (textField(output, "query") ?? textField(call.input, "query"))
@@ -118,10 +138,12 @@ export function createWebResearchActivityDispatcher(
       chunk.type === "tool-output-denied" ||
       chunk.type === "tool-input-error"
     ) {
+      calls.delete(toolCallId)
       onActivity({
         toolCallId,
         kind: call.toolName === "webSearch" ? "search" : "read",
-        status: "complete",
+        status: "error",
+        subquestionId: textField(call.input, "subquestionId"),
         query:
           call.toolName === "webSearch"
             ? textField(call.input, "query")

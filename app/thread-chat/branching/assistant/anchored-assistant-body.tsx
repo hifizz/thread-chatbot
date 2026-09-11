@@ -2,7 +2,7 @@
 
 import type { MarkdownDensity } from "../../chat/message/markdown-body"
 import type { ConversationViewMessage, ThreadTreeState } from "../../core/types"
-import { WebResearchPanel } from "../../orchestration/overlays/web-research-panel"
+import { AssistantTrace } from "./assistant-trace"
 import { AnchoredMarkdown } from "./anchored-markdown"
 import { assistantPartRenderPlan } from "./assistant-part-render-plan"
 
@@ -21,7 +21,17 @@ export function AnchoredAssistantBody({
 
   return (
     <>
-      {renderPlan.map(({ kind, part, index }) => {
+      {renderPlan.map((item, position) => {
+        if (item.kind === "trace") {
+          return <AssistantTrace
+            key={`trace-${item.index}`}
+            items={item.items}
+            status={message.status}
+            plan={message.researchPlan}
+            active={(message.status === "pending" || message.status === "streaming") && position === renderPlan.length - 1}
+          />
+        }
+        const { kind, part, index } = item
         if (kind === "text" && part.type === "text") {
           return (
             <AnchoredMarkdown
@@ -31,33 +41,6 @@ export function AnchoredAssistantBody({
               source={part.text}
               onOpenThread={onOpenThread}
               density={density}
-            />
-          )
-        }
-
-        if (kind === "reasoning" && part.type === "reasoning") {
-          return (
-            <details
-              key={`${part.type}-${index}`}
-              className="inherited reasoning-part"
-              data-ui-message-part="reasoning"
-            >
-              <summary>思考过程</summary>
-              <div className="inherited-body reasoning-body">
-                <p>{part.text}</p>
-              </div>
-            </details>
-          )
-        }
-
-        if (kind === "research") {
-          return (
-            <WebResearchPanel
-              key={`${part.type}-${index}`}
-              activities={message.webResearch ?? []}
-              route={message.researchRoute}
-              plan={message.researchPlan}
-              complete={message.status === "done"}
             />
           )
         }

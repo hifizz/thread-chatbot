@@ -1,0 +1,42 @@
+/* ThinkingState 的轻量时间线，全部由真实消息 part 驱动，复用项目语义 token。 */
+.tc .assistant-thinking-status { display: inline-flex; align-items: center; gap: 8px; padding: 6px 0; color: var(--tc-content-secondary); font-size: 12px; }
+.tc .assistant-trace { margin: 8px 0 16px; color: var(--tc-content-secondary); min-width: 0; }
+.tc .assistant-trace-toggle { display: flex; align-items: center; gap: 8px; max-width: min(100%, 560px); padding: 6px 8px; margin-left: -8px; border: 0; border-radius: 6px; background: transparent; color: var(--tc-content-secondary); text-align: left; font-size: 12px; cursor: pointer; }
+.tc .assistant-trace-toggle:not(:disabled):hover { background: var(--tc-surface-raised); }
+.tc .assistant-trace-toggle:focus-visible, .tc .assistant-trace summary:focus-visible, .tc .assistant-trace a:focus-visible { outline: 2px solid var(--tc-border-project-focus); outline-offset: 2px; }
+.tc .assistant-trace svg { flex-shrink: 0; }
+.tc .assistant-trace-title { flex: 1; min-width: 0; max-width: 100%; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; }
+.tc .assistant-trace-chevron { transition: transform 240ms ease; }
+.tc .assistant-trace-toggle[aria-expanded="true"] > .assistant-trace-chevron, .tc .assistant-trace-tool[open] > summary > .assistant-trace-chevron { transform: rotate(180deg); }
+.tc .assistant-trace-expand { display: grid; grid-template-rows: 0fr; opacity: 0; transition: grid-template-rows 320ms cubic-bezier(.23,1,.32,1), opacity 240ms ease; }
+.tc .assistant-trace-expand[data-expanded="true"] { grid-template-rows: 1fr; opacity: 1; }
+.tc .assistant-trace-clip { overflow: hidden; min-width: 0; min-height: 0; }
+/* HeroUI 检测滚动边界；渐隐仅使用 alpha 遮罩，适配所有主题且不依赖动画。 */
+.tc .assistant-trace-scroll { max-height: min(360px, 50dvh); overflow-y: auto; overflow-x: hidden; overscroll-behavior-y: contain; scrollbar-gutter: stable; padding: 2px 4px; --assistant-trace-fade-top: 0px; --assistant-trace-fade-bottom: 0px; mask-image: linear-gradient(to bottom, transparent, var(--tc-content-primary) var(--assistant-trace-fade-top), var(--tc-content-primary) calc(100% - var(--assistant-trace-fade-bottom)), transparent); mask-mode: alpha; }
+.tc .assistant-trace-scroll[data-top-scroll="true"], .tc .assistant-trace-scroll[data-top-bottom-scroll="true"] { --assistant-trace-fade-top: var(--scroll-shadow-size); }
+.tc .assistant-trace-scroll[data-bottom-scroll="true"], .tc .assistant-trace-scroll[data-top-bottom-scroll="true"] { --assistant-trace-fade-bottom: var(--scroll-shadow-size); }
+.tc .assistant-trace-scroll:focus-visible { outline: 2px solid var(--tc-border-project-focus); outline-offset: -2px; }
+.tc .assistant-trace p { margin: 0; font-size: 12px; line-height: 1.8; overflow-wrap: anywhere; }
+.tc .assistant-trace-reasoning { white-space: pre-wrap; }
+.tc .assistant-trace-tool { min-width: 0; }
+.tc .assistant-trace-tool > summary { display: flex; align-items: center; gap: 8px; padding: 6px 0; min-height: 20px; list-style: none; cursor: pointer; font-size: 12px; }
+.tc .assistant-trace-tool > summary::-webkit-details-marker { display: none; }
+.tc .assistant-trace-tool > summary:hover { color: var(--tc-content-primary); }
+.tc .assistant-trace-tool-label { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.tc .assistant-trace-toggle:disabled { cursor: default; }
+.tc .assistant-trace-tool-body { padding: 8px 0 0; }
+.tc .assistant-trace-sources { list-style: none; margin: 10px 0 0; padding: 0; display: flex; gap: 6px; flex-wrap: wrap; }
+/* tc-review: 1px 来源标签描边与工具卡相同。 */
+.tc .assistant-trace-sources li { margin: 0; border: 1px solid var(--tc-border-subtle); border-radius: 6px; max-width: 100%; background: var(--tc-surface-base); }
+.tc .assistant-trace-sources a, .tc .assistant-trace-sources li > span { display: flex; align-items: center; gap: 4px; padding: 4px 8px; font-size: 10px; color: var(--tc-content-secondary); text-decoration: none; overflow-wrap: anywhere; }
+.tc .assistant-trace-sources a:hover { color: var(--tc-content-primary); text-decoration: underline; }
+.tc .assistant-trace-source-link { display: inline-flex; align-items: center; gap: 4px; margin-top: 8px; color: var(--tc-content-secondary); font-size: 10px; }
+.tc .assistant-trace-tool-body .assistant-trace-note { color: var(--tc-content-muted); margin-top: 8px; }
+.tc .assistant-trace-spin { animation: assistant-trace-spin 1.4s linear infinite; }
+.tc .assistant-trace-shimmer { background: linear-gradient(90deg, var(--tc-content-secondary) 35%, var(--tc-content-primary) 50%, var(--tc-content-secondary) 65%); background-size: 200% 100%; background-clip: text; color: transparent; animation: assistant-trace-shimmer 1.8s linear infinite; }
+@keyframes assistant-trace-spin { to { transform: rotate(360deg); } }
+@keyframes assistant-trace-shimmer { from { background-position: 150% center; } to { background-position: -50% center; } }
+@media (prefers-reduced-motion: reduce) {
+  .tc .assistant-trace *, .tc .assistant-trace *::before, .tc .assistant-thinking-status * { animation: none !important; transition: none !important; }
+  .tc .assistant-trace-shimmer { background: none; color: var(--tc-content-secondary); }
+}
