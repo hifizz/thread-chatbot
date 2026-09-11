@@ -19,7 +19,7 @@ const plan = assistantPartRenderPlan(message)
 
 assert.deepEqual(
   plan.map((item) => item.kind),
-  ["reasoning", "text"],
+  ["trace", "text"],
   "assistant parts 必须按 AI SDK UIMessage.parts[] 顺序渲染"
 )
 

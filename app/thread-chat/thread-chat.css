@@ -12,6 +12,7 @@
 @import "./styles/columns.css";
 @import "./styles/columns-collapse.css";
 @import "./styles/messages.css";
+@import "./styles/assistant-trace.css";
 @import "./styles/artifact-card.css";
 @import "./styles/message-actions.css";
 @import "./styles/branch-source.css";

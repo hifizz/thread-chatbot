@@ -8,6 +8,7 @@ import {
 import type { ConversationViewMessage } from "../../core/types"
 import type { ThreadMessageActionCommands } from "../actions/message-action-commands"
 import { AssistantMessageToolbar } from "../actions/assistant-message-toolbar"
+import { ThinkingStatus } from "./thinking-status"
 import { assistantMessagePresentation } from "./conversation-message-logic"
 import { EditableUserMessage } from "./editable-user-message"
 import { UserMessageContent } from "./user-message-content"
@@ -104,19 +105,7 @@ export function ConversationMessage({
                 </span>
               )}
               {presentation.isWaitingForVisibleOutput ? (
-                <span
-                  className="typing"
-                  role="status"
-                  aria-label={
-                    message.backgroundGeneration
-                      ? GENERATION_BACKGROUND_LABEL
-                      : "正在生成回复"
-                  }
-                >
-                  <i />
-                  <i />
-                  <i />
-                </span>
+                <ThinkingStatus />
               ) : (
                 <>
                   {renderAssistantBody(message)}

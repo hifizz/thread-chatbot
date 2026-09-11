@@ -385,6 +385,7 @@ export function reasoningForResearchRoute(
 export function researchPlanExecutionPrompt(plan: ResearchPlan): string {
   return [
     "你正在执行一份已批准的结构化研究计划。按子问题检索并在必要时深读原文；不要向用户复述内部推理。",
+    "每次调用 webSearch 或 readUrl 时，用 subquestionId 标明对应的子问题 id。只能使用计划中已有的 id；若本次调用不对应单个子问题则省略。",
     `研究目标：${plan.goal}`,
     ...plan.subquestions.map(
       (item) =>

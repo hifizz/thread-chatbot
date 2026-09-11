@@ -39,11 +39,11 @@ export type ThreadChatTools = {
     output: MarkdownArtifactOutput
   }
   webSearch: {
-    input: { query: string }
+    input: { query: string; subquestionId?: string }
     output: WebSearchOutput
   }
   readUrl: {
-    input: { url: string }
+    input: { url: string; subquestionId?: string }
     output: { url: string; content: string }
   }
 }
