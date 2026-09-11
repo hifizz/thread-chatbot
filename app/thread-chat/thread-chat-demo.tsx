@@ -64,6 +64,7 @@ import {
   ThreadSwitcher,
   type SwitcherMode,
 } from "./orchestration/navigation/thread-switcher"
+import { ScrollMemoryScope } from "./scroll/use-scroll-memory"
 import { TreeList } from "./orchestration/navigation/tree-list"
 import { StoreBoundProjectPanel } from "./orchestration/artifacts/store-bound-project-panel"
 import type { CanvasChatActions } from "./orchestration/canvas/canvas-actions"
@@ -625,7 +626,7 @@ function NormalizedThreadChat({
   }
 
   return (
-    <ArtifactResourcesProvider store={runtime.store}><ComposerDraftProvider key={treeId}><ArtifactNavigationProvider onOpen={openArtifact}><div
+    <ScrollMemoryScope.Provider key={treeId} value={treeId}><ArtifactResourcesProvider store={runtime.store}><ComposerDraftProvider key={treeId}><ArtifactNavigationProvider onOpen={openArtifact}><div
       className="tc"
       data-view-mode={workspace.viewMode}
       ref={rootRef}
@@ -780,6 +781,6 @@ function NormalizedThreadChat({
         onLocate={(threadId) => openBranchUI(threadId, null)}
       />
       <WorkspaceToast toast={toast} onDismiss={dismissToast} />
-    </div></ArtifactNavigationProvider></ComposerDraftProvider></ArtifactResourcesProvider>
+    </div></ArtifactNavigationProvider></ComposerDraftProvider></ArtifactResourcesProvider></ScrollMemoryScope.Provider>
   )
 }

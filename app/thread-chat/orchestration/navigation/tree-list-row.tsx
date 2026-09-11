@@ -58,6 +58,7 @@ export function TreeListRow({
 }: TreeListRowProps) {
   return (
     <div
+      data-scroll-memory-anchor={item.id}
       className={`swx-row tlx-row ${isCurrent ? "cur" : ""}`}
       onClick={() => {
         if (editing || confirming || deleting) return

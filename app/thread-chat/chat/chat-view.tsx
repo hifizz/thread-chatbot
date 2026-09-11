@@ -21,6 +21,8 @@ import { ConversationMessage } from "./message/conversation-message"
 import type { MessageActionViewState } from "./actions/message-action-types"
 import type { ThreadMessageActionCommands } from "./actions/message-action-commands"
 
+import { RememberedViewport } from "../scroll/remembered-message-viewport"
+
 export interface ChatViewProps {
   /** 会话 id：写到 .msg-list 的 data-list 上（划选气泡靠它反查消息） */
   threadId: string
@@ -89,14 +91,14 @@ export function ChatView({
       {/* 滚动：交给 headless MessageScroller 接管「流式贴底 / 上滑释放 / 滚到底按钮」，
           见 §5 注释（下方 Provider）。.msg-list + data-list 必须保留——划选气泡靠
           .closest(".msg-list") + data-list 反查会话。 */}
-      <MessageScroller.Provider autoScroll defaultScrollPosition="end">
+      <MessageScroller.Provider key={threadId} autoScroll defaultScrollPosition="start">
         <MessageScroller.Root className="msg-scroll-root" ref={rootRef}>
-          <MessageScroller.Viewport className="msg-list" data-list={threadId}>
+          <RememberedViewport threadId={threadId}>
             <MessageScroller.Content className="msg-scroll-content">
               <div className="lane">
                 {intro}
                 {messages.map((msg) => (
-                  <div key={msg.id} data-thread-chat-message-id={msg.id}>
+                  <div key={msg.id} data-thread-chat-message-id={msg.id} data-scroll-memory-anchor={msg.id}>
                     <MessageScroller.Item messageId={msg.id}>
                       <ConversationMessage
                         threadId={threadId}
@@ -118,7 +120,7 @@ export function ChatView({
                 ))}
               </div>
             </MessageScroller.Content>
-          </MessageScroller.Viewport>
+          </RememberedViewport>
           <MessageScroller.Button direction="end" className="scroll-end-btn">
             <span className="scroll-end-icon">↓</span>
           </MessageScroller.Button>

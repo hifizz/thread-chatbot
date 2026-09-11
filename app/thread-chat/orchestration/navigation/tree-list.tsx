@@ -31,6 +31,7 @@ import {
 import type { ProjectListItemDTO } from "@/lib/thread-chat/contracts/dto"
 import { dialogCloseToShell } from "../overlays/dialog-close-to-shell"
 import { ShortcutHint } from "../overlays/shortcut-hint"
+import { useScrollMemory } from "../../scroll/use-scroll-memory"
 import { TreeListRow } from "./tree-list-row"
 
 export interface TreeListProps {
@@ -80,6 +81,7 @@ export function TreeList({
   closing = false,
   container,
 }: TreeListProps) {
+  const listRef = useScrollMemory("project-list", { ready: items !== null })
   /** 内联重命名中的树 id + 草稿 */
   const [editingId, setEditingId] = useState<string | null>(null)
   const [draft, setDraft] = useState("")
@@ -219,7 +221,7 @@ export function TreeList({
               </div>
             )}
           </div>
-          <div className="swx-list">
+          <div className="swx-list" ref={listRef}>
             {items === null && !loadFailed && (
               <div className="swx-empty">加载中…</div>
             )}
