@@ -8,6 +8,7 @@ import {
   Clock3Icon,
   GlobeIcon,
 } from "lucide-react"
+import { webResearchData, webResearchSourcesFromOutput } from "@/lib/chat/web-research-activity"
 import { cn } from "@/lib/utils"
 
 // Claude 风格的研究过程面板：把当前消息里的 webSearch / readUrl 工具调用
@@ -21,11 +22,7 @@ type ToolPart = {
   type: string
   toolName?: string
   args?: { query?: string; url?: string }
-  result?: {
-    query?: string
-    url?: string
-    results?: SearchResultItem[]
-  }
+  result?: unknown
   status?: { type?: string }
 }
 
@@ -35,8 +32,10 @@ export type ResearchStep =
       query: string
       sources: SearchResultItem[]
       running: boolean
+      failed?: boolean
+      truncated?: boolean
     }
-  | { kind: "read"; url: string; running: boolean }
+  | { kind: "read"; url: string; running: boolean; failed?: boolean; truncated?: boolean }
 
 function hostOf(url: string): string {
   try {
@@ -66,20 +65,26 @@ function useResearchSteps(): {
     for (const part of content) {
       if (part.type !== "tool-call" || !part.toolName) continue
       if (!RESEARCH_TOOL_NAMES.has(part.toolName)) continue
-      const running = part.status?.type === "running" || part.result == null
+      const data = webResearchData(part.result)
+      const failed = part.status?.type === "incomplete" || (part.result != null && !data)
+      const running = !failed && (part.status?.type === "running" || part.result == null)
       if (running) anyRunning = true
       if (part.toolName === "webSearch") {
         steps.push({
           kind: "search",
-          query: part.result?.query ?? part.args?.query ?? "",
-          sources: part.result?.results ?? [],
+          query: (typeof data?.query === "string" ? data.query : undefined) ?? part.args?.query ?? "",
+          sources: webResearchSourcesFromOutput(part.result).map((source) => ({ ...source, snippet: "" })),
           running,
+          failed,
+          truncated: data?.truncated === true,
         })
       } else {
         steps.push({
           kind: "read",
-          url: part.result?.url ?? part.args?.url ?? "",
+          url: (typeof data?.url === "string" ? data.url : undefined) ?? part.args?.url ?? "",
           running,
+          failed,
+          truncated: data?.truncated === true,
         })
       }
     }
@@ -142,6 +147,7 @@ type ResearchGroup = {
   title: string
   running: boolean
   results: SearchResultItem[]
+  truncated?: boolean
 }
 
 function researchGroups(steps: ResearchStep[]): {
@@ -150,20 +156,13 @@ function researchGroups(steps: ResearchStep[]): {
 } {
   const visitedUrls = new Set(
     steps.flatMap((step) =>
-      step.kind === "read" ? [normalizedUrl(step.url)] : []
-    )
-  )
-  const searchedUrls = new Set(
-    steps.flatMap((step) =>
-      step.kind === "search"
-        ? step.sources.map((source) => normalizedUrl(source.url))
-        : []
+      step.kind === "read" && !step.running && !step.failed ? [normalizedUrl(step.url)] : []
     )
   )
   const searchGroups: ResearchGroup[] = []
   const searchGroupByQuery = new Map<string, ResearchGroup>()
   steps.forEach((step, index) => {
-    if (step.kind !== "search") return
+    if (step.kind !== "search" || step.failed) return
     const normalizedQuery = step.query.trim().toLowerCase().replace(/\s+/g, " ")
     const key = normalizedQuery || `pending-${index}`
     const existing = searchGroupByQuery.get(key)
@@ -192,31 +191,15 @@ function researchGroups(steps: ResearchStep[]): {
     searchGroups.push(group)
   })
 
-  // 已失败且没有结果的内部重试不单独暴露给用户；如果全部为空，保留一组作为总体状态。
-  const visibleSearchGroups = searchGroups.filter(
-    (group) => group.running || group.results.length > 0
-  )
-  const groups =
-    visibleSearchGroups.length > 0
-      ? visibleSearchGroups
-      : searchGroups.slice(0, 1)
-  const directReads = steps.filter(
-    (step): step is Extract<ResearchStep, { kind: "read" }> =>
-      step.kind === "read" && !searchedUrls.has(normalizedUrl(step.url))
-  )
-  if (directReads.length > 0) {
+  const groups = [...searchGroups]
+  steps.forEach((step, index) => {
+    if (step.kind !== "read" || step.failed) return
     groups.push({
-      id: "direct-reads",
-      kind: "read",
-      title: "访问网页",
-      running: directReads.some((step) => step.running),
-      results: directReads.map((step) => ({
-        title: hostOf(step.url),
-        url: step.url,
-        snippet: "",
-      })),
+      id: `read-${index}`, kind: "read", title: hostOf(step.url),
+      running: step.running, truncated: step.truncated,
+      results: step.running ? [] : [{ title: hostOf(step.url), url: step.url, snippet: "" }],
     })
-  }
+  })
   return { groups, visitedUrls }
 }
 
@@ -246,13 +229,14 @@ export const ResearchPanelView: FC<{
   const [open, setOpen] = useState(false)
   const contentId = useId()
   const { groups, visitedUrls } = useMemo(() => researchGroups(steps), [steps])
-  const isDirectFetch = title === "网页读取"
+  const isDirectFetch = title === "网页读取" && groups.every((group) => group.kind === "read")
+  const hasFailures = steps.some((step) => step.failed)
   const triggerLabel = anyRunning
     ? isDirectFetch
       ? "正在读取网页"
       : "正在搜索网络"
     : isDirectFetch
-      ? "已读取网页"
+      ? steps.some((step) => step.truncated) ? "已读取部分正文" : "已读取网页"
       : "已搜索网络"
   const outcome =
     completionText ??
@@ -260,13 +244,20 @@ export const ResearchPanelView: FC<{
       ? `完成了「${plan.goal}」的资料检索与回答。`
       : `完成了 ${groups.length} 组联网检索并整理了回答。`)
   // 工具批次之间 anyRunning 会短暂变为 false；最终记录只能在整条回答完成后出现。
-  const showOutcome = complete ?? !anyRunning
+  const showOutcome = !hasFailures && (complete ?? !anyRunning)
+
+  // 内部失败保留在活动记录中，面板只呈现进行中的操作和有效来源。
+  // 若全部失败，由最终回答说明对任务的影响，不再重复展示失败条目。
+  if (groups.length === 0) return null
 
   return (
     <section
       data-slot="research-panel"
       className="mt-3 mb-3 min-w-0 text-[var(--ink,_#24211b)]"
     >
+      <p className="mb-1 text-sm" data-slot="web-progress-intro">
+        {steps[0]?.kind === "read" ? "我先读取目标网页，核对原文内容。" : `我先联网核实${steps[0]?.kind === "search" && steps[0].query ? `「${steps[0].query}」` : "相关资料"}。`}
+      </p>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -321,7 +312,7 @@ export const ResearchPanelView: FC<{
                     {group.title}
                   </span>
                   <span className="shrink-0 text-xs text-[var(--ink-faint,_#a79e8d)]">
-                    {group.running && group.results.length === 0
+                    {group.truncated ? "已读取部分正文" : group.running && group.results.length === 0
                       ? "查询中"
                       : `${group.results.length} 个结果`}
                   </span>

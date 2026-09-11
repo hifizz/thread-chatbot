@@ -30,6 +30,6 @@ const tools = await readFile(
 )
 assert.equal(tools.match(/\{ abortSignal \}/g)?.length, 2)
 assert.match(tools, /webSearch\([\s\S]*abortSignal/)
-assert.match(tools, /extractUrl\(url, abortSignal/)
+assert.match(tools, /webFetch\(normalized, \{ signal: abortSignal/)
 
 console.log("PASS  stopping generation aborts in-flight AnySearch operations")

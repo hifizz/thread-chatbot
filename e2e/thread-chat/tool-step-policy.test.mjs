@@ -3,7 +3,7 @@ import { createToolStepPolicy } from "../../app/api/chat/tool-step-policy.ts"
 import { researchToolNames } from "../../app/api/chat/research-tool-capabilities.ts"
 
 assert.deepEqual(researchToolNames("answer"), [])
-assert.deepEqual(researchToolNames("fetch"), ["readUrl"])
+assert.deepEqual(researchToolNames("fetch"), ["readUrl", "webSearch"])
 assert.deepEqual(researchToolNames("search"), ["webSearch", "readUrl"])
 assert.deepEqual(researchToolNames("research"), ["webSearch", "readUrl"])
 
@@ -22,11 +22,12 @@ const fetchPolicy = createToolStepPolicy({
   researchMode: "fetch",
 })
 assert.deepEqual(fetchPolicy?.({ stepNumber: 0 }), {
-  activeTools: ["createMarkdownArtifact", "readUrl"],
+  activeTools: ["createMarkdownArtifact", "readUrl", "webSearch"],
   toolChoice: { type: "tool", toolName: "readUrl" },
 })
 assert.deepEqual(fetchPolicy?.({ stepNumber: 1 }), {
-  activeTools: ["createMarkdownArtifact", "readUrl"],
+  activeTools: ["createMarkdownArtifact", "readUrl", "webSearch"],
+  toolChoice: "auto",
 })
 
 for (const researchMode of ["search", "research"]) {
@@ -41,6 +42,7 @@ for (const researchMode of ["search", "research"]) {
   })
   assert.deepEqual(policy?.({ stepNumber: 2 }), {
     activeTools: ["webSearch", "readUrl"],
+    toolChoice: "auto",
   })
 }
 
@@ -55,6 +57,7 @@ assert.deepEqual(markdownPolicy?.({ stepNumber: 0 }), {
 })
 assert.deepEqual(markdownPolicy?.({ stepNumber: 1 }), {
   activeTools: ["createMarkdownArtifact"],
+  toolChoice: "auto",
 })
 
 console.log(

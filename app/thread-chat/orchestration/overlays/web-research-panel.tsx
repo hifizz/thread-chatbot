@@ -32,11 +32,15 @@ export function WebResearchPanel({
             snippet: "",
           })),
           running: activity.status === "running",
+          failed: activity.status === "failed",
+          truncated: activity.truncated,
         }
       : {
           kind: "read",
           url: activity.url ?? "正在选择网页…",
           running: activity.status === "running",
+          failed: activity.status === "failed",
+          truncated: activity.truncated,
         }
   )
 

@@ -1,3 +1,4 @@
+import type { WebBudget } from "@/lib/ai/web-access"
 import { tool } from "ai"
 import {
   MARKDOWN_ARTIFACT_TOOL_DESCRIPTION,
@@ -20,10 +21,11 @@ export function createMarkdownArtifactTool(messageId: string) {
 export function buildGenerationTools(input: {
   messageId: string
   toolNames: readonly ("createMarkdownArtifact" | "webSearch" | "readUrl")[]
+  budget?: WebBudget
   routeReason?: string
 }) {
   const { readUrl: readUrlTool, webSearch: webSearchTool } =
-    createResearchTools({ routeReason: input.routeReason })
+    createResearchTools({ routeReason: input.routeReason, budget: input.budget })
   return Object.fromEntries(
     input.toolNames.map((name) => [
       name,

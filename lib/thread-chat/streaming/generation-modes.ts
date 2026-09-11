@@ -1,3 +1,4 @@
+import { researchToolNames } from "@/lib/chat/research-tool-capabilities"
 import {
   DIRECT_FETCH_SYSTEM_PROMPT,
   RESEARCH_MAX_STEPS,
@@ -38,9 +39,7 @@ export function resolveGenerationMode(input: {
   const { researchMode, artifactRequested } = input
   const tools: GenerationToolName[] = []
   if (artifactRequested) tools.push("createMarkdownArtifact")
-  if (researchMode === "fetch") tools.push("readUrl")
-  if (researchMode === "search" || researchMode === "research")
-    tools.push("webSearch", "readUrl")
+  tools.push(...researchToolNames(researchMode))
 
   const firstTool =
     researchMode === "fetch"

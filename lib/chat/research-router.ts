@@ -147,7 +147,7 @@ export function extractHttpUrls(text: string): string[] {
   return [...new Set((text.match(URL_PATTERN) ?? []).map(trimUrlPunctuation))]
 }
 
-function explicitlyDisablesWeb(text: string): boolean {
+export function explicitlyDisablesWeb(text: string): boolean {
   return /(?:不要|无需|不用|禁止).{0,8}(?:联网|搜索|检索|访问网络)|\b(?:do\s+not|don'?t|without)\s+(?:browse|search|use\s+the\s+web)\b/i.test(
     text
   )
@@ -211,11 +211,10 @@ export function deterministicResearchRoute(text: string): ResearchRoute | null {
     )
   if (freshnessRequired) return route("search", "freshness_required")
 
-  const obviousAnswer =
-    /^(?:请|帮我|请你)?\s*(?:解释|说明|改写|润色|翻译|总结|概括|续写|起草|写|计算|推导|分析这段|检查这段|优化这段)|(?:什么是|是什么意思|为什么|如何理解|怎么理解)|\b(?:explain|rewrite|polish|translate|summarize|draft|calculate|derive|what\s+is|why\s+does)\b/i.test(
-      normalized
-    )
-  if (obviousAnswer) return route("answer", "no_web_needed")
+  if (/^(?:请|帮我|请你)?\s*(?:总结|翻译|改写|润色|分析|检查|优化)(?:这段|以下|下面)(?:文字|内容|文本|代码)/.test(normalized)) {
+    return route("answer", "no_web_needed")
+  }
+  // 解释/什么是等句式不能决定事实是否稳定，交给语义路由判断实体和证据。
 
   return null
 }
@@ -265,7 +264,7 @@ export async function resolveResearchRoute({
         modelCallTrace
       ),
       reasoning: "low",
-      system: RESEARCH_ROUTER_SYSTEM_PROMPT,
+      system: `${RESEARCH_ROUTER_SYSTEM_PROMPT}\n当前日期：${new Date().toISOString().slice(0, 10)}`,
       prompt: [
         "只输出符合下列字段的原始 JSON，不要使用 Markdown 代码块：",
         '{"mode":"answer|fetch|search|research","reasonCode":"no_web_needed|explicit_url|explicit_search|freshness_required|multi_source_research|search_unavailable","urls":[],"suggestedQueries":[]}',
@@ -290,9 +289,9 @@ export async function resolveResearchRoute({
     if (recovered.success)
       return normalizeModelRoute(recovered.data, searchReady)
     console.warn(
-      `[research-router] 模型路由失败，降级为直接回答: ${errorSummary(error)}`
+      `[research-router] 模型路由失败，保守尝试核实: ${errorSummary(error)}`
     )
-    return route("answer", "no_web_needed")
+    return route("search", "freshness_required")
   }
 }
 
