@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useEffect, useRef, useState } from "react"
+import React, { useState } from "react"
 import { ListTree, Search } from "lucide-react"
 import { THREAD_CHAT_SHORTCUTS } from "@/constants/thread-chat"
 import type { ThreadTreeState } from "../../core/types"
@@ -12,6 +12,7 @@ import {
 } from "../../core/selectors"
 import { dotColorOf, dvar } from "../../theme"
 import type { Slot } from "../columns/placement"
+import { useScrollMemory } from "../../scroll/use-scroll-memory"
 import { ShortcutHint } from "../overlays/shortcut-hint"
 
 export type SwitcherMode =
@@ -37,7 +38,7 @@ export function ThreadSwitcherPanel({
 }: ThreadSwitcherPanelProps) {
   const [query, setQuery] = useState("")
   const [hi, setHi] = useState(0)
-  const listRef = useRef<HTMLDivElement | null>(null)
+  const listRef = useScrollMemory(JSON.stringify(["thread-list", mode.kind, mode.kind === "subtree" ? mode.rootId : mode.kind === "column" ? mode.vpIndex : "global", query]))
 
   const isGlobal = mode.kind === "global"
   const isSubtree = mode.kind === "subtree"
@@ -54,11 +55,10 @@ export function ThreadSwitcherPanel({
           (row.anchor ?? "").toLowerCase().includes(normalizedQuery)
       )
 
-  useEffect(() => {
-    listRef.current
-      ?.querySelector(`[data-swxrow="${hi}"]`)
-      ?.scrollIntoView({ block: "nearest" })
-  }, [hi])
+  function moveSelection(index: number) {
+    setHi(index)
+    listRef.current?.querySelector(`[data-swxrow="${index}"]`)?.scrollIntoView({ block: "nearest" })
+  }
 
   const statusOf = (id: string): { label: string } | null => {
     if (id === "main") return { label: "锚定" }
@@ -95,10 +95,10 @@ export function ThreadSwitcherPanel({
             onKeyDown={(event) => {
               if (event.key === "ArrowDown") {
                 event.preventDefault()
-                setHi((current) => Math.min(current + 1, rows.length - 1))
+                moveSelection(Math.min(hi + 1, rows.length - 1))
               } else if (event.key === "ArrowUp") {
                 event.preventDefault()
-                setHi((current) => Math.max(current - 1, 0))
+                moveSelection(Math.max(hi - 1, 0))
               } else if (event.key === "Enter") {
                 event.preventDefault()
                 const row = rows[hi]
@@ -166,6 +166,7 @@ export function ThreadSwitcherPanel({
             <div
               key={row.id}
               data-swxrow={index}
+              data-scroll-memory-anchor={row.id}
               className={`swx-row tc-accent-context ${index === hi ? "hi" : ""}`}
               style={
                 {
