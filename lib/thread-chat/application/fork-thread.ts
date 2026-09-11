@@ -1,3 +1,4 @@
+import { resolveForkModelId } from "@/lib/thread-chat/application/fork-model"
 import { resolveUserContent } from "./resolve-user-content"
 import { messages, threads } from "@/lib/db/schema"
 import type { ForkThreadCommand } from "@/lib/thread-chat/contracts/commands"
@@ -40,8 +41,9 @@ export function forkThread(
   parentThreadId: string,
   command: ForkThreadCommand
 ) {
-  assertAllowedModel(command.modelId)
-  assertAllowedGenerationSettings(command.modelId, command.generationSettings)
+  const modelId = resolveForkModelId(command.modelId) ?? command.modelId
+  assertAllowedModel(modelId)
+  assertAllowedGenerationSettings(modelId, command.generationSettings)
   return withConversationTransaction(async (tx) =>
     executeIdempotentCommand({
       tx,
@@ -87,14 +89,14 @@ export function forkThread(
             anchorText: command.anchorText,
             footnote,
             depth: parent.depth + 1,
-            modelId: command.modelId,
+            modelId,
           })
           .returning()
         if (!command.firstTurn) {
           await touchProjectAndThread(tx, project.id, child.id)
           return { thread: toThreadDTO(child), generation: null }
         }
-        const parts = await resolveUserContent({ tx, userId, projectId: project.id, modelId: command.modelId, content: command.firstTurn, operation: { type: "send", sourceThreadId: parent.id } })
+        const parts = await resolveUserContent({ tx, userId, projectId: project.id, modelId, content: command.firstTurn, operation: { type: "send", sourceThreadId: parent.id } })
         const [userSequence, assistantSequence] = await allocateThreadSequences(
           tx,
           child.id,
@@ -122,12 +124,12 @@ export function forkThread(
               role: "assistant",
               parts: [],
               status: "generating",
-              modelId: command.modelId,
+              modelId,
               startedAt: now,
             },
           ])
           .returning()
-        await touchProjectAndThread(tx, project.id, child.id, command.modelId)
+        await touchProjectAndThread(tx, project.id, child.id, modelId)
         const rootThreadId = await findRootThreadId(tx, project.id)
         if (!rootThreadId) stateConflict("Project 缺少根 Thread")
         return {
