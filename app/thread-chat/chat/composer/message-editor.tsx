@@ -30,7 +30,7 @@ export function MessageEditor({ scope, draft, revision = 0, artifacts, onChange,
   }))
   return <LexicalComposer initialConfig={initialConfig}>
     <div className={`composer-editor-wrap${className ? ` ${className}` : ""}`}>
-      <PlainTextPlugin contentEditable={<ContentEditable className="composer-editor" aria-label={placeholder} placeholder={null} />} placeholder={<span className="composer-placeholder">{placeholder}</span>} ErrorBoundary={LexicalErrorBoundary} />
+      <PlainTextPlugin contentEditable={<ContentEditable className="composer-editor" aria-label={placeholder} enterKeyHint="enter" placeholder={null} />} placeholder={<span className="composer-placeholder">{placeholder}</span>} ErrorBoundary={LexicalErrorBoundary} />
     </div>
     <HistoryPlugin />
     <ComposerClipboardPlugin />

@@ -2,7 +2,7 @@
 import { useEffect } from "react"
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext"
 import { COMMAND_PRIORITY_LOW, KEY_ENTER_COMMAND } from "lexical"
-import { shouldSubmitComposerKey } from "./conversation-composer-logic"
+import { shouldSubmitComposerKey } from "@/lib/chat/composer-keyboard"
 export function ComposerSubmitPlugin({ onSubmit }: { onSubmit?: () => void }) {
   const [editor] = useLexicalComposerContext()
   useEffect(() => editor.registerCommand(KEY_ENTER_COMMAND, (event) => {
