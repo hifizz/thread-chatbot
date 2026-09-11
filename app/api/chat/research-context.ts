@@ -2,6 +2,7 @@ import type { LanguageModel, UIMessage } from "ai"
 import type { ModelCallTrace } from "@/lib/ai/model-call-logger"
 import {
   createResearchPlan,
+  explicitlyDisablesWeb,
   resolveResearchRoute,
   type ResearchRoute,
 } from "@/lib/chat/research-router"
@@ -15,6 +16,7 @@ type ResearchContextInput = {
   messages: UIMessage[]
   deepResearchRequested: boolean
   searchReady: boolean
+  abortSignal?: AbortSignal
   modelCallTrace?: ModelCallTrace
 }
 
@@ -36,11 +38,12 @@ export async function resolveResearchContext(
     deepResearchRequested,
     searchReady,
     modelCallTrace,
+    abortSignal,
   }: ResearchContextInput,
   dependencies: ResearchContextDependencies = defaultDependencies
 ) {
   const latestText = latestUserText(messages)
-  const researchRoute: ResearchRoute = deepResearchRequested
+  const researchRoute: ResearchRoute = deepResearchRequested && !explicitlyDisablesWeb(latestText)
     ? searchReady
       ? {
           mode: "research",
@@ -60,6 +63,7 @@ export async function resolveResearchContext(
         recentConversation: recentConversationText(messages),
         searchReady,
         modelCallTrace,
+        abortSignal,
       })
   const researchPlan =
     researchRoute.mode === "research"
@@ -68,6 +72,7 @@ export async function resolveResearchContext(
           userRequest: latestText,
           route: researchRoute,
           modelCallTrace,
+          abortSignal,
         })
       : null
 

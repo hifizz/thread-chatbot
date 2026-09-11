@@ -1,61 +1,67 @@
 import { tool } from "ai"
 import { z } from "zod"
-import { webSearch, extractUrl } from "@/lib/ai/search"
+import { webSearch, webFetch } from "@/lib/ai/search"
+import { createWebBudget, webBudgetExceeded, normalizeWebUrl, WebAccessError, webFailure, type WebBudget, type WebToolResult } from "@/lib/ai/web-access"
 import { EXTRACT_CHAR_LIMIT, SEARCH_MAX_RESULTS } from "@/constants/research"
 
-// 深度研究的后端工具：联网搜索 + 网页深读。工具调用与结果会在 assistant-ui 里渲染，
-// 天然提供「研究过程可见」；模型据搜索/深读结果多步推进，最终综合成带引用的报告。
+type ResearchToolContext = { routeReason?: string; budget?: WebBudget }
 
-type ResearchToolObservabilityContext = { routeReason?: string }
-
-export function createResearchTools(
-  context: ResearchToolObservabilityContext = {}
-) {
-  const webSearchTool = tool({
-    description:
-      "联网搜索以获取实时或事实性信息。用于回答需要最新资料、外部知识的问题。可多次调用以覆盖不同子问题。",
-    inputSchema: z.object({
-      query: z.string().describe("检索关键词或问题，尽量具体"),
-    }),
-    execute: async ({ query }, { abortSignal }) => {
-      const { results } = await webSearch(
-        query,
-        SEARCH_MAX_RESULTS,
-        abortSignal,
-        context
-      )
-      // 返回给模型的结构：带 url 的结果列表，供其继续深读或引用
-      return {
-        query,
-        results: results.map((r) => ({
-          title: r.title,
-          url: r.url,
-          snippet: r.snippet,
-        })),
+/** 每次生成创建一次；失败缓存与在途合并不会跨生成或用户共享。 */
+export function createResearchTools(context: ResearchToolContext = {}) {
+  const budget = context.budget ?? createWebBudget()
+  const failures = new Map<string, WebToolResult<never>>()
+  const pending = new Map<string, Promise<WebToolResult<unknown>>>()
+  async function run<T>(key: string, signal: AbortSignal | undefined, operation: () => Promise<T>): Promise<WebToolResult<T>> {
+    signal?.throwIfAborted()
+    const inflight = pending.get(key)
+    if (inflight) return inflight as Promise<WebToolResult<T>>
+    if (budget.exhausted) return webFailure(webBudgetExceeded())
+    const previous = failures.get(key)
+    if (previous) return previous
+    const request = (async (): Promise<WebToolResult<T>> => {
+      try {
+        const data = await operation()
+        signal?.throwIfAborted()
+        return { ok: true, data }
+      } catch (error) {
+        signal?.throwIfAborted()
+        if (!(error instanceof WebAccessError)) throw error
+        const failure = webFailure(error)
+        if (key.startsWith("search:") && failure.nextAction === "search") failure.nextAction = "revise_query"
+        failures.set(key, failure)
+        return failure
       }
-    },
-  })
-
-  const readUrlTool = tool({
-    description:
-      "深读某个网页的完整正文。URL 可以由用户直接提供，也可以来自搜索结果；翻译、总结或分析指定页面时应直接调用。",
-    inputSchema: z.object({
-      url: z.string().describe("要深读的网页 URL（来自搜索结果）"),
+    })()
+    pending.set(key, request)
+    try { return await request } finally { pending.delete(key) }
+  }
+  return {
+    webSearch: tool({
+      description: "联网核实实时事实，优先官方资料；摘要不足时继续 readUrl。失败时按 nextAction 调整查询，证据充分即停止。",
+      inputSchema: z.object({ query: z.string().describe("具体的检索关键词或问题") }),
+      execute: async ({ query }, { abortSignal }) => run(`search:${query.trim()}`, abortSignal, async () => {
+        if (!query.trim()) throw new WebAccessError("INVALID_QUERY", "请提供有效查询。", "revise_query")
+        const { results } = await budget.run(abortSignal, (signal, attemptIndex) =>
+          webSearch(query.trim(), SEARCH_MAX_RESULTS, signal, { routeReason: context.routeReason, attemptIndex }))
+        if (!results.length) throw new WebAccessError("EMPTY_RESULT", "没有找到有效来源，可调整查询；这不代表目标不存在。", "revise_query")
+        return { query, results }
+      }),
     }),
-    execute: async ({ url }, { abortSignal }) => {
-      const content = await extractUrl(url, abortSignal, context)
-      return { url, content: content.slice(0, EXTRACT_CHAR_LIMIT) }
-    },
-  })
-
-  return { webSearch: webSearchTool, readUrl: readUrlTool }
-}
-
-const defaultResearchTools = createResearchTools()
-export const webSearchTool = defaultResearchTools.webSearch
-export const readUrlTool = defaultResearchTools.readUrl
-
-export const researchTools = {
-  webSearch: webSearchTool,
-  readUrl: readUrlTool,
+    readUrl: tool({
+      description: "读取用户指定或搜索得到的网页正文。ok=false 表示未读到正文；truncated=true 表示仅获得部分正文，不可声称读完。",
+      inputSchema: z.object({ url: z.string().describe("公开网页 URL") }),
+      execute: async ({ url }, { abortSignal }) => {
+        abortSignal?.throwIfAborted()
+        let normalized: string
+        try { normalized = normalizeWebUrl(url) } catch (error) {
+          if (!(error instanceof WebAccessError)) throw error
+          return webFailure(error)
+        }
+        return run(`fetch:${normalized}`, abortSignal, async () => {
+          const page = await webFetch(normalized, { signal: abortSignal, budget, routeReason: context.routeReason })
+          return { ...page, content: page.content.slice(0, EXTRACT_CHAR_LIMIT), truncated: page.content.length > EXTRACT_CHAR_LIMIT }
+        })
+      },
+    }),
+  }
 }

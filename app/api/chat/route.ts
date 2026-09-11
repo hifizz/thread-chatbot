@@ -1,3 +1,4 @@
+import { createWebBudget } from "@/lib/ai/web-access"
 import {
   convertToModelMessages,
   consumeStream,
@@ -70,12 +71,15 @@ export async function POST(req: Request) {
         try {
           const { researchRoute, researchPlan } = await resolveResearchContext({
             model: chatModel,
+            abortSignal: req.signal,
             messages,
             deepResearchRequested: research,
             searchReady,
             modelCallTrace,
           })
+          const webBudget = createWebBudget()
           const { tools: allTools, webToolsEnabled } = buildChatToolSet({
+            budget: webBudget,
             researchMode: researchRoute.mode,
             routeReason: researchRoute.reasonCode,
             searchReady,
@@ -104,6 +108,7 @@ export async function POST(req: Request) {
           })
 
           const result = streamText({
+            abortSignal: req.signal,
             ...buildAiTelemetryConfig(MODEL_CALL_PURPOSE.chatAnswer, {
               ...modelCallTrace,
               modelId,
@@ -123,6 +128,7 @@ export async function POST(req: Request) {
             // 明确 Markdown 交付请求只强制第 0 步启动工具调用；后续步骤仍保留工具，
             // 让模型在用户要求多份独立文档时，为每份文档分别创建一个 Artifact。
             prepareStep: createToolStepPolicy({
+              webBudget,
               isThreadChat: false,
               markdownArtifactRequested: false,
               researchMode: researchRoute.mode,

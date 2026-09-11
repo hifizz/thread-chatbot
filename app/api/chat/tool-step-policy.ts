@@ -1,11 +1,13 @@
+import type { WebBudget } from "@/lib/ai/web-access"
 import { MARKDOWN_ARTIFACT_TOOL_NAME } from "@/lib/chat/markdown-artifact"
 import type { ResearchRoute } from "@/lib/chat/research-router"
 import {
   researchToolNames,
   type ResearchToolName,
-} from "@/app/api/chat/research-tool-capabilities"
+} from "@/lib/chat/research-tool-capabilities"
 
 type ToolStepPolicyInput = {
+  webBudget?: WebBudget
   isThreadChat: boolean
   markdownArtifactRequested: boolean
   researchMode: ResearchRoute["mode"]
@@ -15,7 +17,7 @@ type RoutedToolName = ResearchToolName | typeof MARKDOWN_ARTIFACT_TOOL_NAME
 
 type ToolStep = {
   activeTools: RoutedToolName[]
-  toolChoice?: {
+  toolChoice?: "auto" | {
     type: "tool"
     toolName: RoutedToolName
   }
@@ -26,6 +28,7 @@ type ToolStep = {
  * 交付仅在没有更高优先级联网动作时首步强制，后续步骤保留全部可用工具。
  */
 export function createToolStepPolicy({
+  webBudget,
   isThreadChat,
   markdownArtifactRequested,
   researchMode,
@@ -41,6 +44,7 @@ export function createToolStepPolicy({
   if (activeTools.length === 0) return undefined
 
   return ({ stepNumber }: { stepNumber: number }): ToolStep => {
+    if (webBudget?.exhausted) return { activeTools: activeTools.filter((name) => name === MARKDOWN_ARTIFACT_TOOL_NAME), toolChoice: "auto" }
     if (stepNumber === 0 && activeWebTools.length > 0) {
       return {
         activeTools,
@@ -56,6 +60,6 @@ export function createToolStepPolicy({
         },
       }
     }
-    return { activeTools }
+    return { activeTools, toolChoice: "auto" }
   }
 }

@@ -9,7 +9,8 @@ export interface WebResearchSource {
 export interface WebResearchActivity {
   toolCallId: string
   kind: "search" | "read"
-  status: "running" | "complete"
+  status: "running" | "complete" | "failed"
+  truncated?: boolean
   query?: string
   url?: string
   sources: WebResearchSource[]
@@ -32,10 +33,17 @@ function textField(value: unknown, field: string): string | undefined {
   return typeof text === "string" && text.trim() ? text.trim() : undefined
 }
 
+/** 兼容历史未包装的结果；新失败结果永远不产生来源。 */
+export function webResearchData(output: unknown): Record<string, unknown> | undefined {
+  if (!isRecord(output) || output.ok === false) return undefined
+  return output.ok === true ? (isRecord(output.data) ? output.data : undefined) : output
+}
+
 /** webSearch provider output 到产品来源列表的唯一规范化边界。 */
 export function webResearchSourcesFromOutput(
   output: unknown
 ): WebResearchSource[] {
+  output = webResearchData(output)
   if (!isRecord(output) || !Array.isArray(output.results)) return []
   const seen = new Set<string>()
   return output.results.flatMap((result) => {
@@ -74,6 +82,7 @@ export function createWebResearchActivityDispatcher(
       const input =
         chunk.type === "tool-input-available" ? chunk.input : undefined
       calls.set(toolCallId, { toolName: chunk.toolName, input })
+      if (chunk.type === "tool-input-start") return true
       onActivity({
         toolCallId,
         kind: chunk.toolName === "webSearch" ? "search" : "read",
@@ -92,11 +101,12 @@ export function createWebResearchActivityDispatcher(
     if (!call) return false
 
     if (chunk.type === "tool-output-available") {
-      const output = chunk.output
+      const output = webResearchData(chunk.output)
       onActivity({
         toolCallId,
         kind: call.toolName === "webSearch" ? "search" : "read",
-        status: "complete",
+        status: output ? "complete" : "failed",
+        truncated: output?.truncated === true,
         query:
           call.toolName === "webSearch"
             ? (textField(output, "query") ?? textField(call.input, "query"))
@@ -121,7 +131,7 @@ export function createWebResearchActivityDispatcher(
       onActivity({
         toolCallId,
         kind: call.toolName === "webSearch" ? "search" : "read",
-        status: "complete",
+        status: "failed",
         query:
           call.toolName === "webSearch"
             ? textField(call.input, "query")

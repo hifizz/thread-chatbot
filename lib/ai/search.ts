@@ -1,4 +1,6 @@
 import {
+  EXA_CONTENTS_API_URL,
+  EXA_PROVIDER_NAME,
   ANYSEARCH_CLIENT_HEADER,
   ANYSEARCH_MCP_API_URL,
   ANYSEARCH_PROVIDER_NAME,
@@ -7,6 +9,7 @@ import {
   ANYSEARCH_SEARCH_RESULT_CHAR_LIMIT,
   ANYSEARCH_SEARCH_RESULT_LIMIT,
 } from "@/constants/research"
+import { WebAccessError, assertUsablePage, normalizeWebUrl, type WebBudget } from "@/lib/ai/web-access"
 import { runProviderAttempt } from "@/lib/observability/provider-attempt"
 
 // AnySearch 的 REST 搜索返回结构化 JSON；MCP extract 返回清洗后的 Markdown。
@@ -50,22 +53,8 @@ type AnySearchSearchResponse = {
   results?: AnySearchResult[]
 }
 
-class AnySearchProviderError extends Error {
-  readonly code: string
-
-  constructor(
-    action: string,
-    readonly status: number,
-    code = "ANYSEARCH_PROVIDER_ERROR"
-  ) {
-    super(`AnySearch ${action}失败（HTTP ${status}）`)
-    this.name = "AnySearchProviderError"
-    this.code = code
-  }
-}
-
-function providerError(action: string, status: number) {
-  return new AnySearchProviderError(action, status)
+function providerError(action: string, status: number, code = "WEB_PROVIDER_ERROR") {
+  return new WebAccessError(code, `${action}未取得可用结果。`, "search", true, status)
 }
 
 async function anySearchJson<T>(
@@ -86,7 +75,20 @@ async function anySearchJson<T>(
   )
   try {
     const response = await fetch(url, { ...init, signal: controller.signal })
-    return { response, data: (await response.json()) as T }
+    if (!response.ok) throw providerError("联网请求", response.status)
+    try {
+      return { response, data: (await response.json()) as T }
+    } catch (error) {
+      if (error instanceof SyntaxError) throw providerError("响应解析", response.status, "INVALID_RESPONSE")
+      throw error
+    }
+  } catch (error) {
+    externalSignal?.throwIfAborted()
+    if (controller.signal.aborted) throw providerError("请求超时", 408, "WEB_TIMEOUT")
+    if (error instanceof TypeError && /fetch failed|network|failed to fetch/i.test(error.message)) {
+      throw providerError("网络连接", 502)
+    }
+    throw error
   } finally {
     clearTimeout(timeout)
     externalSignal?.removeEventListener("abort", forwardAbort)
@@ -161,8 +163,26 @@ export async function webSearch(
 type AnySearchMcpResponse = {
   error?: { message?: string }
   result?: {
+    structuredContent?: { url?: string; title?: string; content?: string; error?: unknown }
+    isError?: boolean
     content?: { type?: string; text?: string }[]
   }
+}
+
+/** MCP 可能用结构化 content，或在文本块里编码 JSON。只解包已知正文形状。 */
+function unwrapExtractText(text: string): string {
+  const trimmed = text.trim()
+  if (!trimmed.startsWith("{")) return trimmed
+  try {
+    const parsed: unknown = JSON.parse(trimmed)
+    if (parsed && typeof parsed === "object") {
+      if ("error" in parsed && parsed.error) throw providerError("网页抽取", 200, "WEB_PROVIDER_TOOL_ERROR")
+      if ("content" in parsed && typeof parsed.content === "string") return parsed.content.trim()
+    }
+  } catch (error) {
+    if (!(error instanceof SyntaxError)) throw error
+  }
+  return trimmed
 }
 
 /** 抽取单个 HTML 网页的正文；AnySearch 直接返回 Markdown。 */
@@ -198,20 +218,69 @@ export async function extractUrl(
         },
         signal
       )
-      if (!res.ok || data.error) {
-        throw providerError("网页抽取", res.status)
+      if (!res.ok) throw providerError("网页抽取", res.status)
+      if (data.error) throw providerError("网页抽取", res.status, "WEB_PROVIDER_RPC_ERROR")
+      if (data.result?.isError) {
+        const message = data.result.content?.map((item) => item.text ?? "").join(" ") ?? ""
+        if (/blocked (?:url|address)|private (?:ip|address)|ssrf|unsafe url|invalid url/i.test(message)) {
+          throw new WebAccessError("UNSAFE_URL", "该网址无法安全读取。", "stop", false, res.status)
+        }
+        throw providerError("网页抽取", res.status, "WEB_PROVIDER_TOOL_ERROR")
       }
 
-      const text = data.result?.content?.find(
-        (item) => item.type === "text" && typeof item.text === "string"
-      )?.text
-      if (!text)
-        throw new AnySearchProviderError("网页抽取", res.status, "EMPTY_RESULT")
-      return text
+      if (data.result?.structuredContent?.error) throw providerError("网页抽取", res.status)
+      const text = data.result?.structuredContent?.content ?? (data.result?.content ?? [])
+        .filter((item) => item.type === "text" && typeof item.text === "string")
+        .map((item) => unwrapExtractText(item.text ?? "")).join("\n").trim()
+      const content = unwrapExtractText(text)
+      assertUsablePage(content)
+      return content
     },
     (text) => ({
       outcome: text.trim() ? "success" : "unusable",
       responseCharacters: text.length,
     })
   )
+}
+
+/** 同一 URL 的有限备用不暴露为新的模型工具。 */
+export async function webFetch(url: string, context: {
+  signal?: AbortSignal
+  budget: WebBudget
+  routeReason?: string
+}): Promise<{ url: string; content: string; title?: string; publishedDate?: string }> {
+  const normalized = normalizeWebUrl(url)
+  const providers = [ANYSEARCH_PROVIDER_NAME, ...(process.env.EXA_API_KEY?.trim() ? [EXA_PROVIDER_NAME] : [])]
+  for (const [fallbackCount, provider] of providers.entries()) {
+    context.signal?.throwIfAborted()
+    try {
+      return await context.budget.run(context.signal, async (signal, attemptIndex) => {
+        const attempt = { routeReason: context.routeReason, attemptIndex, fallbackCount }
+        if (provider === ANYSEARCH_PROVIDER_NAME) {
+          return { url: normalized, content: await extractUrl(normalized, signal, attempt) }
+        }
+        return runProviderAttempt({ provider, operation: "extract", url: normalized, ...attempt,
+          usage: { unit: "request", quantity: 1, estimated: true } }, async () => {
+          const { data, response } = await anySearchJson<{
+            results?: { url?: string; text?: string; title?: string; publishedDate?: string }[]
+            statuses?: { status?: string }[]
+          }>(EXA_CONTENTS_API_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "x-api-key": process.env.EXA_API_KEY!.trim() },
+            body: JSON.stringify({ urls: [normalized], text: true }),
+          }, signal)
+          if (data.statuses?.some((item) => item.status !== "success")) throw providerError("网页抽取", response.status)
+          const page = data.results?.[0]
+          const content = page?.text?.trim() ?? ""
+          assertUsablePage(content)
+          return { url: normalized, content, title: page?.title, publishedDate: page?.publishedDate }
+        }, (page) => ({ outcome: "success", responseCharacters: page.content.length }))
+      })
+    } catch (error) {
+      context.signal?.throwIfAborted()
+      if (!(error instanceof WebAccessError) || !error.allowProviderFallback) throw error
+      if (fallbackCount === providers.length - 1) throw error
+    }
+  }
+  throw providerError("网页抽取", 502)
 }
