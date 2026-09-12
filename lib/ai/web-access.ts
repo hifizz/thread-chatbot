@@ -1,4 +1,4 @@
-import { WEB_MAX_DURATION_MS, WEB_MAX_PROVIDER_ATTEMPTS, WEB_MAX_CONCURRENCY } from "@/constants/research"
+import { WEB_MAX_DURATION_MS, WEB_MAX_PROVIDER_ATTEMPTS, WEB_MAX_CONCURRENCY, WEB_CONTENT_CHAR_LIMIT, WEB_RESEARCH_MAX_PROVIDER_ATTEMPTS, WEB_RESEARCH_MAX_DURATION_MS } from "@/constants/research"
 
 export type WebToolFailure = {
   ok: false
@@ -56,22 +56,37 @@ export function assertUsablePage(content: string): void {
 
 /** 每次生成独享；从首个真实上游尝试开始计时，空闲时不保留计时器/监听器。 */
 export function createWebBudget(options: {
+  mode?: "answer" | "fetch" | "search" | "research"
+  maxContentChars?: number
   maxProviderAttempts?: number
   maxDurationMs?: number
   maxConcurrency?: number
 } = {}) {
-  const maxAttempts = options.maxProviderAttempts ?? WEB_MAX_PROVIDER_ATTEMPTS
-  const duration = options.maxDurationMs ?? WEB_MAX_DURATION_MS
+  const maxAttempts = options.maxProviderAttempts ?? (options.mode === "research" ? WEB_RESEARCH_MAX_PROVIDER_ATTEMPTS : WEB_MAX_PROVIDER_ATTEMPTS)
+  const duration = options.maxDurationMs ?? (options.mode === "research" ? WEB_RESEARCH_MAX_DURATION_MS : WEB_MAX_DURATION_MS)
+  const maxContentChars = options.maxContentChars ?? WEB_CONTENT_CHAR_LIMIT
   const concurrency = options.maxConcurrency ?? WEB_MAX_CONCURRENCY
-  if (!Number.isInteger(maxAttempts) || maxAttempts < 1 || !Number.isFinite(duration) || duration <= 0 || !Number.isInteger(concurrency) || concurrency < 1) {
+  if (!Number.isInteger(maxContentChars) || maxContentChars < 1 || !Number.isInteger(maxAttempts) || maxAttempts < 1 || !Number.isFinite(duration) || duration <= 0 || !Number.isInteger(concurrency) || concurrency < 1) {
     throw new RangeError("联网预算配置必须为正数，次数和并发数必须为整数")
   }
+  let contentChars = 0
+  let cachedPages = 0
   let attempts = 0
   let deadline: number | undefined
   let active = 0
   const waiting = new Set<() => void>()
   return {
     get attempts() { return attempts },
+    get policy() { return { maxProviderAttempts: maxAttempts, maxDurationMs: duration, maxConcurrency: concurrency, maxContentChars } },
+    get remainingChars() { return maxContentChars - contentChars },
+    get canReadCache() { return cachedPages > 0 && contentChars < maxContentChars },
+    registerSnapshot() { cachedPages++ },
+    /** 同步扣减，避免并行工具在 await 间隙超卖。 */
+    spendContent(chars: number) {
+      if (!Number.isInteger(chars) || chars < 0) throw new RangeError("内容用量必须为非负整数")
+      if (chars > maxContentChars - contentChars) throw webContentBudgetExceeded()
+      contentChars += chars
+    },
     get exhausted() { return attempts >= maxAttempts || (deadline !== undefined && Date.now() >= deadline) },
     async run<T>(signal: AbortSignal | undefined, operation: (signal: AbortSignal, attemptIndex: number) => Promise<T>): Promise<T> {
       signal?.throwIfAborted()
@@ -108,3 +123,14 @@ export function createWebBudget(options: {
   }
 }
 export type WebBudget = ReturnType<typeof createWebBudget>
+
+export function webContentBudgetExceeded(): WebAccessError {
+  return new WebAccessError("WEB_CONTENT_BUDGET_EXHAUSTED", "本轮资料容量已用尽，请根据已取得的证据回答，只说明影响结论的缺口。", "stop")
+}
+
+/** 网络用尽后保留缓存续读；两类额度都不能再使用时保留非联网工具。 */
+export function availableResearchTools<T extends string>(names: readonly T[], budget: WebBudget): T[] {
+  return names.filter((name) => name === "webSearch"
+    ? !budget.exhausted && budget.remainingChars > 0
+    : name === "readUrl" ? budget.remainingChars > 0 && (!budget.exhausted || budget.canReadCache) : true)
+}

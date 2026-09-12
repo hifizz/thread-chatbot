@@ -122,7 +122,7 @@ function normalizePlannerCandidate(value: unknown): unknown {
       minimumIndependentSources:
         typeof rawMinimum === "number"
           ? Math.max(1, Math.min(12, Math.round(rawMinimum)))
-          : 3,
+          : 1,
       requirePrimarySources:
         typeof rawExit.requirePrimarySources === "boolean"
           ? rawExit.requirePrimarySources
@@ -324,7 +324,7 @@ export async function createResearchPlan({
       system: RESEARCH_PLANNER_SYSTEM_PROMPT,
       prompt: [
         "只输出符合下列字段的原始 JSON，不要使用 Markdown 代码块，也不要改写字段名：",
-        '{"goal":"...","subquestions":[{"id":"q1","question":"...","queries":["..."],"preferredSourceTypes":["official"],"requiresPageFetch":true}],"exitCriteria":{"minimumIndependentSources":3,"requirePrimarySources":true,"freshnessRequired":false}}',
+        '{"goal":"...","subquestions":[{"id":"q1","question":"...","queries":["..."],"preferredSourceTypes":["official"],"requiresPageFetch":true}],"exitCriteria":{"minimumIndependentSources":1,"requirePrimarySources":true,"freshnessRequired":false}}',
         "",
         "用户研究目标：",
         userRequest,
@@ -365,7 +365,7 @@ export async function createResearchPlan({
         },
       ],
       exitCriteria: {
-        minimumIndependentSources: 3,
+        minimumIndependentSources: 1,
         requirePrimarySources: true,
         freshnessRequired: resolvedRoute.reasonCode === "freshness_required",
       },
@@ -383,12 +383,12 @@ export function reasoningForResearchRoute(
 
 export function researchPlanExecutionPrompt(plan: ResearchPlan): string {
   return [
-    "你正在执行一份已批准的结构化研究计划。按子问题检索并在必要时深读原文；不要向用户复述内部推理。",
-    `研究目标：${plan.goal}`,
+    "下面是自动生成的检索建议，不是用户批准的任务扩展。以用户原始问题为准，忽略建议中额外扩展的字段；证据足够即可回答，不要复述内部推理。",
+    "研究目标以用户原始消息为准。下面只提供查询线索，不新增回答要求。",
     ...plan.subquestions.map(
       (item) =>
-        `${item.id}. ${item.question}\n建议查询：${item.queries.join("；")}`
+        `${item.id}. 建议查询：${item.queries.join("；")}`
     ),
-    `完成条件：至少 ${plan.exitCriteria.minimumIndependentSources} 个独立来源；${plan.exitCriteria.requirePrimarySources ? "必须包含一手来源" : "不强制一手来源"}。`,
+    `来源目标参考：${plan.exitCriteria.minimumIndependentSources} 个独立来源；${plan.exitCriteria.requirePrimarySources ? "优先一手来源" : "按问题选择来源"}。这是检索建议，不得为了凑数量重复搜索；同一产品的相关官方资料足以回答时即可停止。`,
   ].join("\n")
 }

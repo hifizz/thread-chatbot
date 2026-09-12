@@ -77,7 +77,7 @@ export async function POST(req: Request) {
             searchReady,
             modelCallTrace,
           })
-          const webBudget = createWebBudget()
+          const webBudget = createWebBudget({ mode: researchRoute.mode })
           const { tools: allTools, webToolsEnabled } = buildChatToolSet({
             budget: webBudget,
             researchMode: researchRoute.mode,
