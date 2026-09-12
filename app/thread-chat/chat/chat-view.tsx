@@ -30,7 +30,7 @@ export interface ChatViewProps {
   isMain?: boolean
   /** 列头区（面包屑 / 标题行），由上层（branching）组装 */
   header?: React.ReactNode
-  /** 列头之下、消息列表之上的横幅区（focus banner / 继承的上文） */
+  /** 消息列表开头、随消息滚动的横幅区（focus banner / 继承的上文） */
   banner?: React.ReactNode
   /** 消息列表顶部的插卡（主线的 hint 提示） */
   intro?: React.ReactNode
@@ -87,7 +87,6 @@ export function ChatView({
   return (
     <>
       {header}
-      {banner}
       {/* 滚动：交给 headless MessageScroller 接管「流式贴底 / 上滑释放 / 滚到底按钮」，
           见 §5 注释（下方 Provider）。.msg-list + data-list 必须保留——划选气泡靠
           .closest(".msg-list") + data-list 反查会话。 */}
@@ -96,6 +95,7 @@ export function ChatView({
           <RememberedViewport threadId={threadId}>
             <MessageScroller.Content className="msg-scroll-content">
               <div className="lane">
+                {banner}
                 {intro}
                 {messages.map((msg) => (
                   <div key={msg.id} data-thread-chat-message-id={msg.id} data-scroll-memory-anchor={msg.id}>
