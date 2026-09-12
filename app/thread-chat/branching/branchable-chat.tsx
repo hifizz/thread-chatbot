@@ -159,7 +159,7 @@ export function BranchableChat({
                     <span
                       className={here ? "here" : "seg2"}
                       onClick={here ? undefined : () => onCrumbNav(c.id)}
-                      title={here ? undefined : `回到「${c.title}」`}
+                      title={here ? c.title : `回到「${c.title}」`}
                     >
                       {c.title}
                     </span>
@@ -192,9 +192,9 @@ export function BranchableChat({
   )
 
   /* ---------- focus banner + 继承的上文（仅分支列） ----------
-     父级（列）没有水平 padding，用 .lane.pad 承担 18px 侧距并居中通道 */
+     横幅放在消息阅读通道内，与正文一起滚动。 */
   const banner = isMain ? null : (
-    <div className="lane pad">
+    <div className="branch-context">
       <div className="focus-banner">
         <span className="fn">{thread.footnote}</span>
         <div className="ft">
@@ -204,7 +204,12 @@ export function BranchableChat({
               ? "主线"
               : `「${threadTitle(state, thread.parentId!)}」`}
           </span>
-          <q>{thread.anchorText}</q>
+          <details className="focus-quote">
+            <summary title="展开或收起完整引用">
+              <q>{thread.anchorText}</q>
+            </summary>
+            <q className="focus-quote-full">{thread.anchorText}</q>
+          </details>
         </div>
         {sourceProvenance && !sourceProvenance.isOnActivePath && (
           <div className="inactive-source">

@@ -318,3 +318,102 @@
   color: var(--tc-content-muted);
   margin-right: 6px;
 }
+
+/* 分支背景随消息滚动，避免长引用挤占正文可用高度。 */
+.tc .branch-context {
+  margin-bottom: 16px;
+}
+.tc .branch-context .focus-banner {
+  margin-top: 0;
+}
+.tc .focus-quote > summary {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  list-style: none;
+}
+.tc .focus-quote > summary q {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tc .focus-quote > summary::after {
+  content: "⌄";
+  flex: none;
+}
+.tc .focus-quote[open] > summary::after {
+  content: "⌃";
+}
+.tc .focus-quote-full {
+  display: block;
+  margin-top: 8px;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 720px) {
+  /* 同时限制上下界，覆盖桌面拖拽保存的 flex-basis；单列继续铺满。 */
+  .tc .cols > .column {
+    min-width: 95%;
+    max-width: 95%;
+  }
+  .tc .cols > .column:only-child {
+    min-width: 100%;
+    max-width: 100%;
+  }
+  .tc .cols > .col-resizer {
+    display: none;
+  }
+  .tc .crumb {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    white-space: nowrap;
+    margin-bottom: 6px;
+  }
+  .tc .crumb .seg2,
+  .tc .crumb .here {
+    flex: 0 1 auto;
+    min-width: 24px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .tc .crumb .here {
+    flex-shrink: 0;
+    max-width: 45%;
+  }
+  .tc .crumb .chev {
+    flex: none;
+  }
+  .tc .focus-banner {
+    padding: 6px 8px;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .tc .focus-banner .ft {
+    flex: 1;
+  }
+  .tc .focus-banner .ft .lbl,
+  .tc .focus-quote > summary {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .tc .focus-quote > summary {
+    list-style: none;
+  }
+  .tc .focus-quote > summary::-webkit-details-marker {
+    display: none;
+  }
+  .tc .focus-quote[open] > summary {
+    color: var(--tc-content-muted);
+  }
+  .tc .branch-context details.inherited {
+    margin-top: 6px;
+  }
+  .tc .branch-context details.inherited > summary {
+    padding: 6px 8px;
+    white-space: nowrap;
+  }
+}
