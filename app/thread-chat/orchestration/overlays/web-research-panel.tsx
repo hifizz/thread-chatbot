@@ -5,24 +5,27 @@ import {
   type ResearchStep,
 } from "@/components/assistant-ui/research-panel"
 import type { ResearchPlan, ResearchRoute } from "@/lib/chat/research-router"
-import type { WebResearchActivity } from "@/lib/chat/web-research-activity"
+import { settledResearchActivities, type WebResearchActivity } from "@/lib/chat/web-research-activity"
 
 export function WebResearchPanel({
   activities,
   route,
   plan,
   complete,
+  settled = false,
 }: {
   activities: WebResearchActivity[]
   route?: ResearchRoute
   plan?: ResearchPlan
   complete?: boolean
+  settled?: boolean
 }) {
   // 路由和 Planner 先于真实工具事件到达；不能据此把面板提前放到正文顶部。
   // 第一次 webSearch/readUrl 开始后再显示，位置由消息记录的文本偏移决定。
   if (activities.length === 0) return null
 
-  const steps: ResearchStep[] = activities.map((activity) =>
+  const currentActivities = settledResearchActivities(activities, settled)
+  const steps: ResearchStep[] = currentActivities.map((activity) =>
     activity.kind === "search"
       ? {
           kind: "search",
@@ -44,7 +47,7 @@ export function WebResearchPanel({
         }
   )
 
-  const anyRunning = activities.some(
+  const anyRunning = currentActivities.some(
     (activity) => activity.status === "running"
   )
   const title =

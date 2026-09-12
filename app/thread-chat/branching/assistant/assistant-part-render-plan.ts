@@ -1,3 +1,4 @@
+import { WEB_RESEARCH_TOOL_NAMES } from "@/lib/chat/web-research-activity"
 import type { ConversationViewMessage } from "../../core/types"
 import type { ThreadChatUIMessage } from "@/lib/thread-chat/contracts/ui-message"
 
@@ -53,6 +54,8 @@ export function assistantPartRenderPlan(
       plan.push({ kind: "source-url", part, index })
       return
     }
+    // 联网工具由研究面板展示，不输出内部 input-available 等状态。
+    if (WEB_RESEARCH_TOOL_NAMES.some((name) => part.type === `tool-${name}`)) return
     if (part.type.startsWith("tool-")) {
       plan.push({ kind: "tool", part, index })
     }

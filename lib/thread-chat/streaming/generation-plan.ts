@@ -1,5 +1,4 @@
-import { WEB_BUDGET_POLICY } from "@/constants/research"
-import { createWebBudget } from "@/lib/ai/web-access"
+import { availableResearchTools, createWebBudget } from "@/lib/ai/web-access"
 import { evaluateContextBudget } from "../application/context-budget"
 import { isStepCount, streamText, type ModelMessage, type ToolSet } from "ai"
 import type { GenerationSettings } from "@/constants/generation-settings"
@@ -143,7 +142,7 @@ export async function prepareGeneration(input: PrepareGenerationInput) {
     researchMode: researchRoute.mode,
     artifactRequested,
   })
-  const webBudget = createWebBudget()
+  const webBudget = createWebBudget({ mode: researchRoute.mode })
   const tools = buildGenerationTools({
     budget: webBudget,
     messageId: input.messageId,
@@ -207,7 +206,9 @@ export async function prepareGeneration(input: PrepareGenerationInput) {
     ...(activeTools.length > 0
       ? {
           prepareStep: ({ stepNumber }: { stepNumber: number }) => ({
-            activeTools: webBudget.exhausted ? activeTools.filter((name) => name === "createMarkdownArtifact") : activeTools,
+            activeTools: stepNumber >= generationMode.maxSteps - 1
+              ? activeTools.filter((name) => name === "createMarkdownArtifact")
+              : availableResearchTools(activeTools, webBudget),
             ...(stepNumber === 0 && generationMode.firstTool
               ? {
                   toolChoice: {
@@ -248,7 +249,7 @@ export async function prepareGeneration(input: PrepareGenerationInput) {
     contextMetadata: {
       ...contextMetadata,
       contextBudget,
-      webBudgetPolicy: WEB_BUDGET_POLICY,
+      webBudgetPolicy: webBudget.policy,
       generationMode: generationMode.id,
       promptSchemaVersion: THREAD_CHAT_PROMPT_SCHEMA_VERSION,
       actualProvider: resolvedModel.route.actualProvider,

@@ -106,7 +106,7 @@ export function createWebResearchActivityDispatcher(
         toolCallId,
         kind: call.toolName === "webSearch" ? "search" : "read",
         status: output ? "complete" : "failed",
-        truncated: output?.truncated === true,
+        truncated: typeof output?.fullyRead === "boolean" ? !output.fullyRead : output?.truncated === true,
         query:
           call.toolName === "webSearch"
             ? (textField(output, "query") ?? textField(call.input, "query"))
@@ -147,4 +147,10 @@ export function createWebResearchActivityDispatcher(
 
     return false
   }
+}
+
+/** 历史或终态消息不应保留悬挂的读取状态；成功来源仍保留。 */
+export function settledResearchActivities(activities: WebResearchActivity[], settled: boolean): WebResearchActivity[] {
+  return settled ? activities.map((activity) => activity.status === "running"
+    ? { ...activity, status: "failed", sources: [] } : activity) : activities
 }

@@ -1,21 +1,33 @@
 import { tool } from "ai"
 import { z } from "zod"
 import { webSearch, webFetch } from "@/lib/ai/search"
-import { createWebBudget, webBudgetExceeded, normalizeWebUrl, WebAccessError, webFailure, type WebBudget, type WebToolResult } from "@/lib/ai/web-access"
-import { EXTRACT_CHAR_LIMIT, SEARCH_MAX_RESULTS } from "@/constants/research"
+import { createWebBudget, webContentBudgetExceeded, normalizeWebUrl, WebAccessError, webFailure, type WebBudget, type WebToolResult } from "@/lib/ai/web-access"
+import { createResearchDocuments } from "@/lib/chat/research-documents"
+import { WEB_SEARCH_RESPONSE_CHAR_LIMIT, SEARCH_MAX_RESULTS } from "@/constants/research"
 
 type ResearchToolContext = { routeReason?: string; budget?: WebBudget }
 
 /** 每次生成创建一次；失败缓存与在途合并不会跨生成或用户共享。 */
 export function createResearchTools(context: ResearchToolContext = {}) {
   const budget = context.budget ?? createWebBudget()
+  const documents = createResearchDocuments(budget)
   const failures = new Map<string, WebToolResult<never>>()
   const pending = new Map<string, Promise<WebToolResult<unknown>>>()
   async function run<T>(key: string, signal: AbortSignal | undefined, operation: () => Promise<T>): Promise<WebToolResult<T>> {
     signal?.throwIfAborted()
     const inflight = pending.get(key)
-    if (inflight) return inflight as Promise<WebToolResult<T>>
-    if (budget.exhausted) return webFailure(webBudgetExceeded())
+    if (inflight) {
+      const result = await inflight as WebToolResult<T>
+      signal?.throwIfAborted()
+      if (result.ok) {
+        try { budget.spendContent(JSON.stringify(result.data).length) }
+        catch (error) {
+          if (!(error instanceof WebAccessError)) throw error
+          return webFailure(error)
+        }
+      }
+      return result
+    }
     const previous = failures.get(key)
     if (previous) return previous
     const request = (async (): Promise<WebToolResult<T>> => {
@@ -44,23 +56,33 @@ export function createResearchTools(context: ResearchToolContext = {}) {
         const { results } = await budget.run(abortSignal, (signal, attemptIndex) =>
           webSearch(query.trim(), SEARCH_MAX_RESULTS, signal, { routeReason: context.routeReason, attemptIndex }))
         if (!results.length) throw new WebAccessError("EMPTY_RESULT", "没有找到有效来源，可调整查询；这不代表目标不存在。", "revise_query")
-        return { query, results }
+        const selected: typeof results = []
+        for (const result of results) {
+          if (JSON.stringify({ query, results: [...selected, result] }).length > Math.min(WEB_SEARCH_RESPONSE_CHAR_LIMIT, budget.remainingChars)) continue
+          selected.push(result)
+        }
+        if (!selected.length) {
+          if (budget.remainingChars < WEB_SEARCH_RESPONSE_CHAR_LIMIT) throw webContentBudgetExceeded()
+          throw new WebAccessError("SEARCH_RESULT_TOO_LARGE", "检索条目过长，请缩小检索范围。", "revise_query")
+        }
+        const data = { query, results: selected }
+        budget.spendContent(JSON.stringify(data).length)
+        return data
       }),
     }),
     readUrl: tool({
-      description: "读取用户指定或搜索得到的网页正文。ok=false 表示未读到正文；truncated=true 表示仅获得部分正文，不可声称读完。",
-      inputSchema: z.object({ url: z.string().describe("公开网页 URL") }),
-      execute: async ({ url }, { abortSignal }) => {
+      description: "读取公开网页。长文档按页返回；hasMore=true 时传入原 URL 和 nextCursor 继续同一快照，不会重复抓取。全文任务请读至末尾，取证任务证据足够即可停止。totalChars 是抽取快照长度，不保证原网页完整。游标仅本次生成有效。ok=false 不是正文；不向用户复述内部参数。",
+      inputSchema: z.object({ url: z.string().describe("公开网页 URL"), cursor: z.string().nullish().describe("同一 URL 上次返回的 nextCursor；首次读取省略") }),
+      execute: async ({ url, cursor }, { abortSignal }) => {
         abortSignal?.throwIfAborted()
+        const readCursor = cursor?.trim() || undefined
         let normalized: string
         try { normalized = normalizeWebUrl(url) } catch (error) {
           if (!(error instanceof WebAccessError)) throw error
           return webFailure(error)
         }
-        return run(`fetch:${normalized}`, abortSignal, async () => {
-          const page = await webFetch(normalized, { signal: abortSignal, budget, routeReason: context.routeReason })
-          return { ...page, content: page.content.slice(0, EXTRACT_CHAR_LIMIT), truncated: page.content.length > EXTRACT_CHAR_LIMIT }
-        })
+        return run(`fetch:${normalized}:${readCursor ?? "first"}`, abortSignal, () =>
+          documents.read(normalized, readCursor, abortSignal, () => webFetch(normalized, { signal: abortSignal, budget, routeReason: context.routeReason })))
       },
     }),
   }

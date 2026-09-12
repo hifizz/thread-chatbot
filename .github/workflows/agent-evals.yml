@@ -4,6 +4,14 @@ on:
   pull_request:
     paths:
       - "constants/**"
+      - "e2e/thread-chat/*research*"
+      - "e2e/thread-chat/web-recovery*"
+      - "app/api/chat/**"
+      - "lib/thread-chat/streaming/**"
+      - "app/thread-chat/branching/assistant/**"
+      - "app/thread-chat/orchestration/overlays/web-research-panel.tsx"
+      - "components/assistant-ui/research-panel.tsx"
+      - ".github/workflows/agent-evals.yml"
       - "evals/agent/**"
       - "lib/ai/**"
       - "lib/chat/**"
@@ -41,6 +49,15 @@ jobs:
         run: |
           pnpm test:observability:eval-foundation
           pnpm test:observability:eval-scorers
+      - name: Web recovery and document pagination
+        run: >-
+          node --import tsx --test
+          e2e/thread-chat/web-recovery.test.mjs
+          e2e/thread-chat/research-pagination.test.mjs
+          e2e/thread-chat/tool-step-policy.test.mjs
+          e2e/thread-chat/search-abort.test.mjs
+          e2e/thread-chat/research-router-context.test.mjs
+          e2e/thread-chat/web-research-placement.test.mjs
       - name: Stable CI subset
         run: pnpm eval:agent:ci -- --write-snapshot=evals/agent/results/local/ci.json
       - name: Baseline comparison and deterministic gate

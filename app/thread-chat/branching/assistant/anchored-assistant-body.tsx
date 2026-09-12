@@ -58,6 +58,7 @@ export function AnchoredAssistantBody({
               route={message.researchRoute}
               plan={message.researchPlan}
               complete={message.status === "done"}
+              settled={message.status !== "pending" && message.status !== "streaming"}
             />
           )
         }

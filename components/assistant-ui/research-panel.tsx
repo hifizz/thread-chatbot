@@ -76,7 +76,7 @@ function useResearchSteps(): {
           sources: webResearchSourcesFromOutput(part.result).map((source) => ({ ...source, snippet: "" })),
           running,
           failed,
-          truncated: data?.truncated === true,
+          truncated: typeof data?.fullyRead === "boolean" ? !data.fullyRead : data?.truncated === true,
         })
       } else {
         steps.push({
@@ -84,7 +84,7 @@ function useResearchSteps(): {
           url: (typeof data?.url === "string" ? data.url : undefined) ?? part.args?.url ?? "",
           running,
           failed,
-          truncated: data?.truncated === true,
+          truncated: typeof data?.fullyRead === "boolean" ? !data.fullyRead : data?.truncated === true,
         })
       }
     }
@@ -192,13 +192,26 @@ function researchGroups(steps: ResearchStep[]): {
   })
 
   const groups = [...searchGroups]
+  const reads = new Map<string, ResearchGroup>()
   steps.forEach((step, index) => {
     if (step.kind !== "read" || step.failed) return
-    groups.push({
+    const key = normalizedUrl(step.url)
+    const existing = reads.get(key)
+    if (existing) {
+      existing.running = step.running
+      if (!step.running) {
+        existing.truncated = step.truncated
+        existing.results = [{ title: hostOf(step.url), url: step.url, snippet: "" }]
+      }
+      return
+    }
+    const group: ResearchGroup = {
       id: `read-${index}`, kind: "read", title: hostOf(step.url),
       running: step.running, truncated: step.truncated,
       results: step.running ? [] : [{ title: hostOf(step.url), url: step.url, snippet: "" }],
-    })
+    }
+    reads.set(key, group)
+    groups.push(group)
   })
   return { groups, visitedUrls }
 }
@@ -236,7 +249,7 @@ export const ResearchPanelView: FC<{
       ? "正在读取网页"
       : "正在搜索网络"
     : isDirectFetch
-      ? steps.some((step) => step.truncated) ? "已读取部分正文" : "已读取网页"
+      ? groups.some((group) => group.truncated) ? "已读取部分正文" : "已读取网页"
       : "已搜索网络"
   const outcome =
     completionText ??
