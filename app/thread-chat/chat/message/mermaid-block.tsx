@@ -2,6 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react"
 import { useTheme } from "next-themes"
+import { MermaidCanvas } from "./mermaid-canvas"
 import type { MarkdownSettlementBatch } from "@/lib/markdown/settlement-batch"
 
 /** SVG 通过图片隔离展示，避免图内样式、脚本和重复 id 进入正文 DOM。 */
@@ -12,7 +13,6 @@ export function MermaidBlock({ code, streaming, batch, children }: {
   children: ReactNode
 }) {
   const { resolvedTheme } = useTheme()
-  const imageRef = useRef<HTMLImageElement>(null)
   const rootRef = useRef<HTMLDivElement>(null)
   const registrationRef = useRef<ReturnType<MarkdownSettlementBatch["register"]> | null>(null)
   const [view, setView] = useState<"diagram" | "code">("diagram")
@@ -48,10 +48,10 @@ export function MermaidBlock({ code, streaming, batch, children }: {
   }, [code, resolvedTheme, streaming])
 
   useEffect(() => {
-    if (failed || (current?.url && imageRef.current?.complete && imageRef.current.naturalWidth > 0)) {
+    if (failed) {
       registrationRef.current?.settle()
     }
-  }, [failed, batch, current])
+  }, [failed, batch])
 
   return (
     <div className="md-mermaid" ref={rootRef}>
@@ -59,12 +59,11 @@ export function MermaidBlock({ code, streaming, batch, children }: {
         <button type="button" aria-pressed={!showCode} disabled={failed} onClick={() => setView("diagram")}>图表</button>
         <button type="button" aria-pressed={showCode} onClick={() => setView("code")}>源码</button>
       </div>
-      <div hidden={showCode} className="md-mermaid-viewport" tabIndex={showCode ? -1 : 0} role="region" aria-label="Mermaid 图表">
-        {current?.url ? (
-          // eslint-disable-next-line @next/next/no-img-element -- 本地 SVG 图片隔离，不经过远程图片优化。
-          <img ref={imageRef} src={current.url} alt="Mermaid 图表（可切换查看源码）" onLoad={() => registrationRef.current?.settle()} onError={() => setResult({ code, theme: resolvedTheme, url: null })} />
-        ) : <span className="md-mermaid-status">{streaming ? "图表生成中…" : "正在绘制图表…"}</span>}
-      </div>
+      {current?.url ? (
+        <MermaidCanvas key={code} url={current.url} hidden={showCode}
+          onLoad={() => registrationRef.current?.settle()}
+          onError={() => setResult({ code, theme: resolvedTheme, url: null })} />
+      ) : <div hidden={showCode} className="md-mermaid-status">{streaming ? "图表生成中…" : "正在绘制图表…"}</div>}
       {/* 保留源码 DOM，避免切换视图反复挂载高亮体。 */}
       <div hidden={!showCode}>{children}</div>
       {failed && <div className="md-mermaid-status">暂时无法绘制此图，已显示源码。</div>}
