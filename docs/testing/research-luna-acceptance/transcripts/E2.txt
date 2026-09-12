@@ -1,0 +1,354 @@
+[p1 "Thread Chat · 分支对话" | space "联网续读 GPT Luna 验收"(2): 1 managed, 0 untracked — p1* "Thread Chat · 分支对话"]
+root
+  container
+    container
+      button [ref=1]
+        text "新对话"
+      button [ref=2]
+        svg_root
+        text "对话列表"
+        container "打开对话列表：Command 或 Control 加 Shift 加 K"
+          text "⌘"
+          text "⇧"
+          text "K"
+      text "Thread Chat"
+      button [ref=3]
+        svg_root
+      group "视图模式"
+        button [ref=4]
+          svg_root
+          text "列"
+        button [ref=5]
+          svg_root
+          text "画布"
+      group "列数"
+        button [ref=6]
+          text "自适应"
+        button [ref=7]
+          text "2"
+        button [ref=8]
+          text "3"
+        button [ref=9]
+          text "4"
+      group "列满时的放置策略"
+        button [ref=10]
+          text "替换⑥"
+        button [ref=11]
+          text "细条⑤"
+      button [ref=12]
+        svg_root
+        text "会话树"
+        container "打开会话树：Command 或 Control 加 K"
+          text "⌘"
+          text "K"
+      button [ref=13]
+        svg_root
+        text "Project"
+        text "0"
+      button [ref=14]
+        text "W"
+    container
+      container
+        container
+          text "锚定"
+          text "主线"
+          button [ref=15]
+            svg_root
+            text "0"
+        text "分析网页结构和标记"
+      container
+        region "Messages" [ref=16, loc=role:region[name="Messages"]]
+          log
+            text "你"
+            text "完整分析 https://research-fixture.example/oversized，逐部分列出编号和独特标记，不得遗漏。"
+            button "复制" [ref=17]
+              svg_root
+            button "重新编辑" [ref=18, loc=css:button[aria-label="重新编辑"]]
+              svg_root
+            container
+              text "AI"
+              container
+                container
+                  paragraph
+                    text "我先读取目标网页，核对原文内容。"
+                  button [ref=19]
+                    text "已读取部分正文"
+                    text "展开详情"
+                    svg_root
+                container [ref=20]
+                  text "思考过程"
+                paragraph
+                  text "**Planning sequential page reading**"
+                container [ref=21]
+                  text "思考过程"
+                paragraph
+                  text "**Planning sequential text reading**"
+                container [ref=22]
+                  text "思考过程"
+                paragraph
+                  text "**Continuing section enumeration**"
+                container [ref=23]
+                  text "思考过程"
+                paragraph
+                  text "**Planning marker inspection and pagination**"
+                container [ref=24]
+                  text "思考过程"
+                paragraph
+                  text "**Planning pagination completion**"
+                container [ref=25]
+                  text "思考过程"
+                paragraph
+                  text "**Clarifying analysis limitations and source citation** **Summarizing verified sections 1-27 with coverage limits** **Confirming unique sequential markers for parts 1-27**"
+                container
+                  heading
+                    text "核实结果"
+                  paragraph
+                    text "我无法在当前证据范围内负责任地声称“完整且不得遗漏”：原文已核实到"
+                    text "第 28 部分开头"
+                    text "，但第 28 部分的标记尚未出现；第 29 部分及之后未能核实。因此，下面列出的是目前已确认的部分，不能代替全文清单。"
+                  heading
+                    text "已确认的编号与独特标记"
+                  region "表格" [ref=26, loc=role:region[name="表格"]]
+                    table
+                      table_row
+                        table_cell
+                          text "部分编号"
+                        table_cell
+                          text "独特标记"
+                      table_row
+                        table_cell
+                          text "第 1 部分"
+                        table_cell
+                          text "PART-1"
+                      table_row
+                        table_cell
+                          text "第 2 部分"
+                        table_cell
+                          text "PART-2"
+                      table_row
+                        table_cell
+                          text "第 3 部分"
+                        table_cell
+                          text "PART-3"
+                      table_row
+                        table_cell
+                          text "第 4 部分"
+                        table_cell
+                          text "PART-4"
+                      table_row
+                        table_cell
+                          text "第 5 部分"
+                        table_cell
+                          text "PART-5"
+                      table_row
+                        table_cell
+                          text "第 6 部分"
+                        table_cell
+                          text "PART-6"
+                      table_row
+                        table_cell
+                          text "第 7 部分"
+                        table_cell
+                          text "PART-7"
+                      table_row
+                        table_cell
+                          text "第 8 部分"
+                        table_cell
+                          text "PART-8"
+                      table_row
+                        table_cell
+                          text "第 9 部分"
+                        table_cell
+                          text "PART-9"
+                      table_row
+                        table_cell
+                          text "第 10 部分"
+                        table_cell
+                          text "PART-10"
+                      table_row
+                        table_cell
+                          text "第 11 部分"
+                        table_cell
+                          text "PART-11"
+                      table_row
+                        table_cell
+                          text "第 12 部分"
+                        table_cell
+                          text "PART-12"
+                      table_row
+                        table_cell
+                          text "第 13 部分"
+                        table_cell
+                          text "PART-13"
+                      table_row
+                        table_cell
+                          text "第 14 部分"
+                        table_cell
+                          text "PART-14"
+                      table_row
+                        table_cell
+                          text "第 15 部分"
+                        table_cell
+                          text "PART-15"
+                      table_row
+                        table_cell
+                          text "第 16 部分"
+                        table_cell
+                          text "PART-16"
+                      table_row
+                        table_cell
+                          text "第 17 部分"
+                        table_cell
+                          text "PART-17"
+                      table_row
+                        table_cell
+                          text "第 18 部分"
+                        table_cell
+                          text "PART-18"
+                      table_row
+                        table_cell
+                          text "第 19 部分"
+                        table_cell
+                          text "PART-19"
+                      table_row
+                        table_cell
+                          text "第 20 部分"
+                        table_cell
+                          text "PART-20"
+                      table_row
+                        table_cell
+                          text "第 21 部分"
+                        table_cell
+                          text "PART-21"
+                      table_row
+                        table_cell
+                          text "第 22 部分"
+                        table_cell
+                          text "PART-22"
+                      table_row
+                        table_cell
+                          text "第 23 部分"
+                        table_cell
+                          text "PART-23"
+                      table_row
+                        table_cell
+                          text "第 24 部分"
+                        table_cell
+                          text "PART-24"
+                      table_row
+                        table_cell
+                          text "第 25 部分"
+                        table_cell
+                          text "PART-25"
+                      table_row
+                        table_cell
+                          text "第 26 部分"
+                        table_cell
+                          text "PART-26"
+                      table_row
+                        table_cell
+                          text "第 27 部分"
+                        table_cell
+                          text "PART-27"
+                  heading
+                    text "内容模式"
+                  paragraph
+                    text "已核实部分的正文反复说明同一类常规维护流程："
+                  unordered_list
+                    list_item
+                      text "检查记录需要按顺序归档；"
+                    list_item
+                      text "常规流程不会修改本节列出的特殊规则；"
+                    list_item
+                      text "各部分的独特标记按部分编号递增，已确认范围内没有发现跳号。"
+                  heading
+                    text "尚未核实的范围"
+                  unordered_list
+                    list_item
+                      text "第 28 部分"
+                      text "：已确认标题存在，但其独特标记尚未在已取得内容中出现。"
+                    list_item
+                      text "第 29 部分及以后"
+                      text "：未取得足够原文，无法列出其编号和标记。"
+                  paragraph
+                    text "来源："
+                    anchor [ref=27, loc=href:https://research-fixture.example/oversized, url=https://research-fixture.example/oversized]
+                      text "原文页面"
+              button "复制" [ref=28]
+                svg_root
+              button "重新生成" [ref=29, loc=css:button[aria-label="重新生成"]]
+                svg_root
+              button "点赞" [ref=30, loc=css:button[aria-label="点赞"]]
+                svg_root
+              button "点踩" [ref=31, loc=css:button[aria-label="点踩"]]
+                svg_root
+        button [ref=32]
+          text "↓"
+        container
+          container
+            textfield "输入问题，@ 引用 Artifact" [ref=33]
+              paragraph
+            text "输入问题，@ 引用 Artifact"
+          container
+            container
+              button "添加附件" [ref=34, loc=css:button[aria-label="添加附件"]]
+                svg_root
+              container [ref=35]
+                button "选择对话模型" [ref=36, loc=css:button[aria-label="选择对话模型"]]
+                  text "GPT-5.6 Luna"
+                  svg_root
+              container [ref=37]
+                comboboxgrouping "选择推理强度" [ref=38, loc=css:button[aria-label="选择推理强度"]]
+                  container
+                    text "Effort:"
+                    text "high"
+                  svg_root
+              textbox [ref=39]
+                text "high"
+              container [ref=40]
+                comboboxgrouping "选择最大输出 token" [ref=41, loc=css:button[aria-label="选择最大输出 token"]]
+                  container
+                    text "Max:"
+                    text "32K"
+                  svg_root
+              textbox [ref=42]
+                text "32000"
+            container
+              button "语音输入" [ref=43, loc=css:button[aria-label="语音输入"]]
+                svg_root
+              button "发送" [ref=44, loc=css:button[aria-label="发送"]]
+                svg_root
+                svg_root
+    dialog "Projectv0"
+      svg_root
+      heading
+        text "Project"
+        text "v"
+        text "0"
+      button [ref=45]
+        svg_root
+      button [ref=46]
+        text "Overview"
+      button [ref=47]
+        text "Files"
+        text "0"
+      button [ref=48]
+        text "Artifacts"
+        text "0"
+      container
+        text "PROJECT CONTRACT"
+        heading
+          text "目标与长期指令"
+        paragraph
+          text "保存后只影响之后启动的生成，不改写历史消息、Artifact 或 Fork Context。"
+        button [ref=49]
+          svg_root
+          text "编辑"
+        text "Target"
+        text "尚未设置 Target。"
+        text "Instructions"
+        text "尚未设置 Instructions。"
+  container "Notifications alt+T" [ref=50]
+  button "Open Next.js Dev Tools" [ref=51, loc=css:button[aria-label="Open Next.js Dev Tools"]]
+    svg_root
+  alert

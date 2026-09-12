@@ -1,0 +1,451 @@
+[p1 "Thread Chat · 分支对话" | space "联网续读 GPT Luna 验收"(2): 1 managed, 0 untracked — p1* "Thread Chat · 分支对话"]
+root
+  container
+    container
+      button [ref=1]
+        text "新对话"
+      button [ref=2]
+        svg_root
+        text "对话列表"
+        container "打开对话列表：Command 或 Control 加 Shift 加 K"
+          text "⌘"
+          text "⇧"
+          text "K"
+      text "Thread Chat"
+      button [ref=3]
+        svg_root
+      group "视图模式"
+        button [ref=4]
+          svg_root
+          text "列"
+        button [ref=5]
+          svg_root
+          text "画布"
+      group "列数"
+        button [ref=6]
+          text "自适应"
+        button [ref=7]
+          text "2"
+        button [ref=8]
+          text "3"
+        button [ref=9]
+          text "4"
+      group "列满时的放置策略"
+        button [ref=10]
+          text "替换⑥"
+        button [ref=11]
+          text "细条⑤"
+      button [ref=12]
+        svg_root
+        text "会话树"
+        container "打开会话树：Command 或 Control 加 K"
+          text "⌘"
+          text "K"
+      button [ref=13]
+        svg_root
+        text "Project"
+        text "0"
+      button [ref=14]
+        text "W"
+    container
+      container
+        container
+          text "锚定"
+          text "主线"
+          button [ref=15]
+            svg_root
+            text "0"
+        text "二分查找简介"
+      container
+        region "Messages" [ref=16, loc=role:region[name="Messages"]]
+          log
+            text "你"
+            text "解释什么是二分查找，用一个小例子说明。"
+            button "复制" [ref=17]
+              svg_root
+            button "重新编辑" [ref=18, loc=css:button[aria-label="重新编辑"]]
+              svg_root
+            container
+              text "AI"
+              container
+                container [ref=19]
+                  text "思考过程"
+                paragraph
+                  text "**Structuring binary search explanation in Chinese**"
+                container
+                  heading
+                    text "什么是二分查找？"
+                  paragraph
+                    text "二分查找（Binary Search）"
+                    text "是一种在"
+                    text "有序数组"
+                    text "中快速查找目标元素的方法。"
+                  paragraph
+                    text "它的核心思想是："
+                  paragraph
+                    text "每次查看中间位置的元素，然后根据大小关系，把查找范围缩小一半。"
+                  paragraph
+                    text "因此，二分查找的效率很高，时间复杂度是："
+                  text "text"
+                  button [ref=20]
+                    svg_root
+                  text "O(log n)"
+                  paragraph
+                    text "但它有一个重要前提："
+                  paragraph
+                    text "数据必须已经排好序。"
+                  heading
+                    text "小例子"
+                  paragraph
+                    text "假设有一个升序数组："
+                  text "text"
+                  button [ref=21]
+                    svg_root
+                  text "[1, 3, 5, 7, 9, 11, 13]"
+                  paragraph
+                    text "现在要查找数字"
+                    text "9"
+                    text "。"
+                  heading
+                    text "第一步"
+                  paragraph
+                    text "查找范围是整个数组："
+                  text "text"
+                  button [ref=22]
+                    svg_root
+                  text "[1, 3, 5, 7, 9, 11, 13]"
+                  paragraph
+                    text "中间元素是"
+                    text "7"
+                    text "。"
+                  paragraph
+                    text "因为："
+                  text "text"
+                  button [ref=23]
+                    svg_root
+                  text "9 > 7"
+                  paragraph
+                    text "所以目标值"
+                    text "9"
+                    text "不可能在"
+                    text "7"
+                    text "的左边，只需要查找右半部分："
+                  text "text"
+                  button [ref=24]
+                    svg_root
+                  text "[9, 11, 13]"
+                  heading
+                    text "第二步"
+                  paragraph
+                    text "当前范围是："
+                  text "text"
+                  button [ref=25]
+                    svg_root
+                  text "[9, 11, 13]"
+                  paragraph
+                    text "中间元素是"
+                    text "11"
+                    text "。"
+                  paragraph
+                    text "因为："
+                  text "text"
+                  button [ref=26]
+                    svg_root
+                  text "9 < 11"
+                  paragraph
+                    text "所以目标值在"
+                    text "11"
+                    text "的左边，只需要查找："
+                  text "text"
+                  button [ref=27]
+                    svg_root
+                  text "[9]"
+                  heading
+                    text "第三步"
+                  paragraph
+                    text "当前只剩下："
+                  text "text"
+                  button [ref=28]
+                    svg_root
+                  text "[9]"
+                  paragraph
+                    text "中间元素就是"
+                    text "9"
+                    text "，查找成功。"
+                  heading
+                    text "查找过程总结"
+                  region "表格" [ref=29, loc=role:region[name="表格"]]
+                    table
+                      table_row
+                        table_cell
+                          text "查找范围"
+                        table_cell
+                          text "中间值"
+                        table_cell
+                          text "比较结果"
+                      table_row
+                        table_cell
+                          text "[1, 3, 5, 7, 9, 11, 13]"
+                        table_cell
+                          text "7"
+                        table_cell
+                          text "9 > 7"
+                          text "，查右半部分"
+                      table_row
+                        table_cell
+                          text "[9, 11, 13]"
+                        table_cell
+                          text "11"
+                        table_cell
+                          text "9 < 11"
+                          text "，查左半部分"
+                      table_row
+                        table_cell
+                          text "[9]"
+                        table_cell
+                          text "9"
+                        table_cell
+                          text "找到"
+                  heading
+                    text "代码示例"
+                  container
+                    container
+                      text "python"
+                      button [ref=30]
+                        svg_root
+                    container [ref=31]
+                      container
+                        text "def"
+                        text "binary_search"
+                        text "("
+                        text "arr"
+                        text ","
+                        text "target"
+                        text "):"
+                      container
+                        text "left"
+                        text "="
+                        text "0"
+                      container
+                        text "right"
+                        text "="
+                        text "len"
+                        text "("
+                        text "arr"
+                        text ")"
+                        text "-"
+                        text "1"
+                      container
+                        text "while"
+                        text "left"
+                        text "<="
+                        text "right"
+                        text ":"
+                      container
+                        text "mid"
+                        text "="
+                        text "("
+                        text "left"
+                        text "+"
+                        text "right"
+                        text ")"
+                        text "//"
+                        text "2"
+                      container
+                        text "if"
+                        text "arr"
+                        text "["
+                        text "mid"
+                        text "]"
+                        text "=="
+                        text "target"
+                        text ":"
+                      container
+                        text "return"
+                        text "mid"
+                        text "# 返回目标元素的下标"
+                      container
+                        text "elif"
+                        text "arr"
+                        text "["
+                        text "mid"
+                        text "]"
+                        text "<"
+                        text "target"
+                        text ":"
+                      container
+                        text "left"
+                        text "="
+                        text "mid"
+                        text "+"
+                        text "1"
+                        text "# 去右半部分查找"
+                      container
+                        text "else"
+                        text ":"
+                      container
+                        text "right"
+                        text "="
+                        text "mid"
+                        text "-"
+                        text "1"
+                        text "# 去左半部分查找"
+                      container
+                        text "return"
+                        text "-"
+                        text "1"
+                        text "# 没有找到"
+                  paragraph
+                    text "使用："
+                  container
+                    container
+                      text "python"
+                      button [ref=32]
+                        svg_root
+                    container [ref=33]
+                      container
+                        text "arr"
+                        text "="
+                        text "["
+                        text "1"
+                        text ","
+                        text "3"
+                        text ","
+                        text "5"
+                        text ","
+                        text "7"
+                        text ","
+                        text "9"
+                        text ","
+                        text "11"
+                        text ","
+                        text "13"
+                        text "]"
+                      container
+                        text "print"
+                        text "("
+                        text "binary_search"
+                        text "("
+                        text "arr"
+                        text ","
+                        text "9"
+                        text "))"
+                  paragraph
+                    text "输出："
+                  container
+                    container
+                      text "text"
+                      button [ref=34]
+                        svg_root
+                    text "4"
+                  paragraph
+                    text "因为"
+                    text "9"
+                    text "在数组中的下标是"
+                    text "4"
+                    text "。"
+                  heading
+                    text "为什么二分查找很快？"
+                  paragraph
+                    text "假设有"
+                    text "1,000,000"
+                    text "个元素："
+                  unordered_list
+                    list_item
+                      text "顺序查找最坏可能需要比较"
+                      text "1,000,000"
+                      text "次；"
+                    list_item
+                      text "二分查找每次排除一半，大约只需要："
+                  container
+                    container
+                      text "text"
+                      button [ref=35]
+                        svg_root
+                    text "log₂(1,000,000) ≈ 20"
+                  paragraph
+                    text "次比较。"
+                  paragraph
+                    text "所以，二分查找特别适合在"
+                    text "大型有序数据"
+                    text "中寻找元素。"
+                  paragraph
+                    text "需要注意的是，如果数组没有排序，二分查找通常不能正确工作。"
+              button "复制" [ref=36]
+                svg_root
+              button "重新生成" [ref=37, loc=css:button[aria-label="重新生成"]]
+                svg_root
+              button "点赞" [ref=38, loc=css:button[aria-label="点赞"]]
+                svg_root
+              button "点踩" [ref=39, loc=css:button[aria-label="点踩"]]
+                svg_root
+        button [ref=40]
+          text "↓"
+        container
+          container
+            textfield "输入问题，@ 引用 Artifact" [ref=41]
+              paragraph
+            text "输入问题，@ 引用 Artifact"
+          container
+            container
+              button "添加附件" [ref=42, loc=css:button[aria-label="添加附件"]]
+                svg_root
+              container [ref=43]
+                button "选择对话模型" [ref=44, loc=css:button[aria-label="选择对话模型"]]
+                  text "GPT-5.6 Luna"
+                  svg_root
+              container [ref=45]
+                comboboxgrouping "选择推理强度" [ref=46, loc=css:button[aria-label="选择推理强度"]]
+                  container
+                    text "Effort:"
+                    text "high"
+                  svg_root
+              textbox [ref=47]
+                text "high"
+              container [ref=48]
+                comboboxgrouping "选择最大输出 token" [ref=49, loc=css:button[aria-label="选择最大输出 token"]]
+                  container
+                    text "Max:"
+                    text "32K"
+                  svg_root
+              textbox [ref=50]
+                text "32000"
+            container
+              button "语音输入" [ref=51, loc=css:button[aria-label="语音输入"]]
+                svg_root
+              button "发送" [ref=52, loc=css:button[aria-label="发送"]]
+                svg_root
+                svg_root
+    dialog "Projectv0"
+      svg_root
+      heading
+        text "Project"
+        text "v"
+        text "0"
+      button [ref=53]
+        svg_root
+      button [ref=54]
+        text "Overview"
+      button [ref=55]
+        text "Files"
+        text "0"
+      button [ref=56]
+        text "Artifacts"
+        text "0"
+      container
+        text "PROJECT CONTRACT"
+        heading
+          text "目标与长期指令"
+        paragraph
+          text "保存后只影响之后启动的生成，不改写历史消息、Artifact 或 Fork Context。"
+        button [ref=57]
+          svg_root
+          text "编辑"
+        text "Target"
+        text "尚未设置 Target。"
+        text "Instructions"
+        text "尚未设置 Instructions。"
+  container "Notifications alt+T" [ref=58]
+  button "Open Next.js Dev Tools" [ref=59, loc=css:button[aria-label="Open Next.js Dev Tools"]]
+    svg_root
+  alert

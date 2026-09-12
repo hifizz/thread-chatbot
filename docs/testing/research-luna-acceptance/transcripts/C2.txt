@@ -1,0 +1,218 @@
+[p1 "Thread Chat · 分支对话" | space "联网续读 GPT Luna 验收"(2): 1 managed, 0 untracked — p1* "Thread Chat · 分支对话"]
+root
+  container
+    container
+      button [ref=1]
+        text "新对话"
+      button [ref=2]
+        svg_root
+        text "对话列表"
+        container "打开对话列表：Command 或 Control 加 Shift 加 K"
+          text "⌘"
+          text "⇧"
+          text "K"
+      text "Thread Chat"
+      button [ref=3]
+        svg_root
+      group "视图模式"
+        button [ref=4]
+          svg_root
+          text "列"
+        button [ref=5]
+          svg_root
+          text "画布"
+      group "列数"
+        button [ref=6]
+          text "自适应"
+        button [ref=7]
+          text "2"
+        button [ref=8]
+          text "3"
+        button [ref=9]
+          text "4"
+      group "列满时的放置策略"
+        button [ref=10]
+          text "替换⑥"
+        button [ref=11]
+          text "细条⑤"
+      button [ref=12]
+        svg_root
+        text "会话树"
+        container "打开会话树：Command 或 Control 加 K"
+          text "⌘"
+          text "K"
+      button [ref=13]
+        svg_root
+        text "Project"
+        text "0"
+      button [ref=14]
+        text "W"
+    container
+      container
+        container
+          text "锚定"
+          text "主线"
+          button [ref=15]
+            svg_root
+            text "0"
+        text "Nacre-731部署要求"
+      container
+        region "Messages" [ref=16, loc=role:region[name="Messages"]]
+          log
+            text "你"
+            text "说明 Nacre-731 的部署要求，优先使用官方资料。"
+            button "复制" [ref=17]
+              svg_root
+            button "重新编辑" [ref=18, loc=css:button[aria-label="重新编辑"]]
+              svg_root
+            container
+              text "AI"
+              container
+                container
+                  paragraph
+                    text "我先联网核实「Nacre-731 deployment requirements official」。"
+                  button [ref=19]
+                    text "已搜索网络"
+                    text "展开详情"
+                    svg_root
+                container
+                  container [ref=20]
+                    text "思考过程"
+                  paragraph
+                    text "**Clarifying official source requirements**"
+                container
+                  heading
+                    text "Nacre-731 部署要求"
+                  paragraph
+                    text "根据目前可获取的资料，Nacre-731 的最低部署要求如下："
+                  region "表格" [ref=21, loc=role:region[name="表格"]]
+                    table
+                      table_row
+                        table_cell
+                          text "项目"
+                        table_cell
+                          text "要求"
+                      table_row
+                        table_cell
+                          text "操作系统"
+                        table_cell
+                          text "仅支持 Linux"
+                      table_row
+                        table_cell
+                          text "内存"
+                        table_cell
+                          text "至少 8 GB RAM"
+                      table_row
+                        table_cell
+                          text "磁盘空间"
+                        table_cell
+                          text "至少 20 GB"
+                  heading
+                    text "结论"
+                  paragraph
+                    text "部署前应准备一台运行 Linux 的服务器，并至少具备："
+                  unordered_list
+                    list_item
+                      text "8 GB 内存"
+                    list_item
+                      text "20 GB 可用磁盘空间"
+                  paragraph
+                    text "官方资料目前"
+                    text "没有明确说明"
+                    text "以下要求，因此不能据此补充或推断："
+                  unordered_list
+                    list_item
+                      text "CPU 型号、核心数或架构"
+                    list_item
+                      text "Linux 发行版及版本"
+                    list_item
+                      text "GPU 要求"
+                    list_item
+                      text "网络端口与带宽"
+                    list_item
+                      text "依赖软件、运行时或容器环境"
+                    list_item
+                      text "推荐配置与生产环境冗余要求"
+                  paragraph
+                    text "来源："
+                    anchor [ref=22, loc=href:https://research-fixture.example/deployment, url=https://research-fixture.example/deployment]
+                      text "Nacre-731 部署要求"
+              toolbar "消息操作"
+                button "复制" [ref=23]
+                  svg_root
+                button "重新生成" [ref=24, loc=css:button[aria-label="重新生成"]]
+                  svg_root
+                button "点赞" [ref=25, loc=css:button[aria-label="点赞"]]
+                  svg_root
+                button "点踩" [ref=26, loc=css:button[aria-label="点踩"]]
+                  svg_root
+        button [ref=27]
+          text "↓"
+        container
+          container
+            textfield "输入问题，@ 引用 Artifact" [ref=28]
+              paragraph
+            text "输入问题，@ 引用 Artifact"
+          container
+            container
+              button "添加附件" [ref=29, loc=css:button[aria-label="添加附件"]]
+                svg_root
+              container [ref=30]
+                button "选择对话模型" [ref=31, loc=css:button[aria-label="选择对话模型"]]
+                  text "GPT-5.6 Luna"
+                  svg_root
+              container [ref=32]
+                comboboxgrouping "选择推理强度" [ref=33, loc=css:button[aria-label="选择推理强度"]]
+                  container
+                    text "Effort:"
+                    text "high"
+                  svg_root
+              textbox [ref=34]
+                text "high"
+              container [ref=35]
+                comboboxgrouping "选择最大输出 token" [ref=36, loc=css:button[aria-label="选择最大输出 token"]]
+                  container
+                    text "Max:"
+                    text "32K"
+                  svg_root
+              textbox [ref=37]
+                text "32000"
+            container
+              button "语音输入" [ref=38, loc=css:button[aria-label="语音输入"]]
+                svg_root
+              button "发送" [ref=39, loc=css:button[aria-label="发送"]]
+                svg_root
+                svg_root
+    dialog "Projectv0"
+      svg_root
+      heading
+        text "Project"
+        text "v"
+        text "0"
+      button [ref=40]
+        svg_root
+      button [ref=41]
+        text "Overview"
+      button [ref=42]
+        text "Files"
+        text "0"
+      button [ref=43]
+        text "Artifacts"
+        text "0"
+      container
+        text "PROJECT CONTRACT"
+        heading
+          text "目标与长期指令"
+        paragraph
+          text "保存后只影响之后启动的生成，不改写历史消息、Artifact 或 Fork Context。"
+        button [ref=44]
+          svg_root
+          text "编辑"
+        text "Target"
+        text "尚未设置 Target。"
+        text "Instructions"
+        text "尚未设置 Instructions。"
+  container "Notifications alt+T" [ref=45]
+  button "Open Next.js Dev Tools" [ref=46, loc=css:button[aria-label="Open Next.js Dev Tools"]]
+    svg_root
+  alert

@@ -1,0 +1,171 @@
+TAP version 13
+# Subtest: 12 万字符按同一快照续读，无遗漏/重复；网络耗尽仍可读缓存
+ok 1 - 12 万字符按同一快照续读，无遗漏/重复；网络耗尽仍可读缓存
+  ---
+  duration_ms: 3.502875
+  type: 'test'
+  ...
+# Subtest: 游标绑定 URL 与工具实例；错误游标不触发抓取
+ok 2 - 游标绑定 URL 与工具实例；错误游标不触发抓取
+  ---
+  duration_ms: 0.665334
+  type: 'test'
+  ...
+# Subtest: 正文和元数据共同计量；并行读取不超额，耗尽不能用空大纲循环
+ok 3 - 正文和元数据共同计量；并行读取不超额，耗尽不能用空大纲循环
+  ---
+  duration_ms: 0.352
+  type: 'test'
+  ...
+# Subtest: 优先段落边界，超长块回退硬切且不破坏 emoji
+ok 4 - 优先段落边界，超长块回退硬切且不破坏 emoji
+  ---
+  duration_ms: 0.122584
+  type: 'test'
+  ...
+# Subtest: 并行同页只抓一次，内容修改不影响快照；取消后不交付正文
+ok 5 - 并行同页只抓一次，内容修改不影响快照；取消后不交付正文
+  ---
+  duration_ms: 5.327875
+  type: 'test'
+  ...
+# Subtest: 超大快照明确拒绝，不静默裁剪冒充全文
+ok 6 - 超大快照明确拒绝，不静默裁剪冒充全文
+  ---
+  duration_ms: 0.188708
+  type: 'test'
+  ...
+# Subtest: 搜索按完整条目裁剪；结果也计入共享内容额度
+ok 7 - 搜索按完整条目裁剪；结果也计入共享内容额度
+  ---
+  duration_ms: 4.440125
+  type: 'test'
+  ...
+# Subtest: GPT Luna 首次读取的空字符串/null 游标视为省略
+ok 8 - GPT Luna 首次读取的空字符串/null 游标视为省略
+  ---
+  duration_ms: 3.458375
+  type: 'test'
+  ...
+# Subtest: 同一工具调用并发合并上游，但每份送入模型的返回分别计量
+ok 9 - 同一工具调用并发合并上游，但每份送入模型的返回分别计量
+  ---
+  duration_ms: 7.019292
+  type: 'test'
+  ...
+# Subtest: 超过并发上限的独立请求排队，峰值为3且全部完成
+ok 10 - 超过并发上限的独立请求排队，峰值为3且全部完成
+  ---
+  duration_ms: 18.869792
+  type: 'test'
+  ...
+# Subtest: 停止后不残留读取进度或内部工具状态，已完成来源仍保留
+ok 11 - 停止后不残留读取进度或内部工具状态，已完成来源仍保留
+  ---
+  duration_ms: 0.443708
+  type: 'test'
+  ...
+# [model-call] {"callId":"e80d1427-e549-42fa-a4f8-d9037ba3689a","operation":"generate","purpose":"research-route","provider":"mock-provider","model":"mock-model-id","correlation":{"environment":"development","release":"local"},"context":{"messageCount":2,"roleCounts":{"system":1,"user":1},"textCharacters":668,"filePartCount":0,"toolCallPartCount":0,"toolResultPartCount":0,"availableToolCount":0,"maxOutputTokens":600}}
+# PASS  research routing preserves URL behavior, reasoning, and cancellation
+# Subtest: e2e/thread-chat/research-router-context.test.mjs
+ok 2 - e2e/thread-chat/research-router-context.test.mjs
+  ---
+  duration_ms: 358.211542
+  type: 'test'
+  ...
+# PASS  stopping generation aborts in-flight AnySearch operations
+# Subtest: e2e/thread-chat/search-abort.test.mjs
+ok 3 - e2e/thread-chat/search-abort.test.mjs
+  ---
+  duration_ms: 295.144833
+  type: 'test'
+  ...
+# PASS  chat tool step policy preserves route priority and later-step availability
+# Subtest: e2e/thread-chat/tool-step-policy.test.mjs
+ok 4 - e2e/thread-chat/tool-step-policy.test.mjs
+  ---
+  duration_ms: 312.7195
+  type: 'test'
+  ...
+# Subtest: 两个入口首步读取，之后开放搜索；answer 与 artifact 能力范围不变
+ok 15 - 两个入口首步读取，之后开放搜索；answer 与 artifact 能力范围不变
+  ---
+  duration_ms: 1.06475
+  type: 'test'
+  ...
+# Subtest: HTTP 200 工具级错误、空白、错误页失败，多文本块合并
+ok 16 - HTTP 200 工具级错误、空白、错误页失败，多文本块合并
+  ---
+  duration_ms: 5.270167
+  type: 'test'
+  ...
+# Subtest: 真实 OpenAI 错误页样本：结构化正文及 JSON 文本都必须校验
+ok 17 - 真实 OpenAI 错误页样本：结构化正文及 JSON 文本都必须校验
+  ---
+  duration_ms: 1.786166
+  type: 'test'
+  ...
+# Subtest: 主成功不备用、主失败备用成功、全部失败、没有凭据不备用
+ok 18 - 主成功不备用、主失败备用成功、全部失败、没有凭据不备用
+  ---
+  duration_ms: 3.668041
+  type: 'test'
+  ...
+# Subtest: 安全拒绝、无效 URL、取消和未知异常不触发备用
+ok 19 - 安全拒绝、无效 URL、取消和未知异常不触发备用
+  ---
+  duration_ms: 0.643584
+  type: 'test'
+  ...
+# Subtest: 共享预算、并发去重、失败不重试、新查询可执行、截断契约
+ok 20 - 共享预算、并发去重、失败不重试、新查询可执行、截断契约
+  ---
+  duration_ms: 15.358625
+  type: 'test'
+  ...
+# Subtest: 并发硬计数与总时限终止在途请求，取消继续抛出
+ok 21 - 并发硬计数与总时限终止在途请求，取消继续抛出
+  ---
+  duration_ms: 28.180541
+  type: 'test'
+  ...
+# Subtest: 并发上限、排队取消及跨轮失败隔离
+ok 22 - 并发上限、排队取消及跨轮失败隔离
+  ---
+  duration_ms: 1.003875
+  type: 'test'
+  ...
+# Subtest: 预算耗尽后移除联网工具，保留最终说明与 Artifact
+ok 23 - 预算耗尽后移除联网工具，保留最终说明与 Artifact
+  ---
+  duration_ms: 0.183083
+  type: 'test'
+  ...
+# Subtest: 供应商明确安全拒绝不得换供应商
+ok 24 - 供应商明确安全拒绝不得换供应商
+  ---
+  duration_ms: 0.444459
+  type: 'test'
+  ...
+# Subtest: UI 不把失败当已读取，失败无来源，部分正文标记传递
+ok 25 - UI 不把失败当已读取，失败无来源，部分正文标记传递
+  ---
+  duration_ms: 0.25325
+  type: 'test'
+  ...
+# PASS  web research placement waits for activity and preserves recorded/fallback offsets
+# Subtest: e2e/thread-chat/web-research-placement.test.mjs
+ok 6 - e2e/thread-chat/web-research-placement.test.mjs
+  ---
+  duration_ms: 183.594084
+  type: 'test'
+  ...
+1..26
+# tests 26
+# suites 0
+# pass 26
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 427.500667

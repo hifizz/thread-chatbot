@@ -1,0 +1,226 @@
+[p1 "Thread Chat · 分支对话" | space "联网续读 GPT Luna 验收"(2): 1 managed, 0 untracked — p1* "Thread Chat · 分支对话"]
+root
+  container
+    container
+      button [ref=1]
+        text "新对话"
+      button [ref=2]
+        svg_root
+        text "对话列表"
+        container "打开对话列表：Command 或 Control 加 Shift 加 K"
+          text "⌘"
+          text "⇧"
+          text "K"
+      text "Thread Chat"
+      button [ref=3]
+        svg_root
+      group "视图模式"
+        button [ref=4]
+          svg_root
+          text "列"
+        button [ref=5]
+          svg_root
+          text "画布"
+      group "列数"
+        button [ref=6]
+          text "自适应"
+        button [ref=7]
+          text "2"
+        button [ref=8]
+          text "3"
+        button [ref=9]
+          text "4"
+      group "列满时的放置策略"
+        button [ref=10]
+          text "替换⑥"
+        button [ref=11]
+          text "细条⑤"
+      button [ref=12]
+        svg_root
+        text "会话树"
+        container "打开会话树：Command 或 Control 加 K"
+          text "⌘"
+          text "K"
+      button [ref=13]
+        svg_root
+        text "Project"
+        text "0"
+      button [ref=14]
+        text "W"
+    container
+      container
+        container
+          text "锚定"
+          text "主线"
+          button [ref=15]
+            svg_root
+            text "0"
+        text "Next.js 稳定版本核实"
+      container
+        region "Messages" [ref=16, loc=role:region[name="Messages"]]
+          log
+            container
+              text "你"
+              text "请核实 Next.js 当前稳定版本，并给出官方来源。"
+              toolbar "消息操作"
+                button "复制" [ref=17]
+                  svg_root
+                button "重新编辑" [ref=18, loc=css:button[aria-label="重新编辑"]]
+                  svg_root
+            container
+              text "AI"
+              container
+                container
+                  paragraph
+                    text "我先联网核实「site:nextjs.org Next.js latest stable version official release」。"
+                  button [ref=19]
+                    text "已搜索网络"
+                    text "展开详情"
+                    svg_root
+                container
+                  container [ref=20]
+                    text "思考过程"
+                  paragraph
+                    text "**Verifying Next.js current stable version**"
+                container
+                  container [ref=21]
+                    text "思考过程"
+                  paragraph
+                    text "**Verifying latest Next.js version from official sources**"
+                container
+                  container [ref=22]
+                    text "思考过程"
+                  paragraph
+                    text "**Confirming Next.js stable version details** **Planning concise version summary with sources**"
+                container
+                  heading
+                    text "核实结果"
+                  paragraph
+                    text "截至本次核查，"
+                    container
+                      text "Next.js 当前稳定版本是"
+                      text "16.3.5"
+                    text "。"
+                  paragraph
+                    text "依据："
+                  unordered_list
+                    list_item
+                      text "Next.js 官方文档的安装页面标注"
+                      text "Latest Version: 16.3.5"
+                      text "："
+                      anchor [ref=23, loc=href:https://nextjs.org/docs/app/getting-started/installation, url=https://nextjs.org/docs/app/getting-started/installation]
+                        text "官方安装文档"
+                    list_item
+                      text "Next.js 官方 GitHub 仓库的 Releases 页面将"
+                      anchor [ref=24, loc=href:https://github.com/vercel/next.js/releases/tag/v16.3.5, url=https://github.com/vercel/next.js/releases/tag/v16.3.5]
+                        text "v16.3.5"
+                      text "标记为"
+                      text "Latest"
+                      text "。"
+                    list_item
+                      text "同一页面中更新的"
+                      text "v16.4.0-canary.*"
+                      text "标记为"
+                      text "Pre-release"
+                      text "，属于 Canary 预览版本，不是稳定版。"
+                  paragraph
+                    text "安装或升级到当前稳定版："
+                  container
+                    container
+                      text "bash"
+                      button [ref=25]
+                        svg_root
+                    container [ref=26]
+                      text "npm"
+                      text "install"
+                      text "next@latest"
+                  paragraph
+                    text "也可以指定确切版本："
+                  container
+                    container
+                      text "bash"
+                      button [ref=27]
+                        svg_root
+                    container [ref=28]
+                      text "npm"
+                      text "install"
+                      text "next@16.3.5"
+              toolbar "消息操作"
+                button "复制" [ref=29]
+                  svg_root
+                button "重新生成" [ref=30, loc=css:button[aria-label="重新生成"]]
+                  svg_root
+                button "点赞" [ref=31, loc=css:button[aria-label="点赞"]]
+                  svg_root
+                button "点踩" [ref=32, loc=css:button[aria-label="点踩"]]
+                  svg_root
+        button [ref=33]
+          text "↓"
+        container
+          container
+            textfield "输入问题，@ 引用 Artifact" [ref=34]
+              paragraph
+            text "输入问题，@ 引用 Artifact"
+          container
+            container
+              button "添加附件" [ref=35, loc=css:button[aria-label="添加附件"]]
+                svg_root
+              container [ref=36]
+                button "选择对话模型" [ref=37, loc=css:button[aria-label="选择对话模型"]]
+                  text "GPT-5.6 Luna"
+                  svg_root
+              container [ref=38]
+                comboboxgrouping "选择推理强度" [ref=39, loc=css:button[aria-label="选择推理强度"]]
+                  container
+                    text "Effort:"
+                    text "high"
+                  svg_root
+              textbox [ref=40]
+                text "high"
+              container [ref=41]
+                comboboxgrouping "选择最大输出 token" [ref=42, loc=css:button[aria-label="选择最大输出 token"]]
+                  container
+                    text "Max:"
+                    text "32K"
+                  svg_root
+              textbox [ref=43]
+                text "32000"
+            container
+              button "语音输入" [ref=44, loc=css:button[aria-label="语音输入"]]
+                svg_root
+              button "发送" [ref=45, loc=css:button[aria-label="发送"]]
+                svg_root
+                svg_root
+    dialog "Projectv0"
+      svg_root
+      heading
+        text "Project"
+        text "v"
+        text "0"
+      button [ref=46]
+        svg_root
+      button [ref=47]
+        text "Overview"
+      button [ref=48]
+        text "Files"
+        text "0"
+      button [ref=49]
+        text "Artifacts"
+        text "0"
+      container
+        text "PROJECT CONTRACT"
+        heading
+          text "目标与长期指令"
+        paragraph
+          text "保存后只影响之后启动的生成，不改写历史消息、Artifact 或 Fork Context。"
+        button [ref=50]
+          svg_root
+          text "编辑"
+        text "Target"
+        text "尚未设置 Target。"
+        text "Instructions"
+        text "尚未设置 Instructions。"
+  container "Notifications alt+T" [ref=51]
+  button "Open Next.js Dev Tools" [ref=52, loc=css:button[aria-label="Open Next.js Dev Tools"]]
+    svg_root
+  alert

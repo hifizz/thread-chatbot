@@ -1,4 +1,5 @@
-import type { WebBudget } from "@/lib/ai/web-access"
+import { RESEARCH_MAX_STEPS } from "@/constants/research"
+import { availableResearchTools, type WebBudget } from "@/lib/ai/web-access"
 import { MARKDOWN_ARTIFACT_TOOL_NAME } from "@/lib/chat/markdown-artifact"
 import type { ResearchRoute } from "@/lib/chat/research-router"
 import {
@@ -44,7 +45,8 @@ export function createToolStepPolicy({
   if (activeTools.length === 0) return undefined
 
   return ({ stepNumber }: { stepNumber: number }): ToolStep => {
-    if (webBudget?.exhausted) return { activeTools: activeTools.filter((name) => name === MARKDOWN_ARTIFACT_TOOL_NAME), toolChoice: "auto" }
+    if (stepNumber >= RESEARCH_MAX_STEPS - 1) return { activeTools: activeTools.filter((name) => name === MARKDOWN_ARTIFACT_TOOL_NAME), toolChoice: "auto" }
+    if (webBudget && (webBudget.exhausted || webBudget.remainingChars <= 0)) return { activeTools: availableResearchTools(activeTools, webBudget), toolChoice: "auto" }
     if (stepNumber === 0 && activeWebTools.length > 0) {
       return {
         activeTools,

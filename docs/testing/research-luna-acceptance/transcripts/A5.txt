@@ -1,0 +1,796 @@
+[p1 "Thread Chat · 分支对话" | space "联网续读 GPT Luna 验收"(2): 1 managed, 0 untracked — p1* "Thread Chat · 分支对话"]
+root
+  container
+    container
+      button [ref=1]
+        text "新对话"
+      button [ref=2]
+        svg_root
+        text "对话列表"
+        container "打开对话列表：Command 或 Control 加 Shift 加 K"
+          text "⌘"
+          text "⇧"
+          text "K"
+      text "Thread Chat"
+      button [ref=3]
+        svg_root
+      group "视图模式"
+        button [ref=4]
+          svg_root
+          text "列"
+        button [ref=5]
+          svg_root
+          text "画布"
+      group "列数"
+        button [ref=6]
+          text "自适应"
+        button [ref=7]
+          text "2"
+        button [ref=8]
+          text "3"
+        button [ref=9]
+          text "4"
+      group "列满时的放置策略"
+        button [ref=10]
+          text "替换⑥"
+        button [ref=11]
+          text "细条⑤"
+      button [ref=12]
+        svg_root
+        text "会话树"
+        container "打开会话树：Command 或 Control 加 K"
+          text "⌘"
+          text "K"
+      button [ref=13]
+        svg_root
+        text "Project"
+        text "0"
+      button [ref=14]
+        text "W"
+    container
+      container
+        container
+          text "锚定"
+          text "主线"
+          button [ref=15]
+            svg_root
+            text "0"
+        text "PostgreSQL 16 扩展兼容性"
+      container
+        region "Messages" [ref=16, loc=role:region[name="Messages"]]
+          log
+            text "你"
+            text "查找 PostgreSQL 16 的官方升级注意事项，重点关注扩展兼容性。"
+            button "复制" [ref=17]
+              svg_root
+            button "重新编辑" [ref=18, loc=css:button[aria-label="重新编辑"]]
+              svg_root
+            container
+              text "AI"
+              container
+                container
+                  paragraph
+                    text "我先联网核实「site:postgresql.org/docs/16 upgrading PostgreSQL 16 upgrade notes extensions compatibility official」。"
+                  button [ref=19]
+                    text "已搜索网络"
+                    text "展开详情"
+                    svg_root
+                container [ref=20]
+                  text "思考过程"
+                paragraph
+                  text "**Researching PostgreSQL 16 extension upgrade caveats**"
+                container [ref=21]
+                  text "思考过程"
+                paragraph
+                  text "**Planning extension compatibility extraction**"
+                container [ref=22]
+                  text "思考过程"
+                paragraph
+                  text "**Planning extension compatibility search**"
+                container [ref=23]
+                  text "思考过程"
+                paragraph
+                  text "**Planning extension compatibility search**"
+                container
+                  container [ref=24]
+                    text "思考过程"
+                  paragraph
+                    text "**Assessing PostgreSQL 16 extension compatibility changes** **Clarifying PostgreSQL 16 extension upgrade procedures** **Recommending extension inventory query post-upgrade** **Planning PostgreSQL 16 u..."
+                container
+                  heading
+                    text "PostgreSQL 16 官方升级注意事项：扩展兼容性重点"
+                  heading
+                    text "一、先看结论"
+                  paragraph
+                    text "从 PostgreSQL 旧主版本升级到 PostgreSQL 16，不能只替换服务器二进制文件。官方要求使用以下方式之一迁移数据："
+                  unordered_list
+                    list_item
+                      text "pg_dump"
+                      text "/"
+                      text "pg_dumpall"
+                      text "后恢复；"
+                    list_item
+                      text "pg_upgrade"
+                      text "；"
+                    list_item
+                      text "逻辑复制。"
+                  paragraph
+                    text "其中，"
+                    container
+                      text "pg_upgrade"
+                      text "不会替你验证所有第三方扩展的二进制兼容性"
+                    text "。如果扩展包含 C 代码、"
+                    text ".so"
+                    text "/"
+                    text ".dll"
+                    text "共享库、后台加载模块或逻辑解码插件，必须单独确认它是否有 PostgreSQL 16 版本，并在新集群中安装或重新编译。"
+                    text "来源："
+                    anchor [ref=25, url=https://www.postgresql.org/docs/16/upgrading.html]
+                      text "PostgreSQL 16 升级文档"
+                    text "、"
+                    anchor [ref=26, url=https://www.postgresql.org/docs/16/pgupgrade.html]
+                      text "pg_upgrade"
+                      text "官方文档"
+                    text "。"
+                  heading
+                    text "二、扩展兼容性最重要的官方要求"
+                  heading
+                    text "1."
+                    text "pg_upgrade"
+                    text "不会自动迁移扩展的共享库"
+                  paragraph
+                    text "官方明确要求："
+                  paragraph
+                    text "如果旧集群使用了扩展的共享对象文件，例如"
+                    text "pgcrypto.so"
+                    text "，必须在新集群中安装与新 PostgreSQL 服务器二进制文件匹配的共享对象文件。"
+                  paragraph
+                    text "这适用于："
+                  unordered_list
+                    list_item
+                      text "PostgreSQL 自带的"
+                      text "contrib"
+                      text "模块；"
+                    list_item
+                      text "第三方 C 扩展；"
+                    list_item
+                      text "自定义编译的扩展；"
+                    list_item
+                      text "使用后台加载或共享库的模块。"
+                  paragraph
+                    text "例如："
+                  container
+                    container
+                      text "text"
+                      button [ref=27]
+                        svg_root
+                    text "旧版本： /usr/lib/postgresql/15/lib/postgis-3.so 新版本需要： /usr/lib/postgresql/16/lib/postgis-3.so"
+                  paragraph
+                    text "不能简单地把 PostgreSQL 15 的"
+                    text ".so"
+                    text "文件复制到 PostgreSQL 16 后继续使用。通常应当："
+                  ordered_list
+                    list_item
+                      text "安装该扩展针对 PostgreSQL 16 的发行包；或"
+                    list_item
+                      text "使用 PostgreSQL 16 的头文件和"
+                      text "pg_config"
+                      text "重新编译扩展。"
+                  paragraph
+                    text "官方说明："
+                    anchor [ref=28, url=https://www.postgresql.org/docs/16/pgupgrade.html]
+                      text "pg_upgrade"
+                      text "—Install extension shared object files"
+                    text "。"
+                  heading
+                    text "2. 不要在"
+                    text "pg_upgrade"
+                    text "前后手工重复执行"
+                    text "CREATE EXTENSION"
+                  paragraph
+                    text "对于使用"
+                    text "pg_upgrade"
+                    text "的场景，官方特别提醒："
+                  unordered_list
+                    list_item
+                      text "扩展的 SQL 定义和目录对象会随数据库升级处理；"
+                    list_item
+                      text "不要在新集群中重新执行类似下面的命令："
+                  text "sql"
+                  button [ref=29]
+                    svg_root
+                  container [ref=30]
+                    text "CREATE"
+                    text "EXTENSION pgcrypto;"
+                  paragraph
+                    text "否则可能导致扩展对象重复。"
+                  paragraph
+                    text "正确做法是："
+                  ordered_list
+                    list_item
+                      text "在新 PostgreSQL 安装中提供兼容的扩展"
+                      text ".so"
+                      text "、control 文件和 SQL 文件；"
+                    list_item
+                      text "运行"
+                      text "pg_upgrade"
+                      text "；"
+                    list_item
+                      text "根据"
+                      text "pg_upgrade"
+                      text "输出，执行它生成的扩展更新或后处理脚本。"
+                  paragraph
+                    text "官方原文说明：新集群需要安装共享对象文件，但"
+                    text "不要重新加载扩展的 schema 定义"
+                    text "；如果有扩展更新，"
+                    text "pg_upgrade"
+                    text "会报告并生成后续脚本。"
+                    text "来源："
+                    anchor [ref=31, url=https://www.postgresql.org/docs/16/pgupgrade.html]
+                      text "pg_upgrade"
+                      text "官方文档"
+                    text "。"
+                  paragraph
+                    text "注意：这条规则针对"
+                    text "pg_upgrade"
+                    text "。如果采用"
+                    text "pg_dump"
+                    text "/"
+                    text "pg_restore"
+                    text "，扩展的创建过程会通过逻辑备份恢复，但目标服务器仍然必须预先安装兼容的扩展包。"
+                  heading
+                    text "3."
+                    text "pg_upgrade"
+                    text "无法检查所有外部模块的二进制兼容性"
+                  paragraph
+                    text "官方明确指出，"
+                    text "pg_upgrade"
+                    text "会检查 PostgreSQL 本身的一些编译时设置，例如 32 位或 64 位架构，但："
+                  paragraph
+                    text "外部模块也必须二进制兼容，不过这部分无法由"
+                    text "pg_upgrade"
+                    text "检查。"
+                  paragraph
+                    text "因此，下面这类扩展不能只依赖"
+                    text "pg_upgrade --check"
+                    text "判断是否安全："
+                  unordered_list
+                    list_item
+                      text "PostGIS；"
+                    list_item
+                      text "TimescaleDB；"
+                    list_item
+                      text "pgvector；"
+                    list_item
+                      text "PL/Java、PL/R、PL/Python 等过程语言模块；"
+                    list_item
+                      text "逻辑解码插件；"
+                    list_item
+                      text "自定义 C 扩展；"
+                    list_item
+                      text "使用"
+                      text "shared_preload_libraries"
+                      text "加载的模块；"
+                    list_item
+                      text "监控、审计、连接池或安全相关插件。"
+                  paragraph
+                    text "应当逐个确认扩展项目或发行版是否提供 PostgreSQL 16 构建版本。"
+                    text "来源："
+                    anchor [ref=32, url=https://www.postgresql.org/docs/16/pgupgrade.html]
+                      text "pg_upgrade"
+                      text "官方文档"
+                    text "。"
+                  heading
+                    text "4. 扩展使用 PostgreSQL 内部 C API 时，需要特别谨慎"
+                  paragraph
+                    text "PostgreSQL 官方升级文档将以下内容列为大版本升级的潜在影响范围："
+                  unordered_list
+                    list_item
+                      text "系统目录；"
+                    list_item
+                      text "PostgreSQL Server C-language API；"
+                    list_item
+                      text "引用 PostgreSQL 内部后端函数的代码。"
+                  paragraph
+                    text "PostgreSQL 16 发布说明还指出，部分初始化机制发生变化，针对旧版本编写的模块可能需要更新。也就是说，某些扩展即使 SQL 接口没有变化，也可能因为�..."
+                  unordered_list
+                    list_item
+                      text "PostgreSQL 内部函数签名变化；"
+                    list_item
+                      text "服务器内部结构变化；"
+                    list_item
+                      text "扩展初始化入口变化；"
+                    list_item
+                      text "编译器或 ABI 兼容问题；"
+                  paragraph
+                    text "而需要升级源码或重新编译。"
+                  paragraph
+                    text "来源："
+                  unordered_list
+                    list_item
+                      anchor [ref=33, url=https://www.postgresql.org/docs/release/16.0/#RELEASE-16-MIGRATION]
+                        text "PostgreSQL 16 发布说明：Migration to Version 16"
+                    list_item
+                      anchor [ref=34, url=https://www.postgresql.org/docs/16/upgrading.html]
+                        text "PostgreSQL 16 升级文档"
+                  heading
+                    text "三、PostgreSQL 16 中已明确列出的相关兼容性变化"
+                  heading
+                    text "1."
+                    text "pg_walinspect"
+                    text "删除了两个函数"
+                  paragraph
+                    text "PostgreSQL 16 发布说明明确列出了以下函数被删除："
+                  text "text"
+                  button [ref=35]
+                    svg_root
+                  text "pg_get_wal_records_info_till_end_of_wal() pg_get_wal_stats_till_end_of_wal()"
+                  paragraph
+                    text "如果扩展、监控脚本、诊断工具或自定义 SQL 使用了这两个函数，需要在升级前修改。"
+                    text "来源："
+                    anchor [ref=36, url=https://www.postgresql.org/docs/release/16.0/#RELEASE-16-MIGRATION]
+                      text "PostgreSQL 16 发布说明中的 Migration 部分"
+                    text "。"
+                  heading
+                    text "2."
+                    text "force_parallel_mode"
+                    text "更名为"
+                    text "debug_parallel_query"
+                  paragraph
+                    text "如果扩展配置、测试脚本或运维脚本引用了："
+                  text "sql"
+                  button [ref=37]
+                    svg_root
+                  container [ref=38]
+                    text "SET"
+                    text "force_parallel_mode"
+                    text "="
+                    text "..."
+                  paragraph
+                    text "PostgreSQL 16 中应检查并改用："
+                  text "sql"
+                  button [ref=39]
+                    svg_root
+                  container [ref=40]
+                    text "SET"
+                    text "debug_parallel_query"
+                    text "="
+                    text "..."
+                  paragraph
+                    text "这不是某个特定扩展的变更，但扩展测试框架、性能测试脚本和数据库初始化脚本可能会受到影响。"
+                    text "来源："
+                    anchor [ref=41, url=https://www.postgresql.org/docs/release/16.0/#RELEASE-16-MIGRATION]
+                      text "PostgreSQL 16 发布说明"
+                    text "。"
+                  heading
+                    text "3. 其他可能影响扩展脚本的变化"
+                  paragraph
+                    text "PostgreSQL 16 的迁移说明还列出了若干用户可见变化，例如："
+                  unordered_list
+                    list_item
+                      text "删除"
+                      text "vacuum_defer_cleanup_age"
+                      text "；"
+                    list_item
+                      text "删除只读服务器变量"
+                      text "lc_collate"
+                      text "和"
+                      text "lc_ctype"
+                      text "；"
+                    list_item
+                      text "REINDEX DATABASE"
+                      text "不再处理系统目录索引；"
+                    list_item
+                      text "继承表和分区表对"
+                      text "GENERATED"
+                      text "列的限制收紧；"
+                    list_item
+                      text "角色继承和"
+                      text "CREATEROLE"
+                      text "权限规则发生变化。"
+                  paragraph
+                    text "如果扩展的安装脚本、升级脚本、测试 SQL 或运维脚本依赖这些参数和行为，应在测试环境中检查。"
+                    text "来源："
+                    anchor [ref=42, url=https://www.postgresql.org/docs/release/16.0/#RELEASE-16-MIGRATION]
+                      text "PostgreSQL 16 发布说明：Migration to Version 16"
+                    text "。"
+                  heading
+                    text "四、建议的扩展盘点方法"
+                  paragraph
+                    text "升级前先在旧集群记录已安装扩展及版本："
+                  text "sql"
+                  button [ref=43]
+                    svg_root
+                  container [ref=44]
+                    text "SELECT"
+                    text "e"
+                    text "."
+                    text "extname"
+                    text ","
+                    text "e"
+                    text "."
+                    text "extversion"
+                    text ","
+                    text "n"
+                    text "."
+                    text "nspname"
+                    text "AS"
+                    text "schema_name"
+                    text "FROM"
+                    text "pg_extension"
+                    text "AS"
+                    text "e"
+                    text "JOIN"
+                    text "pg_namespace"
+                    text "AS"
+                    text "n"
+                    text "ON"
+                    text "n"
+                    text "."
+                    text "oid"
+                    text "="
+                    text "e"
+                    text "."
+                    text "extnamespace"
+                    text "ORDER BY"
+                    text "e"
+                    text "."
+                    text "extname"
+                    text ";"
+                  paragraph
+                    text "再查看服务器上可用的扩展版本："
+                  text "sql"
+                  button [ref=45]
+                    svg_root
+                  container [ref=46]
+                    text "SELECT"
+                    text "name"
+                    text ","
+                    text "default_version,"
+                    text "installed_version,"
+                    text "comment"
+                    text "FROM"
+                    text "pg_available_extensions"
+                    text "WHERE"
+                    text "installed_version"
+                    text "IS NOT NULL"
+                    text "ORDER BY"
+                    text "name"
+                    text ";"
+                  paragraph
+                    text "重点标记以下几类："
+                  region "表格" [ref=47, loc=role:region[name="表格"]]
+                    table
+                      table_row
+                        table_cell
+                          text "类型"
+                        table_cell
+                          text "关注点"
+                      table_row
+                        table_cell
+                          text "纯 SQL 扩展"
+                        table_cell
+                          text "是否有 PostgreSQL 16 的 control/SQL 文件，是否需要执行扩展升级"
+                      table_row
+                        table_cell
+                          text "C 扩展"
+                        table_cell
+                          text "是否提供 PG16"
+                          text ".so"
+                          text "/"
+                          text ".dll"
+                          text "，是否需要重新编译"
+                      table_row
+                        table_cell
+                          text "shared_preload_libraries"
+                          text "模块"
+                        table_cell
+                          text "新服务器启动时能否正常加载"
+                      table_row
+                        table_cell
+                          text "逻辑解码插件"
+                        table_cell
+                          text "是否兼容 PG16 的 WAL/逻辑解码接口"
+                      table_row
+                        table_cell
+                          text "过程语言"
+                        table_cell
+                          text "运行时、解释器版本和 PostgreSQL 16 支持情况"
+                      table_row
+                        table_cell
+                          text "带自定义数据类型或索引访问方法的扩展"
+                        table_cell
+                          text "升级后索引、运算符类和查询计划是否正常"
+                      table_row
+                        table_cell
+                          text "带后台 worker 的扩展"
+                        table_cell
+                          text "启动、权限、共享内存和 GUC 配置是否兼容"
+                  paragraph
+                    text "仅查询"
+                    text "pg_extension"
+                    text "还不够；还应检查配置文件中的："
+                  text "sql"
+                  button [ref=48]
+                    svg_root
+                  container [ref=49]
+                    text "SHOW shared_preload_libraries;"
+                    text "SHOW session_preload_libraries;"
+                  paragraph
+                    text "以及部署目录中实际安装的扩展库文件。"
+                  heading
+                    text "五、推荐的 PostgreSQL 16 升级流程"
+                  heading
+                    text "阶段 1：升级前确认"
+                  ordered_list
+                    list_item
+                      text "记录所有扩展名称、版本和 schema。"
+                    list_item
+                      text "为每个扩展确认 PostgreSQL 16 支持版本。"
+                    list_item
+                      text "安装或编译 PostgreSQL 16 对应的扩展包。"
+                    list_item
+                      text "检查扩展是否修改了系统配置，例如："
+                      unordered_list
+                        list_item
+                          text "shared_preload_libraries"
+                        list_item
+                          text "自定义 GUC；"
+                        list_item
+                          text "后台 worker；"
+                        list_item
+                          text "逻辑复制或逻辑解码配置。"
+                    list_item
+                      text "阅读 PostgreSQL 16 以及所有中间大版本的发布说明。官方特别指出，如果从更早版本跨版本升级，应阅读中间版本的 major release notes。"
+                      text "来源："
+                      anchor [ref=50, url=https://www.postgresql.org/docs/16/upgrading.html]
+                        text "PostgreSQL 16 升级文档"
+                      text "。"
+                  heading
+                    text "阶段 2：在副本上执行检查"
+                  paragraph
+                    text "使用新版本的"
+                    text "pg_upgrade"
+                    text "，先执行："
+                  text "bash"
+                  button [ref=51]
+                    svg_root
+                  container [ref=52]
+                    text "pg_upgrade"
+                    text "--check"
+                    text "\"
+                    text "--old-datadir=/path/to/old/data"
+                    text "\"
+                    text "--new-datadir=/path/to/new/data"
+                    text "\"
+                    text "--old-bindir=/path/to/old/bin"
+                    text "\"
+                    text "--new-bindir=/path/to/new/bin"
+                  paragraph
+                    text "如果生产升级计划使用"
+                    text "--link"
+                    text "或"
+                    text "--clone"
+                    text "，检查阶段也应带上相应选项："
+                  text "bash"
+                  button [ref=53]
+                    svg_root
+                  container [ref=54]
+                    text "pg_upgrade"
+                    text "--check"
+                    text "--link"
+                    text "..."
+                  paragraph
+                    text "官方说明，"
+                    text "--check"
+                    text "会列出兼容性问题及升级后需要手工调整的项目。"
+                    text "来源："
+                    anchor [ref=55, url=https://www.postgresql.org/docs/16/pgupgrade.html]
+                      text "pg_upgrade"
+                      text "官方文档"
+                    text "。"
+                  heading
+                    text "阶段 3：正式升级"
+                  paragraph
+                    text "正式运行"
+                    text "pg_upgrade"
+                    text "前："
+                  unordered_list
+                    list_item
+                      text "新集群中先安装所有 PG16 版本的扩展共享库；"
+                    list_item
+                      text "不要在新集群中重复执行"
+                      text "CREATE EXTENSION"
+                      text "；"
+                    list_item
+                      text "停止旧集群和新集群；"
+                    list_item
+                      text "确认扩展相关的配置文件已迁移；"
+                    list_item
+                      text "如果有备用服务器，也要安装同样的扩展共享库。"
+                  heading
+                    text "阶段 4：升级后处理"
+                  paragraph
+                    text "升级完成后："
+                  ordered_list
+                    list_item
+                      text "执行"
+                      text "pg_upgrade"
+                      text "生成的后处理脚本；"
+                    list_item
+                      text "特别执行扩展更新脚本；"
+                    list_item
+                      text "在脚本执行完成前，不要访问需要重建的表或索引；"
+                    list_item
+                      text "运行统计信息重建，因为优化器统计信息不会由"
+                      text "pg_upgrade"
+                      text "迁移；"
+                    list_item
+                      text "验证扩展版本："
+                  text "sql"
+                  button [ref=56]
+                    svg_root
+                  container [ref=57]
+                    text "SELECT"
+                    text "extname, extversion"
+                    text "FROM"
+                    text "pg_extension"
+                    text "ORDER BY"
+                    text "extname;"
+                  ordered_list
+                    list_item
+                      text "测试扩展的实际功能，而不只是确认"
+                      text "CREATE EXTENSION"
+                      text "或数据库启动成功，例如："
+                      unordered_list
+                        list_item
+                          text "PostGIS 空间索引和空间函数；"
+                        list_item
+                          text "pgvector 索引创建与查询；"
+                        list_item
+                          text "TimescaleDB hypertable、压缩和后台任务；"
+                        list_item
+                          text "逻辑解码插件输出；"
+                        list_item
+                          text "审计、监控和连接池模块；"
+                        list_item
+                          text "依赖扩展对象的应用 SQL。"
+                  paragraph
+                    text "官方提醒：如果"
+                    text "pg_upgrade"
+                    text "生成了重建脚本，在脚本执行完成前访问相关对象可能导致错误结果或性能问题。"
+                    text "来源："
+                    anchor [ref=58, url=https://www.postgresql.org/docs/16/pgupgrade.html]
+                      text "pg_upgrade"
+                      text "官方文档"
+                    text "。"
+                  heading
+                    text "六、实务上的判断标准"
+                  paragraph
+                    text "可以把扩展兼容性分成三层："
+                  heading
+                    text "可以初步认为风险较低"
+                  unordered_list
+                    list_item
+                      text "纯 SQL 扩展；"
+                    list_item
+                      text "扩展项目明确声明支持 PostgreSQL 16；"
+                    list_item
+                      text "不依赖内部系统目录；"
+                    list_item
+                      text "不包含 C 共享库或后台 worker。"
+                  heading
+                    text "必须安装 PG16 专用版本"
+                  unordered_list
+                    list_item
+                      text "包含"
+                      text ".so"
+                      text "/"
+                      text ".dll"
+                      text "；"
+                    list_item
+                      text "使用 PostgreSQL Server C API；"
+                    list_item
+                      text "使用"
+                      text "shared_preload_libraries"
+                      text "；"
+                    list_item
+                      text "自定义类型、索引访问方法或后台 worker；"
+                    list_item
+                      text "逻辑解码或 WAL 相关插件。"
+                  heading
+                    text "必须在测试环境做完整回归"
+                  unordered_list
+                    list_item
+                      text "PostGIS、TimescaleDB 等复杂扩展；"
+                    list_item
+                      text "自定义 C 扩展；"
+                    list_item
+                      text "依赖 PostgreSQL 内部结构的扩展；"
+                    list_item
+                      text "参与复制、审计、监控或安全控制的模块；"
+                    list_item
+                      text "有大量扩展升级脚本或数据迁移脚本的系统。"
+                  paragraph
+                    text "官方 PostgreSQL 16 文档没有提供一份完整的第三方扩展兼容性名单"
+                    text "；它明确要求外部模块自行保证二进制兼容，而"
+                    text "pg_upgrade"
+                    text "无法替你验证。因此，最终是否可升级，需要结合每个扩展项目或发行版维护者针对 PostgreSQL 16 的支持说明。"
+              button "复制" [ref=59]
+                svg_root
+              button "重新生成" [ref=60, loc=css:button[aria-label="重新生成"]]
+                svg_root
+              button "点赞" [ref=61, loc=css:button[aria-label="点赞"]]
+                svg_root
+              button "点踩" [ref=62, loc=css:button[aria-label="点踩"]]
+                svg_root
+        button [ref=63]
+          text "↓"
+        container
+          container
+            textfield "输入问题，@ 引用 Artifact" [ref=64]
+              paragraph
+            text "输入问题，@ 引用 Artifact"
+          container
+            container
+              button "添加附件" [ref=65, loc=css:button[aria-label="添加附件"]]
+                svg_root
+              container [ref=66]
+                button "选择对话模型" [ref=67, loc=css:button[aria-label="选择对话模型"]]
+                  text "GPT-5.6 Luna"
+                  svg_root
+              container [ref=68]
+                comboboxgrouping "选择推理强度" [ref=69, loc=css:button[aria-label="选择推理强度"]]
+                  container
+                    text "Effort:"
+                    text "high"
+                  svg_root
+              textbox [ref=70]
+                text "high"
+              container [ref=71]
+                comboboxgrouping "选择最大输出 token" [ref=72, loc=css:button[aria-label="选择最大输出 token"]]
+                  container
+                    text "Max:"
+                    text "32K"
+                  svg_root
+              textbox [ref=73]
+                text "32000"
+            container
+              button "语音输入" [ref=74, loc=css:button[aria-label="语音输入"]]
+                svg_root
+              button "发送" [ref=75, loc=css:button[aria-label="发送"]]
+                svg_root
+                svg_root
+    dialog "Projectv0"
+      svg_root
+      heading
+        text "Project"
+        text "v"
+        text "0"
+      button [ref=76]
+        svg_root
+      button [ref=77]
+        text "Overview"
+      button [ref=78]
+        text "Files"
+        text "0"
+      button [ref=79]
+        text "Artifacts"
+        text "0"
+      container
+        text "PROJECT CONTRACT"
+        heading
+          text "目标与长期指令"
+        paragraph
+          text "保存后只影响之后启动的生成，不改写历史消息、Artifact 或 Fork Context。"
+        button [ref=80]
+          svg_root
+          text "编辑"
+        text "Target"
+        text "尚未设置 Target。"
+        text "Instructions"
+        text "尚未设置 Instructions。"
+  container "Notifications alt+T" [ref=81]
+  button "Open Next.js Dev Tools" [ref=82, loc=css:button[aria-label="Open Next.js Dev Tools"]]
+    svg_root
+  alert
