@@ -1,16 +1,17 @@
 "use client"
 
-import { useEffect, useRef, useState, type PointerEvent } from "react"
-import { Minus, Plus } from "lucide-react"
+import { useEffect, useRef, useState, type ReactNode, type PointerEvent } from "react"
+import { Maximize, Minus, Plus, RotateCcw } from "lucide-react"
 import { MERMAID_CANVAS as C } from "@/constants/mermaid"
 import { automaticDiagramScale, constrainDiagram, fitDiagram, zoomDiagram, type DiagramSize, type DiagramTransform } from "@/lib/markdown/mermaid-viewport"
 
 type Point = { x: number; y: number }
 
 /** 仅处理图片视口；SVG 生成、流式状态和失败回退仍由 MermaidBlock 管理。 */
-export function MermaidCanvas({ url, hidden, onLoad, onError }: {
+export function MermaidCanvas({ url, hidden, viewControls, onLoad, onError }: {
   url: string
   hidden: boolean
+  viewControls: ReactNode
   onLoad: () => void
   onError: () => void
 }) {
@@ -70,6 +71,13 @@ export function MermaidCanvas({ url, hidden, onLoad, onError }: {
     })
   }
 
+  const reset = () => {
+    manual.current = false
+    setState((previous) => previous && ({ ...previous, transform: constrainDiagram({
+      scale: automaticDiagramScale(previous.image, previous.canvas), x: C.padding, y: C.padding,
+    }, previous.image, previous.canvas) }))
+  }
+
   const pan = (dx: number, dy: number) => {
     manual.current = true
     setState((previous) => previous && ({ ...previous, transform: constrainDiagram({
@@ -101,15 +109,18 @@ export function MermaidCanvas({ url, hidden, onLoad, onError }: {
 
   const scale = state?.transform.scale ?? 1
   return (
-    <div hidden={hidden} className="md-mermaid-canvas">
-      <div className="md-mermaid-tools" role="group" aria-label="图表缩放">
-        <button type="button" aria-label="缩小图表" title="缩小" disabled={!state || scale <= Math.min(C.minScale, fitDiagram(state.image, state.canvas))} onClick={() => zoom(scale / C.zoomStep)}><Minus size={16} /></button>
-        <span className="md-mermaid-scale" aria-label="当前缩放比例">{Math.round(scale * 100)}%</span>
-        <button type="button" aria-label="放大图表" title="放大" disabled={!state || scale >= C.maxScale} onClick={() => zoom(scale * C.zoomStep)}><Plus size={16} /></button>
-        <button type="button" disabled={!state} onClick={() => { if (state) zoom(fitDiagram(state.image, state.canvas)) }}>适应画布</button>
-        <button type="button" disabled={!state} onClick={() => zoom(1)}>100%</button>
+    <div className="md-mermaid-canvas">
+      <div className="md-mermaid-toolbar">
+        {viewControls}
+        <div hidden={hidden} className="md-mermaid-tools" role="group" aria-label="图表缩放">
+          <button type="button" aria-label="缩小图表" title="缩小" disabled={!state || scale <= Math.min(C.minScale, fitDiagram(state.image, state.canvas))} onClick={() => zoom(scale / C.zoomStep)}><Minus size={16} /></button>
+          <button type="button" className="md-mermaid-scale" aria-label={`当前缩放 ${Math.round(scale * 100)}%，恢复 100%`} title="恢复 100%" disabled={!state} onClick={() => zoom(1)}>{Math.round(scale * 100)}%</button>
+          <button type="button" aria-label="放大图表" title="放大" disabled={!state || scale >= C.maxScale} onClick={() => zoom(scale * C.zoomStep)}><Plus size={16} /></button>
+          <button type="button" aria-label="适应画布" title="适应画布" disabled={!state} onClick={() => { if (state) zoom(fitDiagram(state.image, state.canvas)) }}><Maximize size={16} /></button>
+          <button type="button" aria-label="重置图表" title="重置为默认自适应" disabled={!state} onClick={reset}><RotateCcw size={16} /></button>
+        </div>
       </div>
-      <div ref={viewportRef} className="md-mermaid-viewport" role="region" aria-label="Mermaid 图表，可拖动或用方向键移动" tabIndex={hidden ? -1 : 0}
+      <div hidden={hidden} ref={viewportRef} className="md-mermaid-viewport" role="region" aria-label="Mermaid 图表，可拖动或用方向键移动" tabIndex={hidden ? -1 : 0}
         style={{ height: state?.canvas.height ?? C.minHeight }}
         onKeyDown={(event) => {
           if (event.ctrlKey || event.metaKey || event.altKey) return

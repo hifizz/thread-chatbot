@@ -53,17 +53,23 @@ export function MermaidBlock({ code, streaming, batch, children }: {
     }
   }, [failed, batch])
 
+  const viewControls = (
+    <div className="md-mermaid-tools" role="group" aria-label="Mermaid 显示方式">
+      <button type="button" aria-pressed={!showCode} disabled={failed} onClick={() => setView("diagram")}>图表</button>
+      <button type="button" aria-pressed={showCode} onClick={() => setView("code")}>源码</button>
+    </div>
+  )
+
   return (
     <div className="md-mermaid" ref={rootRef}>
-      <div className="md-mermaid-tools" role="group" aria-label="Mermaid 显示方式">
-        <button type="button" aria-pressed={!showCode} disabled={failed} onClick={() => setView("diagram")}>图表</button>
-        <button type="button" aria-pressed={showCode} onClick={() => setView("code")}>源码</button>
-      </div>
       {current?.url ? (
-        <MermaidCanvas key={code} url={current.url} hidden={showCode}
+        <MermaidCanvas key={code} url={current.url} hidden={showCode} viewControls={viewControls}
           onLoad={() => registrationRef.current?.settle()}
           onError={() => setResult({ code, theme: resolvedTheme, url: null })} />
-      ) : <div hidden={showCode} className="md-mermaid-status">{streaming ? "图表生成中…" : "正在绘制图表…"}</div>}
+      ) : <>
+        <div className="md-mermaid-toolbar">{viewControls}</div>
+        <div hidden={showCode} className="md-mermaid-status">{streaming ? "图表生成中…" : "正在绘制图表…"}</div>
+      </>}
       {/* 保留源码 DOM，避免切换视图反复挂载高亮体。 */}
       <div hidden={!showCode}>{children}</div>
       {failed && <div className="md-mermaid-status">暂时无法绘制此图，已显示源码。</div>}

@@ -303,12 +303,31 @@
   max-width: 100%;
   margin: 0 0 var(--tc-prose-code-gap);
 }
+/* 保留工具栏高度，悬停时不推动图表；键盘和触屏仍可直接操作。 */
+.tc .md-mermaid-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  overflow-x: auto;
+}
+@media (hover: hover) and (pointer: fine) {
+  .tc .md-mermaid-toolbar {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .tc .md-mermaid:hover .md-mermaid-toolbar,
+  .tc .md-mermaid:has(:focus-visible) .md-mermaid-toolbar {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
 .tc .md-mermaid-tools {
   display: flex;
   justify-content: flex-end;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 4px;
+  flex-shrink: 0;
+  gap: 2px;
   font-family: var(--tc-typography-family-ui);
   font-size: var(--tc-prose-lang-size);
 }
@@ -341,8 +360,8 @@
 .tc .md-mermaid-tools button:disabled {
   cursor: default;
 }
-.tc .md-mermaid-scale {
-  min-width: 40px;
+.tc .md-mermaid-tools .md-mermaid-scale {
+  min-width: 44px;
   text-align: center;
   color: var(--tc-content-muted);
   font-variant-numeric: tabular-nums;
@@ -377,7 +396,6 @@
 @media (pointer: coarse) {
   .tc .md-mermaid-tools button {
     min-height: 44px;
-    min-width: 44px;
   }
 }
 .tc .md-mermaid-status {
