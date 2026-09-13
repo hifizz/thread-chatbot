@@ -219,6 +219,25 @@
   background: var(--tc-surface-ink);
   box-shadow: 0 8px 18px var(--tc-shadow-pop);
 }
+.tc .selection-toolbar[data-mobile="true"] {
+  left: 12px;
+  right: 12px;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
+  gap: 8px;
+  padding: 8px;
+}
+.tc .selection-toolbar[data-mobile="true"] button {
+  min-height: 44px;
+  font-size: 14px;
+}
+.tc .selection-toolbar[data-selecting="true"] {
+  visibility: hidden;
+  pointer-events: none;
+}
+.tc .selection-toolbar button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 /* 完成测量定位后再播放，复用提问弹窗的入场关键帧。 */
 .tc .selection-toolbar[data-positioned="true"] {
   animation: tc-pop 0.14s ease;

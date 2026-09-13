@@ -31,6 +31,8 @@ import React, {
 } from "react"
 import "./selection-draft-guard.css"
 import { SelectionToolbar } from "./selection-toolbar"
+import { SelectionQuestionDrawer } from "./selection-question-drawer"
+import { useIsMobile } from "@/hooks/use-mobile"
 import { useComposerDraftStore } from "../../chat/composer/composer-drafts"
 import { THREAD_QUOTE_SCHEMA_VERSION } from "@/lib/thread-chat/contracts/quote"
 import { shouldSubmitComposerKey } from "@/lib/chat/composer-keyboard"
@@ -86,10 +88,13 @@ export function SelectionBubble({
   lastActiveOf,
 }: SelectionBubbleProps) {
   const draftStore = useComposerDraftStore()
+  const mobile = useIsMobile()
   const [panel, setPanel] = useState<"toolbar" | "question">("toolbar")
+  const [mobileQuoteSaved, setMobileQuoteSaved] = useState(false)
   /** 可选首问（受控 textarea）：留空提交 = 现有预填流；非空提交 = 带问开分支 */
   const [question, setQuestion] = useState("")
   const hasQuestion = question.trim().length > 0
+  const guardMobileDraft = mobile && question.length > 0
   /** 有草稿时新划选被忽略的轻提示（悬挂在气泡外，不扰动面板高度/定位） */
   const [draftHint, setDraftHint] = useState(false)
   /** 轻提示自动消失计时器（再次忽略新划选时重置） */
@@ -109,7 +114,9 @@ export function SelectionBubble({
     state,
     selection: sel,
     onSelectionChange: onSelChange,
-    hasDraft: hasQuestion,
+    hasDraft: hasQuestion || guardMobileDraft || (mobile && panel === "question"),
+    mobile,
+    preserveEmptySelection: mobileQuoteSaved,
     onIgnoredSelection: showDraftHint,
   })
   /** Esc 确认弹窗（有草稿时 Esc 不直接关，先确认清空） */
@@ -132,6 +139,7 @@ export function SelectionBubble({
   if (forSel !== sel) {
     setForSel(sel)
     setPanel("toolbar")
+    setMobileQuoteSaved(false)
     setOverride(null)
     setMetaHeld(sel?.meta ?? false)
     setQuestion("")
@@ -154,7 +162,7 @@ export function SelectionBubble({
     const ro = new ResizeObserver(measure)
     ro.observe(el)
     return () => ro.disconnect()
-  }, [sel, panel])
+  }, [sel, panel, mobile])
 
   useEffect(() => {
     if (panel === "question" && measuredH > 0 && document.activeElement === document.body) {
@@ -185,6 +193,12 @@ export function SelectionBubble({
     if (!sel) return
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape" || e.isComposing) return
+      if (mobile && (panel === "question" || guardMobileDraft)) {
+        e.preventDefault()
+        e.stopPropagation()
+        setPanel(panel === "question" ? "toolbar" : "question")
+        return
+      }
       if (!question.trim()) return
       e.preventDefault()
       e.stopPropagation()
@@ -198,11 +212,11 @@ export function SelectionBubble({
     }
     document.addEventListener("keydown", onKey, true)
     return () => document.removeEventListener("keydown", onKey, true)
-  }, [sel, question, confirming])
+  }, [sel, question, confirming, mobile, panel, guardMobileDraft])
 
   if (!sel) return null
-  if (panel === "toolbar") return <SelectionToolbar rect={sel.rect}
-    onBranch={() => { window.getSelection()?.removeAllRanges(); setPanel("question") }}
+  const toolbar = <SelectionToolbar rect={sel.rect} mobile={mobile} continueDisabled={guardMobileDraft}
+    onBranch={() => { if (mobile) setMobileQuoteSaved(true); window.getSelection()?.removeAllRanges(); setPanel("question") }}
     onContinue={() => {
       const quote = { schemaVersion: THREAD_QUOTE_SCHEMA_VERSION, text: sel.text,
         source: { type: "message" as const, messageId: sel.msgId, anchor: sel.anchor } }
@@ -212,6 +226,7 @@ export function SelectionBubble({
       window.getSelection()?.removeAllRanges()
       onSelChange(null)
     }} />
+  if (panel === "toolbar" && !mobile) return toolbar
 
   /* —— 落点：floating-popup 定位模型，只用上/下两向（尾巴竖直指向选区）——
      测得高度前（measuredH=0）先把气泡藏到屏外并隐藏，测完这一帧即就位，避免旧位闪现。 */
@@ -303,6 +318,13 @@ export function SelectionBubble({
     window.getSelection()?.removeAllRanges()
     onSelChange(null)
   }
+
+  if (mobile) return <>
+    {panel === "toolbar" ? toolbar : null}
+    <SelectionQuestionDrawer open={panel === "question"} text={sel.text} question={question}
+      onQuestionChange={setQuestion} onClose={() => setPanel("toolbar")}
+      onSubmit={() => submit(false)} />
+  </>
 
   return (
     <>
