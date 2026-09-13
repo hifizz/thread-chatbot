@@ -122,6 +122,8 @@
     @apply border-border outline-ring/50;
     }
   body {
+    /* Base UI Drawer 的 iOS 遮罩需要已定位的 body。 */
+    position: relative;
     @apply bg-background text-foreground;
     }
   button:not(:disabled), [role="button"]:not(:disabled) {

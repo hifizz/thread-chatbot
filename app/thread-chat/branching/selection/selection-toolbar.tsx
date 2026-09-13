@@ -7,8 +7,8 @@ import { BUBBLE_GAP, BUBBLE_SAFE_PADDING } from "@/constants/selection-bubble"
 import { computePopupPosition, type Rect } from "./bubble-position"
 
 /** 只负责工具条展示、定位和键盘导航；操作由调用方接入。 */
-export function SelectionToolbar({ rect, onContinue, onBranch }: {
-  rect: Rect; onContinue(): void; onBranch(): void
+export function SelectionToolbar({ rect, onContinue, onBranch, mobile = false, continueDisabled = false }: {
+  rect: Rect; onContinue(): void; onBranch(): void; mobile?: boolean; continueDisabled?: boolean
 }) {
   const ref = useRef<HTMLDivElement>(null)
   const [height, setHeight] = useState(0)
@@ -25,8 +25,8 @@ export function SelectionToolbar({ rect, onContinue, onBranch }: {
   const position = height ? computePopupPosition(rect, { width, height }, {
     left: 0, top: 0, width: window.innerWidth, height: window.innerHeight,
   }, { sides: ["top", "bottom"], gap: BUBBLE_GAP, safePadding: BUBBLE_SAFE_PADDING }) : null
-  return <div ref={ref} className="selection-toolbar" data-positioned={Boolean(position)} role="toolbar" aria-label={COPY.label}
-    style={{ width, left: position?.left, top: position?.top, visibility: position ? "visible" : "hidden" }}
+  return <div ref={ref} className="selection-toolbar" data-mobile={mobile} data-positioned={mobile || Boolean(position)} role="toolbar" aria-label={COPY.label}
+    style={mobile ? undefined : { width, left: position?.left, top: position?.top, visibility: position ? "visible" : "hidden" }}
     onPointerDown={(event) => event.preventDefault()}
     onKeyDown={(event) => {
       if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return
@@ -37,7 +37,7 @@ export function SelectionToolbar({ rect, onContinue, onBranch }: {
       event.preventDefault()
       buttons[next]?.focus()
     }}>
-    <button type="button" title={COPY.continueLabel} onClick={onContinue}><MessageSquareReply size={16} aria-hidden="true" />{COPY.continue}</button>
+    <button type="button" disabled={continueDisabled} title={continueDisabled ? COPY.pendingQuestion : COPY.continueLabel} onClick={onContinue}><MessageSquareReply size={16} aria-hidden="true" />{mobile ? COPY.mobileContinue : COPY.continue}</button>
     <button type="button" title={COPY.branchLabel} onClick={onBranch}><GitBranch size={16} aria-hidden="true" />{COPY.branch}</button>
   </div>
 }
