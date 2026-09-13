@@ -18,6 +18,12 @@ export interface SelectionInfo {
   anchor: TextAnchor
 }
 
+// DOM 引用与可序列化选区分开保存；选区释放后由 WeakMap 自动回收。
+const selectionRoots = new WeakMap<SelectionInfo, HTMLElement>()
+export function getSelectionRoot(selection: SelectionInfo) {
+  return selectionRoots.get(selection)
+}
+
 /** assistant Markdown 划选的唯一 document 观察器与锚点采集边界。
  *  hasDraft：气泡输入框里有草稿时不允许「轻松取消」——外部点击 / 空选 /
  *  滚动都不关闭气泡，新划选也一律忽略（保留 DOM 选区供复制粘贴进输入框）。
@@ -101,7 +107,7 @@ export function useAssistantTextSelection({
           return
         }
         const rect = domSelection.getRangeAt(0).getBoundingClientRect()
-        onSelectionChange({
+        const nextSelection: SelectionInfo = {
           text: anchor.quote.exact,
           threadId,
           msgId,
@@ -113,7 +119,9 @@ export function useAssistantTextSelection({
           },
           meta,
           anchor,
-        })
+        }
+        selectionRoots.set(nextSelection, markdownRoot)
+        onSelectionChange(nextSelection)
       }, mobile ? MOBILE_SELECTION_SETTLE_MS : 10)
     }
     const onMouseUp = (event: MouseEvent) => {

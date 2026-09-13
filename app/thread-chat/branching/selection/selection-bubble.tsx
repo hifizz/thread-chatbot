@@ -30,6 +30,7 @@ import React, {
   useState,
 } from "react"
 import "./selection-draft-guard.css"
+import { useQuestionHighlight } from "./use-question-highlight"
 import { SelectionToolbar } from "./selection-toolbar"
 import { SelectionQuestionDrawer } from "./selection-question-drawer"
 import { useIsMobile } from "@/hooks/use-mobile"
@@ -150,6 +151,8 @@ export function SelectionBubble({
     setMeasuredH(0) // 换一段划选：高度作废，等重新测量再定位（先隐藏，避免旧位闪现）
   }
 
+  useQuestionHighlight(sel, panel === "question")
+
   /* 测量面板高度：内容变化（打字自增高 / 列条出现）经 ResizeObserver 实时回填，
      驱动定位模型重新择位（贴底时自动上下翻转），气泡不会被 viewport 裁切 */
   useLayoutEffect(() => {
@@ -164,11 +167,12 @@ export function SelectionBubble({
     return () => ro.disconnect()
   }, [sel, panel, mobile])
 
+  const questionPositioned = measuredH > 0
   useEffect(() => {
-    if (panel === "question" && measuredH > 0 && document.activeElement === document.body) {
+    if (!mobile && panel === "question" && questionPositioned) {
       taRef.current?.focus({ preventScroll: true })
     }
-  }, [panel, measuredH])
+  }, [panel, mobile, questionPositioned])
 
   /* 气泡打开期间跟踪 ⌘/Ctrl 起落（keydown/keyup 都带 metaKey/ctrlKey 快照） */
   useEffect(() => {
