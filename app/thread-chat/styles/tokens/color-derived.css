@@ -95,6 +95,7 @@
 /* contextual 派生只在显式上下文边界计算。注入变量与上下文类必须成对出现，
    token 层不枚举业务组件，新增组件也不会静默继承根节点的中性色计算结果。 */
 .tc .tc-accent-context {
+  --tc-question-highlight: color-mix(in srgb, var(--tc-accent, var(--tc-depth-neutral)) 20%, transparent);
   --tc-accent-wash: color-mix(in srgb, var(--tc-accent, var(--tc-depth-neutral)) 9%, transparent);
   --tc-accent-tint: color-mix(in srgb, var(--tc-accent, var(--tc-depth-neutral)) 8%, transparent);
   --tc-accent-hint: color-mix(in srgb, var(--tc-accent, var(--tc-depth-neutral)) 7%, transparent);

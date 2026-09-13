@@ -310,3 +310,8 @@
 .dark .tc .sel-bubble .sb-shape {
   filter: drop-shadow(0 8px 18px var(--tc-shadow-deep));
 }
+
+/* 临时提问引用：仅底色，沿用来源列的主题，不添加分支装饰。 */
+.tc ::highlight(tc-question) {
+  background-color: var(--tc-question-highlight);
+}
