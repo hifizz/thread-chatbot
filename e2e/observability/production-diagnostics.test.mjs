@@ -6,13 +6,21 @@ import { createResearchTools } from "../../lib/chat/research-tools.ts"
 import { createWebBudget, availableResearchTools } from "../../lib/ai/web-access.ts"
 
 const logs = []
+const originalInfo = console.info
 const originalWarn = console.warn
 const originalError = console.error
 const originalFetch = globalThis.fetch
 const originalEnv = process.env.NODE_ENV
 process.env.NODE_ENV = "production"
-console.warn = (prefix, json) => { if (prefix === "[ai-diagnostic]") logs.push(JSON.parse(json)) }
-console.error = console.warn
+const captureDiagnostic = (line) => {
+  try {
+    const entry = JSON.parse(String(line))
+    if (entry.source === "server-log" && entry.fields?.event) logs.push(entry.fields)
+  } catch {}
+}
+console.info = captureDiagnostic
+console.warn = captureDiagnostic
+console.error = captureDiagnostic
 try {
   globalThis.fetch = async () => new Response("private upstream body", { status: 429 })
   const inputs = await Promise.all(["a", "b"].map((id) => buildThreadChatTraceInput({
@@ -60,8 +68,9 @@ try {
   assert.equal(diagnosticCorrelation().assistantMessageId, undefined)
   assert.ok(!JSON.stringify(logs).includes("secret"))
   assert.ok(!JSON.stringify(logs).includes("private upstream body"))
-  console.info("生产诊断：429、预算拦截、并发关联、脱敏通过")
+  originalInfo("生产诊断：429、预算拦截、并发关联、脱敏通过")
 } finally {
+  console.info = originalInfo
   console.warn = originalWarn
   console.error = originalError
   globalThis.fetch = originalFetch

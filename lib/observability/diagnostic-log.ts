@@ -1,7 +1,7 @@
-import { AI_DIAGNOSTIC_LOG_PREFIX, AI_DIAGNOSTIC_EVENTS } from "@/constants/observability"
+import { AI_DIAGNOSTIC_EVENTS } from "@/constants/observability"
 import { AsyncLocalStorage } from "node:async_hooks"
 import { getActiveSpanId, getActiveTraceId } from "@langfuse/tracing"
-import { enqueueAxiomLog } from "@/lib/observability/axiom-log"
+import { logger } from "@/lib/axiom/server"
 import { safeErrorMetadata } from "@/lib/observability/error"
 
 /** 独立于遥测 exporter；未配置 Langfuse 时也保留应用关联标识。 */
@@ -38,12 +38,10 @@ export function logDiagnostic(
   error?: unknown,
   level: "info" | "warn" | "error" = "warn",
 ) {
-  const payload = {
+  logger[level](event, {
     event,
     ...fields,
     ...diagnosticCorrelation(),
     ...(error === undefined ? {} : safeErrorMetadata(error)),
-  }
-  console[level](AI_DIAGNOSTIC_LOG_PREFIX, JSON.stringify(payload))
-  enqueueAxiomLog({ level, ...payload })
+  })
 }

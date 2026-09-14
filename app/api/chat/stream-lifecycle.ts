@@ -4,6 +4,8 @@ import { GENERATION_ERRORS } from "@/constants/generation"
 import { chargeUsage } from "@/lib/billing/credits"
 import { usageCostEvidence } from "@/lib/billing/usage-cost-evidence"
 import type { OpenRouterStepLike } from "@/lib/ai/llm/openrouter"
+import { logger } from "@/lib/axiom/server"
+import { safeErrorMetadata } from "@/lib/observability/error"
 
 type UsageStep = OpenRouterStepLike & {
   usage: {
@@ -44,7 +46,12 @@ export function createStreamLifecycle(
   return {
     onError({ error }: { error: unknown }) {
       modelStreamError = GENERATION_ERRORS.streamFailed
-      console.error("[chat] 模型流错误:", error)
+      logger.error("chat.model_stream.error", {
+        modelId,
+        provider: model.provider,
+        threadId: linearThreadId,
+        ...safeErrorMetadata(error),
+      })
     },
 
     onAbort() {},
@@ -68,9 +75,11 @@ export function createStreamLifecycle(
         model.provider === "openrouter" &&
         costEvidence.source !== "openrouter"
       ) {
-        console.warn(
-          `[chat] OpenRouter 成本元数据不完整，使用静态估值：${model.id}`
-        )
+        logger.warn("billing.cost_fallback", {
+          provider: model.provider,
+          modelId: model.id,
+          costSource: costEvidence.source,
+        })
       }
       await dependencies.charge({
         userId,

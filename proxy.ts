@@ -1,12 +1,24 @@
-import { NextResponse, type NextRequest } from "next/server"
+import { NextResponse, type NextFetchEvent, type NextRequest } from "next/server"
 import { getSessionCookie } from "better-auth/cookies"
 import { ROUTES } from "@/constants/routes"
+import { logger } from "@/lib/axiom/server"
 
 // 乐观鉴权：仅检查会话 cookie 是否存在（不做数据库校验，避免 Edge 开销）。
 // 真正的会话有效性由各 API 路由 / 服务端再次校验。
 // Next 16 已将 middleware 约定重命名为 proxy（同签名）。
-export function proxy(request: NextRequest) {
+export function proxy(request: NextRequest, event: NextFetchEvent) {
   const { pathname } = request.nextUrl
+
+  logger.info("http.request", {
+    method: request.method,
+    path: pathname,
+    host: request.nextUrl.host,
+  })
+  event.waitUntil(logger.flush())
+
+  // API 仍由各 Route Handler 自己鉴权；这里只记录请求，不改变现有 API 行为。
+  if (pathname.startsWith("/api/")) return NextResponse.next()
+
   const hasSession = getSessionCookie(request) != null
 
   // 无需登录即可访问的页面（公开落地页 + 登录/注册/找回密码 + 法务页）
@@ -43,6 +55,6 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  // 仅拦截页面路由：排除 api、静态资源、图片等。
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|favicon).*)"],
+  // 记录页面与 API 请求；静态资源、图片和站点图标不进入应用日志。
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|favicon).*)"],
 }

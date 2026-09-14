@@ -100,4 +100,3 @@ export const AI_DIAGNOSTIC_EVENTS = {
   generationException: "generation.exception",
   generationInitializationError: "generation.initialization_error",
 } as const
-export const AI_DIAGNOSTIC_LOG_PREFIX = "[ai-diagnostic]"

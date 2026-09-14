@@ -1,5 +1,7 @@
 import type { Telemetry } from "ai"
+import { logger } from "@/lib/axiom/server"
 import { resolveObservabilityConfig } from "@/lib/observability/config"
+import { safeErrorMetadata } from "@/lib/observability/error"
 import { maskLangfuseExport } from "@/lib/observability/mask"
 
 type EnvironmentSource = Record<string, string | undefined>
@@ -99,10 +101,7 @@ async function initialize(
       devtools = "registered"
     } catch (error) {
       devtools = "failed"
-      console.warn(
-        "[observability] AI SDK DevTools 初始化失败，继续使用摘要日志",
-        error
-      )
+      logger.warn("observability.devtools.init_failed", safeErrorMetadata(error))
     }
   }
 
@@ -124,10 +123,7 @@ async function initialize(
       langfuse = "registered"
     } catch (error) {
       langfuse = "failed"
-      console.warn(
-        "[observability] Langfuse 初始化失败，继续使用摘要日志",
-        error
-      )
+      logger.warn("observability.langfuse.init_failed", safeErrorMetadata(error))
     }
   }
 
@@ -151,7 +147,7 @@ export function registerNodeObservability(
     options.source ?? process.env,
     options.runtime
   ).catch((error) => {
-    console.warn("[observability] 遥测注册失败，继续使用摘要日志", error)
+    logger.warn("observability.registration_failed", safeErrorMetadata(error))
     return {
       status: "degraded" as const,
       devtools: "failed" as const,
