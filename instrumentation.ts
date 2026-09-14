@@ -25,7 +25,10 @@ export const onRequestError: Instrumentation.onRequestError = async (
     routerKind: context.routerKind,
     routePath: context.routePath,
     routeType: context.routeType,
-    digest: "digest" in error ? error.digest : undefined,
+    digest:
+      typeof error === "object" && error !== null && "digest" in error
+        ? error.digest
+        : undefined,
     ...safeErrorMetadata(error),
   })
   await logger.flush()
