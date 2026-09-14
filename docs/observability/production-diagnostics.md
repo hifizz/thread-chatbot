@@ -32,8 +32,29 @@
 
 本改动仅补诊断，不修改联网预算、模型参数或失败恢复策略，不修复 #135/#136 尚未确认的根因。无法补回历史未记录的日志。
 
+## Axiom
+
+Axiom 是可选 transport，不替代 stdout。配置完整后，每条已经过上述脱敏规则处理的诊断事件会继续写 VPS stdout，同时异步批量发送到 Axiom；Axiom 不可用或 ingest 失败不会影响聊天请求。
+
+生产环境配置：
+
+```bash
+AXIOM_TOKEN=<server-only ingest API token>
+AXIOM_DATASET=thread-chat-production
+AXIOM_EDGE_URL=https://eu-central-1.aws.edge.axiom.co
+```
+
+`AXIOM_EDGE_URL` 使用 Axiom Settings > General 对应 edge deployment 的完整 URL。三个变量缺任意一个都会安全降级为仅 stdout。不要使用 `NEXT_PUBLIC_` 变量，也不要把 token 写入客户端代码。
+
+Axiom 事件额外包含 `timestamp`、`service=thread-chat`、`environment` 和 `release`。核心检索字段仍是 `event`、`requestId`、`threadId`、`assistantMessageId`、`toolCallId`、`modelId`、`provider`、`sessionId`、`traceId`。可以用 `traceId` 回到 Langfuse 查看同一条 AI 回复。
+
+推荐先建立三个查询/看板：按 `event` 聚合失败数；按 `modelId/provider` 聚合失败率；按 `traceId/requestId` 查看单次故障链路。
+
 ## 验证
 
-`node --import tsx e2e/observability/production-diagnostics.test.mjs`
+```bash
+node --import tsx e2e/observability/production-diagnostics.test.mjs
+node --import tsx e2e/observability/axiom-log.test.mjs
+```
 
-覆盖生产环境 429、并发 Session/Trace 隔离、预算拦截、敏感内容不进入日志；另运行已有供应商、Trace 和 UI 消息流测试。远端 Langfuse 与线上部署需在配置凭据的环境中核验。
+覆盖生产环境 429、并发 Session/Trace 隔离、预算拦截、敏感内容不进入日志，以及 Axiom 配置、批量 ingest、环境/release 元数据和未配置时安全降级。远端 Langfuse 与真实 Axiom 上报仍需在配置凭据的部署环境中核验。
