@@ -1,4 +1,5 @@
 import type { LanguageModelUsage } from "ai"
+import { logger } from "@/lib/axiom/server"
 import type {
   PromptCacheObservation,
   PromptCacheRouteIdentity,
@@ -81,28 +82,27 @@ export function reportPromptCacheObservation(
   observation: PromptCacheObservation
 ): void {
   try {
-    console.info(
-      "[thread-chat-prompt-cache]",
-      JSON.stringify({
-        status: observation.status,
-        actualProvider: observation.route.actualProvider,
-        protocol: observation.route.protocol,
-        credentialGroup: observation.route.credentialGroup,
-        upstreamModel: observation.route.upstreamModel,
-        generationMode: observation.generationMode,
-        promptSchemaVersion: observation.promptSchemaVersion,
-        projectContractVersion: observation.projectContractVersion,
-        explicitCacheEnabled: observation.explicitCacheEnabled,
-        inputTokens: observation.inputTokens,
-        noCacheTokens: observation.noCacheTokens,
-        cacheReadTokens: observation.cacheReadTokens,
-        cacheWriteTokens: observation.cacheWriteTokens,
-        outputTokens: observation.outputTokens,
-        metricFormula: observation.metricFormula,
-        tokenHitRate: observation.tokenHitRate,
-      })
-    )
+    logger.info("prompt_cache.observation", {
+      status: observation.status,
+      actualProvider: observation.route.actualProvider,
+      protocol: observation.route.protocol,
+      credentialGroup: observation.route.credentialGroup,
+      upstreamModel: observation.route.upstreamModel,
+      generationMode: observation.generationMode,
+      promptSchemaVersion: observation.promptSchemaVersion,
+      projectContractVersion: observation.projectContractVersion,
+      explicitCacheEnabled: observation.explicitCacheEnabled,
+      inputTokens: observation.inputTokens,
+      noCacheTokens: observation.noCacheTokens,
+      cacheReadTokens: observation.cacheReadTokens,
+      cacheWriteTokens: observation.cacheWriteTokens,
+      outputTokens: observation.outputTokens,
+      metricFormula: observation.metricFormula,
+      tokenHitRate: observation.tokenHitRate,
+    })
   } catch (error) {
-    console.warn("[thread-chat] Prompt 缓存摘要日志失败:", error)
+    logger.warn("prompt_cache.log_failed", {
+      errorName: error instanceof Error ? error.name : "UnknownError",
+    })
   }
 }
