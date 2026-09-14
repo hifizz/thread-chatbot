@@ -7,6 +7,7 @@ import {
 } from "@/lib/chat/markdown-artifact"
 import { createResearchTools } from "@/lib/chat/research-tools"
 import { artifactIdForTool } from "@/lib/thread-chat/domain/tool-identity"
+import { createGenerateVisualizationTool } from "@/lib/visualization/tool"
 
 export function createMarkdownArtifactTool(messageId: string) {
   return tool({
@@ -34,5 +35,9 @@ export function buildGenerationTools(input: {
     readUrl: readUrlTool,
     ...input.documentTools,
   }
-  return Object.fromEntries(input.toolNames.map((name) => [name, registry[name]]))
+  return {
+    ...Object.fromEntries(input.toolNames.map((name) => [name, registry[name]])),
+    // 可视化工具不参与按名选择，所有模式恒定附加。
+    generate_visualization: createGenerateVisualizationTool(),
+  }
 }
