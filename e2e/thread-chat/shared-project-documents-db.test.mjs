@@ -148,6 +148,31 @@ try {
   const [savedMessage] = await testDb.select().from(messages).where(eq(messages.id, messageA))
   const restored = toMessageDTO({ ...savedMessage, parts: [] })
   assert.ok(restored.parts.some(part => part.type === 'tool-updateProjectDocument' && part.output.status === a.status)); checks++
+  if (!process.env.THREADCHAT_TEST_DB_MODULE) {
+    const [otherArtifact] = await testDb.insert(artifacts).values({ id: id(), projectId, threadId: rootId,
+      sourceMessageId: sourceMessage, kind: 'markdown', title: '独立文档', content: '原方案' }).returning()
+    const other = await testDb.transaction(tx => repository.registerDocumentArtifact(tx, otherArtifact, userId))
+    const read = await service.readProjectDocument(identities[1], { documentId: other.documentId }, 'read-independent')
+    let locked, release, timer
+    const ready = new Promise(resolve => { locked = resolve })
+    const gate = new Promise(resolve => { release = resolve })
+    const holding = testDb.transaction(async tx => {
+      await tx.select().from(documents).where(eq(documents.id, documentId)).for('update')
+      locked()
+      await gate
+    })
+    await Promise.race([ready, holding])
+    try {
+      const committed = await Promise.race([
+        service.updateProjectDocument(identities[1], { documentId: other.documentId, expectedRevisionId: other.id,
+          readId: read.readId, edits: [{ oldText: '原方案', newText: '独立更新成功' }], changeSummary: '独立更新' }, 'update-independent'),
+        new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('其他文档锁不应阻塞独立更新')), 5000) }),
+      ])
+      assert.equal(committed.status, 'committed')
+      console.log('PASS 原生 PostgreSQL：持有 F1 文档锁期间，另一份文档独立提交成功')
+      checks++
+    } finally { clearTimeout(timer); release(); await holding }
+  }
   await requestMessageStop(userId, messageB, { commandId: id() })
   const stopped = await service.updateProjectDocument(identities[1], latestInput, 'after-stop')
   assert.equal(stopped.code, 'EXECUTION_INACTIVE'); checks++

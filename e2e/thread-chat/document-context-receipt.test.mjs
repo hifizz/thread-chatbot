@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict'
-import { withDocumentContextReceipt } from '../../lib/thread-chat/streaming/document-context-receipt.ts'
-import { documentExportSnapshot } from '../../lib/thread-chat/domain/document-export.ts'
+import { withDocumentContextReceipt } from '../../lib/thread-chat/streaming/documents/context-receipt.ts'
+import { documentExportSnapshot } from '../../lib/thread-chat/domain/documents/export.ts'
 
-import { documentContextForRequest } from '../../lib/thread-chat/domain/document-context-history.ts'
+import { documentContextForRequest } from '../../lib/thread-chat/domain/documents/context-history.ts'
 
 const consume = async (parts) => {
   let calls = 0
@@ -45,3 +45,10 @@ for (const request of ['把 @F1 的旧方案替换成盲评，保存为原文档
 }
 assert.equal(resolveGenerationMode({ researchMode: 'search', artifactRequested: true, documentTools: DOCUMENT_TOOL_NAMES }).firstTool, 'webSearch')
 console.log('PASS 文档生成策略：创建/更新自由选择，研究首步约束保持')
+
+const { messagePartsToContent } = await import('../../lib/thread-chat/contracts/message-content.ts')
+const content = messagePartsToContent(planned.parts)
+assert.deepEqual(content.parts, [{ type: 'text', text: '原用户问题' }])
+assert.equal(planned.parts.length, 2, '还原编辑内容不修改服务端保存的固定清单')
+assert.throws(() => messagePartsToContent([{ type: 'text', text: '问题' }, { type: 'unknown-data' }]), /不支持/)
+console.log('PASS 刷新/编辑消息：服务端文档清单不进入用户内容，未知类型仍拒绝')
