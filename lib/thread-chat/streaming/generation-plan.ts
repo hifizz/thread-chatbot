@@ -1,4 +1,4 @@
-import { DOCUMENT_INSTRUCTIONS, DOCUMENT_LIMITS } from "@/constants/project-documents"
+import { DOCUMENT_TOOL_NAMES } from "@/constants/project-documents"
 import { withDocumentContextReceipt } from "./document-context-receipt"
 import { buildDocumentTools } from "./document-tools"
 import { markDocumentContextUsed } from "../application/document-context"
@@ -145,28 +145,31 @@ export async function prepareGeneration(input: PrepareGenerationInput) {
   const artifactRequested = isExplicitMarkdownArtifactRequest(
     input.latestUserText
   )
+  const documentTools = buildDocumentTools({ userId: input.userId, projectId: input.projectId,
+    threadId: input.threadId, messageId: input.messageId })
   const generationMode = resolveGenerationMode({
     researchMode: researchRoute.mode,
     artifactRequested,
+    documentTools: DOCUMENT_TOOL_NAMES.filter((name) => name in documentTools),
   })
   const webBudget = createWebBudget({ mode: researchRoute.mode })
-  const tools: ToolSet = { ...buildGenerationTools({
+  const tools: ToolSet = buildGenerationTools({
+    documentTools,
     budget: webBudget,
     messageId: input.messageId,
     toolNames: searchReady
       ? generationMode.toolNames
       : generationMode.toolNames.filter(
-          (name) => name === "createMarkdownArtifact"
+          (name) => name !== "webSearch" && name !== "readUrl"
         ),
     routeReason: researchRoute.reasonCode,
-  }), ...buildDocumentTools({ userId: input.userId, projectId: input.projectId, threadId: input.threadId, messageId: input.messageId }) }
-  const maxSteps = Math.max(generationMode.maxSteps, DOCUMENT_LIMITS.toolSteps)
+  })
+  const maxSteps = generationMode.maxSteps
   const activeTools = Object.keys(tools)
   const projectContract = buildProjectContractContext(input.projectContract)
   const stableInstructions = [
     ...generationMode.systemParts.slice(0, 1),
     projectContract,
-    DOCUMENT_INSTRUCTIONS,
     ...generationMode.systemParts.slice(1),
   ]
     .filter((part): part is string => part !== null)
@@ -227,7 +230,7 @@ export async function prepareGeneration(input: PrepareGenerationInput) {
             activeTools: stepNumber >= maxSteps - 1
               ? []
               : availableResearchTools(activeTools, webBudget),
-            ...(stepNumber === 0 && generationMode.firstTool && !/(?:更新|修改|勾选|update|edit)/i.test(input.latestUserText)
+            ...(stepNumber === 0 && generationMode.firstTool
               ? {
                   toolChoice: {
                     type: "tool" as const,

@@ -1,3 +1,4 @@
+import { documentWritesEnabled } from "./documents/configuration"
 import { withConversationTransaction } from "../persistence/transaction"
 import type { ThreadChatUIMessage } from "../contracts/ui-message"
 import { and, desc, eq, sql } from "drizzle-orm"
@@ -82,7 +83,7 @@ export async function updateProjectDocument(identity: DocumentExecution, raw: Up
         const { project, message } = await lockExecution(tx, identity)
         const [doc] = await tx.select().from(documents).where(eq(documents.id, owned.id)).for("update")
         if (!doc?.currentRevisionId) return { status: "rejected", code: "DOCUMENT_UNAVAILABLE" }
-        if (process.env.THREAD_CHAT_DOCUMENT_WRITES === "false") return { status: "rejected", code: "WRITES_DISABLED" }
+        if (!documentWritesEnabled()) return { status: "rejected", code: "WRITES_DISABLED" }
         if (project.archivedAt || doc.archivedAt) return { status: "rejected", code: "DOCUMENT_READ_ONLY" }
         if (!message || message.role !== "assistant" || message.status !== "generating" || message.stopRequestedAt || message.supersededAt)
           return { status: "rejected", code: "EXECUTION_INACTIVE" }

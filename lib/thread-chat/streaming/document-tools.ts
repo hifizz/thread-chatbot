@@ -1,3 +1,4 @@
+import { documentWritesEnabled } from "../application/documents/configuration"
 import { tool } from "ai"
 import { DOCUMENT_INSTRUCTIONS } from "@/constants/project-documents"
 import { findDocumentsInputSchema, readDocumentInputSchema, updateDocumentInputSchema, type DocumentExecution } from "../contracts/document"
@@ -15,7 +16,7 @@ export function buildDocumentTools(identity: DocumentExecution) {
       inputSchema: readDocumentInputSchema,
       execute: (input, { toolCallId }) => readProjectDocument(identity, input, toolCallId),
     }),
-    ...(process.env.THREAD_CHAT_DOCUMENT_WRITES === "false" ? {} : {
+    ...(!documentWritesEnabled() ? {} : {
       updateProjectDocument: tool({
         description: DOCUMENT_INSTRUCTIONS,
         inputSchema: updateDocumentInputSchema,
