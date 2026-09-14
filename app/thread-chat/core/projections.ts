@@ -71,7 +71,10 @@ export function projectMessageDTO(input: {
 }): ConversationViewMessage {
   const { message, state } = input
   const forks: Fork[] = Object.values(state.threadsById)
-    .filter((thread) => thread.forkMessageId === message.id)
+    .filter(
+      (thread) =>
+        thread.forkMessageId === message.id && !thread.forkArtifactId
+    )
     .map((thread) => ({
       text: thread.anchorText ?? "",
       num: thread.footnote ?? 0,
@@ -146,6 +149,7 @@ export function projectThreadDTO(
         : (thread.anchorText ?? selectDisplayTitle(thread))),
     anchorText: thread.anchorText,
     forkFromMsgId: thread.forkMessageId,
+    forkArtifactId: thread.forkArtifactId ?? null,
     footnote: thread.footnote,
     children: Object.values(state.threadsById)
       .filter((child) => child.parentId === thread.id)
