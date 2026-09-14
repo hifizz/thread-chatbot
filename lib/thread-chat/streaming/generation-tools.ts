@@ -6,6 +6,7 @@ import {
 } from "@/lib/chat/markdown-artifact"
 import { createResearchTools } from "@/lib/chat/research-tools"
 import { artifactIdForTool } from "@/lib/thread-chat/streaming/artifacts"
+import { createGenerateVisualizationTool } from "@/lib/visualization/tool"
 
 export function createMarkdownArtifactTool(messageId: string) {
   return tool({
@@ -26,7 +27,7 @@ export function buildGenerationTools(input: {
 }) {
   const { readUrl: readUrlTool, webSearch: webSearchTool } =
     createResearchTools({ routeReason: input.routeReason, budget: input.budget })
-  return Object.fromEntries(
+  const selected = Object.fromEntries(
     input.toolNames.map((name) => [
       name,
       name === "createMarkdownArtifact"
@@ -36,4 +37,8 @@ export function buildGenerationTools(input: {
           : readUrlTool,
     ])
   )
+  return {
+    ...selected,
+    generate_visualization: createGenerateVisualizationTool(),
+  }
 }

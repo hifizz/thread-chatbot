@@ -143,7 +143,10 @@ export async function prepareGeneration(input: PrepareGenerationInput) {
     artifactRequested,
   })
   const webBudget = createWebBudget({ mode: researchRoute.mode })
-  const tools = buildGenerationTools({
+  // Generation modes select a dynamic subset of tools, while visualization is
+  // always mounted. Keep the orchestration boundary as ToolSet so AI SDK's
+  // prepareStep can safely address dynamically selected tool names.
+  const tools: ToolSet = buildGenerationTools({
     budget: webBudget,
     messageId: input.messageId,
     toolNames: searchReady
@@ -213,7 +216,7 @@ export async function prepareGeneration(input: PrepareGenerationInput) {
               ? {
                   toolChoice: {
                     type: "tool" as const,
-                    toolName: generationMode.firstTool as string,
+                    toolName: generationMode.firstTool,
                   },
                 }
               : { toolChoice: "auto" as const }),
@@ -243,7 +246,7 @@ export async function prepareGeneration(input: PrepareGenerationInput) {
     textStream: result.stream as ReadableStream<
       import("ai").TextStreamPart<ToolSet>
     >,
-    tools: tools as ToolSet,
+    tools,
     leadingChunks,
     usage: result.usage,
     contextMetadata: {

@@ -8,6 +8,7 @@ export const MODEL_CALL_PURPOSE = {
   researchPlan: "research-plan",
   researchRoute: "research-route",
   evaluationJudge: "evaluation-judge",
+  visualizationGenerate: "visualization-generate",
 } as const
 
 export type ModelCallPurpose =

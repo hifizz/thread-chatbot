@@ -14,6 +14,8 @@ import type {
 } from "@/lib/thread-chat/contracts/ui-message"
 import { createMarkdownArtifactProgressDispatcher } from "@/lib/chat/markdown-artifact"
 import { createWebResearchActivityDispatcher } from "@/lib/chat/web-research-activity"
+import { createVisualizationDispatcher } from "@/lib/visualization/stream"
+import { GENERATE_VISUALIZATION_TOOL_NAME } from "@/lib/visualization/types"
 import type { StreamSessionController } from "@/lib/thread-chat/streaming/stream-session"
 
 export interface UIMessagePipelineEnd {
@@ -57,6 +59,17 @@ function transientKey(
   chunk: Extract<ThreadChatUIMessageChunk, { type: `data-${string}` }>
 ): string {
   return `${chunk.type}:${chunk.id ?? ""}`
+}
+
+function withoutInternalVisualizationToolPart(
+  snapshot: ThreadChatUIMessage
+): ThreadChatUIMessage {
+  return {
+    ...snapshot,
+    parts: snapshot.parts.filter(
+      (part) => part.type !== `tool-${GENERATE_VISUALIZATION_TOOL_NAME}`
+    ),
+  }
 }
 
 function withTransientParts(
@@ -104,6 +117,15 @@ async function* injectLeadingChunks(
       data,
     })
   })
+  const visualization = createVisualizationDispatcher(
+    ({ toolCallId, visualization: data }) => {
+      derived.push({
+        type: "data-visualization",
+        id: `visualization:${toolCallId}`,
+        data,
+      })
+    }
+  )
   try {
     while (true) {
       const result = await reader.read()
@@ -112,6 +134,7 @@ async function* injectLeadingChunks(
       derived.length = 0
       await artifactProgress(result.value)
       researchActivity(result.value)
+      visualization(result.value)
       for (const chunk of derived) yield chunk
       if (!injected && result.value.type === "start") {
         injected = true
@@ -181,7 +204,9 @@ export async function consumeUIMessagePipeline<TOOLS extends ToolSet>({
   }).getReader()
 
   let reducedSnapshot = structuredClone(initialMessage)
-  let liveSnapshot = structuredClone(initialMessage)
+  let liveSnapshot = withoutInternalVisualizationToolPart(
+    structuredClone(initialMessage)
+  )
   const transientParts = new Map<string, ThreadChatUIMessageChunk>()
   try {
     for await (const chunk of injectLeadingChunks(generated, leadingChunks)) {
@@ -192,14 +217,15 @@ export async function consumeUIMessagePipeline<TOOLS extends ToolSet>({
         if (next.done) throw new Error("UI_MESSAGE_REDUCER_ENDED_EARLY")
         reducedSnapshot = next.value
       } else if (chunk.type === "start-step") {
-        // readUIMessageStream 在下一个可见更新才 emit step-start；先同步覆盖 Session。
         reducedSnapshot = appendStepStart(reducedSnapshot)
       }
 
       if (isDataChunk(chunk) && chunk.transient === true) {
         transientParts.set(transientKey(chunk), structuredClone(chunk))
       }
-      liveSnapshot = withTransientParts(reducedSnapshot, transientParts)
+      liveSnapshot = withoutInternalVisualizationToolPart(
+        withTransientParts(reducedSnapshot, transientParts)
+      )
       session.publish(chunk, liveSnapshot)
       await onSnapshot?.(liveSnapshot)
     }
@@ -208,8 +234,10 @@ export async function consumeUIMessagePipeline<TOOLS extends ToolSet>({
     snapshotReader.releaseLock()
   }
 
-  // 终态持久化不包含 transient data parts。
-  liveSnapshot = structuredClone(reducedSnapshot)
+  // 终态只持久化 authoritative data-visualization part，不保留内部可视化 Tool payload。
+  liveSnapshot = withoutInternalVisualizationToolPart(
+    structuredClone(reducedSnapshot)
+  )
   session.replaceSnapshot(liveSnapshot)
   await onSnapshot?.(liveSnapshot)
   return (

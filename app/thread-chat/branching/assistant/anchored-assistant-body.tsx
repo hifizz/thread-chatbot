@@ -3,6 +3,7 @@
 import type { MarkdownDensity } from "../../chat/message/markdown-body"
 import type { ConversationViewMessage, ThreadTreeState } from "../../core/types"
 import { WebResearchPanel } from "../../orchestration/overlays/web-research-panel"
+import { VisualizationBlock } from "@/components/visualization/visualization-block"
 import { AnchoredMarkdown } from "./anchored-markdown"
 import { assistantPartRenderPlan } from "./assistant-part-render-plan"
 
@@ -59,6 +60,15 @@ export function AnchoredAssistantBody({
               plan={message.researchPlan}
               complete={message.status === "done"}
               settled={message.status !== "pending" && message.status !== "streaming"}
+            />
+          )
+        }
+
+        if (kind === "visualization" && part.type === "data-visualization") {
+          return (
+            <VisualizationBlock
+              key={`${part.type}-${part.id ?? index}`}
+              visualization={part.data}
             />
           )
         }
