@@ -1,11 +1,12 @@
 "use client"
 
-import { createContext, useContext, useState, type ReactNode } from "react"
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react"
 import { createStore } from "zustand/vanilla"
 import { useStore } from "zustand"
 import type { ThreadQuoteDataV1 } from "@/lib/thread-chat/contracts/quote"
 import type { ThreadComposerDraft } from "@/lib/thread-chat/contracts/composer"
 import type { ComposerAttachmentDraft } from "@/lib/thread-chat/composer-attachments"
+import { clearStoredDraft, flushAllStoredDrafts, readStoredDraft, scheduleStoredDraft } from "./composer-draft-storage"
 
 export interface ComposerDraftEntry {
   draft: ThreadComposerDraft
@@ -24,6 +25,13 @@ const DraftContext = createContext<DraftStore | null>(null)
 
 export function ComposerDraftProvider({ children }: { children: ReactNode }) {
   const [store] = useState(createComposerDraftStore)
+  useEffect(() => {
+    window.addEventListener("pagehide", flushAllStoredDrafts)
+    return () => {
+      window.removeEventListener("pagehide", flushAllStoredDrafts)
+      flushAllStoredDrafts()
+    }
+  }, [])
   return <DraftContext.Provider value={store}>{children}</DraftContext.Provider>
 }
 
@@ -37,10 +45,24 @@ export function useComposerDraft(scope: string, initial: () => ThreadComposerDra
   const store = useComposerDraftStore()
   const [fallback] = useState<ComposerDraftEntry>(() => ({ draft: initial(), revision: 0 }))
   const entry = useStore(store, (state) => state.entries[scope] ?? fallback)
+
+  useEffect(() => {
+    if (store.getState().entries[scope]) return
+    const draft = readStoredDraft(scope) ?? fallback.draft
+    store.setState((state) => ({
+      entries: {
+        ...state.entries,
+        [scope]: { draft, revision: draft === fallback.draft ? 0 : 1 },
+      },
+    }))
+  }, [fallback, scope, store])
+
   function update(draft: ThreadComposerDraft, reset = false) {
     store.setState((state) => ({ entries: { ...state.entries, [scope]: {
       draft, revision: (state.entries[scope]?.revision ?? 0) + (reset ? 1 : 0),
     } } }))
+    if (reset) clearStoredDraft(scope)
+    else scheduleStoredDraft(scope, draft)
   }
   function clearSubmitted(submitted: ThreadComposerDraft) {
     const current = store.getState().entries[scope]?.draft ?? fallback.draft
