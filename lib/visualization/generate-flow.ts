@@ -1,4 +1,5 @@
-import { generateText, Output } from "ai"
+import { generateText, NoObjectGeneratedError, Output } from "ai"
+import { z } from "zod"
 import { getChatModel } from "@/constants/model"
 import { MODEL_CALL_PURPOSE } from "@/constants/model-call"
 import { isModelConfigured, resolveChatModel } from "@/lib/ai/llm/providers"
@@ -7,12 +8,12 @@ import { buildAiTelemetryConfig } from "@/lib/observability/ai-sdk"
 import { logger } from "@/lib/axiom/server"
 import { flowSpecSchema } from "@/lib/visualization/schema"
 import type {
-  FlowSpec,
   GenerateVisualizationInput,
   GenerateVisualizationResult,
 } from "@/lib/visualization/types"
 import {
   verifyFlowGraph,
+  verifyFlowSpec,
   type FlowVerificationError,
 } from "@/lib/visualization/verify-flow"
 
@@ -34,6 +35,8 @@ function basePrompt(input: GenerateVisualizationInput): string {
   return [
     "Convert the user's request into a concise user-flow graph.",
     "Return only the structured object requested by the schema.",
+    // JSON-mode providers may omit response_format.schema from the wire request.
+    `Required JSON schema: ${JSON.stringify(z.toJSONSchema(flowSpecSchema))}`,
     "Rules:",
     "- Describe semantic flow only. Never emit coordinates, styles, handles, React Flow, Dagre, ELK, SVG, or HTML fields.",
     "- Prefer 5-15 nodes unless the request genuinely needs more.",
@@ -51,7 +54,7 @@ function basePrompt(input: GenerateVisualizationInput): string {
 
 function repairPrompt(
   input: GenerateVisualizationInput,
-  spec: FlowSpec,
+  spec: unknown,
   errors: readonly FlowVerificationError[]
 ): string {
   return [
@@ -90,7 +93,7 @@ export async function generateVerifiedVisualization(
 ): Promise<GenerateVisualizationResult> {
   const startedAt = performance.now()
   const { modelId, model } = visualizationModel()
-  let previousSpec: FlowSpec | null = null
+  let previousSpec: unknown = null
   let previousErrors: FlowVerificationError[] = []
   let firstPass: "passed" | "failed" = "failed"
   let lastError: unknown
@@ -100,7 +103,7 @@ export async function generateVerifiedVisualization(
       const response = await generateCandidate({
         model,
         prompt:
-          previousSpec && previousErrors.length > 0
+          previousErrors.length > 0
             ? repairPrompt(input, previousSpec, previousErrors)
             : basePrompt(input),
       })
@@ -138,8 +141,15 @@ export async function generateVerifiedVisualization(
       previousErrors = verification.errors
     } catch (error) {
       lastError = error
-      previousSpec = null
-      previousErrors = []
+      if (NoObjectGeneratedError.isInstance(error) && error.text !== undefined) {
+        try {
+          previousSpec = JSON.parse(error.text)
+          previousErrors = verifyFlowSpec(previousSpec).errors
+        } catch {
+          previousSpec = error.text
+          previousErrors = [{ code: "schema_invalid", path: "", message: "Output is not valid JSON" }]
+        }
+      }
       if (attempt === 1) firstPass = "failed"
     }
   }

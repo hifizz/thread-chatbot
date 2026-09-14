@@ -25,13 +25,13 @@
 - [x] 4.1 Register `generate_visualization` in the existing Tool registry.
 - [x] 4.2 Make the Tool description encourage use for user/product/business/agent flows without requiring the main model to author nodes, edges, SVG, or library schemas.
 - [x] 4.3 Return verified `FlowSpec` plus verification metadata from the Tool result.
-- [ ] 4.4 Add tests proving the Tool contract remains unchanged when the visualization model implementation changes.
+- [x] 4.4 Add tests proving the Tool contract remains unchanged when the visualization model implementation changes.
 
 ## 5. Message persistence
 
 - [x] 5.1 Add typed `data-visualization` assistant message part support for `kind=user-flow` and versioned `FlowSpec`.
 - [x] 5.2 Persist `FlowSpec` only; do not store final SVG, HTML, positions, React Flow nodes, ELK graph objects, or other renderer output as the authoritative visualization data.
-- [ ] 5.3 Verify serialization/deserialization and historical message loading for the new part.
+- [x] 5.3 Verify serialization/deserialization and historical message loading for the new part.
 - [ ] 5.4 Verify existing Thread/Fork/Share/Snapshot behavior carries the visualization part through the existing Message lifecycle without a new visualization ownership table.
 
 ## 6. Renderer adapter boundary
@@ -48,13 +48,13 @@
 - [x] 7.2 Add `FlowCanvas` and focused node/edge rendering components.
 - [ ] 7.3 Reuse or extract the existing Mermaid diagram shell/toolbar where practical.
 - [x] 7.4 Support Preview/Source, Fit, Zoom Out, Zoom In, and Reset.
-- [ ] 7.5 Verify desktop and mobile rendering for representative horizontal and vertical flows.
+- [x] 7.5 Verify desktop and mobile rendering for representative horizontal and vertical flows.
 
 ## 8. Renderer replacement acceptance
 
 - [x] 8.1 Add an acceptance test or fixture demonstrating that replacing the V1 adapter/renderer does not require migration of existing `data-visualization` message data.
 - [x] 8.2 Confirm renderer replacement does not require changing `GenerateVisualizationInput`, generation responsibilities, or renderer-independent Schema/Graph Verify.
-- [ ] 8.3 Confirm a renderer-specific capability gap degrades in Adapter/Renderer instead of introducing a third-party field into `FlowSpec`.
+- [x] 8.3 Confirm a renderer-specific capability gap degrades in Adapter/Renderer instead of introducing a third-party field into `FlowSpec`.
 
 ## 9. Observability and evaluation
 
@@ -72,5 +72,5 @@
 
 - [x] 11.1 Run `openspec validate add-user-flow-visualization --strict` and resolve all validation errors.
 - [x] 11.2 Run `openspec validate --all --strict` and ensure the new change does not break existing specs.
-- [ ] 11.3 Run typecheck, relevant unit/integration tests, and production build after implementation. (`typecheck` and User Flow contract tests pass in Visualization CI; production build remains pending because the current Vercel preview fails earlier in the existing database migration step.)
+- [x] 11.3 Run typecheck, relevant unit/integration tests, and production build after implementation. (Local macOS typecheck, User Flow contracts, UI Message pipeline tests, and production build passed on 2026-09-15. The existing search-abort source-count assertion still fails independently.)
 - [x] 11.4 Verify no renderer-specific schema has become part of authoritative message persistence before marking the change complete.

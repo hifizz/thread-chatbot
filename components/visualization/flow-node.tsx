@@ -1,6 +1,7 @@
 "use client"
 
 import { Handle, Position, type NodeProps } from "@xyflow/react"
+import { FLOW_NODE_HEIGHT, FLOW_NODE_WIDTH } from "@/constants/visualization-renderer"
 import type { FlowRenderNode } from "@/components/visualization/react-flow-adapter"
 
 const kindLabels = {
@@ -17,7 +18,11 @@ export function FlowNode({ data }: NodeProps<FlowRenderNode>) {
   const horizontal = data.direction === "LR"
 
   return (
-    <div className="w-[196px] rounded-xl border border-border bg-card px-3 py-2.5 text-card-foreground shadow-sm">
+    <div
+      className={`rounded-xl border border-border bg-card px-3 py-2.5 text-card-foreground shadow-sm ${node.kind === "decision" ? "border-dashed border-2" : ""}`}
+      style={{ width: FLOW_NODE_WIDTH, height: FLOW_NODE_HEIGHT }}
+      title={[node.label, node.description].filter(Boolean).join("\n")}
+    >
       <Handle
         type="target"
         position={horizontal ? Position.Left : Position.Top}
@@ -29,10 +34,10 @@ export function FlowNode({ data }: NodeProps<FlowRenderNode>) {
             {kindLabels[node.kind]}
           </span>
         ) : null}
-        <span className="min-w-0 text-sm font-medium leading-5">{node.label}</span>
+        <span className="min-w-0 line-clamp-2 break-words text-sm font-medium leading-5">{node.label}</span>
       </div>
       {node.description ? (
-        <p className="mt-1 line-clamp-2 text-xs leading-4 text-muted-foreground">
+        <p className="mt-1 line-clamp-2 break-words text-xs leading-4 text-muted-foreground">
           {node.description}
         </p>
       ) : null}
