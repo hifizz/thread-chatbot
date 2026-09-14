@@ -207,7 +207,7 @@ DocumentRevision 就是权威变更事件，列表按文档 revisionNumber 表�
 | --- | --- |
 | `lib/thread-chat/contracts/document.ts`（新增） | DTO、只读/写入输入、错误联合、固定上下文 Part 校验 |
 | `lib/thread-chat/domain/document-edit.ts`（新增） | 原文匹配、重叠检查、倒序应用等纯函数；不操作 DB、不调用模型 |
-| `lib/thread-chat/persistence/document-repository.ts`（新增） | Document/Revision 查询、锁、head 更新及版本约束 |
+| `lib/thread-chat/persistence/documents/`（新增） | Document/Revision 查询、锁、head 更新及版本约束 |
 | `lib/thread-chat/application/` | resolve/read/update-document 应用服务；权限、收据、事务、来源审计；统一编译固定版本 |
 | `lib/thread-chat/streaming/` | 工具注册/结果持久化、执行身份与 Stop 协调、最终化去重、冲突重试预算 |
 | `app/thread-chat/orchestration/artifacts/` | 文档列表、当前/历史版本、差异和来源导航 |

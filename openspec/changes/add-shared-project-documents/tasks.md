@@ -1,4 +1,4 @@
-本 Change 已开始实施；勾选表示对应代码或本地验证完成。原生 PostgreSQL、真实模型和浏览器验收由用户在 macOS 本地继续进行，详见 implementation.md。不修改 #143 的完成状态，不在功能分支生成数据库迁移。
+本 Change 已开始实施；勾选表示对应代码或本地验证完成。2026-09-15 已完成原生 PostgreSQL 验证及部分真实模型、EGO 浏览器验收，未覆盖项仍保持未勾选，详见 implementation.md。不修改 #143 的完成状态，不在功能分支生成数据库迁移。
 
 ## 1. 依赖与合同
 
@@ -8,7 +8,7 @@
 
 ## 2. 数据与版本仓储
 
-- [ ] 2.1 在 Schema 源码增加 documents/document_revisions，验证同文档 parent/head、唯一 artifactId/版本号、来源关系和项目隔离；在独立数据库 db:push，不生成 drizzle 文件。
+- [x] 2.1 在 Schema 源码增加 documents/document_revisions，验证同文档 parent/head、唯一 artifactId/版本号、来源关系和项目隔离；在独立数据库 db:push，不生成 drizzle 文件。
 - [x] 2.2 实现 Document current/历史/差异/版本列表查询，正文只从固定 Artifact 读取；增加按 Artifact 精确解析 Document 的查询。
 - [x] 2.3 接通普通 Markdown 创建的原子 Document/R1 登记与更新产物的去重路径；验证提交不得留下 currentRevisionId 空的可见文档。
 - [x] 2.4 编写可恢复、幂等的旧 completed Markdown 登记过程，保留旧 Artifact ID，不按同名合并；验证重复运行、部分失败、未登记不可写及原引用回放。
@@ -16,7 +16,7 @@
 ## 3. 文档更新应用服务
 
 - [x] 3.1 实现统一 updateDocument 服务：所有权校验、文档行锁、幂等回放、可写/执行状态检查、expectedRevisionId 和 readId 验证、原子 Artifact/Revision/head/收据提交。
-- [ ] 3.2 通过真实并发事务验证 A/B 同版本修改：仅一个提交成功、另一个版本冲突；不同文档独立更新，统一锁顺序，持锁期间不调用模型。
+- [x] 3.2 通过真实并发事务验证 A/B 同版本修改：仅一个提交成功、另一个版本冲突；不同文档独立更新，统一锁顺序，持锁期间不调用模型。
 - [x] 3.3 实现结构化冲突/拒绝/no-op 结果与请求校验，覆盖整笔失败无副作用、超限、文档归档、ID 重用不同 payload 及成功后 head 前进仍回放原收据。
 - [x] 3.4 校验 Stop 与提交的先后协调，保证停止先发生不写入、提交先成功不撤销；最终化/恢复不重复收集或删除已提交 Artifact。
 

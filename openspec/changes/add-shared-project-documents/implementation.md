@@ -21,7 +21,7 @@
 
 PGlite 的连接事务是串行执行的，这组测试不能替代原生 PostgreSQL 多连接锁竞争。保留真实数据库执行入口：准备独立测试库并 `db:push` 后，设置 DATABASE_URL 运行数据库测试。
 
-## 尚未通过的发布门槛
+## 交接时尚未通过的发布门槛（本地进展见末节）
 
 1. 原生 PostgreSQL 多连接竞争、旧库登记/升级演练。用户决定在 macOS 本地验收；本轮未操作 Neon。
 2. 真实模型自然语言工具序列验收；样例保存在 `e2e/thread-chat/document-update-cases.json`，交由用户使用 macOS 本地配置运行。
@@ -49,3 +49,15 @@ PGlite 的连接事务是串行执行的，这组测试不能替代原生 Postgr
 本轮验证：TypeScript、相关 ESLint、Markdown 修改 12 项、文档数据库检查 31 项、使用收据/失败计划/固定导出测试、预算错误测试、Markdown 可见文字、Quote 合同、StreamSession、提示词缓存和 #143 Artifact fork 数据库/SDK 上下文回归通过。数据库结果来自 PGlite；不代表原生多连接、真实模型或浏览器已通过。OpenSpec 全量严格校验 38 项通过。
 
 本地运行按 [macOS 验收清单](macos-acceptance.md)。仍未归档或发布。模型目录没有可信的完整请求 tokenizer/context window，因此生产预算保持 unknown；保留提供商超限反馈和范围缩减流程，不能声称已实现所有模型的精确调用前计量。
+
+## 2026-09-15 代码质量修复与本地复验
+
+- 将 application、persistence、domain、streaming 各层文档功能放入各自 documents 目录；维持层间边界，不用全局 utils 汇集业务规则。
+- 统一工具选择、步骤预算、写入开关、来源资格与固定上下文展开规则。应用服务保留事务编排，SQL 与收据解析进入专门仓储。
+- 历史列表只返回元数据；差异展开时再读取固定正文。版本选择、差异、导出分别维护操作状态；显式传递提问状态，异步导航失效后不得覆盖当前视图。
+- EGO 发现并修复版本菜单层级、重复 React key，以及持久化文档清单被误当用户编辑内容造成刷新崩溃的问题。
+- 独立本机数据库 wt_pr145_quality 完成 db:push、seed，原生应用服务检查 35 项通过。实际观察 A/B 双连接等待同一文档锁，并验证持有 F1 锁期间另一份文档成功提交；无 migration、snapshot、journal 变更。
+- GPT-5.6 Luna 通过真实 @artifact 执行 readProjectDocument → updateProjectDocument，一次提交方案和复选框；一个 Document、两个版本，刷新后正文、来源和 committed 收据保留。
+- EGO 完成桌面差异、V1 切换/导出、390×844 手机展示、分享失败重试、真实提问状态禁用版本切换。分享失败使用 fixture 注入，不能视为系统分享成功。
+
+详见 [本地修复验收记录](../../../docs/acceptance/pr-145-quality-review.md)。tasks 仅新增勾选 2.1、3.2。真实 A/B/C 全流程、完整边界模型案例、系统分享、主题/焦点矩阵、关闭写入后重启及旧生产库迁移仍待验收。完整请求预算保持 unknown。
