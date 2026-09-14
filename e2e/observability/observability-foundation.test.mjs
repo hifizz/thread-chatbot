@@ -59,16 +59,15 @@ const productionSource = {
 }
 assert.deepEqual(resolveTelemetryContentPolicy({ source: productionSource }), {
   enabled: true,
-  recordInputs: false,
-  recordOutputs: false,
-  reason: "metadata-only",
+  recordInputs: true,
+  recordOutputs: true,
+  reason: "content-enabled",
 })
 assert.equal(
   resolveTelemetryContentPolicy({
     source: productionSource,
-    allowContentCapture: true,
   }).reason,
-  "production-cohort"
+  "content-enabled"
 )
 assert.equal(
   resolveTelemetryContentPolicy({
@@ -79,7 +78,7 @@ assert.equal(
       AI_OBSERVABILITY_ENVIRONMENT: "evaluation",
     },
   }).reason,
-  "evaluation"
+  "content-enabled"
 )
 assert.equal(
   resolveObservabilityConfig(productionSource).devtoolsEnabled,
@@ -89,14 +88,12 @@ assert.equal(
 const allowedContext = buildObservabilityRuntimeContext({
   requestId: "request-1",
   modelId: "provider/model",
-  allowContentCapture: true,
   // JS 合同测试故意注入未知字段，证明 allowlist 会丢弃它。
   secret: "must-not-export",
 })
 assert.equal(allowedContext.requestId, "request-1")
 assert.equal(allowedContext.modelId, "provider/model")
 assert.ok(!("secret" in allowedContext))
-assert.ok(!("allowContentCapture" in allowedContext))
 const telemetryConfig = buildAiTelemetryConfig("chat-answer", {
   requestId: "request-1",
 })
@@ -112,6 +109,12 @@ const secretFixture = {
   authorization: "Bearer super-secret-token",
   Cookie: "session=abc",
   apiKey: "sk-abcdefghijklmnop",
+  api_key: "snake-case-key",
+  "api-key": "kebab-case-key",
+  secret: "client-secret",
+  password: "password-value",
+  token: "token-value",
+  credentials: { username: "admin", password: "nested-password" },
   profile: {
     email: "person@example.com",
     phone: "+65 8123 4567",
@@ -120,6 +123,9 @@ const secretFixture = {
   query: "customer confidential query",
   attachmentBody: "private attachment body",
   pageText: "private page body",
+  rawRequest: { body: "raw provider request" },
+  rawResponse: { body: "raw provider response" },
+  providerResponse: { body: "provider response" },
   providerError: { body: "raw provider response" },
   output: "safe answer <think>hidden reasoning</think> after",
   nested: ["Bearer another-token", "https://example.com/path?token=secret"],
@@ -130,20 +136,36 @@ for (const secret of [
   "super-secret-token",
   "session=abc",
   "abcdefghijklmnop",
+  "snake-case-key",
+  "kebab-case-key",
+  "client-secret",
+  "password-value",
+  "token-value",
+  "admin",
+  "nested-password",
+]) {
+  assert.ok(!serializedMasked.includes(secret), `exporter 泄漏了 ${secret}`)
+}
+for (const content of [
   "person@example.com",
   "8123 4567",
-  "?a=1",
+  "?a=1#secret",
   "customer confidential query",
   "private attachment body",
   "private page body",
+  "raw provider request",
   "raw provider response",
+  "provider response",
   "hidden reasoning",
   "another-token",
   "?token=secret",
 ]) {
-  assert.ok(!serializedMasked.includes(secret), `exporter 泄漏了 ${secret}`)
+  assert.ok(serializedMasked.includes(content), `exporter 误清洗了 ${content}`)
 }
-assert.equal(masked.profile.url, "https://example.com/private")
+assert.equal(
+  masked.profile.url,
+  "https://example.com/private?a=1#secret"
+)
 assert.equal(maskTelemetryValue({ self: null }).self, null)
 
 function fakeRuntime({ remoteFailure = false } = {}) {

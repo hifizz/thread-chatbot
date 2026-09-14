@@ -20,7 +20,7 @@
 - 用 AI SDK 官方遥测注册同时支撑本地 DevTools 和 Langfuse，避免每个模型调用手写不同 exporter。
 - 让一个 assistant Message 的路由、模型步骤、工具、Search attempt、后台消费和终态形成一棵可追踪的运行树。
 - 保持数据库为会话与反馈事实源，Langfuse 只承担观测、分析、Score 和实验。
-- 以 metadata-only 的生产默认策略降低隐私风险和 Cloud 用量；需要内容时采用明确环境或 cohort 开关和统一脱敏。
+- 用显式内容开关在生产记录完整 Input/Output，支持线上诊断与评测；需要时可独立关闭内容而保留结构遥测。
 - 以项目内版本化 case 为评测事实源，并使用 Langfuse Datasets/Experiments 提供运行、比较和可视化。
 - 允许从 Langfuse Cloud 平滑切到兼容的 Langfuse OSS endpoint。
 
@@ -44,11 +44,11 @@
 
 | 环境       |      AI SDK DevTools |                     Langfuse |                           内容记录 |
 | ---------- | -------------------: | ---------------------------: | ---------------------------------: |
-| 本地开发   | 默认开启，可显式关闭 |                     默认关闭 |     仅本机，可包含完整开发输入输出 |
-| 自动测试   |                 关闭 |                     默认关闭 |                               关闭 |
-| 显式评测   |                 关闭 | 使用独立 environment/project |          对批准 fixture 开启并脱敏 |
-| staging    |                 关闭 |                         开启 |             默认关闭，允许受控开启 |
-| production |             强制关闭 |                 有凭据时开启 | 默认关闭，仅显式抽样 cohort 可开启 |
+| 本地开发   | 默认开启，可显式关闭 |                     默认关闭 | 由 `AI_TELEMETRY_RECORD_CONTENT` 控制 |
+| 自动测试   |                 关闭 |                     默认关闭 | 由 `AI_TELEMETRY_RECORD_CONTENT` 控制 |
+| 显式评测   |                 关闭 | 使用独立 environment/project | 由 `AI_TELEMETRY_RECORD_CONTENT` 控制 |
+| staging    |                 关闭 |                         开启 | 由 `AI_TELEMETRY_RECORD_CONTENT` 控制 |
+| production |             强制关闭 |                 有凭据时开启 | 由 `AI_TELEMETRY_RECORD_CONTENT` 控制 |
 
 所有 `streamText`、`generateText`、embedding 和后续 rerank 调用通过共享 helper 设置稳定的 `functionId`、是否记录输入输出以及运行上下文。`functionId` 优先复用 `MODEL_CALL_PURPOSE`；新增工具/步骤名称进入 `constants/`，不在调用点散落字符串。
 
@@ -60,7 +60,7 @@
 
 开发环境注册官方 `DevToolsTelemetry()`，查看器读取其本地数据；`.devtools/` 整体进入 `.gitignore`，生产构建和运行时必须有断言防止 DevTools 初始化。
 
-第一阶段生产使用独立 Langfuse Cloud project。按 2026-08-28 官方价格页，Hobby 当前无需信用卡，包含每月 50k units、30 天历史和 2 位用户；这些数字写入运维文档并标记查询日期，不作为永久合同。初期不采集生产正文且不增加 collector，可最大限度降低接入和运维成本。
+第一阶段生产使用独立 Langfuse Cloud project。按 2026-08-28 官方价格页，Hobby 当前无需信用卡，包含每月 50k units、30 天历史和 2 位用户；这些数字写入运维文档并标记查询日期，不作为永久合同。生产开启 Input/Output 以支持线上诊断与评测，达到用量边界后再按实际数据决定抽样、升级或自托管。
 
 配置至少区分：
 
@@ -108,7 +108,7 @@ root attributes:
 
 **替代方案：**新增 `generationId`/Trace 映射表。它会重新制造规范化改造已经移除的第二身份与一致性问题，因此拒绝。
 
-### D4. Trace 树按业务步骤命名，不记录隐藏推理
+### D4. Trace 树按业务步骤命名，内容由统一开关控制
 
 统一 Trace 结构：
 
@@ -128,24 +128,23 @@ AI SDK integration 负责模型、step、tool 和 usage；应用自定义 span �
 
 每个 provider attempt 至少包含 correlation/Trace、provider、operation、route reason、attempt index、fallback count、outcome、duration、原始 usage unit/quantity 和安全错误分类。只保留 query fingerprint 和域名级信息；不保留完整 query、URL 或 response body。
 
-公开给用户的 reasoning/data/tool UI parts 与遥测分开处理。遥测只记录 part 类型、数量、状态和允许的公开摘要；MiniMax `<think>` 提取出来的隐藏推理正文以及任何 provider chain-of-thought 均不得导出。
+公开给用户的 reasoning/data/tool UI parts 与遥测分开处理。启用内容采集时，遥测可以记录 MiniMax `<think>`、provider reasoning、data/tool parts 和原始 provider payload；出口只清洗明确的凭据字段。
 
 **替代方案：**把每个 UI stream chunk 都作为 span/event。它会显著增加 Cloud units、噪声和敏感内容风险，且不提升步骤级诊断，因此只记录聚合 checkpoint 指标，不记录 token/chunk 明细。
 
 ### D5. 生产内容采集采用集中策略与出口脱敏
 
-建立一个 server-only telemetry policy，默认：
+建立一个 server-only telemetry policy：
 
 ```text
-recordInputs  = false
-recordOutputs = false
-recordMetadata/timing/usage/errors = true
-sampling = 100% metadata-only（低流量初期）
+recordInputs  = AI_TELEMETRY_RECORD_CONTENT
+recordOutputs = AI_TELEMETRY_RECORD_CONTENT
+recordMetadata/timing/usage/errors = AI_TELEMETRY_ENABLED
 ```
 
-只有 `evaluation`、明确 staging 开关或受控 production cohort 可以开启内容。cohort 判定先于模型调用，结果作为布尔策略传递，不把用户输入用作 exporter 规则。即使开启，Langfuse span processor 的 mask 函数仍是最后出口，递归处理 input/output/metadata，删除 auth、cookie、API key、secret、邮箱/手机号等配置规则、URL 查询参数、附件正文、页面正文和禁止字段。
+环境标签不改变内容采集语义。Langfuse span processor 的 mask 函数作为最后出口，递归处理 input/output/metadata，只删除字段名为 authorization、cookie、apiKey、secret、password、token 或 credentials 的值；不扫描普通字符串，不改写 URL，不清洗 provider payload、附件/页面正文或 reasoning。
 
-首阶段不使用 head sampling，因为它可能在请求开始时丢弃后来才失败的 Trace；低流量下先全量记录 metadata。达到 Cloud units 边界后再根据实测 span 数量决定 trace-level sampling。若未来必须保证保留所有错误，再评估 tail sampling/collector，而不是承诺简单 head sampling 能做到。
+首阶段不使用 head sampling，因为它可能在请求开始时丢弃后来才失败的 Trace；低流量下先全量记录完整 Trace。达到 Cloud units 边界后再根据实测 span 数量决定 trace-level sampling。若未来必须保证保留所有错误，再评估 tail sampling/collector，而不是承诺简单 head sampling 能做到。
 
 **替代方案：**默认记录完整 prompt/output 后依赖人工删除。Cloud 免费层只有有限历史且数据已离开应用边界，风险不可接受。
 
@@ -238,7 +237,7 @@ CI/评测 Trace 使用独立 environment、experiment/case/candidate attributes�
   -> 继续观测并回流新失败
 ```
 
-初期不自动抓取生产正文，因为生产默认不记录内容且自动复制会破坏隐私边界。操作员可用 Message ID 在有权限的产品数据库中复盘，经人工生成最小化、去身份化 case。后续若内容 cohort 和治理成熟，可以增加“候选 case”队列，但仍需人工批准才能进入 committed suite。
+生产 Trace 可以记录正文，但不自动把它复制进仓库评测集。操作员从有权限的 Langfuse Trace 或产品数据库复盘，经人工生成最小化、去身份化 case；后续可以增加“候选 case”队列，但仍需人工批准才能进入 committed suite。
 
 ### D11. Node.js 运行时先升级，部署采用可关闭的增量 Gate
 
@@ -252,7 +251,7 @@ CI/评测 Trace 使用独立 environment、experiment/case/candidate attributes�
 - [开发热更新导致 telemetry 重复注册和重复 span] → 使用进程级 singleton/`Symbol.for` guard，并测试重复调用 register。
 - [Langfuse 故障拖慢或破坏请求] → 批量 exporter、短超时、post-commit feedback、边界 catch；所有产品行为只依赖数据库和 Agent 结果。
 - [生产 metadata 仍可关联用户] → user ID 使用 HMAC 匿名化；只发送必要的 opaque Message/Project/Thread IDs；建立集中 allowlist 与 mask 出口。
-- [内容抽样泄漏敏感 prompt、附件或网页] → 默认关闭 input/output，显式 cohort，出口 mask，测试注入 credential/PII/URL/page content，禁止隐藏推理。
+- [完整内容采集可能包含用户数据] → 使用显式环境变量控制，出口清洗明确凭据字段；需要停止内容采集时无需关闭全部遥测。
 - [50k units 很快被多步 Agent 消耗] → 不记录 chunk/token 级事件，先测每次 Agent 平均 units，Cloud dashboard 定期检查；smoke 与 scheduled 分档，接近上限时再抽样/升级/自托管。
 - [Hobby 30 天历史不足以长期回归] → 关键失败经脱敏进入 repo dataset；实验摘要和配置指纹可保存为 CI artifact/仓库允许的报告，不依赖无限 Trace 留存。
 - [模型与 Web 结果非确定造成误报] → 稳定 contract 与 live Web 分组；相同 case IDs 比较；记录 provider failure；阈值按 suite 校准，不以单次 judge 总分阻断。
@@ -265,7 +264,7 @@ CI/评测 Trace 使用独立 environment、experiment/case/candidate attributes�
 
 1. **Gate 0—运行时与基线**：将本地、CI、VPS 固定到 Node.js 22+；记录升级前后 typecheck、build 与现有 Thread Chat gates；准备 Langfuse Cloud 独立 project/region 和 server-only secrets。
 2. **Gate 1—本地 DevTools**：安装并注册官方 DevTools，忽略本地数据目录；验证开发模型、工具、embedding 可见，生产启动断言 DevTools 未启用。
-3. **Gate 2—metadata-only 生产 Trace**：接入 Langfuse/OpenTelemetry，总开关初始关闭；先在 staging 验证身份、Trace 树、mask 和失败隔离，再对 production 小流量开启，之后逐步到 metadata-only 全量。
+3. **Gate 2—生产完整 Trace**：接入 Langfuse/OpenTelemetry，总开关初始关闭；先在 staging 验证身份、Trace 树、窄凭据字段 mask 和失败隔离，再对 production 小流量开启完整内容，之后逐步到低流量全量。
 4. **Gate 3—完整 Thread Chat 与反馈**：根 Trace 包住 `runGeneration`，补 provider attempt/checkpoint/finalize；启用 post-commit feedback mirror 和幂等 backfill。验证 Stop、Retry、断线、初始化失败和重启恢复。
 5. **Gate 4—评测基线**：建立五个小型 suite、合成 fixtures、runner、确定性 scorer、Langfuse Dataset 同步和 experiment；保存 AnySearch/当前 prompt/当前模型 baseline。模型裁判只在人工校准后启用。
 6. **Gate 5—持续回归**：建立生产问题人工策展流程；根据 Cloud units 实测启用小型 CI action 和 scheduled/release suite；配置 suite-specific threshold 与 override/rollback。
@@ -281,4 +280,4 @@ CI/评测 Trace 使用独立 environment、experiment/case/candidate attributes�
 
 - Langfuse Cloud 选择欧洲、美国或日本 region；在 apply 前根据 VPS 位置、延迟和数据要求选择，只影响 base URL 与数据驻留说明。
 - 第一个模型裁判使用哪一模型、抽多少人工标签以及各 suite 的阻断阈值；在 Gate 4 跑出 baseline 后决定，不改变 runner 与评分分层。
-- metadata-only 全量运行后的平均 units/Agent 与 scheduled suite 频率；用 Gate 2/4 实测决定是否需要 sampling 或付费计划。
+- 完整 Trace 全量运行后的平均 units/Agent 与 scheduled suite 频率；用 Gate 2/4 实测决定是否需要 sampling 或付费计划。

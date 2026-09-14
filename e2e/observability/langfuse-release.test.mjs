@@ -33,7 +33,7 @@ test("deployed readiness reports metadata-only without exposing credentials", ()
   assert.ok(!JSON.stringify(report).includes("sk-lf-test"))
 })
 
-test("content capture, missing salt, local release, and insecure endpoint fail closed", () => {
+test("content capture is allowed while missing salt, local release, and insecure endpoint fail closed", () => {
   const source = deployedSource("http://langfuse.internal:3000")
   source.AI_TELEMETRY_RECORD_CONTENT = "true"
   source.AI_OBSERVABILITY_ID_SALT = ""
@@ -44,7 +44,11 @@ test("content capture, missing salt, local release, and insecure endpoint fail c
     report.checks
       .filter((check) => check.status === "fail")
       .map((check) => check.id),
-    ["metadata-only", "anonymous-user-salt", "release", "endpoint"]
+    ["anonymous-user-salt", "release", "endpoint"]
+  )
+  assert.equal(
+    report.checks.find((check) => check.id === "content-capture")?.status,
+    "pass"
   )
 })
 

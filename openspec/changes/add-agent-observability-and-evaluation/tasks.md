@@ -12,8 +12,8 @@
 
 - [x] 2.1 在 `constants/` 和 `lib/observability/` 定义稳定的环境、Trace/Observation 名称、attribute allowlist、错误类别和应用自有遥测上下文类型
 - [x] 2.2 实现 assistant Message/request 到确定性 Trace ID、feedback Score ID 和带 salt HMAC 用户匿名 ID 的 server-only helper，并增加稳定性与不泄漏原始用户 ID 的测试
-- [x] 2.3 实现集中 telemetry policy，默认 production `recordInputs=false`、`recordOutputs=false`，只允许 evaluation、staging 或显式 cohort 开启内容
-- [x] 2.4 实现 Langfuse 出口 mask，递归清除 credential、Authorization、Cookie、secret、个人信息、完整敏感 query/URL、附件/网页正文、原始 provider payload 和隐藏推理字段
+- [x] 2.3 实现集中 telemetry policy，由 `AI_TELEMETRY_RECORD_CONTENT` 在所有环境统一控制 `recordInputs` 和 `recordOutputs`
+- [x] 2.4 实现 Langfuse 出口 mask，只按字段名递归清除 authorization、cookie、apiKey、secret、password、token 和 credentials
 - [x] 2.5 增加根级 Next.js `instrumentation.ts` 与 Node.js 专用初始化模块，以进程级 singleton 防止开发热更新或测试重复注册
 - [x] 2.6 在 development 条件注册官方 AI SDK DevTools，提供本地启动/查看命令，并加入生产环境不得初始化 DevTools 的显式保护
 - [x] 2.7 在配置完整时注册 Langfuse Vercel AI SDK integration、span processor 和批量 exporter；配置缺失或初始化失败时安全降级到现有服务端摘要日志
@@ -21,7 +21,7 @@
 - [x] 2.9 将回答、研究路由、研究计划、标题、附件洞察、embedding batch/query 等现有 AI SDK 调用接到共享 telemetry option builder
 - [x] 2.10 让 `withModelCallLogging` 复用新的关联上下文与 attribute 命名，同时继续只输出结构摘要，不输出 prompt/output 正文
 - [x] 2.11 增加注册合同测试，覆盖重复 register、development、test、production、缺失 Langfuse 凭据、远程初始化异常和 production DevTools 禁用
-- [x] 2.12 增加脱敏测试，注入 API key、Authorization、Cookie、邮箱/手机号、完整 URL/query、附件/页面正文、原始 provider error 和 `<think>` 内容，确认 exporter 只能收到允许字段
+- [x] 2.12 增加脱敏测试，确认 exporter 只清洗 authorization、cookie、apiKey、secret、password、token、credentials 字段，并保留其他内容
 
 ## 3. 规范化 Thread Chat 与过渡入口 Trace
 
@@ -58,11 +58,11 @@
 ## 6. Langfuse Cloud 验证与渐进发布
 
 - [ ] 6.1 由操作员创建独立 Langfuse Cloud Hobby project，按 VPS 位置和数据要求选择 region，并把 public/secret key 仅配置到 server-side secret store
-- [ ] 6.2 在 staging 以 metadata-only 和 telemetry 总开关关闭为初始状态部署，确认无凭据日志、无 DevTools、无 prompt/output 正文
+- [ ] 6.2 在 staging 以 telemetry 总开关关闭为初始状态部署，再开启内容采集，确认完整 input/output 可见、凭据字段已清洗且无 DevTools
 - [ ] 6.3 开启 staging telemetry，分别运行普通回答、研究路由、Search/Fetch、工具、Stop、Retry 和失败场景，人工核对 Langfuse Trace 树、session、usage、终态和匿名用户属性
 - [ ] 6.4 进行 Langfuse endpoint 不可达、401、429、超时和 exporter flush 失败演练，确认 Agent 响应、后台生成、终态落库与 feedback 保存不受影响
-- [ ] 6.5 记录 metadata-only 场景的平均/高位 units 每次 Agent、ingestion 速率和历史窗口需求，并编写接近 50k units、30 天或 2 用户边界时的检查与决策清单
-- [ ] 6.6 先对 production 小范围开启，再逐步到低流量 metadata-only 全量；记录开关、release、验证证据和一键关闭 remote export 的回滚步骤
+- [ ] 6.5 记录完整内容场景的平均/高位 units 每次 Agent、ingestion 速率和历史窗口需求，并编写接近套餐边界时的检查与决策清单
+- [ ] 6.6 先对 production 小范围开启完整内容采集，再逐步到低流量全量；记录开关、release、验证证据和关闭内容或 remote export 的回滚步骤
 - [x] 6.7 用非生产兼容 endpoint 或配置测试验证 Cloud base URL 可替换，且切换不改变 Agent 编排、Trace seed、Message schema 或 feedback 事实源
 
 ## 7. 项目自有评测基础设施
@@ -111,7 +111,7 @@
 - [ ] 10.2 运行现有 Thread Chat 数据库、Session、UI Message pipeline、API、client store 和 cutover gates，证明遥测不会改变会话状态机和用户行为
 - [ ] 10.3 运行 local smoke 和至少一次 baseline/candidate Experiment，确认 case、Trace、scores、fingerprint、报告和 final flush 完整
 - [x] 10.4 运行 `pnpm typecheck`、`pnpm lint` 和适用生产 build；若存在无关既有失败，单独记录基线且不掩盖新增失败
-- [ ] 10.5 在本地实际查看 DevTools 的普通回答与多步工具运行，在 Langfuse staging 实际查看 metadata-only Trace、反馈 Score 和 Experiment，并保存无敏感内容的验收证据
+- [ ] 10.5 在本地实际查看 DevTools 的普通回答与多步工具运行，在 Langfuse staging 实际查看完整 Input/Output、凭据字段脱敏、反馈 Score 和 Experiment，并保存验收证据
 - [x] 10.6 完成开发、环境变量、Cloud region/额度、隐私策略、故障处置、feedback backfill、评测数据维护、CI override、生产回流和 Cloud→OSS 切换文档
 - [x] 10.7 运行 `git diff --check` 与 `openspec validate add-agent-observability-and-evaluation --strict`，确认所有 capability scenarios 均有实现或明确的分 Gate 验收证据
 
