@@ -143,7 +143,10 @@ export async function prepareGeneration(input: PrepareGenerationInput) {
     artifactRequested,
   })
   const webBudget = createWebBudget({ mode: researchRoute.mode })
-  const tools = buildGenerationTools({
+  // Generation modes select a dynamic subset of tools, while visualization is
+  // always mounted. Keep the orchestration boundary as ToolSet so AI SDK's
+  // prepareStep can safely address dynamically selected tool names.
+  const tools: ToolSet = buildGenerationTools({
     budget: webBudget,
     messageId: input.messageId,
     toolNames: searchReady
@@ -153,12 +156,7 @@ export async function prepareGeneration(input: PrepareGenerationInput) {
         ),
     routeReason: researchRoute.reasonCode,
   })
-  type ActiveToolName = Extract<keyof typeof tools, string>
-  const activeTools = Object.keys(tools) as ActiveToolName[]
-  const firstTool =
-    generationMode.firstTool && generationMode.firstTool in tools
-      ? (generationMode.firstTool as ActiveToolName)
-      : null
+  const activeTools = Object.keys(tools)
   const projectContract = buildProjectContractContext(input.projectContract)
   const stableInstructions = [
     ...generationMode.systemParts.slice(0, 1),
@@ -214,32 +212,62 @@ export async function prepareGeneration(input: PrepareGenerationInput) {
             activeTools: stepNumber >= generationMode.maxSteps - 1
               ? activeTools.filter((name) => name === "createMarkdownArtifact")
               : availableResearchTools(activeTools, webBudget),
-            ...(stepNumber === 0 && firstTool
+            ...(stepNumber === 0 && generationMode.firstTool
               ? {
                   toolChoice: {
                     type: "tool" as const,
-                    toolName: firstTool,
+                    toolName: generationMode.firstTool,
                   },
                 }
               : { toolChoice: "auto" as const }),
           }),
-          stopWhen: isStepCount(generationMode.maxSteps),
         }
       : {}),
+    stopWhen: isStepCount(generationMode.maxSteps),
   })
 
-  return {
-    result,
-    tools: tools as ToolSet,
-    researchRoute,
-    researchPlan,
-    generationMode,
-    promptCache: {
-      policy: cachePolicy,
-      boundaries: input.promptCacheBoundaries,
-      schemaVersion: THREAD_CHAT_PROMPT_SCHEMA_VERSION,
+  const leadingChunks: ThreadChatUIMessageChunk[] = [
+    {
+      type: "data-research-route",
+      id: "research-route",
+      data: researchRoute,
     },
-    contextBudget,
-    contextMetadata,
+    ...(researchPlan
+      ? [
+          {
+            type: "data-research-plan" as const,
+            id: "research-plan",
+            data: researchPlan,
+          },
+        ]
+      : []),
+  ]
+  return {
+    textStream: result.stream as ReadableStream<
+      import("ai").TextStreamPart<ToolSet>
+    >,
+    tools,
+    leadingChunks,
+    usage: result.usage,
+    contextMetadata: {
+      ...contextMetadata,
+      contextBudget,
+      webBudgetPolicy: webBudget.policy,
+      generationMode: generationMode.id,
+      promptSchemaVersion: THREAD_CHAT_PROMPT_SCHEMA_VERSION,
+      actualProvider: resolvedModel.route.actualProvider,
+      protocol: resolvedModel.route.protocol,
+      credentialGroup: resolvedModel.route.credentialGroup,
+      upstreamModel: resolvedModel.route.upstreamModel,
+      explicitCacheEnabled: cachePolicy.explicitCacheEnabled,
+      promptCacheBreakpointCount: cachedPrompt.breakpointCount,
+    },
+    promptCacheContext: {
+      route: resolvedModel.route,
+      generationMode: generationMode.id,
+      promptSchemaVersion: THREAD_CHAT_PROMPT_SCHEMA_VERSION,
+      projectContractVersion: input.projectContract.version,
+      explicitCacheEnabled: cachePolicy.explicitCacheEnabled,
+    },
   }
 }
