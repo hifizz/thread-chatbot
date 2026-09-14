@@ -1,3 +1,6 @@
+import { AI_DIAGNOSTIC_EVENTS } from "@/constants/observability"
+import { logDiagnostic } from "@/lib/observability/diagnostic-log"
+import { safeErrorMetadata } from "@/lib/observability/error"
 import { createHash } from "node:crypto"
 import { AsyncLocalStorage } from "node:async_hooks"
 import { getActiveSpanId, getActiveTraceId } from "@langfuse/tracing"
@@ -260,6 +263,7 @@ export async function runProviderAttempt<T>(
           errorCategory: classifyObservabilityError(error),
         }
         emitProviderAttemptEvent(finishEvent)
+        logDiagnostic(AI_DIAGNOSTIC_EVENTS.providerFailure, { ...finishEvent, ...safeErrorMetadata(error) }, error, outcome === "cancelled" ? "info" : "warn")
         observation.update({
           level: outcome === "cancelled" ? "DEFAULT" : "ERROR",
           statusMessage: `provider attempt ${outcome}`,

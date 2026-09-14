@@ -1,3 +1,5 @@
+import { AI_DIAGNOSTIC_EVENTS } from "@/constants/observability"
+import { logDiagnostic, withDiagnosticContext } from "@/lib/observability/diagnostic-log"
 import { tool } from "ai"
 import { z } from "zod"
 import { webSearch, webFetch } from "@/lib/ai/search"
@@ -47,11 +49,34 @@ export function createResearchTools(context: ResearchToolContext = {}) {
     pending.set(key, request)
     try { return await request } finally { pending.delete(key) }
   }
-  return {
+  function observeTool<T>(toolName: string, toolCallId: string, signal: AbortSignal | undefined, execute: () => Promise<WebToolResult<T>>) {
+    return withDiagnosticContext({ toolName, toolCallId }, async () => {
+      const startedAt = performance.now()
+      try {
+        const result = await execute()
+        if (!result.ok) {
+          logDiagnostic(AI_DIAGNOSTIC_EVENTS.toolFailure, {
+            durationMs: Math.round(performance.now() - startedAt),
+            errorCode: result.error.code,
+            nextAction: result.nextAction,
+            providerAttempts: budget.attempts,
+            budgetElapsedMs: budget.elapsedMs,
+            budgetReason: budget.exhaustedReason,
+            remainingChars: budget.remainingChars,
+          })
+        }
+        return result
+      } catch (error) {
+        logDiagnostic(AI_DIAGNOSTIC_EVENTS.toolException, { durationMs: Math.round(performance.now() - startedAt) }, error, signal?.aborted ? "info" : "error")
+        throw error
+      }
+    })
+  }
+  const tools = {
     webSearch: tool({
       description: "联网核实实时事实，优先官方资料；摘要不足时继续 readUrl。失败时按 nextAction 调整查询，证据充分即停止。",
       inputSchema: z.object({ query: z.string().describe("具体的检索关键词或问题") }),
-      execute: async ({ query }, { abortSignal }) => run(`search:${query.trim()}`, abortSignal, async () => {
+      execute: async ({ query }, { abortSignal, toolCallId }) => observeTool("webSearch", toolCallId, abortSignal, () => run(`search:${query.trim()}`, abortSignal, async () => {
         if (!query.trim()) throw new WebAccessError("INVALID_QUERY", "请提供有效查询。", "revise_query")
         const { results } = await budget.run(abortSignal, (signal, attemptIndex) =>
           webSearch(query.trim(), SEARCH_MAX_RESULTS, signal, { routeReason: context.routeReason, attemptIndex }))
@@ -68,12 +93,12 @@ export function createResearchTools(context: ResearchToolContext = {}) {
         const data = { query, results: selected }
         budget.spendContent(JSON.stringify(data).length)
         return data
-      }),
+      })),
     }),
     readUrl: tool({
       description: "读取公开网页。长文档按页返回；hasMore=true 时传入原 URL 和 nextCursor 继续同一快照，不会重复抓取。全文任务请读至末尾，取证任务证据足够即可停止。totalChars 是抽取快照长度，不保证原网页完整。游标仅本次生成有效。ok=false 不是正文；不向用户复述内部参数。",
       inputSchema: z.object({ url: z.string().describe("公开网页 URL"), cursor: z.string().nullish().describe("同一 URL 上次返回的 nextCursor；首次读取省略") }),
-      execute: async ({ url, cursor }, { abortSignal }) => {
+      execute: async ({ url, cursor }, { abortSignal, toolCallId }) => observeTool("readUrl", toolCallId, abortSignal, async () => {
         abortSignal?.throwIfAborted()
         const readCursor = cursor?.trim() || undefined
         let normalized: string
@@ -83,7 +108,8 @@ export function createResearchTools(context: ResearchToolContext = {}) {
         }
         return run(`fetch:${normalized}:${readCursor ?? "first"}`, abortSignal, () =>
           documents.read(normalized, readCursor, abortSignal, () => webFetch(normalized, { signal: abortSignal, budget, routeReason: context.routeReason })))
-      },
+      }),
     }),
   }
+  return tools
 }

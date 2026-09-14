@@ -1,3 +1,5 @@
+import { AI_DIAGNOSTIC_EVENTS } from "@/constants/observability"
+import { logDiagnostic } from "@/lib/observability/diagnostic-log"
 import { contextLimitFailure } from "../application/context-budget"
 import type { LanguageModelUsage, TextStreamPart, ToolSet } from "ai"
 import type { GenerationSettings } from "@/constants/generation-settings"
@@ -192,6 +194,7 @@ async function runGenerationCore({
       },
     })
   } catch (error) {
+    logDiagnostic(AI_DIAGNOSTIC_EVENTS.generationException, { assistantMessageId: message.id }, error, session.signal.aborted ? "info" : "error")
     thrown = error
   }
 
@@ -362,6 +365,7 @@ export async function runGeneration(input: {
         },
       },
       async (observation) => {
+        logDiagnostic(AI_DIAGNOSTIC_EVENTS.generationInitializationError, { assistantMessageId: input.messageId }, error, "error")
         const terminal = await observeAppOperation(
           OBSERVATION_NAMES.generationFinalize,
           {

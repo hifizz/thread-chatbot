@@ -65,6 +65,7 @@ export async function buildThreadChatTraceInput(input: {
     sessionId: input.projectId,
     tags: ["thread-chat", "normalized"],
     context: {
+      requestId: crypto.randomUUID(),
       projectId: input.projectId,
       threadId: input.threadId,
       assistantMessageId: input.assistantMessageId,
