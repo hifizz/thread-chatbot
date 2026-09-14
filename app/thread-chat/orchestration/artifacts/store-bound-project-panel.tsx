@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useMemo } from "react"
+import { useCallback, useEffect, useMemo } from "react"
 import type { ConversationStore } from "../../core/store"
 import { useConversationStore } from "../../core/use-thread-store"
 import type { ThreadChatClient } from "../../net/client"
@@ -74,6 +74,36 @@ export function StoreBoundProjectPanel({
       }),
     [state.artifactOrder, state.artifactsById]
   )
+
+  // ProjectPanel 的渲染组件保持纯展示；这里把当前 Markdown 阅读区标记成可划选来源。
+  // 全局唯一 selection observer 据此获得稳定的 artifact/message/thread identity。
+  useEffect(() => {
+    if (!open || !activeId) return
+    const artifact = state.artifactsById[activeId]
+    if (!artifact || artifact.kind !== "markdown" || !state.project) return
+    const frame = window.requestAnimationFrame(() => {
+      const surface = document.querySelector<HTMLElement>(
+        ".project-panel.open .project-artifact-content"
+      )
+      if (!surface) return
+      surface.dataset.selectionArtifactId = artifact.id
+      surface.dataset.selectionMessageId = artifact.sourceMessageId
+      surface.dataset.selectionThreadId =
+        artifact.threadId === state.project?.rootThreadId
+          ? "main"
+          : artifact.threadId
+    })
+    return () => {
+      window.cancelAnimationFrame(frame)
+      const surface = document.querySelector<HTMLElement>(
+        ".project-panel .project-artifact-content"
+      )
+      if (!surface) return
+      delete surface.dataset.selectionArtifactId
+      delete surface.dataset.selectionMessageId
+      delete surface.dataset.selectionThreadId
+    }
+  }, [activeId, open, state.artifactsById, state.project])
 
   const refresh = useCallback(async () => {
     const bootstrap = await client.getProject(projectId)
