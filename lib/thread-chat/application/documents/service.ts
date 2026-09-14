@@ -1,7 +1,7 @@
 import { findOwnedProject, findRootThreadId } from "../../persistence/project-repository"
 import { pendingDocumentUpdates } from "../../persistence/documents/context"
 import type { ProjectDocumentsDTO } from "../../contracts/document"
-import { isActiveDocumentExecution } from "../../domain/document-execution"
+import { isActiveDocumentExecution } from "../../domain/documents/execution"
 import { lockDocumentExecution, countExecutionConflicts, hasDocumentReadReceipt, saveDocumentToolResult,
   type DocumentReadReceipt, type DocumentUpdateReceipt } from "../../persistence/documents/commands"
 import { lockDocument, appendDocumentRevision } from "../../persistence/documents/writes"
@@ -10,7 +10,7 @@ import { type ConversationTransaction, withConversationTransaction } from "../..
 import { db } from "@/lib/db"
 import { DOCUMENT_COMMAND, DOCUMENT_LIMITS } from "@/constants/project-documents"
 import { type DocumentExecution, type DocumentReadResult, type UpdateDocumentInput, type UpdateDocumentResult, updateDocumentInputSchema } from "../../contracts/document"
-import { applyDocumentEdits } from "../../domain/document-edit"
+import { applyDocumentEdits } from "../../domain/documents/edit"
 import { artifactIdForTool } from "../../domain/tool-identity"
 import { executeIdempotentCommand } from "../../persistence/command-repository"
 import { documentForArtifact, findOwnedDocument, listOwnedDocuments, readDocumentRevision, listDocumentHistory, listDocumentCommits } from "../../persistence/documents/queries"

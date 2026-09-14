@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { DOCUMENT_UI_COPY } from "@/constants/project-documents"
 import type { ArtifactDTO } from "@/lib/thread-chat/contracts/dto"
-import { documentExportSnapshot } from "@/lib/thread-chat/domain/document-export"
+import { documentExportSnapshot } from "@/lib/thread-chat/domain/documents/export"
 
 export function DocumentExportActions({ artifact }: { artifact: ArtifactDTO }) {
   const [error, setError] = useState<string | null>(null)

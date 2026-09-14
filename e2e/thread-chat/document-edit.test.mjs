@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { applyDocumentEdits } from '../../lib/thread-chat/domain/document-edit.ts'
+import { applyDocumentEdits } from '../../lib/thread-chat/domain/documents/edit.ts'
 const input = '# 计划\n- [ ] TODO6\n方案：旧方案\n\n其他任务保持不变'
 assert.deepEqual(applyDocumentEdits(input, [
   { oldText: '- [ ] TODO6', newText: '- [x] TODO6' },

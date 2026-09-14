@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm"
 import { artifacts, documents, documentRevisions, messages } from "@/lib/db/schema"
 import type { DocumentExecution, DocumentRevisionDTO, UpdateDocumentInput } from "../../contracts/document"
-import { canRegisterDocument } from "../../domain/document-execution"
+import { canRegisterDocument } from "../../domain/documents/execution"
 import { artifactIdForTool } from "../../domain/tool-identity"
 import type { ConversationTransaction } from "../transaction"
 

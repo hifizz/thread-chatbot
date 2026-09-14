@@ -1,4 +1,4 @@
-import type { ArtifactDTO } from "../contracts/dto"
+import type { ArtifactDTO } from "../../contracts/dto"
 
 /** 导出/系统文件分享只捕获当前所选固定 Artifact，绝不解析 Document head。 */
 export function documentExportSnapshot(artifact: ArtifactDTO) {

@@ -1,4 +1,4 @@
-import { DOCUMENT_LIMITS } from "@/constants/project-documents"
+import { DATABASE_TRANSACTION_ATTEMPTS } from "@/constants/database"
 import { eq, sql } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { projects, threads } from "@/lib/db/schema"
@@ -15,7 +15,7 @@ export async function withConversationTransaction<T>(
     try { return await db.transaction(execute) }
     catch (error) {
       const value = error as { code?: string; cause?: { code?: string } }
-      if ((value.code ?? value.cause?.code) !== "40P01" || attempt >= DOCUMENT_LIMITS.transactionAttempts) throw error
+      if ((value.code ?? value.cause?.code) !== "40P01" || attempt >= DATABASE_TRANSACTION_ATTEMPTS) throw error
       // PostgreSQL 已整笔回滚；只重试死锁，不重试业务错误或不确定的网络提交。
     }
   }

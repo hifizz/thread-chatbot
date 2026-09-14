@@ -1,4 +1,4 @@
-import { documentContextForRequest } from "../domain/document-context-history"
+import { documentContextForRequest } from "../domain/documents/context-history"
 import { restoreDocumentToolParts } from "../persistence/message-parts"
 import { expandDocumentUpdates } from "./documents/context"
 import {

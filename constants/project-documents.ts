@@ -10,7 +10,6 @@ export const DOCUMENT_LIMITS = {
   summaryChars: 500,
   conflictRetries: 2,
   toolSteps: 12,
-  transactionAttempts: 3,
 } as const
 export const DOCUMENT_TOOL_NAMES = [
   "findProjectDocuments", "readProjectDocument", "updateProjectDocument",

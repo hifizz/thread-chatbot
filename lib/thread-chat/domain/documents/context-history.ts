@@ -1,5 +1,5 @@
-import type { ProjectDocumentUpdates } from "../contracts/document"
-import type { ThreadChatUIMessage } from "../contracts/ui-message"
+import type { ProjectDocumentUpdates } from "../../contracts/document"
+import type { ThreadChatUIMessage } from "../../contracts/ui-message"
 
 interface ContextRow {
   id: string

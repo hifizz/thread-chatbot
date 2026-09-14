@@ -1,5 +1,5 @@
 import { DOCUMENT_LIMITS } from "@/constants/project-documents"
-import { markdownEditSchema, type MarkdownEdit, type DocumentEditError } from "../contracts/document"
+import { markdownEditSchema, type MarkdownEdit, type DocumentEditError } from "../../contracts/document"
 
 export type DocumentPatchResult = { ok: true; content: string; changed: boolean } | { ok: false; code: DocumentEditError }
 /** 所有范围针对原始 Markdown，先全部验证，再倒序应用。 */
