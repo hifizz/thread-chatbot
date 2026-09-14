@@ -153,7 +153,12 @@ export async function prepareGeneration(input: PrepareGenerationInput) {
         ),
     routeReason: researchRoute.reasonCode,
   })
-  const activeTools = Object.keys(tools)
+  type ActiveToolName = Extract<keyof typeof tools, string>
+  const activeTools = Object.keys(tools) as ActiveToolName[]
+  const firstTool =
+    generationMode.firstTool && generationMode.firstTool in tools
+      ? (generationMode.firstTool as ActiveToolName)
+      : null
   const projectContract = buildProjectContractContext(input.projectContract)
   const stableInstructions = [
     ...generationMode.systemParts.slice(0, 1),
@@ -209,62 +214,32 @@ export async function prepareGeneration(input: PrepareGenerationInput) {
             activeTools: stepNumber >= generationMode.maxSteps - 1
               ? activeTools.filter((name) => name === "createMarkdownArtifact")
               : availableResearchTools(activeTools, webBudget),
-            ...(stepNumber === 0 && generationMode.firstTool
+            ...(stepNumber === 0 && firstTool
               ? {
                   toolChoice: {
                     type: "tool" as const,
-                    toolName: generationMode.firstTool as string,
+                    toolName: firstTool,
                   },
                 }
               : { toolChoice: "auto" as const }),
           }),
+          stopWhen: isStepCount(generationMode.maxSteps),
         }
       : {}),
-    stopWhen: isStepCount(generationMode.maxSteps),
   })
 
-  const leadingChunks: ThreadChatUIMessageChunk[] = [
-    {
-      type: "data-research-route",
-      id: "research-route",
-      data: researchRoute,
-    },
-    ...(researchPlan
-      ? [
-          {
-            type: "data-research-plan" as const,
-            id: "research-plan",
-            data: researchPlan,
-          },
-        ]
-      : []),
-  ]
   return {
-    textStream: result.stream as ReadableStream<
-      import("ai").TextStreamPart<ToolSet>
-    >,
+    result,
     tools: tools as ToolSet,
-    leadingChunks,
-    usage: result.usage,
-    contextMetadata: {
-      ...contextMetadata,
-      contextBudget,
-      webBudgetPolicy: webBudget.policy,
-      generationMode: generationMode.id,
-      promptSchemaVersion: THREAD_CHAT_PROMPT_SCHEMA_VERSION,
-      actualProvider: resolvedModel.route.actualProvider,
-      protocol: resolvedModel.route.protocol,
-      credentialGroup: resolvedModel.route.credentialGroup,
-      upstreamModel: resolvedModel.route.upstreamModel,
-      explicitCacheEnabled: cachePolicy.explicitCacheEnabled,
-      promptCacheBreakpointCount: cachedPrompt.breakpointCount,
+    researchRoute,
+    researchPlan,
+    generationMode,
+    promptCache: {
+      policy: cachePolicy,
+      boundaries: input.promptCacheBoundaries,
+      schemaVersion: THREAD_CHAT_PROMPT_SCHEMA_VERSION,
     },
-    promptCacheContext: {
-      route: resolvedModel.route,
-      generationMode: generationMode.id,
-      promptSchemaVersion: THREAD_CHAT_PROMPT_SCHEMA_VERSION,
-      projectContractVersion: input.projectContract.version,
-      explicitCacheEnabled: cachePolicy.explicitCacheEnabled,
-    },
+    contextBudget,
+    contextMetadata,
   }
 }
