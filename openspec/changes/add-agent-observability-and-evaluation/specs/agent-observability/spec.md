@@ -80,24 +80,24 @@ The system SHALL record structured child Observations for applicable research ro
 - **WHEN** a model provider returns token or provider usage and a finish reason
 - **THEN** the corresponding model Observation records the original usage fields and finish reason without interpreting them as product billing
 
-### Requirement: Production telemetry is private by default
+### Requirement: Content capture is explicitly configurable
 
-Production telemetry SHALL record structure, identities needed for correlation, timing, usage, tool and provider names, outcomes, and sanitized metadata by default. Recording prompt inputs, model outputs, attachment contents, fetched page bodies, or other user content MUST be disabled by default and MAY be enabled only for an explicitly configured staging, evaluation, or controlled sampling policy after masking. API keys, authorization headers, cookies, raw provider payloads, complete sensitive queries or URLs, and hidden chain-of-thought MUST never be exported.
+Telemetry SHALL use `AI_TELEMETRY_RECORD_CONTENT` as the single content-capture switch in development, staging, evaluation, and production. When enabled, model inputs and outputs SHALL be recorded. Export masking SHALL replace values whose field names are authorization, cookie, apiKey, secret, password, token, or credentials, case-insensitively and with common api-key separators. It SHALL NOT scan ordinary string contents or remove URLs, queries, provider payloads, attachments, page bodies, or reasoning.
 
 #### Scenario: Ordinary production generation
 
-- **WHEN** a production Agent run is not part of an approved content-recording cohort
-- **THEN** its Trace is operationally useful without exporting prompt text, response text, attachment contents, or fetched page bodies
+- **WHEN** production sets `AI_TELEMETRY_RECORD_CONTENT=true`
+- **THEN** its Trace exports model input and output after the narrow credential-field mask
 
 #### Scenario: Evaluation environment records content
 
-- **WHEN** an authorized evaluation run enables input and output recording
-- **THEN** configured masking runs before export and removes credentials, personal data, sensitive URL components, and prohibited internal reasoning
+- **WHEN** an evaluation run enables input and output recording
+- **THEN** it uses the same content and credential-field masking semantics as production
 
 #### Scenario: Provider returns a verbose failure
 
 - **WHEN** an upstream error contains request bodies, credentials, page content, or provider-specific raw details
-- **THEN** telemetry contains only the approved error category and safe summary
+- **THEN** enabled content capture may retain the diagnostic payload while values under configured credential field names are redacted
 
 ### Requirement: Observability failures cannot break Agent behavior
 

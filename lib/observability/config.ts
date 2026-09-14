@@ -78,10 +78,8 @@ export function resolveObservabilityConfig(
 
 export function resolveTelemetryContentPolicy({
   source = process.env,
-  allowContentCapture = false,
 }: {
   source?: EnvironmentSource
-  allowContentCapture?: boolean
 } = {}): TelemetryContentPolicy {
   const config = resolveObservabilityConfig(source)
   if (!config.enabled) {
@@ -106,24 +104,10 @@ export function resolveTelemetryContentPolicy({
     }
   }
 
-  const reason =
-    config.environment === OBSERVABILITY_ENVIRONMENTS.development
-      ? "development"
-      : config.environment === OBSERVABILITY_ENVIRONMENTS.evaluation
-        ? "evaluation"
-        : config.environment === OBSERVABILITY_ENVIRONMENTS.staging
-          ? "staging"
-          : config.environment === OBSERVABILITY_ENVIRONMENTS.production &&
-              allowContentCapture
-            ? "production-cohort"
-            : null
-
-  return reason
-    ? { enabled: true, recordInputs: true, recordOutputs: true, reason }
-    : {
-        enabled: true,
-        recordInputs: false,
-        recordOutputs: false,
-        reason: "metadata-only",
-      }
+  return {
+    enabled: true,
+    recordInputs: true,
+    recordOutputs: true,
+    reason: "content-enabled",
+  }
 }

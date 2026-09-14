@@ -20,11 +20,7 @@ export type ObservabilityContext = Partial<
     Exclude<ObservabilityAttributeKey, ObservabilityIdentifierKey>,
     ObservabilityAttributeValue
   >
-> &
-  Partial<Record<ObservabilityIdentifierKey, string>> & {
-    /** 只作为本次调用的策略输入，不会进入 exporter。 */
-    allowContentCapture?: boolean
-  }
+> & Partial<Record<ObservabilityIdentifierKey, string>>
 
 export type ModelCallTrace = {
   requestId?: string
@@ -43,10 +39,7 @@ export type TelemetryContentPolicy = {
   reason:
     | "disabled"
     | "metadata-only"
-    | "development"
-    | "evaluation"
-    | "staging"
-    | "production-cohort"
+    | "content-enabled"
 }
 
 export type ObservabilityConfig = {

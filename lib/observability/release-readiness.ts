@@ -69,12 +69,12 @@ export function evaluateObservabilityReleaseReadiness(
         : "remote export is disabled; use this state for the initial safe deploy",
     },
     {
-      id: "metadata-only",
-      status: !content.recordInputs && !content.recordOutputs ? "pass" : "fail",
+      id: "content-capture",
+      status: "pass",
       message:
         !content.recordInputs && !content.recordOutputs
           ? "prompt and output content capture is disabled"
-          : "staging/production rollout must start with metadata-only telemetry",
+          : "prompt and output content capture is explicitly enabled",
     },
     {
       id: "devtools-disabled",

@@ -7,8 +7,8 @@
 | 使用面      | 能力                                                                                                 | 事实源与边界                                                                      |
 | ----------- | ---------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
 | 本地调试    | AI SDK DevTools 查看模型 step、工具调用和流式生成                                                    | 只在 development 显式开启；production 有硬保护                                    |
-| 线上观测    | Langfuse 按 release、Project session、Thread、匿名用户、终态、错误和 usage 检索完整 Trace 树         | production 默认 metadata-only，不记录 prompt/output 正文                          |
-| Search 诊断 | 查看 route reason、provider、attempt/fallback、duration、usage unit 与安全错误类别                   | 只保留 query fingerprint 和域名，不保留完整 query/URL/正文                        |
+| 线上观测    | Langfuse 按 release、Project session、Thread、匿名用户、终态、错误和 usage 检索完整 Trace 树         | 由 `AI_TELEMETRY_RECORD_CONTENT` 明确控制是否记录 prompt/output 正文                |
+| Search 诊断 | 查看 route reason、provider、attempt/fallback、duration、usage unit 与安全错误类别                   | 开启内容记录时保留完整 query/URL/正文，明确的凭据字段会被清洗                      |
 | 用户反馈    | up/down/cleared 以确定性 Score ID 镜像到对应 Message Trace                                           | 产品数据库始终是事实源；Langfuse 是最终一致的分析副本                             |
 | 持续评测    | 比较 prompt、model、Search policy/provider、memory、toolset 和 multimodal parser 的 case-level delta | repo case/revision 是可复现事实源；Langfuse Dataset/Experiment 是远端镜像与分析面 |
 
@@ -41,9 +41,9 @@ pnpm observability:devtools
 AI_TELEMETRY_ENABLED=true
 AI_LANGFUSE_ENABLED=true
 AI_DEVTOOLS_ENABLED=false
-AI_OBSERVABILITY_ENVIRONMENT=staging
+AI_OBSERVABILITY_ENVIRONMENT=production
 AI_OBSERVABILITY_RELEASE=<git-sha-or-image-tag>
-AI_TELEMETRY_RECORD_CONTENT=false
+AI_TELEMETRY_RECORD_CONTENT=true
 LANGFUSE_PUBLIC_KEY=<server-secret>
 LANGFUSE_SECRET_KEY=<server-secret>
 LANGFUSE_BASE_URL=<region-endpoint>
@@ -56,7 +56,7 @@ AI_OBSERVABILITY_ID_SALT=<high-entropy-server-secret>
 pnpm observability:check-release
 ```
 
-然后按 [Langfuse Cloud 渐进发布](./06-langfuse-cloud-rollout.md) 从 staging metadata-only、小流量 production 到全量逐 Gate 验证。Cloud 不可达或配置缺失只降低观测能力，不能改变 Agent 响应、Message 数据库终态或 feedback 保存。迁移 Langfuse OSS 时替换 endpoint/key 并重跑 Gate，不改 Agent 编排和数据模型。
+然后按 [Langfuse Cloud 渐进发布](./06-langfuse-cloud-rollout.md) 核对生产 Input/Output 和凭据字段脱敏。Cloud 不可达或配置缺失只降低观测能力，不能改变 Agent 响应、Message 数据库终态或 feedback 保存。迁移 Langfuse OSS 时替换 endpoint/key 并重跑 Gate，不改 Agent 编排和数据模型。
 
 ## 4. 怎么测试
 
@@ -88,7 +88,7 @@ AI_OBSERVABILITY_ENVIRONMENT=evaluation \
   pnpm eval:agent:release -- --executor=declared --langfuse-experiment
 ```
 
-代码级测试不能替代两项人工验收：实际打开 DevTools 查看普通回答/多步工具，以及在 Langfuse staging 查看 metadata-only Trace、feedback Score、Experiment 与无敏感数据。数据库 Gate 也必须由专用测试数据库执行。
+代码级测试不能替代两项人工验收：实际打开 DevTools 查看普通回答/多步工具，以及在 Langfuse production 查看完整 Input/Output、feedback Score、Experiment 与凭据字段脱敏。数据库 Gate 也必须由专用测试数据库执行。
 
 ## 5. Loop Engineering 日常循环
 

@@ -38,9 +38,7 @@ export function buildAiTelemetryOptions(
   purpose: ModelCallPurpose,
   context: ObservabilityContext = {}
 ): TelemetryOptions<AiRuntimeContext> {
-  const policy = resolveTelemetryContentPolicy({
-    allowContentCapture: context.allowContentCapture,
-  })
+  const policy = resolveTelemetryContentPolicy()
   const runtimeContext = buildObservabilityRuntimeContext(context)
   const includeRuntimeContext = Object.fromEntries(
     Object.keys(runtimeContext).map((key) => [key, true])
