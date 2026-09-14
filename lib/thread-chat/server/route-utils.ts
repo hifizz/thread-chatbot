@@ -4,6 +4,8 @@ import type {
   CommandResponse,
 } from "@/lib/thread-chat/contracts/errors"
 import { ConversationApplicationError } from "@/lib/thread-chat/application/errors"
+import { logger } from "@/lib/axiom/server"
+import { safeErrorMetadata } from "@/lib/observability/error"
 import { CommandIdConflictError } from "@/lib/thread-chat/persistence/command-repository"
 import { ensureThreadChatRuntimeInitialized } from "@/lib/thread-chat/streaming/runtime"
 import {
@@ -99,7 +101,7 @@ export function mapRouteError(error: unknown): Response {
       "SESSION_NOT_AVAILABLE",
       "生成流已不可用，请轮询消息状态"
     )
-  console.error("[thread-chat:v1] route failed", error)
+  logger.error("thread_chat.route.failed", safeErrorMetadata(error))
   return errorResponse(500, "GENERATION_FAILED", "服务暂时不可用")
 }
 
