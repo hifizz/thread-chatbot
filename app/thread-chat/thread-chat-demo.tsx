@@ -486,6 +486,7 @@ function NormalizedThreadChat({
             : {}),
         })
         .then(({ command }) => {
+          if (info.artifactId) closeDrawer()
           const title =
             info.text.length > 13 ? `${info.text.slice(0, 13)}…` : info.text
           if (workspace.viewMode === "canvas") {
@@ -499,6 +500,7 @@ function NormalizedThreadChat({
         .catch(() => showToast("创建分支失败，请重试"))
     },
     [
+      closeDrawer,
       generationSettings,
       openBranchUI,
       runtime.commands,
