@@ -459,15 +459,31 @@ function NormalizedThreadChat({
       const modelId =
         current.threadsById[parentThreadId]?.modelId ??
         DEFAULT_THREAD_CHAT_MODEL_ID
+      const target = info.artifactId
+        ? ({
+            type: "artifact" as const,
+            artifactId: info.artifactId,
+            anchor: info.anchor,
+          })
+        : ({ type: "message" as const, anchor: info.anchor })
       void runtime.commands
         .forkThread({
           parentThreadId,
           sourceMessageId: info.msgId,
-          anchorText: info.text,
-          anchor: info.anchor,
+          target,
           modelId,
           ...generationSettingsInput(modelId, generationSettings),
-          ...(question?.trim() ? { firstTurn: forkFirstTurnContent({ text: question, sourceMessageId: info.msgId, anchorText: info.text, anchor: info.anchor }) } : {}),
+          ...(question?.trim()
+            ? {
+                firstTurn: forkFirstTurnContent({
+                  text: question,
+                  sourceMessageId: info.msgId,
+                  ...(info.artifactId ? { artifactId: info.artifactId } : {}),
+                  anchorText: info.text,
+                  anchor: info.anchor,
+                }),
+              }
+            : {}),
         })
         .then(({ command }) => {
           const title =
