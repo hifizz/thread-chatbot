@@ -1,6 +1,8 @@
-import { GENERATE_VISUALIZATION_TOOL_NAME } from "@/lib/visualization/tool"
 import { generateVisualizationResultSchema } from "@/lib/visualization/schema"
-import type { VisualizationData } from "@/lib/visualization/types"
+import {
+  GENERATE_VISUALIZATION_TOOL_NAME,
+  type VisualizationData,
+} from "@/lib/visualization/types"
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null

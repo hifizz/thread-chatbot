@@ -13,10 +13,11 @@ import { Maximize2, Minus, Plus, RotateCcw } from "lucide-react"
 import type { FlowSpec } from "@/lib/visualization/types"
 import { adaptFlowSpec } from "@/lib/visualization/renderer-adapter"
 import { FlowNode } from "@/components/visualization/flow-node"
+import { FlowGroup } from "@/components/visualization/flow-group"
 import { FlowEdge } from "@/components/visualization/flow-edge"
 import { reactFlowAdapter } from "@/components/visualization/react-flow-adapter"
 
-const nodeTypes = { flowNode: FlowNode }
+const nodeTypes = { flowNode: FlowNode, flowGroup: FlowGroup }
 const edgeTypes = { flowEdge: FlowEdge }
 
 function Canvas({ spec }: { spec: FlowSpec }) {
