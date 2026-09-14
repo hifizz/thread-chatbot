@@ -51,7 +51,8 @@ export interface ThreadDTO {
   projectId: string
   parentId: string | null
   forkMessageId: string | null
-  forkArtifactId: string | null
+  /** 缺省只用于旧 fixture / 旧 bootstrap；服务端新 DTO 总是返回 null 或 Artifact ID。 */
+  forkArtifactId?: string | null
   forkContext: string[]
   forkAnchor: TextAnchor | null
   anchorText: string | null
