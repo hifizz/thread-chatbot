@@ -88,3 +88,16 @@ export const OBSERVABILITY_POLICY_VERSIONS = {
 } as const
 
 export const TELEMETRY_REDACTED_VALUE = "[REDACTED]"
+
+/** 服务端结构化诊断事件名，供日志查询稳定使用。 */
+export const AI_DIAGNOSTIC_EVENTS = {
+  providerFailure: "provider.failure",
+  toolFailure: "tool.failure",
+  toolException: "tool.exception",
+  budgetToolsRemoved: "web.budget_tools_removed",
+  streamError: "stream.error",
+  streamProtocolError: "stream.protocol_error",
+  generationException: "generation.exception",
+  generationInitializationError: "generation.initialization_error",
+} as const
+export const AI_DIAGNOSTIC_LOG_PREFIX = "[ai-diagnostic]"

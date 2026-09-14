@@ -1,3 +1,4 @@
+import { diagnosticCorrelation } from "@/lib/observability/diagnostic-log"
 import {
   wrapEmbeddingModel,
   wrapLanguageModel,
@@ -87,7 +88,7 @@ function writeModelCallLog(input: {
       purpose: input.purpose,
       provider: input.provider,
       model: input.model,
-      correlation: buildObservabilityRuntimeContext(input.trace),
+      correlation: { ...buildObservabilityRuntimeContext(input.trace), ...diagnosticCorrelation() },
       context: input.context,
     })
   )

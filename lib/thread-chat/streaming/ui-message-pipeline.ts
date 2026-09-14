@@ -1,3 +1,5 @@
+import { AI_DIAGNOSTIC_EVENTS } from "@/constants/observability"
+import { logDiagnostic } from "@/lib/observability/diagnostic-log"
 import {
   readUIMessageStream,
   toUIMessageStream,
@@ -137,6 +139,8 @@ export async function consumeUIMessagePipeline<TOOLS extends ToolSet>({
   onSnapshot,
   onProtocolError,
 }: ConsumeUIMessagePipelineInput<TOOLS>): Promise<UIMessagePipelineEnd> {
+  const loggedErrors = new Set<unknown>()
+  const startedAt = performance.now()
   let end: UIMessagePipelineEnd | null = null
   const generated = toUIMessageStream<TOOLS, ThreadChatUIMessage>({
     stream: textStream,
@@ -144,7 +148,13 @@ export async function consumeUIMessagePipeline<TOOLS extends ToolSet>({
     generateMessageId: () => initialMessage.id,
     sendReasoning: true,
     sendSources: true,
-    onError: () => "生成过程中发生错误",
+    onError: (error) => {
+      if (!loggedErrors.has(error)) {
+        loggedErrors.add(error)
+        logDiagnostic(AI_DIAGNOSTIC_EVENTS.streamError, { assistantMessageId: initialMessage.id, durationMs: Math.round(performance.now() - startedAt) }, error, "error")
+      }
+      return "生成过程中发生错误"
+    },
     onEnd: (event) => {
       end = {
         responseMessage: event.responseMessage,
@@ -163,7 +173,10 @@ export async function consumeUIMessagePipeline<TOOLS extends ToolSet>({
   const snapshotReader = readUIMessageStream<ThreadChatUIMessage>({
     message: structuredClone(initialMessage),
     stream: reducerChannel.readable,
-    onError: onProtocolError,
+    onError: (error) => {
+      logDiagnostic(AI_DIAGNOSTIC_EVENTS.streamProtocolError, { assistantMessageId: initialMessage.id, durationMs: Math.round(performance.now() - startedAt) }, error, "error")
+      onProtocolError?.(error)
+    },
     terminateOnError: true,
   }).getReader()
 

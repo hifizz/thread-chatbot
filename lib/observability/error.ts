@@ -51,5 +51,6 @@ export function safeErrorMetadata(error: unknown) {
     errorCategory: classifyObservabilityError(error),
     errorName: name.slice(0, 100),
     ...(code ? { errorCode: code.slice(0, 100) } : {}),
+    ...(errorStatus(error) !== undefined ? { httpStatus: errorStatus(error) } : {}),
   }
 }

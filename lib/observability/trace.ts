@@ -4,6 +4,7 @@ import {
   type LangfuseObservation,
   type LangfuseSpanAttributes,
 } from "@langfuse/tracing"
+import { withDiagnosticContext } from "@/lib/observability/diagnostic-log"
 import { TRACE_NAMES } from "@/constants/observability"
 import { safeErrorMetadata } from "@/lib/observability/error"
 import type { ObservabilityContext } from "@/lib/observability/types"
@@ -151,7 +152,14 @@ export async function runAgentTrace<T>(
   input: AgentTraceInput,
   fn: (observation: AppObservation) => Promise<T>
 ): Promise<T> {
-  return getAgentTraceBackend().runRoot(input, async (observation) => {
+  return withDiagnosticContext({
+    sessionId: input.sessionId,
+    traceId: input.traceId,
+    projectId: input.context.projectId,
+    threadId: input.context.threadId,
+    assistantMessageId: input.context.assistantMessageId,
+    requestId: input.context.requestId,
+  }, () => getAgentTraceBackend().runRoot(input, async (observation) => {
     try {
       return await fn(observation)
     } catch (error) {
@@ -164,7 +172,7 @@ export async function runAgentTrace<T>(
     } finally {
       observation.end()
     }
-  })
+  }))
 }
 
 /** legacy streaming route 由 server-owned after callback 手动结束。 */

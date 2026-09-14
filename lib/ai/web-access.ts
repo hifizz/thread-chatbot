@@ -1,3 +1,5 @@
+import { AI_DIAGNOSTIC_EVENTS } from "@/constants/observability"
+import { logDiagnostic } from "@/lib/observability/diagnostic-log"
 import { WEB_MAX_DURATION_MS, WEB_MAX_PROVIDER_ATTEMPTS, WEB_MAX_CONCURRENCY, WEB_CONTENT_CHAR_LIMIT, WEB_RESEARCH_MAX_PROVIDER_ATTEMPTS, WEB_RESEARCH_MAX_DURATION_MS } from "@/constants/research"
 
 export type WebToolFailure = {
@@ -77,6 +79,13 @@ export function createWebBudget(options: {
   const waiting = new Set<() => void>()
   return {
     get attempts() { return attempts },
+    get elapsedMs() { return deadline === undefined ? 0 : Math.max(0, Date.now() - (deadline - duration)) },
+    get exhaustedReason() {
+      if (contentChars >= maxContentChars) return "content"
+      if (attempts >= maxAttempts) return "attempts"
+      if (deadline !== undefined && Date.now() >= deadline) return "deadline"
+      return undefined
+    },
     get policy() { return { maxProviderAttempts: maxAttempts, maxDurationMs: duration, maxConcurrency: concurrency, maxContentChars } },
     get remainingChars() { return maxContentChars - contentChars },
     get canReadCache() { return cachedPages > 0 && contentChars < maxContentChars },
@@ -130,7 +139,18 @@ export function webContentBudgetExceeded(): WebAccessError {
 
 /** 网络用尽后保留缓存续读；两类额度都不能再使用时保留非联网工具。 */
 export function availableResearchTools<T extends string>(names: readonly T[], budget: WebBudget): T[] {
-  return names.filter((name) => name === "webSearch"
+  const available = names.filter((name) => name === "webSearch"
     ? !budget.exhausted && budget.remainingChars > 0
     : name === "readUrl" ? budget.remainingChars > 0 && (!budget.exhausted || budget.canReadCache) : true)
+  if (available.length !== names.length) {
+    logDiagnostic(AI_DIAGNOSTIC_EVENTS.budgetToolsRemoved, {
+      removedTools: names.filter((name) => !available.includes(name)).join(","),
+      providerAttempts: budget.attempts,
+      budgetElapsedMs: budget.elapsedMs,
+      budgetReason: budget.exhaustedReason,
+      remainingChars: budget.remainingChars,
+      errorCode: budget.remainingChars <= 0 ? "WEB_CONTENT_BUDGET_EXHAUSTED" : "WEB_BUDGET_EXHAUSTED",
+    })
+  }
+  return available
 }
