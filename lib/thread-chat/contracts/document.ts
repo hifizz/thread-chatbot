@@ -22,15 +22,20 @@ export type DocumentEditError = "SOURCE_NOT_FOUND" | "SOURCE_AMBIGUOUS" | "OVERL
 export interface DocumentDTO {
   id: string; projectId: string; currentRevisionId: string; title: string
   archivedAt: string | null
-  currentArtifactId?: string
-  sourceThreadId?: string
-  sourceMessageId?: string
 }
-export interface DocumentRevisionDTO {
+export interface DocumentListItemDTO extends DocumentDTO {
+  currentArtifactId: string
+  sourceThreadId: string
+  sourceMessageId: string
+}
+export interface DocumentRevisionSummaryDTO {
   id: string; documentId: string; revisionNumber: number; parentRevisionId: string | null
-  artifactId: string; title: string; content: string; changeSummary: string
+  artifactId: string; title: string; changeSummary: string
   sourceThreadId: string; sourceMessageId: string; createdAt: string
   sourceMessageStatus: "generating" | "completed" | "failed" | "stopped"
+}
+export interface DocumentRevisionDTO extends DocumentRevisionSummaryDTO {
+  content: string
 }
 export interface DocumentReadResult {
   document: DocumentDTO; revision: DocumentRevisionDTO; readId: string; isCurrent: boolean
@@ -59,5 +64,5 @@ export interface DocumentCommitDTO {
   sourceThreadId: string; sourceMessageId: string; createdAt: string
 }
 export interface ProjectDocumentsDTO {
-  documents: DocumentDTO[]; pending: ProjectDocumentUpdates; commits: DocumentCommitDTO[]
+  documents: DocumentListItemDTO[]; pending: ProjectDocumentUpdates; commits: DocumentCommitDTO[]
 }

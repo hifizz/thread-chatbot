@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from "react"
 import { DOCUMENT_PROGRESS_REFRESH_MS } from "@/constants/project-documents"
-import type { ThreadChatClient } from "../../net/client"
-import type { ConversationStore } from "../../core/store"
-import { useConversationStore } from "../../core/use-thread-store"
+import type { ThreadChatClient } from "../../../net/client"
+import type { ConversationStore } from "../../../core/store"
+import { useConversationStore } from "../../../core/use-thread-store"
 
 /** 勾选仅选择下一轮主线输入范围；不会标记模型已读，也不会启动生成。 */
 export function ProjectDocumentUpdates({ projectId, client, store }: {

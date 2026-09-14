@@ -171,6 +171,7 @@ function NormalizedThreadChat({
   treeId: string
   runtime: ReturnType<typeof useConversationRuntime>
 }) {
+  const [questionArtifactId, setQuestionArtifactId] = useState<string | null>(null)
   const router = useRouter()
   const state = useConversationStore(runtime.store, (value) => value)
   const { settings: generationSettings } = useGenerationSettings()
@@ -729,6 +730,7 @@ function NormalizedThreadChat({
         state={tree}
         sel={selection}
         onSelChange={setSelection}
+        onQuestionArtifactChange={setQuestionArtifactId}
         onFork={handleFork}
         slots={
           workspace.viewMode === "canvas"
@@ -788,6 +790,7 @@ function NormalizedThreadChat({
       )}
 
       <StoreBoundProjectPanel
+        questionArtifactId={questionArtifactId}
         projectId={treeId}
         store={runtime.store}
         client={runtime.client}

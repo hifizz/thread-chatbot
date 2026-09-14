@@ -1,6 +1,6 @@
 import { and, desc, eq, inArray, isNotNull } from "drizzle-orm"
 import { artifacts, documents, documentRevisions, messages, projects } from "@/lib/db/schema"
-import type { DocumentDTO, DocumentRevisionDTO } from "../../contracts/document"
+import type { DocumentListItemDTO, DocumentRevisionDTO, DocumentRevisionSummaryDTO } from "../../contracts/document"
 import type { ConversationExecutor } from "../transaction"
 
 export async function findOwnedDocument(executor: ConversationExecutor, userId: string, documentId: string) {
@@ -13,14 +13,14 @@ export async function findOwnedDocument(executor: ConversationExecutor, userId: 
 const revisionColumns = {
   id: documentRevisions.id, documentId: documentRevisions.documentId,
   revisionNumber: documentRevisions.revisionNumber, parentRevisionId: documentRevisions.parentRevisionId,
-  artifactId: artifacts.id, title: artifacts.title, content: artifacts.content,
+  artifactId: artifacts.id, title: artifacts.title,
   changeSummary: documentRevisions.changeSummary, sourceThreadId: artifacts.threadId,
   sourceMessageId: artifacts.sourceMessageId, sourceMessageStatus: messages.status,
   createdAt: documentRevisions.createdAt,
 }
 
 function revisionQuery(executor: ConversationExecutor) {
-  return executor.select(revisionColumns).from(documentRevisions)
+  return executor.select({ ...revisionColumns, content: artifacts.content }).from(documentRevisions)
     .innerJoin(documents, eq(documents.id, documentRevisions.documentId))
     .innerJoin(artifacts, and(eq(artifacts.id, documentRevisions.artifactId), eq(artifacts.projectId, documents.projectId)))
     .innerJoin(messages, and(eq(messages.id, artifacts.sourceMessageId), eq(messages.projectId, artifacts.projectId), eq(messages.threadId, artifacts.threadId)))
@@ -32,18 +32,21 @@ export async function readDocumentRevision(executor: ConversationExecutor, docum
   return row ? { ...row, createdAt: row.createdAt.toISOString() } : null
 }
 
-export async function listDocumentHistory(executor: ConversationExecutor, documentId: string): Promise<DocumentRevisionDTO[]> {
-  const rows = await revisionQuery(executor).where(eq(documentRevisions.documentId, documentId))
-    .orderBy(desc(documentRevisions.revisionNumber))
+export async function listDocumentHistory(executor: ConversationExecutor, documentId: string): Promise<DocumentRevisionSummaryDTO[]> {
+  const rows = await executor.select(revisionColumns).from(documentRevisions)
+    .innerJoin(artifacts, eq(artifacts.id, documentRevisions.artifactId))
+    .innerJoin(messages, eq(messages.id, artifacts.sourceMessageId))
+    .where(eq(documentRevisions.documentId, documentId)).orderBy(desc(documentRevisions.revisionNumber))
   return rows.map((row) => ({ ...row, createdAt: row.createdAt.toISOString() }))
 }
 
-export async function listOwnedDocuments(executor: ConversationExecutor, userId: string, projectId: string): Promise<DocumentDTO[]> {
+export async function listOwnedDocuments(executor: ConversationExecutor, userId: string, projectId: string, documentId?: string): Promise<DocumentListItemDTO[]> {
   const rows = await executor.select({ document: documents, title: artifacts.title, currentArtifactId: artifacts.id, sourceThreadId: artifacts.threadId, sourceMessageId: artifacts.sourceMessageId }).from(documents)
     .innerJoin(projects, eq(projects.id, documents.projectId))
     .innerJoin(documentRevisions, and(eq(documentRevisions.id, documents.currentRevisionId), eq(documentRevisions.documentId, documents.id)))
     .innerJoin(artifacts, and(eq(artifacts.id, documentRevisions.artifactId), eq(artifacts.projectId, documents.projectId)))
-    .where(and(eq(projects.userId, userId), eq(documents.projectId, projectId), isNotNull(documents.currentRevisionId)))
+    .where(and(eq(projects.userId, userId), eq(documents.projectId, projectId), isNotNull(documents.currentRevisionId),
+      documentId ? eq(documents.id, documentId) : undefined))
     .orderBy(desc(documents.createdAt), documents.id)
   return rows.map(({ document: d, title, currentArtifactId, sourceThreadId, sourceMessageId }) => ({ id: d.id, projectId: d.projectId,
     currentRevisionId: d.currentRevisionId!, currentArtifactId, title, sourceThreadId, sourceMessageId, archivedAt: d.archivedAt?.toISOString() ?? null }))

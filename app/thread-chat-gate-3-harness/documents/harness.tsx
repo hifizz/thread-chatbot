@@ -5,7 +5,7 @@ import type { ArtifactDTO, ProjectDTO } from "@/lib/thread-chat/contracts/dto"
 import type { DocumentRevisionDTO } from "@/lib/thread-chat/contracts/document"
 import { createThreadChatClient } from "@/app/thread-chat/net/client"
 import { ProjectPanel } from "@/app/thread-chat/orchestration/artifacts/project-panel"
-import { DocumentView } from "@/app/thread-chat/orchestration/artifacts/document-view"
+import { DocumentView } from "@/app/thread-chat/orchestration/artifacts/documents/view"
 import "@/app/thread-chat/thread-chat.css"
 
 const id = (n: number) => `10000000-0000-4000-8000-${String(n).padStart(12, "0")}`
@@ -26,7 +26,14 @@ const artifacts: ArtifactDTO[] = revisions.map((r) => ({ id: r.artifactId, proje
   kind: "markdown", title: r.title, content: r.content, language: null, metadata: {}, createdAt: r.createdAt, updatedAt: r.createdAt,
   document: { id: r.documentId, revisionId: r.id, revisionNumber: r.revisionNumber, currentRevisionId: revisions[0].id },
 }))
-const client = createThreadChatClient({ fetch: async () => Response.json(revisions) })
+const client = createThreadChatClient({ fetch: async (input) => {
+  const url = String(input)
+  if (url.includes("/artifacts/")) return Response.json(artifacts.find((artifact) => url.endsWith(artifact.id)))
+  return Response.json(revisions.map((revision) => {
+    const summary = { ...revision, content: undefined }
+    return summary
+  }))
+} })
 const noop = async () => {}
 export function DocumentsHarness() {
   const [activeId, setActiveId] = useState<string | null>(artifacts[0].id)
@@ -34,6 +41,6 @@ export function DocumentsHarness() {
     <ProjectPanel project={project} files={[]} artifacts={artifacts} open activeId={activeId}
       onClose={() => {}} onSelect={setActiveId} onLocate={() => {}} onRefresh={noop}
       onSaveContract={noop} onAddProjectFile={noop} onRemoveProjectFile={noop}
-      renderDocumentControls={(artifact) => <DocumentView artifact={artifact} client={client} onSelect={setActiveId} />} />
+      renderDocumentControls={(artifact) => <DocumentView navigationBlocked={false} artifact={artifact} client={client} onSelect={setActiveId} />} />
   </main>
 }

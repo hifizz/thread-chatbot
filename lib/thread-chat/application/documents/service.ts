@@ -30,11 +30,10 @@ export async function getDocumentHistory(userId: string, documentId: string) {
   return listDocumentHistory(db, doc.id)
 }
 export async function findProjectDocuments(identity: DocumentExecution, input: { query?: string; artifactId?: string }) {
-  const candidates = await listOwnedDocuments(db, identity.userId, identity.projectId)
-  if (input.artifactId) {
-    const id = await documentForArtifact(db, identity.userId, identity.projectId, input.artifactId)
-    return candidates.filter((doc) => doc.id === id)
-  }
+  const documentId = input.artifactId
+    ? await documentForArtifact(db, identity.userId, identity.projectId, input.artifactId) : undefined
+  if (input.artifactId && !documentId) return []
+  const candidates = await listOwnedDocuments(db, identity.userId, identity.projectId, documentId ?? undefined)
   const query = input.query?.trim().toLocaleLowerCase()
   return query ? candidates.filter((doc) => doc.title.toLocaleLowerCase().includes(query)) : candidates
 }

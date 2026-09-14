@@ -112,6 +112,11 @@ try {
   }, 'second-update')
   assert.equal(result.status, 'committed'); checks++
   const current = await service.getProjectDocument(userId, documentId)
+  const history = await service.getDocumentHistory(userId, documentId)
+  assert.ok(history.length >= 2)
+  assert.ok(history.every((revision) => !('content' in revision)), '版本目录不得携带历史全文')
+  assert.equal(history[0].id, current.revision.id)
+  checks++
   assert.ok(current.revision.content.includes('- [x] TODO6'))
   assert.ok(current.revision.content.includes('方案：新方案'))
   assert.ok(current.revision.content.includes('TODO2：六个维度')); checks++

@@ -1,19 +1,22 @@
 "use client"
 
+import { useRef } from "react"
 import { ChevronDown } from "lucide-react"
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu"
-import type { DocumentRevisionDTO } from "@/lib/thread-chat/contracts/document"
+import type { DocumentRevisionSummaryDTO } from "@/lib/thread-chat/contracts/document"
 
-export function DocumentVersionHistory({ revisions, revisionId, currentRevisionId, onSelect }: {
-  revisions: DocumentRevisionDTO[]; revisionId: string; currentRevisionId: string
-  onSelect(revision: DocumentRevisionDTO): void
+export function DocumentVersionHistory({ revisions, revisionId, currentRevisionId, disabled, onSelect }: {
+  disabled: boolean
+  revisions: DocumentRevisionSummaryDTO[]; revisionId: string; currentRevisionId: string
+  onSelect(revision: DocumentRevisionSummaryDTO): void
 }) {
+  const container = useRef<HTMLDivElement>(null)
   const selected = revisions.find((revision) => revision.id === revisionId)
-  return <DropdownMenu>
-    <DropdownMenuTrigger className="project-secondary" aria-label="选择文档版本">
+  return <div ref={container}><DropdownMenu>
+    <DropdownMenuTrigger disabled={disabled} className="project-secondary" aria-label="选择文档版本">
       V{selected?.revisionNumber ?? "…"}{revisionId === currentRevisionId ? " · 最新" : " · 历史"} <ChevronDown size={12} />
     </DropdownMenuTrigger>
-    <DropdownMenuContent className="w-72 max-w-[90vw]">
+    <DropdownMenuContent container={container} className="w-72 max-w-[90vw]">
       {revisions.map((revision) => <DropdownMenuItem key={revision.id} onClick={() => onSelect(revision)}>
         <div>
           <strong>V{revision.revisionNumber}{revision.id === currentRevisionId ? " · 最新" : ""}</strong>
@@ -22,5 +25,5 @@ export function DocumentVersionHistory({ revisions, revisionId, currentRevisionI
         </div>
       </DropdownMenuItem>)}
     </DropdownMenuContent>
-  </DropdownMenu>
+  </DropdownMenu></div>
 }

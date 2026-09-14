@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
+import { DOCUMENT_UI_COPY } from "@/constants/project-documents"
 import {
   ARTIFACT_SOURCE_HIGHLIGHT_MS,
   ARTIFACT_SOURCE_LOCATE_ATTEMPTS,
@@ -18,8 +19,8 @@ import type { ConversationStore } from "../../core/store"
 import { useConversationStore } from "../../core/use-thread-store"
 import type { ThreadChatClient } from "../../net/client"
 import type { ConversationCommands } from "../../net/commands/conversation-commands"
-import { ProjectDocumentUpdates } from "./project-document-updates"
-import { DocumentView } from "./document-view"
+import { ProjectDocumentUpdates } from "./documents/project-updates"
+import { DocumentView } from "./documents/view"
 import { ProjectPanel } from "./project-panel"
 
 interface ArtifactSourceNavigationDetail {
@@ -58,6 +59,7 @@ function revealMessage(messageId: string, attempt = 0) {
 
 export function StoreBoundProjectPanel({
   projectId,
+  questionArtifactId,
   store,
   client,
   commands,
@@ -68,6 +70,7 @@ export function StoreBoundProjectPanel({
   onLocate,
 }: {
   projectId: string
+  questionArtifactId: string | null
   store: ConversationStore
   client: ThreadChatClient
   commands: ConversationCommands
@@ -77,7 +80,12 @@ export function StoreBoundProjectPanel({
   onSelect(id: string): void
   onLocate(threadId: string, sourceMessageId: string): void
 }) {
-  const versionRequest = useRef(0)
+  const versionRequest = useRef({ sequence: 0 })
+  useEffect(() => {
+    const pending = versionRequest.current
+    pending.sequence++
+    return () => { pending.sequence++ }
+  }, [activeId, projectId, open, questionArtifactId])
   const state = useConversationStore(store, (value) => value)
   const [pendingSource, setPendingSource] = useState<ArtifactSourceNavigationDetail | null>(null)
   const files = useMemo(
@@ -247,13 +255,16 @@ export function StoreBoundProjectPanel({
   return (
     <ProjectPanel
       documentUpdates={open ? <ProjectDocumentUpdates projectId={projectId} client={client} store={store} /> : null}
-      renderDocumentControls={(artifact) => <DocumentView artifact={artifact} client={client} onSelect={(id) => {
-        const request = ++versionRequest.current
+      renderDocumentControls={(artifact) => <DocumentView artifact={artifact} client={client} navigationBlocked={questionArtifactId === artifact.id} onSelect={(id) => {
+        if (questionArtifactId === artifact.id) return
+        const request = ++versionRequest.current.sequence
         void client.getArtifact(id).then((artifact) => {
-          if (request !== versionRequest.current) return
-          store.getState().upsertArtifact(artifact); onSelect(id)
+          if (request !== versionRequest.current.sequence) return
+          store.getState().upsertArtifact(artifact)
+          window.getSelection()?.removeAllRanges()
+          onSelect(id)
         })
-          .catch(() => toast.error("版本加载失败，请重试"))
+          .catch(() => { if (request === versionRequest.current.sequence) toast.error(DOCUMENT_UI_COPY.versionFailed) })
       }} />}
       project={state.project}
       files={files}
