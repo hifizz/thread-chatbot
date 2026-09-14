@@ -1,3 +1,4 @@
+import { DOCUMENT_LIMITS } from "@/constants/project-documents"
 import { eq, sql } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { projects, threads } from "@/lib/db/schema"
@@ -7,10 +8,17 @@ export type ConversationTransaction = Parameters<
 >[0]
 export type ConversationExecutor = typeof db | ConversationTransaction
 
-export function withConversationTransaction<T>(
+export async function withConversationTransaction<T>(
   execute: (tx: ConversationTransaction) => Promise<T>
 ): Promise<T> {
-  return db.transaction(execute)
+  for (let attempt = 1; ; attempt++) {
+    try { return await db.transaction(execute) }
+    catch (error) {
+      const value = error as { code?: string; cause?: { code?: string } }
+      if ((value.code ?? value.cause?.code) !== "40P01" || attempt >= DOCUMENT_LIMITS.transactionAttempts) throw error
+      // PostgreSQL 已整笔回滚；只重试死锁，不重试业务错误或不确定的网络提交。
+    }
+  }
 }
 
 export async function allocateThreadSequences(

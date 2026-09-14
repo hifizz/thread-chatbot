@@ -41,7 +41,7 @@ export function SelectionQuestionDrawer({ open, text, question, onQuestionChange
   }, [open])
 
   return <Drawer open={open} showSwipeHandle swipeDirection="down" onOpenChange={(nextOpen) => { if (!nextOpen) onClose() }}>
-    <DrawerContent data-selection-drawer initialFocus={inputRef} finalFocus={false}
+    <DrawerContent data-question-dialog-open="true" data-selection-drawer initialFocus={inputRef} finalFocus={false}
       portalClassName="tc selection-question-portal"
       style={viewport ? { bottom: viewport.bottom, maxHeight: Math.max(0, viewport.height - 24) } : undefined}>
       <DrawerHeader>

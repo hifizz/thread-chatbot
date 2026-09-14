@@ -1,6 +1,7 @@
+import { registerDocumentArtifact } from "../persistence/document-repository"
 import { and, eq } from "drizzle-orm"
 import { db } from "@/lib/db"
-import { artifacts, messages } from "@/lib/db/schema"
+import { artifacts, messages, projects } from "@/lib/db/schema"
 import type { MessageDTO } from "@/lib/thread-chat/contracts/dto"
 import type { ThreadChatUIMessage } from "@/lib/thread-chat/contracts/ui-message"
 import { stripTransientParts } from "@/lib/thread-chat/application/command-utils"
@@ -67,14 +68,17 @@ export async function finalizeGeneration({
     }
 
     if (finalArtifacts.length > 0) {
-      await tx.insert(artifacts).values(
+      const inserted = await tx.insert(artifacts).values(
         finalArtifacts.map((artifact) => ({
           ...artifact,
           projectId: updated.projectId,
           threadId: updated.threadId,
           sourceMessageId: updated.id,
         }))
-      )
+      ).onConflictDoNothing().returning()
+      const [project] = await tx.select({ userId: projects.userId }).from(projects).where(eq(projects.id, updated.projectId))
+      if (!project) throw new Error("PROJECT_NOT_FOUND")
+      for (const artifact of inserted) await registerDocumentArtifact(tx, artifact, project.userId)
     }
     return toMessageDTO(updated)
   })

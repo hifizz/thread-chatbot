@@ -342,6 +342,7 @@ export function SelectionBubble({
               ? "sel-bubble entering"
               : "sel-bubble"
         }
+        data-question-dialog-open="true"
         data-dir={dir}
         onAnimationEnd={(e) => {
           // animationend 会冒泡，只认气泡自身画布上的两个动画

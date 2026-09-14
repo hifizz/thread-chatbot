@@ -1,9 +1,13 @@
 import { and, desc, eq, inArray } from "drizzle-orm"
-import { artifacts, messages, projects, threads } from "@/lib/db/schema"
+import { artifacts, messages, projects, threads, documents, documentRevisions } from "@/lib/db/schema"
 import type { ConversationExecutor } from "@/lib/thread-chat/persistence/transaction"
 
 const artifactSourceSelection = {
   artifact: artifacts,
+  documentId: documents.id,
+  documentRevisionId: documentRevisions.id,
+  documentRevisionNumber: documentRevisions.revisionNumber,
+  documentCurrentRevisionId: documents.currentRevisionId,
   sourceThreadCustomTitle: threads.customTitle,
   sourceThreadAutoTitle: threads.autoTitle,
   sourceThreadFootnote: threads.footnote,
@@ -14,6 +18,8 @@ function withSource(executor: ConversationExecutor) {
   return executor
     .select(artifactSourceSelection)
     .from(artifacts)
+    .leftJoin(documentRevisions, eq(documentRevisions.artifactId, artifacts.id))
+    .leftJoin(documents, and(eq(documents.id, documentRevisions.documentId), eq(documents.projectId, artifacts.projectId)))
     .innerJoin(
       messages,
       and(

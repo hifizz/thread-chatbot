@@ -1,6 +1,11 @@
+import { DOCUMENT_INSTRUCTIONS, DOCUMENT_LIMITS } from "@/constants/project-documents"
+import { withDocumentContextReceipt } from "./document-context-receipt"
+import { buildDocumentTools } from "./document-tools"
+import { markDocumentContextUsed } from "../application/document-context"
+import type { ProjectDocumentUpdates } from "../contracts/document"
 import { availableResearchTools, createWebBudget } from "@/lib/ai/web-access"
 import { evaluateContextBudget } from "../application/context-budget"
-import { isStepCount, streamText, type ModelMessage, type ToolSet } from "ai"
+import { isStepCount, streamText, wrapLanguageModel, type ModelMessage, type ToolSet } from "ai"
 import type { GenerationSettings } from "@/constants/generation-settings"
 import { THREAD_CHAT_PROMPT_SCHEMA_VERSION } from "@/constants/thread-chat-prompt"
 import { MODEL_CALL_PURPOSE } from "@/constants/model-call"
@@ -35,6 +40,8 @@ import { observeAppOperation } from "@/lib/observability/trace"
 import type { ObservabilityContext } from "@/lib/observability/types"
 
 export interface PrepareGenerationInput {
+  userId: string
+  documentUpdates?: ProjectDocumentUpdates
   messageId: string
   projectId: string
   threadId: string
@@ -143,7 +150,7 @@ export async function prepareGeneration(input: PrepareGenerationInput) {
     artifactRequested,
   })
   const webBudget = createWebBudget({ mode: researchRoute.mode })
-  const tools = buildGenerationTools({
+  const tools: ToolSet = { ...buildGenerationTools({
     budget: webBudget,
     messageId: input.messageId,
     toolNames: searchReady
@@ -152,12 +159,14 @@ export async function prepareGeneration(input: PrepareGenerationInput) {
           (name) => name === "createMarkdownArtifact"
         ),
     routeReason: researchRoute.reasonCode,
-  })
+  }), ...buildDocumentTools({ userId: input.userId, projectId: input.projectId, threadId: input.threadId, messageId: input.messageId }) }
+  const maxSteps = Math.max(generationMode.maxSteps, DOCUMENT_LIMITS.toolSteps)
   const activeTools = Object.keys(tools)
   const projectContract = buildProjectContractContext(input.projectContract)
   const stableInstructions = [
     ...generationMode.systemParts.slice(0, 1),
     projectContract,
+    DOCUMENT_INSTRUCTIONS,
     ...generationMode.systemParts.slice(1),
   ]
     .filter((part): part is string => part !== null)
@@ -192,12 +201,21 @@ export async function prepareGeneration(input: PrepareGenerationInput) {
   // 在所有 system、历史、附件和工具已确定的边界明确记录 unknown。
   const contextBudget = evaluateContextBudget({ inputTokens: null, contextWindow: null, outputTokens: generationOptions.maxOutputTokens ?? 0 })
   if (contextBudget.status === "exceeded") throw new Error("context_length_exceeded")
+  if (typeof model === "string") throw new Error("MODEL_ROUTE_NOT_RESOLVED")
   const result = streamText({
     ...buildAiTelemetryConfig(MODEL_CALL_PURPOSE.chatAnswer, {
       ...trace,
       modelId: input.modelId,
     }),
-    model: withModelCallLogging(model, MODEL_CALL_PURPOSE.chatAnswer, trace),
+    model: withModelCallLogging(wrapLanguageModel({
+      model,
+      middleware: { specificationVersion: "v3", wrapStream: async ({ doStream }) => {
+        const response = await doStream()
+        const manifest = input.documentUpdates
+        return manifest ? { ...response, stream: withDocumentContextReceipt(response.stream,
+          () => markDocumentContextUsed(input.messageId, manifest)) } : response
+      } },
+    }), MODEL_CALL_PURPOSE.chatAnswer, trace),
     abortSignal: input.abortSignal,
     ...generationOptions,
     instructions: cachedPrompt.instructions,
@@ -206,10 +224,10 @@ export async function prepareGeneration(input: PrepareGenerationInput) {
     ...(activeTools.length > 0
       ? {
           prepareStep: ({ stepNumber }: { stepNumber: number }) => ({
-            activeTools: stepNumber >= generationMode.maxSteps - 1
-              ? activeTools.filter((name) => name === "createMarkdownArtifact")
+            activeTools: stepNumber >= maxSteps - 1
+              ? []
               : availableResearchTools(activeTools, webBudget),
-            ...(stepNumber === 0 && generationMode.firstTool
+            ...(stepNumber === 0 && generationMode.firstTool && !/(?:更新|修改|勾选|update|edit)/i.test(input.latestUserText)
               ? {
                   toolChoice: {
                     type: "tool" as const,
@@ -220,7 +238,7 @@ export async function prepareGeneration(input: PrepareGenerationInput) {
           }),
         }
       : {}),
-    stopWhen: isStepCount(generationMode.maxSteps),
+    stopWhen: isStepCount(maxSteps),
   })
 
   const leadingChunks: ThreadChatUIMessageChunk[] = [

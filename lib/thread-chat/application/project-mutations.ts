@@ -1,6 +1,7 @@
 import { and, eq } from "drizzle-orm"
 import {
   projectFiles,
+  documents,
   projects,
   threads,
 } from "@/lib/db/schema"
@@ -264,6 +265,9 @@ export function deleteProject(
       execute: async () => {
         const project = await lockOwnedProject(tx, userId, projectId)
         if (!project) notFound()
+        // 先解除文档 head 并删除版本链，再删除消息/Artifact，避免跨层外键级联顺序冲突。
+        await tx.update(documents).set({ currentRevisionId: null }).where(eq(documents.projectId, project.id))
+        await tx.delete(documents).where(eq(documents.projectId, project.id))
         await tx.delete(projects).where(eq(projects.id, project.id))
         return { projectId, deleted: true as const }
       },

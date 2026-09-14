@@ -4,12 +4,15 @@ import {
   timestamp,
   index,
   uniqueIndex,
+  unique,
   integer,
   boolean,
   vector,
   primaryKey,
   check,
+  foreignKey,
   type AnyPgColumn,
+  type PgTableExtraConfigValue,
 } from "drizzle-orm/pg-core"
 import { relations, sql } from "drizzle-orm"
 import { dbSchema } from "./pg-schema"
@@ -19,6 +22,7 @@ import {
   PROJECT_TARGET_MAX_CHARS,
 } from "@/constants/project-workspace"
 import { user } from "./auth-schema"
+import type { MarkdownEdit, ProjectDocumentUpdates } from "@/lib/thread-chat/contracts/document"
 import type { TextAnchor } from "@/lib/thread-chat/domain/text-anchor"
 import type { ThreadChatUIMessage } from "@/lib/thread-chat/contracts/ui-message"
 import type {
@@ -231,6 +235,8 @@ export const messages = dbSchema.table(
     supersededAt: timestamp("superseded_at", { withTimezone: true }),
     stopRequestedAt: timestamp("stop_requested_at", { withTimezone: true }),
     feedback: text("feedback").$type<ConversationMessageFeedback>(),
+    documentToolParts: jsonb("document_tool_parts").$type<ThreadChatUIMessage["parts"]>().notNull().default([]),
+    documentContextUsed: jsonb("document_context_used").$type<ProjectDocumentUpdates>(),
     providerUsage: jsonb("provider_usage").$type<Record<string, unknown>>(),
     finishReason: text("finish_reason"),
     errorCode: text("error_code"),
@@ -379,11 +385,53 @@ export const artifacts = dbSchema.table(
       .defaultNow(),
   },
   (table) => [
+    unique("artifacts_document_source_uq").on(table.id, table.projectId, table.sourceMessageId),
     index("artifacts_project_created_idx").on(table.projectId, table.createdAt),
     index("artifacts_thread_created_idx").on(table.threadId, table.createdAt),
     index("artifacts_source_message_idx").on(table.sourceMessageId),
   ]
 )
+
+/** 持续文档身份；正文只保存在不可变 Artifact 中。 */
+export const documents = dbSchema.table("documents", {
+  id: text("id").primaryKey(),
+  projectId: text("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  currentRevisionId: text("current_revision_id"),
+  archivedAt: timestamp("archived_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table): PgTableExtraConfigValue[] => [
+  unique("documents_project_id_uq").on(table.id, table.projectId),
+  index("documents_project_idx").on(table.projectId),
+  foreignKey({ name: "documents_current_revision_fk", columns: [table.id, table.currentRevisionId],
+    foreignColumns: [documentRevisions.documentId, documentRevisions.id] }),
+])
+
+export const documentRevisions = dbSchema.table("document_revisions", {
+  id: text("id").primaryKey(),
+  documentId: text("document_id").notNull(),
+  projectId: text("project_id").notNull(),
+  revisionNumber: integer("revision_number").notNull(),
+  parentRevisionId: text("parent_revision_id"),
+  artifactId: text("artifact_id").notNull(),
+  changeSummary: text("change_summary").notNull(),
+  edits: jsonb("edits").$type<MarkdownEdit[]>().notNull().default([]),
+  actorUserId: text("actor_user_id").notNull().references(() => user.id),
+  commandId: text("command_id"),
+  executionId: text("execution_id").notNull().references(() => messages.id),
+  toolCallId: text("tool_call_id"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table): PgTableExtraConfigValue[] => [
+  foreignKey({ name: "document_revisions_project_fk", columns: [table.documentId, table.projectId],
+    foreignColumns: [documents.id, documents.projectId] }).onDelete("cascade"),
+  foreignKey({ name: "document_revisions_artifact_source_fk", columns: [table.artifactId, table.projectId, table.executionId],
+    foreignColumns: [artifacts.id, artifacts.projectId, artifacts.sourceMessageId] }),
+  uniqueIndex("document_revisions_number_uq").on(table.documentId, table.revisionNumber),
+  uniqueIndex("document_revisions_artifact_uq").on(table.artifactId),
+  unique("document_revisions_document_id_uq").on(table.documentId, table.id),
+  foreignKey({ name: "document_revisions_parent_fk", columns: [table.documentId, table.parentRevisionId],
+    foreignColumns: [table.documentId, table.id] }),
+  check("document_revisions_number_positive", sql`${table.revisionNumber} >= 1`),
+])
 
 /** v1 创建/写命令的幂等收据；result 是提交后的权威 DTO。 */
 export const conversationCommands = dbSchema.table(

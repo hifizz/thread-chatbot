@@ -1,3 +1,4 @@
+import { pendingDocumentUpdates } from "./document-context"
 import { resolveUserContent } from "./resolve-user-content"
 import { and, inArray, isNull } from "drizzle-orm"
 import { messages } from "@/lib/db/schema"
@@ -69,6 +70,8 @@ export function editLatestTurn(
           stateConflict("只能编辑最新一轮用户消息")
         }
         const parts = await resolveUserContent({ tx, userId, projectId: project.id, modelId: command.modelId, content: command, operation: { type: "edit", originalParts: source.parts } })
+        if (thread.parentId === null) parts.push({ type: "data-project-document-updates",
+          data: await pendingDocumentUpdates(tx, project.id, thread.id) })
         const [userSequence, assistantSequence] = await allocateThreadSequences(
           tx,
           thread.id,

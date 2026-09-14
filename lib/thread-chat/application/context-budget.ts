@@ -20,5 +20,5 @@ export function contextLimitFailure(error: unknown): { code: string; message: st
     const record = value as Record<string, unknown>
     return [record.code, record.message, record.cause, record.error, record.responseBody].some(matches)
   }
-  return matches(error) ? { code: "CONTEXT_LIMIT_EXCEEDED", message: "上下文超过模型限制，请减少附件或引用，或开启新对话。" } : null
+  return matches(error) ? { code: "CONTEXT_LIMIT_EXCEEDED", message: "上下文超过模型限制，请在项目面板缩小本轮文档范围，并发送新消息；也可减少附件或引用。" } : null
 }

@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
 import {
   ARTIFACT_SOURCE_HIGHLIGHT_MS,
@@ -18,6 +18,8 @@ import type { ConversationStore } from "../../core/store"
 import { useConversationStore } from "../../core/use-thread-store"
 import type { ThreadChatClient } from "../../net/client"
 import type { ConversationCommands } from "../../net/commands/conversation-commands"
+import { ProjectDocumentUpdates } from "./project-document-updates"
+import { DocumentView } from "./document-view"
 import { ProjectPanel } from "./project-panel"
 
 interface ArtifactSourceNavigationDetail {
@@ -75,6 +77,7 @@ export function StoreBoundProjectPanel({
   onSelect(id: string): void
   onLocate(threadId: string, sourceMessageId: string): void
 }) {
+  const versionRequest = useRef(0)
   const state = useConversationStore(store, (value) => value)
   const [pendingSource, setPendingSource] = useState<ArtifactSourceNavigationDetail | null>(null)
   const files = useMemo(
@@ -243,6 +246,15 @@ export function StoreBoundProjectPanel({
 
   return (
     <ProjectPanel
+      documentUpdates={open ? <ProjectDocumentUpdates projectId={projectId} client={client} store={store} /> : null}
+      renderDocumentControls={(artifact) => <DocumentView artifact={artifact} client={client} onSelect={(id) => {
+        const request = ++versionRequest.current
+        void client.getArtifact(id).then((artifact) => {
+          if (request !== versionRequest.current) return
+          store.getState().upsertArtifact(artifact); onSelect(id)
+        })
+          .catch(() => toast.error("版本加载失败，请重试"))
+      }} />}
       project={state.project}
       files={files}
       artifacts={artifacts}

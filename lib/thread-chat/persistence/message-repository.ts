@@ -22,13 +22,14 @@ export async function lockOwnedMessage(
   userId: string,
   messageId: string
 ) {
-  const [row] = await tx
-    .select({ message: messages })
-    .from(messages)
-    .innerJoin(projects, eq(projects.id, messages.projectId))
-    .where(and(eq(messages.id, messageId), eq(projects.userId, userId)))
-    .limit(1)
-    .for("update")
+  const owned = await findOwnedMessage(tx, userId, messageId)
+  if (!owned) return null
+  // 与文档提交统一 Project → Message 顺序；SHARE 不阻塞其他文档的提交。
+  const [project] = await tx.select({ id: projects.id }).from(projects)
+    .where(and(eq(projects.id, owned.projectId), eq(projects.userId, userId))).for("share")
+  if (!project) return null
+  const [row] = await tx.select({ message: messages }).from(messages)
+    .where(eq(messages.id, messageId)).for("update")
   return row?.message ?? null
 }
 

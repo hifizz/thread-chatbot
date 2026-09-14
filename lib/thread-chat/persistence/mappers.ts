@@ -1,3 +1,4 @@
+import { restoreDocumentToolParts } from "./message-parts"
 import { ATTACHMENT_URL_PREFIX } from "@/constants/attachment"
 import type {
   artifacts,
@@ -28,6 +29,10 @@ export interface ProjectFileRow {
 }
 
 export interface ArtifactSourceRow {
+  documentId?: string | null
+  documentRevisionId?: string | null
+  documentRevisionNumber?: number | null
+  documentCurrentRevisionId?: string | null
   artifact: ArtifactRow
   sourceThreadCustomTitle: string | null
   sourceThreadAutoTitle: string | null
@@ -104,7 +109,7 @@ export function toMessageDTO(row: MessageRow): MessageDTO {
     threadId: row.threadId,
     sequence: row.sequence,
     role: row.role,
-    parts: row.parts,
+    parts: restoreDocumentToolParts(row.parts, row.documentToolParts),
     status: row.status,
     modelId: row.modelId,
     replacesMessageId: row.replacesMessageId,
@@ -126,7 +131,7 @@ export function toConversationMessage(row: MessageRow): ConversationMessage {
     threadId: row.threadId,
     sequence: row.sequence,
     role: row.role,
-    parts: row.parts,
+    parts: restoreDocumentToolParts(row.parts, row.documentToolParts),
     status: row.status,
     replacesMessageId: row.replacesMessageId,
     supersededAt: iso(row.supersededAt),
@@ -136,6 +141,9 @@ export function toConversationMessage(row: MessageRow): ConversationMessage {
 export function toArtifactDTO(row: ArtifactSourceRow): ArtifactDTO {
   const artifact = row.artifact
   return {
+    ...(row.documentId && row.documentRevisionId && row.documentCurrentRevisionId && row.documentRevisionNumber
+      ? { document: { id: row.documentId, revisionId: row.documentRevisionId,
+          revisionNumber: row.documentRevisionNumber, currentRevisionId: row.documentCurrentRevisionId } } : {}),
     id: artifact.id,
     projectId: artifact.projectId,
     threadId: artifact.threadId,

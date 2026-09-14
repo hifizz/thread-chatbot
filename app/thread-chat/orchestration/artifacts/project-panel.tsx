@@ -34,6 +34,8 @@ export interface ProjectPanelProps {
   project: ProjectDTO | null
   files: ProjectFileDTO[]
   artifacts: ArtifactDTO[]
+  documentUpdates?: React.ReactNode
+  renderDocumentControls?(artifact: ArtifactDTO): React.ReactNode
   open: boolean
   activeId: string | null
   onClose(): void
@@ -94,6 +96,8 @@ export function ProjectPanel({
   onSaveContract,
   onAddProjectFile,
   onRemoveProjectFile,
+  renderDocumentControls,
+  documentUpdates,
 }: ProjectPanelProps) {
   const titleId = useId()
   const fileInputRef = useRef<HTMLInputElement | null>(null)
@@ -154,8 +158,14 @@ export function ProjectPanel({
     [activeId, artifacts]
   )
   const sortedArtifacts = useMemo(
-    () =>
-      [...artifacts]
+    () => {
+      const newest = new Map<string, ArtifactDTO>()
+      for (const artifact of artifacts) {
+        const key = artifact.document?.id ?? artifact.id
+        const previous = newest.get(key)
+        if (!previous || (artifact.document?.revisionNumber ?? 0) > (previous.document?.revisionNumber ?? 0)) newest.set(key, artifact)
+      }
+      return [...newest.values()]
         .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
         .filter((artifact) => {
           const query = artifactQuery.trim().toLowerCase()
@@ -168,7 +178,8 @@ export function ProjectPanel({
             .join(" ")
             .toLowerCase()
             .includes(query)
-        }),
+        })
+    },
     [artifactQuery, artifacts]
   )
   const sortedFiles = useMemo(
@@ -305,7 +316,7 @@ export function ProjectPanel({
           className={displayedSection === "artifacts" ? "on" : ""}
           onClick={() => selectSection("artifacts")}
         >
-          Artifacts <span>{artifacts.length}</span>
+          文档与产物 <span>{new Set(artifacts.map((artifact) => artifact.document?.id ?? artifact.id)).size}</span>
         </button>
       </div>
 
@@ -317,6 +328,7 @@ export function ProjectPanel({
       )}
 
       <div className="art-body project-panel-body">
+        {documentUpdates}
         {loading ? <div className="project-empty">Project 加载中…</div> : null}
 
         {displayedSection === "overview" && !loading && (
@@ -548,6 +560,7 @@ export function ProjectPanel({
                     </button>
                   </div>
                 </div>
+                {renderDocumentControls?.(selectedArtifact)}
                 <div className="project-artifact-content">
                   {selectedArtifact.kind === "markdown" && (
                     <MarkdownBody

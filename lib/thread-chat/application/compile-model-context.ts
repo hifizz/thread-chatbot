@@ -1,3 +1,6 @@
+import { documentContextForRequest } from "../domain/document-context-history"
+import { restoreDocumentToolParts } from "../persistence/message-parts"
+import { expandDocumentUpdates } from "./document-context"
 import {
   artifactReferenceData,
   artifactReferenceDataSchema,
@@ -33,11 +36,12 @@ function asUiMessage(row: {
   id: string
   role: "user" | "assistant"
   parts: ThreadChatUIMessage["parts"]
+  documentToolParts?: ThreadChatUIMessage["parts"]
 }): ThreadChatUIMessage {
   return {
     id: row.id,
     role: row.role,
-    parts: stripTransientParts(row.parts),
+    parts: stripTransientParts(restoreDocumentToolParts(row.parts, row.documentToolParts)),
     metadata: { messageId: row.id, threadId: "context" },
   }
 }
@@ -177,10 +181,12 @@ export async function compileModelContextWithProject({
         message.id !== excludeAssistantMessageId
     )
     .map(asUiMessage)
+  const activeUserId = currentRows.findLast((row) => row.role === "user" && row.supersededAt === null)?.id
+  const selectDocumentContext = documentContextForRequest([...inheritedRows, ...currentRows], activeUserId)
   const uiMessages: ThreadChatUIMessage[] = [
     ...inheritedMessages,
     ...currentMessages,
-  ]
+  ].map(selectDocumentContext)
   const projectFiles = await listProjectFileRows(db, thread.projectId)
   const resolved = await resolveAttachmentContext({
     messages: uiMessages,
@@ -230,7 +236,7 @@ export async function compileModelContextWithProject({
     withProjectContext,
     new Map(referenceRows.map(({ artifact }) => [artifact.id, artifact]))
   )
-  const modelMessages = await convertToModelMessages(expanded, {
+  const modelMessages = await convertToModelMessages(await expandDocumentUpdates(thread.projectId, expanded), {
     ignoreIncompleteToolCalls: true,
     convertDataPart: (part) => {
       if (part.type !== "data-quote") return undefined

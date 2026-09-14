@@ -1,3 +1,4 @@
+import type { DocumentRevisionDTO, ProjectDocumentsDTO } from "@/lib/thread-chat/contracts/document"
 import type {
   AddProjectFileCommand,
   DeleteProjectCommand,
@@ -147,6 +148,14 @@ export function createThreadChatClient(options: ThreadChatClientOptions = {}) {
         fetcher,
         url(`/api/thread-chat/v1/messages/${messageId}`)
       )
+    },
+    listDocuments(projectId: string) {
+      return requestJson<ProjectDocumentsDTO>(fetcher,
+        url(`/api/thread-chat/v1/projects/${projectId}/documents`))
+    },
+    getDocumentHistory(documentId: string) {
+      return requestJson<DocumentRevisionDTO[]>(fetcher,
+        url(`/api/thread-chat/v1/documents/${documentId}/revisions`))
     },
     getArtifact(artifactId: string) {
       return requestJson<ArtifactDTO>(
