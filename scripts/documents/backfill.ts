@@ -1,5 +1,5 @@
 import "dotenv/config"
-import { registerExistingDocuments } from "@/lib/thread-chat/application/register-existing-documents"
+import { registerExistingDocuments } from "@/lib/thread-chat/application/documents/register-existing"
 
 let registered = 0
 try {

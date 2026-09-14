@@ -15,14 +15,16 @@ if (process.env.THREADCHAT_TEST_DB_MODULE) {
 }
 const [{ db }, schema, service, repository, { and, eq, sql }, contextService, { requestMessageStop }, { toMessageDTO }, { finalizeGeneration }] = await Promise.all([
   import('../../lib/db/index.ts'), import('../../lib/db/schema.ts'),
-  import('../../lib/thread-chat/application/document-service.ts'),
-  import('../../lib/thread-chat/persistence/document-repository.ts'), import('drizzle-orm'),
-  import('../../lib/thread-chat/application/document-context.ts'),
+  import('../../lib/thread-chat/application/documents/service.ts'),
+  import('../../lib/thread-chat/persistence/documents/writes.ts'), import('drizzle-orm'),
+  import('../../lib/thread-chat/application/documents/context.ts'),
   import('../../lib/thread-chat/application/stop-message.ts'), import('../../lib/thread-chat/persistence/mappers.ts'),
   import('../../lib/thread-chat/streaming/finalize.ts'),
 ])
 // 上面的直接 db import 也使用显式测试模块，其他应用模块由 hook 获得同一连接。
 const testDb = process.env.THREADCHAT_TEST_DB_MODULE ? (await import(pathToFileURL(process.env.THREADCHAT_TEST_DB_MODULE).href)).db : db
+const documentQueries = await import('../../lib/thread-chat/persistence/documents/queries.ts')
+const contextRepository = await import('../../lib/thread-chat/persistence/documents/context.ts')
 const { user, projects, threads, messages, artifacts, documents, documentRevisions } = schema
 const id = () => crypto.randomUUID()
 const userId = id(), projectId = id(), rootId = id(), sourceMessage = id(), threadA = id(), threadB = id(), messageA = id(), messageB = id()
@@ -53,10 +55,10 @@ try {
   await assert.rejects(() => testDb.update(documentRevisions).set({ projectId: id() }).where(eq(documentRevisions.id, initial.id)),
     error => error.cause?.code === '23503')
   await assert.rejects(() => testDb.update(documentRevisions).set({ executionId: messageB }).where(eq(documentRevisions.id, initial.id)),
-    error => error.cause?.constraint === 'document_revisions_artifact_source_fk')
+    error => (error.cause?.constraint_name ?? error.cause?.constraint) === 'document_revisions_artifact_source_fk')
   checks++
   const documentId = initial.documentId
-  const originalManifest = await contextService.pendingDocumentUpdates(testDb, projectId, rootId)
+  const originalManifest = await contextRepository.pendingDocumentUpdates(testDb, projectId, rootId)
   const reads = await Promise.all(identities.map((identity, i) => service.readProjectDocument(identity, { documentId }, `read-${i}`)))
   const input = { documentId, expectedRevisionId: initial.id, readId: reads[0].readId,
     edits: [{ oldText: '- [ ] TODO6', newText: '- [x] TODO6' }, { oldText: '方案：旧方案', newText: '方案：新方案' }], changeSummary: '更新 TODO6 并完成' }
@@ -131,13 +133,13 @@ try {
   const frozenExpansion = await contextService.expandDocumentUpdates(projectId, [{ id: id(), role: 'user', parts: [{ type: 'data-project-document-updates', data: originalManifest }] }])
   assert.ok(frozenExpansion[0].parts[0].text.includes(baseContent))
   assert.equal(frozenExpansion[0].parts[0].text.includes('方案：新方案'), false); checks++
-  const manifest = await contextService.pendingDocumentUpdates(testDb, projectId, rootId)
+  const manifest = await contextRepository.pendingDocumentUpdates(testDb, projectId, rootId)
   assert.equal(manifest.documents[0].commitIds.length, 3); checks++
-  assert.equal((await contextService.pendingDocumentUpdates(testDb, projectId, rootId, [])).documents.length, 0); checks++
+  assert.equal((await contextRepository.pendingDocumentUpdates(testDb, projectId, rootId, [])).documents.length, 0); checks++
   const expanded = await contextService.expandDocumentUpdates(projectId, [{ id: id(), role: 'user', parts: [{ type: 'data-project-document-updates', data: manifest }] }])
   assert.ok(expanded[0].parts[0].text.includes(current.revision.content)); checks++
-  await contextService.markDocumentContextUsed(sourceMessage, manifest)
-  assert.equal((await contextService.pendingDocumentUpdates(testDb, projectId, rootId)).documents.length, 0); checks++
+  await contextRepository.markDocumentContextUsed(testDb, sourceMessage, manifest)
+  assert.equal((await contextRepository.pendingDocumentUpdates(testDb, projectId, rootId)).documents.length, 0); checks++
   const [savedMessage] = await testDb.select().from(messages).where(eq(messages.id, messageA))
   const restored = toMessageDTO({ ...savedMessage, parts: [] })
   assert.ok(restored.parts.some(part => part.type === 'tool-updateProjectDocument' && part.output.status === a.status)); checks++
@@ -150,7 +152,7 @@ try {
   assert.deepEqual(await service.updateProjectDocument(identities[0], input, 'update-a'), a); checks++
   await finalizeGeneration({ messageId: messageA, snapshot: { id: messageA, role: 'assistant', parts: [] }, status: 'failed' })
   assert.equal((await service.getProjectDocument(userId, documentId)).revision.id, current.revision.id); checks++
-  const [artifact2] = await testDb.insert(artifacts).values({ id: id(), projectId, threadId: threadB, sourceMessageId: messageB,
+  const [artifact2] = await testDb.insert(artifacts).values({ id: id(), projectId, threadId: rootId, sourceMessageId: sourceMessage,
     kind: 'markdown', title: 'F1', content: '同名但不同文档' }).returning()
   const initial2 = await testDb.transaction(tx => repository.registerDocumentArtifact(tx, artifact2, userId))
   assert.notEqual(initial2.documentId, documentId)
@@ -168,17 +170,17 @@ try {
     else process.env.THREAD_CHAT_DOCUMENT_WRITES = previousWrites
   }
   // 旧 completed 产物：未登记不可写；中断后逐产物恢复，同名不合并。
-  const { registerExistingDocument, registerExistingDocuments } = await import('../../lib/thread-chat/application/register-existing-documents.ts')
+  const { registerExistingDocument, registerExistingDocuments } = await import('../../lib/thread-chat/application/documents/register-existing.ts')
   const legacyIds = [id(), id()]
   await testDb.insert(artifacts).values(legacyIds.map(artifactId => ({ id: artifactId, projectId,
     threadId: rootId, sourceMessageId: sourceMessage, kind: 'markdown', title: 'F1', content: '旧文档原文' })))
-  assert.equal(await repository.documentForArtifact(testDb, userId, projectId, legacyIds[0]), null)
+  assert.equal(await documentQueries.documentForArtifact(testDb, userId, projectId, legacyIds[0]), null)
   assert.equal(await registerExistingDocument(legacyIds[0]), true)
   assert.equal(await registerExistingDocument(legacyIds[0]), false)
-  assert.equal(await repository.documentForArtifact(testDb, userId, projectId, legacyIds[1]), null)
+  assert.equal(await documentQueries.documentForArtifact(testDb, userId, projectId, legacyIds[1]), null)
   assert.equal(await registerExistingDocument(legacyIds[1]), true)
-  assert.notEqual(await repository.documentForArtifact(testDb, userId, projectId, legacyIds[0]),
-    await repository.documentForArtifact(testDb, userId, projectId, legacyIds[1]))
+  assert.notEqual(await documentQueries.documentForArtifact(testDb, userId, projectId, legacyIds[0]),
+    await documentQueries.documentForArtifact(testDb, userId, projectId, legacyIds[1]))
   assert.equal((await testDb.select().from(artifacts).where(eq(artifacts.id, legacyIds[0])))[0].content, '旧文档原文')
   // 不运行跨用户批处理；批处理的遍历仅在显式隔离内存数据库中验证。
   if (process.env.THREADCHAT_TEST_DB_MODULE) assert.equal(await registerExistingDocuments(), 0)
@@ -216,6 +218,20 @@ try {
   assert.equal(child.result.thread.parentId, fixed.revision.sourceThreadId)
   assert.equal(child.result.thread.forkArtifactId, fixed.revision.artifactId)
   await assert.rejects(() => forkThread(userId, rootId, { ...forkCommand, commandId: id(), threadId: id() })); checks++
+  // 普通创建工具成功后停止/失败，不登记新文档；已 committed 更新仍保留。
+  for (const terminalStatus of ['failed', 'stopped']) {
+    const messageId = id()
+    await testDb.insert(messages).values({ id: messageId, projectId, threadId: rootId,
+      sequence: terminalStatus === 'failed' ? 50 : 51, role: 'assistant', parts: [], status: 'generating', modelId: 'test-model' })
+    await finalizeGeneration({ messageId, status: terminalStatus, snapshot: { id: messageId, role: 'assistant', parts: [{
+      type: 'tool-createMarkdownArtifact', toolCallId: `create-${terminalStatus}`, state: 'output-available',
+      input: { title: '未完成创建', content: '# 未完成' }, output: { created: true },
+    }] } })
+    const [sourceArtifact] = await testDb.select().from(artifacts).where(eq(artifacts.sourceMessageId, messageId))
+    assert.ok(sourceArtifact, '普通固定产物保留原有阅读行为')
+    assert.equal((await testDb.select().from(documentRevisions).where(eq(documentRevisions.artifactId, sourceArtifact.id))).length, 0)
+    checks++
+  }
   const { deleteProject } = await import('../../lib/thread-chat/application/project-mutations.ts')
   await deleteProject(userId, projectId, { commandId: id() })
   assert.equal((await testDb.select().from(documents).where(eq(documents.projectId, projectId))).length, 0); checks++

@@ -1,13 +1,11 @@
 import { and, asc, eq, gt, isNull } from "drizzle-orm"
-import { db } from "@/lib/db"
 import { artifacts, documentRevisions, messages, projects } from "@/lib/db/schema"
 import { DOCUMENT_LIMITS } from "@/constants/project-documents"
-import { registerDocumentArtifact } from "../persistence/document-repository"
-import { withConversationTransaction } from "../persistence/transaction"
+import { registerDocumentArtifact } from "./writes"
+import type { ConversationExecutor, ConversationTransaction } from "../transaction"
 
 /** 一个旧产物一个事务；与生成提交相同的 Project → Message 锁顺序。 */
-export async function registerExistingDocument(artifactId: string): Promise<boolean> {
-  return withConversationTransaction(async (tx) => {
+export async function registerExistingDocumentInTransaction(tx: ConversationTransaction, artifactId: string): Promise<boolean> {
     const [source] = await tx.select().from(artifacts).where(eq(artifacts.id, artifactId))
     if (!source || source.kind !== "markdown") return false
     const [project] = await tx.select().from(projects).where(eq(projects.id, source.projectId)).for("share")
@@ -16,21 +14,15 @@ export async function registerExistingDocument(artifactId: string): Promise<bool
       eq(messages.id, source.sourceMessageId), eq(messages.projectId, source.projectId),
       eq(messages.threadId, source.threadId),
     )).for("update")
-    if (message?.role !== "assistant" || message.status !== "completed") return false
+    if (!message) return false
     const [existing] = await tx.select({ id: documentRevisions.id }).from(documentRevisions)
       .where(eq(documentRevisions.artifactId, source.id))
     if (existing) return false
-    await registerDocumentArtifact(tx, source, project.userId)
-    return true
-  })
+    return Boolean(await registerDocumentArtifact(tx, source, project.userId))
 }
 
-/** 分页避免一次加载全部历史；失败即停止，重跑时跳过已提交的 Artifact。 */
-export async function registerExistingDocuments(onProgress?: (registered: number) => void) {
-  let cursor: string | undefined
-  let registered = 0
-  for (;;) {
-    const candidates = await db.select({ id: artifacts.id }).from(artifacts)
+export function listUnregisteredDocuments(executor: ConversationExecutor, cursor?: string) {
+  return executor.select({ id: artifacts.id }).from(artifacts)
       .innerJoin(messages, and(eq(messages.id, artifacts.sourceMessageId),
         eq(messages.projectId, artifacts.projectId), eq(messages.threadId, artifacts.threadId)))
       .leftJoin(documentRevisions, eq(documentRevisions.artifactId, artifacts.id))
@@ -38,11 +30,4 @@ export async function registerExistingDocuments(onProgress?: (registered: number
         eq(messages.status, "completed"), isNull(documentRevisions.id),
         cursor ? gt(artifacts.id, cursor) : undefined))
       .orderBy(asc(artifacts.id)).limit(DOCUMENT_LIMITS.backfillBatch)
-    if (!candidates.length) return registered
-    for (const candidate of candidates) {
-      if (await registerExistingDocument(candidate.id)) registered++
-      cursor = candidate.id
-      onProgress?.(registered)
-    }
-  }
 }

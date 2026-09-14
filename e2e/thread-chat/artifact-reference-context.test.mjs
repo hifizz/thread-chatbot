@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import { convertToModelMessages } from "ai"
 import { artifactReferenceData } from "../../lib/thread-chat/contracts/artifact-reference.ts"
 import { expandArtifactReferencesInContext } from "../../lib/thread-chat/application/artifact-reference-context.ts"
-import { artifactIdForTool } from "../../lib/thread-chat/streaming/artifacts.ts"
+import { artifactIdForTool } from "../../lib/thread-chat/domain/tool-identity.ts"
 
 const id = (n) => `20000000-0000-4000-8000-${String(n).padStart(12, "0")}`
 const makeArtifact = (n) => ({

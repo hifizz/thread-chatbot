@@ -5,7 +5,7 @@ import * as schema from "../../lib/db/schema.ts"
 import * as commands from "../../lib/thread-chat/application/index.ts"
 import { DEFAULT_THREAD_CHAT_MODEL_ID as modelId } from "../../constants/model.ts"
 import { finalizeGeneration } from "../../lib/thread-chat/streaming/finalize.ts"
-import { artifactIdForTool } from "../../lib/thread-chat/streaming/artifacts.ts"
+import { artifactIdForTool } from "../../lib/thread-chat/domain/tool-identity.ts"
 const id = () => crypto.randomUUID()
 const userId = `artifact-test-${id()}`
 const otherUser = `artifact-other-${id()}`

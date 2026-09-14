@@ -1,5 +1,5 @@
 import { z } from "zod"
-import { getProjectDocument } from "@/lib/thread-chat/application/document-service"
+import { getProjectDocument } from "@/lib/thread-chat/application/documents/service"
 import { jsonNoCache, withThreadChatRoute, type RouteContext } from "@/lib/thread-chat/server/route-utils"
 
 export async function GET(request: Request, context: RouteContext<{ documentId: string }>) {

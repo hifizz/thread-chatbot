@@ -1,4 +1,4 @@
-import { pendingDocumentUpdates } from "./document-context"
+import { pendingDocumentUpdates } from "../persistence/documents/context"
 import { resolveUserContent } from "./resolve-user-content"
 import { and, inArray, isNull } from "drizzle-orm"
 import { messages } from "@/lib/db/schema"

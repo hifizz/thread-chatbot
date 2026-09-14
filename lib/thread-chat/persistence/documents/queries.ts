@@ -1,7 +1,7 @@
-import { and, desc, eq, isNotNull } from "drizzle-orm"
+import { and, desc, eq, inArray, isNotNull } from "drizzle-orm"
 import { artifacts, documents, documentRevisions, messages, projects } from "@/lib/db/schema"
-import type { DocumentDTO, DocumentRevisionDTO } from "../contracts/document"
-import type { ConversationExecutor, ConversationTransaction } from "./transaction"
+import type { DocumentDTO, DocumentRevisionDTO } from "../../contracts/document"
+import type { ConversationExecutor } from "../transaction"
 
 export async function findOwnedDocument(executor: ConversationExecutor, userId: string, documentId: string) {
   const [row] = await executor.select({ document: documents }).from(documents)
@@ -10,19 +10,32 @@ export async function findOwnedDocument(executor: ConversationExecutor, userId: 
   return row?.document ?? null
 }
 
-export async function readDocumentRevision(executor: ConversationExecutor, documentId: string, revisionId: string): Promise<DocumentRevisionDTO | null> {
-  const [row] = await executor.select({ revision: documentRevisions, artifact: artifacts, status: messages.status })
-    .from(documentRevisions)
+const revisionColumns = {
+  id: documentRevisions.id, documentId: documentRevisions.documentId,
+  revisionNumber: documentRevisions.revisionNumber, parentRevisionId: documentRevisions.parentRevisionId,
+  artifactId: artifacts.id, title: artifacts.title, content: artifacts.content,
+  changeSummary: documentRevisions.changeSummary, sourceThreadId: artifacts.threadId,
+  sourceMessageId: artifacts.sourceMessageId, sourceMessageStatus: messages.status,
+  createdAt: documentRevisions.createdAt,
+}
+
+function revisionQuery(executor: ConversationExecutor) {
+  return executor.select(revisionColumns).from(documentRevisions)
     .innerJoin(documents, eq(documents.id, documentRevisions.documentId))
     .innerJoin(artifacts, and(eq(artifacts.id, documentRevisions.artifactId), eq(artifacts.projectId, documents.projectId)))
     .innerJoin(messages, and(eq(messages.id, artifacts.sourceMessageId), eq(messages.projectId, artifacts.projectId), eq(messages.threadId, artifacts.threadId)))
+}
+
+export async function readDocumentRevision(executor: ConversationExecutor, documentId: string, revisionId: string): Promise<DocumentRevisionDTO | null> {
+  const [row] = await revisionQuery(executor)
     .where(and(eq(documentRevisions.documentId, documentId), eq(documentRevisions.id, revisionId))).limit(1)
-  if (!row) return null
-  const { revision: r, artifact: a } = row
-  return { id: r.id, documentId, revisionNumber: r.revisionNumber, parentRevisionId: r.parentRevisionId,
-    artifactId: a.id, title: a.title, content: a.content, changeSummary: r.changeSummary,
-    sourceThreadId: a.threadId, sourceMessageId: a.sourceMessageId,
-    sourceMessageStatus: row.status, createdAt: r.createdAt.toISOString() }
+  return row ? { ...row, createdAt: row.createdAt.toISOString() } : null
+}
+
+export async function listDocumentHistory(executor: ConversationExecutor, documentId: string): Promise<DocumentRevisionDTO[]> {
+  const rows = await revisionQuery(executor).where(eq(documentRevisions.documentId, documentId))
+    .orderBy(desc(documentRevisions.revisionNumber))
+  return rows.map((row) => ({ ...row, createdAt: row.createdAt.toISOString() }))
 }
 
 export async function listOwnedDocuments(executor: ConversationExecutor, userId: string, projectId: string): Promise<DocumentDTO[]> {
@@ -44,19 +57,14 @@ export async function documentForArtifact(executor: ConversationExecutor, userId
   return row?.documentId ?? null
 }
 
-/** 调用方持有来源消息锁；同一 Artifact 登记可重复执行，不合并同名产物。 */
-export async function registerDocumentArtifact(tx: ConversationTransaction, artifact: typeof artifacts.$inferSelect, userId: string) {
-  const [existing] = await tx.select().from(documentRevisions).where(eq(documentRevisions.artifactId, artifact.id)).limit(1)
-  if (existing) return existing
-  if (artifact.kind !== "markdown") throw new Error("DOCUMENT_KIND_INVALID")
-  const id = crypto.randomUUID()
-  const revisionId = crypto.randomUUID()
-  await tx.insert(documents).values({ id, projectId: artifact.projectId })
-  const [revision] = await tx.insert(documentRevisions).values({ id: revisionId, documentId: id, projectId: artifact.projectId,
-    revisionNumber: 1, artifactId: artifact.id, changeSummary: "创建文档", actorUserId: userId,
-    executionId: artifact.sourceMessageId,
-    toolCallId: typeof artifact.metadata.toolCallId === "string" ? artifact.metadata.toolCallId : null,
-  }).returning()
-  await tx.update(documents).set({ currentRevisionId: revisionId }).where(eq(documents.id, id))
-  return revision
+
+export async function listDocumentCommits(executor: ConversationExecutor, projectId: string, commitIds: readonly string[]) {
+  if (!commitIds.length) return []
+  const rows = await executor.select({ id: documentRevisions.id, documentId: documentRevisions.documentId,
+    revisionNumber: documentRevisions.revisionNumber, changeSummary: documentRevisions.changeSummary,
+    sourceThreadId: artifacts.threadId, sourceMessageId: artifacts.sourceMessageId, createdAt: documentRevisions.createdAt,
+  }).from(documentRevisions).innerJoin(artifacts, eq(artifacts.id, documentRevisions.artifactId))
+    .where(and(eq(artifacts.projectId, projectId), inArray(documentRevisions.id, [...new Set(commitIds)])))
+    .orderBy(documentRevisions.documentId, documentRevisions.revisionNumber)
+  return rows.map((row) => ({ ...row, createdAt: row.createdAt.toISOString() }))
 }

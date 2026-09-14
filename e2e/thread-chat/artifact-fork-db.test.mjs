@@ -4,7 +4,7 @@ import { db } from "../../lib/db/index.ts"
 import * as schema from "../../lib/db/schema.ts"
 import * as commands from "../../lib/thread-chat/application/index.ts"
 import { compileModelContext } from "../../lib/thread-chat/application/compile-model-context.ts"
-import { artifactIdForTool } from "../../lib/thread-chat/streaming/artifacts.ts"
+import { artifactIdForTool } from "../../lib/thread-chat/domain/tool-identity.ts"
 import { DEFAULT_THREAD_CHAT_MODEL_ID as modelId } from "../../constants/model.ts"
 
 assert.match(new URL(process.env.DATABASE_URL).pathname, /^\/(wt_|thread-chat-.*test)/, "仅允许独立测试数据库")

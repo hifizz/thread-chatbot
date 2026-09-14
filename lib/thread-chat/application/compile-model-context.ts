@@ -1,6 +1,6 @@
 import { documentContextForRequest } from "../domain/document-context-history"
 import { restoreDocumentToolParts } from "../persistence/message-parts"
-import { expandDocumentUpdates } from "./document-context"
+import { expandDocumentUpdates } from "./documents/context"
 import {
   artifactReferenceData,
   artifactReferenceDataSchema,

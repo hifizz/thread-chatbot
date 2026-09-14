@@ -6,7 +6,7 @@ import {
   markdownArtifactInputSchema,
 } from "@/lib/chat/markdown-artifact"
 import { createResearchTools } from "@/lib/chat/research-tools"
-import { artifactIdForTool } from "@/lib/thread-chat/streaming/artifacts"
+import { artifactIdForTool } from "@/lib/thread-chat/domain/tool-identity"
 
 export function createMarkdownArtifactTool(messageId: string) {
   return tool({

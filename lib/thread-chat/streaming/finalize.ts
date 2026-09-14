@@ -1,4 +1,4 @@
-import { registerDocumentArtifact } from "../persistence/document-repository"
+import { registerDocumentArtifact } from "../persistence/documents/writes"
 import { and, eq } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { artifacts, messages, projects } from "@/lib/db/schema"

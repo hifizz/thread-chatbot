@@ -1,7 +1,8 @@
+import { db } from "@/lib/db"
 import { DOCUMENT_TOOL_NAMES } from "@/constants/project-documents"
 import { withDocumentContextReceipt } from "./document-context-receipt"
 import { buildDocumentTools } from "./document-tools"
-import { markDocumentContextUsed } from "../application/document-context"
+import { markDocumentContextUsed } from "../persistence/documents/context"
 import type { ProjectDocumentUpdates } from "../contracts/document"
 import { availableResearchTools, createWebBudget } from "@/lib/ai/web-access"
 import { evaluateContextBudget } from "../application/context-budget"
@@ -216,7 +217,7 @@ export async function prepareGeneration(input: PrepareGenerationInput) {
         const response = await doStream()
         const manifest = input.documentUpdates
         return manifest ? { ...response, stream: withDocumentContextReceipt(response.stream,
-          () => markDocumentContextUsed(input.messageId, manifest)) } : response
+          () => markDocumentContextUsed(db, input.messageId, manifest)) } : response
       } },
     }), MODEL_CALL_PURPOSE.chatAnswer, trace),
     abortSignal: input.abortSignal,
