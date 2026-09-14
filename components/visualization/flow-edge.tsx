@@ -26,10 +26,10 @@ export function FlowEdge(props: EdgeProps<FlowRenderEdge>) {
       {label ? (
         <EdgeLabelRenderer>
           <div
-            className="pointer-events-none absolute rounded-md border border-border bg-background px-1.5 py-0.5 text-[10px] text-muted-foreground shadow-sm"
+            className="pointer-events-none absolute max-w-[160px] rounded-md border border-border bg-background px-1.5 py-0.5 text-[10px] text-muted-foreground shadow-sm"
             style={{ transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)` }}
           >
-            {label}
+            <span className="line-clamp-2 break-words">{label}</span>
           </div>
         </EdgeLabelRenderer>
       ) : null}

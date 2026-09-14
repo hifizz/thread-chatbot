@@ -1,6 +1,7 @@
 "use client"
 
 import { useMemo } from "react"
+import { useTheme } from "next-themes"
 import {
   Background,
   BackgroundVariant,
@@ -21,6 +22,7 @@ const nodeTypes = { flowNode: FlowNode, flowGroup: FlowGroup }
 const edgeTypes = { flowEdge: FlowEdge }
 
 function Canvas({ spec }: { spec: FlowSpec }) {
+  const { resolvedTheme } = useTheme()
   const graph = useMemo(() => adaptFlowSpec(spec, reactFlowAdapter), [spec])
   const { fitView, zoomIn, zoomOut } = useReactFlow()
 
@@ -50,12 +52,15 @@ function Canvas({ spec }: { spec: FlowSpec }) {
         edgeTypes={edgeTypes}
         fitView
         fitViewOptions={{ padding: 0.2, maxZoom: 1 }}
-        minZoom={0.2}
+        minZoom={0.01}
         maxZoom={2}
         nodesDraggable={false}
         nodesConnectable={false}
         elementsSelectable
         zoomOnDoubleClick={false}
+        zoomOnScroll={false}
+        preventScrolling={false}
+        colorMode={resolvedTheme === "dark" ? "dark" : "light"}
         deleteKeyCode={null}
         proOptions={{ hideAttribution: true }}
       >

@@ -1,5 +1,6 @@
 import dagre from "@dagrejs/dagre"
-import { Position, type Edge, type Node } from "@xyflow/react"
+import { MarkerType, Position, type Edge, type Node } from "@xyflow/react"
+import { FLOW_NODE_WIDTH as NODE_WIDTH, FLOW_NODE_HEIGHT as NODE_HEIGHT } from "@/constants/visualization-renderer"
 import type {
   FlowDirection,
   FlowEdge,
@@ -9,8 +10,6 @@ import type {
 } from "@/lib/visualization/types"
 import type { FlowRendererAdapter } from "@/lib/visualization/renderer-adapter"
 
-const NODE_WIDTH = 196
-const NODE_HEIGHT = 76
 const GROUP_PADDING_X = 24
 const GROUP_PADDING_TOP = 38
 const GROUP_PADDING_BOTTOM = 18
@@ -41,7 +40,7 @@ function groupNodes(
   spec: FlowSpec,
   semanticNodes: FlowRenderNode[]
 ): FlowGroupRenderNode[] {
-  const byId = new Map(semanticNodes.map((node) => [node.id, node]))
+  const byId = new Map(semanticNodes.map((node) => [node.data.semanticNode.id, node]))
   return (spec.groups ?? []).flatMap((group) => {
     const members = group.nodeIds.flatMap((id) => {
       const node = byId.get(id)
@@ -98,7 +97,7 @@ export const reactFlowAdapter: FlowRendererAdapter<ReactFlowGraph> = {
     const semanticNodes: FlowRenderNode[] = spec.nodes.map((node) => {
       const layout = graph.node(node.id)
       return {
-        id: node.id,
+        id: `node:${node.id}`,
         type: "flowNode",
         position: {
           x: layout.x - NODE_WIDTH / 2,
@@ -118,8 +117,9 @@ export const reactFlowAdapter: FlowRendererAdapter<ReactFlowGraph> = {
     const edges: FlowRenderEdge[] = spec.edges.map((edge) => ({
       id: edge.id,
       type: "flowEdge",
-      source: edge.from,
-      target: edge.to,
+      source: `node:${edge.from}`,
+      target: `node:${edge.to}`,
+      markerEnd: { type: MarkerType.ArrowClosed },
       data: { semanticEdge: edge },
       label: edge.label,
       zIndex: 1,

@@ -2,6 +2,7 @@ import { artifactReferenceDataSchema } from "../contracts/artifact-reference"
 import { loadProjectReferenceArtifactRows } from "../persistence/artifact-repository"
 import { expandArtifactReferencesInContext } from "./artifact-reference-context"
 import { convertToModelMessages, type ModelMessage } from "ai"
+import { visualizationForModel } from "@/lib/visualization/model-context"
 import { db } from "@/lib/db"
 import { supportsModelImageInput } from "@/constants/model"
 import {
@@ -127,6 +128,7 @@ export async function compileModelContextWithProject({
   const modelMessages = await convertToModelMessages(expanded, {
     ignoreIncompleteToolCalls: true,
     convertDataPart: (part) => {
+      if (part.type === "data-visualization") return visualizationForModel(part.data)
       if (part.type !== "data-quote") return undefined
       const parsed = persistedThreadQuotePartSchema.safeParse(part)
       if (!parsed.success) return undefined
