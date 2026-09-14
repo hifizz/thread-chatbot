@@ -264,6 +264,26 @@
   margin-bottom: 2px;
   font-family: var(--tc-typography-family-code);
 }
+.tc .focus-source-artifact {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 3px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--tc-accent);
+  font: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 2px;
+}
+.tc .focus-source-artifact:hover,
+.tc .focus-source-artifact:focus-visible {
+  color: var(--tc-content-primary);
+  outline: none;
+}
 .tc .focus-banner .ft q {
   font-family: var(--tc-typography-family-read);
   color: var(--tc-content-primary);
