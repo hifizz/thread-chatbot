@@ -312,6 +312,12 @@
 }
 
 /* 临时提问引用：仅底色，沿用来源列的主题，不添加分支装饰。 */
+.tc.selection-question-portal {
+  position: fixed;
+  inset: 0;
+  z-index: var(--tc-z-selection);
+}
+
 .tc ::highlight(tc-question) {
   background-color: var(--tc-question-highlight);
 }

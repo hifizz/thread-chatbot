@@ -1,6 +1,6 @@
 "use client"
 import { ARTIFACT_SOURCE_NAVIGATION_EVENT } from "@/constants/artifact-navigation"
-import { persistedThreadQuotePartSchema } from "@/lib/thread-chat/contracts/quote"
+import { threadQuotePartV1Schema } from "@/lib/thread-chat/contracts/quote"
 import type { ConversationViewMessage } from "../../core/types"
 import { useArtifactNavigation } from "../composer/artifact-resources"
 import { UIMessageSupplementalParts } from "./ui-message-parts"
@@ -19,11 +19,10 @@ export function InlineUserContent({ message }: { message: ConversationViewMessag
       {message.uiParts.map((part, index) => {
         if (part.type === "text") return <span key={index}>{part.text}</span>
         if (part.type === "data-quote") {
-          const parsed = persistedThreadQuotePartSchema.safeParse(part)
+          const parsed = threadQuotePartV1Schema.safeParse(part)
           const quote = parsed.success ? parsed.data.data : null
           const artifactSource =
             quote &&
-            "schemaVersion" in quote &&
             quote.source.type === "artifact"
               ? quote.source
               : null

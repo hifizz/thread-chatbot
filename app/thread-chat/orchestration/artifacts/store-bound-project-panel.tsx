@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useRef } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
 import {
   ARTIFACT_SOURCE_HIGHLIGHT_MS,
@@ -76,7 +76,7 @@ export function StoreBoundProjectPanel({
   onLocate(threadId: string, sourceMessageId: string): void
 }) {
   const state = useConversationStore(store, (value) => value)
-  const pendingSource = useRef<ArtifactSourceNavigationDetail | null>(null)
+  const [pendingSource, setPendingSource] = useState<ArtifactSourceNavigationDetail | null>(null)
   const files = useMemo(
     () =>
       state.projectFileOrder.flatMap((id) => {
@@ -98,7 +98,7 @@ export function StoreBoundProjectPanel({
     const onArtifactSource = (event: Event) => {
       const detail = (event as CustomEvent<ArtifactSourceNavigationDetail>).detail
       if (!detail?.artifactId || !detail.anchor) return
-      pendingSource.current = detail
+      setPendingSource({ ...detail })
     }
     window.addEventListener(ARTIFACT_SOURCE_NAVIGATION_EVENT, onArtifactSource)
     return () =>
@@ -138,11 +138,11 @@ export function StoreBoundProjectPanel({
   // 分支来源导航：先由上层打开正确 Artifact，再在该内容根中精确定位并短暂高亮。
   // 重试有固定上限，绝不在其他文档或消息正文中按相同句子猜测。
   useEffect(() => {
-    const request = pendingSource.current
+    const request = pendingSource
     if (!open || !activeId || !request || request.artifactId !== activeId) return
     let cancelled = false
-    let retryTimer: ReturnType<typeof setTimeout> | null = null
-    let clearTimer: ReturnType<typeof setTimeout> | null = null
+    let retryTimer: number | null = null
+    let clearTimer: number | null = null
     const markId = `artifact-source:${request.artifactId}`
 
     const reveal = (attempt = 0) => {
@@ -158,7 +158,7 @@ export function StoreBoundProjectPanel({
             ARTIFACT_SOURCE_LOCATE_DELAY_MS
           )
         } else {
-          pendingSource.current = null
+          setPendingSource(null)
           toast.error("已打开来源文档，但未能准确定位原文")
         }
         return
@@ -168,7 +168,7 @@ export function StoreBoundProjectPanel({
         fuzzyThreshold: 1,
       })
       if (!located || located.strategy === "fuzzy") {
-        pendingSource.current = null
+        setPendingSource(null)
         toast.error("已打开来源文档，但未能准确定位原文")
         return
       }
@@ -184,9 +184,11 @@ export function StoreBoundProjectPanel({
         markId,
         "var(--tc-question-highlight, var(--tc-ink-hover))"
       )
-      pendingSource.current = null
       clearTimer = window.setTimeout(
-        () => clearHighlights(markdownRoot, markId),
+        () => {
+          clearHighlights(markdownRoot, markId)
+          setPendingSource(null)
+        },
         ARTIFACT_SOURCE_HIGHLIGHT_MS
       )
     }
@@ -202,7 +204,7 @@ export function StoreBoundProjectPanel({
       )
       if (root) clearHighlights(root, markId)
     }
-  }, [activeId, open])
+  }, [activeId, open, pendingSource])
 
   const refresh = useCallback(async () => {
     const bootstrap = await client.getProject(projectId)
