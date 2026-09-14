@@ -1,3 +1,5 @@
+export const GENERATE_VISUALIZATION_TOOL_NAME = "generate_visualization" as const
+
 export type FlowDirection = "LR" | "TB"
 
 export type FlowNodeKind =
