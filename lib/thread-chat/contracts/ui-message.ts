@@ -7,6 +7,11 @@ import type {
 import type { WebResearchActivity } from "@/lib/chat/web-research-activity"
 import type { ResearchPlan, ResearchRoute } from "@/lib/chat/research-contract"
 import type { ThreadChatQuoteData } from "@/lib/thread-chat/contracts/quote"
+import type {
+  GenerateVisualizationInput,
+  GenerateVisualizationResult,
+  VisualizationData,
+} from "@/lib/visualization/types"
 
 export interface ThreadChatMessageMetadata {
   messageId: string
@@ -21,6 +26,7 @@ export type ThreadChatDataParts = {
   "research-route": ResearchRoute
   "research-plan": ResearchPlan
   "artifact-progress": MarkdownArtifactProgressEvent
+  visualization: VisualizationData
 }
 
 export interface MarkdownArtifactOutput {
@@ -37,6 +43,10 @@ export type ThreadChatTools = {
   createMarkdownArtifact: {
     input: MarkdownArtifactInput
     output: MarkdownArtifactOutput
+  }
+  generate_visualization: {
+    input: GenerateVisualizationInput
+    output: GenerateVisualizationResult
   }
   webSearch: {
     input: { query: string }

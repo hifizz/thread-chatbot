@@ -7,6 +7,7 @@ export type AssistantPartRenderKind =
   | "text"
   | "reasoning"
   | "research"
+  | "visualization"
   | "file"
   | "source-url"
   | "tool"
@@ -46,6 +47,10 @@ export function assistantPartRenderPlan(
       }
       return
     }
+    if (part.type === "data-visualization") {
+      plan.push({ kind: "visualization", part, index })
+      return
+    }
     if (part.type === "file" || part.type === "reasoning-file") {
       plan.push({ kind: "file", part, index })
       return
@@ -54,8 +59,9 @@ export function assistantPartRenderPlan(
       plan.push({ kind: "source-url", part, index })
       return
     }
-    // 联网工具由研究面板展示，不输出内部 input-available 等状态。
+    // 联网和可视化工具都有专用产品 UI，不输出内部 input/output 状态。
     if (WEB_RESEARCH_TOOL_NAMES.some((name) => part.type === `tool-${name}`)) return
+    if (part.type === "tool-generate_visualization") return
     if (part.type.startsWith("tool-")) {
       plan.push({ kind: "tool", part, index })
     }

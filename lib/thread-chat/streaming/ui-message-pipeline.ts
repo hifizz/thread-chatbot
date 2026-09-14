@@ -14,6 +14,7 @@ import type {
 } from "@/lib/thread-chat/contracts/ui-message"
 import { createMarkdownArtifactProgressDispatcher } from "@/lib/chat/markdown-artifact"
 import { createWebResearchActivityDispatcher } from "@/lib/chat/web-research-activity"
+import { createVisualizationDispatcher } from "@/lib/visualization/stream"
 import type { StreamSessionController } from "@/lib/thread-chat/streaming/stream-session"
 
 export interface UIMessagePipelineEnd {
@@ -104,6 +105,15 @@ async function* injectLeadingChunks(
       data,
     })
   })
+  const visualization = createVisualizationDispatcher(
+    ({ toolCallId, visualization: data }) => {
+      derived.push({
+        type: "data-visualization",
+        id: `visualization:${toolCallId}`,
+        data,
+      })
+    }
+  )
   try {
     while (true) {
       const result = await reader.read()
@@ -112,6 +122,7 @@ async function* injectLeadingChunks(
       derived.length = 0
       await artifactProgress(result.value)
       researchActivity(result.value)
+      visualization(result.value)
       for (const chunk of derived) yield chunk
       if (!injected && result.value.type === "start") {
         injected = true
