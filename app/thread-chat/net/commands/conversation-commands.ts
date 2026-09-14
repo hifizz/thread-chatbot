@@ -2,6 +2,7 @@ import type { GenerationSettings } from "@/constants/generation-settings"
 import type {
   AddProjectFileCommand,
   EditLatestTurnCommand,
+  ForkTarget,
   ForkThreadCommand,
   RemoveProjectFileCommand,
   RetryMessageCommand,
@@ -15,10 +16,11 @@ import type {
   ThreadDTO,
 } from "@/lib/thread-chat/contracts/dto"
 import type { TextAnchor } from "@/lib/thread-chat/domain/text-anchor"
-import type {
-  MessageContentInput,
+import type { MessageContentInput } from "@/lib/thread-chat/contracts/message-content"
+import {
+  messageContentToUiParts,
+  messageContentInputSchema,
 } from "@/lib/thread-chat/contracts/message-content"
-import { messageContentToUiParts, messageContentInputSchema } from "@/lib/thread-chat/contracts/message-content"
 import { artifactReferenceData } from "@/lib/thread-chat/contracts/artifact-reference"
 import type { ConversationStore } from "../../core/store"
 import type { ConversationEntitySnapshot } from "../../core/types"
@@ -41,8 +43,10 @@ export interface ConversationCommandOptions {
 export interface ForkCommandInput {
   parentThreadId: string
   sourceMessageId: string
-  anchorText: string
-  anchor: TextAnchor
+  /** 新入口使用 target；旧消息划选仍可传 anchorText + anchor。 */
+  target?: ForkTarget
+  anchorText?: string
+  anchor?: TextAnchor
   modelId: string
   generationSettings?: GenerationSettings
   firstTurn?: MessageContentInput
@@ -240,6 +244,7 @@ export function createConversationCommands(
       projectId: command.projectId,
       parentId: null,
       forkMessageId: null,
+      forkArtifactId: null,
       forkContext: [],
       forkAnchor: null,
       anchorText: null,
@@ -353,13 +358,25 @@ export function createConversationCommands(
     const project = state.project
     const parent = state.threadsById[input.parentThreadId]
     if (!project || !parent) throw new Error("来源会话尚未加载")
-    const firstTurn = input.firstTurn === undefined ? undefined : messageContentInputSchema.parse(input.firstTurn)
+    const target: ForkTarget = input.target ?? (() => {
+      if (!input.anchor || !input.anchorText)
+        throw new Error("分支来源缺少选区")
+      return { type: "message", anchor: input.anchor }
+    })()
+    const anchorText = target.anchor.quote.exact
+    if (input.anchorText && input.anchorText !== anchorText)
+      throw new Error("选区锚点与来源文本不一致")
+    const firstTurn =
+      input.firstTurn === undefined
+        ? undefined
+        : messageContentInputSchema.parse(input.firstTurn)
     const command: ForkThreadCommand = Object.freeze({
       commandId: createId(),
       threadId: createId(),
       sourceMessageId: input.sourceMessageId,
-      anchorText: input.anchorText,
-      anchor: input.anchor,
+      ...(input.target
+        ? { target }
+        : { anchorText, anchor: target.anchor }),
       modelId: input.modelId,
       ...generationSettingsField(input.generationSettings),
       ...(firstTurn
@@ -386,9 +403,11 @@ export function createConversationCommands(
         projectId: project.id,
         parentId: parent.id,
         forkMessageId: command.sourceMessageId,
+        forkArtifactId:
+          target.type === "artifact" ? target.artifactId : null,
         forkContext: [],
-        forkAnchor: command.anchor,
-        anchorText: command.anchorText,
+        forkAnchor: target.anchor,
+        anchorText,
         footnote,
         depth: parent.depth + 1,
         modelId: command.modelId,
@@ -400,7 +419,9 @@ export function createConversationCommands(
         updatedAt: now,
       }
       if (!command.firstTurn)
-        return { threadsById: { ...snapshot.threadsById, [thread.id]: thread } }
+        return {
+          threadsById: { ...snapshot.threadsById, [thread.id]: thread },
+        }
       return {
         threadsById: { ...snapshot.threadsById, [thread.id]: thread },
         ...withMessages(snapshot, [
