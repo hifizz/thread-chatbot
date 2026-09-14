@@ -11,6 +11,7 @@ import type {
   ThreadDTO,
 } from "@/lib/thread-chat/contracts/dto"
 import { buildFrozenForkContext } from "@/lib/thread-chat/domain/fork-context"
+import { locateArtifactAnchor } from "@/lib/thread-chat/domain/markdown-visible-text"
 import {
   assertAllowedGenerationSettings,
   assertAllowedModel,
@@ -71,6 +72,7 @@ export function forkThread(
         const project = await lockOwnedProject(tx, userId, parent.projectId)
         if (!project) notFound()
         if (project.archivedAt) stateConflict("已归档 Project 不可创建分支")
+        if (parent.archivedAt) stateConflict("已归档 Thread 不可创建分支")
         const target = normalizedTarget(command)
         const anchor = target.anchor
         const anchorText = anchor.quote.exact
@@ -87,6 +89,8 @@ export function forkThread(
         )
         if (!source || source.supersededAt)
           stateConflict("分支来源不在当前时间线")
+        if (source.role !== "assistant")
+          stateConflict("只能从 Assistant 回复产生的内容创建分支")
         if (source.status !== "completed")
           stateConflict("分支来源尚未完成")
 
@@ -106,11 +110,8 @@ export function forkThread(
             stateConflict("当前只支持从 Markdown Artifact 开启分支")
           if (row.sourceMessageStatus !== "completed")
             stateConflict("Artifact 来源尚未完成")
-          // exact 是客户端从渲染后的 Markdown 采集的权威快照。第一阶段先做
-          // 保守校验：只有能在固定 Artifact 内容中找到原文的选区才允许写入。
-          // 更复杂的 Markdown 可见文本归一化在独立选择器测试中逐步扩展。
-          if (!artifact.content.includes(anchorText))
-            stateConflict("选区无法在 Artifact 中定位，请重新划选")
+          if (!locateArtifactAnchor(artifact.content, anchor))
+            stateConflict("选区无法在 Artifact 可见文字中唯一定位，请重新划选")
           forkArtifactId = artifact.id
         }
 
