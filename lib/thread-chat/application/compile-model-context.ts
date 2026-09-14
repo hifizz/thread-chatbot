@@ -9,7 +9,6 @@ import {
   findOwnedArtifact,
   loadProjectReferenceArtifactRows,
 } from "../persistence/artifact-repository"
-import { expandArtifactReferencesInContext } from "./artifact-reference-context"
 import { convertToModelMessages, type ModelMessage } from "ai"
 import { db } from "@/lib/db"
 import { supportsModelImageInput } from "@/constants/model"
@@ -232,11 +231,11 @@ export async function compileModelContextWithProject({
   )
   if (referenceRows.length !== new Set(referenceIds).size)
     stateConflict("Artifact 引用目标不完整")
-  const expanded = expandArtifactReferencesInContext(
-    withProjectContext,
+  const expanded = await expandDocumentUpdates(
+    thread.projectId, withProjectContext,
     new Map(referenceRows.map(({ artifact }) => [artifact.id, artifact]))
   )
-  const modelMessages = await convertToModelMessages(await expandDocumentUpdates(thread.projectId, expanded), {
+  const modelMessages = await convertToModelMessages(expanded, {
     ignoreIncompleteToolCalls: true,
     convertDataPart: (part) => {
       if (part.type !== "data-quote") return undefined

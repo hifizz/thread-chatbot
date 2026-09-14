@@ -68,3 +68,11 @@ export async function listDocumentCommits(executor: ConversationExecutor, projec
     .orderBy(documentRevisions.documentId, documentRevisions.revisionNumber)
   return rows.map((row) => ({ ...row, createdAt: row.createdAt.toISOString() }))
 }
+
+/** 只按固定 Revision ID 读取；不追随可变的文档 head。 */
+export async function loadProjectDocumentRevisions(executor: ConversationExecutor, projectId: string, revisionIds: readonly string[]) {
+  if (!revisionIds.length) return []
+  const rows = await revisionQuery(executor).where(and(eq(documents.projectId, projectId),
+    inArray(documentRevisions.id, [...new Set(revisionIds)])))
+  return rows.map((row) => ({ ...row, createdAt: row.createdAt.toISOString() }))
+}

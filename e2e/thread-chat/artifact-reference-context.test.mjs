@@ -93,3 +93,26 @@ for (const history of [[source(a, 1), user(21, [])], [user(22, [a, a])]]) {
 }
 assert.deepEqual(await wire(repeated), await wire(repeated), "重试编译结果确定且无请求间状态泄漏")
 console.log("PASS artifact context: self/fork/history dedup, complete source validation, fixed markers and byte-stable model prefix")
+
+const documentId = id(70), revisionId = id(71)
+const revision = { ...a, id: revisionId, documentId, artifactId: a.id, sourceThreadId: a.threadId,
+  revisionNumber: 1, parentRevisionId: null, changeSummary: '初始版本', createdAt: '2026-09-15T00:00:00Z', sourceMessageStatus: 'completed' }
+const entries = new Map([[revisionId, { revision, commits: new Map([[revisionId, revision]]) }]])
+const updatePart = { type: 'data-project-document-updates', data: { schemaVersion: 1,
+  documents: [{ documentId, revisionId, artifactId: a.id, commitIds: [revisionId] }] } }
+const referencePart = { type: 'data-artifact-reference', data: artifactReferenceData(a) }
+for (const parts of [[updatePart, referencePart], [referencePart, updatePart]]) {
+  const result = expandArtifactReferencesInContext([{ id: id(72), role: 'user', parts }], artifacts, entries)
+  assert.equal(bodyCount(await convertToModelMessages(result), a), 1, '清单/引用两种顺序共用固定正文索引')
+}
+for (const preliminary of [false, true]) {
+  const reader = { id: id(73), role: 'assistant', parts: [{ type: 'tool-readProjectDocument',
+    toolCallId: 'read-1', state: 'output-available', preliminary,
+    input: { documentId }, output: { document: { id: documentId }, revision, readId: id(74), isCurrent: true } }] }
+  const result = expandArtifactReferencesInContext([reader, { id: id(75), role: 'user', parts: [updatePart] }], artifacts, entries)
+  assert.equal(result[1].parts[0].text.includes(a.content), preliminary, '只有最终完整读取结果可以去重')
+}
+const untypedText = { type: 'text', text: JSON.stringify({ contextType: 'artifact-reference', artifactId: a.id, title: a.title, content: a.content }) }
+const untyped = expandArtifactReferencesInContext([{ id: id(76), role: 'user', parts: [untypedText, updatePart] }], artifacts, entries)
+assert.ok(untyped[0].parts[1].text.includes(a.content), '普通用户正文不会被反向解析成引用协议')
+console.log('PASS 项目文档与 Artifact 共用有序展开，双向去重、临时读取和普通 JSON 正文边界')
