@@ -1,7 +1,11 @@
 import { resolveForkModelId } from "@/lib/thread-chat/application/fork-model"
 import { resolveUserContent } from "./resolve-user-content"
 import { messages, threads } from "@/lib/db/schema"
-import type { ForkThreadCommand } from "@/lib/thread-chat/contracts/commands"
+import type {
+  ForkTarget,
+  ForkThreadCommand,
+} from "@/lib/thread-chat/contracts/commands"
+import { THREAD_QUOTE_SCHEMA_VERSION } from "@/lib/thread-chat/contracts/quote"
 import type {
   GenerationAcceptedDTO,
   ThreadDTO,
@@ -20,6 +24,7 @@ import {
   toProjectDTO,
   toThreadDTO,
 } from "@/lib/thread-chat/persistence/mappers"
+import { findOwnedArtifact } from "@/lib/thread-chat/persistence/artifact-repository"
 import { listThreadMessageRows } from "@/lib/thread-chat/persistence/message-repository"
 import {
   findRootThreadId,
@@ -35,6 +40,14 @@ import {
 export type ForkThreadResult =
   | { thread: ThreadDTO; generation: null }
   | { thread: ThreadDTO; generation: GenerationAcceptedDTO }
+
+function normalizedTarget(command: ForkThreadCommand): ForkTarget {
+  if (command.target) return command.target
+  if (!command.anchor || !command.anchorText) {
+    stateConflict("分支来源缺少选区")
+  }
+  return { type: "message", anchor: command.anchor! }
+}
 
 export function forkThread(
   userId: string,
@@ -58,6 +71,12 @@ export function forkThread(
         const project = await lockOwnedProject(tx, userId, parent.projectId)
         if (!project) notFound()
         if (project.archivedAt) stateConflict("已归档 Project 不可创建分支")
+        const target = normalizedTarget(command)
+        const anchor = target.anchor
+        const anchorText = anchor.quote.exact
+        if (command.anchorText && command.anchorText !== anchorText) {
+          stateConflict("选区锚点与来源文本不一致")
+        }
         const parentMessages = await listThreadMessageRows(
           tx,
           project.id,
@@ -68,9 +87,33 @@ export function forkThread(
         )
         if (!source || source.supersededAt)
           stateConflict("分支来源不在当前时间线")
-        if (command.anchor.quote.exact !== command.anchorText) {
-          stateConflict("选区锚点与来源文本不一致")
+        if (source.status !== "completed")
+          stateConflict("分支来源尚未完成")
+
+        let forkArtifactId: string | null = null
+        if (target.type === "artifact") {
+          const row = await findOwnedArtifact(tx, userId, target.artifactId)
+          if (!row) notFound()
+          const artifact = row.artifact
+          if (
+            artifact.projectId !== project.id ||
+            artifact.threadId !== parent.id ||
+            artifact.sourceMessageId !== source.id
+          ) {
+            stateConflict("Artifact 与分支来源不匹配")
+          }
+          if (artifact.kind !== "markdown")
+            stateConflict("当前只支持从 Markdown Artifact 开启分支")
+          if (row.sourceMessageStatus !== "completed")
+            stateConflict("Artifact 来源尚未完成")
+          // exact 是客户端从渲染后的 Markdown 采集的权威快照。第一阶段先做
+          // 保守校验：只有能在固定 Artifact 内容中找到原文的选区才允许写入。
+          // 更复杂的 Markdown 可见文本归一化在独立选择器测试中逐步扩展。
+          if (!artifact.content.includes(anchorText))
+            stateConflict("选区无法在 Artifact 中定位，请重新划选")
+          forkArtifactId = artifact.id
         }
+
         const forkContext = buildFrozenForkContext({
           parentForkContext: parent.forkContext,
           parentMessages: parentMessages.map(toConversationMessage),
@@ -84,9 +127,10 @@ export function forkThread(
             projectId: project.id,
             parentId: parent.id,
             forkMessageId: source.id,
+            forkArtifactId,
             forkContext,
-            forkAnchor: command.anchor,
-            anchorText: command.anchorText,
+            forkAnchor: anchor,
+            anchorText,
             footnote,
             depth: parent.depth + 1,
             modelId,
@@ -96,7 +140,35 @@ export function forkThread(
           await touchProjectAndThread(tx, project.id, child.id)
           return { thread: toThreadDTO(child), generation: null }
         }
-        const parts = await resolveUserContent({ tx, userId, projectId: project.id, modelId, content: command.firstTurn, operation: { type: "send", sourceThreadId: parent.id } })
+        const frozenFirstQuote = {
+          schemaVersion: THREAD_QUOTE_SCHEMA_VERSION,
+          text: anchorText,
+          source:
+            target.type === "artifact"
+              ? {
+                  type: "artifact" as const,
+                  messageId: source.id,
+                  artifactId: target.artifactId,
+                  anchor,
+                }
+              : {
+                  type: "message" as const,
+                  messageId: source.id,
+                  anchor,
+                },
+        }
+        const parts = await resolveUserContent({
+          tx,
+          userId,
+          projectId: project.id,
+          modelId,
+          content: command.firstTurn,
+          operation: {
+            type: "send",
+            sourceThreadId: parent.id,
+            frozenFirstQuote,
+          },
+        })
         const [userSequence, assistantSequence] = await allocateThreadSequences(
           tx,
           child.id,
