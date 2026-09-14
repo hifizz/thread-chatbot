@@ -149,6 +149,7 @@ export function projectThreadDTO(
         : (thread.anchorText ?? selectDisplayTitle(thread))),
     anchorText: thread.anchorText,
     forkFromMsgId: thread.forkMessageId,
+    forkAnchor: thread.forkAnchor,
     forkArtifactId: thread.forkArtifactId ?? null,
     footnote: thread.footnote,
     children: Object.values(state.threadsById)
