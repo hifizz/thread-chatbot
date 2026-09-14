@@ -8,6 +8,7 @@ import {
   type LanguageModelMiddleware,
 } from "ai"
 import type { ModelCallPurpose } from "@/constants/model-call"
+import { logger } from "@/lib/axiom/server"
 import { buildObservabilityRuntimeContext } from "@/lib/observability/ai-sdk"
 import type { ModelCallTrace } from "@/lib/observability/types"
 
@@ -80,18 +81,18 @@ function writeModelCallLog(input: {
   trace?: ModelCallTrace
   context: Record<string, unknown>
 }) {
-  console.info(
-    "[model-call]",
-    JSON.stringify({
-      callId: crypto.randomUUID(),
-      operation: input.operation,
-      purpose: input.purpose,
-      provider: input.provider,
-      model: input.model,
-      correlation: { ...buildObservabilityRuntimeContext(input.trace), ...diagnosticCorrelation() },
-      context: input.context,
-    })
-  )
+  logger.info("model.call", {
+    callId: crypto.randomUUID(),
+    operation: input.operation,
+    purpose: input.purpose,
+    provider: input.provider,
+    model: input.model,
+    correlation: {
+      ...buildObservabilityRuntimeContext(input.trace),
+      ...diagnosticCorrelation(),
+    },
+    context: input.context,
+  })
 }
 
 /** 在每次真正进入 LanguageModel 的 generate/stream 方法前记录一条脱敏摘要。 */
