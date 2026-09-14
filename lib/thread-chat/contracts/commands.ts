@@ -100,18 +100,60 @@ const textAnchorSchema = z
   })
   .strict()
 
+export const forkTargetSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("message"), anchor: textAnchorSchema }).strict(),
+  z
+    .object({
+      type: z.literal("artifact"),
+      artifactId: entityIdSchema,
+      anchor: textAnchorSchema,
+    })
+    .strict(),
+])
+
 export const forkThreadCommandSchema = z
   .object({
     commandId: commandIdSchema,
     threadId: entityIdSchema,
     sourceMessageId: entityIdSchema,
-    anchorText: z.string().trim().min(1).max(20_000),
-    anchor: textAnchorSchema,
+    target: forkTargetSchema.optional(),
+    // Legacy message-fork fields. New clients send target instead.
+    anchorText: z.string().trim().min(1).max(20_000).optional(),
+    anchor: textAnchorSchema.optional(),
     modelId: modelIdSchema,
     ...generationSettingsField,
     firstTurn: firstForkTurnSchema.optional(),
   })
   .strict()
+  .superRefine((command, context) => {
+    const hasLegacyField =
+      command.anchorText !== undefined || command.anchor !== undefined
+    if (command.target && hasLegacyField) {
+      context.addIssue({
+        code: "custom",
+        path: ["target"],
+        message: "target 不能与旧版 anchorText/anchor 同时出现",
+      })
+      return
+    }
+    if (!command.target) {
+      if (!command.anchorText || !command.anchor) {
+        context.addIssue({
+          code: "custom",
+          path: ["target"],
+          message: "必须提供 target，或完整的旧版 anchorText/anchor",
+        })
+        return
+      }
+      if (command.anchor.quote.exact !== command.anchorText) {
+        context.addIssue({
+          code: "custom",
+          path: ["anchorText"],
+          message: "选区锚点与来源文本不一致",
+        })
+      }
+    }
+  })
 
 export const editLatestTurnCommandSchema = z
   .object(baseGenerationFields)
@@ -184,6 +226,7 @@ export const updateThreadCommandSchema = z
 
 export type StartProjectCommand = z.infer<typeof startProjectCommandSchema>
 export type SendMessageCommand = z.infer<typeof sendMessageCommandSchema>
+export type ForkTarget = z.infer<typeof forkTargetSchema>
 export type ForkThreadCommand = z.infer<typeof forkThreadCommandSchema>
 export type EditLatestTurnCommand = z.infer<typeof editLatestTurnCommandSchema>
 export type RetryMessageCommand = z.infer<typeof retryMessageCommandSchema>
