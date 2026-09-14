@@ -48,12 +48,40 @@ export function sendMessage(
         if (!project) notFound()
         if (project.archivedAt) stateConflict("已归档 Project 不可发送消息")
         await assertThreadReadyForTurn(tx, project.id, thread.id)
-        const parts = await resolveUserContent({ tx, userId, projectId: project.id, modelId: command.modelId, content: command, operation: { type: "send", sourceThreadId: thread.id,
-          ...(thread.nextSequence === 1 && thread.forkMessageId && thread.forkAnchor && thread.anchorText ? { frozenFirstQuote: {
-            schemaVersion: THREAD_QUOTE_SCHEMA_VERSION, text: thread.anchorText,
-            source: { type: "message", messageId: thread.forkMessageId, anchor: thread.forkAnchor },
-          } } : {}),
-        } })
+        const parts = await resolveUserContent({
+          tx,
+          userId,
+          projectId: project.id,
+          modelId: command.modelId,
+          content: command,
+          operation: {
+            type: "send",
+            sourceThreadId: thread.id,
+            ...(thread.nextSequence === 1 &&
+            thread.forkMessageId &&
+            thread.forkAnchor &&
+            thread.anchorText
+              ? {
+                  frozenFirstQuote: {
+                    schemaVersion: THREAD_QUOTE_SCHEMA_VERSION,
+                    text: thread.anchorText,
+                    source: thread.forkArtifactId
+                      ? {
+                          type: "artifact" as const,
+                          messageId: thread.forkMessageId,
+                          artifactId: thread.forkArtifactId,
+                          anchor: thread.forkAnchor,
+                        }
+                      : {
+                          type: "message" as const,
+                          messageId: thread.forkMessageId,
+                          anchor: thread.forkAnchor,
+                        },
+                  },
+                }
+              : {}),
+          },
+        })
         const [userSequence, assistantSequence] = await allocateThreadSequences(
           tx,
           thread.id,
