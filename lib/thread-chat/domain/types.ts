@@ -116,6 +116,8 @@ export interface Thread {
   anchorText: string | null
   /** 从父会话哪条消息分叉出来（决定「继承的上文」截断点） */
   forkFromMsgId: string | null
+  /** 分叉时保存的可重定位文本锚点；主线为 null。 */
+  forkAnchor?: TextAnchor | null
   /** 非空表示讨论焦点来自该 Message 生成的 Markdown Artifact。 */
   forkArtifactId?: string | null
   footnote: number | null
