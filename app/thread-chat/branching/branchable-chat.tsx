@@ -14,6 +14,7 @@ import type { MessageContentInput } from "@/lib/thread-chat/contracts/message-co
 
 import React from "react"
 import { FileText, ListTree } from "lucide-react"
+import { ARTIFACT_SOURCE_NAVIGATION_EVENT } from "@/constants/artifact-navigation"
 import type { TextAnchor } from "@/lib/thread-chat/domain/text-anchor"
 import type { Message, ThreadTreeState } from "../core/types"
 import {
@@ -209,9 +210,22 @@ export function BranchableChat({
                 type="button"
                 className="focus-source-artifact"
                 title={`打开来源文档「${sourceArtifact.title}」并定位原文`}
-                onClick={() =>
-                  onOpenArtifact(sourceArtifact.id, thread.forkAnchor ?? undefined)
-                }
+                onClick={() => {
+                  onOpenArtifact(
+                    sourceArtifact.id,
+                    thread.forkAnchor ?? undefined
+                  )
+                  if (thread.forkAnchor) {
+                    window.dispatchEvent(
+                      new CustomEvent(ARTIFACT_SOURCE_NAVIGATION_EVENT, {
+                        detail: {
+                          artifactId: sourceArtifact.id,
+                          anchor: thread.forkAnchor,
+                        },
+                      })
+                    )
+                  }
+                }}
               >
                 <FileText size={11} aria-hidden="true" />
                 《{sourceArtifact.title}》
