@@ -1,5 +1,6 @@
 "use client"
 
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu"
 import { Download, Share2 } from "lucide-react"
 import { useState } from "react"
 import { DOCUMENT_UI_COPY } from "@/constants/project-documents"
@@ -40,9 +41,9 @@ export function DocumentExportActions({ artifact }: { artifact: ArtifactDTO }) {
       if (!(cause instanceof DOMException && cause.name === "AbortError")) setError(DOCUMENT_UI_COPY.shareFailed)
     } finally { setSharing(false) }
   }
-  return <div className="project-document-export">
+  return <>
     {error && <p className="project-document-action-error" role="alert">{error}</p>}
-    <button type="button" className="project-secondary" onClick={download} title="导出当前固定版本" aria-label="导出当前版本"><Download size={14} />导出</button>
-    <button type="button" className="project-secondary" disabled={sharing} onClick={() => void share()} title="分享当前固定版本文件" aria-label="分享当前版本文件"><Share2 size={14} />分享</button>
-  </div>
+    <DropdownMenuItem onClick={download} closeOnClick={false}><Download size={14} />导出当前版本</DropdownMenuItem>
+    <DropdownMenuItem disabled={sharing} closeOnClick={false} onClick={() => void share()}><Share2 size={14} />分享当前版本文件</DropdownMenuItem>
+  </>
 }

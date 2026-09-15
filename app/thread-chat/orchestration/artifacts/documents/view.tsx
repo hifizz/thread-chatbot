@@ -6,7 +6,6 @@ import type { ArtifactDTO } from "@/lib/thread-chat/contracts/dto"
 import type { DocumentRevisionSummaryDTO } from "@/lib/thread-chat/contracts/document"
 import type { ThreadChatClient } from "../../../net/client"
 import { DocumentVersionHistory } from "./version-history"
-import { DocumentExportActions } from "./export-actions"
 import { DocumentDiff } from "./diff"
 
 /** 只管理版本目录；导航资格由持有选区/草稿的上层明确传入。 */
@@ -36,15 +35,13 @@ export function DocumentView({ artifact, client, navigationBlocked, onSelect }: 
   return <div className="project-document-view">
     {errorDocumentId === documentId && <p role="alert">{DOCUMENT_UI_COPY.historyFailed} <button type="button" onClick={() => setRefresh((value) => value + 1)}>重新加载版本</button></p>}
     {navigationBlocked && <p role="status">{DOCUMENT_UI_COPY.navigationBlocked}</p>}
-    <div className="project-document-toolbar">
     <DocumentVersionHistory revisions={revisions} revisionId={document.revisionId}
       currentRevisionId={document.currentRevisionId} disabled={navigationBlocked} onSelect={(revision) => onSelect(revision.artifactId)} />
-    <DocumentExportActions key={`export:${artifact.id}`} artifact={artifact} />
-    </div>
+    {previous && <DocumentDiff key={`diff:${artifact.id}`} before={previous} after={artifact} client={client} />}
     {latest && latest.id !== document.revisionId && <p>
       正在查看历史版本 <button type="button" className="project-secondary" disabled={navigationBlocked} onClick={() => onSelect(latest.artifactId)}>查看最新版本</button>
     </p>}
     {artifact.sourceMessageStatus !== "completed" && <p>此版本已保存。来源回复尚未成功完成，暂时不能从这里开启分支。</p>}
-    {previous && <DocumentDiff key={`diff:${artifact.id}`} before={previous} after={artifact} client={client} />}
+
   </div>
 }

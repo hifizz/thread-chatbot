@@ -2,12 +2,10 @@
 
 import React, { useEffect, useId, useMemo, useRef, useState } from "react"
 import {
-  Check,
-  Copy,
+  ArrowLeft,
   ExternalLink,
   FileText,
   FolderKanban,
-  LocateFixed,
   Paperclip,
   Pencil,
   Search,
@@ -27,7 +25,7 @@ import type {
   ProjectFileDTO,
 } from "@/lib/thread-chat/contracts/dto"
 import { MarkdownBody } from "../../chat/message/markdown-body"
-import { useCopyMarkdown } from "../../chat/actions/use-copy-markdown"
+import { ArtifactPreviewActions } from "./artifact-preview-actions"
 import { uploadProjectFile } from "../../net/project-file-upload"
 
 export interface ProjectPanelProps {
@@ -112,7 +110,6 @@ export function ProjectPanel({
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [artifactQuery, setArtifactQuery] = useState("")
-  const { copied, copy } = useCopyMarkdown(setError)
   const archived = Boolean(project?.archivedAt)
   const loading = open && !project
   const displayedSection: ProjectPanelSection = activeId ? "artifacts" : section
@@ -266,9 +263,11 @@ export function ProjectPanel({
     onLocate(viewThreadId, artifact.sourceMessageId)
   }
 
+  const preview = displayedSection === "artifacts" ? selectedArtifact : null
+
   return (
     <div
-      className={`art-drawer project-panel ${open ? "open" : ""}`}
+      className={`art-drawer project-panel ${open ? "open" : ""} ${preview ? "project-panel-preview" : ""}`}
       role="dialog"
       aria-modal={false}
       aria-labelledby={titleId}
@@ -276,24 +275,23 @@ export function ProjectPanel({
       inert={!open}
     >
       <div className="art-head project-panel-head">
-        <FolderKanban size={16} />
-        <h3 id={titleId}>
-          项目空间
-        </h3>
+        {preview ? <button type="button" className="project-preview-back" aria-label="返回文档列表" title="返回文档列表" onClick={() => { setSection("artifacts"); onSelect("") }}><ArrowLeft size={18} /></button> : <FolderKanban size={16} />}
+        <h3 id={titleId} title={preview?.title}>{preview?.title ?? "项目空间"}</h3>
+        {preview && <ArtifactPreviewActions key={preview.id} artifact={preview} onLocate={() => locateArtifact(preview)} />}
         {archived && <span className="project-readonly">只读</span>}
         <button
           ref={closeButtonRef}
           type="button"
           className="art-x"
-          title="收起项目空间"
-          aria-label="收起项目空间"
+          title={preview ? "关闭文档预览" : "收起项目空间"}
+          aria-label={preview ? "关闭文档预览" : "收起项目空间"}
           onClick={onClose}
         >
           <X size={13} />
         </button>
       </div>
 
-      <div
+      {!preview && <div
         className="project-sections"
         role="tablist"
         aria-label="项目空间"
@@ -316,7 +314,7 @@ export function ProjectPanel({
         >
           文档与产物 <span>{new Set(artifacts.map((artifact) => artifact.document?.id ?? artifact.id)).size}</span>
         </button>
-      </div>
+      </div>}
 
       {error && <div className="project-error">{error}</div>}
       {archived && (
@@ -326,7 +324,7 @@ export function ProjectPanel({
       )}
 
       <div className="art-body project-panel-body">
-        {documentUpdates}
+        <div hidden={!!preview}>{documentUpdates}</div>
         {loading ? <div className="project-empty">Project 加载中…</div> : null}
 
         {displayedSection === "overview" && !loading && (
@@ -513,51 +511,6 @@ export function ProjectPanel({
           <section className="project-artifacts">
             {selectedArtifact ? (
               <div className="project-artifact-detail">
-                <button className="project-back" onClick={() => onSelect("")}>
-                  ← 全部文档与产物
-                </button>
-                <div className="project-section-heading artifact-detail-heading">
-                  <div>
-                    <div className="project-eyebrow">
-                      {artifactKindLabel(selectedArtifact.kind)}
-                    </div>
-                    <h4>{selectedArtifact.title}</h4>
-                    <p>
-                      来源：
-                      {selectedArtifact.sourceThreadTitle ?? "未命名 Thread"}
-                      {selectedArtifact.sourceThreadFootnote !== null
-                        ? ` · 脚注 ${selectedArtifact.sourceThreadFootnote}`
-                        : ""}
-                      {` · ${sourceStatusLabel(selectedArtifact.sourceMessageStatus)}`}
-                      {` · ${formatDate(selectedArtifact.createdAt)}`}
-                    </p>
-                  </div>
-                  <div className="project-actions">
-                    {selectedArtifact.kind === "markdown" && (
-                      <button
-                        type="button"
-                        className="project-secondary"
-                        title={
-                          copied
-                            ? "Markdown raw 内容已复制"
-                            : "复制 Markdown raw 内容"
-                        }
-                        onClick={() => void copy(selectedArtifact.content)}
-                      >
-                        {copied ? <Check size={12} /> : <Copy size={12} />}
-                        <span aria-live="polite">
-                          {copied ? "已复制" : "复制"}
-                        </span>
-                      </button>
-                    )}
-                    <button
-                      className="project-secondary"
-                      onClick={() => locateArtifact(selectedArtifact)}
-                    >
-                      <LocateFixed size={12} /> 定位来源
-                    </button>
-                  </div>
-                </div>
                 {renderDocumentControls?.(selectedArtifact)}
                 <div className="project-artifact-content">
                   {selectedArtifact.kind === "markdown" && (
