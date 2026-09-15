@@ -1,4 +1,3 @@
-import { listOwnedDocuments } from "../persistence/documents/queries"
 import { db } from "@/lib/db"
 import type {
   ArtifactDTO,
@@ -8,7 +7,8 @@ import type {
 } from "@/lib/thread-chat/contracts/dto"
 import {
   findOwnedArtifact,
-  listProjectArtifactRows,
+  listOwnedProjectArtifactCatalog,
+  listOwnedThreadArtifactRows,
 } from "@/lib/thread-chat/persistence/artifact-repository"
 import {
   toArtifactDTO,
@@ -56,13 +56,12 @@ export async function getProjectBootstrap(
       activeGenerationIds: [],
     }
   }
-  const [threadRows, messageRows, artifactRows, projectFileRows, documentRows] =
+  const [threadRows, messageRows, catalog, projectFileRows] =
     await Promise.all([
       listProjectThreadRows(db, project.id),
       listProjectMessageRows(db, project.id),
-      listProjectArtifactRows(db, project.id),
+      listOwnedProjectArtifactCatalog(db, userId, project.id),
       listProjectFileRows(db, project.id),
-      listOwnedDocuments(db, userId, project.id),
     ])
   const root = threadRows.find((thread) => thread.parentId === null)
   if (!root) throw new Error("PROJECT_WITHOUT_ROOT_THREAD")
@@ -71,8 +70,7 @@ export async function getProjectBootstrap(
     files: projectFileRows.map(toProjectFileDTO),
     threads: threadRows.map(toThreadDTO),
     messages: messageRows.map(toMessageDTO),
-    artifacts: artifactRows.map(toArtifactSummaryDTO),
-    documents: documentRows,
+    ...catalog,
     activeGenerationIds: messageRows
       .filter((message) => message.status === "generating")
       .map((message) => message.id),
@@ -93,4 +91,8 @@ export async function getArtifact(
 ): Promise<ArtifactDTO | null> {
   const row = await findOwnedArtifact(db, userId, artifactId)
   return row ? toArtifactDTO(row) : null
+}
+
+export async function getThreadArtifacts(userId: string, threadId: string) {
+  return (await listOwnedThreadArtifactRows(db, userId, threadId)).map(toArtifactSummaryDTO)
 }

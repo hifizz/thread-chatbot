@@ -1,9 +1,12 @@
-import { and, desc, eq, inArray, sql, getTableColumns } from "drizzle-orm"
+import { toArtifactSummaryDTO } from "./mappers"
+import type { ProjectDocumentsDTO } from "../contracts/document"
+import { and, desc, eq, inArray, sql, getTableColumns, isNull, or } from "drizzle-orm"
 import { artifacts, messages, projects, threads, documents, documentRevisions } from "@/lib/db/schema"
 import type { ConversationExecutor } from "@/lib/thread-chat/persistence/transaction"
 
 const artifactSourceSelection = {
   documentId: documents.id,
+  documentArchivedAt: documents.archivedAt,
   documentRevisionId: documentRevisions.id,
   documentRevisionNumber: documentRevisions.revisionNumber,
   sourceThreadCustomTitle: threads.customTitle,
@@ -53,12 +56,33 @@ export async function findOwnedArtifact(
   return row ? requireContent(row) : null
 }
 
-export function listProjectArtifactRows(
+/** 同一 SQL 快照同时返回权威 head 和完整条目，历史版本不进入当前目录。 */
+export async function listOwnedProjectArtifactCatalog(
   executor: ConversationExecutor,
+  userId: string,
   projectId: string
-) {
-  return withSource(executor, true)
-    .where(eq(artifacts.projectId, projectId))
+): Promise<ProjectDocumentsDTO> {
+  const rows = await withSource(executor, true)
+    .innerJoin(projects, eq(projects.id, artifacts.projectId))
+    .where(and(eq(projects.userId, userId), eq(artifacts.projectId, projectId),
+      or(isNull(documentRevisions.id), eq(documentRevisions.id, documents.currentRevisionId))))
+    .orderBy(desc(artifacts.createdAt))
+  return {
+    artifacts: rows.map(toArtifactSummaryDTO),
+    documents: rows.flatMap((row) => row.documentId && row.documentRevisionId && row.documentRevisionNumber ? [{
+      id: row.documentId, projectId, currentRevisionId: row.documentRevisionId,
+      currentArtifactId: row.artifact.id, title: row.artifact.title,
+      revisionNumber: row.documentRevisionNumber, sourceMessageStatus: row.sourceMessageStatus,
+      sourceThreadId: row.artifact.threadId, sourceMessageId: row.artifact.sourceMessageId,
+      archivedAt: row.documentArchivedAt?.toISOString() ?? null,
+    }] : []),
+  }
+}
+
+/** 打开 Thread 时才取其固定产物元数据；不包含正文，也不写文档 head。 */
+export async function listOwnedThreadArtifactRows(executor: ConversationExecutor, userId: string, threadId: string) {
+  return withSource(executor, true).innerJoin(projects, eq(projects.id, artifacts.projectId))
+    .where(and(eq(projects.userId, userId), eq(artifacts.threadId, threadId)))
     .orderBy(desc(artifacts.createdAt))
 }
 

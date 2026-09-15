@@ -250,6 +250,20 @@ export function createConversationStore(input?: {
           artifactOrder: [...new Set([...state.artifactOrder, ...artifacts.map((artifact) => artifact.id)])] }
       })
     },
+    cacheArtifactSummaries(artifacts) {
+      set((state) => {
+        // 固定元数据只补缓存；不覆盖当前目录，也不把来源终态退回生成中。
+        const additions = artifacts.filter((artifact) => !state.artifactsById[artifact.id])
+        const completed = artifacts.filter((artifact) => artifact.sourceMessageStatus !== "generating"
+          && state.artifactsById[artifact.id]?.sourceMessageStatus === "generating")
+        if (!additions.length && !completed.length) return state
+        return {
+          artifactsById: { ...state.artifactsById,
+            ...Object.fromEntries([...additions, ...completed].map((artifact) => [artifact.id, artifactMetadata(artifact)])) },
+          artifactOrder: [...state.artifactOrder, ...additions.map((artifact) => artifact.id)],
+        }
+      })
+    },
     upsertArtifact(artifact: ArtifactDTO) {
       set((state) => ({
         artifactsById: { ...state.artifactsById, [artifact.id]: artifactMetadata(artifact) },

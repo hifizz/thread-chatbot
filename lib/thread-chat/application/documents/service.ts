@@ -1,5 +1,4 @@
-import { listProjectArtifactRows } from "../../persistence/artifact-repository"
-import { toArtifactSummaryDTO } from "../../persistence/mappers"
+import { listOwnedProjectArtifactCatalog } from "../../persistence/artifact-repository"
 import { findOwnedProject } from "../../persistence/project-repository"
 import type { ProjectDocumentsDTO } from "../../contracts/document"
 import { isActiveDocumentExecution } from "../../domain/documents/execution"
@@ -113,6 +112,5 @@ async function commitDocumentUpdate(tx: ConversationTransaction, identity: Docum
 
 export async function getProjectDocuments(userId: string, projectId: string): Promise<ProjectDocumentsDTO> {
   if (!await findOwnedProject(db, userId, projectId)) notFound()
-  const [documents, artifacts] = await Promise.all([listOwnedDocuments(db, userId, projectId), listProjectArtifactRows(db, projectId)])
-  return { documents, artifacts: artifacts.map(toArtifactSummaryDTO) }
+  return listOwnedProjectArtifactCatalog(db, userId, projectId)
 }

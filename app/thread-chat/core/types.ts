@@ -98,6 +98,7 @@ export interface NormalizedThreadChatState extends ConversationEntityState {
   upsertThread(thread: ThreadDTO): void
   upsertMessage(message: MessageDTO): void
   upsertArtifact(artifact: ArtifactDTO): void
+  cacheArtifactSummaries(artifacts: ArtifactSummaryDTO[]): void
   syncDocuments(documents: DocumentListItemDTO[], artifacts: ArtifactSummaryDTO[]): void
   applyStreamSnapshot(
     messageId: string,

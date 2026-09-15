@@ -511,6 +511,7 @@ export function createGate3MockRuntime(
   }
 
   const client: ThreadChatClient = {
+    async listThreadArtifacts(threadId: string) { return [...artifacts.values()].filter(artifact => artifact.threadId === threadId) },
     async listDocuments() { return { documents: [], artifacts: [...artifacts.values()] } },
     async getDocumentHistory() { return [] },
     async listProjects(archived = false) {

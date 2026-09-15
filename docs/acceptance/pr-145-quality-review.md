@@ -133,3 +133,22 @@ EGO 在真实三版本项目中观察 @ 候选仅一项；无版本参数的读�
 本轮执行：pnpm typecheck、pnpm test:thread-chat:documents、pnpm test:thread-chat:gate3-client、node --import tsx e2e/thread-chat/artifact-reference-context.test.mjs、node /tmp/pr145-db.mjs pnpm test:thread-chat:documents-db、相关 pnpm exec eslint、pnpm openspec:validate（38 项）、git diff --check。未手动格式化，未修改迁移或 Neon，未合并/部署。EGO 空间仍使用「PR 143 本地验收」，新增测试标签已关闭，用户原标签保留。
 
 最后清理：Artifact 元数据删除无消费者使用的可变 currentRevisionId；目录未变化时不触发会话重绘，检查不遍历缓存全文。
+
+## 三次审查修复与测试路径（2026-09-15）
+
+本轮修复范围为 fdf3d97 后的三项 P2；下表取代前文有关“Bootstrap 返回全部历史元数据”的旧实现说明。
+
+| 问题 | 修复前 → 修复后 | 测试路径与结果 |
+| --- | --- | --- |
+| 锁升级死锁 | 编辑/重试先共享锁再升级 → 入口直接 Project 排他锁，再 Thread、Message；删除全局重试 | 原生两连接操作不同 Thread，在 Project 入口同时等待，放行后两笔事务成功。文档 A/B 锁竞争、不同文档独立提交、Stop 回归通过 |
+| 目录迟到响应回退 | 轮询、生成结束、面板 Bootstrap 各自写 store → 运行时单入口，生成结束/面板只发失效通知 | 可控请求中先发旧轮询，再通知生成完成；旧响应不落地，只补一次新请求，最终保持 V2。释放后迟到响应也不能写入 |
+| 目录缺项、轮询历史数据膨胀 | Document/全部 Artifact 两次快照拼接 → 一次关联查询只返回完整当前条目，Bootstrap 复用；历史按打开 Thread 加载 | 原生事务在新 Artifact/Revision/head 写入后暂缓提交；另一连接提交前读到完整旧目录，提交后读到完整新目录。单 SQL 次数、所有权、历史正文读取均通过 |
+| 真实页面回归 | 历史卡片必须保留，当前列表不得变成三份文件 | EGO 打开真实三版本 F1：Bootstrap 与目录均为 1 个 Document、1 个 Artifact、0 个正文；打开主线另取 3 条历史元数据。旧消息卡片进入 V1，未完成 TODO6/旧方案不变；手机显式进入 V3/盲评，返回列表计数 1，关闭面板后 @ 只有一项 |
+
+逐张检查桌面和手机截图：正文区域未被项目管理控件占据，390×844 下页面宽度和 scrollWidth 均为 390。没有新增模型请求，没有更改用户文档正文，测试输入已清除。EGO 新建验收标签已关闭，用户原有两个标签保留。
+
+截图：[桌面 V1](assets/pr-145-third-review/desktop-v1.png)、[手机 V1](assets/pr-145-third-review/mobile-v1.png)、[手机最新版](assets/pr-145-third-review/mobile-current.png)、[手机单一引用候选](assets/pr-145-third-review/mobile-mention.png)。
+
+执行命令：`pnpm typecheck`、`pnpm test:thread-chat:documents`、`pnpm test:thread-chat:gate3-client`、`node --import tsx e2e/thread-chat/artifact-reference-context.test.mjs`、`node /tmp/pr145-db.mjs pnpm test:thread-chat:documents-db`（原生 43 项）、相关 `pnpm exec eslint`、`pnpm openspec:validate`（38 项）、`git diff --check`。本地 3015 原先未启动，使用同一独立库启动验收服务，未修改 .env.local；仍使用 wt_pr145_quality，无 Neon/迁移操作。
+
+未覆盖：完整真实模型 A/B/C 与所有自然语言边界、系统分享、完整焦点/主题/草稿矩阵和正式迁移。上述专项通过不代表可直接发布；未合并或部署。

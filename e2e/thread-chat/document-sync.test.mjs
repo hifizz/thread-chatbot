@@ -77,3 +77,43 @@ try {
   assert.equal(pending.length, 3, 'dispose unsubscribes invalidation notifications')
   console.log('PASS 目录响应顺序：单入口、丢弃旧轮询、合并生成结束通知、释放后不写入')
 } finally { ordered.dispose() }
+
+// 按已打开 Thread 加载历史；重复目录轮询不重拉历史，也不能把 head 改回旧版。
+const { startThreadArtifactHistory } = await import('../../app/thread-chat/net/artifacts/history.ts')
+const historyStore = createConversationStore()
+historyStore.setState({ project: { id: 'p', rootThreadId: 't1' },
+  threadsById: { t1: { id: 't1' }, t2: { id: 't2' } },
+  messagesById: { m1: { id: 'm1', status: 'generating' } }, messageIdsByThread: { t1: ['m1'] } })
+historyStore.getState().syncDocuments(catalog(2).documents, catalog(2).artifacts)
+const historyRequests = []
+let failHistory = false
+const historySync = startThreadArtifactHistory('p', { async listThreadArtifacts(threadId) {
+  historyRequests.push(threadId)
+  if (failHistory) throw new Error('offline')
+  return [{ ...catalog(1).artifacts[0], sourceMessageStatus: 'completed' }]
+} }, historyStore)
+try {
+  await new Promise(setImmediate)
+  assert.deepEqual(historyRequests, ['t1'], 'closed Thread history is not requested')
+  assert.equal(historyStore.getState().artifactsById.a1.id, 'a1', 'historical message card is cached')
+  assert.equal(selectCurrentProjectArtifacts(historyStore.getState())[0].id, 'a2')
+  assert.deepEqual(historyStore.getState().artifactContentsById, {})
+  historySync.refresh()
+  await new Promise(setImmediate)
+  assert.deepEqual(historyRequests, ['t1'], 'unchanged polling does not refetch historical metadata')
+  historyStore.setState({ messagesById: { m1: { id: 'm1', status: 'completed' } } })
+  await new Promise(setImmediate)
+  assert.deepEqual(historyRequests, ['t1', 't1'], 'source completion refreshes the opened Thread')
+  failHistory = true
+  historyStore.getState().setWorkspace({ openThreadIds: ['t2'] })
+  await new Promise(setImmediate)
+  assert.deepEqual(historyRequests, ['t1', 't1', 't2'], 'failed history load must not spin')
+  failHistory = false
+  historySync.refresh()
+  await new Promise(setImmediate)
+  assert.deepEqual(historyRequests, ['t1', 't1', 't2', 't2'], 'failed load can retry on next catalog refresh')
+  historySync.dispose()
+  historyStore.setState({ messagesById: {} })
+  assert.equal(historyRequests.length, 4)
+  console.log('PASS 历史元数据：按打开路径加载、未变化不重取、终态刷新、失败重试、不能覆盖当前目录')
+} finally { historySync.dispose() }

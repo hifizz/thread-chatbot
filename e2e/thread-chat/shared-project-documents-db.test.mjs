@@ -333,12 +333,63 @@ try {
     assert.equal((await testDb.select().from(documentRevisions).where(eq(documentRevisions.artifactId, sourceArtifact.id))).length, 0)
     checks++
   }
+  if (!process.env.THREADCHAT_TEST_DB_MODULE) {
+    const before = await service.getProjectDocument(userId, documentId)
+    let release, ready
+    const gate = new Promise(resolve => { release = resolve })
+    const held = new Promise(resolve => { ready = resolve })
+    const writer = testDb.transaction(async tx => {
+      await repository.lockDocument(tx, documentId)
+      const next = await repository.appendDocumentRevision(tx, identities[0], {
+        ...input, expectedRevisionId: before.revision.id, changeSummary: '目录快照并发检查',
+      }, before.revision, before.revision.content + '\n快照检查', 'catalog-snapshot', id())
+      ready()
+      await gate
+      return next
+    })
+    await Promise.race([held, writer])
+    try {
+      const during = await service.getProjectDocuments(userId, projectId)
+      const head = during.documents.find(doc => doc.id === documentId)
+      assert.equal(head.currentRevisionId, before.revision.id)
+      assert.equal(during.artifacts.find(item => item.id === head.currentArtifactId).document.revisionId, before.revision.id)
+    } finally { release() }
+    const committed = await writer
+    const after = await service.getProjectDocuments(userId, projectId)
+    const head = after.documents.find(doc => doc.id === documentId)
+    assert.equal(head.currentRevisionId, committed.revisionId)
+    assert.equal(after.artifacts.find(item => item.id === head.currentArtifactId).document.revisionId, committed.revisionId)
+    assert.equal(after.artifacts.filter(item => item.document?.id === documentId).length, 1)
+    console.log('PASS 原生 PostgreSQL：并发写入提交前后目录均返回完整匹配的 head 与 Artifact')
+    checks++
+  }
   const { getProjectBootstrap, getArtifact } = await import('../../lib/thread-chat/application/queries.ts')
   const catalog = await getProjectBootstrap(userId, projectId)
-  assert.ok(catalog.artifacts.length > 10)
+  assert.equal(catalog.artifacts.filter(item => item.document?.id === documentId).length, 1,
+    'bootstrap must return exactly one current entry for a document with many revisions')
+  const { listOwnedProjectArtifactCatalog } = await import('../../lib/thread-chat/persistence/artifact-repository.ts')
+  let catalogStatements = 0
+  const observedExecutor = new Proxy(testDb, { get(target, name) {
+    if (name === 'select') return (...args) => { catalogStatements++; return target.select(...args) }
+    const value = target[name]
+    return typeof value === 'function' ? value.bind(target) : value
+  } })
+  await listOwnedProjectArtifactCatalog(observedExecutor, userId, projectId)
+  assert.equal(catalogStatements, 1, 'current heads and artifact metadata must share one SQL statement snapshot')
+  const currentCatalog = await service.getProjectDocuments(userId, projectId)
+  assert.deepEqual(currentCatalog.artifacts, catalog.artifacts)
+  assert.deepEqual(currentCatalog.documents, catalog.documents)
+  for (const document of currentCatalog.documents) {
+    const entry = currentCatalog.artifacts.find(item => item.id === document.currentArtifactId)
+    assert.equal(entry.document.revisionId, document.currentRevisionId)
+  }
+  const { getThreadArtifacts } = await import('../../lib/thread-chat/application/queries.ts')
+  const sourceHistory = await getThreadArtifacts(userId, rootId)
+  assert.ok(sourceHistory.some(item => item.id === artifact.id), 'opening source Thread loads its fixed historical cards')
+  assert.ok(sourceHistory.every(item => item.threadId === rootId && !('content' in item)))
+  assert.deepEqual(await getThreadArtifacts('other-user', rootId), [], 'history cannot cross ownership boundary')
   assert.ok(catalog.artifacts.every(artifact => !('content' in artifact)), 'bootstrap never returns artifact bodies')
-  const catalogInitialRevision = catalog.artifacts.find(artifact => artifact.document?.revisionNumber === 1)
-  const fixedBody = await getArtifact(userId, catalogInitialRevision.id)
+  const fixedBody = await getArtifact(userId, artifact.id)
   assert.equal(typeof fixedBody.content, 'string')
   assert.ok(fixedBody.content.length > 0, 'fixed historical body remains available on demand')
   checks++

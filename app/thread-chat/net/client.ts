@@ -17,6 +17,7 @@ import type {
 } from "@/lib/thread-chat/contracts/commands"
 import type {
   ArtifactDTO,
+  ArtifactSummaryDTO,
   GenerationAcceptedDTO,
   MessageDTO,
   ProjectBootstrapDTO,
@@ -152,6 +153,10 @@ export function createThreadChatClient(options: ThreadChatClientOptions = {}) {
     listDocuments(projectId: string) {
       return requestJson<ProjectDocumentsDTO>(fetcher,
         url(`/api/thread-chat/v1/projects/${projectId}/documents`))
+    },
+    listThreadArtifacts(threadId: string) {
+      return requestJson<ArtifactSummaryDTO[]>(fetcher,
+        url(`/api/thread-chat/v1/threads/${threadId}/artifacts`))
     },
     getDocumentHistory(documentId: string) {
       return requestJson<DocumentRevisionSummaryDTO[]>(fetcher,

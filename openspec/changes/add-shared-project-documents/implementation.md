@@ -85,3 +85,12 @@ PGlite 不替代原生多连接测试。本次未执行 macOS 浏览器或真实
 - 通知查询在单次 SQL 中汇总 Thread 收据、过滤已消费提交并计算每文档最近 10 条及省略数量；兼容不连续旧 commitIds，不将其错误解释成连续版本游标。
 - application/documents/model-context.ts 持有文档格式与文档上下文类型；通用引用编译保持单遍有序展开、共享去重集合，原序列化文本不变。
 - 原生独立 PostgreSQL 41 项通过，包含 A/B 同时等待文档锁、不同文档独立提交、Bootstrap 无正文及历史全文按 ID 读取。真实 EGO 验证桌面/390×844 下的历史及最新阅读；真实模型全场景和系统分享仍未补齐，不据此提升发布状态。
+
+## 三次审查修复：锁协议与目录一致性（2026-09-15）
+
+- 会话写入口 `lockOwnedThread` 先锁 Project，再锁 Thread；编辑/重试通过 `lockOwnedMessageTurn` 继续锁 Message。Stop、反馈和文档执行使用 Project 共享锁。生成收尾也先锁父级，避免插入 Artifact 的外键检查逆序获取父锁。删除全局死锁事务重试，原生测试不靠重试掩盖锁升级。
+- `startProjectDocumentSync` 是运行时唯一的目录请求/写入入口。生成结束和打开面板使用 store 失效通知；未完成请求收到通知后不落地旧响应，合并补发一次请求。普通定时轮询不反复取消慢请求。打开面板不再用完整 Bootstrap 覆盖会话状态。
+- `listOwnedProjectArtifactCatalog` 一次关联查询返回匹配的当前 Document 与 Artifact 元数据；Bootstrap 和目录 API 复用。历史版本不再进入每五秒的目录响应。
+- `/threads/:threadId/artifacts` 按所有权返回该 Thread 的固定历史元数据，不含正文。运行时仅为已打开的 Thread 加载，消息状态未变时不重复请求；失败可重试。历史缓存不能更新 Document head，来源终态不能被旧生成中状态覆盖；正文仍按固定 Artifact ID 加载。
+- wt_pr145_quality 原生数据库 43 项通过，含原有文档锁竞争、不同文档独立提交、新的 Project 锁竞争与并发目录快照检查。真实三版本项目的 Bootstrap/目录均返回 1 个 Document + 1 个 Artifact，打开主线按需返回 3 条历史元数据。
+- EGO 在已有「PR 143 本地验收」空间验证桌面 V1、390×844 手机 V1/最新阅读、列表计数 1、@ 单一候选，并实际检查截图。测试草稿已清除，用户原标签保留；未发送真实模型请求。完整模型、系统分享与迁移验收仍保持待完成。
