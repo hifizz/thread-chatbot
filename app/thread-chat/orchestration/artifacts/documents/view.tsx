@@ -28,6 +28,8 @@ export function DocumentView({ artifact, currentRevisionId, client, navigationBl
     return () => { active = false }
   }, [client, documentId, currentRevisionId, refresh])
   if (!document) return null
+  // 切换文档时组件可能复用，history 会保留上一份文档的数据，直到新请求成功。
+  // active 只阻止旧请求写入；此处过滤避免加载中或失败时显示上一份文档的版本。
   const revisions = history.filter((revision) => revision.documentId === document.id)
   const selected = revisions.find((revision) => revision.id === document.revisionId)
   const latest = revisions.find((revision) => revision.id === currentRevisionId)
