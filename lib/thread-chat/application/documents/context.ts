@@ -3,7 +3,8 @@ import { documentUpdatesSchema } from "../../contracts/document"
 import type { ReferenceArtifact } from "../../contracts/artifact-reference"
 import type { ThreadChatUIMessage } from "../../contracts/ui-message"
 import { loadProjectDocumentRevisions, listDocumentCommits } from "../../persistence/documents/queries"
-import { expandArtifactReferencesInContext, type DocumentContextEntry } from "../artifact-reference-context"
+import { expandArtifactReferencesInContext } from "../artifact-reference-context"
+import type { DocumentContextEntry } from "./model-context"
 import { stateConflict } from "../errors"
 
 /** 固定版本一次批量加载；摘要查询不读取历史正文，展开按消息原有顺序执行。 */
