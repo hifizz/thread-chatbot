@@ -7,7 +7,7 @@ import { LexicalTypeaheadMenuPlugin, MenuOption, type MenuResolution } from "@le
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext"
 import type { ArtifactDTO } from "@/lib/thread-chat/contracts/dto"
 import { $createComposerCapsuleNode } from "./composer-capsule-node"
-import { currentProjectArtifacts } from "@/lib/thread-chat/domain/documents/current-artifacts"
+import { selectCurrentProjectArtifacts } from "@/lib/thread-chat/domain/artifacts/selectors"
 import { matchArtifactMention } from "@/lib/thread-chat/artifact-mention-match"
 
 class ArtifactOption extends MenuOption {
@@ -20,7 +20,7 @@ export function ArtifactMentionPlugin({ artifacts }: { artifacts: Record<string,
   const options = useMemo(() => {
     if (query === null) return []
     const needle = query.toLocaleLowerCase()
-    return currentProjectArtifacts(Object.values(artifacts))
+    return selectCurrentProjectArtifacts(Object.values(artifacts))
       .filter((item) => item.kind === "markdown" && item.sourceMessageStatus === "completed" &&
         `${item.title} Markdown ${item.sourceThreadTitle ?? ""}`.toLocaleLowerCase().includes(needle))
       .map((item) => new ArtifactOption(item))

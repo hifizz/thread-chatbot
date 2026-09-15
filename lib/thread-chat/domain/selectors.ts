@@ -9,7 +9,6 @@ import { messagePathTo } from "./message-graph"
 export {
   activeMessagePath,
   activeLeafTurn,
-  activePathArtifacts,
   artifactSourceProvenance,
   assistantTurnAlternatives,
   childThreadSourceProvenance,
@@ -17,6 +16,12 @@ export {
   messagePathTo,
   sourceMessageProvenance,
 } from "./message-graph"
+
+export {
+  selectCurrentProjectArtifacts,
+  selectCurrentDocumentArtifact,
+  selectArtifactsOnSelectedMessagePaths,
+} from "./artifacts/selectors"
 
 /** 消息引用且当前 registry 中真实存在的 Artifact（坏引用静默过滤）。 */
 export function validArtifactsOfMessage(

@@ -27,7 +27,7 @@ import type {
   ProjectFileDTO,
 } from "@/lib/thread-chat/contracts/dto"
 import { MarkdownBody } from "../../chat/message/markdown-body"
-import { currentProjectArtifacts } from "@/lib/thread-chat/domain/documents/current-artifacts"
+import { selectCurrentProjectArtifacts } from "@/lib/thread-chat/domain/artifacts/selectors"
 import { ArtifactPreviewActions } from "./artifact-preview-actions"
 import { uploadProjectFile } from "../../net/project-file-upload"
 
@@ -159,7 +159,7 @@ export function ProjectPanel({
   )
   const sortedArtifacts = useMemo(
     () => {
-      return currentProjectArtifacts(artifacts)
+      return selectCurrentProjectArtifacts(artifacts)
         .filter((artifact) => {
           const query = artifactQuery.trim().toLowerCase()
           if (!query) return true
@@ -308,7 +308,7 @@ export function ProjectPanel({
           className={displayedSection === "artifacts" ? "on" : ""}
           onClick={() => selectSection("artifacts")}
         >
-          文档与产物 <span>{currentProjectArtifacts(artifacts).length}</span>
+          文档与产物 <span>{selectCurrentProjectArtifacts(artifacts).length}</span>
         </button>
       </div>}
 

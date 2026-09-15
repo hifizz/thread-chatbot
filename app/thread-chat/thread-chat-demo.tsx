@@ -1,6 +1,6 @@
 "use client"
 
-import { currentProjectArtifacts } from "@/lib/thread-chat/domain/documents/current-artifacts"
+import { selectCurrentProjectArtifacts } from "@/lib/thread-chat/domain/artifacts/selectors"
 
 import { useInputViewport } from "./orchestration/use-input-viewport"
 
@@ -609,7 +609,7 @@ function NormalizedThreadChat({
     state.project?.customTitle ?? state.project?.autoTitle ?? derivedSubtitle
   const hintVisible = !hintDismissed && !mainHasMessage
   const branchCount = Math.max(0, Object.keys(tree.threads).length - 1)
-  const markdownCount = currentProjectArtifacts(Object.values(state.artifactsById))
+  const markdownCount = selectCurrentProjectArtifacts(Object.values(state.artifactsById))
     .filter((artifact) => artifact.kind === "markdown").length
   const navigationProps: ThreadChatNavigationProps = {
     viewMode: workspace.viewMode,

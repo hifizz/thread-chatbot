@@ -1,9 +1,11 @@
+import { activeMessagePath } from "../message-graph"
+import type { Artifact, ThreadTreeState } from "../types"
 import type { ArtifactDTO } from "../../contracts/dto"
 
 /** 当前文档目录。版本选择集中在这里，消费者只接收每份文档的当前内容。
  * 固定 Artifact 集合仍完整保留，历史引用不得使用此目录回放。
  */
-export function currentProjectArtifacts(artifacts: readonly ArtifactDTO[]): ArtifactDTO[] {
+export function selectCurrentProjectArtifacts(artifacts: readonly ArtifactDTO[]): ArtifactDTO[] {
   const documents = new Map<string, ArtifactDTO>()
   const standalone: ArtifactDTO[] = []
   for (const artifact of artifacts) {
@@ -24,6 +26,21 @@ export function currentProjectArtifacts(artifacts: readonly ArtifactDTO[]): Arti
 }
 
 /** 调用方只提供持续文档身份，不需要指定或比较版本。 */
-export function currentDocumentArtifact(artifacts: readonly ArtifactDTO[], documentId: string): ArtifactDTO | null {
-  return currentProjectArtifacts(artifacts).find((artifact) => artifact.document?.id === documentId) ?? null
+export function selectCurrentDocumentArtifact(artifacts: readonly ArtifactDTO[], documentId: string): ArtifactDTO | null {
+  return selectCurrentProjectArtifacts(artifacts).find((artifact) => artifact.document?.id === documentId) ?? null
+}
+
+/** 各 Thread 选中消息路径产生的固定产物；保留历史版本与原有产物顺序。 */
+export function selectArtifactsOnSelectedMessagePaths(state: ThreadTreeState): Artifact[] {
+  const activeMessageIds = new Set(
+    Object.values(state.threads).flatMap((thread) =>
+      activeMessagePath(thread).map((message) => message.id)
+    )
+  )
+  return state.artifactOrder.flatMap((artifactId) => {
+    const artifact = state.artifacts[artifactId]
+    return artifact && activeMessageIds.has(artifact.sourceMessageId)
+      ? [artifact]
+      : []
+  })
 }
