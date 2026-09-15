@@ -290,12 +290,26 @@ try {
       changeSummary: `第 ${i} 次补充` }, `many-update-${i}`)
     assert.equal(result.status, 'committed')
   }
-  const bounded = await contextRepository.pendingDocumentNotices(testDb, projectId, childIdentity.threadId)
+  let noticeRowCount = 0
+  const bounded = await contextRepository.pendingDocumentNotices({ execute: async query => {
+    const rows = await testDb.execute(query)
+    noticeRowCount = rows.length
+    return rows
+  } }, projectId, childIdentity.threadId)
+  assert.ok(noticeRowCount <= bounded.documents.length * 10, 'database result itself is bounded, not just the assembled notice')
   const boundedDoc = bounded.documents.find(d => d.documentId === documentId)
   assert.equal(boundedDoc.changes.length, 10)
   assert.equal(boundedDoc.omittedChangeCount, boundedDoc.revisionNumber - 10)
   assert.equal(boundedDoc.changes.at(-1).revisionNumber, boundedDoc.revisionNumber)
   assert.equal('commitIds' in boundedDoc, false)
+  const sparseIds = [boundedDoc.changes[0].commitId, boundedDoc.changes.at(-1).commitId]
+  await contextRepository.markDocumentContextUsed(testDb, childIdentity.messageId, { schemaVersion: 1, documents: [{
+    documentId, revisionId: boundedDoc.revisionId, artifactId: boundedDoc.artifactId, commitIds: sparseIds,
+  }] })
+  const sparsePending = (await contextRepository.pendingDocumentNotices(testDb, projectId, childIdentity.threadId)).documents.find(d => d.documentId === documentId)
+  assert.ok(sparsePending.changes.every(change => !sparseIds.includes(change.commitId)))
+  assert.equal(sparsePending.omittedChangeCount, Math.max(0, boundedDoc.revisionNumber - sparseIds.length - 10))
+  checks++
   await contextRepository.markDocumentContextUsed(testDb, childIdentity.messageId, bounded)
   assert.equal((await contextRepository.pendingDocumentNotices(testDb, projectId, childIdentity.threadId)).documents.length, 0)
   // 编辑产生新的消息快照；原用户通知不能被改写。
