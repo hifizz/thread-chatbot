@@ -1,3 +1,4 @@
+import { toDocumentListItemDTO } from "./mappers"
 import { and, desc, eq, inArray, isNotNull } from "drizzle-orm"
 import { artifacts, documents, documentRevisions, messages, projects } from "@/lib/db/schema"
 import type { DocumentListItemDTO, DocumentRevisionDTO, DocumentRevisionSummaryDTO } from "../../contracts/document"
@@ -41,7 +42,11 @@ export async function listDocumentHistory(executor: ConversationExecutor, docume
 }
 
 export async function listOwnedDocuments(executor: ConversationExecutor, userId: string, projectId: string, documentId?: string): Promise<DocumentListItemDTO[]> {
-  const rows = await executor.select({ document: documents, revisionNumber: documentRevisions.revisionNumber, sourceMessageStatus: messages.status, title: artifacts.title, currentArtifactId: artifacts.id, sourceThreadId: artifacts.threadId, sourceMessageId: artifacts.sourceMessageId }).from(documents)
+  const rows = await executor.select({ documentId: documents.id,
+    documentRevisionId: documentRevisions.id, documentRevisionNumber: documentRevisions.revisionNumber,
+    sourceMessageStatus: messages.status, artifact: { id: artifacts.id, projectId: artifacts.projectId,
+      title: artifacts.title, threadId: artifacts.threadId, sourceMessageId: artifacts.sourceMessageId },
+  }).from(documents)
     .innerJoin(projects, eq(projects.id, documents.projectId))
     .innerJoin(documentRevisions, and(eq(documentRevisions.id, documents.currentRevisionId), eq(documentRevisions.documentId, documents.id)))
     .innerJoin(artifacts, and(eq(artifacts.id, documentRevisions.artifactId), eq(artifacts.projectId, documents.projectId)))
@@ -49,8 +54,7 @@ export async function listOwnedDocuments(executor: ConversationExecutor, userId:
     .where(and(eq(projects.userId, userId), eq(documents.projectId, projectId), isNotNull(documents.currentRevisionId),
       documentId ? eq(documents.id, documentId) : undefined))
     .orderBy(desc(documents.createdAt), documents.id)
-  return rows.map(({ document: d, title, currentArtifactId, sourceThreadId, sourceMessageId, revisionNumber, sourceMessageStatus }) => ({ revisionNumber, sourceMessageStatus, id: d.id, projectId: d.projectId,
-    currentRevisionId: d.currentRevisionId!, currentArtifactId, title, sourceThreadId, sourceMessageId }))
+  return rows.map(toDocumentListItemDTO)
 }
 
 export async function documentForArtifact(executor: ConversationExecutor, userId: string, projectId: string, artifactId: string) {

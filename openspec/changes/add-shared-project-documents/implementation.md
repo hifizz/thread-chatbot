@@ -111,3 +111,9 @@ PGlite 不替代原生多连接测试。本次未执行 macOS 浏览器或真实
 目录删除五秒定时器和对应常量、启动后的重复请求、打开面板的刷新回调。Bootstrap 提供初始目录，本地生成完成（含恢复跟踪的生成终态）通知同一协调器刷新。同步失败文案改为要求刷新页面，不再声称自动重试；其他浏览器的新文档可暂时不可见，用户刷新页面后加载。已打开历史正文不受目录刷新影响；按需历史/正文查询保留。
 
 TypeScript、相关 ESLint、文档专项、客户端 store、提示词缓存、OpenSpec strict 与 diff 检查通过；新增无后台定时器/无重复初始目录请求及恢复顺序兜底回归。没有本轮真实模型、浏览器或新数据库验收证据，不替代原有未完成门槛。
+
+## 来源状态与目录 DTO 去重
+
+当前目录和固定版本预览共用 `selectArtifactWithCurrentSourceStatus`：仅当前 Artifact 使用目录来源状态，历史及非文档产物保留自身状态，未变化时保留对象引用。`listOwnedProjectArtifactCatalog` 与 `listOwnedDocuments` 共用 `persistence/documents/mappers.ts` 的 `toDocumentListItemDTO`，各自查询保持单 SQL，不增加查询或正文加载。
+
+TypeScript、相关 ESLint、文档专项、客户端 store 与 wt_pr145_quality 原生 44 项通过；新增覆盖历史状态不受当前状态影响、非文档产物/缺失缓存，以及查找接口与当前目录对同一文档返回完全一致的 DTO。只处理这两项重复，不改历史通知或版本加载防御逻辑。

@@ -387,6 +387,11 @@ try {
   const currentCatalog = await service.getProjectDocuments(userId, projectId)
   assert.deepEqual(currentCatalog.artifacts, catalog.artifacts)
   assert.deepEqual(currentCatalog.documents, catalog.documents)
+  const foundDocuments = await documentQueries.listOwnedDocuments(testDb, userId, projectId)
+  for (const item of currentCatalog.documents) {
+    assert.deepEqual(foundDocuments.find(found => found.id === item.id), item,
+      'document discovery and current catalog must assemble identical document DTOs')
+  }
   for (const document of currentCatalog.documents) {
     const entry = currentCatalog.artifacts.find(item => item.id === document.currentArtifactId)
     assert.equal(entry.document.revisionId, document.currentRevisionId)

@@ -1,3 +1,4 @@
+import { toDocumentListItemDTO } from "./documents/mappers"
 import { toArtifactSummaryDTO } from "./mappers"
 import type { ProjectDocumentsDTO } from "../contracts/document"
 import { and, desc, eq, inArray, sql, getTableColumns, isNull, or } from "drizzle-orm"
@@ -68,12 +69,9 @@ export async function listOwnedProjectArtifactCatalog(
     .orderBy(desc(artifacts.createdAt))
   return {
     artifacts: rows.map(toArtifactSummaryDTO),
-    documents: rows.flatMap((row) => row.documentId && row.documentRevisionId && row.documentRevisionNumber ? [{
-      id: row.documentId, projectId, currentRevisionId: row.documentRevisionId,
-      currentArtifactId: row.artifact.id, title: row.artifact.title,
-      revisionNumber: row.documentRevisionNumber, sourceMessageStatus: row.sourceMessageStatus,
-      sourceThreadId: row.artifact.threadId, sourceMessageId: row.artifact.sourceMessageId,
-    }] : []),
+    documents: rows.flatMap((row) => row.documentId && row.documentRevisionId && row.documentRevisionNumber
+      ? [toDocumentListItemDTO({ ...row, documentId: row.documentId,
+          documentRevisionId: row.documentRevisionId, documentRevisionNumber: row.documentRevisionNumber })] : []),
   }
 }
 
