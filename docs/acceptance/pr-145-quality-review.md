@@ -114,3 +114,22 @@ EGO 在真实三版本项目中观察 @ 候选仅一项；无版本参数的读�
 - 新摘要、旧全文清单、已读工具结果及 DocumentContextEntry 收拢到 application/documents/model-context.ts。
 - 通用引用处理器保留一次从前往后的遍历，与文档处理共享 seen 集合；序列化文本保持不变。
 - TypeScript、文档回归、真实 SDK 消息前缀及引用/旧清单双向去重回归通过。
+
+## 本轮专项复验结果
+
+| 场景 | 结果与证据 |
+| --- | --- |
+| Bootstrap 目录不包含正文 | 真实本地 API 200：1 个 Document、3 条 Artifact 元数据、0 条 Artifact 正文 |
+| 固定历史读取 | EGO 从真实消息卡片进入 V2，再从菜单打开 V1；V1 保留未完成的 TODO6 与旧方案 |
+| 显式读取最新版本 | 手机从 V1 点击查看最新版本，进入 V3，内容为未完成 TODO6 与盲评方案 |
+| 桌面/手机阅读 | 实际查看截图；正文占主要空间，390×844 下无横向溢出 |
+| 关闭抽屉后的 @ 候选 | 手机菜单只显示一条 F1 候选；测试输入已清除，未发送模型请求 |
+| 跨窗口来源状态刷新 | 隔离同步回归覆盖 generating → completed、目录不变不重绘；本轮未新增真实模型跨窗口提交 |
+| 通知/事务 | wt_pr145_quality 原生 41 项通过：双连接同时等待文档锁、不同文档独立提交、最近 10 条 SQL 返回上限、旧稀疏收据兼容 |
+| 完整模型及系统分享 | 本轮未完成，保留原 OpenSpec 未勾选项 |
+
+截图：[桌面 V1](assets/pr-145-second-review/desktop-v1.png)、[手机 V1](assets/pr-145-second-review/mobile-v1.png)、[手机最新版](assets/pr-145-second-review/mobile-current.png)、[手机单一引用候选](assets/pr-145-second-review/mobile-mention.png)。
+
+本轮执行：pnpm typecheck、pnpm test:thread-chat:documents、pnpm test:thread-chat:gate3-client、node --import tsx e2e/thread-chat/artifact-reference-context.test.mjs、node /tmp/pr145-db.mjs pnpm test:thread-chat:documents-db、相关 pnpm exec eslint、pnpm openspec:validate（38 项）、git diff --check。未手动格式化，未修改迁移或 Neon，未合并/部署。EGO 空间仍使用「PR 143 本地验收」，新增测试标签已关闭，用户原标签保留。
+
+最后清理：Artifact 元数据删除无消费者使用的可变 currentRevisionId；目录未变化时不触发会话重绘，检查不遍历缓存全文。

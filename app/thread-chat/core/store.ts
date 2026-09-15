@@ -170,7 +170,7 @@ export function createConversationStore(input?: {
   return createStore<NormalizedThreadChatState>()((set, get) => ({
     ...initial,
     documentSyncError: false,
-    setDocumentSyncError(documentSyncError) { set({ documentSyncError }) },
+    setDocumentSyncError(documentSyncError) { set((state) => state.documentSyncError === documentSyncError ? state : { documentSyncError }) },
     optimisticByCommandId: {},
     workspace: {
       ...structuredClone(EMPTY_WORKSPACE),
@@ -233,12 +233,17 @@ export function createConversationStore(input?: {
       })
     },
     syncDocuments(documents, artifacts) {
-      set((state) => ({
-        artifactContentsById: { ...state.artifactContentsById, ...artifactContents(artifacts) },
-        documentsById: Object.fromEntries(documents.map((doc) => [doc.id, doc])),
-        artifactsById: { ...state.artifactsById, ...Object.fromEntries(artifacts.map((artifact) => [artifact.id, artifactMetadata(artifact)])) },
-        artifactOrder: [...new Set([...state.artifactOrder, ...artifacts.map((artifact) => artifact.id)])],
-      }))
+      set((state) => {
+        const documentsById = Object.fromEntries(documents.map((doc) => [doc.id, doc]))
+        const artifactsById = { ...state.artifactsById, ...Object.fromEntries(artifacts.map((artifact) => [artifact.id, artifactMetadata(artifact)])) }
+        const contents = artifactContents(artifacts)
+        const artifactContentsById = Object.entries(contents).every(([id, content]) => state.artifactContentsById[id] === content)
+          ? state.artifactContentsById : { ...state.artifactContentsById, ...contents }
+        if (sameValue(state.documentsById, documentsById) && sameValue(state.artifactsById, artifactsById)
+          && state.artifactContentsById === artifactContentsById) return state
+        return { documentsById, artifactsById, artifactContentsById,
+          artifactOrder: [...new Set([...state.artifactOrder, ...artifacts.map((artifact) => artifact.id)])] }
+      })
     },
     upsertArtifact(artifact: ArtifactDTO) {
       set((state) => ({

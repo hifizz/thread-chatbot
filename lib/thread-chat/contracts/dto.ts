@@ -87,7 +87,7 @@ export interface MessageDTO {
 }
 
 export interface ArtifactSummaryDTO {
-  document?: { id: string; revisionId: string; revisionNumber: number; currentRevisionId: string }
+  document?: { id: string; revisionId: string; revisionNumber: number }
   id: string
   projectId: string
   threadId: string

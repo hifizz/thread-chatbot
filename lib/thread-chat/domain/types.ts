@@ -34,8 +34,8 @@ export interface Artifact {
 /** 尚未落库的 artifact 内容（种子），落库时由 store 补全 id / 来源会话 */
 export type ArtifactSeed = Omit<
   Artifact,
-  "id" | "sourceThreadId" | "sourceMessageId"
->
+  "id" | "sourceThreadId" | "sourceMessageId" | "content"
+> & { content: string }
 
 /** 挂在消息原文上的分支锚点：一段被划选的文字 + 对应脚注号 + 目标会话 */
 export interface Fork {

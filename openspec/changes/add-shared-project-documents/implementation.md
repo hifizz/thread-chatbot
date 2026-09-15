@@ -76,3 +76,12 @@ PGlite 的连接事务是串行执行的，这组测试不能替代原生 Postgr
 本次自动验证：TypeScript、变更 TypeScript/React 文件 ESLint、git diff --check；新通知最终模型消息前缀、固定全文追加、编辑过滤、旧格式兼容、预算错误、Artifact 引用上下文及提示词缓存回归通过。PGlite 使用实际 Schema/应用服务，38 项通过，新增覆盖独立 Thread 收据、接受消息后 head 前进、固定重试、分叉首轮、编辑新快照，以及连续 12 次提交后的摘要上限和通知位置。
 
 PGlite 不替代原生多连接测试。本次未执行 macOS 浏览器或真实模型验收，旧 Mac 证据不能算作新行为已通过。请按 macos-acceptance.md 第 5 节重新验收，tasks 5.5、8.1、8.2 保持待验收。长对话全文依然累积，不承诺无限上下文或固定缓存命中率。
+
+## 二次质量审查修复
+
+- 当前条目从服务端 Document 目录按 currentArtifactId 查询；Artifact 元数据仅保留固定版本身份，不再携带可变 head。
+- 项目运行时持有目录轮询生命周期，来源回复状态每次刷新；不依赖 Drawer，不更换当前阅读版本或草稿。未变化目录保留 store 引用。
+- ProjectBootstrapDTO.artifacts 和目录接口只提供 ArtifactSummaryDTO；全文通过固定 Artifact API 读取并进入独立缓存。历史卡片及 Fork 来源元数据保持；未加载正文明确为 null，不能作为空内容交给模型。
+- 通知查询在单次 SQL 中汇总 Thread 收据、过滤已消费提交并计算每文档最近 10 条及省略数量；兼容不连续旧 commitIds，不将其错误解释成连续版本游标。
+- application/documents/model-context.ts 持有文档格式与文档上下文类型；通用引用编译保持单遍有序展开、共享去重集合，原序列化文本不变。
+- 原生独立 PostgreSQL 41 项通过，包含 A/B 同时等待文档锁、不同文档独立提交、Bootstrap 无正文及历史全文按 ID 读取。真实 EGO 验证桌面/390×844 下的历史及最新阅读；真实模型全场景和系统分享仍未补齐，不据此提升发布状态。

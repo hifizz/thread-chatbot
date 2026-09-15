@@ -41,7 +41,7 @@
 - [x] 6.1 扩展客户端 DTO/store/client 与 ProjectPanel，按 Document 显示一份文件，DocumentView 管理当前/历史版本并复用 ArtifactDetail/MarkdownBody。
 - [x] 6.2 增加 DocumentVersionHistory/DocumentDiff，只读显示版本、真实差异和来源；使用现有 diff 库及组件，不在组件中应用修改。
 - [x] 6.3 接通 DocumentUpdateTool 的读取、提交、冲突重读、已提交、unchanged 和失败状态，刷新从持久化收据恢复，模型文字不作为提交依据。
-- [x] 6.4 移除 ProjectDocumentUpdates、documentScope 和范围按钮，提取目录同步 Hook，保留历史版本/选区/草稿。
+- [x] 6.4 移除 ProjectDocumentUpdates、documentScope 和范围按钮，将目录同步交给项目运行时，保留历史版本/选区/草稿。
 - [x] 6.5 复用 #143 的固定版本划选及导航：最新版来源在哪个 Thread 就从哪里分叉，活跃选区/草稿不追新 head；来源未 completed 时清楚说明不可新分叉。
 - [ ] 6.6 验证导出与分享在创建时固定版本，旧分享不追最新内容，公开入口无写入；手机复用 Drawer、焦点与主题组件。
 
@@ -58,3 +58,12 @@
 
 - [ ] 8.1 macOS EGO 确认桌面/手机无待接收按钮、无通知分隔线；目录更新、历史导航、草稿保护仍正常。
 - [ ] 8.2 macOS 原生独立 PostgreSQL 运行更新后的数据库测试，真实模型执行后台摘要→按需读取→原子更新。
+
+## 9. 二次质量审查修复
+
+- [x] 9.1 服务端 Document 目录统一决定当前条目，项目运行时刷新来源状态；目录未变化不重绘会话。
+- [x] 9.2 Bootstrap/目录只返回 Artifact 元数据，固定正文按需加载；桌面及手机验证 V1 原文、最新版切换与无横向溢出。
+- [x] 9.3 SQL 内限制每文档最近 10 条摘要，原生数据库验证返回行数上限、省略数及稀疏旧收据。
+- [x] 9.4 文档上下文格式集中在文档模块；SDK 历史前缀与引用/旧清单双向去重回归通过。
+
+本节是本轮代码修复的专项验证，不替代 5.5、6.6、7.x、8.x 中未完成的真实模型及发布验收。

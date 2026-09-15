@@ -6,7 +6,6 @@ const artifactSourceSelection = {
   documentId: documents.id,
   documentRevisionId: documentRevisions.id,
   documentRevisionNumber: documentRevisions.revisionNumber,
-  documentCurrentRevisionId: documents.currentRevisionId,
   sourceThreadCustomTitle: threads.customTitle,
   sourceThreadAutoTitle: threads.autoTitle,
   sourceThreadFootnote: threads.footnote,

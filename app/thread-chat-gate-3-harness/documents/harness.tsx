@@ -24,7 +24,7 @@ const artifacts: ArtifactDTO[] = revisions.map((r) => ({ id: r.artifactId, proje
   threadId: r.sourceThreadId, sourceMessageId: r.sourceMessageId, sourceThreadTitle: r.revisionNumber === 1 ? "主线" : `Thread ${r.revisionNumber === 2 ? "A" : "B"}`,
   sourceThreadFootnote: r.revisionNumber === 1 ? null : r.revisionNumber - 1, sourceMessageStatus: r.sourceMessageStatus,
   kind: "markdown", title: r.title, content: r.content, language: null, metadata: {}, createdAt: r.createdAt, updatedAt: r.createdAt,
-  document: { id: r.documentId, revisionId: r.id, revisionNumber: r.revisionNumber, currentRevisionId: revisions[0].id },
+  document: { id: r.documentId, revisionId: r.id, revisionNumber: r.revisionNumber },
 }))
 const client = createThreadChatClient({ fetch: async (input) => {
   const url = String(input)

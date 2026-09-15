@@ -33,7 +33,6 @@ export interface ArtifactSourceRow {
   documentId?: string | null
   documentRevisionId?: string | null
   documentRevisionNumber?: number | null
-  documentCurrentRevisionId?: string | null
   artifact: Omit<ArtifactRow, "content"> & { content: string | null }
   sourceThreadCustomTitle: string | null
   sourceThreadAutoTitle: string | null
@@ -142,9 +141,9 @@ export function toConversationMessage(row: MessageRow): ConversationMessage {
 export function toArtifactSummaryDTO(row: ArtifactSourceRow): ArtifactSummaryDTO {
   const artifact = row.artifact
   return {
-    ...(row.documentId && row.documentRevisionId && row.documentCurrentRevisionId && row.documentRevisionNumber
+    ...(row.documentId && row.documentRevisionId && row.documentRevisionNumber
       ? { document: { id: row.documentId, revisionId: row.documentRevisionId,
-          revisionNumber: row.documentRevisionNumber, currentRevisionId: row.documentCurrentRevisionId } } : {}),
+          revisionNumber: row.documentRevisionNumber } } : {}),
     id: artifact.id,
     projectId: artifact.projectId,
     threadId: artifact.threadId,

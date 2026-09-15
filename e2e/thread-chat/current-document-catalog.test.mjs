@@ -4,7 +4,7 @@ import { selectCurrentProjectArtifacts, selectCurrentDocumentArtifact } from "..
 const artifact = (id, revisionNumber, overrides = {}) => ({
   id, title: "F1", kind: "markdown", sourceMessageStatus: "completed",
   createdAt: `2026-09-15T00:00:0${revisionNumber}.000Z`, content: `body-${id}`,
-  document: { id: "document-1", revisionId: id, revisionNumber, currentRevisionId: "r3" },
+  document: { id: "document-1", revisionId: id, revisionNumber },
   ...overrides,
 })
 const r1 = artifact("r1", 1)
