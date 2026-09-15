@@ -13,12 +13,24 @@
   margin: 10px 0;
 }
 
+/* 相邻轨迹（思考→搜索→读取链）收成一组，视觉上属于同一段 agent trace */
+.tc .thinking-trace + .thinking-trace {
+  margin-top: 0;
+}
+
 .tc .thinking-trace-compact {
   margin: 10px 0;
   color: var(--tc-content-muted);
   font-size: 14px;
   line-height: 1.6;
   white-space: pre-wrap;
+}
+
+/* reasoning 行内 markdown 的强调降权：思维链惯用 **短句** 当小节标题，
+ * 全量加粗在次级墨色的辅助文本里太吵，降为 medium 字重，颜色不脱离上下文。 */
+.tc .thinking-trace strong,
+.tc .thinking-trace-compact strong {
+  font-weight: 500;
 }
 
 /* 奶油黄暖色映射：覆盖 .bui 的冷色 token，仅在 .tc 内生效 */
@@ -58,6 +70,18 @@
   max-height: 256px;
   overflow-y: auto;
   overscroll-behavior: contain;
+  /* 小区域用比全局 9px 更细的滚动条，且只在真正溢出时出现 */
+  scrollbar-width: thin;
+  scrollbar-color: var(--tc-border-scrollbar) transparent;
+}
+
+.tc .thinking-trace .thinking-scroll[data-overflow]::-webkit-scrollbar {
+  width: 6px;
+}
+
+.tc .thinking-trace .thinking-scroll[data-overflow]::-webkit-scrollbar-thumb {
+  background: var(--tc-border-scrollbar);
+  border-radius: 6px;
 }
 
 /* 顶部渐隐：还有上文 */

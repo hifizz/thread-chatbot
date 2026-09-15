@@ -68,11 +68,67 @@ assert.deepEqual(
   "每个调研步骤必须保留自己的时间线位置"
 )
 
+const mergedPlan = assistantPartRenderPlan({
+  ...message,
+  uiParts: [
+    {
+      type: "data-research-activity",
+      id: "research-activity:search-1",
+      data: {
+        toolCallId: "search-1",
+        kind: "search",
+        status: "complete",
+        query: "Cursor",
+        sources: [{ title: "Cursor", url: "https://cursor.com" }],
+      },
+    },
+    {
+      type: "data-research-activity",
+      id: "research-activity:read-1",
+      data: {
+        toolCallId: "read-1",
+        kind: "read",
+        status: "complete",
+        url: "https://cursor.com",
+        title: "Cursor",
+        sources: [],
+      },
+    },
+    {
+      type: "data-research-activity",
+      id: "research-activity:read-2",
+      data: {
+        toolCallId: "read-2",
+        kind: "read",
+        status: "complete",
+        url: "https://cursor.com/pricing",
+        sources: [],
+      },
+    },
+    { type: "text", text: "正文", state: "done" },
+  ],
+})
+assert.equal(
+  mergedPlan.filter((item) => item.kind === "research").length,
+  1,
+  "连续的联网活动必须合并为一个轨迹块"
+)
+assert.equal(
+  mergedPlan[0].activities.length,
+  3,
+  "合并后的轨迹块必须保留全部活动"
+)
+assert.equal(
+  mergedPlan[0].part.data.toolCallId,
+  "search-1",
+  "合并块的位置与 key 锚定在首个活动"
+)
+
 const assistantBodySource = fs.readFileSync(
   "app/thread-chat/branching/assistant/anchored-assistant-body.tsx",
   "utf8"
 )
-assert.match(assistantBodySource, /activities=\{\[part\.data\]\}/)
+assert.match(assistantBodySource, /activities=\{activities \?\? \[part\.data\]\}/)
 assert.doesNotMatch(
   assistantBodySource,
   /activities=\{message\.webResearch \?\? \[\]\}/
@@ -91,7 +147,69 @@ const thinkingTraceSource = fs.readFileSync(
 )
 assert.match(thinkingTraceSource, /if \(!working && rows\.length === 1\)/)
 assert.match(thinkingTraceSource, /className="thinking-trace-compact"/)
-assert.match(thinkingTraceSource, /replace\(\/\\\*\\\*\(\[\^\*\]\+\)\\\*\\\*\/g, "\$1"\)/)
+assert.match(
+  thinkingTraceSource,
+  /allowedElements=\{INLINE_MARKDOWN_ELEMENTS\}[\s\S]*unwrapDisallowed/,
+  "reasoning 文本必须按行内 markdown 渲染（**强调** 不得原样露出）"
+)
+assert.match(
+  thinkingTraceSource,
+  /renderPrimary=\{\(row\) => <InlineMarkdown text=\{row\.primary\} \/>\}/,
+  "reasoning 轨迹行必须走行内 markdown 渲染"
+)
+assert.match(
+  thinkingTraceSource,
+  /<InlineMarkdown text=\{rows\[0\]\.primary\} \/>/,
+  "单段完成态轻量行同样渲染行内 markdown"
+)
+assert.doesNotMatch(
+  thinkingTraceSource,
+  /replace\(\/\\\*/,
+  "不再用正则剥除强调记号冒充渲染"
+)
+assert.match(
+  thinkingTraceSource,
+  /currentActivities\.every\(\s*\(activity\) => activity\.kind === "read"/s,
+  "SearchTrace 必须按当前 activity kind 区分 search 与 read"
+)
+assert.match(
+  thinkingTraceSource,
+  /正在读取 \$\{hostOf\(runningActivity\.url\)\}/,
+  "进行中的读取必须在标题中暴露目标站点"
+)
+assert.match(
+  thinkingTraceSource,
+  /已搜索网络 · \$\{sourceCount\} 个来源/,
+  "合并轨迹的完成摘要必须给出来源数"
+)
+assert.match(
+  thinkingTraceSource,
+  /已读取 \$\{readCount\} 个网页/,
+  "合并轨迹的完成摘要必须给出读取数"
+)
+assert.match(
+  thinkingTraceSource,
+  /读取失败/,
+  "失败的读取必须在轨迹中显式标记"
+)
+assert.doesNotMatch(
+  thinkingTraceSource,
+  /route\?\.mode === "fetch"/,
+  "readUrl 标题不得由整条消息 route 决定"
+)
+assert.match(
+  thinkingTraceSource,
+  /icon: "book-open"/,
+  "readUrl 轨迹行必须声明 BookOpen 图标"
+)
+
+const thinkingStateSource = fs.readFileSync(
+  "components/primitives/ThinkingState.tsx",
+  "utf8"
+)
+assert.match(thinkingStateSource, /import \{ BookOpen \} from "lucide-react"/)
+assert.match(thinkingStateSource, /row\.icon === "book-open"/)
+assert.match(thinkingStateSource, /<BookOpen aria-hidden/)
 
 const thinkingTraceCss = fs.readFileSync(
   "app/thread-chat/styles/thinking-trace.css",

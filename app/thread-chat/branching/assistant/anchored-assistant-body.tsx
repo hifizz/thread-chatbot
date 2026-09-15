@@ -21,7 +21,7 @@ export function AnchoredAssistantBody({
 
   return (
     <>
-      {renderPlan.map(({ kind, part, index }) => {
+      {renderPlan.map(({ kind, part, index, activities }) => {
         if (kind === "text" && part.type === "text") {
           return (
             <AnchoredMarkdown
@@ -43,7 +43,7 @@ export function AnchoredAssistantBody({
           return (
             <SearchTrace
               key={`${part.type}-${part.data.toolCallId}-${index}`}
-              activities={[part.data]}
+              activities={activities ?? [part.data]}
               route={message.researchRoute}
               complete={message.status === "done"}
               settled={message.status !== "pending" && message.status !== "streaming"}

@@ -13,7 +13,7 @@ import "@/app/thread-chat/thread-chat.css"
  * 覆盖流式中/完成两种状态，不发真实模型请求。 */
 
 const REASONING_TEXT_STREAMING =
-  "夏季石果类口味需求明显上升，桃子和杏子领先。\n\n应先检查蛋筒库存，再决定是否推广华夫筒特价。"
+  "**Clarifying seasonal demand**\n\n夏季石果类口味需求明显上升，桃子和杏子领先。\n\n**Checking inventory first**\n\n应先检查蛋筒库存，再决定是否推广华夫筒特价。"
 
 const REASONING_TEXT_LONG = Array.from(
   { length: 12 },
@@ -43,12 +43,48 @@ const SEARCH_ACTIVITIES: WebResearchActivity[] = [
     url: "https://docs.copilotkit.ai/inspector",
     sources: [],
   },
+  {
+    toolCallId: "call-3",
+    kind: "read",
+    status: "complete",
+    url: "https://copilotkit.ai/blog/inspector",
+    title: "Announcing CopilotKit Inspector",
+    sources: [],
+  },
 ]
 
 const SEARCH_ACTIVITIES_DONE = SEARCH_ACTIVITIES.map((activity) => ({
   ...activity,
   status: "complete" as const,
+  ...(activity.kind === "read" && !activity.title
+    ? { title: "Inspector — CopilotKit Docs" }
+    : {}),
 }))
+
+const SEARCH_ACTIVITIES_FAILED: WebResearchActivity[] = [
+  {
+    toolCallId: "call-4",
+    kind: "search",
+    status: "failed",
+    query: "unreachable source",
+    sources: [],
+  },
+  {
+    toolCallId: "call-5",
+    kind: "read",
+    status: "failed",
+    url: "https://example.com/blocked-page",
+    sources: [],
+  },
+  {
+    toolCallId: "call-6",
+    kind: "read",
+    status: "complete",
+    url: "https://example.com/readable-page",
+    title: "A Readable Page",
+    sources: [],
+  },
+]
 
 function FixtureSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -114,12 +150,16 @@ export function ThinkingTraceFixture() {
         />
       </FixtureSection>
 
-      <FixtureSection title="Search · 已完成">
+      <FixtureSection title="Search · 已完成（已读标注 + 页面标题）">
         <SearchTrace
           activities={SEARCH_ACTIVITIES_DONE}
           route={{ mode: "search", reasonCode: "explicit_search", urls: [], suggestedQueries: [] }}
           complete={true}
         />
+      </FixtureSection>
+
+      <FixtureSection title="Search · 部分失败（失败行警示色 + 摘要计数）">
+        <SearchTrace activities={SEARCH_ACTIVITIES_FAILED} complete={true} />
       </FixtureSection>
 
       <FixtureSection title="Tool · 生成中（带进度副文本）">
