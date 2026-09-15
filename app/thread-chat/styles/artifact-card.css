@@ -3,33 +3,70 @@
 .tc .acard {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 14px;
   margin: 10px 0 4px;
-  padding: 10px 12px;
+  padding: 12px 16px;
   width: 100%;
-  max-width: 430px;
+  max-width: 460px;
   background: var(--tc-surface-plain);
-  border: 1px solid var(--tc-border-strong);
-  border-left: 3px solid var(--fc, var(--tc-depth-neutral));
-  border-radius: 10px;
+  border: 1px solid var(--tc-border-subtle);
+  border-radius: 14px;
+  box-shadow: 0 1px 2px -1px var(--tc-shadow-card);
   cursor: pointer;
   font-family: var(--tc-typography-family-ui);
   text-align: left;
 }
 .tc .acard:hover {
-  border-color: var(--fc, var(--tc-depth-neutral));
+  border-color: var(--tc-border-strong);
   box-shadow: 0 4px 14px -6px var(--tc-shadow-hover);
 }
-.tc .acard .ic {
+/* 左侧「页面缩略图」：底页露一条侧边 + 正面一页（符号 + 正文线），
+ * 高度对齐标题 + 副标题两行。 */
+.tc .acard .thumb {
+  position: relative;
   flex: none;
-  width: 30px;
-  height: 30px;
-  border-radius: 8px;
-  background: var(--tc-fc-icon-bg);
-  color: var(--fc, var(--tc-depth-neutral));
+  width: 38px;
+  height: 44px;
+}
+.tc .acard .thumb-back {
+  position: absolute;
+  inset: 3px -2px -1px -3px;
+  border-radius: 7px;
+  background: var(--fc, var(--tc-depth-neutral));
+  opacity: 0.55;
+}
+.tc .acard .thumb-front {
+  position: absolute;
+  inset: 0;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 6px;
+  border: 1px solid var(--fc, var(--tc-depth-neutral));
+  border-radius: 7px;
+  background: var(--tc-fc-icon-bg);
+  color: var(--fc, var(--tc-depth-neutral));
+}
+.tc .acard .thumb-front > svg {
+  width: 16px;
+  height: 16px;
+}
+.tc .acard .thumb-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 16px;
+}
+.tc .acard .thumb-lines i {
+  display: block;
+  height: 2px;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: 0.45;
+}
+.tc .acard .thumb-lines i:last-child {
+  width: 70%;
 }
 .tc .acard .t {
   flex: 1;
@@ -46,72 +83,81 @@
 }
 .tc .acard .t .k {
   display: block;
-  font-family: var(--tc-typography-family-code);
-  font-size: 10px;
+  font-size: 11px;
   color: var(--tc-content-muted);
   margin-top: 2px;
 }
-.tc .acard .go {
+/* 右侧下载按钮：整卡点击开预览，按钮独立停止冒泡。 */
+.tc .acard .dl {
   flex: none;
-  font-family: var(--tc-typography-family-code);
-  font-size: 10px;
-  color: var(--tc-content-muted);
+  height: 30px;
+  padding: 0 14px;
+  border: 1px solid var(--tc-border-strong);
+  border-radius: 9px;
+  background: var(--tc-surface-plain);
+  color: var(--tc-content-primary);
+  font-size: 12px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
 }
-.tc .acard:hover .go {
-  color: var(--fc, var(--tc-depth-neutral));
+.tc .acard .dl:hover {
+  background: var(--tc-surface-sunken);
 }
-.tc .acard-progress {
+/* 不可点击的占位 / 静态形态（等待落库、无打开回调） */
+.tc .acard-static {
   cursor: default;
-  border-style: dashed;
-  background: var(--tc-fc-progress-bg);
-  overflow: hidden;
 }
-.tc .acard-progress:hover {
-  border-color: var(--tc-border-strong);
+.tc .acard-static:hover {
+  border-color: var(--tc-border-subtle);
   box-shadow: none;
 }
-.tc .acard-progress:hover .go {
+.tc .acard-failed .thumb-front {
+  background: var(--tc-surface-sunken);
+  border-color: var(--tc-danger);
+  color: var(--tc-danger);
+}
+.tc .acard-failed .thumb-back {
+  background: var(--tc-danger);
+}
+.tc .acard-failed .t .k {
+  color: var(--tc-danger);
+}
+/* 流式生成块：ThinkingState 外壳内的实时预览小窗 */
+.tc .artifact-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 2px 6px 4px;
+}
+.tc .artifact-preview-text {
+  font-family: var(--tc-typography-family-code);
+  font-size: 11.5px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--tc-content-secondary);
+}
+.tc .artifact-preview-empty,
+.tc .artifact-preview-stats {
+  font-size: 11px;
   color: var(--tc-content-muted);
 }
-.tc .acard-progress .progress-spinner {
-  display: flex;
-  animation: tc-progress-spin 1s linear infinite;
-}
-.tc .acard-progress .progress-heading {
-  display: block;
-  margin-top: 3px;
-  color: var(--tc-content-secondary);
-  font-size: 11px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.tc .acard-progress .progress-track {
-  position: relative;
-  display: block;
-  height: 3px;
-  margin-top: 7px;
-  overflow: hidden;
-  border-radius: 999px;
-  background: var(--tc-fc-track-bg);
-}
-.tc .acard-progress .progress-track span {
-  position: absolute;
-  inset-block: 0;
-  width: 38%;
-  border-radius: inherit;
-  background: var(--fc, var(--tc-depth-1));
-  animation: tc-progress-slide 1.35s ease-in-out infinite;
-}
 .tc .acard.compact {
-  gap: 8px;
+  gap: 9px;
   margin-top: 7px;
-  padding: 8px 9px;
+  padding: 8px 10px;
 }
-.tc .acard.compact .ic {
-  width: 26px;
+.tc .acard.compact .thumb {
+  width: 32px;
+  height: 36px;
+}
+.tc .acard.compact .thumb-front > svg {
+  width: 14px;
+  height: 14px;
+}
+.tc .acard.compact .dl {
   height: 26px;
-}
-.tc .acard.compact .go {
-  display: none;
+  padding: 0 10px;
+  font-size: 11px;
 }

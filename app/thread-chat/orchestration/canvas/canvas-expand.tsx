@@ -71,6 +71,8 @@ export function CanvasExpand({
                   state={state}
                   message={assistantMessage}
                   onOpenThread={(id) => actions.focusThread(id)}
+                  onOpenArtifact={actions.openArtifact}
+                  sourceDepth={data.depth}
                   density="compact"
                 />
               ) : null
@@ -79,7 +81,6 @@ export function CanvasExpand({
               <MessageArtifacts
                 state={state}
                 message={sourceMessage}
-                sourceDepth={data.depth}
                 compact
                 onOpen={actions?.openArtifact}
               />

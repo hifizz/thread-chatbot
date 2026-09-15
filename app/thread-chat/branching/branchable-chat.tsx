@@ -105,6 +105,8 @@ export function BranchableChat({
         state={state}
         message={msg}
         onOpenThread={onOpenThread}
+        onOpenArtifact={onOpenArtifact}
+        sourceDepth={thread.depth}
       />
     )
   }
@@ -115,7 +117,6 @@ export function BranchableChat({
       <MessageArtifacts
         state={state}
         message={msg}
-        sourceDepth={thread.depth}
         onOpen={onOpenArtifact}
       />
     )

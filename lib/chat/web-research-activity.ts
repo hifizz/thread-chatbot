@@ -13,6 +13,8 @@ export interface WebResearchActivity {
   truncated?: boolean
   query?: string
   url?: string
+  /** readUrl 输出透传的页面标题，仅 read 完成时可能携带。 */
+  title?: string
   sources: WebResearchSource[]
 }
 
@@ -115,6 +117,8 @@ export function createWebResearchActivityDispatcher(
           call.toolName === "readUrl"
             ? (textField(output, "url") ?? textField(call.input, "url"))
             : undefined,
+        title:
+          call.toolName === "readUrl" ? textField(output, "title") : undefined,
         sources:
           call.toolName === "webSearch"
             ? webResearchSourcesFromOutput(output)

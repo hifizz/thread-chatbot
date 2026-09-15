@@ -8,7 +8,10 @@ import { getChatModel } from "@/constants/model"
 import { isSearchConfigured } from "@/lib/ai/search"
 import { resolveChatModelWithRoute } from "@/lib/ai/llm/model-routes"
 import { withModelCallLogging } from "@/lib/ai/model-call-logger"
-import { isExplicitMarkdownArtifactRequest } from "@/lib/chat/markdown-artifact"
+import {
+  isExplicitMarkdownArtifactRequest,
+  MARKDOWN_ARTIFACT_TOOL_NAME,
+} from "@/lib/chat/markdown-artifact"
 import {
   createResearchPlan,
   researchPlanExecutionPrompt,
@@ -205,19 +208,45 @@ export async function prepareGeneration(input: PrepareGenerationInput) {
     tools,
     ...(activeTools.length > 0
       ? {
-          prepareStep: ({ stepNumber }: { stepNumber: number }) => ({
-            activeTools: stepNumber >= generationMode.maxSteps - 1
-              ? activeTools.filter((name) => name === "createMarkdownArtifact")
-              : availableResearchTools(activeTools, webBudget),
-            ...(stepNumber === 0 && generationMode.firstTool
-              ? {
-                  toolChoice: {
-                    type: "tool" as const,
-                    toolName: generationMode.firstTool as string,
-                  },
-                }
-              : { toolChoice: "auto" as const }),
-          }),
+          /* 明确的 Markdown 交付请求必须真的产出文件：弱模型检索完可能直接写正文，
+           * 因此 artifact 未产出前中段步骤 toolChoice=required（模型只能走工具），
+           * 末步进一步强制 createMarkdownArtifact，保证用户要文件就一定拿到文件。 */
+          prepareStep: ({ stepNumber, steps }: {
+            stepNumber: number
+            steps: Array<{
+              toolCalls: ReadonlyArray<{ toolName: string }>
+            }>
+          }) => {
+            const artifactDone = steps.some((step) =>
+              step.toolCalls.some(
+                (call) => call.toolName === MARKDOWN_ARTIFACT_TOOL_NAME
+              )
+            )
+            const needsArtifact =
+              generationMode.artifactRequested && !artifactDone
+            const lastStep = stepNumber >= generationMode.maxSteps - 1
+            return {
+              activeTools: lastStep
+                ? activeTools.filter(
+                    (name) => name === MARKDOWN_ARTIFACT_TOOL_NAME
+                  )
+                : availableResearchTools(activeTools, webBudget),
+              toolChoice:
+                stepNumber === 0 && generationMode.firstTool
+                  ? {
+                      type: "tool" as const,
+                      toolName: generationMode.firstTool as string,
+                    }
+                  : needsArtifact && lastStep
+                    ? {
+                        type: "tool" as const,
+                        toolName: MARKDOWN_ARTIFACT_TOOL_NAME as string,
+                      }
+                    : needsArtifact
+                      ? ("required" as const)
+                      : ("auto" as const),
+            }
+          },
         }
       : {}),
     stopWhen: isStepCount(generationMode.maxSteps),

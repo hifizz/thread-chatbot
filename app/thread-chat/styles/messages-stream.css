@@ -27,6 +27,11 @@
   -webkit-text-fill-color: transparent;
   animation: tc-generation-shimmer 1.8s linear infinite;
 }
+/* 正文流尚未开始但轨迹已展开时，三点在正文起始处并行显示 */
+.tc .typing-inline {
+  display: block;
+  margin: 12px 0 4px;
+}
 .tc .typing i {
   width: 6px;
   height: 6px;
