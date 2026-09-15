@@ -1,5 +1,7 @@
 "use client"
 
+import { currentProjectArtifacts } from "@/lib/thread-chat/domain/documents/current-artifacts"
+
 import { useInputViewport } from "./orchestration/use-input-viewport"
 
 import { ComposerDraftProvider } from "./chat/composer/composer-drafts"
@@ -21,7 +23,6 @@ import {
   useGenerationSettings,
 } from "./chat/composer/generation-settings-context"
 import {
-  activePathArtifacts,
   threadTitle,
   type TreeRow,
 } from "./core/selectors"
@@ -608,10 +609,8 @@ function NormalizedThreadChat({
     state.project?.customTitle ?? state.project?.autoTitle ?? derivedSubtitle
   const hintVisible = !hintDismissed && !mainHasMessage
   const branchCount = Math.max(0, Object.keys(tree.threads).length - 1)
-  const markdownCount = activePathArtifacts(tree).reduce(
-    (count, artifact) => count + (artifact.kind === "markdown" ? 1 : 0),
-    0
-  )
+  const markdownCount = currentProjectArtifacts(Object.values(state.artifactsById))
+    .filter((artifact) => artifact.kind === "markdown").length
   const navigationProps: ThreadChatNavigationProps = {
     viewMode: workspace.viewMode,
     showHelp: workspace.viewMode === "canvas" || !hintVisible,
