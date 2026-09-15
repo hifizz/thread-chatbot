@@ -2,28 +2,31 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { $createTextNode, $getSelection, $isRangeSelection, COMMAND_PRIORITY_HIGH, KEY_ENTER_COMMAND } from "lexical"
+import { useDocumentResources } from "./artifact-resources"
 import { ArtifactMenu } from "./artifact-menu"
 import { LexicalTypeaheadMenuPlugin, MenuOption, type MenuResolution } from "@lexical/react/LexicalTypeaheadMenuPlugin"
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext"
-import type { ArtifactDTO } from "@/lib/thread-chat/contracts/dto"
+import type { ArtifactSummaryDTO } from "@/lib/thread-chat/contracts/dto"
 import { $createComposerCapsuleNode } from "./composer-capsule-node"
+import { selectCurrentProjectArtifacts } from "@/lib/thread-chat/domain/artifacts/selectors"
 import { matchArtifactMention } from "@/lib/thread-chat/artifact-mention-match"
 
 class ArtifactOption extends MenuOption {
-  constructor(readonly artifact: ArtifactDTO) { super(artifact.id) }
+  constructor(readonly artifact: ArtifactSummaryDTO) { super(artifact.id) }
 }
-export function ArtifactMentionPlugin({ artifacts }: { artifacts: Record<string, ArtifactDTO> }) {
+export function ArtifactMentionPlugin({ artifacts }: { artifacts: Record<string, ArtifactSummaryDTO> }) {
+  const documentsById = useDocumentResources()
   const [editor] = useLexicalComposerContext()
   const [resolution, setResolution] = useState<MenuResolution | null>(null)
   const [query, setQuery] = useState<string | null>(null)
   const options = useMemo(() => {
     if (query === null) return []
     const needle = query.toLocaleLowerCase()
-    return Object.values(artifacts)
+    return selectCurrentProjectArtifacts({ artifactsById: artifacts, documentsById })
       .filter((item) => item.kind === "markdown" && item.sourceMessageStatus === "completed" &&
         `${item.title} Markdown ${item.sourceThreadTitle ?? ""}`.toLocaleLowerCase().includes(needle))
       .map((item) => new ArtifactOption(item))
-  }, [artifacts, query])
+  }, [artifacts, documentsById, query])
   const triggerFn = useCallback((text: string) => {
     return editor.isComposing() ? null : matchArtifactMention(text)
   }, [editor])

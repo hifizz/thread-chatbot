@@ -1,3 +1,4 @@
+import { restoreDocumentToolParts } from "./message-parts"
 import { ATTACHMENT_URL_PREFIX } from "@/constants/attachment"
 import type {
   artifacts,
@@ -8,6 +9,7 @@ import type {
 } from "@/lib/db/schema"
 import type {
   ArtifactDTO,
+  ArtifactSummaryDTO,
   MessageDTO,
   ProjectDTO,
   ProjectFileDTO,
@@ -28,7 +30,10 @@ export interface ProjectFileRow {
 }
 
 export interface ArtifactSourceRow {
-  artifact: ArtifactRow
+  documentId?: string | null
+  documentRevisionId?: string | null
+  documentRevisionNumber?: number | null
+  artifact: Omit<ArtifactRow, "content"> & { content: string | null }
   sourceThreadCustomTitle: string | null
   sourceThreadAutoTitle: string | null
   sourceThreadFootnote: number | null
@@ -104,7 +109,7 @@ export function toMessageDTO(row: MessageRow): MessageDTO {
     threadId: row.threadId,
     sequence: row.sequence,
     role: row.role,
-    parts: row.parts,
+    parts: restoreDocumentToolParts(row.parts, row.documentToolParts),
     status: row.status,
     modelId: row.modelId,
     replacesMessageId: row.replacesMessageId,
@@ -126,16 +131,19 @@ export function toConversationMessage(row: MessageRow): ConversationMessage {
     threadId: row.threadId,
     sequence: row.sequence,
     role: row.role,
-    parts: row.parts,
+    parts: restoreDocumentToolParts(row.parts, row.documentToolParts),
     status: row.status,
     replacesMessageId: row.replacesMessageId,
     supersededAt: iso(row.supersededAt),
   }
 }
 
-export function toArtifactDTO(row: ArtifactSourceRow): ArtifactDTO {
+export function toArtifactSummaryDTO(row: ArtifactSourceRow): ArtifactSummaryDTO {
   const artifact = row.artifact
   return {
+    ...(row.documentId && row.documentRevisionId && row.documentRevisionNumber
+      ? { document: { id: row.documentId, revisionId: row.documentRevisionId,
+          revisionNumber: row.documentRevisionNumber } } : {}),
     id: artifact.id,
     projectId: artifact.projectId,
     threadId: artifact.threadId,
@@ -146,10 +154,14 @@ export function toArtifactDTO(row: ArtifactSourceRow): ArtifactDTO {
     sourceMessageStatus: row.sourceMessageStatus,
     kind: artifact.kind,
     title: artifact.title,
-    content: artifact.content,
     language: artifact.language,
     metadata: artifact.metadata,
     createdAt: artifact.createdAt.toISOString(),
     updatedAt: artifact.updatedAt.toISOString(),
   }
+}
+
+export function toArtifactDTO(row: ArtifactSourceRow): ArtifactDTO {
+  if (row.artifact.content === null) throw new Error("ARTIFACT_CONTENT_NOT_LOADED")
+  return { ...toArtifactSummaryDTO(row), content: row.artifact.content }
 }

@@ -1,3 +1,4 @@
+import type { DocumentUpdateNotices, ProjectDocumentUpdates, DocumentReadResult, DocumentDTO, UpdateDocumentInput, UpdateDocumentResult } from "./document"
 import type { ArtifactReferenceData } from "./artifact-reference"
 import type { UIMessage, UIMessageChunk } from "ai"
 import type {
@@ -16,6 +17,8 @@ export interface ThreadChatMessageMetadata {
 
 export type ThreadChatDataParts = {
   "artifact-reference": ArtifactReferenceData
+  "project-document-updates": ProjectDocumentUpdates
+  "document-update-notices": DocumentUpdateNotices
   quote: ThreadChatQuoteData
   "research-activity": WebResearchActivity
   "research-route": ResearchRoute
@@ -34,6 +37,9 @@ export type WebSearchOutput = {
 }
 
 export type ThreadChatTools = {
+  findProjectDocuments: { input: { query?: string; artifactId?: string }; output: DocumentDTO[] }
+  readProjectDocument: { input: { documentId: string; revisionId?: string }; output: DocumentReadResult }
+  updateProjectDocument: { input: UpdateDocumentInput; output: UpdateDocumentResult }
   createMarkdownArtifact: {
     input: MarkdownArtifactInput
     output: MarkdownArtifactOutput

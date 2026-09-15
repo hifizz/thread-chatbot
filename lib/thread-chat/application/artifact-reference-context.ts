@@ -1,3 +1,4 @@
+import { expandDocumentContextPart, type DocumentContextEntry } from "./documents/model-context"
 import { isToolUIPart } from "ai"
 import type { ThreadChatUIMessage } from "../contracts/ui-message"
 import { artifactReferenceDataSchema, type ReferenceArtifact } from "../contracts/artifact-reference"
@@ -29,7 +30,8 @@ function includedSourceArtifact(
  */
 export function expandArtifactReferencesInContext(
   messages: ThreadChatUIMessage[],
-  artifacts: Map<string, ReferenceArtifact>
+  artifacts: Map<string, ReferenceArtifact>,
+  documentEntries: ReadonlyMap<string, DocumentContextEntry> = new Map()
 ): ThreadChatUIMessage[] {
   const seen = new Set<string>()
   return messages.map((message) => ({
@@ -37,6 +39,8 @@ export function expandArtifactReferencesInContext(
     parts: message.parts.flatMap((part) => {
       const sourceId = includedSourceArtifact(message, part, artifacts)
       if (sourceId) seen.add(sourceId)
+      const documentParts = expandDocumentContextPart(message, part, documentEntries, artifacts, seen)
+      if (documentParts !== null) return documentParts
       return expandArtifactReferenceParts([part], artifacts, seen)
     }),
   }))

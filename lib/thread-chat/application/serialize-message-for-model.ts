@@ -18,6 +18,7 @@ export function serializeMessageForModel(
     const artifact = state.artifacts[artifactId]
     if (!artifact) continue
     if (artifact.kind !== "markdown") continue
+    if (artifact.content === null) throw new Error("ARTIFACT_CONTENT_NOT_LOADED")
     sections.push(
       `[Markdown Artifact: ${artifact.title}]\n${artifact.content}\n[/Markdown Artifact]`
     )

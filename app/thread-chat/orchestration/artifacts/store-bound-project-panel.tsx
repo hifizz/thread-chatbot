@@ -1,7 +1,8 @@
 "use client"
 
-import { useCallback, useEffect, useMemo } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
+import { DOCUMENT_UI_COPY } from "@/constants/project-documents"
 import {
   ARTIFACT_SOURCE_HIGHLIGHT_MS,
   ARTIFACT_SOURCE_LOCATE_ATTEMPTS,
@@ -16,6 +17,8 @@ import type { ConversationStore } from "../../core/store"
 import { useConversationStore } from "../../core/use-thread-store"
 import type { ThreadChatClient } from "../../net/client"
 import type { ConversationCommands } from "../../net/commands/conversation-commands"
+import { selectCurrentProjectArtifacts, selectArtifactWithCurrentSourceStatus } from "@/lib/thread-chat/domain/artifacts/selectors"
+import { DocumentView } from "./documents/view"
 import type { ArtifactSourceNav } from "../overlays/use-workspace-overlays"
 import { ProjectPanel } from "./project-panel"
 
@@ -50,6 +53,7 @@ function revealMessage(messageId: string, attempt = 0) {
 
 export function StoreBoundProjectPanel({
   projectId,
+  questionArtifactId,
   store,
   client,
   commands,
@@ -62,6 +66,7 @@ export function StoreBoundProjectPanel({
   onLocate,
 }: {
   projectId: string
+  questionArtifactId: string | null
   store: ConversationStore
   client: ThreadChatClient
   commands: ConversationCommands
@@ -73,7 +78,24 @@ export function StoreBoundProjectPanel({
   onSelect(id: string): void
   onLocate(threadId: string, sourceMessageId: string): void
 }) {
+  const versionRequest = useRef({ sequence: 0 })
+  useEffect(() => {
+    const pending = versionRequest.current
+    pending.sequence++
+    return () => { pending.sequence++ }
+  }, [activeId, projectId, open, questionArtifactId])
   const state = useConversationStore(store, (value) => value)
+  const [artifactError, setArtifactError] = useState<string | null>(null)
+  const [artifactRetry, setArtifactRetry] = useState(0)
+  const loadedContent = activeId ? state.artifactContentsById[activeId] : undefined
+  useEffect(() => {
+    if (!open || !activeId || loadedContent !== undefined) return
+    let active = true
+    void client.getArtifact(activeId).then((artifact) => {
+      if (active) { store.getState().upsertArtifact(artifact); setArtifactError(null) }
+    }).catch(() => { if (active) setArtifactError(activeId) })
+    return () => { active = false }
+  }, [activeId, client, loadedContent, open, store, artifactRetry])
   const files = useMemo(
     () =>
       state.projectFileOrder.flatMap((id) => {
@@ -85,10 +107,12 @@ export function StoreBoundProjectPanel({
   const artifacts = useMemo(
     () =>
       state.artifactOrder.flatMap((id) => {
-        const artifact = state.artifactsById[id]
+        const artifact = selectArtifactWithCurrentSourceStatus({
+          artifactsById: state.artifactsById, documentsById: state.documentsById,
+        }, id)
         return artifact ? [artifact] : []
       }),
-    [state.artifactOrder, state.artifactsById]
+    [state.artifactOrder, state.artifactsById, state.documentsById]
   )
 
   // 分支来源导航：openArtifact 同步带上 anchor，这里在对应 Artifact 渲染完成后
@@ -101,6 +125,8 @@ export function StoreBoundProjectPanel({
       onConsumePendingSource()
       return
     }
+    // 正文按需拉取；内容未入库前等下一轮渲染，不空耗定位重试。
+    if (loadedContent === undefined) return
     let cancelled = false
     let retryTimer: number | null = null
     let clearTimer: number | null = null
@@ -165,12 +191,7 @@ export function StoreBoundProjectPanel({
       )
       if (root) clearHighlights(root, markId)
     }
-  }, [activeId, open, pendingSource, onConsumePendingSource])
-
-  const refresh = useCallback(async () => {
-    const bootstrap = await client.getProject(projectId)
-    store.getState().hydrateProject(bootstrap)
-  }, [client, projectId, store])
+  }, [activeId, open, loadedContent, pendingSource, onConsumePendingSource])
 
   const saveContract = useCallback(
     async (target: string, instructions: string) => {
@@ -204,6 +225,22 @@ export function StoreBoundProjectPanel({
 
   return (
     <ProjectPanel
+      documentSyncError={state.documentSyncError}
+      currentArtifacts={selectCurrentProjectArtifacts(state)}
+      renderDocumentControls={(artifact) => <DocumentView artifact={artifact} currentRevisionId={artifact.document ? state.documentsById[artifact.document.id]?.currentRevisionId : undefined} client={client} navigationBlocked={questionArtifactId === artifact.id} onSelect={(id) => {
+        if (questionArtifactId === artifact.id) return
+        const request = ++versionRequest.current.sequence
+        void client.getArtifact(id).then((artifact) => {
+          if (request !== versionRequest.current.sequence) return
+          store.getState().upsertArtifact(artifact)
+          window.getSelection()?.removeAllRanges()
+          onSelect(id)
+        })
+          .catch(() => { if (request === versionRequest.current.sequence) toast.error(DOCUMENT_UI_COPY.versionFailed) })
+      }} />}
+      artifactContents={state.artifactContentsById}
+      artifactLoadError={artifactError === activeId}
+      onRetryArtifact={() => { setArtifactError(null); setArtifactRetry((value) => value + 1) }}
       project={state.project}
       files={files}
       artifacts={artifacts}
@@ -212,7 +249,6 @@ export function StoreBoundProjectPanel({
       onClose={onClose}
       onSelect={onSelect}
       onLocate={locate}
-      onRefresh={refresh}
       onSaveContract={saveContract}
       onAddProjectFile={addProjectFile}
       onRemoveProjectFile={removeProjectFile}

@@ -1,3 +1,4 @@
+import { startProjectDocumentSync } from "../documents/sync"
 import type { ConversationStore } from "../../core/store"
 import type { ThreadChatClient } from "../client"
 import {
@@ -42,13 +43,17 @@ export async function bootConversationProject(options: {
     }
   }
 
+  const documents = startProjectDocumentSync(projectId, client, store)
   // 刷新后的 generating 只轮询，不尝试恢复进程内 SSE。
   const background = bootstrap.activeGenerationIds.map((messageId) =>
     pollBackgroundGeneration({
       store,
       client,
       messageId,
-      onFinishMessage: (message) => generateTitleIfNeeded(message.threadId),
+      onFinishMessage: (message) => {
+        store.getState().requestDocumentRefresh(message.projectId)
+        return generateTitleIfNeeded(message.threadId)
+      },
       pollDelays: options.pollDelays,
       wait: options.wait,
     })
@@ -63,6 +68,7 @@ export async function bootConversationProject(options: {
   return {
     background,
     dispose() {
+      documents.dispose()
       unsubscribe()
       for (const connection of background) connection.close()
     },

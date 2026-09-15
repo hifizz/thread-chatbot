@@ -18,13 +18,11 @@ import {
 } from "@/lib/thread-chat/persistence/mappers"
 import {
   listThreadMessageRows,
-  lockOwnedMessage,
+  lockOwnedMessageTurn,
 } from "@/lib/thread-chat/persistence/message-repository"
 import {
   findRootThreadId,
-  lockOwnedProject,
 } from "@/lib/thread-chat/persistence/project-repository"
-import { lockOwnedThread } from "@/lib/thread-chat/persistence/thread-repository"
 import {
   allocateThreadSequences,
   withConversationTransaction,
@@ -49,12 +47,9 @@ export function retryMessage(
       scopeId: messageId,
       payload: command,
       execute: async (): Promise<GenerationAcceptedDTO> => {
-        const source = await lockOwnedMessage(tx, userId, messageId)
-        if (!source) notFound()
-        const thread = await lockOwnedThread(tx, userId, source.threadId)
-        if (!thread) notFound()
-        const project = await lockOwnedProject(tx, userId, source.projectId)
-        if (!project) notFound()
+        const locked = await lockOwnedMessageTurn(tx, userId, messageId)
+        if (!locked) notFound()
+        const { source, thread, project } = locked
         const timeline = await listThreadMessageRows(
           tx,
           source.projectId,

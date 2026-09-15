@@ -10,3 +10,5 @@ const circular = {}; circular.cause = circular
 assert.equal(contextLimitFailure(circular), null)
 assert.equal(contextLimitFailure(new Error("network unavailable")), null)
 console.log("PASS 上下文预算：输出预留、边界、未知计量、嵌套提供商错误与循环保护")
+
+assert.doesNotMatch(contextLimitFailure(new Error("maximum context length")).message, /项目面板|文档范围/)

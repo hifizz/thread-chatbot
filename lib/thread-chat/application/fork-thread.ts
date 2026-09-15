@@ -1,3 +1,4 @@
+import { appendDocumentNotices } from "./documents/notices"
 import { resolveForkModelId } from "@/lib/thread-chat/application/fork-model"
 import { resolveUserContent } from "./resolve-user-content"
 import { messages, threads } from "@/lib/db/schema"
@@ -29,7 +30,6 @@ import { findOwnedArtifact } from "@/lib/thread-chat/persistence/artifact-reposi
 import { listThreadMessageRows } from "@/lib/thread-chat/persistence/message-repository"
 import {
   findRootThreadId,
-  lockOwnedProject,
 } from "@/lib/thread-chat/persistence/project-repository"
 import { lockOwnedThread } from "@/lib/thread-chat/persistence/thread-repository"
 import {
@@ -59,10 +59,9 @@ export function forkThread(
       scopeId: parentThreadId,
       payload: command,
       execute: async (): Promise<ForkThreadResult> => {
-        const parent = await lockOwnedThread(tx, userId, parentThreadId)
-        if (!parent) notFound()
-        const project = await lockOwnedProject(tx, userId, parent.projectId)
-        if (!project) notFound()
+        const locked = await lockOwnedThread(tx, userId, parentThreadId)
+        if (!locked) notFound()
+        const { project, thread: parent } = locked
         if (project.archivedAt) stateConflict("已归档 Project 不可创建分支")
         if (parent.archivedAt) stateConflict("已归档 Thread 不可创建分支")
         const target = command.target
@@ -152,6 +151,7 @@ export function forkThread(
             frozenFirstQuote,
           },
         })
+        await appendDocumentNotices(tx, project.id, child.id, parts)
         const [userSequence, assistantSequence] = await allocateThreadSequences(
           tx,
           child.id,

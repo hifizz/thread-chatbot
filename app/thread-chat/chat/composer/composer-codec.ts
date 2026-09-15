@@ -1,16 +1,16 @@
 import { $createParagraphNode, $createTextNode, $createLineBreakNode, $getRoot, $isElementNode, $isLineBreakNode, $isTextNode, type LexicalNode } from "lexical"
 import type { ThreadComposerDraft, ComposerMessagePartDraft } from "@/lib/thread-chat/contracts/composer"
-import type { ArtifactDTO } from "@/lib/thread-chat/contracts/dto"
+import type { ArtifactSummaryDTO } from "@/lib/thread-chat/contracts/dto"
 import { ComposerCapsuleNode, $createComposerCapsuleNode } from "./composer-capsule-node"
 
-export function capsuleLabel(part: Exclude<ComposerMessagePartDraft, {type:"text"}>, artifacts: Record<string, ArtifactDTO>) {
+export function capsuleLabel(part: Exclude<ComposerMessagePartDraft, {type:"text"}>, artifacts: Record<string, ArtifactSummaryDTO>) {
   switch (part.type) {
     case "artifact-reference": return `@${artifacts[part.artifactId]?.title ?? "Artifact"}`
     case "quote": return `引用：${part.quote.text.slice(0, 40)}`
     case "file": return `附件：${part.file.filename ?? "文件"}`
   }
 }
-export function $importComposerDraft(draft: ThreadComposerDraft, artifacts: Record<string, ArtifactDTO>) {
+export function $importComposerDraft(draft: ThreadComposerDraft, artifacts: Record<string, ArtifactSummaryDTO>) {
   const paragraph = $createParagraphNode()
   for (const part of draft.parts) {
     if (part.type === "text") {

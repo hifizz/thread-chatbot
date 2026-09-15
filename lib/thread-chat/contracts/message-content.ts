@@ -108,9 +108,11 @@ export function normalizeMessageContentParts(parts: readonly MessageContentPartI
   return result
 }
 
-/** 持久化用户消息直接还原为命令内容，不经过编辑器状态。 */
+/** 还原用户编写的内容；服务端固定清单留在持久化消息中，不进入编辑命令。 */
 export function messagePartsToContent(parts: ThreadChatUIMessage["parts"]): MessageContentInput {
-  return messageContentInputSchema.parse({ parts: normalizeMessageContentParts(parts.map((part): MessageContentPartInput => {
+  return messageContentInputSchema.parse({ parts: normalizeMessageContentParts(parts
+    .filter((part) => part.type !== "data-project-document-updates" && part.type !== "data-document-update-notices")
+    .map((part): MessageContentPartInput => {
     switch (part.type) {
       case "text": return { type: "text", text: part.text }
       case "file": return { type: "file", file: { url: part.url, mediaType: part.mediaType, ...(part.filename ? { filename: part.filename } : {}) } }

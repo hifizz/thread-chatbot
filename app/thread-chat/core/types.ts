@@ -1,3 +1,4 @@
+import type { DocumentListItemDTO } from "@/lib/thread-chat/contracts/document"
 /**
  * 兼容入口：Thread Chat 领域类型的唯一来源位于 lib/thread-chat/domain。
  * 客户端调用方会在后续小步迁移中逐步切换到领域入口。
@@ -8,6 +9,7 @@ import type { Message as LegacyMessage } from "@/lib/thread-chat/domain/types"
 
 import type {
   ArtifactDTO,
+  ArtifactSummaryDTO,
   MessageDTO,
   ProjectBootstrapDTO,
   ProjectDTO,
@@ -66,8 +68,10 @@ export interface ConversationEntitySnapshot {
   threadsById: Record<string, ThreadDTO>
   messagesById: Record<string, MessageDTO>
   messageIdsByThread: Record<string, string[]>
-  artifactsById: Record<string, ArtifactDTO>
+  artifactsById: Record<string, ArtifactSummaryDTO>
+  artifactContentsById: Record<string, string>
   artifactOrder: string[]
+  documentsById: Record<string, DocumentListItemDTO>
   streamByMessageId: Record<string, ConversationStreamState>
 }
 
@@ -82,6 +86,10 @@ export interface ConversationEntityState extends ConversationEntitySnapshot {
 }
 
 export interface NormalizedThreadChatState extends ConversationEntityState {
+  documentRefreshRequested: number
+  requestDocumentRefresh(projectId: string): void
+  documentSyncError: boolean
+  setDocumentSyncError(error: boolean): void
   workspace: WorkspaceUiState
   hydrateProject(bootstrap: ProjectBootstrapDTO): void
   upsertProject(project: ProjectDTO): void
@@ -90,6 +98,8 @@ export interface NormalizedThreadChatState extends ConversationEntityState {
   upsertThread(thread: ThreadDTO): void
   upsertMessage(message: MessageDTO): void
   upsertArtifact(artifact: ArtifactDTO): void
+  cacheArtifactSummaries(artifacts: ArtifactSummaryDTO[]): void
+  syncDocuments(documents: DocumentListItemDTO[], artifacts: ArtifactSummaryDTO[]): void
   applyStreamSnapshot(
     messageId: string,
     message: ThreadChatUIMessage,

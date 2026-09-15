@@ -1,4 +1,5 @@
 import { and, asc, eq } from "drizzle-orm"
+import { lockOwnedProject } from "./project-repository"
 import { projects, threads } from "@/lib/db/schema"
 import type {
   ConversationExecutor,
@@ -24,14 +25,15 @@ export async function lockOwnedThread(
   userId: string,
   threadId: string
 ) {
-  const [row] = await tx
-    .select({ thread: threads })
-    .from(threads)
-    .innerJoin(projects, eq(projects.id, threads.projectId))
-    .where(and(eq(threads.id, threadId), eq(projects.userId, userId)))
-    .limit(1)
+  const owned = await findOwnedThread(tx, userId, threadId)
+  if (!owned) return null
+  // 会话命令会写 Project；入口即获取排他锁，禁止持有子级锁后升级。
+  const project = await lockOwnedProject(tx, userId, owned.projectId)
+  if (!project) return null
+  const [thread] = await tx.select().from(threads)
+    .where(and(eq(threads.id, threadId), eq(threads.projectId, project.id)))
     .for("update")
-  return row?.thread ?? null
+  return thread ? { project, thread } : null
 }
 
 export function listProjectThreadRows(

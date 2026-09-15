@@ -46,7 +46,7 @@ const [
   import("../../lib/db/schema.ts"),
   import("../../constants/model.ts"),
   import("../../lib/thread-chat/streaming/index.ts"),
-  import("../../lib/thread-chat/streaming/artifacts.ts"),
+  import("../../lib/thread-chat/domain/tool-identity.ts"),
   import("../../app/api/thread-chat/v1/projects/route.ts"),
   import("../../app/api/thread-chat/v1/projects/[projectId]/route.ts"),
   import("../../app/api/thread-chat/v1/projects/[projectId]/start/route.ts"),

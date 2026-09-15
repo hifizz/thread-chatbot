@@ -19,7 +19,7 @@ const [
   import("../../lib/db/schema.ts"),
   import("../../lib/thread-chat/application/index.ts"),
   import("../../lib/thread-chat/application/compile-model-context.ts"),
-  import("../../lib/thread-chat/streaming/artifacts.ts"),
+  import("../../lib/thread-chat/domain/tool-identity.ts"),
   import("../../constants/model.ts"),
 ])
 const id = () => crypto.randomUUID()

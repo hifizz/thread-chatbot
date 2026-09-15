@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto"
+import { artifactIdForTool } from "../domain/tool-identity"
 import type { ThreadChatUIMessage } from "@/lib/thread-chat/contracts/ui-message"
 import { markdownArtifactInputSchema } from "@/lib/chat/markdown-artifact"
 
@@ -24,16 +24,6 @@ function toolName(part: Record<string, unknown>): string | null {
   return typeof part.type === "string" && part.type.startsWith("tool-")
     ? part.type.slice(5)
     : null
-}
-
-export function artifactIdForTool(
-  messageId: string,
-  toolCallId: string
-): string {
-  const hex = createHash("sha256")
-    .update(`${messageId}:${toolCallId}`)
-    .digest("hex")
-  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-5${hex.slice(13, 16)}-a${hex.slice(17, 20)}-${hex.slice(20, 32)}`
 }
 
 export function collectFinalArtifacts(

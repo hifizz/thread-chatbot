@@ -1,5 +1,6 @@
 "use client"
 
+import { DocumentUpdateTool } from "./document-update-tool"
 import Image from "next/image"
 import { useEffect, useState } from "react"
 import { Download, FileText, RotateCcw } from "lucide-react"
@@ -271,6 +272,8 @@ export function UIMessageSupplementalParts({
         </a>
       ))}
       {tools.map((part, index) => {
+        if (part.type === "tool-findProjectDocuments" || part.type === "tool-readProjectDocument" || part.type === "tool-updateProjectDocument")
+          return <DocumentUpdateTool key={part.toolCallId} part={part} />
         const state = "state" in part ? String(part.state) : ""
         return (
           <span key={`${part.type}-${index}`} hidden={state === "output-available"}>

@@ -1,6 +1,12 @@
+import { db } from "@/lib/db"
+import { DOCUMENT_TOOL_NAMES } from "@/constants/project-documents"
+import { withDocumentContextReceipt } from "./documents/context-receipt"
+import { buildDocumentTools } from "./documents/tools"
+import { markDocumentContextUsed } from "../persistence/documents/context"
+import type { DocumentContextReceipt } from "../contracts/document"
 import { availableResearchTools, createWebBudget } from "@/lib/ai/web-access"
 import { evaluateContextBudget } from "../application/context-budget"
-import { isStepCount, streamText, type ModelMessage, type ToolSet } from "ai"
+import { isStepCount, streamText, wrapLanguageModel, type ModelMessage, type ToolSet } from "ai"
 import type { GenerationSettings } from "@/constants/generation-settings"
 import { THREAD_CHAT_PROMPT_SCHEMA_VERSION } from "@/constants/thread-chat-prompt"
 import { MODEL_CALL_PURPOSE } from "@/constants/model-call"
@@ -38,6 +44,8 @@ import { observeAppOperation } from "@/lib/observability/trace"
 import type { ObservabilityContext } from "@/lib/observability/types"
 
 export interface PrepareGenerationInput {
+  userId: string
+  documentUpdates?: DocumentContextReceipt
   messageId: string
   projectId: string
   threadId: string
@@ -141,21 +149,27 @@ export async function prepareGeneration(input: PrepareGenerationInput) {
   const artifactRequested = isExplicitMarkdownArtifactRequest(
     input.latestUserText
   )
+  // 项目核心能力常驻，不因文档数量变化切换工具集合和文档策略。
+  const documentTools = buildDocumentTools({ userId: input.userId, projectId: input.projectId,
+    threadId: input.threadId, messageId: input.messageId })
   const generationMode = resolveGenerationMode({
     researchMode: researchRoute.mode,
     artifactRequested,
+    documentTools: DOCUMENT_TOOL_NAMES.filter((name) => name in documentTools),
   })
   const webBudget = createWebBudget({ mode: researchRoute.mode })
-  const tools = buildGenerationTools({
+  const tools: ToolSet = buildGenerationTools({
+    documentTools,
     budget: webBudget,
     messageId: input.messageId,
     toolNames: searchReady
       ? generationMode.toolNames
       : generationMode.toolNames.filter(
-          (name) => name === "createMarkdownArtifact"
+          (name) => name !== "webSearch" && name !== "readUrl"
         ),
     routeReason: researchRoute.reasonCode,
   })
+  const maxSteps = generationMode.maxSteps
   const activeTools = Object.keys(tools)
   const projectContract = buildProjectContractContext(input.projectContract)
   const stableInstructions = [
@@ -195,12 +209,21 @@ export async function prepareGeneration(input: PrepareGenerationInput) {
   // 在所有 system、历史、附件和工具已确定的边界明确记录 unknown。
   const contextBudget = evaluateContextBudget({ inputTokens: null, contextWindow: null, outputTokens: generationOptions.maxOutputTokens ?? 0 })
   if (contextBudget.status === "exceeded") throw new Error("context_length_exceeded")
+  if (typeof model === "string") throw new Error("MODEL_ROUTE_NOT_RESOLVED")
   const result = streamText({
     ...buildAiTelemetryConfig(MODEL_CALL_PURPOSE.chatAnswer, {
       ...trace,
       modelId: input.modelId,
     }),
-    model: withModelCallLogging(model, MODEL_CALL_PURPOSE.chatAnswer, trace),
+    model: withModelCallLogging(wrapLanguageModel({
+      model,
+      middleware: { specificationVersion: "v3", wrapStream: async ({ doStream }) => {
+        const response = await doStream()
+        const manifest = input.documentUpdates
+        return manifest ? { ...response, stream: withDocumentContextReceipt(response.stream,
+          () => markDocumentContextUsed(db, input.messageId, manifest)) } : response
+      } },
+    }), MODEL_CALL_PURPOSE.chatAnswer, trace),
     abortSignal: input.abortSignal,
     ...generationOptions,
     instructions: cachedPrompt.instructions,
@@ -210,7 +233,8 @@ export async function prepareGeneration(input: PrepareGenerationInput) {
       ? {
           /* 明确的 Markdown 交付请求必须真的产出文件：弱模型检索完可能直接写正文，
            * 因此 artifact 未产出前中段步骤 toolChoice=required（模型只能走工具），
-           * 末步进一步强制 createMarkdownArtifact，保证用户要文件就一定拿到文件。 */
+           * 末步进一步强制 createMarkdownArtifact，保证用户要文件就一定拿到文件；
+           * 其余情况的末步不挂工具，留给模型输出最终答复。 */
           prepareStep: ({ stepNumber, steps }: {
             stepNumber: number
             steps: Array<{
@@ -224,12 +248,14 @@ export async function prepareGeneration(input: PrepareGenerationInput) {
             )
             const needsArtifact =
               generationMode.artifactRequested && !artifactDone
-            const lastStep = stepNumber >= generationMode.maxSteps - 1
+            const lastStep = stepNumber >= maxSteps - 1
             return {
               activeTools: lastStep
-                ? activeTools.filter(
-                    (name) => name === MARKDOWN_ARTIFACT_TOOL_NAME
-                  )
+                ? needsArtifact
+                  ? activeTools.filter(
+                      (name) => name === MARKDOWN_ARTIFACT_TOOL_NAME
+                    )
+                  : []
                 : availableResearchTools(activeTools, webBudget),
               toolChoice:
                 stepNumber === 0 && generationMode.firstTool
@@ -249,7 +275,7 @@ export async function prepareGeneration(input: PrepareGenerationInput) {
           },
         }
       : {}),
-    stopWhen: isStepCount(generationMode.maxSteps),
+    stopWhen: isStepCount(maxSteps),
   })
 
   const leadingChunks: ThreadChatUIMessageChunk[] = [

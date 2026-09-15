@@ -12,6 +12,11 @@ export function useQuestionHighlight(selection: SelectionInfo | null, open: bool
     if (!open || !selection || !root || typeof CSS === "undefined"
       || !CSS.highlights || typeof Highlight === "undefined") return
 
+    // Lightning CSS 暂不能解析 ::highlight()（上游 #1300）。交给浏览器解析，
+    // 样式与临时 Highlight 同生命周期；颜色仍取样式层的主题 token。
+    const style = document.createElement("style")
+    style.textContent = `.tc ::highlight(${QUESTION_HIGHLIGHT_NAME}) { background-color: var(--tc-question-highlight); }`
+    document.head.append(style)
     const highlight = new Highlight()
     const update = () => {
       highlight.clear()
@@ -26,6 +31,7 @@ export function useQuestionHighlight(selection: SelectionInfo | null, open: bool
     observer.observe(root, { childList: true, characterData: true, subtree: true })
     return () => {
       observer.disconnect()
+      style.remove()
       if (CSS.highlights.get(QUESTION_HIGHLIGHT_NAME) === highlight)
         CSS.highlights.delete(QUESTION_HIGHLIGHT_NAME)
     }

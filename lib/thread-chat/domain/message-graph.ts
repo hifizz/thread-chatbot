@@ -420,18 +420,3 @@ export function artifactSourceProvenance(
     artifact.sourceMessageId
   )
 }
-
-/** 当前所有 Thread active path 上可默认展示的 Artifact。 */
-export function activePathArtifacts(state: ThreadTreeState): Artifact[] {
-  const activeMessageIds = new Set(
-    Object.values(state.threads).flatMap((thread) =>
-      activeMessagePath(thread).map((message) => message.id)
-    )
-  )
-  return state.artifactOrder.flatMap((artifactId) => {
-    const artifact = state.artifacts[artifactId]
-    return artifact && activeMessageIds.has(artifact.sourceMessageId)
-      ? [artifact]
-      : []
-  })
-}
