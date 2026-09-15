@@ -1,3 +1,4 @@
+import { lockDocumentExecution } from "../persistence/documents/commands"
 import { registerDocumentArtifact } from "../persistence/documents/writes"
 import { and, eq } from "drizzle-orm"
 import { db } from "@/lib/db"
@@ -41,6 +42,13 @@ export async function finalizeGeneration({
   const finalArtifacts = collectFinalArtifacts(messageId, parts)
 
   return db.transaction(async (tx) => {
+    // 结束生成可能插入 Artifact（外键访问 Project），也必须先锁父级。
+    const [identity] = await tx.select({ projectId: messages.projectId,
+      threadId: messages.threadId, userId: projects.userId }).from(messages)
+      .innerJoin(projects, eq(projects.id, messages.projectId)).where(eq(messages.id, messageId))
+    if (!identity || !await lockDocumentExecution(tx, { ...identity, messageId })) {
+      throw new Error("MESSAGE_NOT_FOUND_DURING_FINALIZE")
+    }
     const now = new Date()
     const [updated] = await tx
       .update(messages)

@@ -1,3 +1,4 @@
+import { lockOwnedThread } from "./thread-repository"
 import { and, asc, eq, inArray } from "drizzle-orm"
 import { messages, projects } from "@/lib/db/schema"
 import type { ConversationExecutor } from "@/lib/thread-chat/persistence/transaction"
@@ -31,6 +32,23 @@ export async function lockOwnedMessage(
   const [row] = await tx.select({ message: messages }).from(messages)
     .where(eq(messages.id, messageId)).for("update")
   return row?.message ?? null
+}
+
+/** 编辑/重试会写整个会话：Project UPDATE → Thread UPDATE → Message UPDATE。 */
+export async function lockOwnedMessageTurn(
+  tx: ConversationTransaction,
+  userId: string,
+  messageId: string
+) {
+  const owned = await findOwnedMessage(tx, userId, messageId)
+  if (!owned) return null
+  const locked = await lockOwnedThread(tx, userId, owned.threadId)
+  if (!locked) return null
+  const [source] = await tx.select().from(messages).where(and(
+    eq(messages.id, messageId), eq(messages.projectId, locked.project.id),
+    eq(messages.threadId, locked.thread.id)
+  )).for("update")
+  return source ? { ...locked, source } : null
 }
 
 export function listProjectMessageRows(

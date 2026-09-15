@@ -342,6 +342,40 @@ try {
   assert.equal(typeof fixedBody.content, 'string')
   assert.ok(fixedBody.content.length > 0, 'fixed historical body remains available on demand')
   checks++
+  if (!process.env.THREADCHAT_TEST_DB_MODULE) {
+    const { lockOwnedMessageTurn } = await import('../../lib/thread-chat/persistence/message-repository.ts')
+    let release, ready
+    const gate = new Promise(resolve => { release = resolve })
+    const held = new Promise(resolve => { ready = resolve })
+    const blocker = testDb.transaction(async tx => {
+      await tx.select().from(projects).where(eq(projects.id, projectId)).for('share')
+      ready()
+      await gate
+    })
+    await Promise.race([held, blocker])
+    // 直接事务运行真实命令共用的锁入口，没有重试可掩盖 40P01。
+    const turns = Promise.all([messageA, messageB].map(messageId => testDb.transaction(async tx => {
+      const locked = await lockOwnedMessageTurn(tx, userId, messageId)
+      assert.equal(locked.source.id, messageId)
+      await tx.update(projects).set({ updatedAt: new Date() }).where(eq(projects.id, projectId))
+      return locked.thread.id
+    })))
+    void turns.catch(() => {})
+    try {
+      const deadline = Date.now() + 10000
+      for (;;) {
+        const waiting = await testDb.execute(sql`select count(*)::int as count from pg_stat_activity
+          where datname = current_database() and pid <> pg_backend_pid()
+          and wait_event_type = 'Lock' and query like '%"projects"%for update%'`)
+        if (waiting[0].count >= 2) break
+        assert.ok(Date.now() < deadline, '两条命令必须在获取子级锁之前等待 Project 排他锁')
+        await new Promise(resolve => setTimeout(resolve, 25))
+      }
+    } finally { release(); await blocker }
+    assert.deepEqual((await turns).sort(), [threadA, threadB].sort())
+    console.log('PASS 原生 PostgreSQL：两个 Thread 先等待 Project 排他锁，无锁升级、无事务重试')
+    checks++
+  }
   const { deleteProject } = await import('../../lib/thread-chat/application/project-mutations.ts')
   await deleteProject(userId, projectId, { commandId: id() })
   assert.equal((await testDb.select().from(documents).where(eq(documents.projectId, projectId))).length, 0); checks++

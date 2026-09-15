@@ -19,7 +19,6 @@ import {
 } from "@/lib/thread-chat/persistence/mappers"
 import {
   findRootThreadId,
-  lockOwnedProject,
 } from "@/lib/thread-chat/persistence/project-repository"
 import { lockOwnedThread } from "@/lib/thread-chat/persistence/thread-repository"
 import {
@@ -43,10 +42,9 @@ export function sendMessage(
       scopeId: threadId,
       payload: command,
       execute: async (): Promise<GenerationAcceptedDTO> => {
-        const thread = await lockOwnedThread(tx, userId, threadId)
-        if (!thread) notFound()
-        const project = await lockOwnedProject(tx, userId, thread.projectId)
-        if (!project) notFound()
+        const locked = await lockOwnedThread(tx, userId, threadId)
+        if (!locked) notFound()
+        const { project, thread } = locked
         if (project.archivedAt) stateConflict("已归档 Project 不可发送消息")
         await assertThreadReadyForTurn(tx, project.id, thread.id)
         const parts = await resolveUserContent({

@@ -290,10 +290,9 @@ export function updateThread(
       scopeId: threadId,
       payload: command,
       execute: async () => {
-        const thread = await lockOwnedThread(tx, userId, threadId)
-        if (!thread) notFound()
-        const project = await lockOwnedProject(tx, userId, thread.projectId)
-        if (!project) notFound()
+        const locked = await lockOwnedThread(tx, userId, threadId)
+        if (!locked) notFound()
+        const { project, thread } = locked
         const now = new Date()
         const values = {
           ...(command.modelId !== undefined

@@ -1,4 +1,3 @@
-import { DATABASE_TRANSACTION_ATTEMPTS } from "@/constants/database"
 import { eq, sql } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { projects, threads } from "@/lib/db/schema"
@@ -11,14 +10,7 @@ export type ConversationExecutor = typeof db | ConversationTransaction
 export async function withConversationTransaction<T>(
   execute: (tx: ConversationTransaction) => Promise<T>
 ): Promise<T> {
-  for (let attempt = 1; ; attempt++) {
-    try { return await db.transaction(execute) }
-    catch (error) {
-      const value = error as { code?: string; cause?: { code?: string } }
-      if ((value.code ?? value.cause?.code) !== "40P01" || attempt >= DATABASE_TRANSACTION_ATTEMPTS) throw error
-      // PostgreSQL 已整笔回滚；只重试死锁，不重试业务错误或不确定的网络提交。
-    }
-  }
+  return db.transaction(execute)
 }
 
 export async function allocateThreadSequences(
