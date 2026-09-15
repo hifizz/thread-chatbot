@@ -162,7 +162,7 @@ async function runGenerationCore({
   try {
     prepared = await prepare({
       userId,
-      documentUpdates: latestUser.parts.find((part) => part.type === "data-project-document-updates")?.data,
+      documentUpdates: latestUser.parts.find((part) => part.type === "data-project-document-updates" || part.type === "data-document-update-notices")?.data,
       messageId: message.id,
       projectId: message.projectId,
       threadId: thread.id,

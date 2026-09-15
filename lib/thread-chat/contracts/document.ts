@@ -54,6 +54,20 @@ export const documentUpdatesSchema = z.object({
   }).strict()),
 }).strict()
 export type ProjectDocumentUpdates = z.infer<typeof documentUpdatesSchema>
+export const documentUpdateNoticesSchema = z.object({
+  schemaVersion: z.literal(1),
+  documents: z.array(z.object({
+    documentId: z.uuid(), revisionId: z.uuid(), artifactId: z.uuid(),
+    revisionNumber: z.number().int().positive(), title: z.string(),
+    changes: z.array(z.object({
+      commitId: z.uuid(), revisionNumber: z.number().int().positive(),
+      summary: z.string(), sourceThreadId: z.uuid(), sourceMessageId: z.uuid(),
+    }).strict()).max(DOCUMENT_LIMITS.noticeChanges),
+    omittedChangeCount: z.number().int().nonnegative(),
+  }).strict()),
+}).strict()
+export type DocumentUpdateNotices = z.infer<typeof documentUpdateNoticesSchema>
+export type DocumentContextReceipt = ProjectDocumentUpdates | DocumentUpdateNotices
 /** messageId 是既有 assistant 执行身份，每次 retry 创建独立消息。 */
 export interface DocumentExecution {
   userId: string; projectId: string; threadId: string; messageId: string
@@ -64,5 +78,5 @@ export interface DocumentCommitDTO {
   sourceThreadId: string; sourceMessageId: string; createdAt: string
 }
 export interface ProjectDocumentsDTO {
-  documents: DocumentListItemDTO[]; pending: ProjectDocumentUpdates; commits: DocumentCommitDTO[]
+  documents: DocumentListItemDTO[]
 }

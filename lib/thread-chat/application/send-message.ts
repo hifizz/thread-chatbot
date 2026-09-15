@@ -1,4 +1,4 @@
-import { pendingDocumentUpdates } from "../persistence/documents/context"
+import { appendDocumentNotices } from "./documents/notices"
 import { THREAD_QUOTE_SCHEMA_VERSION } from "@/lib/thread-chat/contracts/quote"
 import { resolveUserContent } from "./resolve-user-content"
 import { messages } from "@/lib/db/schema"
@@ -83,10 +83,7 @@ export function sendMessage(
               : {}),
           },
         })
-        if (thread.parentId === null) {
-          const updates = await pendingDocumentUpdates(tx, project.id, thread.id, command.documentScope)
-          parts.push({ type: "data-project-document-updates", data: updates })
-        }
+        await appendDocumentNotices(tx, project.id, thread.id, parts)
         const [userSequence, assistantSequence] = await allocateThreadSequences(
           tx,
           thread.id,

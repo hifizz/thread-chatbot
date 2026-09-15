@@ -3,7 +3,7 @@ import { DOCUMENT_TOOL_NAMES } from "@/constants/project-documents"
 import { withDocumentContextReceipt } from "./documents/context-receipt"
 import { buildDocumentTools } from "./documents/tools"
 import { markDocumentContextUsed } from "../persistence/documents/context"
-import type { ProjectDocumentUpdates } from "../contracts/document"
+import type { DocumentContextReceipt } from "../contracts/document"
 import { availableResearchTools, createWebBudget } from "@/lib/ai/web-access"
 import { evaluateContextBudget } from "../application/context-budget"
 import { isStepCount, streamText, wrapLanguageModel, type ModelMessage, type ToolSet } from "ai"
@@ -42,7 +42,7 @@ import type { ObservabilityContext } from "@/lib/observability/types"
 
 export interface PrepareGenerationInput {
   userId: string
-  documentUpdates?: ProjectDocumentUpdates
+  documentUpdates?: DocumentContextReceipt
   messageId: string
   projectId: string
   threadId: string

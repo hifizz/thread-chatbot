@@ -1,5 +1,7 @@
 ## 实施状态
 
+本次基于 #145 最新 `d4de322` 实现后台通知；此前接收面板/范围选择已经移除，下方早期记录作为历史证据保留，以末节和最新 Spec 为准。
+
 已 rebase 到 #143 的 `afc83d2`，保留 Artifact Quote 定位与多级父链全文继承。实现落在 #145，合入目标仍是 #143。用户补充确认的版本选择使用标题旁 Dropdown；切换只改变阅读版本，不回滚文档。
 
 已实现 Document/Revision 表、纯 Markdown edits、读收据与幂等更新、生成工具、提交恢复、主线固定输入、版本 Dropdown/差异、主线范围选择，以及旧产物登记脚本。
@@ -61,3 +63,16 @@ PGlite 的连接事务是串行执行的，这组测试不能替代原生 Postgr
 - EGO 完成桌面差异、V1 切换/导出、390×844 手机展示、分享失败重试、真实提问状态禁用版本切换。分享失败使用 fixture 注入，不能视为系统分享成功。
 
 详见 [本地修复验收记录](../../../docs/acceptance/pr-145-quality-review.md)。tasks 仅新增勾选 2.1、3.2。真实 A/B/C 全流程、完整边界模型案例、系统分享、主题/焦点矩阵、关闭写入后重启及旧生产库迁移仍待验收。完整请求预算保持 unknown。
+
+## 本次修订：所有 Thread 后台通知（基于 d4de322）
+
+- 移除主线待接收面板、范围复选框、恢复默认、documentScope 请求/状态与已固定输入提示；也不添加可见通知分隔线。
+- send/edit/fork firstTurn 共用 appendDocumentNotices，在接受消息的事务中以单一 SQL 快照保存新 Part。每文档最近 10 条未通知摘要、当前版本及省略数量；不加载正文，不把长事件链交给 AI 重建状态。
+- 所有 Thread 通知位置独立；document_context_used 兼容旧 commitIds 收据与新 revisionNumber 收据，仅有效提供商响应推进。全文读取仍用已有固定工具结果/readId。
+- 新通知、历史读取结果按原顺序保留，新版本只追加；旧全文 Part 的模型展开合同保持兼容。增加新通知专用快捷编译路径，无旧格式时不查询文档正文。
+- 目录 API 只返回 documents；useProjectDocumentSync 保留原轮询、固定 Artifact/head 同步和历史选区/草稿保护，失败提示与 AI 通知无关。
+- 修正预算超限文案，去除已不存在的范围选择建议。升级需要刷新前端，服务端不再接收 documentScope。此次无新增数据库列、迁移或 Neon 操作。
+
+本次自动验证：TypeScript、变更 TypeScript/React 文件 ESLint、git diff --check；新通知最终模型消息前缀、固定全文追加、编辑过滤、旧格式兼容、预算错误、Artifact 引用上下文及提示词缓存回归通过。PGlite 使用实际 Schema/应用服务，38 项通过，新增覆盖独立 Thread 收据、接受消息后 head 前进、固定重试、分叉首轮、编辑新快照，以及连续 12 次提交后的摘要上限和通知位置。
+
+PGlite 不替代原生多连接测试。本次未执行 macOS 浏览器或真实模型验收，旧 Mac 证据不能算作新行为已通过。请按 macos-acceptance.md 第 5 节重新验收，tasks 5.5、8.1、8.2 保持待验收。长对话全文依然累积，不承诺无限上下文或固定缓存命中率。

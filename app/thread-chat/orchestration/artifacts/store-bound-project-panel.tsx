@@ -19,7 +19,7 @@ import type { ConversationStore } from "../../core/store"
 import { useConversationStore } from "../../core/use-thread-store"
 import type { ThreadChatClient } from "../../net/client"
 import type { ConversationCommands } from "../../net/commands/conversation-commands"
-import { ProjectDocumentUpdates } from "./documents/project-updates"
+import { useProjectDocumentSync } from "./documents/use-project-document-sync"
 import { DocumentView } from "./documents/view"
 import { ProjectPanel } from "./project-panel"
 
@@ -80,6 +80,7 @@ export function StoreBoundProjectPanel({
   onSelect(id: string): void
   onLocate(threadId: string, sourceMessageId: string): void
 }) {
+  const documentSync = useProjectDocumentSync({ projectId, client, store, enabled: open })
   const versionRequest = useRef({ sequence: 0 })
   useEffect(() => {
     const pending = versionRequest.current
@@ -254,7 +255,7 @@ export function StoreBoundProjectPanel({
 
   return (
     <ProjectPanel
-      documentUpdates={open ? <ProjectDocumentUpdates projectId={projectId} client={client} store={store} /> : null}
+      documentSyncError={documentSync.error}
       renderDocumentControls={(artifact) => <DocumentView artifact={artifact} client={client} navigationBlocked={questionArtifactId === artifact.id} onSelect={(id) => {
         if (questionArtifactId === artifact.id) return
         const request = ++versionRequest.current.sequence

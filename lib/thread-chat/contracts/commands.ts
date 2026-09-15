@@ -52,7 +52,7 @@ export const startProjectCommandSchema = z
   })
 
 export const sendMessageCommandSchema = z
-  .object({ ...baseGenerationFields, documentScope: z.array(entityIdSchema).max(500).optional() })
+  .object({ ...baseGenerationFields })
   .strict()
   .superRefine((command, context) => {
     const result = messageContentInputSchema.safeParse({ parts: command.parts })

@@ -14,7 +14,7 @@
 - 文件当前内容、历史版本、消息引用、实际模型输入均有明确身份。
 - 替换、追加、删除普通 Markdown 段落和勾选复选框共用一个更新命令。
 - 提交原子、可重试、可追溯；异步先后顺序不造成丢失更新。
-- 主线能看到已提交进展，并在后续请求中可靠接收固定版本。
+- 所有 Thread 在后续请求中自动获得固定更新摘要，相关正文按需读取。
 
 **Non-Goals:**
 
@@ -29,7 +29,7 @@
 3. 模型解析文档身份，读取当前完整 Markdown 与 Revision ID，再生成局部 edits；一次操作可以同时修改 TODO6 方案和复选框。
 4. 服务端版本检查通过才提交，产生 R2；若 B 仍依据 R1，则返回冲突，由 B 重读 R2 并判断结论是否适用。
 5. 提交后回复“已更新”，展示本次版本、修改说明与查看差异入口。讨论中提出建议、只 @ 引用、查看差异都不触发修改。
-6. 回到主线，界面展示项目文档已提交进展；主线下一条用户消息读取一份固定更新清单和文档版本，继续推进。
+6. 回到任意 Thread 继续发消息；后台追加更新摘要，模型按需读取最新版继续推进，无接收按钮。
 
 ### 2. 两张新表，正文继续使用不可变 Artifact
 
@@ -187,19 +187,23 @@ async function updateDocument(command, trustedExecution) {
 - 按标题搜索、点击当前文档或生成回复期间收到新版本时，不自动改变已经捕获的选区根/Artifact ID；有活跃选区或草稿时提示更新，显式切换前保护草稿。
 - 分享/导出在创建时冻结被选版本与内容。当前采用 Markdown 文件导出和浏览器系统文件分享；不支持文件分享时提示导出。不引入公开分享链接；未来公开入口也不得动态读 head 或开放写工具。
 
-### 8. 主线进展与实际输入固定
+### 8. 后台通知、按需读取、固定历史
 
-DocumentRevision 就是权威变更事件，列表按文档 revisionNumber 表达因果顺序，多文档时间仅用于展示。主线进展视图查询已提交的新版本，展示文件、版本变化、修改说明、来源 Thread；浏览/打开视图不代表模型已经接收。
+本节取代此前“主线接收进展”和“本轮范围选择”的设计。用户只需继续聊天；不展示通知分隔线、勾选或恢复默认。
 
-接受主线下一条用户消息时，在数据库中获取一致的已提交版本清单，比较该主线之前持久化接收的版本，为改变的文档固定“当前 Revision + 未接收的提交说明”。在新用户 Message Parts 保存服务端生成的 `data-project-document-updates`，包含 schemaVersion、按固定顺序排列的 documentId/revisionId/artifactId 与相关提交 ID；客户端不能自报或篡改这份清单。
+调用链：sendMessage / editTurn / forkThread(firstTurn) → appendDocumentNotices → pendingDocumentNotices → 保存 user.parts → compileModelContext → 确定性摘要序列化 → 模型按需 readProjectDocument → 固定工具结果 → 有效提供商响应记录 document_context_used。
 
-读取全部 manifest 的快照需一致：使用单一数据库快照查询（如同一 SQL/REPEATABLE READ 的短事务），不边遍历文档边动态追 head。新增文档也纳入清单；首次接收用当前已提交版本，不猜测用户读过就等于模型读过。清单先表示本轮计划输入；通过预算并实际发出模型请求后，在既有生成执行记录保存该清单的使用收据。进展位置由固定 Parts 与真实使用收据共同确定，生成前失败不推进；不用一个可变的全 Project“已读”布尔值，也不声称使用收据能证明模型已理解内容。
+每条新消息用单一 SQL 快照查询当前 Project 文档及该 Thread 未通知的提交。新 Part `data-document-update-notices` v1 固定 documentId、revisionId、artifactId、revisionNumber、title、changes（commitId、版本号、summary、来源 Thread/Message）、omittedChangeCount。每文档最近 10 条摘要；不会因数十次修改而永久追加一长串提交 ID 到每个新通知。收据保存通知时的 revisionNumber，表示“已通知到此版”，并不表示所有历史修改说明都已逐条阅读。
 
-上下文编译在该新消息位置展开固定全文和提交说明；仅 ID/摘要不算模型已读全文，去重只认同一 Artifact 实际完整内容，R1/R2 不能按 Document ID 混为一次。不能为了加入新版而重写旧消息或删除旧全文；总请求超限时明确失败/提示减少本轮范围，不推进到未进入请求的版本。若需减少范围，由用户在可见进展入口选择本轮文档范围后提交新消息，不静默丢弃更新。
+messages.document_context_used 继续使用现有 JSONB，类型兼容旧清单/新通知，不加表或列。新收据以 Thread+Document+revisionNumber 判断，旧 commitIds 继续有效；只有有效提供商响应才写入。打开目录、保存用户消息、stream-start 或 error 不推进。继承父 Thread 的历史不消费子 Thread 的通知位置。
 
-清单始终持久化，但此前从未收到有效提供商响应、没有使用收据的历史计划，不在后续新用户消息中补发全文；这允许用户缩小范围后重新提交。用户正文、Quote 和已实际使用的历史不删除或改写。
+新通知只编译已存摘要，不查 head、不读取正文。AI 碰到相关具体问题或修改时，调用 readProjectDocument 不传 revisionId，获得当时最新全文及 readId；结果在工具消息原位置持久化。摘要只提供变化线索，不能拼事件链推导正文，也不授权写操作。
 
-该清单跟随本轮历史保存：重试/重生复用原清单，提交后的 R3 不污染正在使用 R2 的请求。模型显式调用 readProjectDocument 读取更晚的 R3 时，工具结果另存固定 R3/readId。子 Thread 不自动注入其他分支全文，只接收正常继承、用户实际引用和工具读取结果；不更改 forkContext 或恢复已删除 Quote。
+后续请求保留此前通知及全文读取结果，新增信息只追加。重试固定原用户 Part，新工具读取另留记录；不能为节省 token 删改旧正文。旧 data-project-document-updates 保持原全文展开及失败计划兼容规则，新数据不沿用该动态过滤。首次升级会改变稳定系统指令，不能宣称跨升级缓存前缀不变；升级后通知追加不会改写历史模型消息，实际缓存命中仍由提供商决定。
+
+统一预算继续计入历史、摘要及实际工具结果。每文档摘要数量受限不等于总上下文无上限；已知超限明确失败，unknown 不伪称通过。长对话压缩另行设计，本次不删除历史或恢复范围选择。
+
+项目目录读取 API 仅返回 documents，不再返回主线 pending/commits。客户端移除 documentScope 和接收面板，将原轮询提取为 useProjectDocumentSync；只更新固定 Artifact/head 元数据，不改变所选版本、选区或草稿。轮询失败给出目录刷新错误并继续重试。旧客户端须刷新到同版前端；服务端不再接受旧 documentScope 请求字段，历史已保存数据仍兼容。
 
 ### 9. 模块与组件拆分
 
@@ -214,7 +218,7 @@ DocumentRevision 就是权威变更事件，列表按文档 revisionNumber 表�
 | `app/thread-chat/net/` | 请求、DTO 状态更新、按 Revision 失效缓存、刷新恢复 |
 | `constants/` | 工具名、限制、重试次数和文案的单一入口 |
 
-组件：ProjectDocumentList 按 Document 展示一份文件；DocumentView 管理所选 Revision/当前版本提示；ArtifactDetail/MarkdownBody/SelectionSurface 复用 #143 阅读与划选；DocumentVersionHistory 展示版本与来源；DocumentDiff 使用现有 diff 库提供只读差异；DocumentUpdateTool 展示读取、提交、冲突重读、已提交、失败；ProjectDocumentUpdates 展示主线未接收进展与本轮范围选择。
+组件：ProjectDocumentList 按 Document 展示一份文件；DocumentView 管理所选 Revision/当前版本提示；ArtifactDetail/MarkdownBody/SelectionSurface 复用 #143 阅读与划选；DocumentVersionHistory 展示版本与来源；DocumentDiff 使用现有 diff 库提供只读差异；DocumentUpdateTool 展示读取、提交、冲突重读、已提交、失败；useProjectDocumentSync 负责目录刷新，与模型通知及阅读状态独立。
 
 组件只展示 DTO/派发命令，不执行 patch 或决定是否能写。已提交卡片以服务端收据为准；桌面与手机复用现有布局、Drawer 和主题 token，不自建编辑器或第二套分支导航。
 
@@ -224,7 +228,7 @@ DocumentRevision 就是权威变更事件，列表按文档 revisionNumber 表�
 - 版本锁不能识别逻辑矛盾 → 重读全文和语义审视，评测覆盖目标删除、需求变更；不声称已保证内容正确。
 - 每版保存完整 Artifact 会增长存储 → 第一版保留完整内容便于可靠回放，后续优化不能破坏固定 ID。
 - 已提交更新的来源回复可能失败 → Document 以提交收据为准，保留操作事实，既有 Fork completed 限制明确展示。
-- 主线更新过多导致上下文超限 → 可见范围选择、固定输入与明确预算失败，不静默摘要/丢弃。
+- 长对话与大量更新仍可能超限 → 简短通知、按需读取和明确预算失败，不静默丢弃历史。
 - 现有 Artifact 收集与新提交服务重复落库 → 单一登记入口和幂等收据，终态恢复测试覆盖。
 
 ## Migration Plan

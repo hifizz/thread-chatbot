@@ -1,3 +1,4 @@
+import { appendDocumentNotices } from "./documents/notices"
 import { resolveForkModelId } from "@/lib/thread-chat/application/fork-model"
 import { resolveUserContent } from "./resolve-user-content"
 import { messages, threads } from "@/lib/db/schema"
@@ -170,6 +171,7 @@ export function forkThread(
             frozenFirstQuote,
           },
         })
+        await appendDocumentNotices(tx, project.id, child.id, parts)
         const [userSequence, assistantSequence] = await allocateThreadSequences(
           tx,
           child.id,

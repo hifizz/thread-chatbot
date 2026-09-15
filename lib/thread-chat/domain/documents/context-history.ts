@@ -1,13 +1,13 @@
-import type { ProjectDocumentUpdates } from "../../contracts/document"
+import type { DocumentContextReceipt } from "../../contracts/document"
 import type { ThreadChatUIMessage } from "../../contracts/ui-message"
 
 interface ContextRow {
   id: string
   parts: ThreadChatUIMessage["parts"]
-  documentContextUsed: ProjectDocumentUpdates | null
+  documentContextUsed: DocumentContextReceipt | null
 }
 
-/** 历史中从未进入请求的计划清单不补发；本轮清单与实际使用过的固定历史保留。 */
+/** 仅兼容旧版全文计划的失败过滤；新版摘要永远保留原位置，不随收据变化删改历史。 */
 export function documentContextForRequest(rows: readonly ContextRow[], activeUserId?: string) {
   const used = new Set(rows.flatMap((row) => row.documentContextUsed ? [JSON.stringify(row.documentContextUsed)] : []))
   return (message: ThreadChatUIMessage): ThreadChatUIMessage => ({ ...message,

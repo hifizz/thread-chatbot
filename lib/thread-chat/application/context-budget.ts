@@ -1,3 +1,5 @@
+import { DOCUMENT_UI_COPY } from "@/constants/project-documents"
+
 /** Token 计量不可用时必须返回 unknown，不能拿字符数当作 token。 */
 export function evaluateContextBudget(input: {
   inputTokens: number | null
@@ -20,5 +22,5 @@ export function contextLimitFailure(error: unknown): { code: string; message: st
     const record = value as Record<string, unknown>
     return [record.code, record.message, record.cause, record.error, record.responseBody].some(matches)
   }
-  return matches(error) ? { code: "CONTEXT_LIMIT_EXCEEDED", message: "上下文超过模型限制，请在项目面板缩小本轮文档范围，并发送新消息；也可减少附件或引用。" } : null
+  return matches(error) ? { code: "CONTEXT_LIMIT_EXCEEDED", message: DOCUMENT_UI_COPY.contextLimit } : null
 }

@@ -1,5 +1,4 @@
-import { findOwnedProject, findRootThreadId } from "../../persistence/project-repository"
-import { pendingDocumentUpdates } from "../../persistence/documents/context"
+import { findOwnedProject } from "../../persistence/project-repository"
 import type { ProjectDocumentsDTO } from "../../contracts/document"
 import { isActiveDocumentExecution } from "../../domain/documents/execution"
 import { lockDocumentExecution, countExecutionConflicts, hasDocumentReadReceipt, saveDocumentToolResult,
@@ -13,7 +12,7 @@ import { type DocumentExecution, type DocumentReadResult, type UpdateDocumentInp
 import { applyDocumentEdits } from "../../domain/documents/edit"
 import { artifactIdForTool } from "../../domain/tool-identity"
 import { executeIdempotentCommand } from "../../persistence/command-repository"
-import { documentForArtifact, findOwnedDocument, listOwnedDocuments, readDocumentRevision, listDocumentHistory, listDocumentCommits } from "../../persistence/documents/queries"
+import { documentForArtifact, findOwnedDocument, listOwnedDocuments, readDocumentRevision, listDocumentHistory } from "../../persistence/documents/queries"
 import { notFound } from "../errors"
 
 export async function getProjectDocument(userId: string, documentId: string, revisionId?: string) {
@@ -112,12 +111,5 @@ async function commitDocumentUpdate(tx: ConversationTransaction, identity: Docum
 
 export async function getProjectDocuments(userId: string, projectId: string): Promise<ProjectDocumentsDTO> {
   if (!await findOwnedProject(db, userId, projectId)) notFound()
-  const root = await findRootThreadId(db, projectId)
-  if (!root) notFound()
-  const [pending, documents] = await Promise.all([
-    pendingDocumentUpdates(db, projectId, root),
-    listOwnedDocuments(db, userId, projectId),
-  ])
-  const commits = await listDocumentCommits(db, projectId, pending.documents.flatMap((item) => item.commitIds))
-  return { documents, pending, commits }
+  return { documents: await listOwnedDocuments(db, userId, projectId) }
 }

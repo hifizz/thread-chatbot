@@ -314,8 +314,6 @@ export function createConversationCommands(
       assistantMessageId: createId(),
       modelId: input.modelId,
       ...generationSettingsField(input.generationSettings),
-      ...(input.threadId === project.rootThreadId && state.workspace.documentScope?.projectId === project.id
-        ? { documentScope: [...state.workspace.documentScope.ids] } : {}),
       parts: messageContentInputSchema.parse(input.content).parts,
     })
     store.getState().beginOptimisticCommand(command.commandId, (snapshot) => {
@@ -344,9 +342,6 @@ export function createConversationCommands(
         client.sendMessage(input.threadId, command)
       )
       store.getState().commitOptimisticCommand(command.commandId)
-      if (input.threadId === project.rootThreadId &&
-          store.getState().workspace.documentScope === state.workspace.documentScope)
-        store.getState().setWorkspace({ documentScope: undefined })
       return {
         command,
         response,

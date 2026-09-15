@@ -1,5 +1,7 @@
 "use client"
 
+import { DOCUMENT_UI_COPY } from "@/constants/project-documents"
+
 import React, { useEffect, useId, useMemo, useRef, useState } from "react"
 import {
   ArrowLeft,
@@ -33,7 +35,7 @@ export interface ProjectPanelProps {
   project: ProjectDTO | null
   files: ProjectFileDTO[]
   artifacts: ArtifactDTO[]
-  documentUpdates?: React.ReactNode
+  documentSyncError?: boolean
   renderDocumentControls?(artifact: ArtifactDTO): React.ReactNode
   open: boolean
   activeId: string | null
@@ -96,7 +98,7 @@ export function ProjectPanel({
   onAddProjectFile,
   onRemoveProjectFile,
   renderDocumentControls,
-  documentUpdates,
+  documentSyncError,
 }: ProjectPanelProps) {
   const titleId = useId()
   const fileInputRef = useRef<HTMLInputElement | null>(null)
@@ -318,7 +320,7 @@ export function ProjectPanel({
       )}
 
       <div className="art-body project-panel-body">
-        <div hidden={!!preview}>{documentUpdates}</div>
+        {documentSyncError && !preview ? <p role="status">{DOCUMENT_UI_COPY.syncFailed}</p> : null}
         {loading ? <div className="project-empty">Project 加载中…</div> : null}
 
         {displayedSection === "overview" && !loading && (

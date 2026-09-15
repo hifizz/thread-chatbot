@@ -17,8 +17,7 @@ export function InlineUserContent({ message }: { message: ConversationViewMessag
   return (
     <>
       {message.uiParts.map((part, index) => {
-        if (part.type === "data-project-document-updates" && part.data.documents.length)
-          return <small key={index}>已固定本轮文档输入：{part.data.documents.length} 份</small>
+        if (part.type === "data-project-document-updates" || part.type === "data-document-update-notices") return null
         if (part.type === "text") return <span key={index}>{part.text}</span>
         if (part.type === "data-quote") {
           const parsed = threadQuotePartV1Schema.safeParse(part)

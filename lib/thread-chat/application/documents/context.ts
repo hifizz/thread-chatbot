@@ -11,6 +11,7 @@ export async function expandDocumentUpdates(projectId: string, input: ThreadChat
   referenceArtifacts: Map<string, ReferenceArtifact> = new Map()): Promise<ThreadChatUIMessage[]> {
   const items = input.flatMap((message) => message.parts.flatMap((part) =>
     part.type === "data-project-document-updates" ? documentUpdatesSchema.parse(part.data).documents : []))
+  if (!items.length) return expandArtifactReferencesInContext(input, referenceArtifacts)
   const [revisions, commits] = await Promise.all([
     loadProjectDocumentRevisions(db, projectId, items.map((item) => item.revisionId)),
     listDocumentCommits(db, projectId, items.flatMap((item) => item.commitIds)),

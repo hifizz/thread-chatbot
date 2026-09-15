@@ -46,7 +46,6 @@ export interface WorkspacePanelSizes {
 }
 
 export interface WorkspaceUiState {
-  documentScope?: { projectId: string; ids: string[] }
   view: "columns" | "canvas"
   openThreadIds: string[]
   columnSlots: Array<{ threadId: string; folded: boolean }>

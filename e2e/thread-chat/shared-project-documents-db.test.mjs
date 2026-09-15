@@ -219,7 +219,7 @@ try {
   await testDb.insert(artifacts).values({ id: unavailableId, projectId, threadId: threadB,
     sourceMessageId: messageB, kind: 'markdown', title: '未完成', content: '不能登记' })
   assert.equal(await registerExistingDocument(unavailableId), false); checks++
-  // 固定主线清单在重试中不追随新 head，子线程不注入项目更新。
+  // 所有 Thread 接收固定摘要；回执各自独立，重试不追随 head。
   const { sendMessage } = await import('../../lib/thread-chat/application/send-message.ts')
   const { retryMessage } = await import('../../lib/thread-chat/application/retry-message.ts')
   const { DEFAULT_THREAD_CHAT_MODEL_ID: modelId } = await import('../../constants/model.ts')
@@ -227,15 +227,40 @@ try {
   const mainTurn = turn('继续推进')
   const sent = await sendMessage(userId, rootId, mainTurn)
   const savedParts = sent.result.userMessage.parts
-  const frozen = savedParts.find(part => part.type === 'data-project-document-updates')
+  const frozen = savedParts.find(part => part.type === 'data-document-update-notices')
   assert.ok(frozen.data.documents.length > 0)
+  assert.equal(JSON.stringify(frozen).includes(baseContent), false)
+  const noticesBefore = await contextService.expandDocumentUpdates(projectId, [sent.result.userMessage])
+  assert.equal(JSON.stringify(noticesBefore).includes('旧文档原文'), false, '摘要不展开全文')
+  const rootIdentity = { userId, projectId, threadId: rootId, messageId: mainTurn.assistantMessageId }
+  await testDb.update(documents).set({ archivedAt: null }).where(eq(documents.id, documentId))
+  const lateRead = await service.readProjectDocument(rootIdentity, { documentId }, 'late-read')
+  const lateUpdate = await service.updateProjectDocument(rootIdentity, { documentId,
+    expectedRevisionId: lateRead.revision.id, readId: lateRead.readId,
+    edits: [{ oldText: lateRead.revision.content, newText: lateRead.revision.content + '\n后续变化' }],
+    changeSummary: '接受消息后提交的新变化' }, 'late-update')
+  assert.equal(lateUpdate.status, 'committed')
+  assert.deepEqual(await contextService.expandDocumentUpdates(projectId, [sent.result.userMessage]), noticesBefore)
+  await contextRepository.markDocumentContextUsed(testDb, mainTurn.assistantMessageId, frozen.data)
+  const nextRoot = await contextRepository.pendingDocumentNotices(testDb, projectId, rootId)
+  assert.deepEqual(nextRoot.documents.map(d => d.revisionId), [lateUpdate.revisionId])
+  assert.equal((await contextRepository.pendingDocumentNotices(testDb, projectId, threadA)).documents.length > 1, true,
+    '主线收据不消费子线程的更新')
+  checks++
   await testDb.update(messages).set({ status: 'failed', finishedAt: new Date() }).where(eq(messages.id, mainTurn.assistantMessageId))
   await retryMessage(userId, mainTurn.assistantMessageId, { commandId: id(), assistantMessageId: id(), modelId })
   const [originalUser] = await testDb.select().from(messages).where(eq(messages.id, mainTurn.userMessageId))
   assert.deepEqual(originalUser.parts, savedParts); checks++
   await testDb.update(threads).set({ nextSequence: 2 }).where(eq(threads.id, threadA))
   const branchTurn = await sendMessage(userId, threadA, turn('继续分支讨论'))
-  assert.equal(branchTurn.result.userMessage.parts.some(part => part.type === 'data-project-document-updates'), false); checks++
+  const branchNotice = branchTurn.result.userMessage.parts.find(part => part.type === 'data-document-update-notices')
+  assert.ok(branchNotice.data.documents.length > 0)
+  assert.deepEqual(await contextRepository.pendingDocumentNotices(testDb, projectId, threadA), branchNotice.data,
+    '仅接受消息而无有效响应，不推进通知位置')
+  await contextRepository.markDocumentContextUsed(testDb, branchTurn.result.assistantMessage.id, branchNotice.data)
+  assert.equal((await contextRepository.pendingDocumentNotices(testDb, projectId, threadA)).documents.length, 0)
+  assert.deepEqual(await contextRepository.pendingDocumentNotices(testDb, projectId, rootId), nextRoot)
+  checks++
   // 更新版本分叉的父节点来自其真实产物来源，不能改为创建文档的主线。
   const { forkThread } = await import('../../lib/thread-chat/application/fork-thread.ts')
   const fixed = await service.getProjectDocument(userId, documentId, winner.revisionId)
@@ -247,7 +272,39 @@ try {
   const child = await forkThread(userId, fixed.revision.sourceThreadId, forkCommand)
   assert.equal(child.result.thread.parentId, fixed.revision.sourceThreadId)
   assert.equal(child.result.thread.forkArtifactId, fixed.revision.artifactId)
+  const first = turn('分析这个文档')
+  const childFirst = await forkThread(userId, fixed.revision.sourceThreadId, {
+    ...forkCommand, commandId: id(), threadId: id(), firstTurn: first,
+  })
+  assert.ok(childFirst.result.generation.userMessage.parts.some(part => part.type === 'data-document-update-notices'))
+  checks++
   await assert.rejects(() => forkThread(userId, rootId, { ...forkCommand, commandId: id(), threadId: id() })); checks++
+  // 多轮变化只携带最近摘要；收据游标不增长为无界事件 ID 列表。
+  const childIdentity = { userId, projectId, threadId: childFirst.result.thread.id,
+    messageId: childFirst.result.generation.assistantMessage.id }
+  for (let i = 0; i < 12; i++) {
+    const read = await service.readProjectDocument(childIdentity, { documentId }, `many-read-${i}`)
+    const result = await service.updateProjectDocument(childIdentity, { documentId,
+      expectedRevisionId: read.revision.id, readId: read.readId,
+      edits: [{ oldText: read.revision.content, newText: read.revision.content + `\n第 ${i} 次补充` }],
+      changeSummary: `第 ${i} 次补充` }, `many-update-${i}`)
+    assert.equal(result.status, 'committed')
+  }
+  const bounded = await contextRepository.pendingDocumentNotices(testDb, projectId, childIdentity.threadId)
+  const boundedDoc = bounded.documents.find(d => d.documentId === documentId)
+  assert.equal(boundedDoc.changes.length, 10)
+  assert.equal(boundedDoc.omittedChangeCount, boundedDoc.revisionNumber - 10)
+  assert.equal(boundedDoc.changes.at(-1).revisionNumber, boundedDoc.revisionNumber)
+  assert.equal('commitIds' in boundedDoc, false)
+  await contextRepository.markDocumentContextUsed(testDb, childIdentity.messageId, bounded)
+  assert.equal((await contextRepository.pendingDocumentNotices(testDb, projectId, childIdentity.threadId)).documents.length, 0)
+  // 编辑产生新的消息快照；原用户通知不能被改写。
+  const { editLatestTurn } = await import('../../lib/thread-chat/application/edit-turn.ts')
+  const edited = await editLatestTurn(userId, branchTurn.result.userMessage.id, turn('更新问题：最新进展如何'))
+  assert.ok(edited.result.generation.userMessage.parts.some(p => p.type === 'data-document-update-notices'))
+  const [oldBranchUser] = await testDb.select().from(messages).where(eq(messages.id, branchTurn.result.userMessage.id))
+  assert.deepEqual(oldBranchUser.parts, branchTurn.result.userMessage.parts)
+  checks += 2
   // 普通创建工具成功后停止/失败，不登记新文档；已 committed 更新仍保留。
   for (const terminalStatus of ['failed', 'stopped']) {
     const messageId = id()

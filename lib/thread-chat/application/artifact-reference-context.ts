@@ -1,4 +1,4 @@
-import { documentUpdatesSchema, type DocumentRevisionDTO, type DocumentCommitDTO } from "../contracts/document"
+import { documentUpdateNoticesSchema, documentUpdatesSchema, type DocumentRevisionDTO, type DocumentCommitDTO } from "../contracts/document"
 
 export interface DocumentContextEntry {
   revision: DocumentRevisionDTO
@@ -51,6 +51,10 @@ export function expandArtifactReferencesInContext(
     parts: message.parts.flatMap((part) => {
       const sourceId = includedSourceArtifact(message, part, artifacts)
       if (sourceId) seen.add(sourceId)
+      if (part.type === "data-document-update-notices") {
+        const notices = documentUpdateNoticesSchema.parse(part.data)
+        return [{ type: "text" as const, text: `项目文档更新通知（仅摘要，未读取全文；相关时调用 readProjectDocument 读取最新版）：\n${JSON.stringify(notices)}` }]
+      }
       if (part.type === "data-project-document-updates") {
         const manifest = documentUpdatesSchema.parse(part.data)
         const text = manifest.documents.map((item) => {

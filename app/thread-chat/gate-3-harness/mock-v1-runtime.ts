@@ -509,7 +509,7 @@ export function createGate3MockRuntime(
   }
 
   const client: ThreadChatClient = {
-    async listDocuments() { return { documents: [], commits: [], pending: { schemaVersion: 1 as const, documents: [] } } },
+    async listDocuments() { return { documents: [] } },
     async getDocumentHistory() { return [] },
     async listProjects(archived = false) {
       return project && Boolean(project.archivedAt) === archived

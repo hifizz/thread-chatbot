@@ -22,7 +22,7 @@ import {
   PROJECT_TARGET_MAX_CHARS,
 } from "@/constants/project-workspace"
 import { user } from "./auth-schema"
-import type { MarkdownEdit, ProjectDocumentUpdates } from "@/lib/thread-chat/contracts/document"
+import type { MarkdownEdit, DocumentContextReceipt } from "@/lib/thread-chat/contracts/document"
 import type { TextAnchor } from "@/lib/thread-chat/domain/text-anchor"
 import type { ThreadChatUIMessage } from "@/lib/thread-chat/contracts/ui-message"
 import type {
@@ -236,7 +236,7 @@ export const messages = dbSchema.table(
     stopRequestedAt: timestamp("stop_requested_at", { withTimezone: true }),
     feedback: text("feedback").$type<ConversationMessageFeedback>(),
     documentToolParts: jsonb("document_tool_parts").$type<ThreadChatUIMessage["parts"]>().notNull().default([]),
-    documentContextUsed: jsonb("document_context_used").$type<ProjectDocumentUpdates>(),
+    documentContextUsed: jsonb("document_context_used").$type<DocumentContextReceipt>(),
     providerUsage: jsonb("provider_usage").$type<Record<string, unknown>>(),
     finishReason: text("finish_reason"),
     errorCode: text("error_code"),
