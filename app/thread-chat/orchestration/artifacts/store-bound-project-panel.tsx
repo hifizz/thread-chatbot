@@ -1,14 +1,12 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo } from "react"
 import { toast } from "sonner"
 import {
   ARTIFACT_SOURCE_HIGHLIGHT_MS,
   ARTIFACT_SOURCE_LOCATE_ATTEMPTS,
   ARTIFACT_SOURCE_LOCATE_DELAY_MS,
-  ARTIFACT_SOURCE_NAVIGATION_EVENT,
 } from "@/constants/artifact-navigation"
-import type { TextAnchor } from "@/lib/thread-chat/domain/text-anchor"
 import {
   clearHighlights,
   locateAnchor,
@@ -18,12 +16,8 @@ import type { ConversationStore } from "../../core/store"
 import { useConversationStore } from "../../core/use-thread-store"
 import type { ThreadChatClient } from "../../net/client"
 import type { ConversationCommands } from "../../net/commands/conversation-commands"
+import type { ArtifactSourceNav } from "../overlays/use-workspace-overlays"
 import { ProjectPanel } from "./project-panel"
-
-interface ArtifactSourceNavigationDetail {
-  artifactId: string
-  anchor: TextAnchor
-}
 
 function findMessageElement(messageId: string): HTMLElement | null {
   return (
@@ -61,6 +55,8 @@ export function StoreBoundProjectPanel({
   commands,
   open,
   activeId,
+  pendingSource,
+  onConsumePendingSource,
   onClose,
   onSelect,
   onLocate,
@@ -71,12 +67,13 @@ export function StoreBoundProjectPanel({
   commands: ConversationCommands
   open: boolean
   activeId: string | null
+  pendingSource: ArtifactSourceNav | null
+  onConsumePendingSource(): void
   onClose(): void
   onSelect(id: string): void
   onLocate(threadId: string, sourceMessageId: string): void
 }) {
   const state = useConversationStore(store, (value) => value)
-  const [pendingSource, setPendingSource] = useState<ArtifactSourceNavigationDetail | null>(null)
   const files = useMemo(
     () =>
       state.projectFileOrder.flatMap((id) => {
@@ -94,52 +91,16 @@ export function StoreBoundProjectPanel({
     [state.artifactOrder, state.artifactsById]
   )
 
-  useEffect(() => {
-    const onArtifactSource = (event: Event) => {
-      const detail = (event as CustomEvent<ArtifactSourceNavigationDetail>).detail
-      if (!detail?.artifactId || !detail.anchor) return
-      setPendingSource({ ...detail })
-    }
-    window.addEventListener(ARTIFACT_SOURCE_NAVIGATION_EVENT, onArtifactSource)
-    return () =>
-      window.removeEventListener(ARTIFACT_SOURCE_NAVIGATION_EVENT, onArtifactSource)
-  }, [])
-
-  // ProjectPanel 的渲染组件保持纯展示；这里把当前 Markdown 阅读区标记成可划选来源。
-  // 全局唯一 selection observer 据此获得稳定的 artifact/message/thread identity。
-  useEffect(() => {
-    if (!open || !activeId) return
-    const artifact = state.artifactsById[activeId]
-    if (!artifact || artifact.kind !== "markdown" || !state.project) return
-    const frame = window.requestAnimationFrame(() => {
-      const surface = document.querySelector<HTMLElement>(
-        ".project-panel.open .project-artifact-content"
-      )
-      if (!surface) return
-      surface.dataset.selectionArtifactId = artifact.id
-      surface.dataset.selectionMessageId = artifact.sourceMessageId
-      surface.dataset.selectionThreadId =
-        artifact.threadId === state.project?.rootThreadId
-          ? "main"
-          : artifact.threadId
-    })
-    return () => {
-      window.cancelAnimationFrame(frame)
-      const surface = document.querySelector<HTMLElement>(
-        ".project-panel .project-artifact-content"
-      )
-      if (!surface) return
-      delete surface.dataset.selectionArtifactId
-      delete surface.dataset.selectionMessageId
-      delete surface.dataset.selectionThreadId
-    }
-  }, [activeId, open, state.artifactsById, state.project])
-
-  // 分支来源导航：先由上层打开正确 Artifact，再在该内容根中精确定位并短暂高亮。
-  // 重试有固定上限，绝不在其他文档或消息正文中按相同句子猜测。
+  // 分支来源导航：openArtifact 同步带上 anchor，这里在对应 Artifact 渲染完成后
+  // 精确定位并短暂高亮。重试有固定上限，绝不在其他文档或消息正文中按相同句子猜测。
   useEffect(() => {
     const request = pendingSource
-    if (!open || !activeId || !request || request.artifactId !== activeId) return
+    if (!open || !activeId || !request) return
+    // openArtifact 同步设置 activeId 与 pendingSource；不匹配即过期请求，直接消费掉。
+    if (request.artifactId !== activeId) {
+      onConsumePendingSource()
+      return
+    }
     let cancelled = false
     let retryTimer: number | null = null
     let clearTimer: number | null = null
@@ -158,17 +119,17 @@ export function StoreBoundProjectPanel({
             ARTIFACT_SOURCE_LOCATE_DELAY_MS
           )
         } else {
-          setPendingSource(null)
+          onConsumePendingSource()
           toast.error("已打开来源文档，但未能准确定位原文")
         }
         return
       }
 
       const located = locateAnchor(markdownRoot, request.anchor, {
-        fuzzyThreshold: 1,
+        allowFuzzy: false,
       })
-      if (!located || located.strategy === "fuzzy") {
-        setPendingSource(null)
+      if (!located) {
+        onConsumePendingSource()
         toast.error("已打开来源文档，但未能准确定位原文")
         return
       }
@@ -187,7 +148,7 @@ export function StoreBoundProjectPanel({
       clearTimer = window.setTimeout(
         () => {
           clearHighlights(markdownRoot, markId)
-          setPendingSource(null)
+          onConsumePendingSource()
         },
         ARTIFACT_SOURCE_HIGHLIGHT_MS
       )
@@ -204,7 +165,7 @@ export function StoreBoundProjectPanel({
       )
       if (root) clearHighlights(root, markId)
     }
-  }, [activeId, open, pendingSource])
+  }, [activeId, open, pendingSource, onConsumePendingSource])
 
   const refresh = useCallback(async () => {
     const bootstrap = await client.getProject(projectId)

@@ -49,6 +49,7 @@ function thread(overrides = {}) {
     projectId: project().id,
     parentId: null,
     forkMessageId: null,
+    forkArtifactId: null,
     forkContext: [],
     forkAnchor: null,
     anchorText: null,
@@ -900,7 +901,7 @@ async function testCommandTitleGenerationUpdatesStore() {
           id: command.threadId,
           parentId: parentThreadId,
           forkMessageId: command.sourceMessageId,
-          anchorText: command.anchorText,
+          anchorText: command.target.anchor.quote.exact,
           footnote: 1,
           depth: 1,
           autoTitle: null,
@@ -1002,8 +1003,7 @@ async function testCommandTitleGenerationUpdatesStore() {
   const forked = await commands.forkThread({
     parentThreadId: started.command.rootThreadId,
     sourceMessageId: started.command.assistantMessageId,
-    anchorText: "锚点",
-    anchor: { quote: { exact: "锚点", prefix: "", suffix: "" } },
+    target: { type: "message", anchor: { quote: { exact: "锚点", prefix: "", suffix: "" } } },
     modelId: "test/model",
     firstTurn: { parts: [{ type: "text", text: "解释锚点" }] },
   })

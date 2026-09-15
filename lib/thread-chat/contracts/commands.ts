@@ -116,44 +116,12 @@ export const forkThreadCommandSchema = z
     commandId: commandIdSchema,
     threadId: entityIdSchema,
     sourceMessageId: entityIdSchema,
-    target: forkTargetSchema.optional(),
-    // Legacy message-fork fields. New clients send target instead.
-    anchorText: z.string().trim().min(1).max(20_000).optional(),
-    anchor: textAnchorSchema.optional(),
+    target: forkTargetSchema,
     modelId: modelIdSchema,
     ...generationSettingsField,
     firstTurn: firstForkTurnSchema.optional(),
   })
   .strict()
-  .superRefine((command, context) => {
-    const hasLegacyField =
-      command.anchorText !== undefined || command.anchor !== undefined
-    if (command.target && hasLegacyField) {
-      context.addIssue({
-        code: "custom",
-        path: ["target"],
-        message: "target 不能与旧版 anchorText/anchor 同时出现",
-      })
-      return
-    }
-    if (!command.target) {
-      if (!command.anchorText || !command.anchor) {
-        context.addIssue({
-          code: "custom",
-          path: ["target"],
-          message: "必须提供 target，或完整的旧版 anchorText/anchor",
-        })
-        return
-      }
-      if (command.anchor.quote.exact !== command.anchorText) {
-        context.addIssue({
-          code: "custom",
-          path: ["anchorText"],
-          message: "选区锚点与来源文本不一致",
-        })
-      }
-    }
-  })
 
 export const editLatestTurnCommandSchema = z
   .object(baseGenerationFields)

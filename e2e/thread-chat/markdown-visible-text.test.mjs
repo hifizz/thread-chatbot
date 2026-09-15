@@ -13,6 +13,11 @@ for (const [markdown, exact] of [
 ]) assert.ok(locateArtifactAnchor(markdown, anchor(exact)), exact)
 assert.equal(locateArtifactAnchor("[正文](https://secret.example)", anchor("secret.example")), null)
 assert.equal(locateArtifactAnchor("![不可划选的图片替代文字](image.png)", anchor("不可划选")), null)
+assert.ok(locateArtifactAnchor("甲  \n乙", anchor("甲\n乙")), "硬换行在 DOM 中保留 \\n 文本节点")
+assert.ok(locateArtifactAnchor("<div>x</div>\n\n目标", anchor("<div>x</div>")), "html 源码以文本形式渲染，可划选")
+assert.ok(locateArtifactAnchor("<div>x</div>\n\n目标", anchor("目标")), "html 之后的文字仍可定位")
+assert.ok(locateArtifactAnchor("跨 <span>内联</span> 标签", anchor("<span>内联</span>")), "行内 html 标签作为可见文本计入")
+assert.ok(locateArtifactAnchor("正文[^a]。\n\n[^a]: 脚注正文内容", anchor("脚注正文内容")), "脚注正文渲染在文末，可划选")
 const repeated = "前甲：采用 AI Judge 评分。尾甲\n\n前乙：采用 AI Judge 评分。尾乙"
 assert.equal(locateArtifactAnchor(repeated, anchor("采用 AI Judge 评分。")), null)
 const matched = locateArtifactAnchor(repeated, anchor("采用 AI Judge 评分。", "前乙：", "尾乙"))

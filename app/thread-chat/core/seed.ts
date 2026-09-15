@@ -19,6 +19,8 @@ export function emptySeedState(): ThreadTreeState {
         title: "主线",
         anchorText: null,
         forkFromMsgId: null,
+        forkAnchor: null,
+        forkArtifactId: null,
         footnote: null,
         children: [],
         messages: [],

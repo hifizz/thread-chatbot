@@ -1,9 +1,44 @@
 "use client"
-import { ARTIFACT_SOURCE_NAVIGATION_EVENT } from "@/constants/artifact-navigation"
-import { threadQuotePartV1Schema } from "@/lib/thread-chat/contracts/quote"
 import type { ConversationViewMessage } from "../../core/types"
 import { useArtifactNavigation } from "../composer/artifact-resources"
 import { UIMessageSupplementalParts } from "./ui-message-parts"
+
+type OpenArtifact = NonNullable<ReturnType<typeof useArtifactNavigation>>
+type QuotePart = Extract<
+  NonNullable<ConversationViewMessage["uiParts"]>[number],
+  { type: "data-quote" }
+>
+
+function QuoteContent({ part, open }: { part: QuotePart; open: OpenArtifact | null }) {
+  const data = part.data
+  // legacy data-quote 只有 text；V1 才有 source，进一步收窄出 artifact 来源
+  const artifactSource =
+    "source" in data && data.source.type === "artifact" ? data.source : null
+  const body = (
+    <>
+      {data.text}
+      {"comment" in data && data.comment ? <small>{data.comment}</small> : null}
+    </>
+  )
+  if (!artifactSource) {
+    return (
+      <span className="msg-quote" title={data.text}>
+        {body}
+      </span>
+    )
+  }
+  return (
+    <button
+      type="button"
+      className="msg-quote msg-quote-source"
+      title="打开引用的 Artifact 并定位原文"
+      disabled={!open}
+      onClick={() => open?.(artifactSource.artifactId, artifactSource.anchor)}
+    >
+      {body}
+    </button>
+  )
+}
 
 export function InlineUserContent({ message }: { message: ConversationViewMessage }) {
   const open = useArtifactNavigation()
@@ -18,51 +53,8 @@ export function InlineUserContent({ message }: { message: ConversationViewMessag
     <>
       {message.uiParts.map((part, index) => {
         if (part.type === "text") return <span key={index}>{part.text}</span>
-        if (part.type === "data-quote") {
-          const parsed = threadQuotePartV1Schema.safeParse(part)
-          const quote = parsed.success ? parsed.data.data : null
-          const artifactSource =
-            quote &&
-            quote.source.type === "artifact"
-              ? quote.source
-              : null
-          const body = (
-            <>
-              {part.data.text}
-              {"comment" in part.data && part.data.comment ? (
-                <small>{part.data.comment}</small>
-              ) : null}
-            </>
-          )
-          if (!artifactSource)
-            return (
-              <span key={index} className="msg-quote" title={part.data.text}>
-                {body}
-              </span>
-            )
-          return (
-            <button
-              key={index}
-              type="button"
-              className="msg-quote msg-quote-source"
-              title="打开引用的 Artifact 并定位原文"
-              disabled={!open}
-              onClick={() => {
-                open?.(artifactSource.artifactId)
-                window.dispatchEvent(
-                  new CustomEvent(ARTIFACT_SOURCE_NAVIGATION_EVENT, {
-                    detail: {
-                      artifactId: artifactSource.artifactId,
-                      anchor: artifactSource.anchor,
-                    },
-                  })
-                )
-              }}
-            >
-              {body}
-            </button>
-          )
-        }
+        if (part.type === "data-quote")
+          return <QuoteContent key={index} part={part} open={open} />
         if (part.type === "data-artifact-reference")
           return (
             <button

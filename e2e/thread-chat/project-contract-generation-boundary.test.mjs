@@ -112,8 +112,7 @@ try {
     userMessageId: id(),
     assistantMessageId: id(),
     modelId,
-    text: "建立 Project",
-    files: [],
+    parts: [{ type: "text", text: "建立 Project" }],
   })
 
   let project = await application.updateProjectContract(userId, projectId, {
@@ -151,8 +150,7 @@ try {
     userMessageId: id(),
     assistantMessageId: id(),
     modelId,
-    text: "第二轮",
-    files: [],
+    parts: [{ type: "text", text: "第二轮" }],
   })
   const secondSnapshot = await runAndCapture({
     messageId: secondTurn.result.assistantMessage.id,
@@ -164,15 +162,17 @@ try {
     version: 2,
   })
 
-  const sourceMessageId = startedProject.result.userMessage.id
+  const sourceMessageId = secondTurn.result.assistantMessage.id
   const childThreadId = id()
   const fork = await application.forkThread(userId, rootThreadId, {
     commandId: id(),
     threadId: childThreadId,
     sourceMessageId,
-    anchorText: "建立 Project",
-    anchor: {
-      quote: { exact: "建立 Project", prefix: "", suffix: "" },
+    target: {
+      type: "message",
+      anchor: {
+        quote: { exact: "ok", prefix: "", suffix: "" },
+      },
     },
     modelId,
   })
@@ -192,8 +192,7 @@ try {
     userMessageId: id(),
     assistantMessageId: id(),
     modelId,
-    text: "旧 Fork 中的新请求",
-    files: [],
+    parts: [{ type: "text", text: "旧 Fork 中的新请求" }],
   })
   const childSnapshot = await runAndCapture({
     messageId: childTurn.result.assistantMessage.id,

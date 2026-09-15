@@ -233,6 +233,8 @@ function NormalizedThreadChat({
     activeArtifactId,
     setActiveArtifactId,
     openArtifact,
+    artifactSourceNav,
+    clearArtifactSourceNav,
     toggleDrawer,
     closeDrawer,
   } = useWorkspaceOverlays()
@@ -478,7 +480,7 @@ function NormalizedThreadChat({
                 firstTurn: forkFirstTurnContent({
                   text: question,
                   sourceMessageId: info.msgId,
-                  ...(info.artifactId ? { artifactId: info.artifactId } : {}),
+                  artifactId: info.artifactId,
                   anchorText: info.text,
                   anchor: info.anchor,
                 }),
@@ -794,6 +796,8 @@ function NormalizedThreadChat({
         commands={runtime.commands}
         open={drawerOpen}
         activeId={activeArtifactId}
+        pendingSource={artifactSourceNav}
+        onConsumePendingSource={clearArtifactSourceNav}
         onClose={closeDrawer}
         onSelect={setActiveArtifactId}
         onLocate={(threadId) => openBranchUI(threadId, null)}

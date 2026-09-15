@@ -36,7 +36,7 @@ export function useConversationComposer({ threadId, isMain, busy, prefill, model
       return messageContentToComposerDraft(forkFirstTurnContent({
         text: prefill,
         sourceMessageId: thread.forkMessageId,
-        ...(thread.forkArtifactId ? { artifactId: thread.forkArtifactId } : {}),
+        artifactId: thread.forkArtifactId,
         anchorText: thread.anchorText,
         anchor: thread.forkAnchor,
       }))

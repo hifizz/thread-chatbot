@@ -263,7 +263,9 @@ export function locateOffsets(
     return { start: exact.start, end: exact.end, strategy: "exact", score: 1 }
   }
 
-  // 3) fuzzy（在归一化文本上做，再映射回原文偏移）
+  // 3) fuzzy（在归一化文本上做，再映射回原文偏移）；严格定位场景可整层关闭
+  if (options.allowFuzzy === false) return null
+
   const { norm, starts, ends } = normalizeWithMap(text)
   const normPattern = normalizeWhitespace(quote.exact)
   if (!normPattern) return null

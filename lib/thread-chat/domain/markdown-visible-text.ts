@@ -13,16 +13,35 @@ type MarkdownNode = {
 }
 
 function visibleText(node: MarkdownNode): string {
-  // 定义和图片没有可划选的 DOM 文字；数学公式的生成型 DOM 不属于文本锚点。
-  if (["definition", "image", "imageReference", "math", "inlineMath"].includes(node.type)) return ""
+  // 坐标系对齐 Range.toString()（纯文本节点拼接）：
+  // - break：remark-rehype 在 <br> 后补一个 "\n" 文本节点，DOM 划选包含该换行。
+  // - html：react-markdown 无 rehype-raw 时把 raw 节点渲染为源码文本（除非 skipHtml），
+  //   node.value 与 DOM 可见字符一致，按普通文本计入。
+  // - definition/image 没有可划选的 DOM 文字；math/footnoteReference 的渲染 DOM
+  //   虽含可选字符但坐标不可复现：跳过会使其后内容的 position 快路径失效，
+  //   由 exact+prefix/suffix 兜底；跨节点划选保守拒绝。
   if (node.type === "break") return "\n"
+  if (
+    ["definition", "image", "imageReference", "math", "inlineMath",
+     "footnoteReference"].includes(node.type)
+  ) return ""
   if (typeof node.value === "string") return node.value
   return node.children?.map(visibleText).join("") ?? ""
 }
 
 /** 与 MarkdownBody 使用同一套语法解析，保留代码、转义字符及解码后的实体。 */
 export function markdownVisibleText(markdown: string): string {
-  return visibleText(markdownParser.parse(markdown))
+  const root = markdownParser.parse(markdown)
+  const main: string[] = []
+  const footnotes: string[] = []
+  for (const child of root.children ?? []) {
+    // footnoteDefinition 的正文渲染在文档末尾的 footnotes 区块，按 DOM 顺序排到尾部；
+    // 区块中的 "Footnotes" 标题与 "↩" 回链字符不模拟，跨该边界的划选保守拒绝。
+    ;(child.type === "footnoteDefinition" ? footnotes : main).push(
+      visibleText(child)
+    )
+  }
+  return main.join("") + footnotes.join("")
 }
 
 export interface ExactAnchorMatch {

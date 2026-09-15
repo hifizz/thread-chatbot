@@ -1,11 +1,11 @@
 import { resolveForkModelId } from "@/lib/thread-chat/application/fork-model"
 import { resolveUserContent } from "./resolve-user-content"
 import { messages, threads } from "@/lib/db/schema"
-import type {
-  ForkTarget,
-  ForkThreadCommand,
-} from "@/lib/thread-chat/contracts/commands"
-import { THREAD_QUOTE_SCHEMA_VERSION } from "@/lib/thread-chat/contracts/quote"
+import type { ForkThreadCommand } from "@/lib/thread-chat/contracts/commands"
+import {
+  THREAD_QUOTE_SCHEMA_VERSION,
+  forkQuoteSource,
+} from "@/lib/thread-chat/contracts/quote"
 import type {
   GenerationAcceptedDTO,
   ThreadDTO,
@@ -42,14 +42,6 @@ export type ForkThreadResult =
   | { thread: ThreadDTO; generation: null }
   | { thread: ThreadDTO; generation: GenerationAcceptedDTO }
 
-function normalizedTarget(command: ForkThreadCommand): ForkTarget {
-  if (command.target) return command.target
-  if (!command.anchor || !command.anchorText) {
-    stateConflict("分支来源缺少选区")
-  }
-  return { type: "message", anchor: command.anchor! }
-}
-
 export function forkThread(
   userId: string,
   parentThreadId: string,
@@ -73,12 +65,9 @@ export function forkThread(
         if (!project) notFound()
         if (project.archivedAt) stateConflict("已归档 Project 不可创建分支")
         if (parent.archivedAt) stateConflict("已归档 Thread 不可创建分支")
-        const target = normalizedTarget(command)
+        const target = command.target
         const anchor = target.anchor
         const anchorText = anchor.quote.exact
-        if (command.anchorText && command.anchorText !== anchorText) {
-          stateConflict("选区锚点与来源文本不一致")
-        }
         const parentMessages = await listThreadMessageRows(
           tx,
           project.id,
@@ -144,19 +133,12 @@ export function forkThread(
         const frozenFirstQuote = {
           schemaVersion: THREAD_QUOTE_SCHEMA_VERSION,
           text: anchorText,
-          source:
-            target.type === "artifact"
-              ? {
-                  type: "artifact" as const,
-                  messageId: source.id,
-                  artifactId: target.artifactId,
-                  anchor,
-                }
-              : {
-                  type: "message" as const,
-                  messageId: source.id,
-                  anchor,
-                },
+          source: forkQuoteSource({
+            messageId: source.id,
+            artifactId:
+              target.type === "artifact" ? target.artifactId : null,
+            anchor,
+          }),
         }
         const parts = await resolveUserContent({
           tx,
