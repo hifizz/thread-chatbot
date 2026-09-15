@@ -9,9 +9,9 @@ export type Json =
   | Json[]
   | { [key: string]: Json };
 
-export type TaskStatus = "queued" | "running" | "completed" | "failed" | "cancelled";
+export type TaskStatus = "queued" | "running" | "cancelling" | "completed" | "failed" | "cancelled";
 
-export type RunStatus = "queued" | "running" | "completed" | "failed" | "cancelled";
+export type RunStatus = "queued" | "running" | "cancelling" | "completed" | "failed" | "cancelled";
 
 export type AgentEvent =
   | { type: "agent.started" }
@@ -57,6 +57,7 @@ export type StoredEvent = {
 
 export type TaskSnapshot = {
   taskId: string;
+  title: string;
   currentRunId: string;
   status: TaskStatus;
   phase: string | null;
@@ -67,4 +68,6 @@ export type TaskSnapshot = {
   workspacePath: string;
   result: TaskResult | null;
   error: TaskError | null;
+  createdAt: string;
+  updatedAt: string;
 };

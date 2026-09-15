@@ -58,3 +58,84 @@ export async function publishDraftPr(input: {
   const pr = (await res.json()) as { number: number; html_url: string; head: { sha: string } };
   return { number: pr.number, url: pr.html_url, headSha: pr.head.sha };
 }
+
+export type PrCheck = { name: string; status: string; conclusion: string | null };
+
+export type PullRequestState = {
+  number: number;
+  url: string;
+  state: string;
+  draft: boolean;
+  merged: boolean;
+  headSha: string;
+  baseBranch: string;
+  additions: number;
+  deletions: number;
+  changedFiles: number;
+  checks: PrCheck[];
+  /** checks 汇总：pending / success / failure / none */
+  checksState: "none" | "pending" | "success" | "failure";
+  updatedAt: string;
+};
+
+/** 查询 PR 的权威状态（含检查运行）。API 失败时抛错，由调用方决定是否保留旧状态。 */
+export async function getPullRequestState(
+  repo: string,
+  token: string,
+  number: number
+): Promise<PullRequestState> {
+  const res = await fetch(`https://api.github.com/repos/${repo}/pulls/${number}`, {
+    headers: headers(token),
+  });
+  if (!res.ok) throw new Error(`查询 PR 失败: ${res.status}`);
+  const pr = (await res.json()) as {
+    number: number;
+    html_url: string;
+    state: string;
+    draft: boolean;
+    merged: boolean;
+    head: { sha: string };
+    base: { ref: string };
+    additions: number;
+    deletions: number;
+    changed_files: number;
+    updated_at: string;
+  };
+
+  let checks: PrCheck[] = [];
+  const checksRes = await fetch(
+    `https://api.github.com/repos/${repo}/commits/${pr.head.sha}/check-runs`,
+    { headers: headers(token) }
+  );
+  if (checksRes.ok) {
+    const data = (await checksRes.json()) as {
+      check_runs: { name: string; status: string; conclusion: string | null }[];
+    };
+    checks = data.check_runs.map((c) => ({ name: c.name, status: c.status, conclusion: c.conclusion }));
+  }
+
+  const checksState: PullRequestState["checksState"] =
+    checks.length === 0
+      ? "none"
+      : checks.some((c) => c.status !== "completed")
+        ? "pending"
+        : checks.every((c) => c.conclusion === "success" || c.conclusion === "skipped" || c.conclusion === "neutral")
+          ? "success"
+          : "failure";
+
+  return {
+    number: pr.number,
+    url: pr.html_url,
+    state: pr.state,
+    draft: pr.draft,
+    merged: pr.merged,
+    headSha: pr.head.sha,
+    baseBranch: pr.base.ref,
+    additions: pr.additions,
+    deletions: pr.deletions,
+    changedFiles: pr.changed_files,
+    checks,
+    checksState,
+    updatedAt: pr.updated_at,
+  };
+}

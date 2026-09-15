@@ -12,7 +12,7 @@ import {
   type WorkspaceDriver,
 } from "@/lib/agent-demo/environment";
 import { getDefaultBranch, publishDraftPr } from "@/lib/agent-demo/github";
-import { emit, getTask, setRunStatus } from "@/lib/agent-demo/store";
+import { emit, getTask, isCancelRequested, registerRunHandles, setRunStatus } from "@/lib/agent-demo/store";
 import { createWorkspaceTools } from "@/lib/agent-demo/tools";
 
 const MAX_STEPS = 20;
@@ -80,6 +80,8 @@ async function runTask(taskId: string) {
 
   setRunStatus(taskId, "running");
   let release: (() => Promise<void>) | null = null;
+  const abortController = new AbortController();
+  registerRunHandles(taskId, { abortController });
 
   try {
     // ── 环境准备：远端沙箱 + 仓库检出（e2b 优先，boxd 次之）─────────
@@ -100,6 +102,7 @@ async function runTask(taskId: string) {
         });
         driver = env.driver;
         release = env.release;
+        registerRunHandles(taskId, { releaseEnv: env.release });
         emit(taskId, "runner", {
           type: "phase.changed",
           phase: "environment",
@@ -115,6 +118,7 @@ async function runTask(taskId: string) {
         });
         driver = env.driver;
         release = env.release;
+        registerRunHandles(taskId, { releaseEnv: env.release });
         emit(taskId, "runner", {
           type: "phase.changed",
           phase: "environment",
@@ -132,6 +136,7 @@ async function runTask(taskId: string) {
     let lastText = "";
 
     const result = streamText({
+      abortSignal: abortController.signal,
       model: resolveAgentModel(),
       system: SYSTEM_PROMPT,
       prompt:
@@ -197,6 +202,10 @@ async function runTask(taskId: string) {
           break;
       }
     }
+    if (isCancelRequested(taskId)) {
+      setRunStatus(taskId, "cancelled");
+      return;
+    }
     if (modelFailed) {
       setRunStatus(taskId, "failed");
       return;
@@ -232,6 +241,11 @@ async function runTask(taskId: string) {
         status: "passed",
         detail: diffDetail.split("\n").slice(-3).join("；"),
       });
+    }
+
+    if (isCancelRequested(taskId)) {
+      setRunStatus(taskId, "cancelled");
+      return;
     }
 
     // ── 受控发布：commit + push + Draft PR ──────────────────────
@@ -285,11 +299,15 @@ async function runTask(taskId: string) {
     emit(taskId, "runner", { type: "run.result.saved", result: taskResult });
     setRunStatus(taskId, delivered ? "completed" : "failed");
   } catch (error) {
-    fail(taskId, "run_failed", "runner", error instanceof Error ? error.message : String(error));
+    if (isCancelRequested(taskId) || abortController.signal.aborted) {
+      setRunStatus(taskId, "cancelled");
+    } else {
+      fail(taskId, "run_failed", "runner", error instanceof Error ? error.message : String(error));
+    }
   } finally {
     if (release) {
       phase(taskId, "release", "回收执行环境");
-      await release();
+      await release().catch(() => {});
     }
   }
 }

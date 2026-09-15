@@ -1,7 +1,7 @@
 // POST /api/agent-tasks —— 创建任务并立即返回 taskId（方案 §9）。
 // demo 版：幂等键可选；持久化为内存；worker 为进程内 runner；执行环境为真实 boxd VM。
 
-import { createTask } from "@/lib/agent-demo/store";
+import { createTask, listTasks } from "@/lib/agent-demo/store";
 import { startRunner } from "@/lib/agent-demo/runner";
 import { prepareWorkspace } from "@/lib/agent-demo/workspace";
 
@@ -10,6 +10,10 @@ export const dynamic = "force-dynamic";
 const pendingIdempotency = new Map<string, string>();
 const REPO_PATTERN = /^[\w.-]+\/[\w.-]+$/;
 const DEFAULT_REPO = "hifizz/ai-daily";
+
+export async function GET() {
+  return Response.json({ tasks: listTasks() });
+}
 
 export async function POST(req: Request) {
   let body: { goal?: string; repo?: string; idempotencyKey?: string };
