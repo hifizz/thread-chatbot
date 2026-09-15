@@ -231,9 +231,8 @@ export function StoreBoundProjectPanel({
   }, [activeId, open, loadedContent, pendingSource])
 
   const refresh = useCallback(async () => {
-    const bootstrap = await client.getProject(projectId)
-    store.getState().hydrateProject(bootstrap)
-  }, [client, projectId, store])
+    store.getState().requestDocumentRefresh(projectId)
+  }, [projectId, store])
 
   const saveContract = useCallback(
     async (target: string, instructions: string) => {

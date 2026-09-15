@@ -49,7 +49,10 @@ export async function bootConversationProject(options: {
       store,
       client,
       messageId,
-      onFinishMessage: (message) => generateTitleIfNeeded(message.threadId),
+      onFinishMessage: (message) => {
+        store.getState().requestDocumentRefresh(message.projectId)
+        return generateTitleIfNeeded(message.threadId)
+      },
       pollDelays: options.pollDelays,
       wait: options.wait,
     })

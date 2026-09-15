@@ -45,3 +45,35 @@ try {
   assert.equal(store.getState(), snapshot)
   console.log('PASS 项目同步：无抽屉依赖、生成完成状态刷新、目录元数据原子更新、固定历史、释放后不写入')
 } finally { sync.dispose() }
+
+// 旧轮询仍在途中时收到生成结束通知：不应用旧响应，合并为一次后续请求。
+const orderedStore = createConversationStore()
+orderedStore.setState({ project: { id: 'p' } })
+const pending = []
+const ordered = startProjectDocumentSync('p', {
+  listDocuments() { return new Promise(resolve => pending.push(resolve)) },
+}, orderedStore)
+const catalog = (version) => ({ documents: [{ id: 'd', currentArtifactId: `a${version}`, currentRevisionId: `r${version}` }],
+  artifacts: [{ id: `a${version}`, title: 'F1', createdAt: '2026-09-15', document: { id: 'd' } }] })
+try {
+  assert.equal(pending.length, 1)
+  orderedStore.getState().requestDocumentRefresh('p')
+  orderedStore.getState().requestDocumentRefresh('p')
+  assert.equal(pending.length, 1, 'generation completion must not open a second request')
+  pending[0](catalog(1))
+  await new Promise(setImmediate)
+  assert.deepEqual(orderedStore.getState().documentsById, {}, 'invalidated response must not be applied')
+  assert.equal(pending.length, 2, 'in-flight invalidations are coalesced, not dropped')
+  pending[1](catalog(2))
+  await new Promise(setImmediate)
+  assert.equal(selectCurrentProjectArtifacts(orderedStore.getState())[0].id, 'a2')
+  const finishing = ordered.refresh()
+  const before = orderedStore.getState()
+  ordered.dispose()
+  pending[2](catalog(1))
+  await finishing
+  assert.equal(orderedStore.getState(), before, 'disposed runtime cannot roll the catalog back')
+  orderedStore.getState().requestDocumentRefresh('p')
+  assert.equal(pending.length, 3, 'dispose unsubscribes invalidation notifications')
+  console.log('PASS 目录响应顺序：单入口、丢弃旧轮询、合并生成结束通知、释放后不写入')
+} finally { ordered.dispose() }

@@ -169,6 +169,11 @@ export function createConversationStore(input?: {
     : emptyEntities()
   return createStore<NormalizedThreadChatState>()((set, get) => ({
     ...initial,
+    documentRefreshRequested: 0,
+    requestDocumentRefresh(projectId) {
+      set((state) => state.project?.id === projectId
+        ? { documentRefreshRequested: state.documentRefreshRequested + 1 } : state)
+    },
     documentSyncError: false,
     setDocumentSyncError(documentSyncError) { set((state) => state.documentSyncError === documentSyncError ? state : { documentSyncError }) },
     optimisticByCommandId: {},

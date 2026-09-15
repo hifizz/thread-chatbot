@@ -86,6 +86,8 @@ export interface ConversationEntityState extends ConversationEntitySnapshot {
 }
 
 export interface NormalizedThreadChatState extends ConversationEntityState {
+  documentRefreshRequested: number
+  requestDocumentRefresh(projectId: string): void
   documentSyncError: boolean
   setDocumentSyncError(error: boolean): void
   workspace: WorkspaceUiState
