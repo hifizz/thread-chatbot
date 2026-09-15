@@ -55,3 +55,18 @@
 - [导出的 V1 文件](assets/pr-145-quality/F1-v1.md)
 
 本轮只新增勾选 tasks 2.1、3.2，其余完整验收门槛保持未勾选。不合并、不部署、不将本轮修复视为发布批准。
+
+## 文档面板视觉复验（2026-09-15）
+
+此前截图仅证明部分功能操作，不能视为视觉验收通过。本轮修复文档控制区缺少布局、按钮粘连、引用框误用、折叠入口不明确、任务项双重标记，以及输入范围说明继承右对齐小字的问题。顶部移除内部合同版本 v0，面板导航统一中文。
+
+使用 EGO 在真实会话中逐张检查截图：1440×1000 桌面、390×844 手机、V1/V2 切换、范围清单展开、版本菜单及深色差异。工具栏间距、折叠箭头、任务项换行均可见；手机面板 scrollWidth 等于 clientWidth，无横向溢出；summary 聚焦后 Enter 能展开/收起。深色通过页面主题 class 验证，未覆盖系统主题切换流程。
+
+- [桌面](assets/pr-145-ui/desktop.png)
+- [手机](assets/pr-145-ui/mobile.png)
+- [手机展开更新范围](assets/pr-145-ui/mobile-progress.png)
+- [手机版本菜单](assets/pr-145-ui/mobile-menu.png)
+- [手机固定 V1](assets/pr-145-ui/mobile-v1.png)
+- [深色版本差异](assets/pr-145-ui/dark-diff.png)
+
+TypeScript、相关 ESLint、Quote/分叉内容回归和 diff --check 通过。本轮通过范围为文档面板上述状态的视觉复验，不扩大为完整 A/B/C 功能验收；tasks 仍为 26/33。

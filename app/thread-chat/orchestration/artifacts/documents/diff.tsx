@@ -1,5 +1,6 @@
 "use client"
 
+import { ChevronRight } from "lucide-react"
 import { useEffect, useMemo, useState } from "react"
 import { diffLines } from "diff"
 import { DOCUMENT_UI_COPY } from "@/constants/project-documents"
@@ -26,9 +27,9 @@ export function DocumentDiff({ before, after, client }: {
   }, [client, artifactId, open, retry])
   const changes = useMemo(() => previous?.id === artifactId
     ? diffLines(previous.content, after.content) : null, [previous, artifactId, after.content])
-  return <details className="inherited" open={open} onToggle={(event) => setOpen(event.currentTarget.open)}>
-    <summary>查看差异：V{before.revisionNumber} → V{after.document?.revisionNumber}</summary>
-    <div className="inherited-body" aria-label="版本差异">
+  return <details className="project-document-disclosure project-document-diff" open={open} onToggle={(event) => setOpen(event.currentTarget.open)}>
+    <summary><ChevronRight size={14} aria-hidden="true" /><span>版本差异</span><span className="project-document-meta">V{before.revisionNumber} → V{after.document?.revisionNumber}</span></summary>
+    <div className="project-document-disclosure-body" aria-label="版本差异">
       {error ? <p role="alert">{DOCUMENT_UI_COPY.diffFailed} <button type="button" onClick={() => setRetry((value) => value + 1)}>重新加载差异</button></p>
         : !changes ? <p role="status">正在加载差异…</p>
         : changes.map((change, index) => <pre key={index} className="whitespace-pre-wrap break-words text-xs">{change.added

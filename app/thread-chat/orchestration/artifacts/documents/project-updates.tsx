@@ -1,5 +1,6 @@
 "use client"
 
+import { ChevronRight } from "lucide-react"
 import { useEffect, useState } from "react"
 import { DOCUMENT_PROGRESS_REFRESH_MS } from "@/constants/project-documents"
 import type { ThreadChatClient } from "../../../net/client"
@@ -50,11 +51,11 @@ export function ProjectDocumentUpdates({ projectId, client, store }: {
   if (!data?.pending.documents.length) return null
   const selected = scope?.projectId === projectId ? scope.ids : undefined
   const pendingIds = data.pending.documents.map((item) => item.documentId)
-  return <details className="inherited">
-    <summary>主线待接收的文档更新：{pendingIds.length} 份</summary>
-    <div className="inherited-body">
+  return <details className="project-document-disclosure project-document-progress">
+    <summary><ChevronRight size={14} aria-hidden="true" /><span>主线待接收更新</span><span className="project-document-meta">{pendingIds.length} 份</span></summary>
+    <div className="project-document-disclosure-body">
       <p>下一次在主线发送消息时带入所选文档。查看此处不会标记为已接收。</p>
-      {data.documents.filter((doc) => pendingIds.includes(doc.id)).map((doc) => <label key={doc.id} className="project-field">
+      {data.documents.filter((doc) => pendingIds.includes(doc.id)).map((doc) => <label key={doc.id} className="project-document-scope-item">
         <span><input type="checkbox" checked={selected === undefined || selected.includes(doc.id)} onChange={(event) => {
           const ids = new Set(selected ?? pendingIds)
           if (event.target.checked) ids.add(doc.id); else ids.delete(doc.id)

@@ -278,17 +278,15 @@ export function ProjectPanel({
       <div className="art-head project-panel-head">
         <FolderKanban size={16} />
         <h3 id={titleId}>
-          Project
-          {project && (
-            <span className="project-version">v{project.contractVersion}</span>
-          )}
+          项目空间
         </h3>
         {archived && <span className="project-readonly">只读</span>}
         <button
           ref={closeButtonRef}
           type="button"
           className="art-x"
-          title="收起 Project Panel"
+          title="收起项目空间"
+          aria-label="收起项目空间"
           onClick={onClose}
         >
           <X size={13} />
@@ -298,19 +296,19 @@ export function ProjectPanel({
       <div
         className="project-sections"
         role="tablist"
-        aria-label="Project workspace"
+        aria-label="项目空间"
       >
         <button
           className={displayedSection === "overview" ? "on" : ""}
           onClick={() => selectSection("overview")}
         >
-          Overview
+          概览
         </button>
         <button
           className={displayedSection === "files" ? "on" : ""}
           onClick={() => selectSection("files")}
         >
-          Files <span>{files.length}</span>
+          文件 <span>{files.length}</span>
         </button>
         <button
           className={displayedSection === "artifacts" ? "on" : ""}
@@ -516,7 +514,7 @@ export function ProjectPanel({
             {selectedArtifact ? (
               <div className="project-artifact-detail">
                 <button className="project-back" onClick={() => onSelect("")}>
-                  ← 全部 Artifacts
+                  ← 全部文档与产物
                 </button>
                 <div className="project-section-heading artifact-detail-heading">
                   <div>

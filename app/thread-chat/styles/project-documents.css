@@ -1,0 +1,72 @@
+/* 文档面板：版本工具栏、进展范围与差异沿用项目主题 token。 */
+.tc .project-document-view {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 24px;
+  font: 12px/1.6 var(--tc-typography-family-ui);
+  color: var(--tc-content-secondary);
+}
+.tc .project-document-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.tc .project-document-export {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.tc .project-document-action-error { flex-basis: 100%; }
+.tc .project-document-toolbar .project-secondary { min-height: 36px; }
+.tc .project-document-view button:disabled { opacity: 0.5; cursor: not-allowed; }
+.tc .project-document-disclosure {
+  border: 1px solid var(--tc-border-subtle);
+  border-radius: 10px;
+  background: var(--tc-veil-card);
+  font: 12px/1.6 var(--tc-typography-family-ui);
+  color: var(--tc-content-secondary);
+  overflow: hidden;
+}
+.tc .project-document-progress { margin-bottom: 20px; }
+.tc .project-document-disclosure > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  cursor: pointer;
+  list-style: none;
+}
+.tc .project-document-disclosure > summary::-webkit-details-marker { display: none; }
+.tc .project-document-disclosure > summary:hover { background: var(--tc-surface-project-status); }
+.tc .project-document-disclosure > summary:focus-visible {
+  outline: 2px solid var(--tc-content-project-accent);
+  outline-offset: -2px;
+}
+.tc .project-document-disclosure > summary > svg { flex: none; transition: transform 150ms; }
+.tc .project-document-disclosure[open] > summary > svg { transform: rotate(90deg); }
+.tc .project-document-meta { margin-left: auto; color: var(--tc-content-muted); white-space: nowrap; }
+.tc .project-document-disclosure-body {
+  padding: 12px;
+  border-top: 1px solid var(--tc-border-subtle);
+  overflow-wrap: anywhere;
+}
+.tc .project-document-disclosure-body > p { margin: 0 0 12px; }
+.tc .project-document-scope-item { display: block; margin: 12px 0; }
+.tc .project-document-scope-item > span { display: block; font-weight: 600; color: var(--tc-content-primary); }
+.tc .project-document-scope-item input { accent-color: var(--tc-content-project-accent); margin-right: 4px; }
+.tc .project-document-scope-item small { display: block; margin-top: 6px; font-size: 12px; line-height: 1.6; }
+.tc .project-document-disclosure-body pre { margin: 0; padding: 4px 0; }
+.tc .project-document-disclosure-body ins { color: var(--tc-content-project-ready); text-decoration: none; }
+.tc .project-document-disclosure-body del { color: var(--tc-content-project-danger); }
+.tc .project-artifact-detail > .artifact-detail-heading { margin-bottom: 16px; }
+.tc .project-artifact-detail .project-artifact-content { padding: 4px 0 24px; }
+@media (max-width: 720px) {
+  .tc .project-document-toolbar { gap: 8px; }
+  .tc .project-document-toolbar .project-secondary { min-height: 40px; }
+  .tc .project-document-view { margin-bottom: 20px; }
+  .tc .project-document-disclosure > summary { min-height: 44px; }
+}
