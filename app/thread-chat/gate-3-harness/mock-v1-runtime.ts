@@ -48,7 +48,7 @@ function commandResponse<T>(data: T) {
 function initialBootstrap(
   projectId: string,
   options: { backgroundRecovery?: boolean } = {}
-): ProjectBootstrapDTO {
+): Omit<ProjectBootstrapDTO, "artifacts"> & { artifacts: ArtifactDTO[] } {
   const stamp = now()
   const project: ProjectDTO = {
     id: projectId,
@@ -511,7 +511,7 @@ export function createGate3MockRuntime(
   }
 
   const client: ThreadChatClient = {
-    async listDocuments() { return { documents: [] } },
+    async listDocuments() { return { documents: [], artifacts: [...artifacts.values()] } },
     async getDocumentHistory() { return [] },
     async listProjects(archived = false) {
       return project && Boolean(project.archivedAt) === archived

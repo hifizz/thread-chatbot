@@ -23,7 +23,8 @@ export interface Artifact {
   title: string
   kind: ArtifactKind
   lang?: string
-  content: string
+  /** 归一化客户端只加载元数据时为 null；阅读与模型输入必须先取得正文。 */
+  content: string | null
   /** 产生该 artifact 的会话（main 或分支 id） */
   sourceThreadId: string
   /** 产生该 artifact 的不可变 assistant 消息节点。 */

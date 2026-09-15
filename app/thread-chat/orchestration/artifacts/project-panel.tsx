@@ -23,6 +23,7 @@ import {
 } from "@/constants/project-workspace"
 import type {
   ArtifactDTO,
+  ArtifactSummaryDTO,
   ProjectDTO,
   ProjectFileDTO,
 } from "@/lib/thread-chat/contracts/dto"
@@ -33,8 +34,11 @@ import { uploadProjectFile } from "../../net/project-file-upload"
 export interface ProjectPanelProps {
   project: ProjectDTO | null
   files: ProjectFileDTO[]
-  artifacts: ArtifactDTO[]
-  currentArtifacts: ArtifactDTO[]
+  artifacts: ArtifactSummaryDTO[]
+  currentArtifacts: ArtifactSummaryDTO[]
+  artifactContents: Readonly<Record<string, string>>
+  artifactLoadError?: boolean
+  onRetryArtifact?(): void
   documentSyncError?: boolean
   renderDocumentControls?(artifact: ArtifactDTO): React.ReactNode
   open: boolean
@@ -89,6 +93,9 @@ export function ProjectPanel({
   files,
   artifacts,
   currentArtifacts,
+  artifactContents,
+  artifactLoadError,
+  onRetryArtifact,
   open,
   activeId,
   onClose,
@@ -154,10 +161,12 @@ export function ProjectPanel({
     }
   }, [open])
 
-  const selectedArtifact = useMemo(
+  const selectedMetadata = useMemo(
     () => artifacts.find((artifact) => artifact.id === activeId) ?? null,
     [activeId, artifacts]
   )
+  const selectedContent = activeId ? artifactContents[activeId] : undefined
+  const selectedArtifact = selectedMetadata && selectedContent !== undefined ? { ...selectedMetadata, content: selectedContent } : null
   const sortedArtifacts = useMemo(
     () => {
       return currentArtifacts
@@ -254,13 +263,13 @@ export function ProjectPanel({
     }
   }
 
-  const locateArtifact = (artifact: ArtifactDTO) => {
+  const locateArtifact = (artifact: ArtifactSummaryDTO) => {
     const viewThreadId =
       project?.rootThreadId === artifact.threadId ? "main" : artifact.threadId
     onLocate(viewThreadId, artifact.sourceMessageId)
   }
 
-  const preview = displayedSection === "artifacts" ? selectedArtifact : null
+  const preview = displayedSection === "artifacts" ? selectedMetadata : null
 
   return (
     <div
@@ -274,7 +283,7 @@ export function ProjectPanel({
       <div className="art-head project-panel-head">
         {preview ? <button type="button" className="project-preview-back" aria-label="返回文档列表" title="返回文档列表" onClick={() => { setSection("artifacts"); onSelect("") }}><ArrowLeft size={18} /></button> : <FolderKanban size={16} />}
         <h3 id={titleId} title={preview?.title}>{preview?.title ?? "项目空间"}</h3>
-        {preview && <ArtifactPreviewActions key={preview.id} artifact={preview} onLocate={() => locateArtifact(preview)} />}
+        {preview && selectedArtifact && <ArtifactPreviewActions key={preview.id} artifact={selectedArtifact} onLocate={() => locateArtifact(preview)} />}
         {archived && <span className="project-readonly">只读</span>}
         <button
           ref={closeButtonRef}
@@ -530,6 +539,8 @@ export function ProjectPanel({
                   )}
                 </div>
               </div>
+            ) : activeId ? (
+              <p role={artifactLoadError ? "alert" : "status"}>{artifactLoadError ? "文档加载失败。" : "正在加载文档…"}{artifactLoadError && <button type="button" onClick={onRetryArtifact}>重新加载</button>}</p>
             ) : (
               <>
                 <div className="project-section-heading">

@@ -1,16 +1,16 @@
 import { activeMessagePath } from "../message-graph"
 import type { Artifact, ThreadTreeState } from "../types"
-import type { ArtifactDTO } from "../../contracts/dto"
+import type { ArtifactSummaryDTO } from "../../contracts/dto"
 
 import type { DocumentListItemDTO } from "../../contracts/document"
 
 export interface ProjectArtifactCatalog {
-  artifactsById: Readonly<Record<string, ArtifactDTO>>
+  artifactsById: Readonly<Record<string, ArtifactSummaryDTO>>
   documentsById: Readonly<Record<string, DocumentListItemDTO>>
 }
 
 /** 当前身份由服务端目录决定；固定产物缓存不承担版本推断职责。 */
-export function selectCurrentProjectArtifacts(catalog: ProjectArtifactCatalog): ArtifactDTO[] {
+export function selectCurrentProjectArtifacts(catalog: ProjectArtifactCatalog): ArtifactSummaryDTO[] {
   const standalone = Object.values(catalog.artifactsById).filter((artifact) => !artifact.document)
   const current = Object.values(catalog.documentsById).flatMap((document) => {
     const artifact = selectCurrentDocumentArtifact(catalog, document.id)
@@ -19,8 +19,8 @@ export function selectCurrentProjectArtifacts(catalog: ProjectArtifactCatalog): 
   return [...standalone, ...current].sort((left, right) => right.createdAt.localeCompare(left.createdAt))
 }
 
-/** 未加载当前正文时返回 null，不回退到历史版本。 */
-export function selectCurrentDocumentArtifact(catalog: ProjectArtifactCatalog, documentId: string): ArtifactDTO | null {
+/** 按持续文档身份查询当前条目，不要求正文已经加载。 */
+export function selectCurrentDocumentArtifact(catalog: ProjectArtifactCatalog, documentId: string): ArtifactSummaryDTO | null {
   const document = catalog.documentsById[documentId]
   const artifact = document && catalog.artifactsById[document.currentArtifactId]
   return artifact ? { ...artifact, sourceMessageStatus: document.sourceMessageStatus } : null

@@ -30,7 +30,7 @@ export interface ReferenceArtifact {
   sourceMessageId: string
 }
 
-export function artifactReferenceData(artifact: ReferenceArtifact): ArtifactReferenceData {
+export function artifactReferenceData(artifact: Omit<ReferenceArtifact, "content">): ArtifactReferenceData {
   return {
     schemaVersion: ARTIFACT_REFERENCE_SCHEMA_VERSION,
     artifactId: artifact.id,

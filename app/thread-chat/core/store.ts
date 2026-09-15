@@ -2,6 +2,7 @@ import { createStore, type StoreApi } from "zustand/vanilla"
 
 import type {
   ArtifactDTO,
+  ArtifactSummaryDTO,
   MessageDTO,
   ProjectBootstrapDTO,
   ProjectDTO,
@@ -52,6 +53,18 @@ function streamState(
   return { phase, lastEventSeq: 0, pollAttempt: 0 }
 }
 
+function artifactMetadata(artifact: ArtifactSummaryDTO): ArtifactSummaryDTO {
+  const metadata = { ...artifact }
+  if ("content" in metadata) delete metadata.content
+  return metadata
+}
+
+/** 只缓存明确提供的全文；元数据刷新不能清除已经读取的固定正文。 */
+function artifactContents(artifacts: readonly ArtifactSummaryDTO[]): Record<string, string> {
+  return Object.fromEntries(artifacts.flatMap((artifact) =>
+    "content" in artifact && typeof artifact.content === "string" ? [[artifact.id, artifact.content]] : []))
+}
+
 function entitiesFromBootstrap(
   bootstrap: ProjectBootstrapDTO
 ): ConversationEntitySnapshot {
@@ -69,8 +82,9 @@ function entitiesFromBootstrap(
       bootstrap.messages.map((message) => [message.id, message])
     ),
     messageIdsByThread: orderedMessageIds(bootstrap.messages),
+    artifactContentsById: artifactContents(bootstrap.artifacts),
     artifactsById: Object.fromEntries(
-      bootstrap.artifacts.map((artifact) => [artifact.id, artifact])
+      bootstrap.artifacts.map((artifact) => [artifact.id, artifactMetadata(artifact)])
     ),
     documentsById: Object.fromEntries(bootstrap.documents.map((doc) => [doc.id, doc])),
     artifactOrder: bootstrap.artifacts.map((artifact) => artifact.id),
@@ -105,6 +119,7 @@ function entitySnapshot(
     messagesById: state.messagesById,
     messageIdsByThread: state.messageIdsByThread,
     artifactsById: state.artifactsById,
+    artifactContentsById: state.artifactContentsById,
     artifactOrder: state.artifactOrder,
     documentsById: state.documentsById,
     streamByMessageId: state.streamByMessageId,
@@ -162,9 +177,11 @@ export function createConversationStore(input?: {
       ...input?.workspace,
     },
     hydrateProject(bootstrap) {
-      set({
-        ...entitiesFromBootstrap(bootstrap),
-        optimisticByCommandId: {},
+      set((state) => {
+        const entities = entitiesFromBootstrap(bootstrap)
+        if (state.project?.id === bootstrap.project?.id)
+          entities.artifactContentsById = { ...state.artifactContentsById, ...entities.artifactContentsById }
+        return { ...entities, optimisticByCommandId: {} }
       })
     },
     upsertProject(project: ProjectDTO) {
@@ -217,14 +234,16 @@ export function createConversationStore(input?: {
     },
     syncDocuments(documents, artifacts) {
       set((state) => ({
+        artifactContentsById: { ...state.artifactContentsById, ...artifactContents(artifacts) },
         documentsById: Object.fromEntries(documents.map((doc) => [doc.id, doc])),
-        artifactsById: { ...state.artifactsById, ...Object.fromEntries(artifacts.map((artifact) => [artifact.id, artifact])) },
+        artifactsById: { ...state.artifactsById, ...Object.fromEntries(artifacts.map((artifact) => [artifact.id, artifactMetadata(artifact)])) },
         artifactOrder: [...new Set([...state.artifactOrder, ...artifacts.map((artifact) => artifact.id)])],
       }))
     },
     upsertArtifact(artifact: ArtifactDTO) {
       set((state) => ({
-        artifactsById: { ...state.artifactsById, [artifact.id]: artifact },
+        artifactsById: { ...state.artifactsById, [artifact.id]: artifactMetadata(artifact) },
+        artifactContentsById: { ...state.artifactContentsById, [artifact.id]: artifact.content },
         artifactOrder: state.artifactOrder.includes(artifact.id)
           ? state.artifactOrder
           : [artifact.id, ...state.artifactOrder],

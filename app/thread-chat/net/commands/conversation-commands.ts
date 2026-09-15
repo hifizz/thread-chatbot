@@ -156,9 +156,8 @@ export function createConversationCommands(
 
   async function refreshProjectArtifacts(projectId: string) {
     try {
-      const bootstrap = await client.getProject(projectId)
-      if (bootstrap.project) store.getState().upsertProject(bootstrap.project)
-      store.getState().syncDocuments(bootstrap.documents, bootstrap.artifacts)
+      const catalog = await client.listDocuments(projectId)
+      store.getState().syncDocuments(catalog.documents, catalog.artifacts)
     } catch {
       // Artifact 资源区刷新是非阻塞增强；历史消息仍保留工具结果。
     }

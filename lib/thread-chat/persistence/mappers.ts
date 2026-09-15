@@ -9,6 +9,7 @@ import type {
 } from "@/lib/db/schema"
 import type {
   ArtifactDTO,
+  ArtifactSummaryDTO,
   MessageDTO,
   ProjectDTO,
   ProjectFileDTO,
@@ -33,7 +34,7 @@ export interface ArtifactSourceRow {
   documentRevisionId?: string | null
   documentRevisionNumber?: number | null
   documentCurrentRevisionId?: string | null
-  artifact: ArtifactRow
+  artifact: Omit<ArtifactRow, "content"> & { content: string | null }
   sourceThreadCustomTitle: string | null
   sourceThreadAutoTitle: string | null
   sourceThreadFootnote: number | null
@@ -138,7 +139,7 @@ export function toConversationMessage(row: MessageRow): ConversationMessage {
   }
 }
 
-export function toArtifactDTO(row: ArtifactSourceRow): ArtifactDTO {
+export function toArtifactSummaryDTO(row: ArtifactSourceRow): ArtifactSummaryDTO {
   const artifact = row.artifact
   return {
     ...(row.documentId && row.documentRevisionId && row.documentCurrentRevisionId && row.documentRevisionNumber
@@ -154,10 +155,14 @@ export function toArtifactDTO(row: ArtifactSourceRow): ArtifactDTO {
     sourceMessageStatus: row.sourceMessageStatus,
     kind: artifact.kind,
     title: artifact.title,
-    content: artifact.content,
     language: artifact.language,
     metadata: artifact.metadata,
     createdAt: artifact.createdAt.toISOString(),
     updatedAt: artifact.updatedAt.toISOString(),
   }
+}
+
+export function toArtifactDTO(row: ArtifactSourceRow): ArtifactDTO {
+  if (row.artifact.content === null) throw new Error("ARTIFACT_CONTENT_NOT_LOADED")
+  return { ...toArtifactSummaryDTO(row), content: row.artifact.content }
 }

@@ -86,7 +86,7 @@ export interface MessageDTO {
   finishedAt: string | null
 }
 
-export interface ArtifactDTO {
+export interface ArtifactSummaryDTO {
   document?: { id: string; revisionId: string; revisionNumber: number; currentRevisionId: string }
   id: string
   projectId: string
@@ -97,11 +97,15 @@ export interface ArtifactDTO {
   sourceMessageStatus: ConversationMessageStatus
   kind: ArtifactKind
   title: string
-  content: string
   language: string | null
   metadata: Record<string, unknown>
   createdAt: string
   updatedAt: string
+}
+
+/** 正文按固定 Artifact ID 单独加载。 */
+export interface ArtifactDTO extends ArtifactSummaryDTO {
+  content: string
 }
 
 export interface ProjectBootstrapDTO {
@@ -110,7 +114,7 @@ export interface ProjectBootstrapDTO {
   files: ProjectFileDTO[]
   threads: ThreadDTO[]
   messages: MessageDTO[]
-  artifacts: ArtifactDTO[]
+  artifacts: ArtifactSummaryDTO[]
   activeGenerationIds: string[]
 }
 

@@ -319,6 +319,15 @@ try {
     assert.equal((await testDb.select().from(documentRevisions).where(eq(documentRevisions.artifactId, sourceArtifact.id))).length, 0)
     checks++
   }
+  const { getProjectBootstrap, getArtifact } = await import('../../lib/thread-chat/application/queries.ts')
+  const catalog = await getProjectBootstrap(userId, projectId)
+  assert.ok(catalog.artifacts.length > 10)
+  assert.ok(catalog.artifacts.every(artifact => !('content' in artifact)), 'bootstrap never returns artifact bodies')
+  const catalogInitialRevision = catalog.artifacts.find(artifact => artifact.document?.revisionNumber === 1)
+  const fixedBody = await getArtifact(userId, catalogInitialRevision.id)
+  assert.equal(typeof fixedBody.content, 'string')
+  assert.ok(fixedBody.content.length > 0, 'fixed historical body remains available on demand')
+  checks++
   const { deleteProject } = await import('../../lib/thread-chat/application/project-mutations.ts')
   await deleteProject(userId, projectId, { commandId: id() })
   assert.equal((await testDb.select().from(documents).where(eq(documents.projectId, projectId))).length, 0); checks++

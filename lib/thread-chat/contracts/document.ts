@@ -1,3 +1,4 @@
+import type { ArtifactSummaryDTO } from "./dto"
 import { z } from "zod"
 import { DOCUMENT_LIMITS } from "@/constants/project-documents"
 
@@ -80,5 +81,6 @@ export interface DocumentCommitDTO {
   sourceThreadId: string; sourceMessageId: string; createdAt: string
 }
 export interface ProjectDocumentsDTO {
+  artifacts: ArtifactSummaryDTO[]
   documents: DocumentListItemDTO[]
 }

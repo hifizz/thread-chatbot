@@ -4,7 +4,7 @@
 export * from "@/lib/thread-chat/domain/selectors"
 
 import type {
-  ArtifactDTO,
+  ArtifactSummaryDTO,
   MessageDTO,
   ThreadDTO,
 } from "@/lib/thread-chat/contracts/dto"
@@ -102,7 +102,7 @@ export function selectSourceProvenance(
 export function selectArtifactsForMessage(
   state: NormalizedThreadChatState,
   messageId: string
-): ArtifactDTO[] {
+): ArtifactSummaryDTO[] {
   return state.artifactOrder.flatMap((id) => {
     const artifact = state.artifactsById[id]
     return artifact?.sourceMessageId === messageId ? [artifact] : []
@@ -111,7 +111,7 @@ export function selectArtifactsForMessage(
 
 export function selectArtifactsForProject(
   state: NormalizedThreadChatState
-): ArtifactDTO[] {
+): ArtifactSummaryDTO[] {
   return state.artifactOrder.flatMap((id) => {
     const artifact = state.artifactsById[id]
     return artifact ? [artifact] : []

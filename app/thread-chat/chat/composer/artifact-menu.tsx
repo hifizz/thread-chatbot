@@ -3,7 +3,7 @@ import { useEffect } from "react"
 import { createPortal } from "react-dom"
 import { autoUpdate, flip, offset, shift, size, useFloating } from "@floating-ui/react"
 import type { MenuOption, MenuResolution } from "@lexical/react/LexicalTypeaheadMenuPlugin"
-import type { ArtifactDTO } from "@/lib/thread-chat/contracts/dto"
+import type { ArtifactSummaryDTO } from "@/lib/thread-chat/contracts/dto"
 import { FileTextIcon } from "lucide-react"
 import { ComposerMenu, ComposerMenuItem } from "@/components/assistant-ui/elements/composer/menu"
 import { ComposerTheme } from "@/components/assistant-ui/elements/composer/theme"
@@ -11,7 +11,7 @@ import { ARTIFACT_REFERENCE_COPY } from "@/constants/artifact-reference"
 import { scrollMenuOptionIntoView } from "@/lib/thread-chat/scroll-menu-option"
 
 /** 复用 Lexical 官方 NodeContextMenuPlugin 的 Floating UI 组合；只定位自己渲染的菜单。 */
-export function ArtifactMenu<T extends MenuOption & { artifact: ArtifactDTO }>({ resolution, root, query, options, selectedIndex, setHighlightedIndex, selectOptionAndCleanUp }: {
+export function ArtifactMenu<T extends MenuOption & { artifact: ArtifactSummaryDTO }>({ resolution, root, query, options, selectedIndex, setHighlightedIndex, selectOptionAndCleanUp }: {
   resolution: MenuResolution; root: HTMLElement | null; options: T[]; selectedIndex: number | null;
   query: string;
   setHighlightedIndex: (index: number) => void; selectOptionAndCleanUp: (option: T) => void

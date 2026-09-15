@@ -6,15 +6,15 @@ import { useDocumentResources } from "./artifact-resources"
 import { ArtifactMenu } from "./artifact-menu"
 import { LexicalTypeaheadMenuPlugin, MenuOption, type MenuResolution } from "@lexical/react/LexicalTypeaheadMenuPlugin"
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext"
-import type { ArtifactDTO } from "@/lib/thread-chat/contracts/dto"
+import type { ArtifactSummaryDTO } from "@/lib/thread-chat/contracts/dto"
 import { $createComposerCapsuleNode } from "./composer-capsule-node"
 import { selectCurrentProjectArtifacts } from "@/lib/thread-chat/domain/artifacts/selectors"
 import { matchArtifactMention } from "@/lib/thread-chat/artifact-mention-match"
 
 class ArtifactOption extends MenuOption {
-  constructor(readonly artifact: ArtifactDTO) { super(artifact.id) }
+  constructor(readonly artifact: ArtifactSummaryDTO) { super(artifact.id) }
 }
-export function ArtifactMentionPlugin({ artifacts }: { artifacts: Record<string, ArtifactDTO> }) {
+export function ArtifactMentionPlugin({ artifacts }: { artifacts: Record<string, ArtifactSummaryDTO> }) {
   const documentsById = useDocumentResources()
   const [editor] = useLexicalComposerContext()
   const [resolution, setResolution] = useState<MenuResolution | null>(null)

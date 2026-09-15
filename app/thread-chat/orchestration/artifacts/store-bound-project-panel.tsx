@@ -87,6 +87,17 @@ export function StoreBoundProjectPanel({
     return () => { pending.sequence++ }
   }, [activeId, projectId, open, questionArtifactId])
   const state = useConversationStore(store, (value) => value)
+  const [artifactError, setArtifactError] = useState<string | null>(null)
+  const [artifactRetry, setArtifactRetry] = useState(0)
+  const loadedContent = activeId ? state.artifactContentsById[activeId] : undefined
+  useEffect(() => {
+    if (!open || !activeId || loadedContent !== undefined) return
+    let active = true
+    void client.getArtifact(activeId).then((artifact) => {
+      if (active) { store.getState().upsertArtifact(artifact); setArtifactError(null) }
+    }).catch(() => { if (active) setArtifactError(activeId) })
+    return () => { active = false }
+  }, [activeId, client, loadedContent, open, store, artifactRetry])
   const [pendingSource, setPendingSource] = useState<ArtifactSourceNavigationDetail | null>(null)
   const files = useMemo(
     () =>
@@ -121,7 +132,7 @@ export function StoreBoundProjectPanel({
   // ProjectPanel 的渲染组件保持纯展示；这里把当前 Markdown 阅读区标记成可划选来源。
   // 全局唯一 selection observer 据此获得稳定的 artifact/message/thread identity。
   useEffect(() => {
-    if (!open || !activeId) return
+    if (!open || !activeId || loadedContent === undefined) return
     const artifact = state.artifactsById[activeId]
     if (!artifact || artifact.kind !== "markdown" || !state.project) return
     const frame = window.requestAnimationFrame(() => {
@@ -146,13 +157,13 @@ export function StoreBoundProjectPanel({
       delete surface.dataset.selectionMessageId
       delete surface.dataset.selectionThreadId
     }
-  }, [activeId, open, state.artifactsById, state.project])
+  }, [activeId, open, loadedContent, state.artifactsById, state.project])
 
   // 分支来源导航：先由上层打开正确 Artifact，再在该内容根中精确定位并短暂高亮。
   // 重试有固定上限，绝不在其他文档或消息正文中按相同句子猜测。
   useEffect(() => {
     const request = pendingSource
-    if (!open || !activeId || !request || request.artifactId !== activeId) return
+    if (!open || !activeId || loadedContent === undefined || !request || request.artifactId !== activeId) return
     let cancelled = false
     let retryTimer: number | null = null
     let clearTimer: number | null = null
@@ -217,7 +228,7 @@ export function StoreBoundProjectPanel({
       )
       if (root) clearHighlights(root, markId)
     }
-  }, [activeId, open, pendingSource])
+  }, [activeId, open, loadedContent, pendingSource])
 
   const refresh = useCallback(async () => {
     const bootstrap = await client.getProject(projectId)
@@ -269,6 +280,9 @@ export function StoreBoundProjectPanel({
         })
           .catch(() => { if (request === versionRequest.current.sequence) toast.error(DOCUMENT_UI_COPY.versionFailed) })
       }} />}
+      artifactContents={state.artifactContentsById}
+      artifactLoadError={artifactError === activeId}
+      onRetryArtifact={() => { setArtifactError(null); setArtifactRetry((value) => value + 1) }}
       project={state.project}
       files={files}
       artifacts={artifacts}

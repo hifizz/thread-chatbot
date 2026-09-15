@@ -1,9 +1,8 @@
-import { and, desc, eq, inArray } from "drizzle-orm"
+import { and, desc, eq, inArray, sql, getTableColumns } from "drizzle-orm"
 import { artifacts, messages, projects, threads, documents, documentRevisions } from "@/lib/db/schema"
 import type { ConversationExecutor } from "@/lib/thread-chat/persistence/transaction"
 
 const artifactSourceSelection = {
-  artifact: artifacts,
   documentId: documents.id,
   documentRevisionId: documentRevisions.id,
   documentRevisionNumber: documentRevisions.revisionNumber,
@@ -14,9 +13,9 @@ const artifactSourceSelection = {
   sourceMessageStatus: messages.status,
 }
 
-function withSource(executor: ConversationExecutor) {
+function withSource(executor: ConversationExecutor, metadataOnly = false) {
   return executor
-    .select(artifactSourceSelection)
+    .select({ ...artifactSourceSelection, artifact: { ...getTableColumns(artifacts), content: metadataOnly ? sql<string | null>`null` : artifacts.content } })
     .from(artifacts)
     .leftJoin(documentRevisions, eq(documentRevisions.artifactId, artifacts.id))
     .leftJoin(documents, and(eq(documents.id, documentRevisions.documentId), eq(documents.projectId, artifacts.projectId)))
@@ -37,6 +36,12 @@ function withSource(executor: ConversationExecutor) {
     )
 }
 
+function requireContent<T extends { artifact: { content: string | null } }>(row: T) {
+  const content = row.artifact.content
+  if (content === null) throw new Error("ARTIFACT_CONTENT_NOT_LOADED")
+  return { ...row, artifact: { ...row.artifact, content } }
+}
+
 export async function findOwnedArtifact(
   executor: ConversationExecutor,
   userId: string,
@@ -46,14 +51,14 @@ export async function findOwnedArtifact(
     .innerJoin(projects, eq(projects.id, artifacts.projectId))
     .where(and(eq(artifacts.id, artifactId), eq(projects.userId, userId)))
     .limit(1)
-  return row ?? null
+  return row ? requireContent(row) : null
 }
 
 export function listProjectArtifactRows(
   executor: ConversationExecutor,
   projectId: string
 ) {
-  return withSource(executor)
+  return withSource(executor, true)
     .where(eq(artifacts.projectId, projectId))
     .orderBy(desc(artifacts.createdAt))
 }
@@ -65,8 +70,9 @@ export async function loadProjectReferenceArtifactRows(
   ids: readonly string[]
 ) {
   if (!ids.length) return []
-  return withSource(executor).where(and(
+  const rows = await withSource(executor).where(and(
     eq(artifacts.projectId, projectId),
     inArray(artifacts.id, [...new Set(ids)])
   ))
+  return rows.map(requireContent)
 }

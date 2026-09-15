@@ -12,6 +12,7 @@ import {
 } from "@/lib/thread-chat/persistence/artifact-repository"
 import {
   toArtifactDTO,
+  toArtifactSummaryDTO,
   toMessageDTO,
   toProjectDTO,
   toProjectFileDTO,
@@ -70,7 +71,7 @@ export async function getProjectBootstrap(
     files: projectFileRows.map(toProjectFileDTO),
     threads: threadRows.map(toThreadDTO),
     messages: messageRows.map(toMessageDTO),
-    artifacts: artifactRows.map(toArtifactDTO),
+    artifacts: artifactRows.map(toArtifactSummaryDTO),
     documents: documentRows,
     activeGenerationIds: messageRows
       .filter((message) => message.status === "generating")

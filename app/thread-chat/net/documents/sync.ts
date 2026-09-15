@@ -10,10 +10,8 @@ export function startProjectDocumentSync(projectId: string, client: ThreadChatCl
     if (disposed || running) return
     running = true
     try {
-      const { documents } = await client.listDocuments(projectId)
+      const { documents, artifacts } = await client.listDocuments(projectId)
       if (disposed) return
-      const missing = documents.filter((doc) => !store.getState().artifactsById[doc.currentArtifactId])
-      const artifacts = await Promise.all(missing.map((doc) => client.getArtifact(doc.currentArtifactId)))
       if (disposed || store.getState().project?.id !== projectId) return
       store.getState().syncDocuments(documents, artifacts)
       store.getState().setDocumentSyncError(false)

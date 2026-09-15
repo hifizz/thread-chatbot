@@ -9,7 +9,7 @@ import { LexicalErrorBoundary } from "@lexical/react/LexicalErrorBoundary"
 import { EditorRefPlugin } from "@lexical/react/LexicalEditorRefPlugin"
 import type { LexicalEditor } from "lexical"
 import type { ThreadComposerDraft } from "@/lib/thread-chat/contracts/composer"
-import type { ArtifactDTO } from "@/lib/thread-chat/contracts/dto"
+import type { ArtifactSummaryDTO } from "@/lib/thread-chat/contracts/dto"
 import { ComposerQuotePlugin } from "./composer-quote-plugin"
 import { ComposerClipboardPlugin } from "./composer-clipboard-plugin"
 import { ComposerCapsuleNode } from "./composer-capsule-node"
@@ -19,7 +19,7 @@ import { ComposerSubmitPlugin } from "./composer-submit-plugin"
 import { ArtifactMentionPlugin } from "./artifact-mention-plugin"
 
 export function MessageEditor({ scope, draft, revision = 0, artifacts, onChange, onSubmit, editorRef, placeholder = "输入问题…", mentions = true, disabled = false, className }: {
-  scope?: string; draft: ThreadComposerDraft; revision?: number; artifacts: Record<string, ArtifactDTO>;
+  scope?: string; draft: ThreadComposerDraft; revision?: number; artifacts: Record<string, ArtifactSummaryDTO>;
   onChange: (draft: ThreadComposerDraft) => void; onSubmit?: () => void;
   editorRef?: RefObject<LexicalEditor | null>; placeholder?: string; mentions?: boolean; disabled?: boolean; className?: string
 }) {

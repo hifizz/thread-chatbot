@@ -6,7 +6,7 @@ import type {
   ThreadTreeState,
 } from "./types"
 import type {
-  ArtifactDTO,
+  ArtifactSummaryDTO,
   MessageDTO,
   ThreadDTO,
 } from "@/lib/thread-chat/contracts/dto"
@@ -167,7 +167,7 @@ export function projectThreadDTO(
 }
 
 export function projectArtifactDTO(
-  artifact: ArtifactDTO,
+  artifact: ArtifactSummaryDTO,
   state: NormalizedThreadChatState
 ): Artifact {
   return {
@@ -175,7 +175,7 @@ export function projectArtifactDTO(
     title: artifact.title,
     kind: artifact.kind,
     ...(artifact.language ? { lang: artifact.language } : {}),
-    content: artifact.content,
+    content: state.artifactContentsById[artifact.id] ?? null,
     sourceThreadId: toConversationViewThreadId(state, artifact.threadId),
     sourceMessageId: artifact.sourceMessageId,
   }

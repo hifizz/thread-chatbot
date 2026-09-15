@@ -9,6 +9,7 @@ import type { Message as LegacyMessage } from "@/lib/thread-chat/domain/types"
 
 import type {
   ArtifactDTO,
+  ArtifactSummaryDTO,
   MessageDTO,
   ProjectBootstrapDTO,
   ProjectDTO,
@@ -67,7 +68,8 @@ export interface ConversationEntitySnapshot {
   threadsById: Record<string, ThreadDTO>
   messagesById: Record<string, MessageDTO>
   messageIdsByThread: Record<string, string[]>
-  artifactsById: Record<string, ArtifactDTO>
+  artifactsById: Record<string, ArtifactSummaryDTO>
+  artifactContentsById: Record<string, string>
   artifactOrder: string[]
   documentsById: Record<string, DocumentListItemDTO>
   streamByMessageId: Record<string, ConversationStreamState>
@@ -94,7 +96,7 @@ export interface NormalizedThreadChatState extends ConversationEntityState {
   upsertThread(thread: ThreadDTO): void
   upsertMessage(message: MessageDTO): void
   upsertArtifact(artifact: ArtifactDTO): void
-  syncDocuments(documents: DocumentListItemDTO[], artifacts: ArtifactDTO[]): void
+  syncDocuments(documents: DocumentListItemDTO[], artifacts: ArtifactSummaryDTO[]): void
   applyStreamSnapshot(
     messageId: string,
     message: ThreadChatUIMessage,
