@@ -36,9 +36,14 @@ export function proxy(request: NextRequest, event: NextFetchEvent) {
     process.env.NODE_ENV === "development" &&
     pathname.startsWith("/thread-chat-gate-3-harness/") &&
     ["localhost", "127.0.0.1"].includes(request.nextUrl.hostname)
+  const isLocalAgentDemo =
+    process.env.NODE_ENV === "development" &&
+    pathname.startsWith("/agent-demo") &&
+    ["localhost", "127.0.0.1"].includes(request.nextUrl.hostname)
   const isAuthPage =
     publicPages.has(pathname) ||
     isLocalGate3Harness ||
+    isLocalAgentDemo ||
     // 匿名只读分享页：token 即凭据；私有 /thread-chat、附件与写命令不受影响。
     pathname.startsWith("/share/")
 
