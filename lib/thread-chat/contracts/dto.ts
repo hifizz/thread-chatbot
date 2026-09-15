@@ -51,6 +51,7 @@ export interface ThreadDTO {
   projectId: string
   parentId: string | null
   forkMessageId: string | null
+  forkArtifactId: string | null
   forkContext: string[]
   forkAnchor: TextAnchor | null
   anchorText: string | null

@@ -2,15 +2,18 @@
 
 import { createContext, useContext, type ReactNode } from "react"
 import { useStore } from "zustand"
+import type { TextAnchor } from "@/lib/thread-chat/domain/text-anchor"
 import type { ConversationStore } from "../../core/store"
 
 const ResourceContext = createContext<ConversationStore | null>(null)
-const ArtifactNavigationContext = createContext<((id: string) => void) | null>(null)
+const ArtifactNavigationContext = createContext<
+  ((id: string, anchor?: TextAnchor) => void) | null
+>(null)
 
 export function ArtifactResourcesProvider({ store, children }: { store: ConversationStore; children: ReactNode }) {
   return <ResourceContext.Provider value={store}>{children}</ResourceContext.Provider>
 }
-export function ArtifactNavigationProvider({ onOpen, children }: { onOpen: (id: string) => void; children: ReactNode }) {
+export function ArtifactNavigationProvider({ onOpen, children }: { onOpen: (id: string, anchor?: TextAnchor) => void; children: ReactNode }) {
   return <ArtifactNavigationContext.Provider value={onOpen}>{children}</ArtifactNavigationContext.Provider>
 }
 export function useArtifactNavigation() { return useContext(ArtifactNavigationContext) }

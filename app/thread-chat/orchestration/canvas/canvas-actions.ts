@@ -1,6 +1,7 @@
 "use client"
 
 import type { MessageContentInput } from "@/lib/thread-chat/contracts/message-content"
+import type { TextAnchor } from "@/lib/thread-chat/domain/text-anchor"
 
 import { createContext } from "react"
 import type { ThreadTreeState } from "../../core/types"
@@ -17,7 +18,7 @@ export interface CanvasChatActions extends ThreadMessageActionCommands {
 /** 画布节点面板可用的完整组合能力。 */
 export interface CanvasActions extends CanvasChatActions {
   focusThread: (threadId: string) => void
-  openArtifact: (artifactId: string) => void
+  openArtifact: (artifactId: string, anchor?: TextAnchor) => void
   getState: () => ThreadTreeState
   setThreadModel: (threadId: string, modelId: string) => void | Promise<unknown>
   messageActionState: MessageActionViewState

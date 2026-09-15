@@ -81,6 +81,7 @@ export function toThreadDTO(row: ThreadRow): ThreadDTO {
     projectId: row.projectId,
     parentId: row.parentId,
     forkMessageId: row.forkMessageId,
+    forkArtifactId: row.forkArtifactId,
     forkContext: row.forkContext,
     forkAnchor: row.forkAnchor,
     anchorText: row.anchorText,

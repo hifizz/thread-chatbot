@@ -7,8 +7,8 @@ import { BUBBLE_GAP, BUBBLE_SAFE_PADDING } from "@/constants/selection-bubble"
 import { computePopupPosition, type Rect } from "./bubble-position"
 
 /** 只负责工具条展示、定位和键盘导航；操作由调用方接入。 */
-export function SelectionToolbar({ rect, onContinue, onBranch, mobile = false, continueDisabled = false }: {
-  rect: Rect; onContinue(): void; onBranch(): void; mobile?: boolean; continueDisabled?: boolean
+export function SelectionToolbar({ rect, onContinue, onBranch, mobile = false, continueDisabled = false, showContinue = true }: {
+  rect: Rect; onContinue(): void; onBranch(): void; mobile?: boolean; continueDisabled?: boolean; showContinue?: boolean
 }) {
   const ref = useRef<HTMLDivElement>(null)
   const [height, setHeight] = useState(0)
@@ -37,7 +37,7 @@ export function SelectionToolbar({ rect, onContinue, onBranch, mobile = false, c
       event.preventDefault()
       buttons[next]?.focus()
     }}>
-    <button type="button" disabled={continueDisabled} title={continueDisabled ? COPY.pendingQuestion : COPY.continueLabel} onClick={onContinue}><MessageSquareReply size={16} aria-hidden="true" />{mobile ? COPY.mobileContinue : COPY.continue}</button>
+    {showContinue && <button type="button" disabled={continueDisabled} title={continueDisabled ? COPY.pendingQuestion : COPY.continueLabel} onClick={onContinue}><MessageSquareReply size={16} aria-hidden="true" />{mobile ? COPY.mobileContinue : COPY.continue}</button>}
     <button type="button" title={COPY.branchLabel} onClick={onBranch}><GitBranch size={16} aria-hidden="true" />{COPY.branch}</button>
   </div>
 }

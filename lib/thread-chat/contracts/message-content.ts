@@ -4,6 +4,7 @@ import { z } from "zod"
 import type { ThreadChatUIMessage } from "@/lib/thread-chat/contracts/ui-message"
 import {
   THREAD_QUOTE_SCHEMA_VERSION,
+  forkQuoteSource,
   threadQuoteDataV1Schema,
   legacyThreadQuoteDataSchema,
   persistedThreadQuotePartSchema,
@@ -125,9 +126,20 @@ export function textMessageContent(text: string, files: readonly FileReference[]
   return messageContentInputSchema.parse({ parts: [{ type: "text", text }, ...files.map((file) => ({ type: "file", file }))] })
 }
 
-export function forkFirstTurnContent(input: { text: string; sourceMessageId: string; anchorText: string; anchor: import("../domain/text-anchor").TextAnchor }): MessageContentInput {
+export function forkFirstTurnContent(input: {
+  text: string
+  sourceMessageId: string
+  artifactId?: string | null
+  anchorText: string
+  anchor: import("../domain/text-anchor").TextAnchor
+}): MessageContentInput {
+  const source = forkQuoteSource({
+    messageId: input.sourceMessageId,
+    artifactId: input.artifactId,
+    anchor: input.anchor,
+  })
   return messageContentInputSchema.parse({ parts: [
-    { type: "quote", quote: { schemaVersion: THREAD_QUOTE_SCHEMA_VERSION, text: input.anchorText, source: { type: "message", messageId: input.sourceMessageId, anchor: input.anchor } } },
+    { type: "quote", quote: { schemaVersion: THREAD_QUOTE_SCHEMA_VERSION, text: input.anchorText, source } },
     { type: "text", text: input.text },
   ] })
 }

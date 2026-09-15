@@ -233,6 +233,8 @@ function NormalizedThreadChat({
     activeArtifactId,
     setActiveArtifactId,
     openArtifact,
+    artifactSourceNav,
+    clearArtifactSourceNav,
     toggleDrawer,
     closeDrawer,
   } = useWorkspaceOverlays()
@@ -459,17 +461,34 @@ function NormalizedThreadChat({
       const modelId =
         current.threadsById[parentThreadId]?.modelId ??
         DEFAULT_THREAD_CHAT_MODEL_ID
+      const target = info.artifactId
+        ? ({
+            type: "artifact" as const,
+            artifactId: info.artifactId,
+            anchor: info.anchor,
+          })
+        : ({ type: "message" as const, anchor: info.anchor })
       void runtime.commands
         .forkThread({
           parentThreadId,
           sourceMessageId: info.msgId,
-          anchorText: info.text,
-          anchor: info.anchor,
+          target,
           modelId,
           ...generationSettingsInput(modelId, generationSettings),
-          ...(question?.trim() ? { firstTurn: forkFirstTurnContent({ text: question, sourceMessageId: info.msgId, anchorText: info.text, anchor: info.anchor }) } : {}),
+          ...(question?.trim()
+            ? {
+                firstTurn: forkFirstTurnContent({
+                  text: question,
+                  sourceMessageId: info.msgId,
+                  artifactId: info.artifactId,
+                  anchorText: info.text,
+                  anchor: info.anchor,
+                }),
+              }
+            : {}),
         })
         .then(({ command }) => {
+          if (info.artifactId) closeDrawer()
           const title =
             info.text.length > 13 ? `${info.text.slice(0, 13)}…` : info.text
           if (workspace.viewMode === "canvas") {
@@ -483,6 +502,7 @@ function NormalizedThreadChat({
         .catch(() => showToast("创建分支失败，请重试"))
     },
     [
+      closeDrawer,
       generationSettings,
       openBranchUI,
       runtime.commands,
@@ -776,6 +796,8 @@ function NormalizedThreadChat({
         commands={runtime.commands}
         open={drawerOpen}
         activeId={activeArtifactId}
+        pendingSource={artifactSourceNav}
+        onConsumePendingSource={clearArtifactSourceNav}
         onClose={closeDrawer}
         onSelect={setActiveArtifactId}
         onLocate={(threadId) => openBranchUI(threadId, null)}

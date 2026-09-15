@@ -100,13 +100,23 @@ const textAnchorSchema = z
   })
   .strict()
 
+export const forkTargetSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("message"), anchor: textAnchorSchema }).strict(),
+  z
+    .object({
+      type: z.literal("artifact"),
+      artifactId: entityIdSchema,
+      anchor: textAnchorSchema,
+    })
+    .strict(),
+])
+
 export const forkThreadCommandSchema = z
   .object({
     commandId: commandIdSchema,
     threadId: entityIdSchema,
     sourceMessageId: entityIdSchema,
-    anchorText: z.string().trim().min(1).max(20_000),
-    anchor: textAnchorSchema,
+    target: forkTargetSchema,
     modelId: modelIdSchema,
     ...generationSettingsField,
     firstTurn: firstForkTurnSchema.optional(),
@@ -184,6 +194,7 @@ export const updateThreadCommandSchema = z
 
 export type StartProjectCommand = z.infer<typeof startProjectCommandSchema>
 export type SendMessageCommand = z.infer<typeof sendMessageCommandSchema>
+export type ForkTarget = z.infer<typeof forkTargetSchema>
 export type ForkThreadCommand = z.infer<typeof forkThreadCommandSchema>
 export type EditLatestTurnCommand = z.infer<typeof editLatestTurnCommandSchema>
 export type RetryMessageCommand = z.infer<typeof retryMessageCommandSchema>

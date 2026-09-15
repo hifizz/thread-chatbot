@@ -87,7 +87,7 @@ export interface Message {
   /** 本页是通过刷新恢复到该活跃 generation；只用于向用户解释后台仍在继续。 */
   backgroundGeneration?: boolean
   artifactIds?: string[]
-  /** UI 状态：pending（未收到首个 delta）/ streaming / done / stopped（用户主动停止）/ error */
+  /** 当前 assistant attempt 的应用 generation id；user 消息不设置。 */
   /** 划选引用（方向 C，用户定稿）：带问开分支时，首条 user 消息结构化携带
       「我在问哪段话」——消息记录自足（导出/搜索/其他消费者拿到即用），UI 渲染
       引用条，发送线据此拼 grounding。可选；无该字段 = 普通消息。 */
@@ -118,6 +118,10 @@ export interface Thread {
   anchorText: string | null
   /** 从父会话哪条消息分叉出来（决定「继承的上文」截断点） */
   forkFromMsgId: string | null
+  /** 分叉时保存的可重定位文本锚点；主线为 null。 */
+  forkAnchor: TextAnchor | null
+  /** 非空表示讨论焦点来自该 Message 生成的 Markdown Artifact。 */
+  forkArtifactId: string | null
   footnote: number | null
   children: string[]
   /** 保存该 Thread 的全部消息节点，顺序为创建顺序。 */

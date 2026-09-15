@@ -29,7 +29,7 @@ async function capture(method, invoke) {
   commands.dispose()
   return captured
 }
-const forkInput = { parentThreadId: rootId, sourceMessageId: sourceId, anchorText: anchor.quote.exact, anchor, modelId: "test/model" }
+const forkInput = { parentThreadId: rootId, sourceMessageId: sourceId, target: { type: "message", anchor }, modelId: "test/model" }
 const fork = await capture("forkThread", (commands) => commands.forkThread({ ...forkInput, firstTurn }))
 assert.deepEqual(fork.firstTurn.parts, firstTurn.parts, "结构化 firstTurn 不依赖独立 text 字段，不重复补入 Quote")
 const empty = await capture("forkThread", (commands) => commands.forkThread(forkInput))

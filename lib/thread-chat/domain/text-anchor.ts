@@ -41,4 +41,6 @@ export interface LocateResult {
 export interface LocateOptions {
   /** fuzzy 命中的最低相似度，低于此值视为丢失。默认 0.7。 */
   fuzzyThreshold?: number
+  /** 置 false 时跳过 fuzzy 层：调用方需要「唯一可证明」的严格定位。 */
+  allowFuzzy?: boolean
 }

@@ -149,6 +149,9 @@ export const threads = dbSchema.table(
     forkMessageId: text("fork_message_id").references(
       (): AnyPgColumn => messages.id
     ),
+    forkArtifactId: text("fork_artifact_id").references(
+      (): AnyPgColumn => artifacts.id
+    ),
     forkContext: jsonb("fork_context").$type<string[]>().notNull().default([]),
     forkAnchor: jsonb("fork_anchor").$type<TextAnchor>(),
     anchorText: text("anchor_text"),
@@ -183,15 +186,19 @@ export const threads = dbSchema.table(
       table.projectId,
       table.forkMessageId
     ),
+    index("threads_project_fork_artifact_idx").on(
+      table.projectId,
+      table.forkArtifactId
+    ),
     check("threads_depth_nonnegative", sql`${table.depth} >= 0`),
     check("threads_next_sequence_positive", sql`${table.nextSequence} >= 1`),
     check(
       "threads_root_or_fork_shape",
       sql`(
         (${table.parentId} is null and ${table.depth} = 0 and
-          ${table.forkMessageId} is null and ${table.forkAnchor} is null and
-          ${table.anchorText} is null and ${table.footnote} is null and
-          ${table.forkContext} = '[]'::jsonb)
+          ${table.forkMessageId} is null and ${table.forkArtifactId} is null and
+          ${table.forkAnchor} is null and ${table.anchorText} is null and
+          ${table.footnote} is null and ${table.forkContext} = '[]'::jsonb)
         or
         (${table.parentId} is not null and ${table.depth} > 0 and
           ${table.forkMessageId} is not null and ${table.forkAnchor} is not null and

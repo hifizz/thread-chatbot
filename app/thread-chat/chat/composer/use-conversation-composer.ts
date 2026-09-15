@@ -33,7 +33,13 @@ export function useConversationComposer({ threadId, isMain, busy, prefill, model
   }
   const { entry, update, clearSubmitted } = useComposerDraft(threadId, () => {
     if (prefill && thread?.forkMessageId && thread.forkAnchor && thread.anchorText) {
-      return messageContentToComposerDraft(forkFirstTurnContent({ text: prefill, sourceMessageId: thread.forkMessageId, anchorText: thread.anchorText, anchor: thread.forkAnchor }))
+      return messageContentToComposerDraft(forkFirstTurnContent({
+        text: prefill,
+        sourceMessageId: thread.forkMessageId,
+        artifactId: thread.forkArtifactId,
+        anchorText: thread.anchorText,
+        anchor: thread.forkAnchor,
+      }))
     }
     return { parts: prefill ? [{ localId: crypto.randomUUID(), type: "text", text: prefill }] : [] }
   })

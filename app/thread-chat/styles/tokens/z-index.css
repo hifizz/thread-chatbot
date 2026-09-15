@@ -11,8 +11,8 @@
   --tc-z-column-top: 3; /* 列间分割线热区（骑在两列交界之上） */
 
   /* ── 弹层族（position:fixed，文档级） ── */
-  --tc-z-selection: 60; /* 划选气泡 */
   --tc-z-drawer: 65; /* Artifact 抽屉 */
+  --tc-z-selection: 68; /* 划选工具栏与提问浮层需覆盖 Artifact 抽屉 */
   --tc-z-confirm: 70; /* 划选草稿清空确认弹窗 */
   --tc-z-switcher: 72; /* 会话切换器遮罩 */
   --tc-z-switcher-top: 74; /* 会话切换器面板 */

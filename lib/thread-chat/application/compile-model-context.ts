@@ -1,5 +1,11 @@
-import { artifactReferenceDataSchema } from "../contracts/artifact-reference"
-import { loadProjectReferenceArtifactRows } from "../persistence/artifact-repository"
+import {
+  artifactReferenceData,
+  artifactReferenceDataSchema,
+} from "../contracts/artifact-reference"
+import {
+  findOwnedArtifact,
+  loadProjectReferenceArtifactRows,
+} from "../persistence/artifact-repository"
 import { expandArtifactReferencesInContext } from "./artifact-reference-context"
 import { convertToModelMessages, type ModelMessage } from "ai"
 import { db } from "@/lib/db"
@@ -36,6 +42,106 @@ function asUiMessage(row: {
   }
 }
 
+function hasArtifactReference(
+  message: ThreadChatUIMessage,
+  artifactId: string
+): boolean {
+  return message.parts.some((part) => {
+    if (part.type !== "data-artifact-reference") return false
+    const parsed = artifactReferenceDataSchema.safeParse(part.data)
+    return parsed.success && parsed.data.artifactId === artifactId
+  })
+}
+
+type OwnedThread = NonNullable<
+  Awaited<ReturnType<typeof findOwnedThread>>
+>
+
+async function collectForkArtifactSources(
+  userId: string,
+  start: OwnedThread
+): Promise<Array<{ artifactId: string; messageId: string }>> {
+  const sources: Array<{ artifactId: string; messageId: string }> = []
+  const visited = new Set<string>()
+  let current: OwnedThread | null = start
+
+  while (current) {
+    if (visited.has(current.id)) stateConflict("Thread 父链存在循环")
+    visited.add(current.id)
+    if (current.forkArtifactId && current.forkMessageId) {
+      sources.push({
+        artifactId: current.forkArtifactId,
+        messageId: current.forkMessageId,
+      })
+    }
+    if (!current.parentId) break
+    current = await findOwnedThread(db, userId, current.parentId)
+    if (!current) stateConflict("Thread 父链不完整")
+  }
+
+  return sources.reverse()
+}
+
+async function includeForkArtifactsInFrozenHistory(input: {
+  userId: string
+  projectId: string
+  sources: Array<{ artifactId: string; messageId: string }>
+  messages: ThreadChatUIMessage[]
+}): Promise<ThreadChatUIMessage[]> {
+  if (!input.sources.length) return input.messages
+
+  const rows = await Promise.all(
+    input.sources.map((source) =>
+      findOwnedArtifact(db, input.userId, source.artifactId)
+    )
+  )
+  const refsByMessageId = new Map<
+    string,
+    Array<NonNullable<(typeof rows)[number]>["artifact"]>
+  >()
+  input.sources.forEach((source, index) => {
+    const row = rows[index]
+    if (!row) stateConflict("Artifact 分支来源不存在")
+    const artifact = row.artifact
+    if (
+      artifact.projectId !== input.projectId ||
+      artifact.sourceMessageId !== source.messageId ||
+      artifact.kind !== "markdown"
+    ) {
+      stateConflict("Artifact 分支来源关系不完整")
+    }
+    refsByMessageId.set(source.messageId, [
+      ...(refsByMessageId.get(source.messageId) ?? []),
+      artifact,
+    ])
+  })
+
+  const messageIds = new Set(input.messages.map((message) => message.id))
+  for (const messageId of refsByMessageId.keys()) {
+    if (!messageIds.has(messageId)) {
+      stateConflict("Artifact 分支的冻结来源消息不完整")
+    }
+  }
+  return input.messages.map((message) => {
+    const refs = refsByMessageId.get(message.id)
+    if (!refs) return message
+    const missing = refs.filter(
+      (artifact) => !hasArtifactReference(message, artifact.id)
+    )
+    if (!missing.length) return message
+    return {
+      ...message,
+      parts: [
+        ...message.parts,
+        ...missing.map((artifact) => ({
+          type: "data-artifact-reference" as const,
+          data: artifactReferenceData(artifact),
+        })),
+      ],
+    }
+  })
+}
+
 export interface CompiledModelContext {
   messages: ModelMessage[]
   boundaries: {
@@ -70,7 +176,13 @@ export async function compileModelContextWithProject({
   if (inherited.some((message) => !message)) {
     stateConflict("冻结分支上下文不完整")
   }
-  const inheritedMessages = inherited.map((row) => asUiMessage(row!))
+  const forkArtifactSources = await collectForkArtifactSources(userId, thread)
+  const inheritedMessages = await includeForkArtifactsInFrozenHistory({
+    userId,
+    projectId: thread.projectId,
+    sources: forkArtifactSources,
+    messages: inherited.map((row) => asUiMessage(row!)),
+  })
   const currentRows = await listThreadMessageRows(
     db,
     thread.projectId,
@@ -118,12 +230,24 @@ export async function compileModelContextWithProject({
     // generic UIMessage-shaped, so restore the narrower ThreadChat type here.
     ...(resolved.messages as ThreadChatUIMessage[]),
   ]
-  const referenceIds = withProjectContext.flatMap((message) => message.parts.flatMap((part) =>
-    part.type === "data-artifact-reference" ? [artifactReferenceDataSchema.parse(part.data).artifactId] : []
-  ))
-  const referenceRows = await loadProjectReferenceArtifactRows(db, thread.projectId, referenceIds)
-  if (referenceRows.length !== new Set(referenceIds).size) stateConflict("Artifact 引用目标不完整")
-  const expanded = expandArtifactReferencesInContext(withProjectContext, new Map(referenceRows.map(({ artifact }) => [artifact.id, artifact])))
+  const referenceIds = withProjectContext.flatMap((message) =>
+    message.parts.flatMap((part) =>
+      part.type === "data-artifact-reference"
+        ? [artifactReferenceDataSchema.parse(part.data).artifactId]
+        : []
+    )
+  )
+  const referenceRows = await loadProjectReferenceArtifactRows(
+    db,
+    thread.projectId,
+    referenceIds
+  )
+  if (referenceRows.length !== new Set(referenceIds).size)
+    stateConflict("Artifact 引用目标不完整")
+  const expanded = expandArtifactReferencesInContext(
+    withProjectContext,
+    new Map(referenceRows.map(({ artifact }) => [artifact.id, artifact]))
+  )
   const modelMessages = await convertToModelMessages(expanded, {
     ignoreIncompleteToolCalls: true,
     convertDataPart: (part) => {

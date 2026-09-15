@@ -10,6 +10,8 @@ export interface SelectionInfo {
   text: string
   threadId: string
   msgId: string
+  /** 非空表示本次划选来自该 Message 产生的 Markdown Artifact。 */
+  artifactId?: string
   /** 选区包围盒（viewport 坐标）：喂 floating-popup 定位模型，气泡围绕它择位 */
   rect: Rect
   /** 划选结束（mouseup）那一刻是否按着 ⌘/Ctrl：作为修饰键跟踪的初值 */
@@ -24,7 +26,7 @@ export function getSelectionRoot(selection: SelectionInfo) {
   return selectionRoots.get(selection)
 }
 
-/** assistant Markdown 划选的唯一 document 观察器与锚点采集边界。
+/** assistant Markdown 与 Markdown Artifact 共用的唯一 document 观察器与锚点采集边界。
  *  hasDraft：气泡输入框里有草稿时不允许「轻松取消」——外部点击 / 空选 /
  *  滚动都不关闭气泡，新划选也一律忽略（保留 DOM 选区供复制粘贴进输入框）。
  *  关闭/换锚入口只剩：提交、Esc 确认清空。 */
@@ -86,12 +88,16 @@ export function useAssistantTextSelection({
           closeIfUnguarded()
           return
         }
+        const artifactSurface = markdownRoot.closest<HTMLElement>(
+          "[data-selection-artifact-id]"
+        )
         const list = markdownRoot.closest(".msg-list") as HTMLElement | null
         const messageElement = markdownRoot.closest(
           ".message"
         ) as HTMLElement | null
-        const threadId = list?.dataset.list
-        const msgId = messageElement?.dataset.msgId
+        const threadId = artifactSurface?.dataset.selectionThreadId ?? list?.dataset.list
+        const msgId = artifactSurface?.dataset.selectionMessageId ?? messageElement?.dataset.msgId
+        const artifactId = artifactSurface?.dataset.selectionArtifactId
         if (!threadId || !msgId) return
         const message = findMessage(threadId, msgId)
         const range = domSelection.getRangeAt(0)
@@ -101,16 +107,17 @@ export function useAssistantTextSelection({
           return
         }
 
-        const anchor = describeRange(markdownRoot, domSelection.getRangeAt(0))
+        const anchor = describeRange(markdownRoot, range)
         if (!anchor || anchor.quote.exact.trim().length < 2) {
           closeIfUnguarded()
           return
         }
-        const rect = domSelection.getRangeAt(0).getBoundingClientRect()
+        const rect = range.getBoundingClientRect()
         const nextSelection: SelectionInfo = {
           text: anchor.quote.exact,
           threadId,
           msgId,
+          ...(artifactId ? { artifactId } : {}),
           rect: {
             left: rect.left,
             top: rect.top,

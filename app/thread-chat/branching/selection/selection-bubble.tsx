@@ -220,8 +220,10 @@ export function SelectionBubble({
 
   if (!sel) return null
   const toolbar = <SelectionToolbar rect={sel.rect} mobile={mobile} continueDisabled={guardMobileDraft}
+    showContinue={!sel.artifactId}
     onBranch={() => { if (mobile) setMobileQuoteSaved(true); window.getSelection()?.removeAllRanges(); setPanel("question") }}
     onContinue={() => {
+      if (sel.artifactId) return
       const quote = { schemaVersion: THREAD_QUOTE_SCHEMA_VERSION, text: sel.text,
         source: { type: "message" as const, messageId: sel.msgId, anchor: sel.anchor } }
       draftStore.setState((state) => ({ quoteRequests: { ...state.quoteRequests,

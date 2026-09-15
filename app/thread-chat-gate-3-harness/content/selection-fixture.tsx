@@ -14,7 +14,7 @@ export function SelectionFixture({ threadId }: { threadId: string }) {
   const state: ThreadTreeState = {
     schemaVersion: THREAD_TREE_SCHEMA_VERSION, artifacts: {}, artifactOrder: [], recents: [], footnoteCounter: 0, seq: 0, tick: 0,
     threads: { [threadId]: { id: threadId, modelId: DEFAULT_THREAD_CHAT_MODEL_ID, parentId: null, depth: 0, title: "测试",
-      anchorText: null, forkFromMsgId: null, footnote: null, children: [], activeLeafMessageId: messageId, lastActive: 0,
+      anchorText: null, forkFromMsgId: null, forkAnchor: null, forkArtifactId: null, footnote: null, children: [], activeLeafMessageId: messageId, lastActive: 0,
       messages: [{ id: messageId, parentMessageId: null, role: "assistant", status: "done", text, forks: [] }],
     } },
   }

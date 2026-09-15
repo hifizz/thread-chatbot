@@ -48,11 +48,19 @@ function projectMessageState(
   }
 }
 
+/** 「主线 = "main"」视图 id 约定的唯一入口；需要 rootThreadId 的调用方请走这里。 */
+export function toViewThreadId(
+  rootThreadId: string | null | undefined,
+  threadId: string
+): string {
+  return rootThreadId === threadId ? "main" : threadId
+}
+
 export function toConversationViewThreadId(
   state: NormalizedThreadChatState,
   threadId: string
 ): string {
-  return state.project?.rootThreadId === threadId ? "main" : threadId
+  return toViewThreadId(state.project?.rootThreadId, threadId)
 }
 
 export function fromConversationViewThreadId(
@@ -71,7 +79,10 @@ export function projectMessageDTO(input: {
 }): ConversationViewMessage {
   const { message, state } = input
   const forks: Fork[] = Object.values(state.threadsById)
-    .filter((thread) => thread.forkMessageId === message.id)
+    .filter(
+      (thread) =>
+        thread.forkMessageId === message.id && !thread.forkArtifactId
+    )
     .map((thread) => ({
       text: thread.anchorText ?? "",
       num: thread.footnote ?? 0,
@@ -146,6 +157,8 @@ export function projectThreadDTO(
         : (thread.anchorText ?? selectDisplayTitle(thread))),
     anchorText: thread.anchorText,
     forkFromMsgId: thread.forkMessageId,
+    forkAnchor: thread.forkAnchor,
+    forkArtifactId: thread.forkArtifactId ?? null,
     footnote: thread.footnote,
     children: Object.values(state.threadsById)
       .filter((child) => child.parentId === thread.id)

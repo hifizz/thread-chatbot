@@ -1,11 +1,27 @@
 import assert from "node:assert/strict"
-import { eq } from "drizzle-orm"
-import { db } from "../../lib/db/index.ts"
-import * as schema from "../../lib/db/schema.ts"
-import * as commands from "../../lib/thread-chat/application/index.ts"
-import { DEFAULT_THREAD_CHAT_MODEL_ID as modelId } from "../../constants/model.ts"
-import { finalizeGeneration } from "../../lib/thread-chat/streaming/finalize.ts"
-import { artifactIdForTool } from "../../lib/thread-chat/streaming/artifacts.ts"
+import { config } from "dotenv"
+
+config({ path: ".env.local" })
+assert.match(new URL(process.env.DATABASE_URL).pathname, /^\/(wt_|thread-chat-.*test)/, "仅允许独立测试数据库")
+
+// ESM 静态 import 先于 config() 求值，db 客户端会拿到旧环境——必须动态 import。
+const [
+  { eq },
+  { db },
+  schema,
+  commands,
+  { finalizeGeneration },
+  { artifactIdForTool },
+  { DEFAULT_THREAD_CHAT_MODEL_ID: modelId },
+] = await Promise.all([
+  import("drizzle-orm"),
+  import("../../lib/db/index.ts"),
+  import("../../lib/db/schema.ts"),
+  import("../../lib/thread-chat/application/index.ts"),
+  import("../../lib/thread-chat/streaming/finalize.ts"),
+  import("../../lib/thread-chat/streaming/artifacts.ts"),
+  import("../../constants/model.ts"),
+])
 const id = () => crypto.randomUUID()
 const userId = `artifact-test-${id()}`
 const otherUser = `artifact-other-${id()}`
@@ -51,7 +67,7 @@ try {
   await settle(boundary.assistantMessageId)
   const fork = await commands.forkThread(userId, source.rootThreadId, {
     commandId: id(), threadId: id(), sourceMessageId: source.assistantMessageId,
-    anchorText: "固定正文", anchor: { quote: { exact: "固定正文", prefix: "", suffix: "" } }, modelId,
+    target: { type: "message", anchor: { quote: { exact: "固定正文", prefix: "", suffix: "" } } }, modelId,
     firstTurn: { userMessageId: id(), assistantMessageId: id(), parts: [{ type: "text", text: "从子分支引用" }, reference] },
   })
   assert.equal(fork.result.generation.userMessage.parts[1].data.artifactId, artifactId)

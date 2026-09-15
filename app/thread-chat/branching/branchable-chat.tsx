@@ -13,7 +13,8 @@ import type { MessageContentInput } from "@/lib/thread-chat/contracts/message-co
  */
 
 import React from "react"
-import { ListTree } from "lucide-react"
+import { FileText, ListTree } from "lucide-react"
+import type { TextAnchor } from "@/lib/thread-chat/domain/text-anchor"
 import type { Message, ThreadTreeState } from "../core/types"
 import {
   activeMessagePath,
@@ -39,7 +40,7 @@ export interface BranchableChatProps {
   /** 统一意图：打开某会话（本列作为「来源列」参与放置策略）。
       opts.keepSource：⌘/Ctrl 点击 = 保留本列，把目标开在紧邻右侧 */
   onOpenThread: (targetId: string, opts?: { keepSource?: boolean }) => void
-  onOpenArtifact: (artifactId: string) => void
+  onOpenArtifact: (artifactId: string, anchor?: TextAnchor) => void
   /** 面包屑就地回退（collapse 语义由 orchestration 实现） */
   onCrumbNav: (targetId: string) => void
   /** ⇄ 把本列切换为任意会话（弹出 local 切换器，锚定在按钮上） */
@@ -89,6 +90,9 @@ export function BranchableChat({
   const chain = isMain ? [] : lineage(state, threadId)
   const inherited = isMain ? [] : collectInherited(state, thread)
   const childCount = thread.children.length
+  const sourceArtifact = thread.forkArtifactId
+    ? state.artifacts[thread.forkArtifactId]
+    : undefined
   const presentation = messageActionState?.presentationByThreadId.get(threadId)
   const sourceProvenance = presentation?.sourceProvenance ?? null
   const visibleMessages = messageActionState
@@ -201,9 +205,26 @@ export function BranchableChat({
         <div className="ft">
           <span className="lbl">
             讨论焦点 · 划选自
-            {thread.parentId === "main"
-              ? "主线"
-              : `「${threadTitle(state, thread.parentId!)}」`}
+            {sourceArtifact ? (
+              <button
+                type="button"
+                className="focus-source-artifact"
+                title={`打开来源文档「${sourceArtifact.title}」并定位原文`}
+                onClick={() =>
+                  onOpenArtifact(
+                    sourceArtifact.id,
+                    thread.forkAnchor ?? undefined
+                  )
+                }
+              >
+                <FileText size={12} aria-hidden="true" />
+                《{sourceArtifact.title}》
+              </button>
+            ) : thread.parentId === "main" ? (
+              "主线"
+            ) : (
+              `「${threadTitle(state, thread.parentId!)}」`
+            )}
           </span>
           <details className="focus-quote">
             <summary title="展开或收起完整引用">

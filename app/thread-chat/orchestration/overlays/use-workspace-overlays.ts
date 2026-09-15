@@ -2,12 +2,19 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import { POPUP_EXIT_MS } from "@/constants/thread-chat"
+import type { TextAnchor } from "@/lib/thread-chat/domain/text-anchor"
 import type { SelectionInfo } from "../../branching/selection/selection-bubble"
 import type { SwitcherMode } from "../navigation/thread-switcher"
 import { escapeOverlayTarget, popupPosition } from "./workspace-overlay-logic"
 import { SWITCHER_DIMENSIONS } from "../navigation/switcher-dimensions"
 
 type ClosingOverlay = { n: number; closing?: boolean }
+
+/** 打开 Artifact 时携带的分支来源定位意图；由 ProjectPanel 消费后清除。 */
+export interface ArtifactSourceNav {
+  artifactId: string
+  anchor: TextAnchor
+}
 
 export function useWorkspaceOverlays() {
   const rootRef = useRef<HTMLDivElement | null>(null)
@@ -19,6 +26,8 @@ export function useWorkspaceOverlays() {
   const [helpPanel, setHelpPanel] = useState<ClosingOverlay | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [activeArtifactId, setActiveArtifactId] = useState<string | null>(null)
+  const [artifactSourceNav, setArtifactSourceNav] =
+    useState<ArtifactSourceNav | null>(null)
   const switcherSequenceRef = useRef(0)
   const treeListSequenceRef = useRef(0)
   const helpSequenceRef = useRef(0)
@@ -113,15 +122,21 @@ export function useWorkspaceOverlays() {
   const openHelpPanel = useCallback(() => {
     setHelpPanel({ n: ++helpSequenceRef.current })
   }, [])
-  const openArtifact = useCallback((artifactId: string) => {
+  const openArtifact = useCallback((artifactId: string, anchor?: TextAnchor) => {
     setActiveArtifactId(artifactId)
+    setArtifactSourceNav(anchor ? { artifactId, anchor } : null)
     setDrawerOpen(true)
+  }, [])
+  const clearArtifactSourceNav = useCallback(() => {
+    setArtifactSourceNav(null)
   }, [])
   const toggleDrawer = useCallback(() => {
     setDrawerOpen((open) => !open)
+    setArtifactSourceNav(null)
   }, [])
   const closeDrawer = useCallback(() => {
     setDrawerOpen(false)
+    setArtifactSourceNav(null)
   }, [])
 
   useEffect(() => {
@@ -182,6 +197,8 @@ export function useWorkspaceOverlays() {
     activeArtifactId,
     setActiveArtifactId,
     openArtifact,
+    artifactSourceNav,
+    clearArtifactSourceNav,
     toggleDrawer,
     closeDrawer,
   }
