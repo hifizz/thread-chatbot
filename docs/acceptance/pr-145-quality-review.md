@@ -168,3 +168,11 @@ CR 部分成立：收据判别和整段 JSON 比较需要修复；旧全文通�
 验证：`pnpm typecheck`、相关 `pnpm exec eslint`、`pnpm test:thread-chat:documents`、`node --import tsx e2e/thread-chat/artifact-reference-context.test.mjs`、`pnpm test:thread-chat:prompt-cache`、`node /tmp/pr145-db.mjs pnpm test:thread-chat:documents-db`（原生 44 项）、OpenSpec strict 和 `git diff --check`。
 
 使用 wt_pr145_quality；未执行删列 SQL、db:push、db:generate 或修改 migration/snapshot/journal，未操作 Neon。当前读取 API 保留，不需要前端改走版本感知接口。本轮无 UI 行为修改，未新增浏览器或真实模型验收证据，完整模型/发布门槛仍待完成。
+
+## 工具与刷新策略收敛
+
+按用户最终选择，第 4 项保持文档工具常驻，不做空目录裁剪；第 5 项完整策略只放 system，更新工具改短描述；第 6 项保留现有恢复算法，在 schema 和 CLAUDE.md 明确统一恢复入口与缺失位置追加的限制，并增加原位替换、末尾兜底和幂等恢复回归。
+
+第 7 项采用仅生成结束刷新：初始目录来自 Bootstrap，移除定时器和面板刷新回调。本浏览器观察生成终态后拉取当前目录；其他浏览器的更新不主动推送，刷新页面后才能保证获取。不增加焦点事件或后台轮询。历史元数据/固定正文的按需读取保留，不属于当前目录同步。
+
+本轮 TypeScript、相关 ESLint、文档/客户端/提示词缓存回归、OpenSpec strict 与 diff 检查通过。新增验证无轮询定时器、初始化不重复拉目录、生成通知合并及迟到响应保护。未重跑浏览器、真实模型或数据库完整验收；前述跨窗口定时同步说明已被此决策取代。

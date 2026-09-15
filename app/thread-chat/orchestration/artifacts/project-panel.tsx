@@ -46,7 +46,6 @@ export interface ProjectPanelProps {
   onClose(): void
   onSelect(id: string): void
   onLocate(threadId: string, sourceMessageId: string): void
-  onRefresh(): Promise<void>
   onSaveContract(target: string, instructions: string): Promise<void>
   onAddProjectFile(attachmentId: string): Promise<void>
   onRemoveProjectFile(attachmentId: string): Promise<void>
@@ -101,7 +100,6 @@ export function ProjectPanel({
   onClose,
   onSelect,
   onLocate,
-  onRefresh,
   onSaveContract,
   onAddProjectFile,
   onRemoveProjectFile,
@@ -124,23 +122,6 @@ export function ProjectPanel({
   const archived = Boolean(project?.archivedAt)
   const loading = open && !project
   const displayedSection: ProjectPanelSection = activeId ? "artifacts" : section
-
-  useEffect(() => {
-    if (!open) return
-    let cancelled = false
-    void onRefresh()
-      .then(() => {
-        if (!cancelled) setError(null)
-      })
-      .catch((cause) => {
-        if (!cancelled) {
-          setError(cause instanceof Error ? cause.message : "Project 加载失败")
-        }
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [onRefresh, open])
 
   useEffect(() => {
     if (open) {
@@ -239,10 +220,8 @@ export function ProjectPanel({
       await uploadProjectFile(file, {
         onAttachmentCreated: onAddProjectFile,
       })
-      await onRefresh()
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "文件上传失败")
-      await onRefresh().catch(() => {})
     } finally {
       setUploading(false)
       if (fileInputRef.current) fileInputRef.current.value = ""

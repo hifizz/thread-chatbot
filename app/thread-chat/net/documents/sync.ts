@@ -1,9 +1,8 @@
 import { startThreadArtifactHistory } from "../artifacts/history"
-import { DOCUMENT_PROGRESS_REFRESH_MS } from "@/constants/project-documents"
 import type { ThreadChatClient } from "../client"
 import type { ConversationStore } from "../../core/store"
 
-/** 唯一目录刷新入口；失效通知合并排队，丢弃通知之前发出的旧请求。 */
+/** 生成结束后的目录刷新入口；初始目录由 Bootstrap 提供，失效通知合并排队，丢弃通知之前发出的旧请求。 */
 export function startProjectDocumentSync(projectId: string, client: ThreadChatClient, store: ConversationStore) {
   const history = startThreadArtifactHistory(projectId, client, store)
   let disposed = false
@@ -44,8 +43,5 @@ export function startProjectDocumentSync(projectId: string, client: ThreadChatCl
   const unsubscribe = store.subscribe((state, previous) => {
     if (state.documentRefreshRequested !== previous.documentRefreshRequested) void refresh()
   })
-  // 轮询不使正在进行的请求失效，避免慢请求被每五秒永久饿死。
-  const timer = setInterval(() => { if (!running) void refresh() }, DOCUMENT_PROGRESS_REFRESH_MS)
-  void refresh()
-  return { refresh, dispose() { disposed = true; history.dispose(); unsubscribe(); clearInterval(timer) } }
+  return { refresh, dispose() { disposed = true; history.dispose(); unsubscribe() } }
 }

@@ -39,7 +39,7 @@ export function DocumentsHarness() {
   const [activeId, setActiveId] = useState<string | null>(artifacts[0].id)
   return <main className="tc" style={{ minHeight: "100dvh" }}>
     <ProjectPanel project={project} files={[]} artifacts={artifacts} currentArtifacts={[artifacts[0]]} artifactContents={Object.fromEntries(artifacts.map(a => [a.id, a.content]))} open activeId={activeId}
-      onClose={() => {}} onSelect={setActiveId} onLocate={() => {}} onRefresh={noop}
+      onClose={() => {}} onSelect={setActiveId} onLocate={() => {}}
       onSaveContract={noop} onAddProjectFile={noop} onRemoveProjectFile={noop}
       renderDocumentControls={(artifact) => <DocumentView currentRevisionId={revisions[0].id} navigationBlocked={false} artifact={artifact} client={client} onSelect={setActiveId} />} />
   </main>

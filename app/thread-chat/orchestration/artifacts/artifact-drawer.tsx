@@ -96,7 +96,6 @@ export function ArtifactDrawer({
       onClose={onClose}
       onSelect={onSelect}
       onLocate={onLocate}
-      onRefresh={() => Promise.resolve()}
       onSaveContract={() => Promise.resolve()}
       onAddProjectFile={() => Promise.resolve()}
       onRemoveProjectFile={() => Promise.resolve()}

@@ -10,7 +10,10 @@ export function persistentMessageParts(
   )
 }
 
-/** 工具提交收据独立于流 checkpoint；恢复时按 toolCallId 替换不完整卡片。 */
+/** 展示和模型上下文共用的恢复入口；工具结果独立于流 checkpoint。
+ * 已匹配的 toolCallId 原位替换；未匹配结果按持久化顺序追加，优先保留已保存事实。
+ * 追加是缺失流位置时的兜底，不代表已恢复它相对于其他文本/工具的原始顺序。
+ */
 export function restoreDocumentToolParts(parts: ThreadChatUIMessage["parts"], committed: ThreadChatUIMessage["parts"] = []): ThreadChatUIMessage["parts"] {
   const remaining = new Map(committed.flatMap((part) => "toolCallId" in part ? [[part.toolCallId, part] as const] : []))
   const restored = parts.map((part) => {

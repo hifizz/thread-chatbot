@@ -146,6 +146,7 @@ export async function prepareGeneration(input: PrepareGenerationInput) {
   const artifactRequested = isExplicitMarkdownArtifactRequest(
     input.latestUserText
   )
+  // 项目核心能力常驻，不因文档数量变化切换工具集合和文档策略。
   const documentTools = buildDocumentTools({ userId: input.userId, projectId: input.projectId,
     threadId: input.threadId, messageId: input.messageId })
   const generationMode = resolveGenerationMode({

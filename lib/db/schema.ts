@@ -235,6 +235,7 @@ export const messages = dbSchema.table(
     supersededAt: timestamp("superseded_at", { withTimezone: true }),
     stopRequestedAt: timestamp("stop_requested_at", { withTimezone: true }),
     feedback: text("feedback").$type<ConversationMessageFeedback>(),
+    // 独立持久化工具结果不受流 checkpoint 覆盖；展示/模型读取必须经 restoreDocumentToolParts 合并。
     documentToolParts: jsonb("document_tool_parts").$type<ThreadChatUIMessage["parts"]>().notNull().default([]),
     documentContextUsed: jsonb("document_context_used").$type<StoredDocumentContextReceipt>(),
     providerUsage: jsonb("provider_usage").$type<Record<string, unknown>>(),

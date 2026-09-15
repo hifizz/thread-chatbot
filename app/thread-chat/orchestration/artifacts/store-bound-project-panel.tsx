@@ -230,10 +230,6 @@ export function StoreBoundProjectPanel({
     }
   }, [activeId, open, loadedContent, pendingSource])
 
-  const refresh = useCallback(async () => {
-    store.getState().requestDocumentRefresh(projectId)
-  }, [projectId, store])
-
   const saveContract = useCallback(
     async (target: string, instructions: string) => {
       await commands.updateProjectContract({
@@ -290,7 +286,6 @@ export function StoreBoundProjectPanel({
       onClose={onClose}
       onSelect={onSelect}
       onLocate={locate}
-      onRefresh={refresh}
       onSaveContract={saveContract}
       onAddProjectFile={addProjectFile}
       onRemoveProjectFile={removeProjectFile}

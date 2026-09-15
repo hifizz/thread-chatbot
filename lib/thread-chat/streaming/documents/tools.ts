@@ -1,6 +1,6 @@
 import { documentWritesEnabled } from "../../application/documents/configuration"
 import { tool } from "ai"
-import { DOCUMENT_INSTRUCTIONS } from "@/constants/project-documents"
+import { DOCUMENT_UPDATE_DESCRIPTION } from "@/constants/project-documents"
 import { findDocumentsInputSchema, readDocumentInputSchema, updateDocumentInputSchema, type DocumentExecution } from "../../contracts/document"
 import { findProjectDocuments, readProjectDocument, updateProjectDocument } from "../../application/documents/service"
 
@@ -18,7 +18,7 @@ export function buildDocumentTools(identity: DocumentExecution) {
     }),
     ...(!documentWritesEnabled() ? {} : {
       updateProjectDocument: tool({
-        description: DOCUMENT_INSTRUCTIONS,
+        description: DOCUMENT_UPDATE_DESCRIPTION,
         inputSchema: updateDocumentInputSchema,
         execute: (input, { toolCallId }) => updateProjectDocument(identity, input, toolCallId),
       }),

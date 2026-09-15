@@ -43,6 +43,7 @@ export async function bootConversationProject(options: {
     }
   }
 
+  const documents = startProjectDocumentSync(projectId, client, store)
   // 刷新后的 generating 只轮询，不尝试恢复进程内 SSE。
   const background = bootstrap.activeGenerationIds.map((messageId) =>
     pollBackgroundGeneration({
@@ -57,7 +58,6 @@ export async function bootConversationProject(options: {
       wait: options.wait,
     })
   )
-  const documents = startProjectDocumentSync(projectId, client, store)
   const unsubscribe = options.storage
     ? store.subscribe((state, previous) => {
         if (state.workspace !== previous.workspace)

@@ -87,3 +87,14 @@ const ordinary = { id: 'ordinary', role: 'user', parts: [{ type: 'text', text: '
 const lazy = documentContextForRequest([{ id: 'unused', get documentContextUsed() { throw new Error('must not scan receipts') } }])
 assert.deepEqual(lazy(ordinary), ordinary)
 console.log('PASS 收据判别及语义匹配：旧无标签兼容、未知协议拒绝、键序/集合无关、固定身份严格、摘要不冒充全文、普通请求不扫描')
+
+const { restoreDocumentToolParts } = await import('../../lib/thread-chat/persistence/message-parts.ts')
+const partial = { type: 'tool-updateProjectDocument', toolCallId: 'matched', state: 'input-available', input: {} }
+const saved = { ...partial, state: 'output-available', output: { status: 'committed' } }
+const missing = { ...saved, toolCallId: 'missing' }
+const streamed = [{ type: 'text', text: 'before' }, partial, { type: 'text', text: 'after' }]
+const restored = restoreDocumentToolParts(streamed, [missing, saved])
+assert.deepEqual(restored, [streamed[0], saved, streamed[2], missing], 'matched result keeps its stream position; unmatched receipt is appended only as recovery fallback')
+assert.equal(streamed[1], partial, 'recovery must not mutate checkpoint data')
+assert.deepEqual(restoreDocumentToolParts(restored, [missing, saved]), restored, 'repeated recovery must not duplicate receipts')
+console.log('PASS 工具结果恢复：原位替换、缺失位置末尾兜底、checkpoint 不变、重复恢复不重复追加')

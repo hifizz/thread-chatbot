@@ -13,9 +13,15 @@ const client = {
   async getArtifact(id) { requests++; return { id, title: 'F1', content: id, createdAt: '2026-09-15',
     sourceMessageStatus: 'generating', document: { id: 'd', revisionId: document.currentRevisionId } } },
 }
+let intervalRegistrations = 0
+const originalSetInterval = globalThis.setInterval
+globalThis.setInterval = (...args) => { intervalRegistrations++; return originalSetInterval(...args) }
 const sync = startProjectDocumentSync('p', client, store)
+globalThis.setInterval = originalSetInterval
 try {
-  await new Promise(setImmediate)
+  assert.equal(intervalRegistrations, 0, "runtime must not schedule background catalog polling")
+  assert.deepEqual(store.getState().documentsById, {}, "startup must not duplicate Bootstrap catalog request")
+  await sync.refresh()
   assert.equal(selectCurrentProjectArtifacts(store.getState())[0].sourceMessageStatus, 'generating')
   document.sourceMessageStatus = 'completed'
   await sync.refresh()
@@ -46,7 +52,7 @@ try {
   console.log('PASS 项目同步：无抽屉依赖、生成完成状态刷新、目录元数据原子更新、固定历史、释放后不写入')
 } finally { sync.dispose() }
 
-// 旧轮询仍在途中时收到生成结束通知：不应用旧响应，合并为一次后续请求。
+// 旧请求仍在途中时收到生成结束通知：不应用旧响应，合并为一次后续请求。
 const orderedStore = createConversationStore()
 orderedStore.setState({ project: { id: 'p' } })
 const pending = []
@@ -56,6 +62,8 @@ const ordered = startProjectDocumentSync('p', {
 const catalog = (version) => ({ documents: [{ id: 'd', currentArtifactId: `a${version}`, currentRevisionId: `r${version}` }],
   artifacts: [{ id: `a${version}`, title: 'F1', createdAt: '2026-09-15', document: { id: 'd' } }] })
 try {
+  assert.equal(pending.length, 0)
+  orderedStore.getState().requestDocumentRefresh("p")
   assert.equal(pending.length, 1)
   orderedStore.getState().requestDocumentRefresh('p')
   orderedStore.getState().requestDocumentRefresh('p')
@@ -75,10 +83,10 @@ try {
   assert.equal(orderedStore.getState(), before, 'disposed runtime cannot roll the catalog back')
   orderedStore.getState().requestDocumentRefresh('p')
   assert.equal(pending.length, 3, 'dispose unsubscribes invalidation notifications')
-  console.log('PASS 目录响应顺序：单入口、丢弃旧轮询、合并生成结束通知、释放后不写入')
+  console.log('PASS 目录响应顺序：单入口、丢弃旧请求、合并生成结束通知、释放后不写入')
 } finally { ordered.dispose() }
 
-// 按已打开 Thread 加载历史；重复目录轮询不重拉历史，也不能把 head 改回旧版。
+// 按已打开 Thread 加载历史；重复目录刷新不重拉历史，也不能把 head 改回旧版。
 const { startThreadArtifactHistory } = await import('../../app/thread-chat/net/artifacts/history.ts')
 const historyStore = createConversationStore()
 historyStore.setState({ project: { id: 'p', rootThreadId: 't1' },
@@ -100,7 +108,7 @@ try {
   assert.deepEqual(historyStore.getState().artifactContentsById, {})
   historySync.refresh()
   await new Promise(setImmediate)
-  assert.deepEqual(historyRequests, ['t1'], 'unchanged polling does not refetch historical metadata')
+  assert.deepEqual(historyRequests, ['t1'], 'unchanged refresh does not refetch historical metadata')
   historyStore.setState({ messagesById: { m1: { id: 'm1', status: 'completed' } } })
   await new Promise(setImmediate)
   assert.deepEqual(historyRequests, ['t1', 't1'], 'source completion refreshes the opened Thread')
