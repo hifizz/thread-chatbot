@@ -19,7 +19,7 @@ import type { ConversationStore } from "../../core/store"
 import { useConversationStore } from "../../core/use-thread-store"
 import type { ThreadChatClient } from "../../net/client"
 import type { ConversationCommands } from "../../net/commands/conversation-commands"
-import { selectCurrentProjectArtifacts } from "@/lib/thread-chat/domain/artifacts/selectors"
+import { selectCurrentProjectArtifacts, selectArtifactWithCurrentSourceStatus } from "@/lib/thread-chat/domain/artifacts/selectors"
 import { DocumentView } from "./documents/view"
 import { ProjectPanel } from "./project-panel"
 
@@ -110,10 +110,10 @@ export function StoreBoundProjectPanel({
   const artifacts = useMemo(
     () =>
       state.artifactOrder.flatMap((id) => {
-        const artifact = state.artifactsById[id]
-        if (!artifact) return []
-        const doc = artifact.document && state.documentsById[artifact.document.id]
-        return [{ ...artifact, sourceMessageStatus: doc?.currentArtifactId === artifact.id ? doc.sourceMessageStatus : artifact.sourceMessageStatus }]
+        const artifact = selectArtifactWithCurrentSourceStatus({
+          artifactsById: state.artifactsById, documentsById: state.documentsById,
+        }, id)
+        return artifact ? [artifact] : []
       }),
     [state.artifactOrder, state.artifactsById, state.documentsById]
   )

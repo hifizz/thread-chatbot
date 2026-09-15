@@ -1,5 +1,5 @@
 import assert from "node:assert/strict"
-import { selectCurrentProjectArtifacts, selectCurrentDocumentArtifact } from "../../lib/thread-chat/domain/artifacts/selectors.ts"
+import { selectCurrentProjectArtifacts, selectCurrentDocumentArtifact, selectArtifactWithCurrentSourceStatus } from "../../lib/thread-chat/domain/artifacts/selectors.ts"
 
 const artifact = (id, revisionNumber, overrides = {}) => ({
   id, title: "F1", kind: "markdown", sourceMessageStatus: "completed",
@@ -50,3 +50,14 @@ const selectors = await import("../../lib/thread-chat/domain/selectors.ts")
 assert.equal(selectors.selectArtifactsOnSelectedMessagePaths, selectArtifactsOnSelectedMessagePaths)
 assert.equal(selectors.selectCurrentProjectArtifacts, selectCurrentProjectArtifacts)
 console.log("PASS 产物查询职责：选中消息路径保留固定历史，当前目录只取 head；统一入口转导出")
+
+const previewCatalog = catalog([r1, stale])
+assert.equal(selectArtifactWithCurrentSourceStatus(previewCatalog, 'r3').sourceMessageStatus, 'completed')
+assert.equal(selectArtifactWithCurrentSourceStatus(previewCatalog, 'r1'), r1, 'historical preview must retain its fixed artifact and source state')
+const failedHead = catalog([r1, stale], [{ ...document, sourceMessageStatus: 'failed' }])
+assert.equal(selectArtifactWithCurrentSourceStatus(failedHead, 'r1').sourceMessageStatus, 'completed', 'current failure must not overwrite historical source status')
+const standalone = artifact('standalone', 1, { document: undefined, sourceMessageStatus: 'stopped' })
+assert.equal(selectArtifactWithCurrentSourceStatus(catalog([standalone]), standalone.id), standalone)
+assert.equal(selectArtifactWithCurrentSourceStatus(previewCatalog, 'missing'), null)
+assert.equal(selectArtifactWithCurrentSourceStatus(catalog([r3]), r3.id), r3, 'unchanged metadata preserves reference')
+console.log('PASS 共享来源状态查询：当前状态更新、历史和普通产物保持、缺失返回空、缓存不变')
