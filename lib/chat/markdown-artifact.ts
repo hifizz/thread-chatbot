@@ -60,20 +60,53 @@ export function isExplicitMarkdownArtifactRequest(text: string): boolean {
     )
   if (conceptQuestion || instructionQuestion) return false
 
-  const chineseArtifact =
-    /(?:(?:帮我|请|为我).{0,8})?(?:创建|生成|输出|整理成|总结成|汇总成|制作|写成|写为|改写成|转换成|转成|导出|保存为|交付).{0,30}(?:markdown|\.md|md[\t ]*(?:文件|文档|格式)|文件|文档|产物|附件)|(?:给我|提供)(?:[\s：:，,]*(?:一份|一个|一篇|该|这份|这个))?[\s：:，,]*(?:markdown|\.md|md[\t ]*(?:文件|文档|格式)|文件|文档|产物|附件)|(?:markdown|\.md|md[\t ]*(?:文件|文档|格式)|文件|文档|产物|附件).{0,30}(?:创建|生成|输出|整理|总结|汇总|制作|写成|写为|改写|转换|转成|导出|保存|交付)/i.test(
-      normalized
-    )
+  /* 文件/文档后面紧跟「的、管理、夹、系统、生成器…」时是普通名词而非交付物。 */
+  const fileNoun = /(?:文件|文档)(?![\t ]*(?:的|管理|夹|系统|格式|类型|传输|下载|上传|大小|路径|名|生成|编辑|阅读|转换|工具))/
+
+  const chineseArtifact = new RegExp(
+    `(?:(?:帮我|请|为我).{0,8})?(?:创建|生成|输出|整理成|总结成|汇总成|制作|写成|写为|改写成|转换成|转成|导出|保存为|交付).{0,30}(?:markdown|\\.md|md[\\t ]*(?:文件|文档|格式)|产物|附件|${fileNoun.source})` +
+      `|(?:给我|提供)(?:[\\s：:，,]*(?:一份|一个|一篇|该|这份|这个|份|个))?[\\s：:，,]*(?:markdown|\\.md|md[\\t ]*(?:文件|文档|格式)|产物|附件|${fileNoun.source})` +
+      `|(?:markdown|\\.md|md[\\t ]*(?:文件|文档|格式)|产物|附件|${fileNoun.source}).{0,30}(?:创建|生成|输出|整理|总结|汇总|制作|写成|写为|改写|转换|转成|导出|保存|交付)`,
+    "i"
+  ).test(normalized)
+  /* 「希望/想要/需要/我要/我想 + （一?份/个/篇）+ 交付物名词」：弱语气但意图明确。
+   * 量词只允许「一」系（不许「这/那」）避免「我希望这份报告更详细」误判；
+   * 文件类名词可裸现（「我要 markdown」），长文类名词必须带量词
+   * （「我要总结」只是让模型概括，不是要文件）。 */
+  const chineseWantArtifact = new RegExp(
+    `(?:希望|想要|需要|我要|我想)[\\s：:，,]*(?:要|有|得到|拿到)?[\\s：:，,]*` +
+      `(?:(?:一?[份个篇][\\s：:，,]*)?(?:markdown|\\.md|md[\\t ]*(?:文件|文档|格式)|产物|附件|${fileNoun.source})` +
+      `|一?[份个篇][\\s：:，,]*(?:文章|报告|文稿|稿件|博客|博文|教程|说明书|成稿|周报|日报|纪要|总结))`,
+    "i"
+  ).test(normalized)
+  /* 「写/做/整理 + 紧邻量词 + 交付物名词」：量词与名词之间不隔内容，避免「写个脚本处理文件」。 */
+  const chineseWriteArtifact = new RegExp(
+    `(?:写|撰写|做|弄|搞|整理)(?:这|那|一|一下|下|个|份|篇|段){0,3}[\\s：:，,]*(?:markdown|\\.md|md[\\t ]*(?:文件|文档|格式)|产物|附件|${fileNoun.source})`,
+    "i"
+  ).test(normalized)
   const chineseLongForm =
-    /(?:(?:帮我|请|为我).{0,8})?(?:创建|生成|撰写|写|创作|制作|输出|交付).{0,20}(?:(?:一|这)(?:篇|份|个))?(?:文章|报告|文稿|稿件|博客|博文|教程|说明书|成稿)|(?:给我|提供)[\s：:，,]*(?:一篇|一份|一个)(?:文章|报告|文稿|稿件|博客|博文|教程|说明书|内容|成稿)|(?:生成|创建|撰写|写|输出).{0,20}(?:一篇|一份|一个)(?:内容|成稿)/i.test(
+    /(?:(?:帮我|请|为我).{0,8})?(?:创建|生成|撰写|写|创作|制作|输出|交付|整理|汇总).{0,20}(?:(?:一|这)(?:篇|份|个))?(?:文章|报告|文稿|稿件|博客|博文|教程|说明书|成稿|周报|日报|纪要|总结)|(?:给我|提供)[\s：:，,]*(?:一篇|一份|一个)(?:文章|报告|文稿|稿件|博客|博文|教程|说明书|内容|成稿|纪要|总结)|(?:生成|创建|撰写|写|输出|整理).{0,20}(?:一篇|一份|一个)(?:内容|成稿)/i.test(
       normalized
     )
   const englishArtifact =
     /\b(?:create|generate|output|convert|export|produce|deliver|provide|return|save|summari[sz]e)\b.{0,60}\b(?:markdown|md\s+(?:file|document)|file|document|artifact|deliverable)\b|\b(?:markdown|md\s+(?:file|document)|file|document|artifact|deliverable)\b.{0,60}\b(?:create|generate|output|convert|export|produce|deliver|provide|return|save|summari[sz]e)\b|\b(?:create|generate|write|draft|produce)\b.{0,60}\b(?:article|report|manuscript|blog\s+post|tutorial)\b/i.test(
       normalized
     )
+  /* 「give me / make / write / draft + 紧邻 + 文件名词」：间隔收紧，避免
+   * "write a function to read a file" 这类代码描述误判成交付请求。 */
+  const englishDeliverable =
+    /\b(?:give\s+(?:me|us)|make|write|draft|whip\s+up|put\s+together)\b.{0,15}\b(?:markdown|\.md\b|md\s+(?:file|document|doc)|file|document|doc|artifact|deliverable)\b/i.test(
+      normalized
+    )
 
-  return chineseArtifact || chineseLongForm || englishArtifact
+  return (
+    chineseArtifact ||
+    chineseWantArtifact ||
+    chineseWriteArtifact ||
+    chineseLongForm ||
+    englishArtifact ||
+    englishDeliverable
+  )
 }
 
 export interface ToolInputAvailableChunk {
@@ -95,6 +128,8 @@ export interface ToolInputDeltaChunk {
   inputTextDelta: string
 }
 
+export const MARKDOWN_ARTIFACT_PREVIEW_CHARS = 1400
+
 export interface MarkdownArtifactProgressEvent {
   toolCallId: string
   phase: "starting" | "streaming"
@@ -102,6 +137,8 @@ export interface MarkdownArtifactProgressEvent {
   characterCount: number
   lineCount: number
   headings: string[]
+  /** 局部正文的尾部窗口（最多 PREVIEW_CHARS），给流式预览小窗做滚动展示。 */
+  preview?: string
 }
 
 export interface MarkdownArtifactStreamEvent {
@@ -160,6 +197,9 @@ export function markdownArtifactProgressFromPartialInput(
     characterCount: content.length,
     lineCount: content.length === 0 ? 0 : content.split(/\r\n|\r|\n/).length,
     headings,
+    ...(content
+      ? { preview: content.slice(-MARKDOWN_ARTIFACT_PREVIEW_CHARS) }
+      : {}),
   }
 }
 
@@ -246,7 +286,7 @@ export function createMarkdownArtifactEventDispatcher(
 }
 
 export const MARKDOWN_ARTIFACT_TOOL_DESCRIPTION = `
-Create one standalone Markdown artifact only when the user explicitly asks for an independent deliverable, such as an article, document, file, report, Markdown/.md file, or artifact. Put directly renderable raw Markdown in content; do not wrap the whole document in an outer markdown code fence. When the user explicitly requests multiple separate documents, call this tool once for each document in the same reply, with one title/content pair per call. Never call it merely because an answer is long, structured, uses Markdown formatting, summarizes research, or contains headings and lists.
+Create one standalone Markdown artifact only when the user explicitly asks for an independent deliverable, such as an article, document, file, report, Markdown/.md file, or artifact. Invoke it silently — do not emit any announcement or transition text (such as "Preparing…" or "Let me create…") before the call; the UI already shows generation progress. Put directly renderable raw Markdown in content; do not wrap the whole document in an outer markdown code fence. When the user explicitly requests multiple separate documents, call this tool once for each document in the same reply, with one title/content pair per call. Never call it merely because an answer is long, structured, uses Markdown formatting, summarizes research, or contains headings and lists.
 
-仅当用户明确要求文章、文档、文件、报告、Markdown/.md 或“产物”等独立交付物时，才创建 Markdown 产物。content 必须是可直接渲染的原始 Markdown，不要给整份文档再套一层 markdown 代码围栏。用户明确要求多份独立文档时，必须在同一回复中为每一份分别调用一次本工具。不要因为回答较长、结构化、使用 Markdown 排版、总结研究结果或包含标题列表就调用本工具。
+仅当用户明确要求文章、文档、文件、报告、Markdown/.md 或“产物”等独立交付物时，才创建 Markdown 产物。直接静默调用本工具，不要在调用前输出“正在准备…”“我来为你生成…”等预告或过渡文字——界面会自动展示生成过程。content 必须是可直接渲染的原始 Markdown，不要给整份文档再套一层 markdown 代码围栏。用户明确要求多份独立文档时，必须在同一回复中为每一份分别调用一次本工具。不要因为回答较长、结构化、使用 Markdown 排版、总结研究结果或包含标题列表就调用本工具。
 `.trim()

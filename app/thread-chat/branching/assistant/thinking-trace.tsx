@@ -1,7 +1,12 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import ThinkingState from "@/components/primitives/ThinkingState"
+import Markdown from "react-markdown"
+import remarkGfm from "remark-gfm"
+import { BookOpen } from "lucide-react"
+import ThinkingState, {
+  TraceFavicon,
+} from "@/components/primitives/ThinkingState"
 import type { ResearchRoute } from "@/lib/chat/research-contract"
 import {
   settledResearchActivities,
@@ -18,6 +23,13 @@ interface TraceRow {
   secondary?: string
   mono?: boolean
   href?: string
+  icon?: "book-open" | "search"
+  /** 行内 spinner（进行中的读取/搜索）。 */
+  running?: boolean
+  /** 失败行：图标与副文本转警示色。 */
+  failed?: boolean
+  /** 非强调行（如搜索词），主文本降为次级墨色。 */
+  subtle?: boolean
 }
 
 function hostOf(url: string): string {
@@ -26,6 +38,32 @@ function hostOf(url: string): string {
   } catch {
     return url
   }
+}
+
+/* reasoning 文本按行内 markdown 渲染：模型常输出 **强调**、`code` 等标记，
+ * 纯文本渲染会把记号原样露出。只放行行内元素，块级结构一律 unwrap。 */
+const INLINE_MARKDOWN_ELEMENTS = ["strong", "em", "del", "code", "a", "br"]
+
+function InlineMarkdown({ text }: { text: string }) {
+  return (
+    <Markdown
+      remarkPlugins={[remarkGfm]}
+      allowedElements={INLINE_MARKDOWN_ELEMENTS}
+      unwrapDisallowed
+      components={{
+        a: ({ children, href }) => (
+          <a href={href} target="_blank" rel="noreferrer">
+            {children}
+          </a>
+        ),
+        code: ({ children }) => (
+          <code className="md-inline-code">{children}</code>
+        ),
+      }}
+    >
+      {text}
+    </Markdown>
+  )
 }
 
 /** 思维链：reasoning part 的分段文本 → Reasoning 变体；耗时在客户端首次捕获。 */
@@ -56,9 +94,7 @@ export function ReasoningTrace({ part }: { part: { text: string; state?: string 
         className="thinking-trace-compact"
         data-ui-message-part="reasoning"
       >
-        {rows[0].primary
-          .replace(/\*\*([^*]+)\*\*/g, "$1")
-          .replace(/__([^_]+)__/g, "$1")}
+        <InlineMarkdown text={rows[0].primary} />
       </div>
     )
   }
@@ -69,17 +105,21 @@ export function ReasoningTrace({ part }: { part: { text: string; state?: string 
         variant="Reasoning"
         working={working}
         active="思考中"
-        done={elapsedSeconds === null ? "已思考" : `思考了 ${elapsedSeconds} 秒`}
+        done={
+          elapsedSeconds === null ? "思考完成" : `思考了 ${elapsedSeconds} 秒`
+        }
         rows={rows}
+        renderPrimary={(row) => <InlineMarkdown text={row.primary} />}
       />
     </div>
   )
 }
 
-/** 联网轨迹：search/read 活动 → Search 变体；来源按 url 去重后合并为一列。 */
+/** 联网轨迹：连续的 search/read 活动合并为一个 Search 变体时间线——
+ * 搜索词行 + 来源行（favicon）+ 读取行（BookOpen）。已读来源不重复成行，
+ * 只在来源行副文本标注；同 URL 的续读游标合并为一行。 */
 export function SearchTrace({
   activities,
-  route,
   complete,
   settled = false,
 }: {
@@ -93,40 +133,138 @@ export function SearchTrace({
   const currentActivities = settledResearchActivities(activities, settled)
 
   const rows: TraceRow[] = []
-  const seen = new Set<string>()
+  const byUrl = new Map<string, TraceRow>()
+  const readUrls = new Set<string>()
+  let sourceCount = 0
+  let failedCount = 0
   for (const activity of currentActivities) {
+    if (activity.status === "failed") failedCount++
     if (activity.kind === "search") {
+      rows.push({
+        primary: activity.query ?? "搜索网络",
+        icon: "search",
+        subtle: true,
+        running: activity.status === "running",
+        failed: activity.status === "failed",
+        secondary: activity.status === "failed" ? "搜索失败" : undefined,
+      })
       for (const source of activity.sources) {
-        if (seen.has(source.url)) continue
-        seen.add(source.url)
-        rows.push({
+        if (byUrl.has(source.url)) continue
+        const row: TraceRow = {
           primary: source.title,
           secondary: hostOf(source.url),
           href: source.url,
-        })
+        }
+        byUrl.set(source.url, row)
+        rows.push(row)
+        sourceCount++
       }
-    } else if (activity.url && !seen.has(activity.url)) {
-      seen.add(activity.url)
-      rows.push({
-        primary: hostOf(activity.url),
-        secondary: activity.url,
-        mono: true,
-        href: activity.url,
-      })
+      continue
     }
+    if (!activity.url) continue
+    const url = activity.url
+    if (activity.status !== "failed") readUrls.add(url)
+    const host = hostOf(url)
+    const existing = byUrl.get(url)
+    if (existing) {
+      if (existing.icon === "book-open") {
+        existing.running = activity.status === "running"
+        existing.failed = activity.status === "failed"
+        if (activity.title) {
+          existing.primary = activity.title
+          existing.secondary = host
+        }
+      } else {
+        existing.secondary =
+          activity.status === "running"
+            ? `${host} · 读取中`
+            : activity.status === "failed"
+              ? `${host} · 读取失败`
+              : activity.truncated
+                ? `${host} · 已读（部分）`
+                : `${host} · 已读`
+      }
+      continue
+    }
+    const row: TraceRow = {
+      primary: activity.title ?? host,
+      secondary:
+        activity.status === "failed"
+          ? `${host} · 读取失败`
+          : activity.truncated && activity.status === "complete"
+            ? `${host} · 部分读取`
+            : host,
+      href: url,
+      icon: "book-open",
+      running: activity.status === "running",
+      failed: activity.status === "failed",
+    }
+    byUrl.set(url, row)
+    rows.push(row)
   }
 
   const working =
-    !complete && currentActivities.some((activity) => activity.status === "running")
-  const fetchMode = route?.mode === "fetch"
+    !complete &&
+    currentActivities.some((activity) => activity.status === "running")
+  const readMode = currentActivities.every(
+    (activity) => activity.kind === "read"
+  )
+  const runningActivity = [...currentActivities]
+    .reverse()
+    .find((activity) => activity.status === "running")
+  const active =
+    runningActivity?.kind === "read" && runningActivity.url
+      ? `正在读取 ${hostOf(runningActivity.url)}`
+      : readMode
+        ? "正在读取网页"
+        : "正在搜索网络"
+
+  const readCount = readUrls.size
+  const done = (() => {
+    if (sourceCount === 0 && readCount === 0) {
+      return failedCount
+        ? "联网核实失败"
+        : readMode
+          ? "已读取网页"
+          : "已搜索网络"
+    }
+    const segments: string[] = []
+    if (sourceCount) segments.push(`已搜索网络 · ${sourceCount} 个来源`)
+    if (readCount) segments.push(`已读取 ${readCount} 个网页`)
+    if (failedCount) segments.push(`${failedCount} 项失败`)
+    return segments.join(" · ")
+  })()
+
+  const sourceHrefs = rows
+    .filter((row) => row.href && !row.icon && !row.failed)
+    .slice(0, 3)
+    .map((row) => row.href!)
+  const icon = working
+    ? undefined
+    : sourceHrefs.length > 0
+      ? (
+        <span className="flex items-center -space-x-1">
+          {sourceHrefs.map((href) => (
+            <TraceFavicon
+              key={href}
+              href={href}
+              className="size-3.5 shrink-0 rounded-full shadow-[0_0_0_1px_var(--page)]"
+            />
+          ))}
+        </span>
+      )
+      : readMode
+        ? <BookOpen aria-hidden className="size-3.5" />
+        : undefined
 
   return (
     <div className="thinking-trace bui">
       <ThinkingState
         variant="Search"
         working={working}
-        active={fetchMode ? "正在读取网页" : "正在搜索网络"}
-        done={fetchMode ? "已读取网页" : `已搜索网络 · ${rows.length} 个来源`}
+        active={active}
+        done={done}
+        icon={icon}
         rows={rows}
       />
     </div>
@@ -142,11 +280,13 @@ export function ToolTrace({
   progress?: MarkdownGenerationProgress
 }) {
   const finished = toolState === "output-available" || toolState === "output-error"
-  const secondary =
-    progress?.partialTitle ??
-    (progress && progress.characterCount > 0
+  const secondary = progress?.partialTitle
+    ? progress.characterCount > 0
+      ? `${progress.partialTitle} · ${progress.characterCount} 字`
+      : progress.partialTitle
+    : progress && progress.characterCount > 0
       ? `${progress.characterCount} 字`
-      : undefined)
+      : undefined
 
   return (
     <div className="thinking-trace bui">

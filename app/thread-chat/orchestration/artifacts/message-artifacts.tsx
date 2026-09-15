@@ -1,34 +1,63 @@
 "use client"
 
-import type { Message, ThreadTreeState } from "../../core/types"
+import type {
+  ConversationViewMessage,
+  ThreadTreeState,
+} from "../../core/types"
 import {
   MarkdownArtifactCard,
-  MarkdownArtifactProgressCard,
+  MarkdownArtifactStreamTrace,
 } from "./markdown-artifact-card"
 import { selectMessageArtifacts } from "./message-artifacts-logic"
 
+/**
+ * 消息气泡之后的 artifact 兜底区：
+ * 正常路径下 artifact 卡片 / 生成块已在 tool part 原位渲染（AnchoredAssistantBody），
+ * 这里只兜底两类数据漂移——
+ *   1. artifactIds 里存在、但 uiParts 没有对应 tool part 的 artifact（历史数据）；
+ *   2. 有生成进度却没有对应 tool part 的极端情况。
+ */
 export function MessageArtifacts({
   state,
   message,
-  sourceDepth,
   compact = false,
   onOpen,
 }: {
   state?: ThreadTreeState
-  message: Message
-  sourceDepth: number | null
+  message: ConversationViewMessage
   compact?: boolean
   onOpen?: (artifactId: string) => void
 }) {
-  const artifacts = onOpen ? selectMessageArtifacts(state, message) : []
-  if (!message.markdownGeneration && artifacts.length === 0) return null
+  const inlineArtifactIds = new Set(
+    (message.uiParts ?? []).flatMap((part) =>
+      part.type === "tool-createMarkdownArtifact" &&
+      part.state === "output-available" &&
+      part.output?.created &&
+      typeof part.output.artifactId === "string"
+        ? [part.output.artifactId]
+        : []
+    )
+  )
+  const hasToolPart = (message.uiParts ?? []).some(
+    (part) =>
+      part.type === "tool-createMarkdownArtifact" &&
+      part.toolCallId === message.markdownGeneration?.toolCallId
+  )
+  const artifacts = onOpen
+    ? selectMessageArtifacts(state, message).filter(
+        (artifact) => !inlineArtifactIds.has(artifact.id)
+      )
+    : []
+  const orphanProgress = Boolean(
+    message.markdownGeneration && !hasToolPart
+  )
+  if (!orphanProgress && artifacts.length === 0) return null
 
   return (
     <>
-      {message.markdownGeneration && (
-        <MarkdownArtifactProgressCard
+      {orphanProgress && (
+        <MarkdownArtifactStreamTrace
           progress={message.markdownGeneration}
-          sourceDepth={sourceDepth}
           compact={compact}
         />
       )}

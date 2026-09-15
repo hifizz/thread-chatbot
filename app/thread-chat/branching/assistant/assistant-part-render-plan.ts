@@ -1,4 +1,7 @@
-import { WEB_RESEARCH_TOOL_NAMES } from "@/lib/chat/web-research-activity"
+import {
+  WEB_RESEARCH_TOOL_NAMES,
+  type WebResearchActivity,
+} from "@/lib/chat/web-research-activity"
 import type { ConversationViewMessage } from "../../core/types"
 import type { ThreadChatUIMessage } from "@/lib/thread-chat/contracts/ui-message"
 
@@ -9,12 +12,15 @@ export type AssistantPartRenderKind =
   | "research"
   | "file"
   | "source-url"
+  | "artifact"
   | "tool"
 
 export interface AssistantPartRenderPlanItem {
   kind: AssistantPartRenderKind
   part: ThreadChatUIPart
   index: number
+  /** 连续的联网活动合并为一个轨迹块展示；仅 research 项携带。 */
+  activities?: WebResearchActivity[]
 }
 
 function fallbackParts(message: ConversationViewMessage): ThreadChatUIPart[] {
@@ -39,7 +45,12 @@ export function assistantPartRenderPlan(
       return
     }
     if (part.type === "data-research-activity") {
-      plan.push({ kind: "research", part, index })
+      const last = plan.at(-1)
+      if (last?.kind === "research") {
+        last.activities?.push(part.data)
+        return
+      }
+      plan.push({ kind: "research", part, index, activities: [part.data] })
       return
     }
     if (part.type === "file" || part.type === "reasoning-file") {
@@ -52,6 +63,11 @@ export function assistantPartRenderPlan(
     }
     // 联网工具由研究面板展示，不输出内部 input-available 等状态。
     if (WEB_RESEARCH_TOOL_NAMES.some((name) => part.type === `tool-${name}`)) return
+    // Markdown 交付物原位渲染：生成中→流式预览块，完成→artifact 卡片。
+    if (part.type === "tool-createMarkdownArtifact") {
+      plan.push({ kind: "artifact", part, index })
+      return
+    }
     if (part.type.startsWith("tool-")) {
       plan.push({ kind: "tool", part, index })
     }

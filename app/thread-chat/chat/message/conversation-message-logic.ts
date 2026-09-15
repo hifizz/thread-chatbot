@@ -18,8 +18,15 @@ export function assistantMessagePresentation(
     message.uiParts?.some(
       (part) => part.type === "reasoning" && part.text.trim().length > 0
     ) ?? false
+  const hasVisibleArtifactTool =
+    message.uiParts?.some(
+      (part) => part.type === "tool-createMarkdownArtifact"
+    ) ?? false
   const hasVisibleContent =
-    hasVisibleText || hasVisibleReasoning || Boolean(message.webResearch?.length)
+    hasVisibleText ||
+    hasVisibleReasoning ||
+    Boolean(message.webResearch?.length) ||
+    hasVisibleArtifactTool
   const isWaitingForVisibleOutput =
     message.role === "assistant" &&
     (message.status === "pending" || message.status === "streaming") &&

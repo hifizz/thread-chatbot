@@ -94,6 +94,8 @@ export const AI_DIAGNOSTIC_EVENTS = {
   providerFailure: "provider.failure",
   toolFailure: "tool.failure",
   toolException: "tool.exception",
+  artifactCreated: "artifact.created",
+  artifactFailed: "artifact.failed",
   budgetToolsRemoved: "web.budget_tools_removed",
   streamError: "stream.error",
   streamProtocolError: "stream.protocol_error",

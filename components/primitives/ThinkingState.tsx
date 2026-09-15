@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { BookOpen } from "lucide-react";
 
 /* ─────────────────────────────────────────────────────────
  * THINKING — expandable agent trace, four variants
@@ -32,6 +33,13 @@ type Row = {
   add?: number;
   del?: number;
   href?: string;
+  icon?: "book-open" | "search";
+  /** row is in-flight: leading glyph becomes a spinner */
+  running?: boolean;
+  /** row failed: glyph and secondary text take the danger tone */
+  failed?: boolean;
+  /** de-emphasized primary text (e.g. echoed search queries) */
+  subtle?: boolean;
 };
 
 const VARIANTS: Record<
@@ -90,6 +98,45 @@ function Dot({ tone }: { tone: string }) {
 
 const TONES = ["bg-accent", "bg-orange", "bg-green"];
 
+function Spinner() {
+  return (
+    <span className="size-3 shrink-0 rounded-full border-[1.5px] border-line-strong border-t-ink-2" style={{ animation: "spin 700ms linear infinite" }} />
+  );
+}
+
+/** 站点真实 favicon（直连目标站 /favicon.ico），加载失败回退到彩色圆点。 */
+export function TraceFavicon({
+  href,
+  tone,
+  className,
+}: {
+  href?: string;
+  tone?: string;
+  className?: string;
+}) {
+  const [failed, setFailed] = useState(false);
+  const origin = useMemo(() => {
+    if (!href) return null;
+    try {
+      return new URL(href).origin;
+    } catch {
+      return null;
+    }
+  }, [href]);
+  if (!origin || failed) return <Dot tone={tone ?? TONES[0]} />;
+  return (
+    // eslint-disable-next-line @next/next/no-img-element -- 任意域名 favicon 无法用 next/image remotePatterns 收敛
+    <img
+      src={`${origin}/favicon.ico`}
+      alt=""
+      loading="lazy"
+      referrerPolicy="no-referrer"
+      onError={() => setFailed(true)}
+      className={className ?? "size-3.5 shrink-0 rounded-[4px]"}
+    />
+  );
+}
+
 export default function ThinkingState({
   variant = "Steps",
   onSettled,
@@ -99,6 +146,9 @@ export default function ThinkingState({
   icon,
   working: workingProp,
   query: queryProp,
+  renderPrimary,
+  body,
+  revision,
 }: {
   variant?: string;
   onSettled?: () => void;
@@ -113,6 +163,15 @@ export default function ThinkingState({
   working?: boolean;
   /** Search query override (the built-in query only comes from VARIANTS) */
   query?: string;
+  /** optional row-primary renderer (e.g. inline markdown for reasoning rows);
+   *  keeps data formatting in the host adapter */
+  renderPrimary?: (row: Row) => ReactNode;
+  /** replaces the row list inside the expandable scroll area (e.g. a live
+   *  streaming preview window); pair with `revision` so scroll/shadow resync */
+  body?: ReactNode;
+  /** opaque change key for `body` content; rows revisions are derived
+   *  automatically, body content is opaque so the host supplies the key */
+  revision?: string;
 }) {
   const sequenced = useSequence(STAGES);
   const [manualExpanded, setManualExpanded] = useState<boolean | null>(null);
@@ -132,7 +191,7 @@ export default function ThinkingState({
   const expanded = manualExpanded ?? autoExpanded;
   const working = controlled ? workingProp : stage < 3;
   const visible = stage < 2 ? 0 : stage === 2 ? Math.min(2, v.rows.length) : v.rows.length;
-  const contentRevision = JSON.stringify(v.rows.slice(0, visible));
+  const contentRevision = revision ?? JSON.stringify(v.rows.slice(0, visible));
   const traceRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const pinnedRef = useRef(true);
@@ -259,7 +318,7 @@ export default function ThinkingState({
         <svg
           width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--ink-3)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"
           className="transition-transform duration-300"
-          style={{ transform: expanded ? "rotate(180deg)" : "rotate(0)" }}
+          style={{ transform: expanded ? "rotate(0)" : "rotate(-90deg)" }}
         >
           <path d="M6 9l6 6 6-6" />
         </svg>
@@ -290,6 +349,7 @@ export default function ThinkingState({
               data-shadow-bottom={shadowBottom || undefined}
             >
                 <div ref={traceRef} className="flex flex-col gap-1 py-1">
+            {body ?? (<>
             {v.query && (
               <div className="flex h-6 items-center gap-2 px-1.5" style={{ animation: expanded ? "fade-up 300ms cubic-bezier(0.23,1,0.32,1) both" : undefined }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--ink-3)" strokeWidth="2" strokeLinecap="round" className="shrink-0">
@@ -302,21 +362,34 @@ export default function ThinkingState({
             {v.rows.slice(0, visible).map((row, i) => {
               const content = (
                 <>
-                {variant === "Search" && <Dot tone={TONES[i % 3]} />}
+                {variant === "Search" && (
+                  row.running ? (
+                    <Spinner />
+                  ) : row.icon === "book-open" ? (
+                    <BookOpen aria-hidden className={`size-3.5 shrink-0 ${row.failed ? "text-red" : "text-ink-3"}`} />
+                  ) : row.icon === "search" ? (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={row.failed ? "var(--red)" : "var(--ink-3)"} strokeWidth="2" strokeLinecap="round" className="shrink-0">
+                      <circle cx="11" cy="11" r="7" />
+                      <path d="M21 21l-4.3-4.3" />
+                    </svg>
+                  ) : (
+                    <TraceFavicon href={row.href} tone={TONES[i % 3]} />
+                  )
+                )}
                 {variant === "Steps" && (
                   i < visible - 1 || !working ? (
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--ink-3)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
                       <path d="M20 6L9 17l-5-5" />
                     </svg>
                   ) : (
-                    <span className="size-3 shrink-0 rounded-full border-[1.5px] border-line-strong border-t-ink-2" style={{ animation: "spin 700ms linear infinite" }} />
+                    <Spinner />
                   )
                 )}
-                <span className={`min-w-0 truncate text-[12.5px] ${variant === "Reasoning" ? "whitespace-pre-wrap leading-relaxed text-ink-2" : "font-medium text-ink"} ${variant === "Search" ? "animated-underline" : ""}`}>
-                  {row.primary}
+                <span className={`min-w-0 truncate text-[12.5px] ${variant === "Reasoning" ? "whitespace-pre-wrap leading-relaxed text-ink-2" : row.subtle ? "text-ink-2" : "font-medium text-ink"} ${variant === "Search" && row.href ? "animated-underline" : ""}`}>
+                  {renderPrimary ? renderPrimary(row) : row.primary}
                 </span>
                 {row.secondary && (
-                  <span className={`shrink-0 text-[11.5px] text-ink-3 ${row.mono ? "font-mono" : ""}`}>
+                  <span className={`shrink-0 max-w-[45%] truncate text-[11.5px] ${row.failed ? "text-red" : "text-ink-3"} ${row.mono ? "font-mono" : ""}`}>
                     {row.secondary}
                   </span>
                 )}
@@ -329,9 +402,16 @@ export default function ThinkingState({
                 </>
               );
               const rowClass = "flex min-h-7 w-full items-center gap-2 rounded-[6px] px-1.5 py-0.5 text-left";
-              const animation = { animation: `fade-up 320ms cubic-bezier(0.23,1,0.32,1) ${i * 120}ms both` };
+              const animation = { animation: `fade-up 320ms cubic-bezier(0.23,1,0.32,1) ${Math.min(i, 6) * 120}ms both` };
 
               if (variant === "Search") {
+                if (!row.href) {
+                  return (
+                    <div key={i} className={rowClass} style={animation}>
+                      {content}
+                    </div>
+                  );
+                }
                 return (
                   <a
                     key={i}
@@ -373,6 +453,7 @@ export default function ThinkingState({
                 +7 more
               </span>
             )}
+            </>)}
               </div>
             </div>
           </div>

@@ -75,6 +75,14 @@ const positive = [
   "Create a Markdown document for the release notes",
   "Summarize this discussion into an .md file",
   "把这次讨论总结成 .md 文件",
+  "我希望有一个 Markdown 文件，总结这次讨论",
+  "给我一个 Markdown",
+  "帮我写个 markdown 文档",
+  "帮我写一份文档",
+  "我想要一份报告",
+  "整理一份会议纪要",
+  "give me a markdown file",
+  "write me a doc summarizing this",
 ]
 for (const text of positive)
   ok(`高置信交付正例：${text}`, isExplicitMarkdownArtifactRequest(text))
@@ -85,6 +93,9 @@ const negative = [
   "How does Markdown work?",
   "Write an explanation of how to use Markdown syntax",
   "请用小标题总结这次讨论",
+  "写一个函数处理文件",
+  "我希望有一个文件管理器",
+  "write a function to read a file",
 ]
 for (const text of negative)
   ok(`概念/普通回答反例：${text}`, !isExplicitMarkdownArtifactRequest(text))
@@ -118,6 +129,10 @@ ok("局部输入统计真实行数", progress.lineCount === 8)
 ok(
   "局部输入保留最近 Markdown 标题",
   progress.headings.join("|") === "概览|风险|下一步"
+)
+ok(
+  "局部输入携带尾部预览窗口",
+  progress.preview === "# 概览\n\n正文\n\n## 风险\n说明\n\n### 下一步"
 )
 
 process.exit(failed)

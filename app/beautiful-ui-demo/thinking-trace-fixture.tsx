@@ -6,6 +6,10 @@ import {
   SearchTrace,
   ToolTrace,
 } from "@/app/thread-chat/branching/assistant/thinking-trace"
+import {
+  MarkdownArtifactStreamTrace,
+  MarkdownArtifactToolPart,
+} from "@/app/thread-chat/orchestration/artifacts/markdown-artifact-card"
 import type { WebResearchActivity } from "@/lib/chat/web-research-activity"
 import "@/app/thread-chat/thread-chat.css"
 
@@ -13,7 +17,7 @@ import "@/app/thread-chat/thread-chat.css"
  * 覆盖流式中/完成两种状态，不发真实模型请求。 */
 
 const REASONING_TEXT_STREAMING =
-  "夏季石果类口味需求明显上升，桃子和杏子领先。\n\n应先检查蛋筒库存，再决定是否推广华夫筒特价。"
+  "**Clarifying seasonal demand**\n\n夏季石果类口味需求明显上升，桃子和杏子领先。\n\n**Checking inventory first**\n\n应先检查蛋筒库存，再决定是否推广华夫筒特价。"
 
 const REASONING_TEXT_LONG = Array.from(
   { length: 12 },
@@ -43,12 +47,61 @@ const SEARCH_ACTIVITIES: WebResearchActivity[] = [
     url: "https://docs.copilotkit.ai/inspector",
     sources: [],
   },
+  {
+    toolCallId: "call-3",
+    kind: "read",
+    status: "complete",
+    url: "https://copilotkit.ai/blog/inspector",
+    title: "Announcing CopilotKit Inspector",
+    sources: [],
+  },
 ]
 
 const SEARCH_ACTIVITIES_DONE = SEARCH_ACTIVITIES.map((activity) => ({
   ...activity,
   status: "complete" as const,
+  ...(activity.kind === "read" && !activity.title
+    ? { title: "Inspector — CopilotKit Docs" }
+    : {}),
 }))
+
+const ARTIFACT_PREVIEW = `# 冰淇淋消费趋势报告
+
+## 市场综述
+
+2024 年国内冰淇淋市场规模约 580 亿元，石果类口味增速领先。
+
+## 口味偏好
+
+- 桃子、杏子口味销量同比 +18%
+- 华夫筒 vs 蛋筒：华夫筒客单价高 12%
+
+## 渠道分布`
+
+const SEARCH_ACTIVITIES_FAILED: WebResearchActivity[] = [
+  {
+    toolCallId: "call-4",
+    kind: "search",
+    status: "failed",
+    query: "unreachable source",
+    sources: [],
+  },
+  {
+    toolCallId: "call-5",
+    kind: "read",
+    status: "failed",
+    url: "https://example.com/blocked-page",
+    sources: [],
+  },
+  {
+    toolCallId: "call-6",
+    kind: "read",
+    status: "complete",
+    url: "https://example.com/readable-page",
+    title: "A Readable Page",
+    sources: [],
+  },
+]
 
 function FixtureSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -114,7 +167,7 @@ export function ThinkingTraceFixture() {
         />
       </FixtureSection>
 
-      <FixtureSection title="Search · 已完成">
+      <FixtureSection title="Search · 已完成（已读标注 + 页面标题）">
         <SearchTrace
           activities={SEARCH_ACTIVITIES_DONE}
           route={{ mode: "search", reasonCode: "explicit_search", urls: [], suggestedQueries: [] }}
@@ -122,17 +175,61 @@ export function ThinkingTraceFixture() {
         />
       </FixtureSection>
 
-      <FixtureSection title="Tool · 生成中（带进度副文本）">
-        <ToolTrace
-          toolState="input-streaming"
+      <FixtureSection title="Search · 部分失败（失败行警示色 + 摘要计数）">
+        <SearchTrace activities={SEARCH_ACTIVITIES_FAILED} complete={true} />
+      </FixtureSection>
+
+      <FixtureSection title="Artifact · 生成中（滚动预览小窗）">
+        <MarkdownArtifactStreamTrace
           progress={{
-            toolCallId: "call-3",
+            toolCallId: "call-md-1",
             phase: "streaming",
             partialTitle: "冰淇淋消费趋势报告",
             characterCount: 1240,
             lineCount: 36,
             headings: ["市场综述", "口味偏好", "渠道分布"],
+            preview: ARTIFACT_PREVIEW,
           }}
+        />
+      </FixtureSection>
+
+      <FixtureSection title="Artifact · 生成中（刚起步，无预览）">
+        <MarkdownArtifactStreamTrace
+          progress={{
+            toolCallId: "call-md-2",
+            phase: "starting",
+            characterCount: 0,
+            lineCount: 0,
+            headings: [],
+          }}
+        />
+      </FixtureSection>
+
+      <FixtureSection title="Artifact · 已完成卡片（tool part 原位）">
+        <MarkdownArtifactToolPart
+          part={{
+            toolCallId: "call-md-3",
+            state: "output-available",
+            input: { title: "冰淇淋消费趋势报告" },
+            output: { created: true, artifactId: "artifact-fixture-1" },
+          }}
+          artifact={{
+            id: "artifact-fixture-1",
+            title: "冰淇淋消费趋势报告",
+            kind: "markdown",
+            content: ARTIFACT_PREVIEW,
+            sourceThreadId: "main",
+            sourceMessageId: "msg-1",
+          }}
+          sourceDepth={0}
+          onOpen={() => {}}
+        />
+      </FixtureSection>
+
+      <FixtureSection title="Artifact · 生成失败">
+        <MarkdownArtifactToolPart
+          part={{ toolCallId: "call-md-4", state: "output-error" }}
+          sourceDepth={0}
         />
       </FixtureSection>
 

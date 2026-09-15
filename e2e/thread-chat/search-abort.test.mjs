@@ -28,7 +28,7 @@ const tools = await readFile(
   new URL("../../lib/chat/research-tools.ts", import.meta.url),
   "utf8"
 )
-assert.equal(tools.match(/\{ abortSignal \}/g)?.length, 2)
+assert.equal(tools.match(/\{ abortSignal, toolCallId \}/g)?.length, 2)
 assert.match(tools, /webSearch\([\s\S]*abortSignal/)
 assert.match(tools, /webFetch\(normalized, \{ signal: abortSignal/)
 
