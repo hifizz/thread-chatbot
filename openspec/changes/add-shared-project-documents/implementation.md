@@ -94,3 +94,12 @@ PGlite 不替代原生多连接测试。本次未执行 macOS 浏览器或真实
 - `/threads/:threadId/artifacts` 按所有权返回该 Thread 的固定历史元数据，不含正文。运行时仅为已打开的 Thread 加载，消息状态未变时不重复请求；失败可重试。历史缓存不能更新 Document head，来源终态不能被旧生成中状态覆盖；正文仍按固定 Artifact ID 加载。
 - wt_pr145_quality 原生数据库 43 项通过，含原有文档锁竞争、不同文档独立提交、新的 Project 锁竞争与并发目录快照检查。真实三版本项目的 Bootstrap/目录均返回 1 个 Document + 1 个 Artifact，打开主线按需返回 3 条历史元数据。
 - EGO 在已有「PR 143 本地验收」空间验证桌面 V1、390×844 手机 V1/最新阅读、列表计数 1、@ 单一候选，并实际检查截图。测试草稿已清除，用户原标签保留；未发送真实模型请求。完整模型、系统分享与迁移验收仍保持待完成。
+
+## 四次审查：生产边界与收据身份
+
+- 核对后保留 `GET /documents/:documentId` 与 `getProjectDocument`：按 Document 读取当前版本是 proposal/spec 明确要求的服务契约；历史卡片按固定 Artifact 读取是另一种语义，不因当前客户端未调用而删除契约。
+- 已退役的 `pendingDocumentUpdates` 全文清单生成器移至 e2e 夹具。生产只生成摘要通知，但仍兼容已持久化的旧全文清单和收据。
+- 删除没有入口的 Document 独立归档字段、DTO 字段与判断，文档写权限继续继承 Project 归档。更新设计文件；没有运行 db:push/db:generate 或任何删列 SQL，独立库遗留空列不影响代码，正式迁移仍由 develop 单独集成。
+- `DocumentContextReceipt` 改成带 `kind: updates | notices` 的判别联合。消息 Part 格式保持不变，生成入口从 Part 类型明确创建带标签收据，新写入严格校验。仅持久化读取边界允许无标签 v1 兼容；未知 kind/schemaVersion（包括显式 null kind）不推进 SQL 通知游标。
+- 旧全文计划使用文档、固定 Revision/Artifact 及 commitIds 集合组成的语义身份匹配；不再比较整段 JSON。键序、文档顺序和提交集合顺序不影响匹配，不同版本/Artifact/不完整提交集合不能冒充已使用记录，摘要收据不能证明全文已使用。没有旧全文 Part 时不扫描收据。
+- 类型检查、相关 ESLint、文档专项、引用上下文、提示词缓存和原生 PostgreSQL 44 项通过。原生覆盖新旧两类收据、未知协议拒绝、Project 归档及原有锁竞争。未重跑真实模型/浏览器全场景，不提高发布验收状态。

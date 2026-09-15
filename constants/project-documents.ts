@@ -15,6 +15,8 @@ export const DOCUMENT_LIMITS = {
 export const DOCUMENT_TOOL_NAMES = [
   "findProjectDocuments", "readProjectDocument", "updateProjectDocument",
 ] as const
+/** 持久化使用收据的类型；消息 Part 的既有格式保持兼容。 */
+export const DOCUMENT_RECEIPT_KIND = { updates: "updates", notices: "notices" } as const
 export const DOCUMENT_COMMAND = {
   read: "document-read", update: "document-update",
 } as const

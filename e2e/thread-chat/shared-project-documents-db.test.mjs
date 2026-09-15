@@ -144,7 +144,7 @@ try {
   assert.equal((await legacyContext.pendingDocumentUpdates(testDb, projectId, rootId, [])).documents.length, 0); checks++
   const expanded = await contextService.expandDocumentUpdates(projectId, [{ id: id(), role: 'user', parts: [{ type: 'data-project-document-updates', data: manifest }] }])
   assert.ok(expanded[0].parts[0].text.includes(current.revision.content)); checks++
-  await contextRepository.markDocumentContextUsed(testDb, sourceMessage, manifest)
+  await testDb.update(messages).set({ documentContextUsed: manifest }).where(eq(messages.id, sourceMessage))
   assert.equal((await legacyContext.pendingDocumentUpdates(testDb, projectId, rootId)).documents.length, 0); checks++
   const [savedMessage] = await testDb.select().from(messages).where(eq(messages.id, messageA))
   const restored = toMessageDTO({ ...savedMessage, parts: [] })
@@ -242,7 +242,7 @@ try {
     changeSummary: '接受消息后提交的新变化' }, 'late-update')
   assert.equal(lateUpdate.status, 'committed')
   assert.deepEqual(await contextService.expandDocumentUpdates(projectId, [sent.result.userMessage]), noticesBefore)
-  await contextRepository.markDocumentContextUsed(testDb, mainTurn.assistantMessageId, frozen.data)
+  await contextRepository.markDocumentContextUsed(testDb, mainTurn.assistantMessageId, { ...frozen.data, kind: "notices" })
   const nextRoot = await contextRepository.pendingDocumentNotices(testDb, projectId, rootId)
   assert.deepEqual(nextRoot.documents.map(d => d.revisionId), [lateUpdate.revisionId])
   assert.equal((await contextRepository.pendingDocumentNotices(testDb, projectId, threadA)).documents.length > 1, true,
@@ -258,7 +258,7 @@ try {
   assert.ok(branchNotice.data.documents.length > 0)
   assert.deepEqual(await contextRepository.pendingDocumentNotices(testDb, projectId, threadA), branchNotice.data,
     '仅接受消息而无有效响应，不推进通知位置')
-  await contextRepository.markDocumentContextUsed(testDb, branchTurn.result.assistantMessage.id, branchNotice.data)
+  await testDb.update(messages).set({ documentContextUsed: branchNotice.data }).where(eq(messages.id, branchTurn.result.assistantMessage.id))
   assert.equal((await contextRepository.pendingDocumentNotices(testDb, projectId, threadA)).documents.length, 0)
   assert.deepEqual(await contextRepository.pendingDocumentNotices(testDb, projectId, rootId), nextRoot)
   checks++
@@ -303,15 +303,22 @@ try {
   assert.equal(boundedDoc.omittedChangeCount, boundedDoc.revisionNumber - 10)
   assert.equal(boundedDoc.changes.at(-1).revisionNumber, boundedDoc.revisionNumber)
   assert.equal('commitIds' in boundedDoc, false)
+  for (const unsupported of [{ ...bounded, kind: 'future' }, { ...bounded, kind: null }, { ...bounded, kind: 'notices', schemaVersion: 2 }]) {
+    await testDb.update(messages).set({ documentContextUsed: unsupported }).where(eq(messages.id, childIdentity.messageId))
+    assert.deepEqual(await contextRepository.pendingDocumentNotices(testDb, projectId, childIdentity.threadId), bounded,
+      'unknown receipt kind/version must not advance the notification cursor')
+    await assert.rejects(() => contextRepository.markDocumentContextUsed(testDb, childIdentity.messageId, unsupported))
+  }
+  checks++
   const sparseIds = [boundedDoc.changes[0].commitId, boundedDoc.changes.at(-1).commitId]
-  await contextRepository.markDocumentContextUsed(testDb, childIdentity.messageId, { schemaVersion: 1, documents: [{
+  await contextRepository.markDocumentContextUsed(testDb, childIdentity.messageId, { kind: "updates", schemaVersion: 1, documents: [{
     documentId, revisionId: boundedDoc.revisionId, artifactId: boundedDoc.artifactId, commitIds: sparseIds,
   }] })
   const sparsePending = (await contextRepository.pendingDocumentNotices(testDb, projectId, childIdentity.threadId)).documents.find(d => d.documentId === documentId)
   assert.ok(sparsePending.changes.every(change => !sparseIds.includes(change.commitId)))
   assert.equal(sparsePending.omittedChangeCount, Math.max(0, boundedDoc.revisionNumber - sparseIds.length - 10))
   checks++
-  await contextRepository.markDocumentContextUsed(testDb, childIdentity.messageId, bounded)
+  await contextRepository.markDocumentContextUsed(testDb, childIdentity.messageId, { ...bounded, kind: "notices" })
   assert.equal((await contextRepository.pendingDocumentNotices(testDb, projectId, childIdentity.threadId)).documents.length, 0)
   // 编辑产生新的消息快照；原用户通知不能被改写。
   const { editLatestTurn } = await import('../../lib/thread-chat/application/edit-turn.ts')

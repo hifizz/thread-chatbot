@@ -1,13 +1,14 @@
 import { eq, sql } from "drizzle-orm"
 import { artifacts, documents, documentRevisions, messages } from "@/lib/db/schema"
-import { DOCUMENT_LIMITS } from "@/constants/project-documents"
-import type { DocumentContextReceipt, DocumentUpdateNotices } from "../../contracts/document"
+import { DOCUMENT_LIMITS, DOCUMENT_RECEIPT_KIND } from "@/constants/project-documents"
+import { documentContextReceiptSchema, type DocumentContextReceipt, type DocumentUpdateNotices } from "../../contracts/document"
 import type { ConversationExecutor } from "../transaction"
 
 /** 在提供商实际返回有效内容后记录；预算/初始化/提供商调用前失败不误推进。 */
 export async function markDocumentContextUsed(executor: ConversationExecutor, messageId: string, manifest: DocumentContextReceipt) {
-  if (!manifest.documents.length) return
-  await executor.update(messages).set({ documentContextUsed: manifest }).where(eq(messages.id, messageId))
+  const receipt = documentContextReceiptSchema.parse(manifest)
+  if (!receipt.documents.length) return
+  await executor.update(messages).set({ documentContextUsed: receipt }).where(eq(messages.id, messageId))
 }
 
 type NoticeRow = {
@@ -16,19 +17,27 @@ type NoticeRow = {
   omittedChangeCount: number
 }
 
-/** 单快照汇总当前 Thread 的收据；数据库只返回每文档最近 N 条，不搬运全部提交摘要。 */
+/** 单快照汇总当前 Thread 的收据；数据库只返回每文档最近 N 条。
+ * 无标签 v1 的字段识别仅留在此持久化兼容边界；新收据按 kind 分支，未知版本不推进。
+ */
 export async function pendingDocumentNotices(executor: ConversationExecutor, projectId: string, threadId: string): Promise<DocumentUpdateNotices> {
   const rows = await executor.execute<NoticeRow>(sql`
     with used_entries as materialized (
-      select entry from ${messages} used_message
+      select entry, case when used_message.document_context_used ? 'kind'
+        then used_message.document_context_used->>'kind' else
+        case when entry ? 'commitIds' then ${DOCUMENT_RECEIPT_KIND.updates}
+             when entry ? 'revisionNumber' then ${DOCUMENT_RECEIPT_KIND.notices} end end as kind
+      from ${messages} used_message
       cross join lateral jsonb_array_elements(coalesce(used_message.document_context_used->'documents', '[]'::jsonb)) entry
       where used_message.thread_id = ${threadId} and used_message.project_id = ${projectId}
+        and used_message.document_context_used->>'schemaVersion' = '1'
     ), cursors as (
       select entry->>'documentId' as document_id, max((entry->>'revisionNumber')::integer) as revision_number
-      from used_entries group by entry->>'documentId'
+      from used_entries where kind = ${DOCUMENT_RECEIPT_KIND.notices} group by entry->>'documentId'
     ), legacy_commits as (
       select distinct entry->>'documentId' as document_id, commit_id
-      from used_entries cross join lateral jsonb_array_elements_text(coalesce(entry->'commitIds', '[]'::jsonb)) commit_id
+      from used_entries cross join lateral jsonb_array_elements_text(
+        case when kind = ${DOCUMENT_RECEIPT_KIND.updates} then coalesce(entry->'commitIds', '[]'::jsonb) else '[]'::jsonb end) commit_id
     ), pending as (
       select revision.id, revision.document_id, revision.revision_number,
         row_number() over (partition by revision.document_id order by revision.revision_number desc) as position,

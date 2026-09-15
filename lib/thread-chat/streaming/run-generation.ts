@@ -1,3 +1,4 @@
+import { documentReceiptForParts } from "./documents/context-receipt"
 import { AI_DIAGNOSTIC_EVENTS } from "@/constants/observability"
 import { logDiagnostic } from "@/lib/observability/diagnostic-log"
 import { contextLimitFailure } from "../application/context-budget"
@@ -162,7 +163,7 @@ async function runGenerationCore({
   try {
     prepared = await prepare({
       userId,
-      documentUpdates: latestUser.parts.find((part) => part.type === "data-project-document-updates" || part.type === "data-document-update-notices")?.data,
+      documentUpdates: documentReceiptForParts(latestUser.parts),
       messageId: message.id,
       projectId: message.projectId,
       threadId: thread.id,

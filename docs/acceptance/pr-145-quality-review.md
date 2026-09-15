@@ -152,3 +152,19 @@ EGO 在真实三版本项目中观察 @ 候选仅一项；无版本参数的读�
 执行命令：`pnpm typecheck`、`pnpm test:thread-chat:documents`、`pnpm test:thread-chat:gate3-client`、`node --import tsx e2e/thread-chat/artifact-reference-context.test.mjs`、`node /tmp/pr145-db.mjs pnpm test:thread-chat:documents-db`（原生 43 项）、相关 `pnpm exec eslint`、`pnpm openspec:validate`（38 项）、`git diff --check`。本地 3015 原先未启动，使用同一独立库启动验收服务，未修改 .env.local；仍使用 wt_pr145_quality，无 Neon/迁移操作。
 
 未覆盖：完整真实模型 A/B/C 与所有自然语言边界、系统分享、完整焦点/主题/草稿矩阵和正式迁移。上述专项通过不代表可直接发布；未合并或部署。
+
+## 四次审查核实与修复
+
+CR 部分成立：收据判别和整段 JSON 比较需要修复；旧全文通知生产器及文档级归档没有当前生产入口，予以清理。`getProjectDocument` 则是 OpenSpec 已定义的“按 Document 读取当前版本”服务契约，保留；固定 Artifact 历史读取不替代它。加 kind 需要兼容已持久化的无标签收据，并非零成本改动。
+
+| 路径 | 修复前 | 修复后及验证 |
+| --- | --- | --- |
+| 老会话失败后继续发送 | 全文计划与收据靠 JSON 字符串相等匹配 | 按固定身份与提交集合比较；打乱键序、文档和 commitIds 顺序仍识别已使用全文；不同版本、Artifact 或提交集合拒绝匹配 |
+| 新旧通知收据 | 无判别字段，由消费者猜 data 形状 | 从消息 Part 类型创建明确 kind；新写入严格校验，无标签 v1 在读取边界兼容；摘要不能冒充全文收据 |
+| 未知收据协议 | SQL 根据字段取游标 | 未知 kind、null kind 或 schemaVersion 不能推进通知；应用写入拒绝这些值 |
+| 普通消息请求 | 每轮先 stringify 所有文档收据 | 仅遇到需要过滤的旧全文 Part 才建立语义索引 |
+| 归档保护 | 另有仅测试写入的 Document 归档字段 | 删除未交付预留，Project 归档仍阻止更新；夹具在归档验证后恢复 Project 状态，后续发送回归通过 |
+
+验证：`pnpm typecheck`、相关 `pnpm exec eslint`、`pnpm test:thread-chat:documents`、`node --import tsx e2e/thread-chat/artifact-reference-context.test.mjs`、`pnpm test:thread-chat:prompt-cache`、`node /tmp/pr145-db.mjs pnpm test:thread-chat:documents-db`（原生 44 项）、OpenSpec strict 和 `git diff --check`。
+
+使用 wt_pr145_quality；未执行删列 SQL、db:push、db:generate 或修改 migration/snapshot/journal，未操作 Neon。当前读取 API 保留，不需要前端改走版本感知接口。本轮无 UI 行为修改，未新增浏览器或真实模型验收证据，完整模型/发布门槛仍待完成。

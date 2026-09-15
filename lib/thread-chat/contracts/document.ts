@@ -1,6 +1,6 @@
 import type { ArtifactSummaryDTO } from "./dto"
 import { z } from "zod"
-import { DOCUMENT_LIMITS } from "@/constants/project-documents"
+import { DOCUMENT_LIMITS, DOCUMENT_RECEIPT_KIND } from "@/constants/project-documents"
 
 export const markdownEditSchema = z.object({
   oldText: z.string().min(1).max(DOCUMENT_LIMITS.contentChars),
@@ -69,7 +69,22 @@ export const documentUpdateNoticesSchema = z.object({
   }).strict()),
 }).strict()
 export type DocumentUpdateNotices = z.infer<typeof documentUpdateNoticesSchema>
-export type DocumentContextReceipt = ProjectDocumentUpdates | DocumentUpdateNotices
+export const documentContextReceiptSchema = z.discriminatedUnion("kind", [
+  documentUpdatesSchema.extend({ kind: z.literal(DOCUMENT_RECEIPT_KIND.updates) }),
+  documentUpdateNoticesSchema.extend({ kind: z.literal(DOCUMENT_RECEIPT_KIND.notices) }),
+])
+export type DocumentContextReceipt = z.infer<typeof documentContextReceiptSchema>
+/** 仅数据库读取边界允许没有 kind 的既有收据，新写入必须使用带标签类型。 */
+export type StoredDocumentContextReceipt = DocumentContextReceipt | ProjectDocumentUpdates | DocumentUpdateNotices
+
+export function parseDocumentContextReceipt(value: unknown): DocumentContextReceipt {
+  if (typeof value === "object" && value !== null && "kind" in value) {
+    return documentContextReceiptSchema.parse(value)
+  }
+  const updates = documentUpdatesSchema.safeParse(value)
+  if (updates.success) return { ...updates.data, kind: DOCUMENT_RECEIPT_KIND.updates }
+  return { ...documentUpdateNoticesSchema.parse(value), kind: DOCUMENT_RECEIPT_KIND.notices }
+}
 /** messageId 是既有 assistant 执行身份，每次 retry 创建独立消息。 */
 export interface DocumentExecution {
   userId: string; projectId: string; threadId: string; messageId: string

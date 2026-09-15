@@ -24,7 +24,8 @@ assert.equal(snapshot.content, '# V1')
 assert.equal(snapshot.artifactId, 'fixed-v1')
 console.log('PASS 使用收据：提供商拒绝不消费、有效响应仅一次；导出/分享固定所选版本')
 
-const manifest = { schemaVersion: 1, documents: [{ documentId: 'd1', revisionId: 'r1', artifactId: 'a1', commitIds: ['r1'] }] }
+const id = n => `40000000-0000-4000-8000-${String(n).padStart(12, '0')}`
+const manifest = { schemaVersion: 1, documents: [{ documentId: id(1), revisionId: id(2), artifactId: id(3), commitIds: [id(2)] }] }
 const planned = { id: 'failed-user', role: 'user', parts: [{ type: 'text', text: '原用户问题' }, { type: 'data-project-document-updates', data: manifest }] }
 const filter = documentContextForRequest([], 'next-user')
 assert.deepEqual(filter(planned).parts, [{ type: 'text', text: '原用户问题' }])
@@ -52,3 +53,37 @@ assert.deepEqual(content.parts, [{ type: 'text', text: '原用户问题' }])
 assert.equal(planned.parts.length, 2, '还原编辑内容不修改服务端保存的固定清单')
 assert.throws(() => messagePartsToContent([{ type: 'text', text: '问题' }, { type: 'unknown-data' }]), /不支持/)
 console.log('PASS 刷新/编辑消息：服务端文档清单不进入用户内容，未知类型仍拒绝')
+
+const { parseDocumentContextReceipt } = await import('../../lib/thread-chat/contracts/document.ts')
+const { documentReceiptForParts } = await import('../../lib/thread-chat/streaming/documents/context-receipt.ts')
+const tagged = { ...manifest, kind: 'updates' }
+assert.deepEqual(parseDocumentContextReceipt(manifest), tagged)
+assert.deepEqual(documentReceiptForParts(planned.parts), tagged)
+const secondEntry = { documentId: id(4), revisionId: id(5), artifactId: id(6), commitIds: [id(7), id(5)] }
+const full = { schemaVersion: 1, documents: [manifest.documents[0], secondEntry] }
+const reordered = { documents: [
+  { commitIds: [id(5), id(7), id(5)], artifactId: id(6), revisionId: id(5), documentId: id(4) },
+  { commitIds: [id(2)], artifactId: id(3), revisionId: id(2), documentId: id(1) },
+], schemaVersion: 1, kind: 'updates' }
+const fullMessage = { ...planned, parts: [{ type: 'data-project-document-updates', data: full }] }
+const withReceipt = receipt => documentContextForRequest([{ id: 'assistant', parts: [], documentContextUsed: receipt }], 'next-user')(fullMessage)
+assert.deepEqual(withReceipt(reordered), fullMessage, 'JSON key/document/commit ordering is not receipt identity')
+for (const change of [{ revisionId: id(8) }, { artifactId: id(8) }, { documentId: id(8) }, { commitIds: [id(5)] }]) {
+  const mismatched = { ...full, kind: 'updates', documents: [full.documents[0], { ...secondEntry, ...change }] }
+  assert.equal(withReceipt(mismatched).parts.length, 0, 'different identity or incomplete commit set cannot authorize a failed plan')
+}
+const notice = { schemaVersion: 1, documents: [{ ...secondEntry, commitIds: undefined,
+  title: 'F1', revisionNumber: 2, changes: [], omittedChangeCount: 0 }] }
+delete notice.documents[0].commitIds
+const noticeReceipt = { ...notice, kind: 'notices' }
+assert.deepEqual(parseDocumentContextReceipt(notice), noticeReceipt)
+assert.deepEqual(documentReceiptForParts([{ type: 'data-document-update-notices', data: notice }]), noticeReceipt)
+assert.equal(withReceipt(noticeReceipt).parts.length, 0, 'a summary receipt does not prove full document context was used')
+assert.throws(() => parseDocumentContextReceipt({ ...tagged, kind: 'future' }))
+assert.throws(() => parseDocumentContextReceipt({ ...tagged, schemaVersion: 2 }))
+assert.throws(() => parseDocumentContextReceipt({ ...tagged, documents: notice.documents }))
+assert.throws(() => parseDocumentContextReceipt({ ...tagged, kind: null }))
+const ordinary = { id: 'ordinary', role: 'user', parts: [{ type: 'text', text: 'hello' }] }
+const lazy = documentContextForRequest([{ id: 'unused', get documentContextUsed() { throw new Error('must not scan receipts') } }])
+assert.deepEqual(lazy(ordinary), ordinary)
+console.log('PASS 收据判别及语义匹配：旧无标签兼容、未知协议拒绝、键序/集合无关、固定身份严格、摘要不冒充全文、普通请求不扫描')
