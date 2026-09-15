@@ -88,3 +88,10 @@ EGO 真实会话验证：1440×1000 桌面和 390×844 手机的正文区域均�
 用户截图中的三个 F1 实际是同一 Document 的三个 Revision。@ 菜单此前直接列出历史 Artifact 缓存，造成重复候选。新增领域层 currentProjectArtifacts/currentDocumentArtifact，统一当前文档投影；@ 候选、项目列表、列表数量和顶部计数都使用它，页面不再各自比较版本。后端现有 GET /documents/:documentId 不传 revisionId 即读取当前内容；固定 Artifact 读取不变。
 
 EGO 在真实三版本项目中观察 @ 候选仅一项；无版本参数的读取返回第三版及其固定 Artifact。没有发送模型请求或修改用户正文。补充并接入文档测试入口：多版本单项、独立同名、head 未载入、生成/失败来源不回退、流式旧元数据及历史快照不变。TypeScript、相关 ESLint、文档与客户端 store 回归通过。顶部计数改动在本轮浏览器收尾后完成编译，未将其热更新前观察值作为通过证据。
+
+## 二次审查修复：目录与同步
+
+- 当前目录改为服务端 Document 身份索引，移除客户端历史版本排序推断。
+- 同步生命周期移入项目运行时，不依赖 Drawer；目录中的来源状态每次刷新，固定正文缓存不改写。
+- 新目录与新正文使用一次 store 更新；旧版本与草稿保持。
+- 新增 document-sync 回归，覆盖远端 generating → completed、原子刷新及释放后的写入保护。TypeScript、文档回归和客户端 store 回归通过。

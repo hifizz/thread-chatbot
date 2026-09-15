@@ -72,6 +72,7 @@ function entitiesFromBootstrap(
     artifactsById: Object.fromEntries(
       bootstrap.artifacts.map((artifact) => [artifact.id, artifact])
     ),
+    documentsById: Object.fromEntries(bootstrap.documents.map((doc) => [doc.id, doc])),
     artifactOrder: bootstrap.artifacts.map((artifact) => artifact.id),
     streamByMessageId: Object.fromEntries(
       bootstrap.messages
@@ -88,6 +89,7 @@ function emptyEntities(): ConversationEntitySnapshot {
     threads: [],
     messages: [],
     artifacts: [],
+    documents: [],
     activeGenerationIds: [],
   })
 }
@@ -104,6 +106,7 @@ function entitySnapshot(
     messageIdsByThread: state.messageIdsByThread,
     artifactsById: state.artifactsById,
     artifactOrder: state.artifactOrder,
+    documentsById: state.documentsById,
     streamByMessageId: state.streamByMessageId,
   })
 }
@@ -151,6 +154,8 @@ export function createConversationStore(input?: {
     : emptyEntities()
   return createStore<NormalizedThreadChatState>()((set, get) => ({
     ...initial,
+    documentSyncError: false,
+    setDocumentSyncError(documentSyncError) { set({ documentSyncError }) },
     optimisticByCommandId: {},
     workspace: {
       ...structuredClone(EMPTY_WORKSPACE),
@@ -209,6 +214,13 @@ export function createConversationStore(input?: {
           },
         }
       })
+    },
+    syncDocuments(documents, artifacts) {
+      set((state) => ({
+        documentsById: Object.fromEntries(documents.map((doc) => [doc.id, doc])),
+        artifactsById: { ...state.artifactsById, ...Object.fromEntries(artifacts.map((artifact) => [artifact.id, artifact])) },
+        artifactOrder: [...new Set([...state.artifactOrder, ...artifacts.map((artifact) => artifact.id)])],
+      }))
     },
     upsertArtifact(artifact: ArtifactDTO) {
       set((state) => ({

@@ -19,7 +19,7 @@ import type { ConversationStore } from "../../core/store"
 import { useConversationStore } from "../../core/use-thread-store"
 import type { ThreadChatClient } from "../../net/client"
 import type { ConversationCommands } from "../../net/commands/conversation-commands"
-import { useProjectDocumentSync } from "./documents/use-project-document-sync"
+import { selectCurrentProjectArtifacts } from "@/lib/thread-chat/domain/artifacts/selectors"
 import { DocumentView } from "./documents/view"
 import { ProjectPanel } from "./project-panel"
 
@@ -80,7 +80,6 @@ export function StoreBoundProjectPanel({
   onSelect(id: string): void
   onLocate(threadId: string, sourceMessageId: string): void
 }) {
-  const documentSync = useProjectDocumentSync({ projectId, client, store, enabled: open })
   const versionRequest = useRef({ sequence: 0 })
   useEffect(() => {
     const pending = versionRequest.current
@@ -101,9 +100,11 @@ export function StoreBoundProjectPanel({
     () =>
       state.artifactOrder.flatMap((id) => {
         const artifact = state.artifactsById[id]
-        return artifact ? [artifact] : []
+        if (!artifact) return []
+        const doc = artifact.document && state.documentsById[artifact.document.id]
+        return [{ ...artifact, sourceMessageStatus: doc?.currentArtifactId === artifact.id ? doc.sourceMessageStatus : artifact.sourceMessageStatus }]
       }),
-    [state.artifactOrder, state.artifactsById]
+    [state.artifactOrder, state.artifactsById, state.documentsById]
   )
 
   useEffect(() => {
@@ -255,8 +256,9 @@ export function StoreBoundProjectPanel({
 
   return (
     <ProjectPanel
-      documentSyncError={documentSync.error}
-      renderDocumentControls={(artifact) => <DocumentView artifact={artifact} client={client} navigationBlocked={questionArtifactId === artifact.id} onSelect={(id) => {
+      documentSyncError={state.documentSyncError}
+      currentArtifacts={selectCurrentProjectArtifacts(state)}
+      renderDocumentControls={(artifact) => <DocumentView artifact={artifact} currentRevisionId={artifact.document ? state.documentsById[artifact.document.id]?.currentRevisionId : undefined} client={client} navigationBlocked={questionArtifactId === artifact.id} onSelect={(id) => {
         if (questionArtifactId === artifact.id) return
         const request = ++versionRequest.current.sequence
         void client.getArtifact(id).then((artifact) => {

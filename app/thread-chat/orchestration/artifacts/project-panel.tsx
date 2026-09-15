@@ -27,7 +27,6 @@ import type {
   ProjectFileDTO,
 } from "@/lib/thread-chat/contracts/dto"
 import { MarkdownBody } from "../../chat/message/markdown-body"
-import { selectCurrentProjectArtifacts } from "@/lib/thread-chat/domain/artifacts/selectors"
 import { ArtifactPreviewActions } from "./artifact-preview-actions"
 import { uploadProjectFile } from "../../net/project-file-upload"
 
@@ -35,6 +34,7 @@ export interface ProjectPanelProps {
   project: ProjectDTO | null
   files: ProjectFileDTO[]
   artifacts: ArtifactDTO[]
+  currentArtifacts: ArtifactDTO[]
   documentSyncError?: boolean
   renderDocumentControls?(artifact: ArtifactDTO): React.ReactNode
   open: boolean
@@ -88,6 +88,7 @@ export function ProjectPanel({
   project,
   files,
   artifacts,
+  currentArtifacts,
   open,
   activeId,
   onClose,
@@ -159,7 +160,7 @@ export function ProjectPanel({
   )
   const sortedArtifacts = useMemo(
     () => {
-      return selectCurrentProjectArtifacts(artifacts)
+      return currentArtifacts
         .filter((artifact) => {
           const query = artifactQuery.trim().toLowerCase()
           if (!query) return true
@@ -173,7 +174,7 @@ export function ProjectPanel({
             .includes(query)
         })
     },
-    [artifactQuery, artifacts]
+    [artifactQuery, currentArtifacts]
   )
   const sortedFiles = useMemo(
     () =>
@@ -308,7 +309,7 @@ export function ProjectPanel({
           className={displayedSection === "artifacts" ? "on" : ""}
           onClick={() => selectSection("artifacts")}
         >
-          文档与产物 <span>{selectCurrentProjectArtifacts(artifacts).length}</span>
+          文档与产物 <span>{currentArtifacts.length}</span>
         </button>
       </div>}
 

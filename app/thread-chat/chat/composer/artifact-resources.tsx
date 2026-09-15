@@ -24,3 +24,9 @@ export function useComposerThread(threadId: string) {
   if (!store) throw new Error("ArtifactResourcesProvider 未挂载")
   return useStore(store, (state) => state.threadsById[threadId === "main" ? state.project?.rootThreadId ?? threadId : threadId])
 }
+
+export function useDocumentResources() {
+  const store = useContext(ResourceContext)
+  if (!store) throw new Error("ArtifactResourcesProvider 未挂载")
+  return useStore(store, (state) => state.documentsById)
+}

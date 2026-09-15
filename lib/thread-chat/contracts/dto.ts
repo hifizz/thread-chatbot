@@ -1,3 +1,4 @@
+import type { DocumentListItemDTO } from "./document"
 import type {
   AttachmentKind,
   AttachmentStatus,
@@ -104,6 +105,7 @@ export interface ArtifactDTO {
 }
 
 export interface ProjectBootstrapDTO {
+  documents: DocumentListItemDTO[]
   project: ProjectDTO | null
   files: ProjectFileDTO[]
   threads: ThreadDTO[]

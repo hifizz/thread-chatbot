@@ -1,3 +1,4 @@
+import { startProjectDocumentSync } from "../documents/sync"
 import type { ConversationStore } from "../../core/store"
 import type { ThreadChatClient } from "../client"
 import {
@@ -53,6 +54,7 @@ export async function bootConversationProject(options: {
       wait: options.wait,
     })
   )
+  const documents = startProjectDocumentSync(projectId, client, store)
   const unsubscribe = options.storage
     ? store.subscribe((state, previous) => {
         if (state.workspace !== previous.workspace)
@@ -63,6 +65,7 @@ export async function bootConversationProject(options: {
   return {
     background,
     dispose() {
+      documents.dispose()
       unsubscribe()
       for (const connection of background) connection.close()
     },

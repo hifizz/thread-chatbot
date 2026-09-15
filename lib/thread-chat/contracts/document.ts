@@ -24,6 +24,8 @@ export interface DocumentDTO {
   archivedAt: string | null
 }
 export interface DocumentListItemDTO extends DocumentDTO {
+  revisionNumber: number
+  sourceMessageStatus: DocumentRevisionSummaryDTO["sourceMessageStatus"]
   currentArtifactId: string
   sourceThreadId: string
   sourceMessageId: string

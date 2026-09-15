@@ -10,20 +10,21 @@ const artifact = (id, revisionNumber, overrides = {}) => ({
 const r1 = artifact("r1", 1)
 const r2 = artifact("r2", 2)
 const r3 = artifact("r3", 3)
-assert.deepEqual(selectCurrentProjectArtifacts([r2, r3, r1]), [r3])
-assert.equal(selectCurrentDocumentArtifact([r1, r2, r3], "document-1"), r3)
-assert.equal(selectCurrentDocumentArtifact([r1, r2], "document-1"), null, "missing head must not silently fall back")
-const other = artifact("other", 1, { document: { id: "document-2", revisionId: "other", revisionNumber: 1, currentRevisionId: "other" } })
-assert.equal(selectCurrentProjectArtifacts([r1, r2, r3, other]).length, 2, "same title does not mean same document")
-const failed = { ...r3, sourceMessageStatus: "failed" }
-assert.deepEqual(selectCurrentProjectArtifacts([r1, r2, failed]), [failed], "source qualification must not select an old completed version")
-const staleMetadata = { ...r1, document: { ...r1.document, currentRevisionId: "r1" } }
-assert.deepEqual(selectCurrentProjectArtifacts([staleMetadata, r3]), [r3], "stream arrival before old metadata refresh")
-const standalone = artifact("legacy", 1, { document: undefined })
-assert.equal(selectCurrentProjectArtifacts([r1, r3, standalone]).length, 2)
-assert.equal(r1.content, "body-r1", "fixed snapshots remain unchanged")
-assert.equal(selectCurrentDocumentArtifact([r1, r3], "unknown"), null)
-console.log("PASS 当前文档目录：多版本单入口、同名身份、head 缺失、流式刷新、来源资格与固定历史")
+const document = { id: "document-1", currentArtifactId: "r3", currentRevisionId: "r3", sourceMessageStatus: "completed" }
+const catalog = (items, documents = [document]) => ({ artifactsById: Object.fromEntries(items.map(a => [a.id, a])), documentsById: Object.fromEntries(documents.map(d => [d.id, d])) })
+assert.deepEqual(selectCurrentProjectArtifacts(catalog([r2, r3, r1])), [r3])
+assert.deepEqual(selectCurrentDocumentArtifact(catalog([r1, r2, r3]), document.id), r3)
+assert.equal(selectCurrentDocumentArtifact(catalog([r1, r2]), document.id), null)
+const other = artifact("other", 1, { document: { id: "document-2", revisionId: "other", revisionNumber: 1 } })
+assert.equal(selectCurrentProjectArtifacts(catalog([r1, r2, r3, other], [document, { ...document, id: "document-2", currentArtifactId: "other" }])).length, 2)
+assert.equal(selectCurrentProjectArtifacts(catalog([r1, r3], [{ ...document, sourceMessageStatus: "failed" }]))[0].sourceMessageStatus, "failed")
+const stale = { ...r3, sourceMessageStatus: "generating" }
+assert.equal(selectCurrentProjectArtifacts(catalog([r1, stale]))[0].sourceMessageStatus, "completed")
+assert.equal(stale.sourceMessageStatus, "generating", "directory metadata does not mutate fixed cache")
+assert.deepEqual(selectCurrentProjectArtifacts(catalog([r1, r3], [])), [], "cache alone cannot invent current documents")
+assert.equal(r1.content, "body-r1")
+assert.equal(selectCurrentDocumentArtifact(catalog([r1, r3]), "unknown"), null)
+console.log("PASS 当前文档目录：权威 head、同名身份、未加载正文、来源状态刷新、固定历史")
 
 // 消息路径与文档 head 是两个维度：原路径应保留旧产物，而不是被当前目录过滤。
 const { selectArtifactsOnSelectedMessagePaths } = await import("../../lib/thread-chat/domain/artifacts/selectors.ts")
@@ -40,7 +41,7 @@ const tree = {
   artifactOrder: ["missing", "r1", "r3"],
 }
 assert.deepEqual(selectArtifactsOnSelectedMessagePaths(tree).map(a => a.id), ["r1"])
-assert.deepEqual(selectCurrentProjectArtifacts(Object.values(tree.artifacts)).map(a => a.id), ["r3"])
+assert.deepEqual(selectCurrentProjectArtifacts(catalog(Object.values(tree.artifacts))).map(a => a.id), ["r3"])
 tree.threads.main.activeLeafMessageId = "answer-2"
 assert.deepEqual(selectArtifactsOnSelectedMessagePaths(tree).map(a => a.id), ["r3"])
 tree.threads.main.activeLeafMessageId = null

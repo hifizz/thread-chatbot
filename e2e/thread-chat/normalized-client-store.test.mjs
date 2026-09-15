@@ -93,6 +93,7 @@ function bootstrap(overrides = {}) {
     messages: [message()],
     files: [],
     artifacts: [],
+    documents: [],
     activeGenerationIds: [],
     ...overrides,
   }

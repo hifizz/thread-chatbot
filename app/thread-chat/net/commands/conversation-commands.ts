@@ -158,8 +158,7 @@ export function createConversationCommands(
     try {
       const bootstrap = await client.getProject(projectId)
       if (bootstrap.project) store.getState().upsertProject(bootstrap.project)
-      for (const artifact of bootstrap.artifacts)
-        store.getState().upsertArtifact(artifact)
+      store.getState().syncDocuments(bootstrap.documents, bootstrap.artifacts)
     } catch {
       // Artifact 资源区刷新是非阻塞增强；历史消息仍保留工具结果。
     }

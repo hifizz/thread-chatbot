@@ -299,6 +299,7 @@ function initialBootstrap(
     files: [],
     threads: [root, child, nested],
     messages,
+    documents: [],
     artifacts: [artifact],
     activeGenerationIds: options.backgroundRecovery
       ? [BACKGROUND_ASSISTANT_ID]
@@ -338,6 +339,7 @@ export function createGate3MockRuntime(
     files: [],
     threads: [...threads.values()].map(clone),
     messages: [...messages.values()].map(clone),
+    documents: [],
     artifacts: [...artifacts.values()].map(clone),
     activeGenerationIds: [...messages.values()]
       .filter((message) => message.status === "generating")

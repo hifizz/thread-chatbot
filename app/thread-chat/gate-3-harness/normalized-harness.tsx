@@ -11,6 +11,7 @@ import { messagePartsToContent, forkFirstTurnContent, type MessageContentInput }
 
 import dynamic from "next/dynamic"
 import React, { useEffect, useMemo, useRef, useState } from "react"
+import { startProjectDocumentSync } from "../net/documents/sync"
 import { createConversationStore, type ConversationStore } from "../core/store"
 import { useConversationStore } from "../core/use-thread-store"
 import {
@@ -143,6 +144,10 @@ export function NormalizedGate3Harness({
     })
     return { mock, store, commands }
   })
+  useEffect(() => {
+    const sync = startProjectDocumentSync(projectId, runtime.mock.client, runtime.store)
+    return () => sync.dispose()
+  }, [projectId, runtime])
   const state = useConversationStore(runtime.store, (value) => value)
   const tree = useMemo(() => projectConversationTree(state), [state])
   const [scenario, setScenario] = useState<Gate3HarnessScenario>("normal")
@@ -403,7 +408,7 @@ export function NormalizedGate3Harness({
 
   const rootHasMessages = (tree.threads.main?.messages.length ?? 0) > 0
   const branchCount = Math.max(0, Object.keys(tree.threads).length - 1)
-  const markdownCount = selectCurrentProjectArtifacts(Object.values(state.artifactsById)).filter(
+  const markdownCount = selectCurrentProjectArtifacts(state).filter(
     (artifact) => artifact.kind === "markdown"
   ).length
   const selectedScenarioLabel =

@@ -609,7 +609,7 @@ function NormalizedThreadChat({
     state.project?.customTitle ?? state.project?.autoTitle ?? derivedSubtitle
   const hintVisible = !hintDismissed && !mainHasMessage
   const branchCount = Math.max(0, Object.keys(tree.threads).length - 1)
-  const markdownCount = selectCurrentProjectArtifacts(Object.values(state.artifactsById))
+  const markdownCount = selectCurrentProjectArtifacts(state)
     .filter((artifact) => artifact.kind === "markdown").length
   const navigationProps: ThreadChatNavigationProps = {
     viewMode: workspace.viewMode,

@@ -9,13 +9,13 @@ import { DocumentVersionHistory } from "./version-history"
 import { DocumentDiff } from "./diff"
 
 /** 只管理版本目录；导航资格由持有选区/草稿的上层明确传入。 */
-export function DocumentView({ artifact, client, navigationBlocked, onSelect }: {
+export function DocumentView({ artifact, currentRevisionId, client, navigationBlocked, onSelect }: {
+  currentRevisionId?: string
   artifact: ArtifactDTO; client: ThreadChatClient; navigationBlocked: boolean
   onSelect(artifactId: string): void
 }) {
   const document = artifact.document
   const documentId = document?.id
-  const currentRevisionId = document?.currentRevisionId
   const [history, setHistory] = useState<DocumentRevisionSummaryDTO[]>([])
   const [errorDocumentId, setErrorDocumentId] = useState<string | null>(null)
   const [refresh, setRefresh] = useState(0)
@@ -36,7 +36,7 @@ export function DocumentView({ artifact, client, navigationBlocked, onSelect }: 
     {errorDocumentId === documentId && <p role="alert">{DOCUMENT_UI_COPY.historyFailed} <button type="button" onClick={() => setRefresh((value) => value + 1)}>重新加载版本</button></p>}
     {navigationBlocked && <p role="status">{DOCUMENT_UI_COPY.navigationBlocked}</p>}
     <DocumentVersionHistory revisions={revisions} revisionId={document.revisionId}
-      currentRevisionId={document.currentRevisionId} disabled={navigationBlocked} onSelect={(revision) => onSelect(revision.artifactId)} />
+      currentRevisionId={currentRevisionId ?? document.revisionId} disabled={navigationBlocked} onSelect={(revision) => onSelect(revision.artifactId)} />
     {previous && <DocumentDiff key={`diff:${artifact.id}`} before={previous} after={artifact} client={client} />}
     {latest && latest.id !== document.revisionId && <p>
       正在查看历史版本 <button type="button" className="project-secondary" disabled={navigationBlocked} onClick={() => onSelect(latest.artifactId)}>查看最新版本</button>

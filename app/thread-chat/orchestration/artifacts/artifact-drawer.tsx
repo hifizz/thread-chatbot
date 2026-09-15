@@ -89,7 +89,7 @@ export function ArtifactDrawer({
     <ProjectPanel
       project={project}
       files={[]}
-      artifacts={artifacts}
+      artifacts={artifacts} currentArtifacts={artifacts}
       open={open}
       activeId={activeId}
       onClose={onClose}

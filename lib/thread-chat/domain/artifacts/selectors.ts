@@ -2,32 +2,28 @@ import { activeMessagePath } from "../message-graph"
 import type { Artifact, ThreadTreeState } from "../types"
 import type { ArtifactDTO } from "../../contracts/dto"
 
-/** 当前文档目录。版本选择集中在这里，消费者只接收每份文档的当前内容。
- * 固定 Artifact 集合仍完整保留，历史引用不得使用此目录回放。
- */
-export function selectCurrentProjectArtifacts(artifacts: readonly ArtifactDTO[]): ArtifactDTO[] {
-  const documents = new Map<string, ArtifactDTO>()
-  const standalone: ArtifactDTO[] = []
-  for (const artifact of artifacts) {
-    const document = artifact.document
-    if (!document) {
-      standalone.push(artifact)
-      continue
-    }
-    const previous = documents.get(document.id)
-    if (!previous || document.revisionNumber > previous.document!.revisionNumber)
-      documents.set(document.id, artifact)
-  }
-  // 已知 head 尚未加载时不把旧正文冒充当前内容。来源资格由具体操作另行检查，
-  // 不能因为新版回复失败或生成中，就悄悄回退到某个 completed 历史版本。
-  return [...standalone, ...documents.values()].filter((artifact) => !artifact.document
-    || artifact.document.revisionId === artifact.document.currentRevisionId)
-    .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
+import type { DocumentListItemDTO } from "../../contracts/document"
+
+export interface ProjectArtifactCatalog {
+  artifactsById: Readonly<Record<string, ArtifactDTO>>
+  documentsById: Readonly<Record<string, DocumentListItemDTO>>
 }
 
-/** 调用方只提供持续文档身份，不需要指定或比较版本。 */
-export function selectCurrentDocumentArtifact(artifacts: readonly ArtifactDTO[], documentId: string): ArtifactDTO | null {
-  return selectCurrentProjectArtifacts(artifacts).find((artifact) => artifact.document?.id === documentId) ?? null
+/** 当前身份由服务端目录决定；固定产物缓存不承担版本推断职责。 */
+export function selectCurrentProjectArtifacts(catalog: ProjectArtifactCatalog): ArtifactDTO[] {
+  const standalone = Object.values(catalog.artifactsById).filter((artifact) => !artifact.document)
+  const current = Object.values(catalog.documentsById).flatMap((document) => {
+    const artifact = selectCurrentDocumentArtifact(catalog, document.id)
+    return artifact ? [artifact] : []
+  })
+  return [...standalone, ...current].sort((left, right) => right.createdAt.localeCompare(left.createdAt))
+}
+
+/** 未加载当前正文时返回 null，不回退到历史版本。 */
+export function selectCurrentDocumentArtifact(catalog: ProjectArtifactCatalog, documentId: string): ArtifactDTO | null {
+  const document = catalog.documentsById[documentId]
+  const artifact = document && catalog.artifactsById[document.currentArtifactId]
+  return artifact ? { ...artifact, sourceMessageStatus: document.sourceMessageStatus } : null
 }
 
 /** 各 Thread 选中消息路径产生的固定产物；保留历史版本与原有产物顺序。 */

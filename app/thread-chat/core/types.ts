@@ -1,3 +1,4 @@
+import type { DocumentListItemDTO } from "@/lib/thread-chat/contracts/document"
 /**
  * 兼容入口：Thread Chat 领域类型的唯一来源位于 lib/thread-chat/domain。
  * 客户端调用方会在后续小步迁移中逐步切换到领域入口。
@@ -68,6 +69,7 @@ export interface ConversationEntitySnapshot {
   messageIdsByThread: Record<string, string[]>
   artifactsById: Record<string, ArtifactDTO>
   artifactOrder: string[]
+  documentsById: Record<string, DocumentListItemDTO>
   streamByMessageId: Record<string, ConversationStreamState>
 }
 
@@ -82,6 +84,8 @@ export interface ConversationEntityState extends ConversationEntitySnapshot {
 }
 
 export interface NormalizedThreadChatState extends ConversationEntityState {
+  documentSyncError: boolean
+  setDocumentSyncError(error: boolean): void
   workspace: WorkspaceUiState
   hydrateProject(bootstrap: ProjectBootstrapDTO): void
   upsertProject(project: ProjectDTO): void
@@ -90,6 +94,7 @@ export interface NormalizedThreadChatState extends ConversationEntityState {
   upsertThread(thread: ThreadDTO): void
   upsertMessage(message: MessageDTO): void
   upsertArtifact(artifact: ArtifactDTO): void
+  syncDocuments(documents: DocumentListItemDTO[], artifacts: ArtifactDTO[]): void
   applyStreamSnapshot(
     messageId: string,
     message: ThreadChatUIMessage,

@@ -41,14 +41,15 @@ export async function listDocumentHistory(executor: ConversationExecutor, docume
 }
 
 export async function listOwnedDocuments(executor: ConversationExecutor, userId: string, projectId: string, documentId?: string): Promise<DocumentListItemDTO[]> {
-  const rows = await executor.select({ document: documents, title: artifacts.title, currentArtifactId: artifacts.id, sourceThreadId: artifacts.threadId, sourceMessageId: artifacts.sourceMessageId }).from(documents)
+  const rows = await executor.select({ document: documents, revisionNumber: documentRevisions.revisionNumber, sourceMessageStatus: messages.status, title: artifacts.title, currentArtifactId: artifacts.id, sourceThreadId: artifacts.threadId, sourceMessageId: artifacts.sourceMessageId }).from(documents)
     .innerJoin(projects, eq(projects.id, documents.projectId))
     .innerJoin(documentRevisions, and(eq(documentRevisions.id, documents.currentRevisionId), eq(documentRevisions.documentId, documents.id)))
     .innerJoin(artifacts, and(eq(artifacts.id, documentRevisions.artifactId), eq(artifacts.projectId, documents.projectId)))
+    .innerJoin(messages, eq(messages.id, artifacts.sourceMessageId))
     .where(and(eq(projects.userId, userId), eq(documents.projectId, projectId), isNotNull(documents.currentRevisionId),
       documentId ? eq(documents.id, documentId) : undefined))
     .orderBy(desc(documents.createdAt), documents.id)
-  return rows.map(({ document: d, title, currentArtifactId, sourceThreadId, sourceMessageId }) => ({ id: d.id, projectId: d.projectId,
+  return rows.map(({ document: d, title, currentArtifactId, sourceThreadId, sourceMessageId, revisionNumber, sourceMessageStatus }) => ({ revisionNumber, sourceMessageStatus, id: d.id, projectId: d.projectId,
     currentRevisionId: d.currentRevisionId!, currentArtifactId, title, sourceThreadId, sourceMessageId, archivedAt: d.archivedAt?.toISOString() ?? null }))
 }
 
