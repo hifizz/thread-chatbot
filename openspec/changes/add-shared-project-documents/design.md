@@ -35,7 +35,7 @@
 
 | 实体 | 核心字段 | 不变量 |
 | --- | --- | --- |
-| `documents` | id、projectId、currentRevisionId、createdAt、archivedAt | ID 是持续文件身份；currentRevisionId 指向本文件已提交版本 |
+| `documents` | id、projectId、currentRevisionId、createdAt | ID 是持续文件身份；currentRevisionId 指向本文件已提交版本 |
 | `document_revisions` | id、documentId、projectId、revisionNumber、parentRevisionId、artifactId、changeSummary、edits、actorUserId、commandId、executionId、toolCallId、createdAt | append-only；正文/标题由 artifactId 唯一读取；来源 Thread/Message 由 Artifact 关联取得 |
 | `artifacts`（已有） | id、projectId、threadId、sourceMessageId、title、content、kind | 每次成功更新创建新 Artifact；旧 ID 与内容不变 |
 | `conversation_commands`（已有） | userId/id、kind、scopeId、requestHash、result | 成功及 no-op 结果可幂等回放 |
@@ -64,7 +64,6 @@ interface DocumentDTO {
   projectId: string
   currentRevisionId: string
   title: string // 来自当前版本的 Artifact
-  archivedAt: string | null
 }
 
 interface DocumentRevisionDTO {
@@ -244,3 +243,5 @@ messages.document_context_used 继续使用现有 JSONB，类型兼容旧清单/
 ## Open Questions
 
 无阻塞产品问题。具体 HTTP 文件路径、readId 复用的生成记录字段和现有 Part 渲染注册点由实施时核对，但必须满足本文身份、持久化、Stop 协调及预算合同。自动合并、人工编辑、版本恢复 UI 和失败消息产物可分叉资格属于后续独立需求。
+
+本期只提供 Project 归档；文档写权限继承 Project。暂不引入独立 Document 归档字段或入口。按 Document 读取当前版本的接口保留为明确的服务契约；固定 Artifact 读取用于历史卡片、Quote 和 Fork，二者不互相替代。

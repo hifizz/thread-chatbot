@@ -22,7 +22,7 @@ export async function getProjectDocument(userId: string, documentId: string, rev
   const revision = await readDocumentRevision(db, doc.id, revisionId ?? doc.currentRevisionId)
   if (!revision) notFound()
   return { document: { id: doc.id, projectId: doc.projectId, currentRevisionId: doc.currentRevisionId,
-    title: revision.title, archivedAt: doc.archivedAt?.toISOString() ?? null }, revision }
+    title: revision.title }, revision }
 }
 export async function getDocumentHistory(userId: string, documentId: string) {
   const doc = await findOwnedDocument(db, userId, documentId)
@@ -53,7 +53,7 @@ export async function readProjectDocument(identity: DocumentExecution, input: { 
         const revision = await readDocumentRevision(tx, doc.id, input.revisionId ?? doc.currentRevisionId!)
         if (!revision) notFound()
         return { document: { id: doc.id, projectId: doc.projectId, currentRevisionId: doc.currentRevisionId!,
-          title: revision.title, archivedAt: doc.archivedAt?.toISOString() ?? null },
+          title: revision.title },
           revision, readId, isCurrent: revision.id === doc.currentRevisionId,
           executionId: identity.messageId }
       } })
@@ -92,7 +92,7 @@ async function commitDocumentUpdate(tx: ConversationTransaction, identity: Docum
   const doc = await lockDocument(tx, input.documentId)
   if (!doc?.currentRevisionId) return { status: "rejected", code: "DOCUMENT_UNAVAILABLE" }
   if (!documentWritesEnabled()) return { status: "rejected", code: "WRITES_DISABLED" }
-  if (project.archivedAt || doc.archivedAt) return { status: "rejected", code: "DOCUMENT_READ_ONLY" }
+  if (project.archivedAt) return { status: "rejected", code: "DOCUMENT_READ_ONLY" }
   if (!isActiveDocumentExecution(message))
     return { status: "rejected", code: "EXECUTION_INACTIVE" }
   const conflicts = await countExecutionConflicts(tx, identity, doc.id)

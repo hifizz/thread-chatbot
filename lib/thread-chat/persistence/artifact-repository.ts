@@ -6,7 +6,6 @@ import type { ConversationExecutor } from "@/lib/thread-chat/persistence/transac
 
 const artifactSourceSelection = {
   documentId: documents.id,
-  documentArchivedAt: documents.archivedAt,
   documentRevisionId: documentRevisions.id,
   documentRevisionNumber: documentRevisions.revisionNumber,
   sourceThreadCustomTitle: threads.customTitle,
@@ -74,7 +73,6 @@ export async function listOwnedProjectArtifactCatalog(
       currentArtifactId: row.artifact.id, title: row.artifact.title,
       revisionNumber: row.documentRevisionNumber, sourceMessageStatus: row.sourceMessageStatus,
       sourceThreadId: row.artifact.threadId, sourceMessageId: row.artifact.sourceMessageId,
-      archivedAt: row.documentArchivedAt?.toISOString() ?? null,
     }] : []),
   }
 }

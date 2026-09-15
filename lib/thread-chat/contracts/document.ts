@@ -22,7 +22,6 @@ export type UpdateDocumentInput = z.infer<typeof updateDocumentInputSchema>
 export type DocumentEditError = "SOURCE_NOT_FOUND" | "SOURCE_AMBIGUOUS" | "OVERLAPPING_EDITS" | "INVALID_EDIT"
 export interface DocumentDTO {
   id: string; projectId: string; currentRevisionId: string; title: string
-  archivedAt: string | null
 }
 export interface DocumentListItemDTO extends DocumentDTO {
   revisionNumber: number

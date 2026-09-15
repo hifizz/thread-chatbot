@@ -24,6 +24,7 @@ const [{ db }, schema, service, repository, { and, eq, sql }, contextService, { 
 // 上面的直接 db import 也使用显式测试模块，其他应用模块由 hook 获得同一连接。
 const testDb = process.env.THREADCHAT_TEST_DB_MODULE ? (await import(pathToFileURL(process.env.THREADCHAT_TEST_DB_MODULE).href)).db : db
 const documentQueries = await import('../../lib/thread-chat/persistence/documents/queries.ts')
+const legacyContext = await import('./fixtures/legacy-document-updates.ts')
 const contextRepository = await import('../../lib/thread-chat/persistence/documents/context.ts')
 const { user, projects, threads, messages, artifacts, documents, documentRevisions } = schema
 const id = () => crypto.randomUUID()
@@ -58,7 +59,7 @@ try {
     error => (error.cause?.constraint_name ?? error.cause?.constraint) === 'document_revisions_artifact_source_fk')
   checks++
   const documentId = initial.documentId
-  const originalManifest = await contextRepository.pendingDocumentUpdates(testDb, projectId, rootId)
+  const originalManifest = await legacyContext.pendingDocumentUpdates(testDb, projectId, rootId)
   const reads = await Promise.all(identities.map((identity, i) => service.readProjectDocument(identity, { documentId }, `read-${i}`)))
   const input = { documentId, expectedRevisionId: initial.id, readId: reads[0].readId,
     edits: [{ oldText: '- [ ] TODO6', newText: '- [x] TODO6' }, { oldText: '方案：旧方案', newText: '方案：新方案' }], changeSummary: '更新 TODO6 并完成' }
@@ -138,13 +139,13 @@ try {
   const frozenExpansion = await contextService.expandDocumentUpdates(projectId, [{ id: id(), role: 'user', parts: [{ type: 'data-project-document-updates', data: originalManifest }] }])
   assert.ok(frozenExpansion[0].parts[0].text.includes(baseContent))
   assert.equal(frozenExpansion[0].parts[0].text.includes('方案：新方案'), false); checks++
-  const manifest = await contextRepository.pendingDocumentUpdates(testDb, projectId, rootId)
+  const manifest = await legacyContext.pendingDocumentUpdates(testDb, projectId, rootId)
   assert.equal(manifest.documents[0].commitIds.length, 3); checks++
-  assert.equal((await contextRepository.pendingDocumentUpdates(testDb, projectId, rootId, [])).documents.length, 0); checks++
+  assert.equal((await legacyContext.pendingDocumentUpdates(testDb, projectId, rootId, [])).documents.length, 0); checks++
   const expanded = await contextService.expandDocumentUpdates(projectId, [{ id: id(), role: 'user', parts: [{ type: 'data-project-document-updates', data: manifest }] }])
   assert.ok(expanded[0].parts[0].text.includes(current.revision.content)); checks++
   await contextRepository.markDocumentContextUsed(testDb, sourceMessage, manifest)
-  assert.equal((await contextRepository.pendingDocumentUpdates(testDb, projectId, rootId)).documents.length, 0); checks++
+  assert.equal((await legacyContext.pendingDocumentUpdates(testDb, projectId, rootId)).documents.length, 0); checks++
   const [savedMessage] = await testDb.select().from(messages).where(eq(messages.id, messageA))
   const restored = toMessageDTO({ ...savedMessage, parts: [] })
   assert.ok(restored.parts.some(part => part.type === 'tool-updateProjectDocument' && part.output.status === a.status)); checks++
@@ -176,9 +177,10 @@ try {
   await requestMessageStop(userId, messageB, { commandId: id() })
   const stopped = await service.updateProjectDocument(identities[1], latestInput, 'after-stop')
   assert.equal(stopped.code, 'EXECUTION_INACTIVE'); checks++
-  await testDb.update(documents).set({ archivedAt: new Date() }).where(eq(documents.id, documentId))
+  await testDb.update(projects).set({ archivedAt: new Date() }).where(eq(projects.id, projectId))
   const archived = await service.updateProjectDocument(identities[0], latestInput, 'archived')
   assert.equal(archived.code, 'DOCUMENT_READ_ONLY'); checks++
+  await testDb.update(projects).set({ archivedAt: null }).where(eq(projects.id, projectId))
   assert.deepEqual(await service.updateProjectDocument(identities[0], input, 'update-a'), a); checks++
   await finalizeGeneration({ messageId: messageA, snapshot: { id: messageA, role: 'assistant', parts: [] }, status: 'failed' })
   assert.equal((await service.getProjectDocument(userId, documentId)).revision.id, current.revision.id); checks++
@@ -233,7 +235,6 @@ try {
   const noticesBefore = await contextService.expandDocumentUpdates(projectId, [sent.result.userMessage])
   assert.equal(JSON.stringify(noticesBefore).includes('旧文档原文'), false, '摘要不展开全文')
   const rootIdentity = { userId, projectId, threadId: rootId, messageId: mainTurn.assistantMessageId }
-  await testDb.update(documents).set({ archivedAt: null }).where(eq(documents.id, documentId))
   const lateRead = await service.readProjectDocument(rootIdentity, { documentId }, 'late-read')
   const lateUpdate = await service.updateProjectDocument(rootIdentity, { documentId,
     expectedRevisionId: lateRead.revision.id, readId: lateRead.readId,

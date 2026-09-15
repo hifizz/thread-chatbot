@@ -50,7 +50,7 @@ export async function listOwnedDocuments(executor: ConversationExecutor, userId:
       documentId ? eq(documents.id, documentId) : undefined))
     .orderBy(desc(documents.createdAt), documents.id)
   return rows.map(({ document: d, title, currentArtifactId, sourceThreadId, sourceMessageId, revisionNumber, sourceMessageStatus }) => ({ revisionNumber, sourceMessageStatus, id: d.id, projectId: d.projectId,
-    currentRevisionId: d.currentRevisionId!, currentArtifactId, title, sourceThreadId, sourceMessageId, archivedAt: d.archivedAt?.toISOString() ?? null }))
+    currentRevisionId: d.currentRevisionId!, currentArtifactId, title, sourceThreadId, sourceMessageId }))
 }
 
 export async function documentForArtifact(executor: ConversationExecutor, userId: string, projectId: string, artifactId: string) {

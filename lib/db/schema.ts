@@ -397,7 +397,6 @@ export const documents = dbSchema.table("documents", {
   id: text("id").primaryKey(),
   projectId: text("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
   currentRevisionId: text("current_revision_id"),
-  archivedAt: timestamp("archived_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table): PgTableExtraConfigValue[] => [
   unique("documents_project_id_uq").on(table.id, table.projectId),
