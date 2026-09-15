@@ -82,3 +82,9 @@ EGO 真实会话验证：1440×1000 桌面和 390×844 手机的正文区域均�
 - [按需展开差异](assets/pr-145-reading/diff.png)
 
 这些检查只覆盖本轮阅读模式，不代表全部功能或全部无障碍场景验收完成。
+
+## 当前文档统一目录（2026-09-15）
+
+用户截图中的三个 F1 实际是同一 Document 的三个 Revision。@ 菜单此前直接列出历史 Artifact 缓存，造成重复候选。新增领域层 currentProjectArtifacts/currentDocumentArtifact，统一当前文档投影；@ 候选、项目列表、列表数量和顶部计数都使用它，页面不再各自比较版本。后端现有 GET /documents/:documentId 不传 revisionId 即读取当前内容；固定 Artifact 读取不变。
+
+EGO 在真实三版本项目中观察 @ 候选仅一项；无版本参数的读取返回第三版及其固定 Artifact。没有发送模型请求或修改用户正文。补充并接入文档测试入口：多版本单项、独立同名、head 未载入、生成/失败来源不回退、流式旧元数据及历史快照不变。TypeScript、相关 ESLint、文档与客户端 store 回归通过。顶部计数改动在本轮浏览器收尾后完成编译，未将其热更新前观察值作为通过证据。

@@ -25,6 +25,7 @@ import type {
   ProjectFileDTO,
 } from "@/lib/thread-chat/contracts/dto"
 import { MarkdownBody } from "../../chat/message/markdown-body"
+import { currentProjectArtifacts } from "@/lib/thread-chat/domain/documents/current-artifacts"
 import { ArtifactPreviewActions } from "./artifact-preview-actions"
 import { uploadProjectFile } from "../../net/project-file-upload"
 
@@ -156,14 +157,7 @@ export function ProjectPanel({
   )
   const sortedArtifacts = useMemo(
     () => {
-      const newest = new Map<string, ArtifactDTO>()
-      for (const artifact of artifacts) {
-        const key = artifact.document?.id ?? artifact.id
-        const previous = newest.get(key)
-        if (!previous || (artifact.document?.revisionNumber ?? 0) > (previous.document?.revisionNumber ?? 0)) newest.set(key, artifact)
-      }
-      return [...newest.values()]
-        .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
+      return currentProjectArtifacts(artifacts)
         .filter((artifact) => {
           const query = artifactQuery.trim().toLowerCase()
           if (!query) return true
@@ -312,7 +306,7 @@ export function ProjectPanel({
           className={displayedSection === "artifacts" ? "on" : ""}
           onClick={() => selectSection("artifacts")}
         >
-          文档与产物 <span>{new Set(artifacts.map((artifact) => artifact.document?.id ?? artifact.id)).size}</span>
+          文档与产物 <span>{currentProjectArtifacts(artifacts).length}</span>
         </button>
       </div>}
 

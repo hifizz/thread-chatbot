@@ -1,5 +1,6 @@
 "use client"
 
+import { currentProjectArtifacts } from "@/lib/thread-chat/domain/documents/current-artifacts"
 import { useInputViewport } from "../orchestration/use-input-viewport"
 
 import { GenerationSettingsProvider } from "../chat/composer/generation-settings-context"
@@ -402,7 +403,7 @@ export function NormalizedGate3Harness({
 
   const rootHasMessages = (tree.threads.main?.messages.length ?? 0) > 0
   const branchCount = Math.max(0, Object.keys(tree.threads).length - 1)
-  const markdownCount = Object.values(tree.artifacts).filter(
+  const markdownCount = currentProjectArtifacts(Object.values(state.artifactsById)).filter(
     (artifact) => artifact.kind === "markdown"
   ).length
   const selectedScenarioLabel =
