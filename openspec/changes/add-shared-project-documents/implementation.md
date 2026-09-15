@@ -62,7 +62,7 @@ PGlite 的连接事务是串行执行的，这组测试不能替代原生 Postgr
 - GPT-5.6 Luna 通过真实 @artifact 执行 readProjectDocument → updateProjectDocument，一次提交方案和复选框；一个 Document、两个版本，刷新后正文、来源和 committed 收据保留。
 - EGO 完成桌面差异、V1 切换/导出、390×844 手机展示、分享失败重试、真实提问状态禁用版本切换。分享失败使用 fixture 注入，不能视为系统分享成功。
 
-详见 [本地修复验收记录](../../../docs/acceptance/pr-145-quality-review.md)。tasks 仅新增勾选 2.1、3.2。真实 A/B/C 全流程、完整边界模型案例、系统分享、主题/焦点矩阵、关闭写入后重启及旧生产库迁移仍待验收。完整请求预算保持 unknown。
+tasks 仅新增勾选 2.1、3.2。真实 A/B/C 全流程、完整边界模型案例、系统分享、主题/焦点矩阵、关闭写入后重启及旧生产库迁移仍待验收。完整请求预算保持 unknown。
 
 ## 本次修订：所有 Thread 后台通知（基于 d4de322）
 
