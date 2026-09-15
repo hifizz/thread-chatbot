@@ -4,6 +4,8 @@ export interface AssistantMessagePresentation {
   hasVisibleText: boolean
   hasVisibleContent: boolean
   isWaitingForVisibleOutput: boolean
+  /** streaming 中但正文尚未开始：轨迹已展开时在正文起始处并行显示 typing */
+  showInlineTyping: boolean
   showBubble: boolean
   showCaret: boolean
 }
@@ -25,11 +27,14 @@ export function assistantMessagePresentation(
     !message.artifactIds?.length &&
     !message.markdownGeneration
 
+  const isStreaming = message.status === "streaming"
+
   return {
     hasVisibleText,
     hasVisibleContent,
     isWaitingForVisibleOutput,
+    showInlineTyping: isStreaming && !hasVisibleText,
     showBubble: hasVisibleContent || isWaitingForVisibleOutput,
-    showCaret: message.status === "streaming" && hasVisibleText,
+    showCaret: isStreaming && hasVisibleText,
   }
 }

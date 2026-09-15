@@ -2,9 +2,9 @@
 
 import type { MarkdownDensity } from "../../chat/message/markdown-body"
 import type { ConversationViewMessage, ThreadTreeState } from "../../core/types"
-import { WebResearchPanel } from "../../orchestration/overlays/web-research-panel"
 import { AnchoredMarkdown } from "./anchored-markdown"
 import { assistantPartRenderPlan } from "./assistant-part-render-plan"
+import { ReasoningTrace, SearchTrace, ToolTrace } from "./thinking-trace"
 
 export function AnchoredAssistantBody({
   state,
@@ -36,27 +36,15 @@ export function AnchoredAssistantBody({
         }
 
         if (kind === "reasoning" && part.type === "reasoning") {
-          return (
-            <details
-              key={`${part.type}-${index}`}
-              className="inherited reasoning-part"
-              data-ui-message-part="reasoning"
-            >
-              <summary>思考过程</summary>
-              <div className="inherited-body reasoning-body">
-                <p>{part.text}</p>
-              </div>
-            </details>
-          )
+          return <ReasoningTrace key={`${part.type}-${index}`} part={part} />
         }
 
-        if (kind === "research") {
+        if (kind === "research" && part.type === "data-research-activity") {
           return (
-            <WebResearchPanel
-              key={`${part.type}-${index}`}
-              activities={message.webResearch ?? []}
+            <SearchTrace
+              key={`${part.type}-${part.data.toolCallId}-${index}`}
+              activities={[part.data]}
               route={message.researchRoute}
-              plan={message.researchPlan}
               complete={message.status === "done"}
               settled={message.status !== "pending" && message.status !== "streaming"}
             />
@@ -91,15 +79,13 @@ export function AnchoredAssistantBody({
           )
         }
 
-        if (kind === "tool") {
-          const toolState = "state" in part ? String(part.state) : ""
+        if (kind === "tool" && part.type === "tool-createMarkdownArtifact") {
           return (
-            <span
+            <ToolTrace
               key={`${part.type}-${index}`}
-              hidden={toolState === "output-available"}
-            >
-              {toolState ? `工具：${toolState}` : ""}
-            </span>
+              toolState={part.state}
+              progress={message.markdownGeneration}
+            />
           )
         }
 

@@ -23,11 +23,95 @@ assert.deepEqual(
   "assistant parts 必须按 AI SDK UIMessage.parts[] 顺序渲染"
 )
 
+const timelinePlan = assistantPartRenderPlan({
+  ...message,
+  uiParts: [
+    { type: "reasoning", text: "规划检索", state: "done" },
+    {
+      type: "data-research-activity",
+      id: "research-activity:search-1",
+      data: {
+        toolCallId: "search-1",
+        kind: "search",
+        status: "complete",
+        query: "Cursor",
+        sources: [{ title: "Cursor", url: "https://cursor.com" }],
+      },
+    },
+    { type: "reasoning", text: "检查搜索结果", state: "done" },
+    {
+      type: "data-research-activity",
+      id: "research-activity:read-1",
+      data: {
+        toolCallId: "read-1",
+        kind: "read",
+        status: "complete",
+        url: "https://cursor.com",
+        sources: [],
+      },
+    },
+    { type: "reasoning", text: "整理结论", state: "done" },
+    { type: "text", text: "正文", state: "done" },
+  ],
+})
+
+assert.deepEqual(
+  timelinePlan.map((item) => item.kind),
+  ["reasoning", "research", "reasoning", "research", "reasoning", "text"],
+  "思考和调研步骤必须按首次出现顺序交错渲染"
+)
+assert.deepEqual(
+  timelinePlan
+    .filter((item) => item.kind === "research")
+    .map((item) => item.part.data.toolCallId),
+  ["search-1", "read-1"],
+  "每个调研步骤必须保留自己的时间线位置"
+)
+
+const assistantBodySource = fs.readFileSync(
+  "app/thread-chat/branching/assistant/anchored-assistant-body.tsx",
+  "utf8"
+)
+assert.match(assistantBodySource, /activities=\{\[part\.data\]\}/)
+assert.doesNotMatch(
+  assistantBodySource,
+  /activities=\{message\.webResearch \?\? \[\]\}/
+)
+
 const css = fs.readFileSync("app/thread-chat/styles/columns.css", "utf8")
 assert.match(
   css,
   /\.tc \.reasoning-body\s*\{[^}]*white-space:\s*pre-wrap;/s,
   "reasoning 展开内容必须保留换行"
+)
+
+const thinkingTraceSource = fs.readFileSync(
+  "app/thread-chat/branching/assistant/thinking-trace.tsx",
+  "utf8"
+)
+assert.match(thinkingTraceSource, /if \(!working && rows\.length === 1\)/)
+assert.match(thinkingTraceSource, /className="thinking-trace-compact"/)
+assert.match(thinkingTraceSource, /replace\(\/\\\*\\\*\(\[\^\*\]\+\)\\\*\\\*\/g, "\$1"\)/)
+
+const thinkingTraceCss = fs.readFileSync(
+  "app/thread-chat/styles/thinking-trace.css",
+  "utf8"
+)
+assert.match(
+  thinkingTraceCss,
+  /\.tc \.thinking-trace\s*\{[^}]*margin:\s*10px 0;/s,
+  "thinking 轨迹在正文流中必须有纵向间距"
+)
+assert.match(
+  thinkingTraceCss,
+  /\.tc \.thinking-trace-compact\s*\{[^}]*color:\s*var\(--tc-content-muted\);[^}]*white-space:\s*pre-wrap;/s,
+  "单段完成态必须使用浅色轻量文字并保留换行"
+)
+const threadChatCss = fs.readFileSync("app/thread-chat/thread-chat.css", "utf8")
+assert.match(
+  threadChatCss,
+  /@import "\.\/styles\/messages-stream\.css";\s*@import "\.\/styles\/thinking-trace\.css";/,
+  "thinking-trace.css 必须按序接入桶文件"
 )
 
 const supplementalPartsSource = fs.readFileSync(

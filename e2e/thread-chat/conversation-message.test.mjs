@@ -15,6 +15,7 @@ assert.deepEqual(assistantMessagePresentation(assistant()), {
   hasVisibleText: false,
   hasVisibleContent: false,
   isWaitingForVisibleOutput: true,
+  showInlineTyping: false,
   showBubble: true,
   showCaret: false,
 })
@@ -27,6 +28,7 @@ assert.deepEqual(
     hasVisibleText: true,
     hasVisibleContent: true,
     isWaitingForVisibleOutput: false,
+    showInlineTyping: false,
     showBubble: true,
     showCaret: true,
   }
@@ -40,6 +42,7 @@ assert.deepEqual(
     hasVisibleText: false,
     hasVisibleContent: true,
     isWaitingForVisibleOutput: false,
+    showInlineTyping: true,
     showBubble: true,
     showCaret: false,
   }
@@ -56,6 +59,7 @@ assert.deepEqual(
     hasVisibleText: false,
     hasVisibleContent: true,
     isWaitingForVisibleOutput: false,
+    showInlineTyping: true,
     showBubble: true,
     showCaret: false,
   }
@@ -69,6 +73,7 @@ assert.deepEqual(
     hasVisibleText: false,
     hasVisibleContent: false,
     isWaitingForVisibleOutput: false,
+    showInlineTyping: false,
     showBubble: false,
     showCaret: false,
   }

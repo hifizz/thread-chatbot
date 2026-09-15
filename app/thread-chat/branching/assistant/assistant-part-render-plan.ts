@@ -28,7 +28,6 @@ export function assistantPartRenderPlan(
 ): AssistantPartRenderPlanItem[] {
   const parts = message.uiParts ?? fallbackParts(message)
   const plan: AssistantPartRenderPlanItem[] = []
-  let researchPanelRendered = false
 
   parts.forEach((part, index) => {
     if (part.type === "text") {
@@ -40,10 +39,7 @@ export function assistantPartRenderPlan(
       return
     }
     if (part.type === "data-research-activity") {
-      if (!researchPanelRendered) {
-        researchPanelRendered = true
-        plan.push({ kind: "research", part, index })
-      }
+      plan.push({ kind: "research", part, index })
       return
     }
     if (part.type === "file" || part.type === "reasoning-file") {
