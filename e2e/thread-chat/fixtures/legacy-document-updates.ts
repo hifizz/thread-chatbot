@@ -29,4 +29,3 @@ export async function pendingDocumentUpdates(executor: ConversationExecutor, pro
   }
   return { schemaVersion: 1, documents: [...entries.values()] }
 }
-
