@@ -1,20 +1,51 @@
 "use client"
 
 import type { MarkdownDensity } from "../../chat/message/markdown-body"
-import type { ConversationViewMessage, ThreadTreeState } from "../../core/types"
+import type {
+  ConversationViewMessage,
+  ThreadTreeState,
+} from "../../core/types"
+import type { MarkdownGenerationProgress } from "../../core/types"
+import type { MarkdownArtifactProgressEvent } from "@/lib/chat/markdown-artifact"
 import { AnchoredMarkdown } from "./anchored-markdown"
 import { assistantPartRenderPlan } from "./assistant-part-render-plan"
 import { ReasoningTrace, SearchTrace, ToolTrace } from "./thinking-trace"
+import { MarkdownArtifactToolPart } from "../../orchestration/artifacts/markdown-artifact-card"
+
+/** data-artifact-progress 是 transient part（追加在 parts 尾部、不持久化）；
+ * 按 toolCallId 取最后一次进度，与对应 tool part 原位配对。 */
+function artifactProgressFor(
+  message: ConversationViewMessage,
+  toolCallId: string
+): MarkdownGenerationProgress | undefined {
+  const parts = message.uiParts ?? []
+  for (let i = parts.length - 1; i >= 0; i--) {
+    const part = parts[i]
+    if (
+      part.type === "data-artifact-progress" &&
+      part.data.toolCallId === toolCallId
+    ) {
+      return part.data as MarkdownArtifactProgressEvent
+    }
+  }
+  return message.markdownGeneration?.toolCallId === toolCallId
+    ? message.markdownGeneration
+    : undefined
+}
 
 export function AnchoredAssistantBody({
   state,
   message,
   onOpenThread,
+  onOpenArtifact,
+  sourceDepth = null,
   density = "default",
 }: {
   state: ThreadTreeState
   message: ConversationViewMessage
   onOpenThread: (targetId: string, opts?: { keepSource?: boolean }) => void
+  onOpenArtifact?: (artifactId: string) => void
+  sourceDepth?: number | null
   density?: MarkdownDensity
 }) {
   const renderPlan = assistantPartRenderPlan(message)
@@ -79,11 +110,34 @@ export function AnchoredAssistantBody({
           )
         }
 
-        if (kind === "tool" && part.type === "tool-createMarkdownArtifact") {
+        if (kind === "artifact" && part.type === "tool-createMarkdownArtifact") {
+          const artifactId =
+            part.state === "output-available" &&
+            typeof part.output?.artifactId === "string"
+              ? part.output.artifactId
+              : undefined
+          return (
+            <MarkdownArtifactToolPart
+              key={`${part.type}-${part.toolCallId}-${index}`}
+              part={part}
+              progress={artifactProgressFor(message, part.toolCallId)}
+              artifact={
+                artifactId ? state.artifacts[artifactId] : undefined
+              }
+              sourceDepth={sourceDepth}
+              settled={
+                message.status !== "pending" && message.status !== "streaming"
+              }
+              onOpen={onOpenArtifact}
+            />
+          )
+        }
+
+        if (kind === "tool") {
           return (
             <ToolTrace
               key={`${part.type}-${index}`}
-              toolState={part.state}
+              toolState={"state" in part ? part.state : undefined}
               progress={message.markdownGeneration}
             />
           )

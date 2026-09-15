@@ -124,6 +124,25 @@ assert.equal(
   "合并块的位置与 key 锚定在首个活动"
 )
 
+const artifactPlan = assistantPartRenderPlan({
+  ...message,
+  uiParts: [
+    { type: "text", text: "说明", state: "done" },
+    {
+      type: "tool-createMarkdownArtifact",
+      toolCallId: "md-1",
+      state: "output-available",
+      input: { title: "报告", content: "# 报告" },
+      output: { created: true, artifactId: "artifact-1" },
+    },
+  ],
+})
+assert.deepEqual(
+  artifactPlan.map((item) => item.kind),
+  ["text", "artifact"],
+  "createMarkdownArtifact 工具 part 必须在正文流中原位渲染为 artifact"
+)
+
 const assistantBodySource = fs.readFileSync(
   "app/thread-chat/branching/assistant/anchored-assistant-body.tsx",
   "utf8"
@@ -132,6 +151,16 @@ assert.match(assistantBodySource, /activities=\{activities \?\? \[part\.data\]\}
 assert.doesNotMatch(
   assistantBodySource,
   /activities=\{message\.webResearch \?\? \[\]\}/
+)
+assert.match(
+  assistantBodySource,
+  /MarkdownArtifactToolPart/,
+  "artifact part 必须原位分发到 MarkdownArtifactToolPart"
+)
+assert.match(
+  assistantBodySource,
+  /artifact=\{\s*artifactId \? state\.artifacts\[artifactId\] : undefined\s*\}/,
+  "artifact 卡片必须从 store 按 output.artifactId 取实体"
 )
 
 const css = fs.readFileSync("app/thread-chat/styles/columns.css", "utf8")

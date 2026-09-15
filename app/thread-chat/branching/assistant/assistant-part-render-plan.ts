@@ -12,6 +12,7 @@ export type AssistantPartRenderKind =
   | "research"
   | "file"
   | "source-url"
+  | "artifact"
   | "tool"
 
 export interface AssistantPartRenderPlanItem {
@@ -62,6 +63,11 @@ export function assistantPartRenderPlan(
     }
     // 联网工具由研究面板展示，不输出内部 input-available 等状态。
     if (WEB_RESEARCH_TOOL_NAMES.some((name) => part.type === `tool-${name}`)) return
+    // Markdown 交付物原位渲染：生成中→流式预览块，完成→artifact 卡片。
+    if (part.type === "tool-createMarkdownArtifact") {
+      plan.push({ kind: "artifact", part, index })
+      return
+    }
     if (part.type.startsWith("tool-")) {
       plan.push({ kind: "tool", part, index })
     }

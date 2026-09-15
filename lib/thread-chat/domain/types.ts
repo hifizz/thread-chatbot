@@ -71,6 +71,8 @@ export interface MarkdownGenerationProgress {
   lineCount: number
   /** 最近解析到的 Markdown ATX 标题，最多保留三项。 */
   headings: string[]
+  /** 局部正文的尾部窗口；仅流式预览小窗使用，不持久化。 */
+  preview?: string
 }
 
 export interface Message {

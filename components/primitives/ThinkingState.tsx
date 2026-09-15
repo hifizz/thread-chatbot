@@ -147,6 +147,8 @@ export default function ThinkingState({
   working: workingProp,
   query: queryProp,
   renderPrimary,
+  body,
+  revision,
 }: {
   variant?: string;
   onSettled?: () => void;
@@ -164,6 +166,12 @@ export default function ThinkingState({
   /** optional row-primary renderer (e.g. inline markdown for reasoning rows);
    *  keeps data formatting in the host adapter */
   renderPrimary?: (row: Row) => ReactNode;
+  /** replaces the row list inside the expandable scroll area (e.g. a live
+   *  streaming preview window); pair with `revision` so scroll/shadow resync */
+  body?: ReactNode;
+  /** opaque change key for `body` content; rows revisions are derived
+   *  automatically, body content is opaque so the host supplies the key */
+  revision?: string;
 }) {
   const sequenced = useSequence(STAGES);
   const [manualExpanded, setManualExpanded] = useState<boolean | null>(null);
@@ -183,7 +191,7 @@ export default function ThinkingState({
   const expanded = manualExpanded ?? autoExpanded;
   const working = controlled ? workingProp : stage < 3;
   const visible = stage < 2 ? 0 : stage === 2 ? Math.min(2, v.rows.length) : v.rows.length;
-  const contentRevision = JSON.stringify(v.rows.slice(0, visible));
+  const contentRevision = revision ?? JSON.stringify(v.rows.slice(0, visible));
   const traceRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const pinnedRef = useRef(true);
@@ -341,6 +349,7 @@ export default function ThinkingState({
               data-shadow-bottom={shadowBottom || undefined}
             >
                 <div ref={traceRef} className="flex flex-col gap-1 py-1">
+            {body ?? (<>
             {v.query && (
               <div className="flex h-6 items-center gap-2 px-1.5" style={{ animation: expanded ? "fade-up 300ms cubic-bezier(0.23,1,0.32,1) both" : undefined }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--ink-3)" strokeWidth="2" strokeLinecap="round" className="shrink-0">
@@ -444,6 +453,7 @@ export default function ThinkingState({
                 +7 more
               </span>
             )}
+            </>)}
               </div>
             </div>
           </div>

@@ -23,7 +23,10 @@ const entry = readFileSync(
 
 assert.doesNotMatch(messages, /\.acard/)
 assert.equal(artifactCard.match(/\.tc \.acard\s*\{/g)?.length, 1)
-assert.equal(artifactCard.match(/\.tc \.acard-progress\s*\{/g)?.length, 1)
+assert.equal(artifactCard.match(/\.tc \.artifact-preview\s*\{/g)?.length, 1)
+assert.match(artifactComponent, /MarkdownArtifactStreamTrace/)
+assert.doesNotMatch(artifactComponent, /"MARKDOWN"/)
+assert.match(artifactComponent, /\? "Markdown"/)
 assert.doesNotMatch(artifactComponent, /style=\{\{\s*display:\s*"block"/)
 assert.equal(
   entry.match(/@import "\.\/styles\/artifact-card\.css";/g)?.length,

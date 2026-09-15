@@ -6,6 +6,10 @@ import {
   SearchTrace,
   ToolTrace,
 } from "@/app/thread-chat/branching/assistant/thinking-trace"
+import {
+  MarkdownArtifactStreamTrace,
+  MarkdownArtifactToolPart,
+} from "@/app/thread-chat/orchestration/artifacts/markdown-artifact-card"
 import type { WebResearchActivity } from "@/lib/chat/web-research-activity"
 import "@/app/thread-chat/thread-chat.css"
 
@@ -60,6 +64,19 @@ const SEARCH_ACTIVITIES_DONE = SEARCH_ACTIVITIES.map((activity) => ({
     ? { title: "Inspector — CopilotKit Docs" }
     : {}),
 }))
+
+const ARTIFACT_PREVIEW = `# 冰淇淋消费趋势报告
+
+## 市场综述
+
+2024 年国内冰淇淋市场规模约 580 亿元，石果类口味增速领先。
+
+## 口味偏好
+
+- 桃子、杏子口味销量同比 +18%
+- 华夫筒 vs 蛋筒：华夫筒客单价高 12%
+
+## 渠道分布`
 
 const SEARCH_ACTIVITIES_FAILED: WebResearchActivity[] = [
   {
@@ -162,17 +179,57 @@ export function ThinkingTraceFixture() {
         <SearchTrace activities={SEARCH_ACTIVITIES_FAILED} complete={true} />
       </FixtureSection>
 
-      <FixtureSection title="Tool · 生成中（带进度副文本）">
-        <ToolTrace
-          toolState="input-streaming"
+      <FixtureSection title="Artifact · 生成中（滚动预览小窗）">
+        <MarkdownArtifactStreamTrace
           progress={{
-            toolCallId: "call-3",
+            toolCallId: "call-md-1",
             phase: "streaming",
             partialTitle: "冰淇淋消费趋势报告",
             characterCount: 1240,
             lineCount: 36,
             headings: ["市场综述", "口味偏好", "渠道分布"],
+            preview: ARTIFACT_PREVIEW,
           }}
+        />
+      </FixtureSection>
+
+      <FixtureSection title="Artifact · 生成中（刚起步，无预览）">
+        <MarkdownArtifactStreamTrace
+          progress={{
+            toolCallId: "call-md-2",
+            phase: "starting",
+            characterCount: 0,
+            lineCount: 0,
+            headings: [],
+          }}
+        />
+      </FixtureSection>
+
+      <FixtureSection title="Artifact · 已完成卡片（tool part 原位）">
+        <MarkdownArtifactToolPart
+          part={{
+            toolCallId: "call-md-3",
+            state: "output-available",
+            input: { title: "冰淇淋消费趋势报告" },
+            output: { created: true, artifactId: "artifact-fixture-1" },
+          }}
+          artifact={{
+            id: "artifact-fixture-1",
+            title: "冰淇淋消费趋势报告",
+            kind: "markdown",
+            content: ARTIFACT_PREVIEW,
+            sourceThreadId: "main",
+            sourceMessageId: "msg-1",
+          }}
+          sourceDepth={0}
+          onOpen={() => {}}
+        />
+      </FixtureSection>
+
+      <FixtureSection title="Artifact · 生成失败">
+        <MarkdownArtifactToolPart
+          part={{ toolCallId: "call-md-4", state: "output-error" }}
+          sourceDepth={0}
         />
       </FixtureSection>
 
