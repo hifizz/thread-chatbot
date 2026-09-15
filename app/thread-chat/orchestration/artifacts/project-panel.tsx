@@ -29,6 +29,7 @@ import type {
 } from "@/lib/thread-chat/contracts/dto"
 import { MarkdownBody } from "../../chat/message/markdown-body"
 import { ArtifactPreviewActions } from "./artifact-preview-actions"
+import { toViewThreadId } from "../../core/projections"
 import { uploadProjectFile } from "../../net/project-file-upload"
 
 export interface ProjectPanelProps {
@@ -243,9 +244,10 @@ export function ProjectPanel({
   }
 
   const locateArtifact = (artifact: ArtifactSummaryDTO) => {
-    const viewThreadId =
-      project?.rootThreadId === artifact.threadId ? "main" : artifact.threadId
-    onLocate(viewThreadId, artifact.sourceMessageId)
+    onLocate(
+      toViewThreadId(project?.rootThreadId, artifact.threadId),
+      artifact.sourceMessageId
+    )
   }
 
   const preview = displayedSection === "artifacts" ? selectedMetadata : null
@@ -497,7 +499,22 @@ export function ProjectPanel({
             {selectedArtifact ? (
               <div className="project-artifact-detail">
                 {renderDocumentControls?.(selectedArtifact)}
-                <div className="project-artifact-content">
+                <div
+                  className="project-artifact-content"
+                  // 把当前 Markdown 阅读区标记成可划选来源；全局唯一 selection
+                  // observer 据此获得稳定的 artifact/message/thread identity。
+                  {...(selectedArtifact.kind === "markdown" && project
+                    ? {
+                        "data-selection-artifact-id": selectedArtifact.id,
+                        "data-selection-message-id":
+                          selectedArtifact.sourceMessageId,
+                        "data-selection-thread-id": toViewThreadId(
+                          project.rootThreadId,
+                          selectedArtifact.threadId
+                        ),
+                      }
+                    : {})}
+                >
                   {selectedArtifact.kind === "markdown" && (
                     <MarkdownBody
                       source={selectedArtifact.content}

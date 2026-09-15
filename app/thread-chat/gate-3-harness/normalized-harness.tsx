@@ -389,8 +389,7 @@ export function NormalizedGate3Harness({
       .forkThread({
         parentThreadId,
         sourceMessageId: info.msgId,
-        anchorText: info.text,
-        anchor: info.anchor,
+        target: { type: "message", anchor: info.anchor },
         modelId:
           state.threadsById[parentThreadId]?.modelId ?? "doubao-seed-2.1-turbo",
         ...(question ? { firstTurn: forkFirstTurnContent({ text: question, sourceMessageId: info.msgId, anchorText: info.text, anchor: info.anchor }) } : {}),

@@ -221,8 +221,7 @@ try {
     userMessageId: firstUserId,
     assistantMessageId: firstAssistantId,
     modelId,
-    text: "通过真实 API 创建项目",
-    files: [],
+    parts: [{ type: "text", text: "通过真实 API 创建项目" }],
   }
   generationModes.set(firstAssistantId, {
     holdUntilAbort: false,
@@ -395,8 +394,7 @@ try {
     userMessageId: secondUserId,
     assistantMessageId: secondAssistantId,
     modelId,
-    text: "等待 Stop",
-    files: [],
+    parts: [{ type: "text", text: "等待 Stop" }],
   }
   generationModes.set(secondAssistantId, {
     holdUntilAbort: true,
@@ -526,8 +524,7 @@ try {
           userMessageId: editedUserId,
           assistantMessageId: editedAssistantId,
           modelId,
-          text: "编辑后的最新一轮",
-          files: [],
+          parts: [{ type: "text", text: "编辑后的最新一轮" }],
         },
       }),
       routeContext("messageId", secondUserId)
@@ -541,8 +538,10 @@ try {
     commandId: id(),
     threadId: childThreadId,
     sourceMessageId: editedAssistantId,
-    anchorText: "fake",
-    anchor: { quote: { exact: "fake", prefix: "", suffix: "" } },
+    target: {
+      type: "message",
+      anchor: { quote: { exact: "fake", prefix: "", suffix: "" } },
+    },
     modelId,
   }
   const forked = await responseJson(

@@ -1,5 +1,5 @@
 import { appendDocumentNotices } from "./documents/notices"
-import { THREAD_QUOTE_SCHEMA_VERSION } from "@/lib/thread-chat/contracts/quote"
+import { THREAD_QUOTE_SCHEMA_VERSION, forkQuoteSource } from "@/lib/thread-chat/contracts/quote"
 import { resolveUserContent } from "./resolve-user-content"
 import { messages } from "@/lib/db/schema"
 import type { SendMessageCommand } from "@/lib/thread-chat/contracts/commands"
@@ -64,18 +64,11 @@ export function sendMessage(
                   frozenFirstQuote: {
                     schemaVersion: THREAD_QUOTE_SCHEMA_VERSION,
                     text: thread.anchorText,
-                    source: thread.forkArtifactId
-                      ? {
-                          type: "artifact" as const,
-                          messageId: thread.forkMessageId,
-                          artifactId: thread.forkArtifactId,
-                          anchor: thread.forkAnchor,
-                        }
-                      : {
-                          type: "message" as const,
-                          messageId: thread.forkMessageId,
-                          anchor: thread.forkAnchor,
-                        },
+                    source: forkQuoteSource({
+                      messageId: thread.forkMessageId,
+                      artifactId: thread.forkArtifactId,
+                      anchor: thread.forkAnchor,
+                    }),
                   },
                 }
               : {}),

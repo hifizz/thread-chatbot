@@ -1,0 +1,115 @@
+/* ==========================================================================
+   ThinkingState 思考轨迹（beautiful-ui）在 .tc 正文流中的落位。
+   组件自身的 token / 交互样式由 .bui 作用域提供（app/beautifui/foundation.css），
+   这里只负责它作为正文兄弟节点时的间距、宽度与内容区滚动。
+
+   配色：把 .bui 的冷灰/蓝灰 token 接到 .tc 的奶油纸墨色体系（semantic 层，
+   自动跟随 .dark 翻转），使轨迹与 .md-body 暖色协调；亮色下为奶油黄暖调。
+   .thinking-scroll 的滚动阴影用 mask 渐隐实现（HeroUI ScrollShadow 的等价视觉）：
+   顶/底 data 属性由组件按滚动位置切换，颜色无关、亮暗自适应。
+   ========================================================================== */
+
+.tc .thinking-trace {
+  margin: 10px 0;
+}
+
+/* 相邻轨迹（思考→搜索→读取链）收成一组，视觉上属于同一段 agent trace */
+.tc .thinking-trace + .thinking-trace {
+  margin-top: 0;
+}
+
+.tc .thinking-trace-compact {
+  margin: 10px 0;
+  color: var(--tc-content-muted);
+  font-size: 14px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+/* reasoning 行内 markdown 的强调降权：思维链惯用 **短句** 当小节标题，
+ * 全量加粗在次级墨色的辅助文本里太吵，降为 medium 字重，颜色不脱离上下文。 */
+.tc .thinking-trace strong,
+.tc .thinking-trace-compact strong {
+  font-weight: 500;
+}
+
+/* 奶油黄暖色映射：覆盖 .bui 的冷色 token，仅在 .tc 内生效 */
+.tc .bui {
+  --page: var(--tc-surface-base);
+  --canvas: var(--tc-surface-base);
+  --surface: var(--tc-palette-control);
+  --inset: var(--tc-surface-raised);
+  --hover: var(--tc-surface-sunken);
+  --hover-2: var(--tc-surface-raised);
+  --ink: var(--tc-content-primary);
+  --ink-2: var(--tc-content-secondary);
+  --ink-3: var(--tc-content-muted);
+  --line: var(--tc-border-subtle);
+  --line-strong: var(--tc-border-strong);
+  --line-soft: var(--tc-border-subtle);
+  --field: var(--tc-surface-raised);
+  --stripe: transparent;
+  --stripe-bg: var(--tc-surface-base);
+  --accent: var(--tc-depth-2);
+  --accent-ink: var(--tc-depth-2);
+  --accent-tint: var(--tc-ink-wash);
+  --green: var(--tc-depth-1);
+  --green-tint: var(--tc-depth-1-wash);
+  --orange: var(--tc-depth-2);
+  --orange-tint: var(--tc-ink-wash);
+  --red: var(--tc-danger);
+  --red-tint: var(--tc-surface-danger);
+  --shadow-hairline: 0 0 0 1px var(--tc-border-subtle);
+  --shadow-btn: 0 0 0 1px var(--tc-border-strong), 0 1px 2px var(--tc-shadow-float);
+}
+
+/* 内容区：跟随 .md-body 宽度（气泡内 100%）。
+ * 只有真正溢出（data-overflow）才封顶 256px 并开启内部滚动；
+ * 短内容不滚动、不出现滚动条——下面没内容时也不做 scroll shadow 暗示。 */
+.tc .thinking-trace .thinking-scroll[data-overflow] {
+  max-height: 256px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  /* 小区域用比全局 9px 更细的滚动条，且只在真正溢出时出现 */
+  scrollbar-width: thin;
+  scrollbar-color: var(--tc-border-scrollbar) transparent;
+}
+
+.tc .thinking-trace .thinking-scroll[data-overflow]::-webkit-scrollbar {
+  width: 6px;
+}
+
+.tc .thinking-trace .thinking-scroll[data-overflow]::-webkit-scrollbar-thumb {
+  background: var(--tc-border-scrollbar);
+  border-radius: 6px;
+}
+
+/* 顶部渐隐：还有上文 */
+.tc .thinking-trace .thinking-scroll[data-shadow-top] {
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 24px);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 24px);
+}
+
+/* 底部渐隐：还有下文 */
+.tc .thinking-trace .thinking-scroll[data-shadow-bottom] {
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 24px), transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 24px), transparent 100%);
+}
+
+/* 两端都有：合并为一条渐变（mask-image 不可叠加） */
+.tc .thinking-trace .thinking-scroll[data-shadow-top][data-shadow-bottom] {
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 24px,
+    #000 calc(100% - 24px),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 24px,
+    #000 calc(100% - 24px),
+    transparent 100%
+  );
+}

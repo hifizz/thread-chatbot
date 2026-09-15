@@ -50,19 +50,37 @@ try {
     userMessageId: id(),
     assistantMessageId: id(),
     modelId,
-    text: "ROOT_USER_BOUNDARY",
-    files: [],
+    parts: [{ type: "text", text: "ROOT_USER_BOUNDARY" }],
   })
-  const userMessageId = started.result.userMessage.id
-  const assistantMessageId = started.result.assistantMessage.id
+  const firstAssistantId = started.result.assistantMessage.id
   const terminalAt = new Date()
   await db
     .update(schema.messages)
     .set({
       status: "completed",
-      parts: [{ type: "text", text: SOURCE_MESSAGE_MARKER }],
+      parts: [{ type: "text", text: "FIRST_TURN_BASELINE" }],
       finishedAt: terminalAt,
       updatedAt: terminalAt,
+    })
+    .where(eq(schema.messages.id, firstAssistantId))
+
+  // 第二轮的 Assistant 产出 Artifact；隔离开关只能以更早的 Assistant 为来源
+  // （fork 来源必须是 Assistant 回复），从而在冻结上下文中排除它。
+  const assistantMessageId = id()
+  await application.sendMessage(userId, rootThreadId, {
+    commandId: id(),
+    userMessageId: id(),
+    assistantMessageId,
+    modelId,
+    parts: [{ type: "text", text: "SECOND_TURN_QUESTION" }],
+  })
+  await db
+    .update(schema.messages)
+    .set({
+      status: "completed",
+      parts: [{ type: "text", text: SOURCE_MESSAGE_MARKER }],
+      finishedAt: new Date(),
+      updatedAt: new Date(),
     })
     .where(eq(schema.messages.id, assistantMessageId))
 
@@ -84,10 +102,12 @@ try {
   await application.forkThread(userId, rootThreadId, {
     commandId: id(),
     threadId: isolatedThreadId,
-    sourceMessageId: userMessageId,
-    anchorText: "ROOT_USER_BOUNDARY",
-    anchor: {
-      quote: { exact: "ROOT_USER_BOUNDARY", prefix: "", suffix: "" },
+    sourceMessageId: firstAssistantId,
+    target: {
+      type: "message",
+      anchor: {
+        quote: { exact: "FIRST_TURN_BASELINE", prefix: "", suffix: "" },
+      },
     },
     modelId,
   })
@@ -113,9 +133,11 @@ try {
     commandId: id(),
     threadId: inheritedThreadId,
     sourceMessageId: assistantMessageId,
-    anchorText: SOURCE_MESSAGE_MARKER,
-    anchor: {
-      quote: { exact: SOURCE_MESSAGE_MARKER, prefix: "", suffix: "" },
+    target: {
+      type: "message",
+      anchor: {
+        quote: { exact: SOURCE_MESSAGE_MARKER, prefix: "", suffix: "" },
+      },
     },
     modelId,
   })

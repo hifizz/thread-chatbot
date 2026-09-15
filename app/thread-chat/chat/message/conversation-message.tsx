@@ -120,6 +120,17 @@ export function ConversationMessage({
               ) : (
                 <>
                   {renderAssistantBody(message)}
+                  {presentation.showInlineTyping && (
+                    <span
+                      className="typing typing-inline"
+                      role="status"
+                      aria-label="正在生成回复"
+                    >
+                      <i />
+                      <i />
+                      <i />
+                    </span>
+                  )}
                   {presentation.showCaret && <span className="caret" />}
                 </>
               )}

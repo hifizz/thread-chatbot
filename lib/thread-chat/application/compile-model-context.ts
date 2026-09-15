@@ -93,9 +93,17 @@ async function includeForkArtifactsInFrozenHistory(input: {
 }): Promise<ThreadChatUIMessage[]> {
   if (!input.sources.length) return input.messages
 
-  let messages = input.messages
-  for (const source of input.sources) {
-    const row = await findOwnedArtifact(db, input.userId, source.artifactId)
+  const rows = await Promise.all(
+    input.sources.map((source) =>
+      findOwnedArtifact(db, input.userId, source.artifactId)
+    )
+  )
+  const refsByMessageId = new Map<
+    string,
+    Array<NonNullable<(typeof rows)[number]>["artifact"]>
+  >()
+  input.sources.forEach((source, index) => {
+    const row = rows[index]
     if (!row) stateConflict("Artifact 分支来源不存在")
     const artifact = row.artifact
     if (
@@ -105,26 +113,36 @@ async function includeForkArtifactsInFrozenHistory(input: {
     ) {
       stateConflict("Artifact 分支来源关系不完整")
     }
+    refsByMessageId.set(source.messageId, [
+      ...(refsByMessageId.get(source.messageId) ?? []),
+      artifact,
+    ])
+  })
 
-    let foundSource = false
-    messages = messages.map((message) => {
-      if (message.id !== source.messageId) return message
-      foundSource = true
-      if (hasArtifactReference(message, artifact.id)) return message
-      return {
-        ...message,
-        parts: [
-          ...message.parts,
-          {
-            type: "data-artifact-reference" as const,
-            data: artifactReferenceData(artifact),
-          },
-        ],
-      }
-    })
-    if (!foundSource) stateConflict("Artifact 分支的冻结来源消息不完整")
+  const messageIds = new Set(input.messages.map((message) => message.id))
+  for (const messageId of refsByMessageId.keys()) {
+    if (!messageIds.has(messageId)) {
+      stateConflict("Artifact 分支的冻结来源消息不完整")
+    }
   }
-  return messages
+  return input.messages.map((message) => {
+    const refs = refsByMessageId.get(message.id)
+    if (!refs) return message
+    const missing = refs.filter(
+      (artifact) => !hasArtifactReference(message, artifact.id)
+    )
+    if (!missing.length) return message
+    return {
+      ...message,
+      parts: [
+        ...message.parts,
+        ...missing.map((artifact) => ({
+          type: "data-artifact-reference" as const,
+          data: artifactReferenceData(artifact),
+        })),
+      ],
+    }
+  })
 }
 
 export interface CompiledModelContext {

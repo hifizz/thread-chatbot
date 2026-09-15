@@ -15,7 +15,6 @@ import type {
   ProjectDTO,
   ThreadDTO,
 } from "@/lib/thread-chat/contracts/dto"
-import type { TextAnchor } from "@/lib/thread-chat/domain/text-anchor"
 import type { MessageContentInput } from "@/lib/thread-chat/contracts/message-content"
 import {
   messageContentToUiParts,
@@ -43,10 +42,7 @@ export interface ConversationCommandOptions {
 export interface ForkCommandInput {
   parentThreadId: string
   sourceMessageId: string
-  /** 新入口使用 target；旧消息划选仍可传 anchorText + anchor。 */
-  target?: ForkTarget
-  anchorText?: string
-  anchor?: TextAnchor
+  target: ForkTarget
   modelId: string
   generationSettings?: GenerationSettings
   firstTurn?: MessageContentInput
@@ -347,14 +343,8 @@ export function createConversationCommands(
     const project = state.project
     const parent = state.threadsById[input.parentThreadId]
     if (!project || !parent) throw new Error("来源会话尚未加载")
-    const target: ForkTarget = input.target ?? (() => {
-      if (!input.anchor || !input.anchorText)
-        throw new Error("分支来源缺少选区")
-      return { type: "message", anchor: input.anchor }
-    })()
+    const target = input.target
     const anchorText = target.anchor.quote.exact
-    if (input.anchorText && input.anchorText !== anchorText)
-      throw new Error("选区锚点与来源文本不一致")
     const firstTurn =
       input.firstTurn === undefined
         ? undefined
@@ -363,9 +353,7 @@ export function createConversationCommands(
       commandId: createId(),
       threadId: createId(),
       sourceMessageId: input.sourceMessageId,
-      ...(input.target
-        ? { target }
-        : { anchorText, anchor: target.anchor }),
+      target,
       modelId: input.modelId,
       ...generationSettingsField(input.generationSettings),
       ...(firstTurn

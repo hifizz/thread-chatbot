@@ -8,9 +8,12 @@ import type { ThreadChatUIMessage } from "@/lib/thread-chat/contracts/ui-message
 import { stripTransientParts } from "@/lib/thread-chat/application/command-utils"
 import { toMessageDTO } from "@/lib/thread-chat/persistence/mappers"
 import {
+  artifactCallStats,
   collectFinalArtifacts,
   hasDisplayableParts,
 } from "@/lib/thread-chat/streaming/artifacts"
+import { AI_DIAGNOSTIC_EVENTS } from "@/constants/observability"
+import { logDiagnostic } from "@/lib/observability/diagnostic-log"
 
 export type RequestedTerminalStatus = "completed" | "stopped" | "failed"
 
@@ -40,6 +43,26 @@ export async function finalizeGeneration({
       ? (error ?? { code: "GENERATION_FAILED", message: "生成失败" })
       : null
   const finalArtifacts = collectFinalArtifacts(messageId, parts)
+  const artifactStats = artifactCallStats(parts)
+  if (artifactStats.attempted > 0) {
+    /* 计量字段：可查询「调用但没产出」的失败率；不传标题/正文。 */
+    logDiagnostic(
+      artifactStats.produced < artifactStats.attempted
+        ? AI_DIAGNOSTIC_EVENTS.artifactFailed
+        : AI_DIAGNOSTIC_EVENTS.artifactCreated,
+      {
+        assistantMessageId: messageId,
+        artifactAttempted: artifactStats.attempted,
+        artifactProduced: artifactStats.produced,
+        artifactTotalChars: finalArtifacts.reduce(
+          (total, artifact) => total + artifact.content.length,
+          0
+        ),
+      },
+      undefined,
+      artifactStats.produced < artifactStats.attempted ? "warn" : "info"
+    )
+  }
 
   return db.transaction(async (tx) => {
     // 结束生成可能插入 Artifact（外键访问 Project），也必须先锁父级。

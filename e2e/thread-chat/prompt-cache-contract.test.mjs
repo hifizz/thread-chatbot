@@ -160,8 +160,7 @@ const fork = forkThreadCommandSchema.parse({
   commandId: ids.command,
   threadId: ids.command,
   sourceMessageId: ids.source,
-  anchorText: quote.text,
-  anchor: quote.source.anchor,
+  target: { type: "message", anchor: quote.source.anchor },
   modelId: turn.modelId,
   generationSettings,
   firstTurn: {

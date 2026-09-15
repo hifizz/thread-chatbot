@@ -1,4 +1,5 @@
 import { z } from "zod"
+import type { TextAnchor } from "../domain/text-anchor"
 
 export const THREAD_QUOTE_SCHEMA_VERSION = "thread-quote-v1" as const
 
@@ -89,6 +90,22 @@ export const persistedThreadQuotePartSchema = z.union([
 ])
 
 export type ThreadQuoteSourceV1 = z.infer<typeof threadQuoteSourceV1Schema>
+
+/** 分叉引用来源的唯一构造入口：message / artifact 判别式只出现一次。 */
+export function forkQuoteSource(input: {
+  messageId: string
+  artifactId?: string | null
+  anchor: TextAnchor
+}): ThreadQuoteSourceV1 {
+  return input.artifactId
+    ? {
+        type: "artifact",
+        messageId: input.messageId,
+        artifactId: input.artifactId,
+        anchor: input.anchor,
+      }
+    : { type: "message", messageId: input.messageId, anchor: input.anchor }
+}
 export type ThreadQuoteDataV1 = z.infer<typeof threadQuoteDataV1Schema>
 export type ThreadQuotePartV1 = z.infer<typeof threadQuotePartV1Schema>
 export type LegacyThreadQuoteData = z.infer<typeof legacyThreadQuoteDataSchema>

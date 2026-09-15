@@ -72,6 +72,8 @@ export interface MarkdownGenerationProgress {
   lineCount: number
   /** 最近解析到的 Markdown ATX 标题，最多保留三项。 */
   headings: string[]
+  /** 局部正文的尾部窗口；仅流式预览小窗使用，不持久化。 */
+  preview?: string
 }
 
 export interface Message {
@@ -118,9 +120,9 @@ export interface Thread {
   /** 从父会话哪条消息分叉出来（决定「继承的上文」截断点） */
   forkFromMsgId: string | null
   /** 分叉时保存的可重定位文本锚点；主线为 null。 */
-  forkAnchor?: TextAnchor | null
+  forkAnchor: TextAnchor | null
   /** 非空表示讨论焦点来自该 Message 生成的 Markdown Artifact。 */
-  forkArtifactId?: string | null
+  forkArtifactId: string | null
   footnote: number | null
   children: string[]
   /** 保存该 Thread 的全部消息节点，顺序为创建顺序。 */

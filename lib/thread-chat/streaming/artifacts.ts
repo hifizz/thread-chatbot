@@ -51,6 +51,34 @@ export function collectFinalArtifacts(
   return collected
 }
 
+export interface ArtifactCallStats {
+  /** createMarkdownArtifact 工具调用总次数（含未完成的调用）。 */
+  attempted: number
+  /** 终态确认产出（created=true 且输入合规）的次数。 */
+  produced: number
+}
+
+/**
+ * 统计一轮生成里 artifact 工具的调用与产出，供 finalize 打诊断事件：
+ * attempted > produced 即「模型调了但参数不合规 / 中途失败 / 没产出」，
+ * attempted = 0 而 generationMode 为 *-artifact 即「强制兜底仍漏调」。
+ */
+export function artifactCallStats(
+  parts: ThreadChatUIMessage["parts"]
+): ArtifactCallStats {
+  let attempted = 0
+  let produced = 0
+  for (const raw of parts) {
+    const part = record(raw)
+    if (!part || toolName(part) !== "createMarkdownArtifact") continue
+    attempted += 1
+    const parsed = markdownArtifactInputSchema.safeParse(part.input)
+    const output = record(part.output)
+    if (parsed.success && output?.created === true) produced += 1
+  }
+  return { attempted, produced }
+}
+
 export function hasDisplayableParts(
   parts: ThreadChatUIMessage["parts"]
 ): boolean {

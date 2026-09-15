@@ -32,13 +32,13 @@ try {
   await settle(start.assistantMessageId)
   const fork = {
     commandId: id(), threadId: id(), sourceMessageId: start.assistantMessageId,
-    anchorText: "被划选的原文", anchor: { quote: { exact: "被划选的原文", prefix: "", suffix: "" } }, modelId,
+    target: { type: "message", anchor: { quote: { exact: "被划选的原文", prefix: "", suffix: "" } } }, modelId,
   }
   await commands.forkThread(userId, rootThreadId, fork)
   const first = turn("先分叉后发送")
   const expectedQuote = { type: "data-quote", data: {
-    schemaVersion: "thread-quote-v1", text: fork.anchorText,
-    source: { type: "message", messageId: fork.sourceMessageId, anchor: fork.anchor },
+    schemaVersion: "thread-quote-v1", text: fork.target.anchor.quote.exact,
+    source: { type: "message", messageId: fork.sourceMessageId, anchor: fork.target.anchor },
   } }
   first.parts.unshift({ type: "quote", quote: expectedQuote.data })
   const sent = await commands.sendMessage(userId, fork.threadId, first)

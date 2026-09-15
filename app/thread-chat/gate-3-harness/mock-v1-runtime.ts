@@ -67,6 +67,7 @@ function initialBootstrap(
     projectId,
     parentId: null,
     forkMessageId: null,
+    forkArtifactId: null,
     forkContext: [],
     forkAnchor: null,
     anchorText: null,
@@ -85,6 +86,7 @@ function initialBootstrap(
     projectId,
     parentId: ROOT_THREAD_ID,
     forkMessageId: ROOT_ASSISTANT_ID,
+    forkArtifactId: null,
     forkContext: [ROOT_USER_ID, ROOT_ASSISTANT_ID],
     forkAnchor: {
       quote: {
@@ -109,6 +111,7 @@ function initialBootstrap(
     projectId,
     parentId: CHILD_THREAD_ID,
     forkMessageId: CHILD_ASSISTANT_ID,
+    forkArtifactId: null,
     forkContext: [
       ROOT_USER_ID,
       ROOT_ASSISTANT_ID,
@@ -641,8 +644,7 @@ export function createGate3MockRuntime(
     async forkThread(parentThreadId, input) {
       const parent = threads.get(parentThreadId)
       if (!parent) throw new Error("THREAD_NOT_FOUND")
-      const anchor = input.target?.anchor ?? input.anchor
-      if (!anchor) throw new Error("FORK_ANCHOR_REQUIRED")
+      const anchor = input.target.anchor
       const anchorText = anchor.quote.exact
       const stamp = now()
       const thread: ThreadDTO = {
@@ -651,7 +653,7 @@ export function createGate3MockRuntime(
         parentId: parentThreadId,
         forkMessageId: input.sourceMessageId,
         forkContext: [],
-        forkArtifactId: input.target?.type === "artifact" ? input.target.artifactId : null,
+        forkArtifactId: input.target.type === "artifact" ? input.target.artifactId : null,
         forkAnchor: anchor,
         anchorText,
         footnote:

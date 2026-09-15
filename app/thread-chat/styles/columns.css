@@ -267,8 +267,8 @@
 .tc .focus-source-artifact {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
-  margin-left: 3px;
+  gap: 4px;
+  margin-left: 4px;
   padding: 0;
   border: 0;
   background: transparent;

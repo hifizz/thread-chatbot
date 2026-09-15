@@ -45,8 +45,7 @@ try {
     userMessageId: id(),
     assistantMessageId: id(),
     modelId,
-    text: "历史稳定性基线",
-    files: [],
+    parts: [{ type: "text", text: "历史稳定性基线" }],
   })
 
   const sourceAssistantId = started.result.assistantMessage.id
@@ -78,12 +77,14 @@ try {
     commandId: id(),
     threadId: childThreadId,
     sourceMessageId: sourceAssistantId,
-    anchorText: "IMMUTABLE_HISTORY_MARKER",
-    anchor: {
-      quote: {
-        exact: "IMMUTABLE_HISTORY_MARKER",
-        prefix: "",
-        suffix: "",
+    target: {
+      type: "message",
+      anchor: {
+        quote: {
+          exact: "IMMUTABLE_HISTORY_MARKER",
+          prefix: "",
+          suffix: "",
+        },
       },
     },
     modelId,

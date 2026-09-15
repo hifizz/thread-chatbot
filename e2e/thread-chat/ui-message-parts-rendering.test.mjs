@@ -23,11 +23,242 @@ assert.deepEqual(
   "assistant parts 必须按 AI SDK UIMessage.parts[] 顺序渲染"
 )
 
+const timelinePlan = assistantPartRenderPlan({
+  ...message,
+  uiParts: [
+    { type: "reasoning", text: "规划检索", state: "done" },
+    {
+      type: "data-research-activity",
+      id: "research-activity:search-1",
+      data: {
+        toolCallId: "search-1",
+        kind: "search",
+        status: "complete",
+        query: "Cursor",
+        sources: [{ title: "Cursor", url: "https://cursor.com" }],
+      },
+    },
+    { type: "reasoning", text: "检查搜索结果", state: "done" },
+    {
+      type: "data-research-activity",
+      id: "research-activity:read-1",
+      data: {
+        toolCallId: "read-1",
+        kind: "read",
+        status: "complete",
+        url: "https://cursor.com",
+        sources: [],
+      },
+    },
+    { type: "reasoning", text: "整理结论", state: "done" },
+    { type: "text", text: "正文", state: "done" },
+  ],
+})
+
+assert.deepEqual(
+  timelinePlan.map((item) => item.kind),
+  ["reasoning", "research", "reasoning", "research", "reasoning", "text"],
+  "思考和调研步骤必须按首次出现顺序交错渲染"
+)
+assert.deepEqual(
+  timelinePlan
+    .filter((item) => item.kind === "research")
+    .map((item) => item.part.data.toolCallId),
+  ["search-1", "read-1"],
+  "每个调研步骤必须保留自己的时间线位置"
+)
+
+const mergedPlan = assistantPartRenderPlan({
+  ...message,
+  uiParts: [
+    {
+      type: "data-research-activity",
+      id: "research-activity:search-1",
+      data: {
+        toolCallId: "search-1",
+        kind: "search",
+        status: "complete",
+        query: "Cursor",
+        sources: [{ title: "Cursor", url: "https://cursor.com" }],
+      },
+    },
+    {
+      type: "data-research-activity",
+      id: "research-activity:read-1",
+      data: {
+        toolCallId: "read-1",
+        kind: "read",
+        status: "complete",
+        url: "https://cursor.com",
+        title: "Cursor",
+        sources: [],
+      },
+    },
+    {
+      type: "data-research-activity",
+      id: "research-activity:read-2",
+      data: {
+        toolCallId: "read-2",
+        kind: "read",
+        status: "complete",
+        url: "https://cursor.com/pricing",
+        sources: [],
+      },
+    },
+    { type: "text", text: "正文", state: "done" },
+  ],
+})
+assert.equal(
+  mergedPlan.filter((item) => item.kind === "research").length,
+  1,
+  "连续的联网活动必须合并为一个轨迹块"
+)
+assert.equal(
+  mergedPlan[0].activities.length,
+  3,
+  "合并后的轨迹块必须保留全部活动"
+)
+assert.equal(
+  mergedPlan[0].part.data.toolCallId,
+  "search-1",
+  "合并块的位置与 key 锚定在首个活动"
+)
+
+const artifactPlan = assistantPartRenderPlan({
+  ...message,
+  uiParts: [
+    { type: "text", text: "说明", state: "done" },
+    {
+      type: "tool-createMarkdownArtifact",
+      toolCallId: "md-1",
+      state: "output-available",
+      input: { title: "报告", content: "# 报告" },
+      output: { created: true, artifactId: "artifact-1" },
+    },
+  ],
+})
+assert.deepEqual(
+  artifactPlan.map((item) => item.kind),
+  ["text", "artifact"],
+  "createMarkdownArtifact 工具 part 必须在正文流中原位渲染为 artifact"
+)
+
+const assistantBodySource = fs.readFileSync(
+  "app/thread-chat/branching/assistant/anchored-assistant-body.tsx",
+  "utf8"
+)
+assert.match(assistantBodySource, /activities=\{activities \?\? \[part\.data\]\}/)
+assert.doesNotMatch(
+  assistantBodySource,
+  /activities=\{message\.webResearch \?\? \[\]\}/
+)
+assert.match(
+  assistantBodySource,
+  /MarkdownArtifactToolPart/,
+  "artifact part 必须原位分发到 MarkdownArtifactToolPart"
+)
+assert.match(
+  assistantBodySource,
+  /artifact=\{\s*artifactId \? state\.artifacts\[artifactId\] : undefined\s*\}/,
+  "artifact 卡片必须从 store 按 output.artifactId 取实体"
+)
+
 const css = fs.readFileSync("app/thread-chat/styles/columns.css", "utf8")
 assert.match(
   css,
   /\.tc \.reasoning-body\s*\{[^}]*white-space:\s*pre-wrap;/s,
   "reasoning 展开内容必须保留换行"
+)
+
+const thinkingTraceSource = fs.readFileSync(
+  "app/thread-chat/branching/assistant/thinking-trace.tsx",
+  "utf8"
+)
+assert.match(thinkingTraceSource, /if \(!working && rows\.length === 1\)/)
+assert.match(thinkingTraceSource, /className="thinking-trace-compact"/)
+assert.match(
+  thinkingTraceSource,
+  /allowedElements=\{INLINE_MARKDOWN_ELEMENTS\}[\s\S]*unwrapDisallowed/,
+  "reasoning 文本必须按行内 markdown 渲染（**强调** 不得原样露出）"
+)
+assert.match(
+  thinkingTraceSource,
+  /renderPrimary=\{\(row\) => <InlineMarkdown text=\{row\.primary\} \/>\}/,
+  "reasoning 轨迹行必须走行内 markdown 渲染"
+)
+assert.match(
+  thinkingTraceSource,
+  /<InlineMarkdown text=\{rows\[0\]\.primary\} \/>/,
+  "单段完成态轻量行同样渲染行内 markdown"
+)
+assert.doesNotMatch(
+  thinkingTraceSource,
+  /replace\(\/\\\*/,
+  "不再用正则剥除强调记号冒充渲染"
+)
+assert.match(
+  thinkingTraceSource,
+  /currentActivities\.every\(\s*\(activity\) => activity\.kind === "read"/s,
+  "SearchTrace 必须按当前 activity kind 区分 search 与 read"
+)
+assert.match(
+  thinkingTraceSource,
+  /正在读取 \$\{hostOf\(runningActivity\.url\)\}/,
+  "进行中的读取必须在标题中暴露目标站点"
+)
+assert.match(
+  thinkingTraceSource,
+  /已搜索网络 · \$\{sourceCount\} 个来源/,
+  "合并轨迹的完成摘要必须给出来源数"
+)
+assert.match(
+  thinkingTraceSource,
+  /已读取 \$\{readCount\} 个网页/,
+  "合并轨迹的完成摘要必须给出读取数"
+)
+assert.match(
+  thinkingTraceSource,
+  /读取失败/,
+  "失败的读取必须在轨迹中显式标记"
+)
+assert.doesNotMatch(
+  thinkingTraceSource,
+  /route\?\.mode === "fetch"/,
+  "readUrl 标题不得由整条消息 route 决定"
+)
+assert.match(
+  thinkingTraceSource,
+  /icon: "book-open"/,
+  "readUrl 轨迹行必须声明 BookOpen 图标"
+)
+
+const thinkingStateSource = fs.readFileSync(
+  "components/primitives/ThinkingState.tsx",
+  "utf8"
+)
+assert.match(thinkingStateSource, /import \{ BookOpen \} from "lucide-react"/)
+assert.match(thinkingStateSource, /row\.icon === "book-open"/)
+assert.match(thinkingStateSource, /<BookOpen aria-hidden/)
+
+const thinkingTraceCss = fs.readFileSync(
+  "app/thread-chat/styles/thinking-trace.css",
+  "utf8"
+)
+assert.match(
+  thinkingTraceCss,
+  /\.tc \.thinking-trace\s*\{[^}]*margin:\s*10px 0;/s,
+  "thinking 轨迹在正文流中必须有纵向间距"
+)
+assert.match(
+  thinkingTraceCss,
+  /\.tc \.thinking-trace-compact\s*\{[^}]*color:\s*var\(--tc-content-muted\);[^}]*white-space:\s*pre-wrap;/s,
+  "单段完成态必须使用浅色轻量文字并保留换行"
+)
+const threadChatCss = fs.readFileSync("app/thread-chat/thread-chat.css", "utf8")
+assert.match(
+  threadChatCss,
+  /@import "\.\/styles\/messages-stream\.css";\s*@import "\.\/styles\/thinking-trace\.css";/,
+  "thinking-trace.css 必须按序接入桶文件"
 )
 
 const supplementalPartsSource = fs.readFileSync(

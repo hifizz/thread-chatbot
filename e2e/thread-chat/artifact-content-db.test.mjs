@@ -1,17 +1,34 @@
 import assert from "node:assert/strict"
-import { eq } from "drizzle-orm"
-import { db } from "../../lib/db/index.ts"
-import * as schema from "../../lib/db/schema.ts"
-import * as commands from "../../lib/thread-chat/application/index.ts"
-import { DEFAULT_THREAD_CHAT_MODEL_ID as modelId } from "../../constants/model.ts"
-import { finalizeGeneration } from "../../lib/thread-chat/streaming/finalize.ts"
-import { artifactIdForTool } from "../../lib/thread-chat/domain/tool-identity.ts"
+import { config } from "dotenv"
+
+config({ path: ".env.local" })
+assert.match(new URL(process.env.DATABASE_URL).pathname, /^\/(wt_|thread-chat-.*test)/, "仅允许独立测试数据库")
+
+// ESM 静态 import 先于 config() 求值，db 客户端会拿到旧环境——必须动态 import。
+const [
+  { eq, inArray },
+  { db },
+  schema,
+  commands,
+  { finalizeGeneration },
+  { artifactIdForTool },
+  { DEFAULT_THREAD_CHAT_MODEL_ID: modelId },
+] = await Promise.all([
+  import("drizzle-orm"),
+  import("../../lib/db/index.ts"),
+  import("../../lib/db/schema.ts"),
+  import("../../lib/thread-chat/application/index.ts"),
+  import("../../lib/thread-chat/streaming/finalize.ts"),
+  import("../../lib/thread-chat/domain/tool-identity.ts"),
+  import("../../constants/model.ts"),
+])
 const id = () => crypto.randomUUID()
 const userId = `artifact-test-${id()}`
 const otherUser = `artifact-other-${id()}`
 const turn = (text = "问题") => ({ commandId: id(), userMessageId: id(), assistantMessageId: id(), modelId, parts: [{ type: "text", text }] })
 const settle = (messageId) => db.update(schema.messages).set({ status: "completed", finishedAt: new Date() }).where(eq(schema.messages.id, messageId))
 const source = { ...turn(), projectId: id(), rootThreadId: id() }
+const cleanupProjectIds = [source.projectId]
 async function rejected(command, user = userId) {
   await assert.rejects(() => commands.sendMessage(user, source.rootThreadId, command))
   assert.equal((await db.select().from(schema.messages).where(eq(schema.messages.id, command.userMessageId))).length, 0)
@@ -29,6 +46,7 @@ try {
   await rejected({ ...turn(), parts: [{ type: "text", text: "问题" }, { ...reference, title: "伪造" }] })
   await rejected({ ...turn(), parts: [{ type: "text", text: "问题" }, reference] }, otherUser)
   const foreign = { ...turn(), projectId: id(), rootThreadId: id() }
+  cleanupProjectIds.push(foreign.projectId)
   await commands.startProject(userId, foreign)
   await settle(foreign.assistantMessageId)
   const otherId = id()
@@ -51,7 +69,7 @@ try {
   await settle(boundary.assistantMessageId)
   const fork = await commands.forkThread(userId, source.rootThreadId, {
     commandId: id(), threadId: id(), sourceMessageId: source.assistantMessageId,
-    anchorText: "固定正文", anchor: { quote: { exact: "固定正文", prefix: "", suffix: "" } }, modelId,
+    target: { type: "message", anchor: { quote: { exact: "固定正文", prefix: "", suffix: "" } } }, modelId,
     firstTurn: { userMessageId: id(), assistantMessageId: id(), parts: [{ type: "text", text: "从子分支引用" }, reference] },
   })
   assert.equal(fork.result.generation.userMessage.parts[1].data.artifactId, artifactId)
@@ -60,7 +78,8 @@ try {
   assert.equal(bootstrap.messages.find(message => message.id === fork.result.generation.userMessage.id).parts[1].data.artifactId, artifactId)
   const own = { ...turn(), parts: [{ type: "text", text: "前文 " }, reference, { type: "text", text: " 后文" }, reference] }
   const saved = (await commands.sendMessage(userId, source.rootThreadId, own)).result
-  assert.deepEqual(saved.userMessage.parts.map((part) => part.type), ["text", "data-artifact-reference", "text", "data-artifact-reference"])
+  // 共享文档特性：同 Project 的新文档修订会以 notices part 追加在末尾。
+  assert.deepEqual(saved.userMessage.parts.map((part) => part.type), ["text", "data-artifact-reference", "text", "data-artifact-reference", "data-document-update-notices"])
   const replay = (await commands.sendMessage(userId, source.rootThreadId, own)).result
   assert.equal(replay.userMessage.id, saved.userMessage.id)
   await settle(own.assistantMessageId)
@@ -80,7 +99,8 @@ try {
   assert.deepEqual(kept.userMessage.parts[0], legacy)
   await settle(kept.assistantMessage.id)
   const removed = (await commands.editLatestTurn(userId, kept.userMessage.id, turn("删除引用"))).result.generation
-  assert.deepEqual(removed.userMessage.parts, [{ type: "text", text: "删除引用" }])
+  assert.deepEqual(removed.userMessage.parts.slice(0, 1), [{ type: "text", text: "删除引用" }])
+  assert.equal(removed.userMessage.parts.at(-1).type, "data-document-update-notices")
   await settle(removed.assistantMessage.id)
   await rejected({ ...turn(), parts: [legacyInput, { type: "text", text: "新消息不可携带旧引用" }] })
   const startBad = { ...turn(), projectId: id(), rootThreadId: id(), parts: [{ type: "text", text: "跨项目" }, reference] }
@@ -88,6 +108,8 @@ try {
   assert.equal((await db.select().from(schema.projects).where(eq(schema.projects.id, startBad.projectId))).length, 0)
   console.log("PASS 数据库事务：权限/范围/完成状态/预算拒绝无半消息、原子终态不可覆盖、完整编辑、旧 Quote 校验与删除、幂等重试")
 } finally {
+  // document_revisions.actorUserId 不级联；documents 级联删除其 revisions。
+  await db.delete(schema.documents).where(inArray(schema.documents.projectId, cleanupProjectIds))
   await db.delete(schema.user).where(eq(schema.user.id, userId))
   await db.delete(schema.user).where(eq(schema.user.id, otherUser))
   await globalThis.__dbClient?.end()
