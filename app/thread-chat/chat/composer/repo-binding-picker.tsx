@@ -1,6 +1,7 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useLayoutEffect, useRef, useState } from "react"
+import { createPortal } from "react-dom"
 import type { ThreadRepositoryBinding } from "@/lib/thread-chat/contracts/dto"
 
 interface RepoItem {
@@ -36,14 +37,55 @@ export function RepoBindingPicker({
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState("")
   const [selectedRepo, setSelectedRepo] = useState<RepoItem | null>(null)
+  const [popoverStyle, setPopoverStyle] = useState<React.CSSProperties>({
+    position: "fixed",
+    display: "none",
+  })
+  const anchorRef = useRef<HTMLDivElement>(null)
   const popoverRef = useRef<HTMLDivElement>(null)
+
+  // 计算并固定 popover 位置（fixed 定位，不受父容器 overflow 裁剪）
+  useLayoutEffect(() => {
+    if (!open || !anchorRef.current) return
+    const rect = anchorRef.current.getBoundingClientRect()
+    const style: React.CSSProperties = {
+      position: "fixed",
+      left: rect.left,
+      bottom: window.innerHeight - rect.top + 4,
+      display: "flex",
+    }
+    setPopoverStyle(style)
+  }, [open])
+
+  // 窗口滚动/缩放时更新位置
+  useEffect(() => {
+    if (!open || !anchorRef.current) return
+    function update() {
+      if (!anchorRef.current) return
+      const rect = anchorRef.current.getBoundingClientRect()
+      setPopoverStyle({
+        position: "fixed",
+        left: rect.left,
+        bottom: window.innerHeight - rect.top + 4,
+        display: "flex",
+      })
+    }
+    window.addEventListener("scroll", update, true)
+    window.addEventListener("resize", update)
+    return () => {
+      window.removeEventListener("scroll", update, true)
+      window.removeEventListener("resize", update)
+    }
+  }, [open])
 
   useEffect(() => {
     if (!open) return
     function onClick(e: MouseEvent) {
       if (
         popoverRef.current &&
-        !popoverRef.current.contains(e.target as Node)
+        !popoverRef.current.contains(e.target as Node) &&
+        anchorRef.current &&
+        !anchorRef.current.contains(e.target as Node)
       ) {
         setOpen(false)
       }
@@ -124,9 +166,69 @@ export function RepoBindingPicker({
     r.fullName.toLowerCase().includes(search.toLowerCase())
   )
 
+  const popoverContent = (
+    <>
+      {loading && <div className="repo-binding-loading">加载中…</div>}
+      {error && <div className="repo-binding-error">{error}</div>}
+      {mode === "select-repo" && !loading && (
+        <>
+          <input
+            className="repo-binding-search"
+            placeholder="搜索仓库…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            autoFocus
+          />
+          <div className="repo-binding-list">
+            {filtered.map((repo) => (
+              <button
+                key={repo.fullName}
+                className="repo-binding-item"
+                onClick={() => pickRepo(repo)}
+              >
+                <span className="repo-binding-name">
+                  {repo.fullName}
+                  {repo.private && (
+                    <span className="repo-binding-private">私有</span>
+                  )}
+                </span>
+                <span className="repo-binding-default">
+                  {repo.defaultBranch}
+                </span>
+              </button>
+            ))}
+            {filtered.length === 0 && (
+              <div className="repo-binding-empty">没有匹配的仓库</div>
+            )}
+          </div>
+        </>
+      )}
+      {mode === "select-branch" && !loading && (
+        <div className="repo-binding-list">
+          <div className="repo-binding-back">
+            <button onClick={() => setMode("select-repo")}>← 返回</button>
+            <span>{selectedRepo?.fullName}</span>
+          </div>
+          {branches.map((b) => (
+            <button
+              key={b.name}
+              className="repo-binding-item"
+              onClick={() => pickBranch(b.name)}
+            >
+              <span className="repo-binding-name">{b.name}</span>
+            </button>
+          ))}
+          {branches.length === 0 && (
+            <div className="repo-binding-empty">没有分支</div>
+          )}
+        </div>
+      )}
+    </>
+  )
+
   if (!binding) {
     return (
-      <div className="repo-binding-picker">
+      <div className="repo-binding-picker" ref={anchorRef}>
         <button
           type="button"
           className="repo-binding-add"
@@ -135,71 +237,23 @@ export function RepoBindingPicker({
         >
           + 选择 GitHub 仓库
         </button>
-        {open && (
-          <div className="repo-binding-popover" ref={popoverRef}>
-            {loading && <div className="repo-binding-loading">加载中…</div>}
-            {error && <div className="repo-binding-error">{error}</div>}
-            {mode === "select-repo" && !loading && (
-              <>
-                <input
-                  className="repo-binding-search"
-                  placeholder="搜索仓库…"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  autoFocus
-                />
-                <div className="repo-binding-list">
-                  {filtered.map((repo) => (
-                    <button
-                      key={repo.fullName}
-                      className="repo-binding-item"
-                      onClick={() => pickRepo(repo)}
-                    >
-                      <span className="repo-binding-name">
-                        {repo.fullName}
-                        {repo.private && (
-                          <span className="repo-binding-private">私有</span>
-                        )}
-                      </span>
-                      <span className="repo-binding-default">
-                        {repo.defaultBranch}
-                      </span>
-                    </button>
-                  ))}
-                  {filtered.length === 0 && (
-                    <div className="repo-binding-empty">没有匹配的仓库</div>
-                  )}
-                </div>
-              </>
-            )}
-            {mode === "select-branch" && !loading && (
-              <div className="repo-binding-list">
-                <div className="repo-binding-back">
-                  <button onClick={() => setMode("select-repo")}>← 返回</button>
-                  <span>{selectedRepo?.fullName}</span>
-                </div>
-                {branches.map((b) => (
-                  <button
-                    key={b.name}
-                    className="repo-binding-item"
-                    onClick={() => pickBranch(b.name)}
-                  >
-                    <span className="repo-binding-name">{b.name}</span>
-                  </button>
-                ))}
-                {branches.length === 0 && (
-                  <div className="repo-binding-empty">没有分支</div>
-                )}
-              </div>
-            )}
-          </div>
-        )}
+        {open && typeof document !== "undefined" &&
+          createPortal(
+            <div
+              className="repo-binding-popover"
+              ref={popoverRef}
+              style={popoverStyle}
+            >
+              {popoverContent}
+            </div>,
+            document.body
+          )}
       </div>
     )
   }
 
   return (
-    <div className="repo-binding-picker">
+    <div className="repo-binding-picker" ref={anchorRef}>
       <span className="repo-binding-chip">
         <span className="repo-binding-icon">📁</span>
         <span className="repo-binding-label">
@@ -222,59 +276,17 @@ export function RepoBindingPicker({
           移除
         </button>
       </span>
-      {open && (
-        <div className="repo-binding-popover" ref={popoverRef}>
-          {loading && <div className="repo-binding-loading">加载中…</div>}
-          {error && <div className="repo-binding-error">{error}</div>}
-          {mode === "select-repo" && !loading && (
-            <>
-              <input
-                className="repo-binding-search"
-                placeholder="搜索仓库…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                autoFocus
-              />
-              <div className="repo-binding-list">
-                {filtered.map((repo) => (
-                  <button
-                    key={repo.fullName}
-                    className="repo-binding-item"
-                    onClick={() => pickRepo(repo)}
-                  >
-                    <span className="repo-binding-name">
-                      {repo.fullName}
-                      {repo.private && (
-                        <span className="repo-binding-private">私有</span>
-                      )}
-                    </span>
-                    <span className="repo-binding-default">
-                      {repo.defaultBranch}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
-          {mode === "select-branch" && !loading && (
-            <div className="repo-binding-list">
-              <div className="repo-binding-back">
-                <button onClick={() => setMode("select-repo")}>← 返回</button>
-                <span>{selectedRepo?.fullName}</span>
-              </div>
-              {branches.map((b) => (
-                <button
-                  key={b.name}
-                  className="repo-binding-item"
-                  onClick={() => pickBranch(b.name)}
-                >
-                  <span className="repo-binding-name">{b.name}</span>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+      {open && typeof document !== "undefined" &&
+        createPortal(
+          <div
+            className="repo-binding-popover"
+            ref={popoverRef}
+            style={popoverStyle}
+          >
+            {popoverContent}
+          </div>,
+          document.body
+        )}
     </div>
   )
 }
