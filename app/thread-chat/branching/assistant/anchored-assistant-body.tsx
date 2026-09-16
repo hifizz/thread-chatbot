@@ -39,6 +39,20 @@ function shortSha(sha: string): string {
   return sha.slice(0, 7)
 }
 
+function githubFileUrl(
+  repo: string,
+  sha: string,
+  path: string,
+  startLine?: number,
+  endLine?: number
+): string {
+  const base = `https://github.com/${repo}/blob/${sha}/${path}`
+  if (startLine && endLine && startLine !== endLine)
+    return `${base}#L${startLine}-L${endLine}`
+  if (startLine) return `${base}#L${startLine}`
+  return base
+}
+
 function RepoContextChip({ data }: { data: RepoContextData }) {
   if (data.status === "unavailable") {
     return (
@@ -74,29 +88,107 @@ function RepoContextChip({ data }: { data: RepoContextData }) {
   )
 }
 
-function RepoToolCard({ part }: { part: { type: string; [k: string]: unknown } }) {
+// ── 仓库工具过程卡 ──────────────────────────────────────────────
+
+interface ToolOutput {
+  ok?: boolean
+  code?: string
+  message?: string
+  data?: {
+    entries?: Array<{ name: string; path: string; type: string }>
+    commitSha?: string
+    path?: string
+    startLine?: number
+    endLine?: number
+    truncated?: boolean
+    matches?: string[]
+  }
+}
+
+function RepoToolCard({
+  part,
+  repoFullName,
+  commitSha,
+}: {
+  part: { type: string; [k: string]: unknown }
+  repoFullName: string
+  commitSha: string | null
+}) {
   const toolName = part.type.replace(/^tool-/, "")
   const toolState = "state" in part ? String(part.state) : ""
-  let label = toolName
-  let detail = ""
-  if (toolState === "input-streaming" || toolState === "input-available") {
-    const input = "input" in part ? (part.input as Record<string, unknown>) : null
-    if (input) {
-      if (toolName === "readRepositoryFile") {
-        detail = String(input.path ?? "")
-      } else if (toolName === "listRepositoryFiles") {
-        detail = String(input.path || "/")
-      } else if (toolName === "findRepositoryPaths") {
-        detail = String(input.query ?? "")
+  const input = "input" in part ? (part.input as Record<string, unknown>) : null
+  const output = "output" in part ? (part.output as ToolOutput) : null
+
+  // ── 输入摘要 ──
+  let inputLabel = ""
+  if (input) {
+    if (toolName === "readRepositoryFile") {
+      inputLabel = String(input.path ?? "")
+    } else if (toolName === "listRepositoryFiles") {
+      inputLabel = String(input.path || "/")
+    } else if (toolName === "findRepositoryPaths") {
+      inputLabel = `"${input.query ?? ""}"`
+    }
+  }
+
+  // ── 输出摘要 ──
+  let outputLabel = ""
+  let outputLink: string | null = null
+  let isError = false
+  if (output) {
+    if (output.ok === false) {
+      isError = true
+      outputLabel = output.message ?? output.code ?? "失败"
+    } else if (output.ok === true && output.data) {
+      if (toolName === "listRepositoryFiles" && output.data.entries) {
+        const dirs = output.data.entries.filter((e) => e.type === "dir").length
+        const files = output.data.entries.length - dirs
+        outputLabel = `${files} 个文件${dirs > 0 ? `，${dirs} 个目录` : ""}`
+      } else if (toolName === "readRepositoryFile") {
+        const s = output.data.startLine
+        const e = output.data.endLine
+        const trunc = output.data.truncated ? "（截断）" : ""
+        outputLabel = `第 ${s}-${e} 行${trunc}`
+        if (output.data.path) {
+          outputLink = githubFileUrl(
+            repoFullName,
+            output.data.commitSha ?? commitSha ?? "",
+            output.data.path,
+            s,
+            e
+          )
+        }
+      } else if (toolName === "findRepositoryPaths" && output.data.matches) {
+        const n = output.data.matches.length
+        const trunc = output.data.truncated ? "（部分）" : ""
+        outputLabel = `${n} 个匹配${trunc}`
       }
     }
-    label = `${toolName}(${detail})`
   }
+
   const isDone = toolState === "output-available"
+  const isStreaming = toolState === "input-streaming" || toolState === "input-available"
+
   return (
-    <div className={`repo-tool-card${isDone ? " done" : ""}`}>
-      <span className="repo-tool-icon">{isDone ? "✓" : "⋯"}</span>
-      <span className="repo-tool-label">{label}</span>
+    <div className={`repo-tool-card${isDone ? " done" : ""}${isError ? " error" : ""}`}>
+      <span className="repo-tool-icon">
+        {isDone ? (isError ? "✕" : "✓") : "⋯"}
+      </span>
+      <span className="repo-tool-name">{toolName}</span>
+      {inputLabel && (
+        <code className="repo-tool-input">{inputLabel}</code>
+      )}
+      {outputLabel && (
+        <span className={`repo-tool-output${isError ? " error" : ""}`}>
+          {outputLink ? (
+            <a href={outputLink} target="_blank" rel="noreferrer">
+              {outputLabel}
+            </a>
+          ) : (
+            outputLabel
+          )}
+        </span>
+      )}
     </div>
   )
 }
@@ -117,6 +209,13 @@ export function AnchoredAssistantBody({
   density?: MarkdownDensity
 }) {
   const renderPlan = assistantPartRenderPlan(message)
+
+  // 从 uiParts 中提取仓库上下文，供工具卡显示链接
+  const repoCtx = (message.uiParts ?? []).find(
+    (p) => p.type === "data-repo-context"
+  ) as { type: string; data: RepoContextData } | undefined
+  const repoFullName = repoCtx?.data?.repositoryFullName ?? ""
+  const commitSha = repoCtx?.data?.commitSha ?? null
 
   return (
     <>
@@ -223,7 +322,14 @@ export function AnchoredAssistantBody({
             toolName === "readRepositoryFile" ||
             toolName === "findRepositoryPaths"
           if (isRepoTool) {
-            return <RepoToolCard key={`${part.type}-${index}`} part={part as { type: string; [k: string]: unknown }} />
+            return (
+              <RepoToolCard
+                key={`${part.type}-${index}`}
+                part={part as { type: string; [k: string]: unknown }}
+                repoFullName={repoFullName}
+                commitSha={commitSha}
+              />
+            )
           }
           return (
             <ToolTrace
