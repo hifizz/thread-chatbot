@@ -407,7 +407,8 @@
   min-width: 280px;
   max-width: 360px;
   max-height: 320px;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
   background: var(--popover);
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -424,12 +425,16 @@
   background: var(--background);
   color: var(--foreground);
   margin-bottom: 4px;
+  flex-shrink: 0;
 }
 
 .tc .repo-binding-list {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
 }
 
 .tc .repo-binding-item {
