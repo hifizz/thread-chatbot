@@ -72,8 +72,10 @@ export class AcpBridge {
     const logFile = `/tmp/devin-acp-${crypto.randomUUID().slice(0, 8)}.jsonl`;
     // e2b 的 onStdout 推送实测会中途静默断开，因此 stdout 用 tee 落盘，
     // 事件统一从日志文件轮询读取（onStdout 只排空不用）。
+    // --model 固定 swe-2-high：沙箱内没有 config.json，不指定就走组织默认，
+    // 可能命中计费模型；SWE-2 全家在当前 Teams 账号下标注 Free。
     const handle = await input.sandbox.commands.run(
-      `bash -lc ${JSON.stringify(`${input.devinBin} acp 2>/dev/null | tee -a ${logFile}`)}`,
+      `bash -lc ${JSON.stringify(`${input.devinBin} acp --model swe-2-high 2>/dev/null | tee -a ${logFile}`)}`,
       {
         background: true,
         stdin: true,
