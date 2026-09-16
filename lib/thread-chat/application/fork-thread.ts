@@ -12,7 +12,6 @@ import type {
   ThreadDTO,
 } from "@/lib/thread-chat/contracts/dto"
 import { buildFrozenForkContext } from "@/lib/thread-chat/domain/fork-context"
-import { locateArtifactAnchor } from "@/lib/thread-chat/domain/markdown-visible-text"
 import {
   assertAllowedGenerationSettings,
   assertAllowedModel,
@@ -98,8 +97,7 @@ export function forkThread(
             stateConflict("当前只支持从 Markdown Artifact 开启分支")
           if (row.sourceMessageStatus !== "completed")
             stateConflict("Artifact 来源尚未完成")
-          if (!locateArtifactAnchor(artifact.content, anchor))
-            stateConflict("选区无法在 Artifact 可见文字中唯一定位，请重新划选")
+          // 与消息分支一致：保留客户端 DOM 选区，不以服务端 Markdown 解析结果校验位置。
           forkArtifactId = artifact.id
         }
 

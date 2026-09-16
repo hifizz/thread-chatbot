@@ -26,7 +26,7 @@ const id = () => crypto.randomUUID()
 const userId = `artifact-fork-${id()}`
 const turn = (text) => ({ commandId: id(), userMessageId: id(), assistantMessageId: id(), modelId, parts: [{ type: "text", text }] })
 const source = { ...turn("生成评测文档"), projectId: id(), rootThreadId: id() }
-const content = "# 金融评测\n\n采用 AI Judge 评分。\n\n准备 500 道题。\n\n唯一全文标记：蓝鲸143"
+const content = "# 金融评测\n\n采用 AI Judge 评分。\n\n准备 500 道题。\n\n唯一全文标记：蓝鲸143\n\nFeature Map\n\n行为约束\n\nPhase A 必须先读 Feature Map。"
 const title = "评测文档"
 const artifactId = artifactIdForTool(source.assistantMessageId, "artifact-call")
 const anchor = { quote: { exact: "采用 AI Judge 评分。", prefix: "", suffix: "" } }
@@ -55,6 +55,15 @@ try {
   assert.ok(child.thread.forkContext.includes(source.assistantMessageId))
   assert.equal((await commands.getProjectBootstrap(userId, source.projectId)).messages.filter(m => m.threadId === child.thread.id).length, 0)
   assertBody(await context(child.thread.id))
+  // DOM 换行和偏移与服务端纯文本不同，重复选中文字仍应原样保存。
+  const domAnchor = { quote: { exact: "Feature Map", prefix: "\n\n行为约束\n\nPhase A 必须先读 ", suffix: "。" }, position: { start: 2750, end: 2761 } }
+  const domFork = (await commands.forkThread(userId, source.rootThreadId, { ...forkInput, commandId: id(), threadId: id(), target: { type: "artifact", artifactId, anchor: domAnchor } })).result
+  assert.deepEqual(domFork.thread.forkAnchor, domAnchor)
+  assert.equal(domFork.thread.anchorText, "Feature Map")
+  assert.equal(domFork.thread.forkArtifactId, artifactId)
+  await db.update(schema.messages).set({ status: "generating", finishedAt: null }).where(eq(schema.messages.id, source.assistantMessageId))
+  await assert.rejects(() => commands.forkThread(userId, source.rootThreadId, { ...forkInput, commandId: id(), threadId: id() }), /分支来源尚未完成/)
+  await settle(source.assistantMessageId, [tool])
   const sent = (await commands.sendMessage(userId, child.thread.id, turn("删除 Quote 后发送"))).result
   assert.equal(sent.userMessage.parts.some(p => p.type === "data-quote"), false)
   await settle(sent.assistantMessage.id)
