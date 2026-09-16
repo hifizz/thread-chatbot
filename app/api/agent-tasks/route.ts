@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 const pendingIdempotency = new Map<string, string>();
 const REPO_PATTERN = /^[\w.-]+\/[\w.-]+$/;
-const DEFAULT_REPO = "hifizz/ai-daily";
+const DEFAULT_REPO = "hifizz/playground.zilin.im";
 
 export async function GET() {
   return Response.json({ tasks: listTasks() });

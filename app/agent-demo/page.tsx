@@ -84,9 +84,9 @@ type PullRequestState = {
   updatedAt: string;
 };
 
-const DEFAULT_REPO = "hifizz/ai-daily";
+const DEFAULT_REPO = "hifizz/playground.zilin.im";
 const DEFAULT_GOAL =
-  "阅读仓库的 README 和目录结构，在 docs/ 下新增一份架构说明文档 architecture.md，用中文描述这个项目的功能、目录结构和关键模块。";
+  "帮我给这个项目下增加一个最近很火的 model reasoning 以及 effort 调节面板组件 demo，然后创建PR，目标合入到main分支。";
 
 const PHASE_ORDER = ["environment", "agent", "verify", "publish", "release"];
 const PHASE_LABEL: Record<string, string> = {
