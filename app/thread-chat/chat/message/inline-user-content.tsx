@@ -52,6 +52,7 @@ export function InlineUserContent({ message }: { message: ConversationViewMessag
   return (
     <>
       {message.uiParts.map((part, index) => {
+        if (part.type === "data-project-document-updates" || part.type === "data-document-update-notices") return null
         if (part.type === "text") return <span key={index}>{part.text}</span>
         if (part.type === "data-quote")
           return <QuoteContent key={index} part={part} open={open} />

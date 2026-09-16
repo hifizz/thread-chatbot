@@ -1,3 +1,6 @@
+import { documentContextForRequest } from "../domain/documents/context-history"
+import { restoreDocumentToolParts } from "../persistence/message-parts"
+import { expandDocumentUpdates } from "./documents/context"
 import {
   artifactReferenceData,
   artifactReferenceDataSchema,
@@ -6,7 +9,6 @@ import {
   findOwnedArtifact,
   loadProjectReferenceArtifactRows,
 } from "../persistence/artifact-repository"
-import { expandArtifactReferencesInContext } from "./artifact-reference-context"
 import { convertToModelMessages, type ModelMessage } from "ai"
 import { db } from "@/lib/db"
 import { supportsModelImageInput } from "@/constants/model"
@@ -33,11 +35,12 @@ function asUiMessage(row: {
   id: string
   role: "user" | "assistant"
   parts: ThreadChatUIMessage["parts"]
+  documentToolParts?: ThreadChatUIMessage["parts"]
 }): ThreadChatUIMessage {
   return {
     id: row.id,
     role: row.role,
-    parts: stripTransientParts(row.parts),
+    parts: stripTransientParts(restoreDocumentToolParts(row.parts, row.documentToolParts)),
     metadata: { messageId: row.id, threadId: "context" },
   }
 }
@@ -195,10 +198,12 @@ export async function compileModelContextWithProject({
         message.id !== excludeAssistantMessageId
     )
     .map(asUiMessage)
+  const activeUserId = currentRows.findLast((row) => row.role === "user" && row.supersededAt === null)?.id
+  const selectDocumentContext = documentContextForRequest([...inheritedRows, ...currentRows], activeUserId)
   const uiMessages: ThreadChatUIMessage[] = [
     ...inheritedMessages,
     ...currentMessages,
-  ]
+  ].map(selectDocumentContext)
   const projectFiles = await listProjectFileRows(db, thread.projectId)
   const resolved = await resolveAttachmentContext({
     messages: uiMessages,
@@ -244,8 +249,8 @@ export async function compileModelContextWithProject({
   )
   if (referenceRows.length !== new Set(referenceIds).size)
     stateConflict("Artifact 引用目标不完整")
-  const expanded = expandArtifactReferencesInContext(
-    withProjectContext,
+  const expanded = await expandDocumentUpdates(
+    thread.projectId, withProjectContext,
     new Map(referenceRows.map(({ artifact }) => [artifact.id, artifact]))
   )
   const modelMessages = await convertToModelMessages(expanded, {

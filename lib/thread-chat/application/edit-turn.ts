@@ -1,3 +1,4 @@
+import { appendDocumentNotices } from "./documents/notices"
 import { resolveUserContent } from "./resolve-user-content"
 import { and, inArray, isNull } from "drizzle-orm"
 import { messages } from "@/lib/db/schema"
@@ -19,13 +20,11 @@ import {
 } from "@/lib/thread-chat/persistence/mappers"
 import {
   listThreadMessageRows,
-  lockOwnedMessage,
+  lockOwnedMessageTurn,
 } from "@/lib/thread-chat/persistence/message-repository"
 import {
   findRootThreadId,
-  lockOwnedProject,
 } from "@/lib/thread-chat/persistence/project-repository"
-import { lockOwnedThread } from "@/lib/thread-chat/persistence/thread-repository"
 import {
   allocateThreadSequences,
   withConversationTransaction,
@@ -52,13 +51,10 @@ export function editLatestTurn(
       scopeId: messageId,
       payload: command,
       execute: async (): Promise<EditTurnResult> => {
-        const source = await lockOwnedMessage(tx, userId, messageId)
-        if (!source) notFound()
+        const locked = await lockOwnedMessageTurn(tx, userId, messageId)
+        if (!locked) notFound()
+        const { source, thread, project } = locked
         if (source.role !== "user") stateConflict("只能编辑用户消息")
-        const thread = await lockOwnedThread(tx, userId, source.threadId)
-        if (!thread) notFound()
-        const project = await lockOwnedProject(tx, userId, source.projectId)
-        if (!project) notFound()
         const timeline = await listThreadMessageRows(
           tx,
           source.projectId,
@@ -69,6 +65,7 @@ export function editLatestTurn(
           stateConflict("只能编辑最新一轮用户消息")
         }
         const parts = await resolveUserContent({ tx, userId, projectId: project.id, modelId: command.modelId, content: command, operation: { type: "edit", originalParts: source.parts } })
+        await appendDocumentNotices(tx, project.id, thread.id, parts)
         const [userSequence, assistantSequence] = await allocateThreadSequences(
           tx,
           thread.id,

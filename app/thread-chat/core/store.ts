@@ -2,6 +2,7 @@ import { createStore, type StoreApi } from "zustand/vanilla"
 
 import type {
   ArtifactDTO,
+  ArtifactSummaryDTO,
   MessageDTO,
   ProjectBootstrapDTO,
   ProjectDTO,
@@ -52,6 +53,18 @@ function streamState(
   return { phase, lastEventSeq: 0, pollAttempt: 0 }
 }
 
+function artifactMetadata(artifact: ArtifactSummaryDTO): ArtifactSummaryDTO {
+  const metadata = { ...artifact }
+  if ("content" in metadata) delete metadata.content
+  return metadata
+}
+
+/** 只缓存明确提供的全文；元数据刷新不能清除已经读取的固定正文。 */
+function artifactContents(artifacts: readonly ArtifactSummaryDTO[]): Record<string, string> {
+  return Object.fromEntries(artifacts.flatMap((artifact) =>
+    "content" in artifact && typeof artifact.content === "string" ? [[artifact.id, artifact.content]] : []))
+}
+
 function entitiesFromBootstrap(
   bootstrap: ProjectBootstrapDTO
 ): ConversationEntitySnapshot {
@@ -69,9 +82,11 @@ function entitiesFromBootstrap(
       bootstrap.messages.map((message) => [message.id, message])
     ),
     messageIdsByThread: orderedMessageIds(bootstrap.messages),
+    artifactContentsById: artifactContents(bootstrap.artifacts),
     artifactsById: Object.fromEntries(
-      bootstrap.artifacts.map((artifact) => [artifact.id, artifact])
+      bootstrap.artifacts.map((artifact) => [artifact.id, artifactMetadata(artifact)])
     ),
+    documentsById: Object.fromEntries(bootstrap.documents.map((doc) => [doc.id, doc])),
     artifactOrder: bootstrap.artifacts.map((artifact) => artifact.id),
     streamByMessageId: Object.fromEntries(
       bootstrap.messages
@@ -88,6 +103,7 @@ function emptyEntities(): ConversationEntitySnapshot {
     threads: [],
     messages: [],
     artifacts: [],
+    documents: [],
     activeGenerationIds: [],
   })
 }
@@ -103,7 +119,9 @@ function entitySnapshot(
     messagesById: state.messagesById,
     messageIdsByThread: state.messageIdsByThread,
     artifactsById: state.artifactsById,
+    artifactContentsById: state.artifactContentsById,
     artifactOrder: state.artifactOrder,
+    documentsById: state.documentsById,
     streamByMessageId: state.streamByMessageId,
   })
 }
@@ -151,15 +169,24 @@ export function createConversationStore(input?: {
     : emptyEntities()
   return createStore<NormalizedThreadChatState>()((set, get) => ({
     ...initial,
+    documentRefreshRequested: 0,
+    requestDocumentRefresh(projectId) {
+      set((state) => state.project?.id === projectId
+        ? { documentRefreshRequested: state.documentRefreshRequested + 1 } : state)
+    },
+    documentSyncError: false,
+    setDocumentSyncError(documentSyncError) { set((state) => state.documentSyncError === documentSyncError ? state : { documentSyncError }) },
     optimisticByCommandId: {},
     workspace: {
       ...structuredClone(EMPTY_WORKSPACE),
       ...input?.workspace,
     },
     hydrateProject(bootstrap) {
-      set({
-        ...entitiesFromBootstrap(bootstrap),
-        optimisticByCommandId: {},
+      set((state) => {
+        const entities = entitiesFromBootstrap(bootstrap)
+        if (state.project?.id === bootstrap.project?.id)
+          entities.artifactContentsById = { ...state.artifactContentsById, ...entities.artifactContentsById }
+        return { ...entities, optimisticByCommandId: {} }
       })
     },
     upsertProject(project: ProjectDTO) {
@@ -210,9 +237,37 @@ export function createConversationStore(input?: {
         }
       })
     },
+    syncDocuments(documents, artifacts) {
+      set((state) => {
+        const documentsById = Object.fromEntries(documents.map((doc) => [doc.id, doc]))
+        const artifactsById = { ...state.artifactsById, ...Object.fromEntries(artifacts.map((artifact) => [artifact.id, artifactMetadata(artifact)])) }
+        const contents = artifactContents(artifacts)
+        const artifactContentsById = Object.entries(contents).every(([id, content]) => state.artifactContentsById[id] === content)
+          ? state.artifactContentsById : { ...state.artifactContentsById, ...contents }
+        if (sameValue(state.documentsById, documentsById) && sameValue(state.artifactsById, artifactsById)
+          && state.artifactContentsById === artifactContentsById) return state
+        return { documentsById, artifactsById, artifactContentsById,
+          artifactOrder: [...new Set([...state.artifactOrder, ...artifacts.map((artifact) => artifact.id)])] }
+      })
+    },
+    cacheArtifactSummaries(artifacts) {
+      set((state) => {
+        // 固定元数据只补缓存；不覆盖当前目录，也不把来源终态退回生成中。
+        const additions = artifacts.filter((artifact) => !state.artifactsById[artifact.id])
+        const completed = artifacts.filter((artifact) => artifact.sourceMessageStatus !== "generating"
+          && state.artifactsById[artifact.id]?.sourceMessageStatus === "generating")
+        if (!additions.length && !completed.length) return state
+        return {
+          artifactsById: { ...state.artifactsById,
+            ...Object.fromEntries([...additions, ...completed].map((artifact) => [artifact.id, artifactMetadata(artifact)])) },
+          artifactOrder: [...state.artifactOrder, ...additions.map((artifact) => artifact.id)],
+        }
+      })
+    },
     upsertArtifact(artifact: ArtifactDTO) {
       set((state) => ({
-        artifactsById: { ...state.artifactsById, [artifact.id]: artifact },
+        artifactsById: { ...state.artifactsById, [artifact.id]: artifactMetadata(artifact) },
+        artifactContentsById: { ...state.artifactContentsById, [artifact.id]: artifact.content },
         artifactOrder: state.artifactOrder.includes(artifact.id)
           ? state.artifactOrder
           : [artifact.id, ...state.artifactOrder],

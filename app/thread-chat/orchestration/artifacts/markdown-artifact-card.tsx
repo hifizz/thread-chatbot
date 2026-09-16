@@ -75,6 +75,8 @@ function ArtifactThumb({ kind }: { kind: Artifact["kind"] }) {
 function downloadArtifact(
   artifact: Pick<Artifact, "title" | "kind" | "lang" | "content">
 ) {
+  // 归一化客户端可能只载入了元数据；按钮已按 content !== null 门控。
+  if (artifact.content === null) return
   const ext =
     artifact.kind === "markdown"
       ? "md"
@@ -265,17 +267,19 @@ export function MarkdownArtifactCard({
         <span className="n">{artifact.title}</span>
         <span className="k">{caption}</span>
       </span>
-      <button
-        type="button"
-        className="dl"
-        aria-label={`下载 ${artifact.title}`}
-        onClick={(event) => {
-          event.stopPropagation()
-          downloadArtifact(artifact)
-        }}
-      >
-        下载
-      </button>
+      {artifact.content !== null && (
+        <button
+          type="button"
+          className="dl"
+          aria-label={`下载 ${artifact.title}`}
+          onClick={(event) => {
+            event.stopPropagation()
+            downloadArtifact(artifact)
+          }}
+        >
+          下载
+        </button>
+      )}
     </>
   )
 

@@ -68,6 +68,7 @@ export interface SelectionBubbleProps {
   state: ThreadTreeState
   sel: SelectionInfo | null
   onSelChange: (s: SelectionInfo | null) => void
+  onQuestionArtifactChange?: (artifactId: string | null) => void
   /** 提交开分支：上层负责真正 fork + 放置；hint 见 placement.ts；
       question = 气泡输入框里的可选首问（trim 后非空才传，成为新分支第 1 条 user 消息） */
   onFork: (s: SelectionInfo, hint?: PlacementHint, question?: string) => void
@@ -82,6 +83,7 @@ export function SelectionBubble({
   state,
   sel,
   onSelChange,
+  onQuestionArtifactChange,
   onFork,
   slots,
   mode,
@@ -120,6 +122,12 @@ export function SelectionBubble({
     preserveEmptySelection: mobileQuoteSaved,
     onIgnoredSelection: showDraftHint,
   })
+  const questionArtifactId = sel?.artifactId && (panel === "question" || hasQuestion || guardMobileDraft)
+    ? sel.artifactId : null
+  useLayoutEffect(() => {
+    onQuestionArtifactChange?.(questionArtifactId)
+    return () => onQuestionArtifactChange?.(null)
+  }, [onQuestionArtifactChange, questionArtifactId])
   /** Esc 确认弹窗（有草稿时 Esc 不直接关，先确认清空） */
   const [confirming, setConfirming] = useState(false)
   /** 气泡左右抖动中（确认弹窗弹出时触发一次，animationend 归位） */

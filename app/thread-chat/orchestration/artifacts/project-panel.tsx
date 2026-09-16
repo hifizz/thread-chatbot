@@ -1,13 +1,13 @@
 "use client"
 
+import { DOCUMENT_UI_COPY } from "@/constants/project-documents"
+
 import React, { useEffect, useId, useMemo, useRef, useState } from "react"
 import {
-  Check,
-  Copy,
+  ArrowLeft,
   ExternalLink,
   FileText,
   FolderKanban,
-  LocateFixed,
   Paperclip,
   Pencil,
   Search,
@@ -23,24 +23,30 @@ import {
 } from "@/constants/project-workspace"
 import type {
   ArtifactDTO,
+  ArtifactSummaryDTO,
   ProjectDTO,
   ProjectFileDTO,
 } from "@/lib/thread-chat/contracts/dto"
 import { MarkdownBody } from "../../chat/message/markdown-body"
+import { ArtifactPreviewActions } from "./artifact-preview-actions"
 import { toViewThreadId } from "../../core/projections"
-import { useCopyMarkdown } from "../../chat/actions/use-copy-markdown"
 import { uploadProjectFile } from "../../net/project-file-upload"
 
 export interface ProjectPanelProps {
   project: ProjectDTO | null
   files: ProjectFileDTO[]
-  artifacts: ArtifactDTO[]
+  artifacts: ArtifactSummaryDTO[]
+  currentArtifacts: ArtifactSummaryDTO[]
+  artifactContents: Readonly<Record<string, string>>
+  artifactLoadError?: boolean
+  onRetryArtifact?(): void
+  documentSyncError?: boolean
+  renderDocumentControls?(artifact: ArtifactDTO): React.ReactNode
   open: boolean
   activeId: string | null
   onClose(): void
   onSelect(id: string): void
   onLocate(threadId: string, sourceMessageId: string): void
-  onRefresh(): Promise<void>
   onSaveContract(target: string, instructions: string): Promise<void>
   onAddProjectFile(attachmentId: string): Promise<void>
   onRemoveProjectFile(attachmentId: string): Promise<void>
@@ -86,15 +92,20 @@ export function ProjectPanel({
   project,
   files,
   artifacts,
+  currentArtifacts,
+  artifactContents,
+  artifactLoadError,
+  onRetryArtifact,
   open,
   activeId,
   onClose,
   onSelect,
   onLocate,
-  onRefresh,
   onSaveContract,
   onAddProjectFile,
   onRemoveProjectFile,
+  renderDocumentControls,
+  documentSyncError,
 }: ProjectPanelProps) {
   const titleId = useId()
   const fileInputRef = useRef<HTMLInputElement | null>(null)
@@ -109,27 +120,9 @@ export function ProjectPanel({
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [artifactQuery, setArtifactQuery] = useState("")
-  const { copied, copy } = useCopyMarkdown(setError)
   const archived = Boolean(project?.archivedAt)
   const loading = open && !project
   const displayedSection: ProjectPanelSection = activeId ? "artifacts" : section
-
-  useEffect(() => {
-    if (!open) return
-    let cancelled = false
-    void onRefresh()
-      .then(() => {
-        if (!cancelled) setError(null)
-      })
-      .catch((cause) => {
-        if (!cancelled) {
-          setError(cause instanceof Error ? cause.message : "Project 加载失败")
-        }
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [onRefresh, open])
 
   useEffect(() => {
     if (open) {
@@ -150,14 +143,15 @@ export function ProjectPanel({
     }
   }, [open])
 
-  const selectedArtifact = useMemo(
+  const selectedMetadata = useMemo(
     () => artifacts.find((artifact) => artifact.id === activeId) ?? null,
     [activeId, artifacts]
   )
+  const selectedContent = activeId ? artifactContents[activeId] : undefined
+  const selectedArtifact = selectedMetadata && selectedContent !== undefined ? { ...selectedMetadata, content: selectedContent } : null
   const sortedArtifacts = useMemo(
-    () =>
-      [...artifacts]
-        .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
+    () => {
+      return currentArtifacts
         .filter((artifact) => {
           const query = artifactQuery.trim().toLowerCase()
           if (!query) return true
@@ -169,8 +163,9 @@ export function ProjectPanel({
             .join(" ")
             .toLowerCase()
             .includes(query)
-        }),
-    [artifactQuery, artifacts]
+        })
+    },
+    [artifactQuery, currentArtifacts]
   )
   const sortedFiles = useMemo(
     () =>
@@ -226,10 +221,8 @@ export function ProjectPanel({
       await uploadProjectFile(file, {
         onAttachmentCreated: onAddProjectFile,
       })
-      await onRefresh()
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "文件上传失败")
-      await onRefresh().catch(() => {})
     } finally {
       setUploading(false)
       if (fileInputRef.current) fileInputRef.current.value = ""
@@ -250,16 +243,18 @@ export function ProjectPanel({
     }
   }
 
-  const locateArtifact = (artifact: ArtifactDTO) => {
+  const locateArtifact = (artifact: ArtifactSummaryDTO) => {
     onLocate(
       toViewThreadId(project?.rootThreadId, artifact.threadId),
       artifact.sourceMessageId
     )
   }
 
+  const preview = displayedSection === "artifacts" ? selectedMetadata : null
+
   return (
     <div
-      className={`art-drawer project-panel ${open ? "open" : ""}`}
+      className={`art-drawer project-panel ${open ? "open" : ""} ${preview ? "project-panel-preview" : ""}`}
       role="dialog"
       aria-modal={false}
       aria-labelledby={titleId}
@@ -267,49 +262,46 @@ export function ProjectPanel({
       inert={!open}
     >
       <div className="art-head project-panel-head">
-        <FolderKanban size={16} />
-        <h3 id={titleId}>
-          Project
-          {project && (
-            <span className="project-version">v{project.contractVersion}</span>
-          )}
-        </h3>
+        {preview ? <button type="button" className="project-preview-back" aria-label="返回文档列表" title="返回文档列表" onClick={() => { setSection("artifacts"); onSelect("") }}><ArrowLeft size={18} /></button> : <FolderKanban size={16} />}
+        <h3 id={titleId} title={preview?.title}>{preview?.title ?? "项目空间"}</h3>
+        {preview && selectedArtifact && <ArtifactPreviewActions key={preview.id} artifact={selectedArtifact} onLocate={() => locateArtifact(preview)} />}
         {archived && <span className="project-readonly">只读</span>}
         <button
           ref={closeButtonRef}
           type="button"
           className="art-x"
-          title="收起 Project Panel"
+          title={preview ? "关闭文档预览" : "收起项目空间"}
+          aria-label={preview ? "关闭文档预览" : "收起项目空间"}
           onClick={onClose}
         >
           <X size={13} />
         </button>
       </div>
 
-      <div
+      {!preview && <div
         className="project-sections"
         role="tablist"
-        aria-label="Project workspace"
+        aria-label="项目空间"
       >
         <button
           className={displayedSection === "overview" ? "on" : ""}
           onClick={() => selectSection("overview")}
         >
-          Overview
+          概览
         </button>
         <button
           className={displayedSection === "files" ? "on" : ""}
           onClick={() => selectSection("files")}
         >
-          Files <span>{files.length}</span>
+          文件 <span>{files.length}</span>
         </button>
         <button
           className={displayedSection === "artifacts" ? "on" : ""}
           onClick={() => selectSection("artifacts")}
         >
-          Artifacts <span>{artifacts.length}</span>
+          文档与产物 <span>{currentArtifacts.length}</span>
         </button>
-      </div>
+      </div>}
 
       {error && <div className="project-error">{error}</div>}
       {archived && (
@@ -319,6 +311,7 @@ export function ProjectPanel({
       )}
 
       <div className="art-body project-panel-body">
+        {documentSyncError && !preview ? <p role="status">{DOCUMENT_UI_COPY.syncFailed}</p> : null}
         {loading ? <div className="project-empty">Project 加载中…</div> : null}
 
         {displayedSection === "overview" && !loading && (
@@ -505,51 +498,7 @@ export function ProjectPanel({
           <section className="project-artifacts">
             {selectedArtifact ? (
               <div className="project-artifact-detail">
-                <button className="project-back" onClick={() => onSelect("")}>
-                  ← 全部 Artifacts
-                </button>
-                <div className="project-section-heading artifact-detail-heading">
-                  <div>
-                    <div className="project-eyebrow">
-                      {artifactKindLabel(selectedArtifact.kind)}
-                    </div>
-                    <h4>{selectedArtifact.title}</h4>
-                    <p>
-                      来源：
-                      {selectedArtifact.sourceThreadTitle ?? "未命名 Thread"}
-                      {selectedArtifact.sourceThreadFootnote !== null
-                        ? ` · 脚注 ${selectedArtifact.sourceThreadFootnote}`
-                        : ""}
-                      {` · ${sourceStatusLabel(selectedArtifact.sourceMessageStatus)}`}
-                      {` · ${formatDate(selectedArtifact.createdAt)}`}
-                    </p>
-                  </div>
-                  <div className="project-actions">
-                    {selectedArtifact.kind === "markdown" && (
-                      <button
-                        type="button"
-                        className="project-secondary"
-                        title={
-                          copied
-                            ? "Markdown raw 内容已复制"
-                            : "复制 Markdown raw 内容"
-                        }
-                        onClick={() => void copy(selectedArtifact.content)}
-                      >
-                        {copied ? <Check size={12} /> : <Copy size={12} />}
-                        <span aria-live="polite">
-                          {copied ? "已复制" : "复制"}
-                        </span>
-                      </button>
-                    )}
-                    <button
-                      className="project-secondary"
-                      onClick={() => locateArtifact(selectedArtifact)}
-                    >
-                      <LocateFixed size={12} /> 定位来源
-                    </button>
-                  </div>
-                </div>
+                {renderDocumentControls?.(selectedArtifact)}
                 <div
                   className="project-artifact-content"
                   // 把当前 Markdown 阅读区标记成可划选来源；全局唯一 selection
@@ -586,6 +535,8 @@ export function ProjectPanel({
                   )}
                 </div>
               </div>
+            ) : activeId ? (
+              <p role={artifactLoadError ? "alert" : "status"}>{artifactLoadError ? "文档加载失败。" : "正在加载文档…"}{artifactLoadError && <button type="button" onClick={onRetryArtifact}>重新加载</button>}</p>
             ) : (
               <>
                 <div className="project-section-heading">

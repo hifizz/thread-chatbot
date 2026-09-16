@@ -409,3 +409,13 @@
 .tc .md-mermaid .md-code {
   margin-bottom: 0;
 }
+
+/* 任务项使用复选框作标记，不叠加普通列表圆点；保留条目内原有换行。 */
+.tc .tc-prose li.task-list-item {
+  list-style: none;
+  white-space: pre-line;
+}
+.tc .tc-prose .task-list-item > input[type="checkbox"] {
+  margin: 0 6px 0 0;
+  accent-color: var(--tc-content-project-accent);
+}

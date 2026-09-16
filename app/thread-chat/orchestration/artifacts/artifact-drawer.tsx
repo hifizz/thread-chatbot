@@ -58,7 +58,7 @@ export function ArtifactDrawer({
     () =>
       state.artifactOrder.flatMap((artifactId) => {
         const artifact = state.artifacts[artifactId]
-        if (!artifact) return []
+        if (!artifact || artifact.content === null) return []
         const thread = state.threads[artifact.sourceThreadId]
         const sourceMessage = thread?.messages.find(
           (message) => message.id === artifact.sourceMessageId
@@ -89,13 +89,13 @@ export function ArtifactDrawer({
     <ProjectPanel
       project={project}
       files={[]}
-      artifacts={artifacts}
+      artifacts={artifacts} currentArtifacts={artifacts}
+      artifactContents={Object.fromEntries(artifacts.map(a => [a.id, a.content]))}
       open={open}
       activeId={activeId}
       onClose={onClose}
       onSelect={onSelect}
       onLocate={onLocate}
-      onRefresh={() => Promise.resolve()}
       onSaveContract={() => Promise.resolve()}
       onAddProjectFile={() => Promise.resolve()}
       onRemoveProjectFile={() => Promise.resolve()}

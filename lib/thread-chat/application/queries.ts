@@ -7,10 +7,12 @@ import type {
 } from "@/lib/thread-chat/contracts/dto"
 import {
   findOwnedArtifact,
-  listProjectArtifactRows,
+  listOwnedProjectArtifactCatalog,
+  listOwnedThreadArtifactRows,
 } from "@/lib/thread-chat/persistence/artifact-repository"
 import {
   toArtifactDTO,
+  toArtifactSummaryDTO,
   toMessageDTO,
   toProjectDTO,
   toProjectFileDTO,
@@ -50,14 +52,15 @@ export async function getProjectBootstrap(
       threads: [],
       messages: [],
       artifacts: [],
+      documents: [],
       activeGenerationIds: [],
     }
   }
-  const [threadRows, messageRows, artifactRows, projectFileRows] =
+  const [threadRows, messageRows, catalog, projectFileRows] =
     await Promise.all([
       listProjectThreadRows(db, project.id),
       listProjectMessageRows(db, project.id),
-      listProjectArtifactRows(db, project.id),
+      listOwnedProjectArtifactCatalog(db, userId, project.id),
       listProjectFileRows(db, project.id),
     ])
   const root = threadRows.find((thread) => thread.parentId === null)
@@ -67,7 +70,7 @@ export async function getProjectBootstrap(
     files: projectFileRows.map(toProjectFileDTO),
     threads: threadRows.map(toThreadDTO),
     messages: messageRows.map(toMessageDTO),
-    artifacts: artifactRows.map(toArtifactDTO),
+    ...catalog,
     activeGenerationIds: messageRows
       .filter((message) => message.status === "generating")
       .map((message) => message.id),
@@ -88,4 +91,8 @@ export async function getArtifact(
 ): Promise<ArtifactDTO | null> {
   const row = await findOwnedArtifact(db, userId, artifactId)
   return row ? toArtifactDTO(row) : null
+}
+
+export async function getThreadArtifacts(userId: string, threadId: string) {
+  return (await listOwnedThreadArtifactRows(db, userId, threadId)).map(toArtifactSummaryDTO)
 }

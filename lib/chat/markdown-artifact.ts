@@ -1,9 +1,10 @@
+import { MARKDOWN_ARTIFACT_CONTENT_MAX_CHARS } from "@/constants/markdown-artifact"
 import { z } from "zod"
 import { parsePartialJson } from "ai"
 
 export const MARKDOWN_ARTIFACT_TOOL_NAME = "createMarkdownArtifact" as const
 export const MARKDOWN_ARTIFACT_TITLE_MAX_LEN = 80
-export const MARKDOWN_ARTIFACT_CONTENT_MAX_CHARS = 64_000
+export { MARKDOWN_ARTIFACT_CONTENT_MAX_CHARS } from "@/constants/markdown-artifact"
 
 export interface MarkdownArtifactInput {
   title: string

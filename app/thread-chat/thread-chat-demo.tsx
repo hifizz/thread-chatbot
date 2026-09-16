@@ -1,5 +1,7 @@
 "use client"
 
+import { selectCurrentProjectArtifacts } from "@/lib/thread-chat/domain/artifacts/selectors"
+
 import { useInputViewport } from "./orchestration/use-input-viewport"
 
 import { ComposerDraftProvider } from "./chat/composer/composer-drafts"
@@ -21,7 +23,6 @@ import {
   useGenerationSettings,
 } from "./chat/composer/generation-settings-context"
 import {
-  activePathArtifacts,
   threadTitle,
   type TreeRow,
 } from "./core/selectors"
@@ -171,6 +172,7 @@ function NormalizedThreadChat({
   treeId: string
   runtime: ReturnType<typeof useConversationRuntime>
 }) {
+  const [questionArtifactId, setQuestionArtifactId] = useState<string | null>(null)
   const router = useRouter()
   const state = useConversationStore(runtime.store, (value) => value)
   const { settings: generationSettings } = useGenerationSettings()
@@ -609,10 +611,8 @@ function NormalizedThreadChat({
     state.project?.customTitle ?? state.project?.autoTitle ?? derivedSubtitle
   const hintVisible = !hintDismissed && !mainHasMessage
   const branchCount = Math.max(0, Object.keys(tree.threads).length - 1)
-  const markdownCount = activePathArtifacts(tree).reduce(
-    (count, artifact) => count + (artifact.kind === "markdown" ? 1 : 0),
-    0
-  )
+  const markdownCount = selectCurrentProjectArtifacts(state)
+    .filter((artifact) => artifact.kind === "markdown").length
   const navigationProps: ThreadChatNavigationProps = {
     viewMode: workspace.viewMode,
     showHelp: workspace.viewMode === "canvas" || !hintVisible,
@@ -731,6 +731,7 @@ function NormalizedThreadChat({
         state={tree}
         sel={selection}
         onSelChange={setSelection}
+        onQuestionArtifactChange={setQuestionArtifactId}
         onFork={handleFork}
         slots={
           workspace.viewMode === "canvas"
@@ -790,6 +791,7 @@ function NormalizedThreadChat({
       )}
 
       <StoreBoundProjectPanel
+        questionArtifactId={questionArtifactId}
         projectId={treeId}
         store={runtime.store}
         client={runtime.client}

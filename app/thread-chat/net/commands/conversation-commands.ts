@@ -150,17 +150,6 @@ export function createConversationCommands(
     throw lastError
   }
 
-  async function refreshProjectArtifacts(projectId: string) {
-    try {
-      const bootstrap = await client.getProject(projectId)
-      if (bootstrap.project) store.getState().upsertProject(bootstrap.project)
-      for (const artifact of bootstrap.artifacts)
-        store.getState().upsertArtifact(artifact)
-    } catch {
-      // Artifact 资源区刷新是非阻塞增强；历史消息仍保留工具结果。
-    }
-  }
-
   function follow(
     accepted: Parameters<typeof followAcceptedGeneration>[0]["accepted"],
     afterFinish?: (threadId: string) => void | Promise<void>
@@ -171,8 +160,8 @@ export function createConversationCommands(
       client,
       accepted,
       onFinishMessage: async (message) => {
+        store.getState().requestDocumentRefresh(message.projectId)
         if (afterFinish) await afterFinish(message.threadId)
-        await refreshProjectArtifacts(message.projectId)
       },
       fetch: options.fetch,
       pollDelays: options.pollDelays,

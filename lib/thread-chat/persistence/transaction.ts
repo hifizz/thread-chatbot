@@ -7,7 +7,7 @@ export type ConversationTransaction = Parameters<
 >[0]
 export type ConversationExecutor = typeof db | ConversationTransaction
 
-export function withConversationTransaction<T>(
+export async function withConversationTransaction<T>(
   execute: (tx: ConversationTransaction) => Promise<T>
 ): Promise<T> {
   return db.transaction(execute)

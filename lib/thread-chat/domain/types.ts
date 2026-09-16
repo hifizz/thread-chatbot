@@ -23,7 +23,8 @@ export interface Artifact {
   title: string
   kind: ArtifactKind
   lang?: string
-  content: string
+  /** 归一化客户端只加载元数据时为 null；阅读与模型输入必须先取得正文。 */
+  content: string | null
   /** 产生该 artifact 的会话（main 或分支 id） */
   sourceThreadId: string
   /** 产生该 artifact 的不可变 assistant 消息节点。 */
@@ -33,8 +34,8 @@ export interface Artifact {
 /** 尚未落库的 artifact 内容（种子），落库时由 store 补全 id / 来源会话 */
 export type ArtifactSeed = Omit<
   Artifact,
-  "id" | "sourceThreadId" | "sourceMessageId"
->
+  "id" | "sourceThreadId" | "sourceMessageId" | "content"
+> & { content: string }
 
 /** 挂在消息原文上的分支锚点：一段被划选的文字 + 对应脚注号 + 目标会话 */
 export interface Fork {

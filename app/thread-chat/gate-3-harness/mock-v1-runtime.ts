@@ -48,7 +48,7 @@ function commandResponse<T>(data: T) {
 function initialBootstrap(
   projectId: string,
   options: { backgroundRecovery?: boolean } = {}
-): ProjectBootstrapDTO {
+): Omit<ProjectBootstrapDTO, "artifacts"> & { artifacts: ArtifactDTO[] } {
   const stamp = now()
   const project: ProjectDTO = {
     id: projectId,
@@ -302,6 +302,7 @@ function initialBootstrap(
     files: [],
     threads: [root, child, nested],
     messages,
+    documents: [],
     artifacts: [artifact],
     activeGenerationIds: options.backgroundRecovery
       ? [BACKGROUND_ASSISTANT_ID]
@@ -341,6 +342,7 @@ export function createGate3MockRuntime(
     files: [],
     threads: [...threads.values()].map(clone),
     messages: [...messages.values()].map(clone),
+    documents: [],
     artifacts: [...artifacts.values()].map(clone),
     activeGenerationIds: [...messages.values()]
       .filter((message) => message.status === "generating")
@@ -512,6 +514,9 @@ export function createGate3MockRuntime(
   }
 
   const client: ThreadChatClient = {
+    async listThreadArtifacts(threadId: string) { return [...artifacts.values()].filter(artifact => artifact.threadId === threadId) },
+    async listDocuments() { return { documents: [], artifacts: [...artifacts.values()] } },
+    async getDocumentHistory() { return [] },
     async listProjects(archived = false) {
       return project && Boolean(project.archivedAt) === archived
         ? [

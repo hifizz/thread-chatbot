@@ -1,6 +1,8 @@
+import { lockDocumentExecution } from "../persistence/documents/commands"
+import { registerDocumentArtifact } from "../persistence/documents/writes"
 import { and, eq } from "drizzle-orm"
 import { db } from "@/lib/db"
-import { artifacts, messages } from "@/lib/db/schema"
+import { artifacts, messages, projects } from "@/lib/db/schema"
 import type { MessageDTO } from "@/lib/thread-chat/contracts/dto"
 import type { ThreadChatUIMessage } from "@/lib/thread-chat/contracts/ui-message"
 import { stripTransientParts } from "@/lib/thread-chat/application/command-utils"
@@ -63,6 +65,13 @@ export async function finalizeGeneration({
   }
 
   return db.transaction(async (tx) => {
+    // 结束生成可能插入 Artifact（外键访问 Project），也必须先锁父级。
+    const [identity] = await tx.select({ projectId: messages.projectId,
+      threadId: messages.threadId, userId: projects.userId }).from(messages)
+      .innerJoin(projects, eq(projects.id, messages.projectId)).where(eq(messages.id, messageId))
+    if (!identity || !await lockDocumentExecution(tx, { ...identity, messageId })) {
+      throw new Error("MESSAGE_NOT_FOUND_DURING_FINALIZE")
+    }
     const now = new Date()
     const [updated] = await tx
       .update(messages)
@@ -90,14 +99,17 @@ export async function finalizeGeneration({
     }
 
     if (finalArtifacts.length > 0) {
-      await tx.insert(artifacts).values(
+      const inserted = await tx.insert(artifacts).values(
         finalArtifacts.map((artifact) => ({
           ...artifact,
           projectId: updated.projectId,
           threadId: updated.threadId,
           sourceMessageId: updated.id,
         }))
-      )
+      ).onConflictDoNothing().returning()
+      const [project] = await tx.select({ userId: projects.userId }).from(projects).where(eq(projects.id, updated.projectId))
+      if (!project) throw new Error("PROJECT_NOT_FOUND")
+      for (const artifact of inserted) await registerDocumentArtifact(tx, artifact, project.userId)
     }
     return toMessageDTO(updated)
   })

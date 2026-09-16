@@ -208,6 +208,7 @@ try {
     threads: [],
     messages: [],
     artifacts: [],
+    documents: [],
     activeGenerationIds: [],
   }
   assert.deepEqual(emptyBootstrap, expectedEmptyBootstrap)
