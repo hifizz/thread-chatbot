@@ -1,3 +1,4 @@
+ALTER TABLE "thread_chat"."artifacts" ADD CONSTRAINT "artifacts_document_source_uq" UNIQUE("id","project_id","source_message_id");--> statement-breakpoint
 CREATE TABLE "thread_chat"."document_revisions" (
 	"id" text PRIMARY KEY NOT NULL,
 	"document_id" text NOT NULL,
@@ -35,5 +36,4 @@ ALTER TABLE "thread_chat"."documents" ADD CONSTRAINT "documents_project_id_proje
 ALTER TABLE "thread_chat"."documents" ADD CONSTRAINT "documents_current_revision_fk" FOREIGN KEY ("id","current_revision_id") REFERENCES "thread_chat"."document_revisions"("document_id","id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 CREATE UNIQUE INDEX "document_revisions_number_uq" ON "thread_chat"."document_revisions" USING btree ("document_id","revision_number");--> statement-breakpoint
 CREATE UNIQUE INDEX "document_revisions_artifact_uq" ON "thread_chat"."document_revisions" USING btree ("artifact_id");--> statement-breakpoint
-CREATE INDEX "documents_project_idx" ON "thread_chat"."documents" USING btree ("project_id");--> statement-breakpoint
-ALTER TABLE "thread_chat"."artifacts" ADD CONSTRAINT "artifacts_document_source_uq" UNIQUE("id","project_id","source_message_id");
+CREATE INDEX "documents_project_idx" ON "thread_chat"."documents" USING btree ("project_id");
