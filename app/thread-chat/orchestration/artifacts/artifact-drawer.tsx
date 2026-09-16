@@ -102,6 +102,7 @@ export function ArtifactDrawer({
       artifactContents={Object.fromEntries(artifacts.map(a => [a.id, a.content]))}
       open={open}
       activeId={activeId}
+      threads={state.threads}
       onClose={onClose}
       onSelect={onSelect}
       onLocate={onLocate}

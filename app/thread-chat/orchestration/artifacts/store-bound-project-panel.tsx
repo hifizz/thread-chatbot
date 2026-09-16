@@ -257,6 +257,7 @@ export function StoreBoundProjectPanel({
       threadDepths={threadDepths}
       open={open}
       activeId={activeId}
+      threads={state.threadsById}
       onClose={onClose}
       onSelect={onSelect}
       onLocate={locate}

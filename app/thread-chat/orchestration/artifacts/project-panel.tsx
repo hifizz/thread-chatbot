@@ -25,12 +25,14 @@ import type {
   ArtifactSummaryDTO,
   ProjectDTO,
   ProjectFileDTO,
+  ThreadDTO,
 } from "@/lib/thread-chat/contracts/dto"
 import { ArtifactPanel, artifactCaption, formatDate } from "./artifact-panel"
 import { MarkdownArtifactCard } from "./markdown-artifact-card"
 import { ProjectPanelSkeleton, ResourceListSkeleton } from "./skeleton"
 import { toViewThreadId } from "../../core/projections"
 import { uploadProjectFile } from "../../net/project-file-upload"
+import { accentOf } from "../../theme"
 
 export interface ProjectPanelProps {
   project: ProjectDTO | null
@@ -46,6 +48,7 @@ export interface ProjectPanelProps {
   threadDepths?: Readonly<Record<string, number>>
   open: boolean
   activeId: string | null
+  threads: Readonly<Record<string, Pick<ThreadDTO, "depth">>>
   onClose(): void
   onSelect(id: string): void
   onLocate(threadId: string, sourceMessageId: string): void
@@ -83,6 +86,7 @@ export function ProjectPanel({
   onRetryArtifact,
   open,
   activeId,
+  threads,
   onClose,
   onSelect,
   onLocate,
@@ -134,6 +138,8 @@ export function ProjectPanel({
     [activeId, artifacts]
   )
   const selectedContent = activeId ? artifactContents[activeId] : undefined
+  const sourceThread = selectedMetadata ? threads[selectedMetadata.threadId] : undefined
+  const artifactAccent = sourceThread ? accentOf(sourceThread) : undefined
   const sortedArtifacts = useMemo(() => {
     return currentArtifacts.filter((artifact) => {
       const query = artifactQuery.trim().toLowerCase()
@@ -253,6 +259,7 @@ export function ProjectPanel({
             if (selectedMetadata) locateArtifact(selectedMetadata)
           }}
           project={project}
+          accent={artifactAccent}
           renderDocumentControls={renderDocumentControls}
         />
       ) : (

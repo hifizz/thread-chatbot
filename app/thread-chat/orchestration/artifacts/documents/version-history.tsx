@@ -3,6 +3,7 @@
 import { useRef } from "react"
 import { ChevronDown } from "lucide-react"
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu"
+import { DOCUMENT_UI_COPY } from "@/constants/project-documents"
 import type { DocumentRevisionSummaryDTO } from "@/lib/thread-chat/contracts/document"
 import { VersionPillSkeleton } from "../skeleton"
 
@@ -14,8 +15,12 @@ export function DocumentVersionHistory({ revisions, revisionId, currentRevisionI
   const container = useRef<HTMLDivElement>(null)
   const selected = revisions.find((revision) => revision.id === revisionId)
   if (!selected) return <VersionPillSkeleton />
-  return <div ref={container}><DropdownMenu>
-    <DropdownMenuTrigger disabled={disabled} className="artifact-version" aria-label="选择文档版本" title="选择文档版本">
+  const disabledReason = disabled ? DOCUMENT_UI_COPY.navigationBlocked : undefined
+  return <div ref={container} title={disabledReason}>
+    {/* 提问开合不能推移正文，否则滚动锚定会触发全局选区关闭监听。 */}
+    <span className="sr-only" role="status">{disabledReason}</span>
+    <DropdownMenu>
+    <DropdownMenuTrigger disabled={disabled} className="artifact-version" aria-label="选择文档版本" title={disabledReason ?? "选择文档版本"}>
       V{selected?.revisionNumber ?? "…"}{revisionId === currentRevisionId ? " · 最新" : " · 历史"} <ChevronDown size={10} />
     </DropdownMenuTrigger>
     <DropdownMenuContent container={container} className="w-72 max-w-[90vw]">

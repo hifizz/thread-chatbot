@@ -67,6 +67,7 @@ export interface ArtifactPanelProps {
   onClose(): void
   onLocate(): void
   project: ProjectDTO | null
+  accent?: string
   renderDocumentControls?(artifact: ArtifactDTO): React.ReactNode
 }
 
@@ -85,6 +86,7 @@ export function ArtifactPanel({
   onClose,
   onLocate,
   project,
+  accent,
   renderDocumentControls,
 }: ArtifactPanelProps) {
   const selected =
@@ -158,7 +160,8 @@ export function ArtifactPanel({
       <div className="art-body artifact-body">
         {selected ? (
           <div
-            className="project-artifact-content"
+            className="project-artifact-content tc-accent-context"
+            style={{ "--tc-accent": accent } as React.CSSProperties}
             // 把当前 Markdown 阅读区标记成可划选来源；全局唯一 selection
             // observer 据此获得稳定的 artifact/message/thread identity。
             {...(selected.kind === "markdown" && project
