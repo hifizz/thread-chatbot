@@ -4,15 +4,21 @@
 
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { isStepCount, streamText, type LanguageModel } from "ai";
+import { readFile } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import type { Sandbox } from "e2b";
+import { AcpBridge } from "@/lib/agent-demo/acp";
 import type { TaskResult } from "@/lib/agent-demo/contracts";
 import {
   createBoxdEnvironment,
   createE2bEnvironment,
+  installDevinHarness,
   LocalDriver,
   type WorkspaceDriver,
 } from "@/lib/agent-demo/environment";
 import { publishDraftPr } from "@/lib/agent-demo/github";
-import { emit, getTask, isCancelRequested, registerRunHandles, setRunStatus } from "@/lib/agent-demo/store";
+import { emit, getTask, isCancelRequested, registerRunHandles, registerSecret, setRunStatus } from "@/lib/agent-demo/store";
 import { createWorkspaceTools } from "@/lib/agent-demo/tools";
 
 const MAX_STEPS = 20;
@@ -91,6 +97,8 @@ async function runTask(taskId: string) {
       (Boolean(process.env.E2B_API_KEY?.trim()) || Boolean(process.env.BOXD_API_KEY?.trim()));
 
     let driver: WorkspaceDriver;
+    let e2bSandbox: Sandbox | null = null;
+    let acp: AcpBridge | null = null;
     if (remoteReady) {
       if (process.env.E2B_API_KEY?.trim()) {
         const env = await createE2bEnvironment({
@@ -102,6 +110,7 @@ async function runTask(taskId: string) {
           onPhase: (label) => phase(taskId, "environment", label),
         });
         driver = env.driver;
+        e2bSandbox = env.sandbox;
         release = env.release;
         registerRunHandles(taskId, { releaseEnv: env.release });
         emit(taskId, "runner", {
@@ -132,11 +141,46 @@ async function runTask(taskId: string) {
     }
     const filesBefore = new Set(await driver.listFiles().catch(() => [] as string[]));
 
+    // ── Harness：e2b 路径下在沙箱内安装并启动 devin acp ──────────
+    if (e2bSandbox) {
+      phase(taskId, "environment", "安装 devin CLI");
+      const cred = await readFile(
+        path.join(os.homedir(), ".local/share/devin/credentials.toml"),
+        "utf8"
+      ).catch(() => null);
+      if (!cred) throw new Error("本机 devin CLI 未登录（缺 credentials.toml）");
+      registerSecret(cred.match(/windsurf_api_key\s*=\s*"([^"]+)"/)?.[1]);
+      const devinBin = await installDevinHarness(e2bSandbox, cred);
+      phase(taskId, "environment", "启动 devin ACP 会话");
+      acp = await AcpBridge.start({
+        sandbox: e2bSandbox,
+        cwd: driver.workdir,
+        devinBin,
+        emitEvent: (payload) => emit(taskId, "agent", payload),
+      });
+      abortController.signal.addEventListener("abort", () => void acp?.cancel());
+    }
+
     // ── Agent 执行 ──────────────────────────────────────────────
     phase(taskId, "agent", "Agent 执行中");
     emit(taskId, "runner", { type: "agent.started" });
     let lastText = "";
 
+    if (acp) {
+      // devin acp harness：ACP 事件已在桥内映射为规范化事件
+      const resp = await acp.prompt(
+        `工作目录是 GitHub 仓库 ${task.repo} 的任务分支 ${task.branch}（基于 ${task.baseBranch}）检出。\n\n` +
+          `任务目标：${task.goal}\n\n` +
+          `规则：不要执行 git commit/push/config 等变更远端或历史的命令（发布由系统统一处理）；` +
+          `完成后用中文简要总结你做了什么、产出哪些文件、如何验证。`
+      );
+      lastText = acp.lastMessage;
+      if (resp.stopReason === "cancelled" || isCancelRequested(taskId)) {
+        setRunStatus(taskId, "cancelled");
+        return;
+      }
+    } else {
+    let modelFailed = false;
     const result = streamText({
       abortSignal: abortController.signal,
       model: resolveAgentModel(),
@@ -158,7 +202,6 @@ async function runTask(taskId: string) {
       onError: ({ error }) => console.error("[agent-demo] 流内错误:", error),
     });
 
-    let modelFailed = false;
     for await (const part of result.fullStream) {
       switch (part.type) {
         case "text-start":
@@ -211,6 +254,7 @@ async function runTask(taskId: string) {
     if (modelFailed) {
       setRunStatus(taskId, "failed");
       return;
+    }
     }
 
     // ── 核实：以 git status / diff 为证据，不信 Agent 自述 ────────

@@ -51,13 +51,21 @@ function store(): Store {
   });
 }
 
-/** 事件落库前的统一脱敏：任何秘密都不允许进入事件表或前端。 */
+/** 事件落库前的统一脱敏：任何秘密都不允许进入事件表或前端。
+ *  运行时注册的密钥（如 devin token）也一并脱敏。 */
+const extraSecrets: string[] = [];
+
+export function registerSecret(secret: string | null | undefined) {
+  if (secret && secret.length > 8) extraSecrets.push(secret);
+}
+
 function sanitizeSecrets(payload: TaskEvent): TaskEvent {
   const secrets = [
     process.env.GITHUB_TOKEN,
     process.env.BOXD_API_KEY,
     process.env.E2B_API_KEY,
     process.env.AGENT_MODEL_API_KEY,
+    ...extraSecrets,
   ].filter((s): s is string => Boolean(s && s.length > 8));
   if (secrets.length === 0) return payload;
   let text = JSON.stringify(payload);

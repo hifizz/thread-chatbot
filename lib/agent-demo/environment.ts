@@ -6,7 +6,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import path from "node:path";
 import { Boxd, type Machine } from "@boxd-sh/sdk";
-import { Sandbox } from "e2b";
+import { CommandExitError, Sandbox } from "e2b";
 
 const execFileAsync = promisify(execFile);
 
@@ -150,9 +150,49 @@ export class E2bDriver implements WorkspaceDriver {
 
 export type E2bEnvironment = {
   sandboxId: string;
+  sandbox: Sandbox;
   driver: E2bDriver;
   release: () => Promise<void>;
 };
+
+const DEVIN_BIN = "/home/user/.local/bin/devin";
+const DEVIN_CRED_PATH = "/home/user/.local/share/devin/credentials.toml";
+
+/**
+ * 在 e2b 沙箱内安装 devin CLI 并写入凭据，返回 devin 可执行文件路径。
+ * credentialsToml 为本机 ~/.local/share/devin/credentials.toml 的内容（密钥材料，
+ * 只进沙箱文件系统，不进事件表）。
+ */
+async function runChecked(sandbox: Sandbox, cmd: string, timeoutMs: number, what: string) {
+  try {
+    return await sandbox.commands.run(cmd, { timeoutMs });
+  } catch (error) {
+    const e = error as CommandExitError;
+    throw new Error(`${what}: ${e.stderr || e.stdout || e.message}`);
+  }
+}
+
+export async function installDevinHarness(
+  sandbox: Sandbox,
+  credentialsToml: string
+): Promise<string> {
+  // install.sh 末尾会跑交互式 `devin setup`，非交互环境必然报 "Login canceled"，
+  // 但二进制本身已装好——因此忽略安装脚本退出码，用 `devin version` 验证。
+  await sandbox.commands.run(
+    `curl -fsSL https://cli.devin.ai/install.sh | bash || true`,
+    { timeoutMs: 300_000 }
+  ).catch(() => {});
+  await runChecked(
+    sandbox,
+    `mkdir -p ${shQuote(path.posix.dirname(DEVIN_CRED_PATH))}`,
+    10_000,
+    "创建凭据目录失败"
+  );
+  await sandbox.files.write(DEVIN_CRED_PATH, credentialsToml);
+  const check = await runChecked(sandbox, `${DEVIN_BIN} version`, 30_000, "devin CLI 不可用");
+  if (!check.stdout.trim()) throw new Error("devin CLI 无输出");
+  return DEVIN_BIN;
+}
 
 const E2B_WORKDIR = "/home/user/repo";
 // Hobby 层单会话上限 1 小时；demo 任务给 30 分钟足够。
@@ -194,6 +234,7 @@ export async function createE2bEnvironment(input: {
 
   return {
     sandboxId: sandbox.sandboxId,
+    sandbox,
     driver,
     release: async () => {
       await sandbox.kill().catch(() => {});
