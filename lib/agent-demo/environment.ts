@@ -198,8 +198,8 @@ export async function installDevinHarness(
 }
 
 const E2B_WORKDIR = "/home/user/repo";
-// Hobby 层单会话上限 1 小时；demo 任务给 30 分钟足够。
-const E2B_SANDBOX_TIMEOUT_MS = 30 * 60 * 1000;
+// Hobby 层单会话上限 1 小时；留 2 分钟余量给 runner 侧的超时收尾。
+const E2B_SANDBOX_TIMEOUT_MS = 58 * 60 * 1000;
 
 export async function createE2bEnvironment(input: {
   taskId: string;

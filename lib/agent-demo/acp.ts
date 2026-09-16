@@ -58,6 +58,13 @@ export class AcpBridge {
     private readonly emitEvent: (payload: TaskEvent) => void
   ) {
     this.exited = handle.wait().catch(() => {});
+    // 进程退出（含沙箱被 e2b 超时杀掉）时，pending 请求必须全部 reject——
+    // 否则 acp.prompt 永久悬挂，任务卡死在 running。
+    void this.exited.then(() => {
+      const err = new Error("devin acp 进程已退出（沙箱可能已回收）");
+      for (const p of this.pending.values()) p.reject(err);
+      this.pending.clear();
+    });
   }
 
   /** 在沙箱内启动 `devin acp` 并完成 initialize + session/new。

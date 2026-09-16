@@ -23,6 +23,8 @@ import { createWorkspaceTools } from "@/lib/agent-demo/tools";
 
 const MAX_STEPS = 20;
 const MAX_OUTPUT_TOKENS = 16_000;
+// 任务级时长预算：早于 e2b 沙箱 58min 硬超时触发，留 3 分钟走 verify+publish 收尾。
+const TASK_TIME_BUDGET_MS = 55 * 60 * 1000;
 
 function phase(taskId: string, phase: string, label: string) {
   emit(taskId, "runner", { type: "phase.changed", phase, label });
@@ -88,6 +90,14 @@ async function runTask(taskId: string) {
   let release: (() => Promise<void>) | null = null;
   const abortController = new AbortController();
   registerRunHandles(taskId, { abortController });
+  // 超时预算：到点中止 Agent（ACP 路径经 abort 监听器发 session/cancel），
+  // 但不丢弃已产出内容——继续走 verify/publish，交付为 partial。
+  let timedOut = false;
+  const deadline = setTimeout(() => {
+    timedOut = true;
+    phase(taskId, "agent", "已超过 55 分钟预算，中止 Agent 并收尾已有产出");
+    abortController.abort();
+  }, TASK_TIME_BUDGET_MS);
 
   try {
     // ── 环境准备：远端沙箱 + 仓库检出（e2b 优先，boxd 次之）─────────
@@ -175,10 +185,15 @@ async function runTask(taskId: string) {
           `完成后用中文简要总结你做了什么、产出哪些文件、如何验证。`
       );
       lastText = acp.lastMessage;
-      if (resp.stopReason === "cancelled" || isCancelRequested(taskId)) {
+      if (isCancelRequested(taskId)) {
         setRunStatus(taskId, "cancelled");
         return;
       }
+      if (resp.stopReason === "cancelled" && !timedOut) {
+        setRunStatus(taskId, "cancelled");
+        return;
+      }
+      // timedOut 的 cancelled：继续往下走 verify/publish，尽量交付已有产出。
     } else {
     let modelFailed = false;
     const result = streamText({
@@ -333,23 +348,36 @@ async function runTask(taskId: string) {
     }
 
     const delivered = verification.every((v) => v.status !== "failed") && changedFiles.length > 0;
+    if (timedOut) {
+      verification.push({
+        label: "运行时长",
+        status: "failed",
+        detail: `超过 ${TASK_TIME_BUDGET_MS / 60000} 分钟预算，Agent 被中止`,
+      });
+    }
     const taskResult: TaskResult = {
-      outcome: delivered ? "delivered" : "partial",
-      summary: lastText.slice(-2000) || "(Agent 未输出总结)",
+      // 超时收尾：即使 PR 已开出也只算 partial（工作不完整）
+      outcome: delivered && !timedOut ? "delivered" : "partial",
+      summary: (timedOut ? "⚠️ 任务超时中止，以下为中止前的产出。\n\n" : "") +
+        (lastText.slice(-2000) || "(Agent 未输出总结)"),
       changedFiles,
       verification,
       commitSha,
       pullRequest,
     };
     emit(taskId, "runner", { type: "run.result.saved", result: taskResult });
-    setRunStatus(taskId, delivered ? "completed" : "failed");
+    // 超时但产出了 PR → completed/partial；超时且无产出 → failed
+    setRunStatus(taskId, delivered || (timedOut && pullRequest) ? "completed" : "failed");
   } catch (error) {
-    if (isCancelRequested(taskId) || abortController.signal.aborted) {
+    if (timedOut) {
+      fail(taskId, "task_timeout", "runner", `任务超过 ${TASK_TIME_BUDGET_MS / 60000} 分钟预算后出错: ${error instanceof Error ? error.message : String(error)}`);
+    } else if (isCancelRequested(taskId) || abortController.signal.aborted) {
       setRunStatus(taskId, "cancelled");
     } else {
       fail(taskId, "run_failed", "runner", error instanceof Error ? error.message : String(error));
     }
   } finally {
+    clearTimeout(deadline);
     if (release) {
       phase(taskId, "release", "回收执行环境");
       await release().catch(() => {});
