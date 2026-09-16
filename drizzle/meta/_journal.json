@@ -71,6 +71,13 @@
       "when": 1789529618625,
       "tag": "0009_broken_chimera",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1789532980552,
+      "tag": "0010_huge_monster_badoon",
+      "breakpoints": true
     }
   ]
 }
