@@ -7,11 +7,14 @@
 
 ## 当前状态
 
-- 执行链路：页面建任务 → e2b 沙箱 clone 仓库 → 安装 devin CLI → 注入本机 `credentials.toml` → `devin acp`（ACP over stdio）→ ACP `session/update` 映射为规范化事件 → SSE 推页面 → git 提交推送 → GitHub Draft PR → 杀沙箱。
+- 执行链路：页面建任务 → e2b 沙箱 clone 仓库 → 注入本机 `credentials.toml` → `devin acp --model swe-2-high`（ACP over stdio）→ ACP `session/update` 映射为规范化事件 → SSE 推页面 → git 提交推送 → GitHub Draft PR → 杀沙箱。
+- **沙箱模板**：`E2B_TEMPLATE=devin-acp-agent` 已启用——devin CLI 烤进镜像（`pnpm agent-demo:build-template` 重建），跳过任务内安装；内存提到 2GB（base 512MB 会 OOM pnpm install）。不设该变量则走 base 镜像 + 任务内现装。
 - 事件权威源：**沙箱内 tee 落盘的 jsonl 文件轮询**（e2b `onStdout` 推送实测会中途静默断开，不可靠）。
+- **模型**：`--model swe-2-high` 固定。SWE-2 全家在当前 Teams 账号标注 Free；不指定会走组织默认，可能命中计费模型。任务实测用量 ~30k input / ~6k output。
+- **超时三层**：runner 55min 预算（中止 agent → 照常 verify/publish，交付 partial PR）→ e2b 58min 硬超时 → ACP 进程退出时 pending 请求全 reject（防任务假死 running）。
 - 存储：内存表，dev server 重启即丢。
-- 已验证交付：`hifizz/playground.zilin.im` PR #18（reasoning/effort 面板 demo）、`hifizz/ai-daily` PR #8/#9。
-- 最新加固（commit `4434844`）：轮询连续失败 3 次发伪工具卡告警、恢复后补读；stdin 写入重试 4 次（防 `request_permission` 应答丢失导致 devin 永久等待）；`request()` 送达失败即 reject。
+- 已验证交付：`hifizz/playground.zilin.im` PR #18（reasoning/effort 面板）、`hifizz/ai-daily` PR #8/#9/#10。模板路径端到端 155s（简单任务）。
+- 加固记录：`4434844` 轮询告警 + stdin 重试；`d401b49` 固定模型；`ffec85e` 预建模板；`2dbd6dd` 超时预算 + partial 收尾。
 
 ## 耗时分析：task-f0d4bbea（总 821s）
 
@@ -62,7 +65,13 @@ agent 阶段拆解：
 
 ## 生产化优先级（待决策）
 
-① 第 1 层观测 → ② 事件表落 Postgres（重启不丢）→ ③ e2b 自定义模板 → ④ worker lease + 超时预算。
+① 第 1 层观测 → ② 事件表落 Postgres（重启不丢）→ ~~③ e2b 自定义模板~~（已做 `ffec85e`）→ ~~④ 超时预算~~（已做 `2dbd6dd`，55min 预算 + partial 收尾）→ ⑤ worker lease。
+
+## 大任务处理（后续再议）
+
+- 断点续跑：超时后用同一任务分支再起任务接力（分支已推送，第二个 agent 可续改）；
+- 模型降档提速（swe-2-medium）或提示词要求"先最小可交付再迭代"；
+- `sandbox.setTimeout()` 运行中续期（Hobby 单次上限仍是 1h）。
 
 ## 已知坑位（备忘）
 
