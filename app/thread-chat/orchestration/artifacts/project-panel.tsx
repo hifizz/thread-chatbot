@@ -26,11 +26,13 @@ import type {
   ArtifactSummaryDTO,
   ProjectDTO,
   ProjectFileDTO,
+  ThreadDTO,
 } from "@/lib/thread-chat/contracts/dto"
 import { MarkdownBody } from "../../chat/message/markdown-body"
 import { ArtifactPreviewActions } from "./artifact-preview-actions"
 import { toViewThreadId } from "../../core/projections"
 import { uploadProjectFile } from "../../net/project-file-upload"
+import { accentOf } from "../../theme"
 
 export interface ProjectPanelProps {
   project: ProjectDTO | null
@@ -44,6 +46,7 @@ export interface ProjectPanelProps {
   renderDocumentControls?(artifact: ArtifactDTO): React.ReactNode
   open: boolean
   activeId: string | null
+  threads: Readonly<Record<string, Pick<ThreadDTO, "depth">>>
   onClose(): void
   onSelect(id: string): void
   onLocate(threadId: string, sourceMessageId: string): void
@@ -98,6 +101,7 @@ export function ProjectPanel({
   onRetryArtifact,
   open,
   activeId,
+  threads,
   onClose,
   onSelect,
   onLocate,
@@ -149,6 +153,8 @@ export function ProjectPanel({
   )
   const selectedContent = activeId ? artifactContents[activeId] : undefined
   const selectedArtifact = selectedMetadata && selectedContent !== undefined ? { ...selectedMetadata, content: selectedContent } : null
+  const sourceThread = selectedMetadata ? threads[selectedMetadata.threadId] : undefined
+  const artifactAccent = sourceThread ? accentOf(sourceThread) : undefined
   const sortedArtifacts = useMemo(
     () => {
       return currentArtifacts
@@ -500,7 +506,8 @@ export function ProjectPanel({
               <div className="project-artifact-detail">
                 {renderDocumentControls?.(selectedArtifact)}
                 <div
-                  className="project-artifact-content"
+                  className="project-artifact-content tc-accent-context"
+                  style={{ "--tc-accent": artifactAccent } as React.CSSProperties}
                   // 把当前 Markdown 阅读区标记成可划选来源；全局唯一 selection
                   // observer 据此获得稳定的 artifact/message/thread identity。
                   {...(selectedArtifact.kind === "markdown" && project

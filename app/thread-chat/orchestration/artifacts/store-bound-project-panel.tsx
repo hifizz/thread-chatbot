@@ -246,6 +246,7 @@ export function StoreBoundProjectPanel({
       artifacts={artifacts}
       open={open}
       activeId={activeId}
+      threads={state.threadsById}
       onClose={onClose}
       onSelect={onSelect}
       onLocate={locate}
