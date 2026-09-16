@@ -48,9 +48,7 @@ export interface RepositoryReadContext {
 
 // ── 限额 ──────────────────────────────────────────────────────
 
-const MAX_FILE_BYTES = 256 * 1024
-const MAX_EXCERPT_LINES = 400
-const MAX_EXCERPT_CHARS = 24_000
+const MAX_FILE_BYTES = 1024 * 1024
 const MAX_DIR_ENTRIES = 200
 const MAX_FIND_RESULTS = 100
 const MAX_TREE_ENTRIES = 5000
@@ -247,15 +245,10 @@ export async function readRepositoryFile(
   const fullContent = Buffer.from(data.content, "base64").toString("utf-8")
   const allLines = fullContent.split("\n")
   const s = Math.max(1, startLine ?? 1)
-  const e = Math.min(allLines.length, endLine ?? s + MAX_EXCERPT_LINES - 1)
+  const e = Math.min(allLines.length, endLine ?? allLines.length)
   const slice = allLines.slice(s - 1, e)
-  let content = slice.join("\n")
-  let truncated = false
-  if (content.length > MAX_EXCERPT_CHARS) {
-    content = content.slice(0, MAX_EXCERPT_CHARS)
-    truncated = true
-  }
-  if (e < allLines.length) truncated = true
+  const content = slice.join("\n")
+  const truncated = false
   return {
     ok: true,
     data: {

@@ -47,7 +47,7 @@ import type { RepoContextData } from "@/lib/thread-chat/contracts/ui-message"
 import { createRepoReadTools } from "@/lib/thread-chat/streaming/repo-tools"
 import { resolveBranchCommit, shortSha } from "@/lib/github/repo-reader"
 
-const REPO_MAX_STEPS = 8
+const REPO_MAX_STEPS = 30
 
 const REPO_SYSTEM_PROMPT = `你正在查看 GitHub 仓库的代码。你有三个只读工具：
 

@@ -10,7 +10,7 @@ import {
   type RepositoryReadContext,
 } from "@/lib/github/repo-reader"
 
-const MAX_CALLS_PER_TURN = 12
+const MAX_CALLS_PER_TURN = 30
 
 export interface RepoToolContext {
   repositoryFullName: string
