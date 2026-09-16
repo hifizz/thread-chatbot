@@ -176,12 +176,15 @@ export async function installDevinHarness(
   sandbox: Sandbox,
   credentialsToml: string
 ): Promise<string> {
+  // 走自定义模板（E2B_TEMPLATE）时 devin 已烤进镜像，跳过下载安装。
   // install.sh 末尾会跑交互式 `devin setup`，非交互环境必然报 "Login canceled"，
   // 但二进制本身已装好——因此忽略安装脚本退出码，用 `devin version` 验证。
-  await sandbox.commands.run(
-    `curl -fsSL https://cli.devin.ai/install.sh | bash || true`,
-    { timeoutMs: 300_000 }
-  ).catch(() => {});
+  if (!process.env.E2B_TEMPLATE?.trim()) {
+    await sandbox.commands.run(
+      `curl -fsSL https://cli.devin.ai/install.sh | bash || true`,
+      { timeoutMs: 300_000 }
+    ).catch(() => {});
+  }
   await runChecked(
     sandbox,
     `mkdir -p ${shQuote(path.posix.dirname(DEVIN_CRED_PATH))}`,
@@ -209,8 +212,11 @@ export async function createE2bEnvironment(input: {
   const apiKey = process.env.E2B_API_KEY?.trim();
   if (!apiKey) throw new Error("E2B_API_KEY 未配置");
 
-  input.onPhase?.("创建 e2b 沙箱");
-  const sandbox = await Sandbox.create({ apiKey, timeoutMs: E2B_SANDBOX_TIMEOUT_MS });
+  // E2B_TEMPLATE 指向自定义模板（devin CLI 已烤入镜像）；缺省用官方 base，
+  // devin 在任务内现装（慢 ~12s，但无需预先构建模板）。
+  const template = process.env.E2B_TEMPLATE?.trim() || "base";
+  input.onPhase?.(template === "base" ? "创建 e2b 沙箱" : `创建 e2b 沙箱（模板 ${template}）`);
+  const sandbox = await Sandbox.create(template, { apiKey, timeoutMs: E2B_SANDBOX_TIMEOUT_MS });
   const driver = new E2bDriver(sandbox, E2B_WORKDIR);
 
   input.onPhase?.("检出仓库");
