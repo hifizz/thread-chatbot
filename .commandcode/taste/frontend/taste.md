@@ -20,3 +20,4 @@
 - Expects mention/reference chips to behave as frozen atomic content: the caret must stay outside, left/right navigation must cross the chip, clicking then typing must preserve it, and clickable references should open the corresponding preview. Confidence: 0.95
 - Expects trigger popovers to be fully keyboard accessible: visibly highlight the initial item, support Up/Down and Enter, keep an informative empty panel when no resources match, and let Escape close it without deleting the typed trigger. Confidence: 0.95
 - Prefers compact content-sized popovers with minimal dead space; a one-item or empty state should be about one row tall plus padding, with empty-state copy centered horizontally and vertically. Confidence: 0.95
+- Wants landing/homepage demos to faithfully replicate the real workbench UI elements and interaction behavior, not simplified mockups — strongly rejects low-fidelity placeholders that feel fake. Confidence: 0.85
