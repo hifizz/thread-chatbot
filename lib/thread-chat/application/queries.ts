@@ -1,3 +1,4 @@
+import { getProjectDocuments } from "./documents/service"
 import { db } from "@/lib/db"
 import type {
   ArtifactDTO,
@@ -7,7 +8,6 @@ import type {
 } from "@/lib/thread-chat/contracts/dto"
 import {
   findOwnedArtifact,
-  listOwnedProjectArtifactCatalog,
   listOwnedThreadArtifactRows,
 } from "@/lib/thread-chat/persistence/artifact-repository"
 import {
@@ -60,7 +60,7 @@ export async function getProjectBootstrap(
     await Promise.all([
       listProjectThreadRows(db, project.id),
       listProjectMessageRows(db, project.id),
-      listOwnedProjectArtifactCatalog(db, userId, project.id),
+      getProjectDocuments(userId, project.id),
       listProjectFileRows(db, project.id),
     ])
   const root = threadRows.find((thread) => thread.parentId === null)

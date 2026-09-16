@@ -4,6 +4,7 @@ import {
 } from "@/lib/chat/web-research-activity"
 import type { ConversationViewMessage } from "../../core/types"
 import type { ThreadChatUIMessage } from "@/lib/thread-chat/contracts/ui-message"
+import { DOCUMENT_TOOL_NAMES } from "@/constants/project-documents"
 
 export type ThreadChatUIPart = ThreadChatUIMessage["parts"][number]
 export type AssistantPartRenderKind =
@@ -13,7 +14,12 @@ export type AssistantPartRenderKind =
   | "file"
   | "source-url"
   | "artifact"
+  | "document"
   | "tool"
+
+const DOCUMENT_TOOL_PART_TYPES: ReadonlySet<string> = new Set(
+  DOCUMENT_TOOL_NAMES.map((name) => `tool-${name}`)
+)
 
 export interface AssistantPartRenderPlanItem {
   kind: AssistantPartRenderKind
@@ -66,6 +72,11 @@ export function assistantPartRenderPlan(
     // Markdown 交付物原位渲染：生成中→流式预览块，完成→artifact 卡片。
     if (part.type === "tool-createMarkdownArtifact") {
       plan.push({ kind: "artifact", part, index })
+      return
+    }
+    // 文档工具走专属渲染；不得落入 createMarkdownArtifact 的"生成文档"轨迹文案。
+    if (DOCUMENT_TOOL_PART_TYPES.has(part.type)) {
+      plan.push({ kind: "document", part, index })
       return
     }
     if (part.type.startsWith("tool-")) {

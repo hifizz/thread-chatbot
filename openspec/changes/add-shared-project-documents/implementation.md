@@ -34,7 +34,7 @@ PGlite 的连接事务是串行执行的，这组测试不能替代原生 Postgr
 
 - `node --import tsx e2e/thread-chat/document-edit.test.mjs`
 - 在已应用 Schema 的隔离库：`node --env-file=.env.local --import tsx e2e/thread-chat/shared-project-documents-db.test.mjs`。
-- 旧产物登记：`node --env-file=.env.local --import tsx scripts/documents/backfill.ts`；每个 completed Markdown 独立事务，可重复执行，同名不合并。
+- 旧产物登记：打开项目、加载文档面板或调用 `findProjectDocuments` 时，自动按当前用户和项目分页补登 completed Markdown；按 `artifactId` 查找仅补登对应产物。每个产物独立事务，可重复执行，同名不合并，无需手动回填即可更新旧文档。历史量大的部署仍可提前运行 `pnpm documents:backfill`，避免首次访问等待批量登记。
 - `THREAD_CHAT_DOCUMENT_WRITES=false` 关闭更新工具并在服务端拒绝新写入；读取、固定上下文与已提交收据继续可用。
 - 先完成数据库集成迁移，再上线兼容服务端、执行登记、启用工具与客户端。发布前不得归档本 Change 为全部验收完成。
 

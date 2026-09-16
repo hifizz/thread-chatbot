@@ -11,6 +11,7 @@ import { AnchoredMarkdown } from "./anchored-markdown"
 import { assistantPartRenderPlan } from "./assistant-part-render-plan"
 import { ReasoningTrace, SearchTrace, ToolTrace } from "./thinking-trace"
 import { MarkdownArtifactToolPart } from "../../orchestration/artifacts/markdown-artifact-card"
+import { DocumentUpdateTool } from "../../chat/message/document-update-tool"
 
 /** data-artifact-progress 是 transient part（追加在 parts 尾部、不持久化）；
  * 按 toolCallId 取最后一次进度，与对应 tool part 原位配对。 */
@@ -130,6 +131,17 @@ export function AnchoredAssistantBody({
               }
               onOpen={onOpenArtifact}
             />
+          )
+        }
+
+        if (
+          kind === "document" &&
+          (part.type === "tool-findProjectDocuments" ||
+            part.type === "tool-readProjectDocument" ||
+            part.type === "tool-updateProjectDocument")
+        ) {
+          return (
+            <DocumentUpdateTool key={part.toolCallId} part={part} />
           )
         }
 

@@ -14,6 +14,7 @@ import { applyDocumentEdits } from "../../domain/documents/edit"
 import { artifactIdForTool } from "../../domain/tool-identity"
 import { executeIdempotentCommand } from "../../persistence/command-repository"
 import { documentForArtifact, findOwnedDocument, listOwnedDocuments, readDocumentRevision, listDocumentHistory } from "../../persistence/documents/queries"
+import { registerOwnedProjectDocuments } from "./register-existing"
 import { notFound } from "../errors"
 
 export async function getProjectDocument(userId: string, documentId: string, revisionId?: string) {
@@ -30,6 +31,7 @@ export async function getDocumentHistory(userId: string, documentId: string) {
   return listDocumentHistory(db, doc.id)
 }
 export async function findProjectDocuments(identity: DocumentExecution, input: { query?: string; artifactId?: string }) {
+  await registerOwnedProjectDocuments(identity.userId, identity.projectId, input.artifactId)
   const documentId = input.artifactId
     ? await documentForArtifact(db, identity.userId, identity.projectId, input.artifactId) : undefined
   if (input.artifactId && !documentId) return []
@@ -112,5 +114,6 @@ async function commitDocumentUpdate(tx: ConversationTransaction, identity: Docum
 
 export async function getProjectDocuments(userId: string, projectId: string): Promise<ProjectDocumentsDTO> {
   if (!await findOwnedProject(db, userId, projectId)) notFound()
+  await registerOwnedProjectDocuments(userId, projectId)
   return listOwnedProjectArtifactCatalog(db, userId, projectId)
 }
