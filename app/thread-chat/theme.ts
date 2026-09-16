@@ -13,7 +13,7 @@ export const dc = (depth: number) => ((depth - 1) % 5) + 1
 export const dvar = (depth: number) => `var(--tc-depth-${dc(depth)})`
 
 /** 列强调色：主线用 depth-1，其余按深度循环 */
-export const accentOf = (t: Thread) =>
+export const accentOf = (t: Pick<Thread, "depth">) =>
   t.depth === 0 ? "var(--tc-depth-1)" : dvar(t.depth)
 
 /** 圆点 / 徽标色：主线用中性墨色，其余按深度循环 */

@@ -21,6 +21,7 @@ import { selectCurrentProjectArtifacts, selectArtifactWithCurrentSourceStatus } 
 import { DocumentView } from "./documents/view"
 import type { ArtifactSourceNav } from "../overlays/use-workspace-overlays"
 import { ProjectPanel } from "./project-panel"
+import { accentOf } from "../../theme"
 
 function findMessageElement(messageId: string): HTMLElement | null {
   return (
@@ -85,6 +86,8 @@ export function StoreBoundProjectPanel({
     return () => { pending.sequence++ }
   }, [activeId, projectId, open, questionArtifactId])
   const state = useConversationStore(store, (value) => value)
+  const sourceThreadId = activeId ? state.artifactsById[activeId]?.threadId : undefined
+  const sourceThread = sourceThreadId ? state.threadsById[sourceThreadId] : undefined
   const [artifactError, setArtifactError] = useState<string | null>(null)
   const [artifactRetry, setArtifactRetry] = useState(0)
   const loadedContent = activeId ? state.artifactContentsById[activeId] : undefined
@@ -246,6 +249,7 @@ export function StoreBoundProjectPanel({
       artifacts={artifacts}
       open={open}
       activeId={activeId}
+      artifactAccent={sourceThread ? accentOf(sourceThread) : undefined}
       onClose={onClose}
       onSelect={onSelect}
       onLocate={locate}

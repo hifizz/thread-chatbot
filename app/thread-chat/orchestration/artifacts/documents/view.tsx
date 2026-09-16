@@ -36,7 +36,8 @@ export function DocumentView({ artifact, currentRevisionId, client, navigationBl
   const previous = revisions.find((revision) => revision.id === selected?.parentRevisionId)
   return <div className="project-document-view">
     {errorDocumentId === documentId && <p role="alert">{DOCUMENT_UI_COPY.historyFailed} <button type="button" onClick={() => setRefresh((value) => value + 1)}>重新加载版本</button></p>}
-    {navigationBlocked && <p role="status">{DOCUMENT_UI_COPY.navigationBlocked}</p>}
+    {/* 提问开合不能推移正文，否则滚动锚定会触发全局选区关闭监听。 */}
+    <span className="sr-only" role="status">{navigationBlocked ? DOCUMENT_UI_COPY.navigationBlocked : ""}</span>
     <DocumentVersionHistory revisions={revisions} revisionId={document.revisionId}
       currentRevisionId={currentRevisionId ?? document.revisionId} disabled={navigationBlocked} onSelect={(revision) => onSelect(revision.artifactId)} />
     {previous && <DocumentDiff key={`diff:${artifact.id}`} before={previous} after={artifact} client={client} />}

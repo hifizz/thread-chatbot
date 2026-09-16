@@ -44,6 +44,7 @@ export interface ProjectPanelProps {
   renderDocumentControls?(artifact: ArtifactDTO): React.ReactNode
   open: boolean
   activeId: string | null
+  artifactAccent?: string
   onClose(): void
   onSelect(id: string): void
   onLocate(threadId: string, sourceMessageId: string): void
@@ -98,6 +99,7 @@ export function ProjectPanel({
   onRetryArtifact,
   open,
   activeId,
+  artifactAccent,
   onClose,
   onSelect,
   onLocate,
@@ -500,7 +502,8 @@ export function ProjectPanel({
               <div className="project-artifact-detail">
                 {renderDocumentControls?.(selectedArtifact)}
                 <div
-                  className="project-artifact-content"
+                  className="project-artifact-content tc-accent-context"
+                  style={{ "--tc-accent": artifactAccent } as React.CSSProperties}
                   // 把当前 Markdown 阅读区标记成可划选来源；全局唯一 selection
                   // observer 据此获得稳定的 artifact/message/thread identity。
                   {...(selectedArtifact.kind === "markdown" && project
