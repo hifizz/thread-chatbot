@@ -4,7 +4,6 @@ import { DOCUMENT_UI_COPY } from "@/constants/project-documents"
 
 import React, { useEffect, useId, useMemo, useRef, useState } from "react"
 import {
-  ArrowLeft,
   ExternalLink,
   FileText,
   FolderKanban,
@@ -28,8 +27,9 @@ import type {
   ProjectFileDTO,
   ThreadDTO,
 } from "@/lib/thread-chat/contracts/dto"
-import { MarkdownBody } from "../../chat/message/markdown-body"
-import { ArtifactPreviewActions } from "./artifact-preview-actions"
+import { ArtifactPanel, artifactCaption, formatDate } from "./artifact-panel"
+import { MarkdownArtifactCard } from "./markdown-artifact-card"
+import { ProjectPanelSkeleton, ResourceListSkeleton } from "./skeleton"
 import { toViewThreadId } from "../../core/projections"
 import { uploadProjectFile } from "../../net/project-file-upload"
 import { accentOf } from "../../theme"
@@ -44,6 +44,8 @@ export interface ProjectPanelProps {
   onRetryArtifact?(): void
   documentSyncError?: boolean
   renderDocumentControls?(artifact: ArtifactDTO): React.ReactNode
+  /** threadId → 分支深度；用于目录卡片缩略图按来源 Thread 着色。 */
+  threadDepths?: Readonly<Record<string, number>>
   open: boolean
   activeId: string | null
   threads: Readonly<Record<string, Pick<ThreadDTO, "depth">>>
@@ -63,34 +65,17 @@ function formatBytes(size: number) {
   return `${(size / (1024 * 1024)).toFixed(1)} MB`
 }
 
-function formatDate(value: string) {
-  return new Intl.DateTimeFormat("zh-CN", {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(value))
-}
-
-function sourceStatusLabel(status: ArtifactDTO["sourceMessageStatus"]) {
-  if (status === "completed") return "已完成"
-  if (status === "stopped") return "已停止"
-  if (status === "failed") return "失败"
-  return "生成中"
-}
-
-function artifactKindLabel(kind: ArtifactDTO["kind"]) {
-  if (kind === "markdown") return "Markdown"
-  if (kind === "code") return "Code"
-  return "Note"
-}
-
 function fileStatusLabel(file: ProjectFileDTO) {
   if (file.status === "ready") return "可用"
   if (file.status === "failed") return "失败"
   return "处理中"
 }
 
+/**
+ * Project 管理屏：概览（Contract）/ 文件 / 文档与产物目录。
+ * 选中 Artifact 后整个 drawer 切换为 ArtifactPanel 阅读屏，返回键回到目录——
+ * 共享同一个 drawer 壳的导航栈，而不是第二个固定抽屉。
+ */
 export function ProjectPanel({
   project,
   files,
@@ -110,6 +95,7 @@ export function ProjectPanel({
   onRemoveProjectFile,
   renderDocumentControls,
   documentSyncError,
+  threadDepths,
 }: ProjectPanelProps) {
   const titleId = useId()
   const fileInputRef = useRef<HTMLInputElement | null>(null)
@@ -152,32 +138,21 @@ export function ProjectPanel({
     [activeId, artifacts]
   )
   const selectedContent = activeId ? artifactContents[activeId] : undefined
-  const selectedArtifact = selectedMetadata && selectedContent !== undefined ? { ...selectedMetadata, content: selectedContent } : null
   const sourceThread = selectedMetadata ? threads[selectedMetadata.threadId] : undefined
   const artifactAccent = sourceThread ? accentOf(sourceThread) : undefined
-  const sortedArtifacts = useMemo(
-    () => {
-      return currentArtifacts
-        .filter((artifact) => {
-          const query = artifactQuery.trim().toLowerCase()
-          if (!query) return true
-          return [
-            artifact.title,
-            artifact.kind,
-            artifact.sourceThreadTitle ?? "",
-          ]
-            .join(" ")
-            .toLowerCase()
-            .includes(query)
-        })
-    },
-    [artifactQuery, currentArtifacts]
-  )
+  const sortedArtifacts = useMemo(() => {
+    return currentArtifacts.filter((artifact) => {
+      const query = artifactQuery.trim().toLowerCase()
+      if (!query) return true
+      return [artifact.title, artifact.kind, artifact.sourceThreadTitle ?? ""]
+        .join(" ")
+        .toLowerCase()
+        .includes(query)
+    })
+  }, [artifactQuery, currentArtifacts])
   const sortedFiles = useMemo(
     () =>
-      [...files].sort((left, right) =>
-        right.addedAt.localeCompare(left.addedAt)
-      ),
+      [...files].sort((left, right) => right.addedAt.localeCompare(left.addedAt)),
     [files]
   )
 
@@ -256,299 +231,283 @@ export function ProjectPanel({
     )
   }
 
-  const preview = displayedSection === "artifacts" ? selectedMetadata : null
+  const reading = Boolean(activeId)
 
   return (
     <div
-      className={`art-drawer project-panel ${open ? "open" : ""} ${preview ? "project-panel-preview" : ""}`}
+      className={`art-drawer project-panel ${open ? "open" : ""} ${reading ? "project-panel-preview" : ""}`}
       role="dialog"
       aria-modal={false}
       aria-labelledby={titleId}
       aria-hidden={!open}
       inert={!open}
     >
-      <div className="art-head project-panel-head">
-        {preview ? <button type="button" className="project-preview-back" aria-label="返回文档列表" title="返回文档列表" onClick={() => { setSection("artifacts"); onSelect("") }}><ArrowLeft size={18} /></button> : <FolderKanban size={16} />}
-        <h3 id={titleId} title={preview?.title}>{preview?.title ?? "项目空间"}</h3>
-        {preview && selectedArtifact && <ArtifactPreviewActions key={preview.id} artifact={selectedArtifact} onLocate={() => locateArtifact(preview)} />}
-        {archived && <span className="project-readonly">只读</span>}
-        <button
-          ref={closeButtonRef}
-          type="button"
-          className="art-x"
-          title={preview ? "关闭文档预览" : "收起项目空间"}
-          aria-label={preview ? "关闭文档预览" : "收起项目空间"}
-          onClick={onClose}
-        >
-          <X size={13} />
-        </button>
-      </div>
+      {reading ? (
+        <ArtifactPanel
+          key={activeId}
+          titleId={titleId}
+          artifact={selectedMetadata}
+          content={selectedContent}
+          loadError={artifactLoadError}
+          onRetry={onRetryArtifact}
+          onBack={() => {
+            setSection("artifacts")
+            onSelect("")
+          }}
+          onClose={onClose}
+          onLocate={() => {
+            if (selectedMetadata) locateArtifact(selectedMetadata)
+          }}
+          project={project}
+          accent={artifactAccent}
+          renderDocumentControls={renderDocumentControls}
+        />
+      ) : (
+        <>
+          <div className="art-head project-panel-head">
+            <FolderKanban size={16} />
+            <h3 id={titleId}>项目空间</h3>
+            {archived && <span className="project-readonly">只读</span>}
+            <button
+              ref={closeButtonRef}
+              type="button"
+              className="art-x"
+              title="收起项目空间"
+              aria-label="收起项目空间"
+              onClick={onClose}
+            >
+              <X size={13} />
+            </button>
+          </div>
 
-      {!preview && <div
-        className="project-sections"
-        role="tablist"
-        aria-label="项目空间"
-      >
-        <button
-          className={displayedSection === "overview" ? "on" : ""}
-          onClick={() => selectSection("overview")}
-        >
-          概览
-        </button>
-        <button
-          className={displayedSection === "files" ? "on" : ""}
-          onClick={() => selectSection("files")}
-        >
-          文件 <span>{files.length}</span>
-        </button>
-        <button
-          className={displayedSection === "artifacts" ? "on" : ""}
-          onClick={() => selectSection("artifacts")}
-        >
-          文档与产物 <span>{currentArtifacts.length}</span>
-        </button>
-      </div>}
+          <div
+            className="project-sections"
+            role="tablist"
+            aria-label="项目空间"
+          >
+            <button
+              className={displayedSection === "overview" ? "on" : ""}
+              onClick={() => selectSection("overview")}
+            >
+              概览
+            </button>
+            <button
+              className={displayedSection === "files" ? "on" : ""}
+              onClick={() => selectSection("files")}
+            >
+              文件 <span>{files.length}</span>
+            </button>
+            <button
+              className={displayedSection === "artifacts" ? "on" : ""}
+              onClick={() => selectSection("artifacts")}
+            >
+              文档与产物 <span>{currentArtifacts.length}</span>
+            </button>
+          </div>
 
-      {error && <div className="project-error">{error}</div>}
-      {archived && (
-        <div className="project-readonly-banner">
-          {PROJECT_WORKSPACE_COPY.archivedReadOnly}
-        </div>
-      )}
-
-      <div className="art-body project-panel-body">
-        {documentSyncError && !preview ? <p role="status">{DOCUMENT_UI_COPY.syncFailed}</p> : null}
-        {loading ? <div className="project-empty">Project 加载中…</div> : null}
-
-        {displayedSection === "overview" && !loading && (
-          <section className="project-overview">
-            <div className="project-section-heading">
-              <div>
-                <div className="project-eyebrow">PROJECT CONTRACT</div>
-                <h4>目标与长期指令</h4>
-                <p>
-                  保存后只影响之后启动的生成，不改写历史消息、Artifact 或 Fork
-                  Context。
-                </p>
-              </div>
-              {!archived && !editing && project && (
-                <button className="project-secondary" onClick={beginEdit}>
-                  <Pencil size={12} /> 编辑
-                </button>
-              )}
+          {error && <div className="project-error">{error}</div>}
+          {archived && (
+            <div className="project-readonly-banner">
+              {PROJECT_WORKSPACE_COPY.archivedReadOnly}
             </div>
+          )}
 
-            <label className="project-field">
-              <span>Target</span>
-              {editing ? (
-                <textarea
-                  value={targetDraft}
-                  maxLength={PROJECT_TARGET_MAX_CHARS}
-                  onChange={(event) => setTargetDraft(event.target.value)}
-                  placeholder="这个 Project 最终希望达成什么？"
-                  rows={5}
-                />
-              ) : (
-                <div className="project-read-value">
-                  {project?.target || "尚未设置 Target。"}
-                </div>
-              )}
-              {editing && (
-                <small>
-                  {targetDraft.length}/{PROJECT_TARGET_MAX_CHARS}
-                </small>
-              )}
-            </label>
+          <div className="art-body project-panel-body">
+            {documentSyncError ? (
+              <p role="status">{DOCUMENT_UI_COPY.syncFailed}</p>
+            ) : null}
+            {loading && displayedSection === "overview" ? (
+              <ProjectPanelSkeleton />
+            ) : null}
 
-            <label className="project-field">
-              <span>Instructions</span>
-              {editing ? (
-                <textarea
-                  value={instructionsDraft}
-                  maxLength={PROJECT_INSTRUCTIONS_MAX_CHARS}
-                  onChange={(event) => setInstructionsDraft(event.target.value)}
-                  placeholder="模型在这个 Project 中应持续遵循哪些工作方式、约束和偏好？"
-                  rows={10}
-                />
-              ) : (
-                <div className="project-read-value project-instructions-value">
-                  {project?.instructions || "尚未设置 Instructions。"}
-                </div>
-              )}
-              {editing && (
-                <small>
-                  {instructionsDraft.length}/{PROJECT_INSTRUCTIONS_MAX_CHARS}
-                </small>
-              )}
-            </label>
-
-            {editing && (
-              <div className="project-actions">
-                <button
-                  className="project-secondary"
-                  disabled={saving}
-                  onClick={cancelEdit}
-                >
-                  取消
-                </button>
-                <button
-                  className="project-primary"
-                  disabled={saving}
-                  onClick={() => void saveContract()}
-                >
-                  {saving ? "保存中…" : "保存 Contract"}
-                </button>
-              </div>
-            )}
-          </section>
-        )}
-
-        {displayedSection === "files" && (
-          <section className="project-files">
-            <div className="project-section-heading">
-              <div>
-                <div className="project-eyebrow">PROJECT FILES</div>
-                <h4>跨 Thread 可用的原始资料</h4>
-                <p>
-                  Ready 文件会在统一预算内参与未来生成；移除只解除 Project
-                  成员关系。
-                </p>
-              </div>
-              {!archived && project && (
-                <>
-                  <input
-                    ref={fileInputRef}
-                    className="project-file-input"
-                    type="file"
-                    accept={ATTACHMENT_ACCEPT}
-                    onChange={(event) => {
-                      const file = event.currentTarget.files?.[0]
-                      if (file) void upload(file)
-                    }}
-                  />
-                  <button
-                    className="project-primary"
-                    disabled={uploading}
-                    onClick={() => fileInputRef.current?.click()}
-                  >
-                    <Upload size={12} /> {uploading ? "上传中…" : "上传文件"}
-                  </button>
-                </>
-              )}
-            </div>
-
-            {sortedFiles.length === 0 ? (
-              <div className="project-empty">
-                <Paperclip size={18} />
-                <strong>还没有 Project File</strong>
-                <span>
-                  上传资料后，同一 Project 的所有 Thread
-                  都可以在后续生成中使用它。
-                </span>
-              </div>
-            ) : (
-              <div className="project-resource-list">
-                {sortedFiles.map((file) => (
-                  <article
-                    className="project-resource-card"
-                    key={file.attachmentId}
-                  >
-                    <div className="project-resource-icon">
-                      <Paperclip size={15} />
-                    </div>
-                    <div className="project-resource-main">
-                      <div className="project-resource-title-row">
-                        <strong title={file.filename}>{file.filename}</strong>
-                        <span className={`project-status ${file.status}`}>
-                          {fileStatusLabel(file)}
-                        </span>
-                      </div>
-                      <div className="project-resource-meta">
-                        {file.mimeType} · {formatBytes(file.size)}
-                        {file.pageCount ? ` · ${file.pageCount} 页` : ""}
-                        {` · 加入于 ${formatDate(file.addedAt)}`}
-                      </div>
-                      {file.summary && <p>{file.summary}</p>}
-                      {file.error && (
-                        <p className="project-file-error">{file.error}</p>
-                      )}
-                    </div>
-                    <div className="project-resource-actions">
-                      <a
-                        className="project-icon-button"
-                        href={file.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        title="打开文件"
-                      >
-                        <ExternalLink size={13} />
-                      </a>
-                      {!archived && (
-                        <button
-                          className="project-icon-button danger"
-                          title="从 Project 移除"
-                          onClick={() => void remove(file)}
-                        >
-                          <Trash2 size={13} />
-                        </button>
-                      )}
-                    </div>
-                  </article>
-                ))}
-              </div>
-            )}
-          </section>
-        )}
-
-        {displayedSection === "artifacts" && (
-          <section className="project-artifacts">
-            {selectedArtifact ? (
-              <div className="project-artifact-detail">
-                {renderDocumentControls?.(selectedArtifact)}
-                <div
-                  className="project-artifact-content tc-accent-context"
-                  style={{ "--tc-accent": artifactAccent } as React.CSSProperties}
-                  // 把当前 Markdown 阅读区标记成可划选来源；全局唯一 selection
-                  // observer 据此获得稳定的 artifact/message/thread identity。
-                  {...(selectedArtifact.kind === "markdown" && project
-                    ? {
-                        "data-selection-artifact-id": selectedArtifact.id,
-                        "data-selection-message-id":
-                          selectedArtifact.sourceMessageId,
-                        "data-selection-thread-id": toViewThreadId(
-                          project.rootThreadId,
-                          selectedArtifact.threadId
-                        ),
-                      }
-                    : {})}
-                >
-                  {selectedArtifact.kind === "markdown" && (
-                    <MarkdownBody
-                      source={selectedArtifact.content}
-                      density="compact"
-                    />
-                  )}
-                  {selectedArtifact.kind === "code" && (
-                    <pre className="art-code">{selectedArtifact.content}</pre>
-                  )}
-                  {selectedArtifact.kind === "note" && (
-                    <div className="art-note">
-                      {selectedArtifact.content
-                        .split("\n\n")
-                        .map((paragraph, index) => (
-                          <p key={index}>{paragraph}</p>
-                        ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            ) : activeId ? (
-              <p role={artifactLoadError ? "alert" : "status"}>{artifactLoadError ? "文档加载失败。" : "正在加载文档…"}{artifactLoadError && <button type="button" onClick={onRetryArtifact}>重新加载</button>}</p>
-            ) : (
-              <>
+            {displayedSection === "overview" && !loading && (
+              <section className="project-overview">
                 <div className="project-section-heading">
                   <div>
-                    <div className="project-eyebrow">PROJECT ARTIFACTS</div>
+                    <h4>目标与长期指令</h4>
+                    <p>
+                      保存后只影响之后启动的生成，不改写历史消息、Artifact 或
+                      Fork Context。
+                    </p>
+                  </div>
+                  {!archived && !editing && project && (
+                    <button className="project-secondary" onClick={beginEdit}>
+                      <Pencil size={12} /> 编辑
+                    </button>
+                  )}
+                </div>
+
+                <label className="project-field">
+                  <span>Target</span>
+                  {editing ? (
+                    <textarea
+                      value={targetDraft}
+                      maxLength={PROJECT_TARGET_MAX_CHARS}
+                      onChange={(event) => setTargetDraft(event.target.value)}
+                      placeholder="这个 Project 最终希望达成什么？"
+                      rows={5}
+                    />
+                  ) : (
+                    <div className="project-read-value">
+                      {project?.target || "尚未设置 Target。"}
+                    </div>
+                  )}
+                  {editing && (
+                    <small>
+                      {targetDraft.length}/{PROJECT_TARGET_MAX_CHARS}
+                    </small>
+                  )}
+                </label>
+
+                <label className="project-field">
+                  <span>Instructions</span>
+                  {editing ? (
+                    <textarea
+                      value={instructionsDraft}
+                      maxLength={PROJECT_INSTRUCTIONS_MAX_CHARS}
+                      onChange={(event) =>
+                        setInstructionsDraft(event.target.value)
+                      }
+                      placeholder="模型在这个 Project 中应持续遵循哪些工作方式、约束和偏好？"
+                      rows={10}
+                    />
+                  ) : (
+                    <div className="project-read-value project-instructions-value">
+                      {project?.instructions || "尚未设置 Instructions。"}
+                    </div>
+                  )}
+                  {editing && (
+                    <small>
+                      {instructionsDraft.length}/
+                      {PROJECT_INSTRUCTIONS_MAX_CHARS}
+                    </small>
+                  )}
+                </label>
+
+                {editing && (
+                  <div className="project-actions">
+                    <button
+                      className="project-secondary"
+                      disabled={saving}
+                      onClick={cancelEdit}
+                    >
+                      取消
+                    </button>
+                    <button
+                      className="project-primary"
+                      disabled={saving}
+                      onClick={() => void saveContract()}
+                    >
+                      {saving ? "保存中…" : "保存 Contract"}
+                    </button>
+                  </div>
+                )}
+              </section>
+            )}
+
+            {displayedSection === "files" && (
+              <section className="project-files">
+                <div className="project-section-heading">
+                  <div>
+                    <h4>跨 Thread 可用的原始资料</h4>
+                    <p>
+                      Ready 文件会在统一预算内参与未来生成；移除只解除 Project
+                      成员关系。
+                    </p>
+                  </div>
+                  {!archived && project && (
+                    <>
+                      <input
+                        ref={fileInputRef}
+                        className="project-file-input"
+                        type="file"
+                        accept={ATTACHMENT_ACCEPT}
+                        onChange={(event) => {
+                          const file = event.currentTarget.files?.[0]
+                          if (file) void upload(file)
+                        }}
+                      />
+                      <button
+                        className="project-primary"
+                        disabled={uploading}
+                        onClick={() => fileInputRef.current?.click()}
+                      >
+                        <Upload size={12} />{" "}
+                        {uploading ? "上传中…" : "上传文件"}
+                      </button>
+                    </>
+                  )}
+                </div>
+
+                {loading ? (
+                  <ResourceListSkeleton />
+                ) : sortedFiles.length === 0 ? (
+                  <div className="project-empty">
+                    <Paperclip size={18} />
+                    <strong>还没有 Project File</strong>
+                    <span>
+                      上传资料后，同一 Project 的所有 Thread
+                      都可以在后续生成中使用它。
+                    </span>
+                  </div>
+                ) : (
+                  <div className="project-resource-list">
+                    {sortedFiles.map((file) => (
+                      <article
+                        className="project-resource-card"
+                        key={file.attachmentId}
+                      >
+                        <div className="project-resource-icon">
+                          <Paperclip size={15} />
+                        </div>
+                        <div className="project-resource-main">
+                          <div className="project-resource-title-row">
+                            <strong title={file.filename}>{file.filename}</strong>
+                            <span className={`project-status ${file.status}`}>
+                              {fileStatusLabel(file)}
+                            </span>
+                          </div>
+                          <div className="project-resource-meta">
+                            {file.mimeType} · {formatBytes(file.size)}
+                            {file.pageCount ? ` · ${file.pageCount} 页` : ""}
+                            {` · 加入于 ${formatDate(file.addedAt)}`}
+                          </div>
+                          {file.summary && <p>{file.summary}</p>}
+                          {file.error && (
+                            <p className="project-file-error">{file.error}</p>
+                          )}
+                        </div>
+                        <div className="project-resource-actions">
+                          <a
+                            className="project-icon-button"
+                            href={file.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            title="打开文件"
+                          >
+                            <ExternalLink size={13} />
+                          </a>
+                          {!archived && (
+                            <button
+                              className="project-icon-button danger"
+                              title="从 Project 移除"
+                              onClick={() => void remove(file)}
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          )}
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                )}
+              </section>
+            )}
+
+            {displayedSection === "artifacts" && (
+              <section className="project-artifacts">
+                <div className="project-section-heading">
+                  <div>
                     <h4>整个 Project 的持久化成果</h4>
                     <p>
                       包含根 Thread 和所有 Fork 产生的
@@ -564,7 +523,9 @@ export function ProjectPanel({
                     placeholder="搜索标题、类型或来源 Thread"
                   />
                 </label>
-                {sortedArtifacts.length === 0 ? (
+                {loading ? (
+                  <ResourceListSkeleton />
+                ) : sortedArtifacts.length === 0 ? (
                   <div className="project-empty">
                     <FileText size={18} />
                     <strong>还没有 Artifact</strong>
@@ -576,39 +537,28 @@ export function ProjectPanel({
                 ) : (
                   <div className="project-resource-list">
                     {sortedArtifacts.map((artifact) => (
-                      <button
+                      <MarkdownArtifactCard
                         key={artifact.id}
-                        className="project-resource-card project-artifact-row"
-                        onClick={() => onSelect(artifact.id)}
-                      >
-                        <div className="project-resource-icon">
-                          <FileText size={15} />
-                        </div>
-                        <div className="project-resource-main">
-                          <div className="project-resource-title-row">
-                            <strong>{artifact.title}</strong>
-                            <span className="project-kind">
-                              {artifactKindLabel(artifact.kind)}
-                            </span>
-                          </div>
-                          <div className="project-resource-meta">
-                            {artifact.sourceThreadTitle ?? "未命名 Thread"}
-                            {artifact.sourceThreadFootnote !== null
-                              ? ` · 脚注 ${artifact.sourceThreadFootnote}`
-                              : ""}
-                            {` · ${sourceStatusLabel(artifact.sourceMessageStatus)}`}
-                            {` · ${formatDate(artifact.createdAt)}`}
-                          </div>
-                        </div>
-                      </button>
+                        artifact={{
+                          id: artifact.id,
+                          title: artifact.title,
+                          kind: artifact.kind,
+                          lang: artifact.language ?? undefined,
+                          content: null,
+                        }}
+                        caption={artifactCaption(artifact)}
+                        sourceDepth={threadDepths?.[artifact.threadId] ?? null}
+                        onOpen={onSelect}
+                        fill
+                      />
                     ))}
                   </div>
                 )}
-              </>
+              </section>
             )}
-          </section>
-        )}
-      </div>
+          </div>
+        </>
+      )}
     </div>
   )
 }

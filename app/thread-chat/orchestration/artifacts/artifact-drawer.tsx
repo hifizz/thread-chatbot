@@ -85,11 +85,20 @@ export function ArtifactDrawer({
     [project?.id, state.artifactOrder, state.artifacts, state.threads]
   )
 
+  const threadDepths = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.values(state.threads).map((thread) => [thread.id, thread.depth])
+      ),
+    [state.threads]
+  )
+
   return (
     <ProjectPanel
       project={project}
       files={[]}
       artifacts={artifacts} currentArtifacts={artifacts}
+      threadDepths={threadDepths}
       artifactContents={Object.fromEntries(artifacts.map(a => [a.id, a.content]))}
       open={open}
       activeId={activeId}

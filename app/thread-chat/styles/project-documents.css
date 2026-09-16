@@ -1,68 +1,237 @@
-/* 文档面板：版本工具栏与差异沿用项目主题 token。 */
-.tc .project-document-view {
+/* Artifact 阅读屏（与 Project 管理屏共享 drawer 壳，由 activeId 切换）：
+ * 标题行（返回 / 标题+类型徽标+版本控制 / 操作 / 关闭）→ meta 行（来源/时间/状态）
+ * → 正文；版本差异展开为标题行下方、压在正文上的浮层。 */
+.tc .artifact-head { position: relative; gap: 10px; padding: 10px 16px; }
+.tc .artifact-back,
+.tc .artifact-more {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  flex: none;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--tc-content-secondary);
+  cursor: pointer;
+}
+.tc .artifact-back:hover,
+.tc .artifact-more:hover {
+  background: var(--tc-surface-project-status);
+  color: var(--tc-content-primary);
+}
+.tc .artifact-heading {
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  margin-bottom: 24px;
-  font: 12px/1.6 var(--tc-typography-family-ui);
-  color: var(--tc-content-secondary);
+  gap: 2px;
 }
-.tc .project-document-view button:disabled { opacity: 0.5; cursor: not-allowed; }
-.tc .project-document-disclosure {
-  border: 1px solid var(--tc-border-subtle);
-  border-radius: 10px;
-  background: var(--tc-veil-card);
-  font: 12px/1.6 var(--tc-typography-family-ui);
-  color: var(--tc-content-secondary);
-  overflow: hidden;
-}
-.tc .project-document-disclosure > summary {
+.tc .artifact-title-line {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 12px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+.tc .artifact-title-line h3 {
+  flex: 0 1 auto;
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 15px;
+  line-height: 22px;
+}
+.tc .artifact-kind {
+  flex: none;
+  font: 11px/22px var(--tc-typography-family-ui);
+  color: var(--tc-content-muted);
+}
+.tc .artifact-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  font: 11px/1.4 var(--tc-typography-family-ui);
+  color: var(--tc-content-muted);
+}
+.tc .artifact-meta > * { flex: none; }
+.tc .artifact-meta-source {
+  flex: 0 1 auto;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 0;
+  border-radius: 6px;
+  padding: 2px 6px;
+  margin: -2px -6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
   cursor: pointer;
-  list-style: none;
 }
-.tc .project-document-disclosure > summary::-webkit-details-marker { display: none; }
-.tc .project-document-disclosure > summary:hover { background: var(--tc-surface-project-status); }
-.tc .project-document-disclosure > summary:focus-visible {
-  outline: 2px solid var(--tc-content-project-accent);
-  outline-offset: -2px;
+.tc .artifact-meta-source:hover {
+  background: var(--tc-surface-project-status);
+  color: var(--tc-content-primary);
 }
-.tc .project-document-disclosure > summary > svg { flex: none; transition: transform 150ms; }
-.tc .project-document-disclosure[open] > summary > svg { transform: rotate(90deg); }
-.tc .project-document-meta { margin-left: auto; color: var(--tc-content-muted); white-space: nowrap; }
-.tc .project-document-disclosure-body {
-  padding: 12px;
-  border-top: 1px solid var(--tc-border-subtle);
+.tc .artifact-meta-source span { overflow: hidden; text-overflow: ellipsis; }
+.tc .artifact-meta-status.failed { color: var(--tc-content-project-danger); }
+.tc .artifact-meta-status.generating { color: var(--tc-content-project-accent); }
+.tc .artifact-actions { flex: none; }
+.tc .artifact-body { padding: 20px 22px 28px; }
+.tc .artifact-body > p[role] {
+  margin: 4px 0 0;
+  color: var(--tc-content-secondary);
+  font: 13px/1.6 var(--tc-typography-family-ui);
+}
+.tc .artifact-body > p[role] button { margin-left: 8px; }
+.tc .artifact-body .project-artifact-content { padding: 4px 0 24px; }
+
+/* 版本控制：display:contents 让版本胶囊、差异触发器、提示条融进标题行；
+ * 提示条换行独占一行，差异面板绝对定位成标题行下方的浮层。 */
+.tc .artifact-title-line .project-document-view { display: contents; }
+.tc .artifact-view-hint {
+  order: 10;
+  flex-basis: 100%;
+  margin: 2px 0 0;
+  font: 11px/1.5 var(--tc-typography-family-ui);
+  color: var(--tc-content-muted);
+}
+.tc .artifact-view-hint button {
+  margin-left: 6px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--tc-content-secondary);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.tc .artifact-view-hint button:disabled { opacity: 0.5; cursor: not-allowed; }
+.tc .artifact-version {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--tc-surface-plain);
+  color: var(--tc-content-secondary);
+  font: 11px/18px var(--tc-typography-family-ui);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.tc .artifact-version:hover {
+  background: var(--tc-surface-project-status);
+  color: var(--tc-content-primary);
+}
+.tc .artifact-version:disabled { opacity: 0.5; cursor: not-allowed; }
+.tc .artifact-diff-trigger,
+.tc .artifact-version-jump {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 6px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--tc-content-secondary);
+  font: 11px/1.6 var(--tc-typography-family-ui);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.tc .artifact-version-jump { color: var(--tc-content-project-accent); }
+.tc .artifact-version-jump:disabled { opacity: 0.5; cursor: not-allowed; }
+.tc .artifact-diff-trigger:hover,
+.tc .artifact-version-jump:hover {
+  background: var(--tc-surface-project-status);
+  color: var(--tc-content-primary);
+}
+.tc .artifact-diff-trigger > svg { transition: transform 150ms; }
+.tc .artifact-diff-trigger[aria-expanded="true"] > svg {
+  transform: rotate(90deg);
+}
+.tc .artifact-diff-panel {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: var(--tc-z-drawer-overlay);
+  max-height: 60vh;
+  overflow: auto;
+  padding: 10px 16px 14px;
+  background: var(--tc-surface-base);
+  border-bottom: 1px solid var(--tc-border-subtle);
+  box-shadow: 0 14px 28px -14px var(--tc-shadow-float);
+  font: 12px/1.7 var(--tc-typography-family-ui);
+  color: var(--tc-content-secondary);
+}
+.tc .artifact-diff-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 0 0 8px;
+  font-size: 11px;
+  color: var(--tc-content-muted);
+}
+.tc .artifact-diff-panel > p[role] { margin: 0; }
+.tc .artifact-diff-panel > p[role] button {
+  margin-left: 8px;
+  text-decoration: underline;
+}
+.tc .artifact-diff-line {
+  display: flex;
+  gap: 6px;
+  margin: 0 -6px;
+  padding: 0 6px;
+  border-radius: 4px;
+  font: 12px/1.7 var(--tc-typography-family-code);
+}
+.tc .artifact-diff-sign {
+  flex: none;
+  width: 12px;
+  text-align: center;
+  color: var(--tc-content-muted);
+}
+.tc .artifact-diff-line.added { background: var(--tc-surface-project-ready); }
+.tc .artifact-diff-line.added .artifact-diff-sign {
+  color: var(--tc-content-project-ready);
+}
+.tc .artifact-diff-line.removed { background: var(--tc-surface-project-error); }
+.tc .artifact-diff-line.removed .artifact-diff-sign {
+  color: var(--tc-content-project-danger);
+}
+.tc .artifact-diff-text {
+  min-width: 0;
+  white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
-.tc .project-document-disclosure-body > p { margin: 0 0 12px; }
-.tc .project-document-disclosure-body pre { margin: 0; padding: 4px 0; }
-.tc .project-document-disclosure-body ins { color: var(--tc-content-project-ready); text-decoration: none; }
-.tc .project-document-disclosure-body del { color: var(--tc-content-project-danger); }
-.tc .project-artifact-detail .project-artifact-content { padding: 4px 0 24px; }
-@media (max-width: 720px) {
-  .tc .project-document-view { margin-bottom: 20px; }
-  .tc .project-document-disclosure > summary { min-height: 44px; }
+.tc .artifact-diff-line ins {
+  background: var(--tc-border-project-hover);
+  border-radius: 2px;
+  text-decoration: none;
 }
-
-/* 阅读模式：标题一行，版本与差异一行；项目级导航只在列表显示。 */
-.tc .project-panel-preview .project-panel-head { gap: 8px; padding: 8px 16px; min-height: 52px; }
-.tc .project-panel-preview .project-panel-head h3 { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
-.tc .project-preview-back,
-.tc .project-preview-more { display: grid; place-items: center; width: 36px; height: 36px; padding: 0; border: 0; background: transparent; color: var(--tc-content-secondary); }
-.tc .project-preview-back:hover,
-.tc .project-preview-more:hover { background: var(--tc-surface-project-status); }
-.tc .project-preview-actions { flex: none; }
-.tc .project-panel-preview .project-panel-body { padding-top: 12px; }
-.tc .project-panel-preview .project-document-view { display: grid; grid-template-columns: auto 1fr; align-items: start; gap: 8px 12px; margin-bottom: 20px; }
-.tc .project-panel-preview .project-document-view > p { grid-column: 1 / -1; margin: 0; }
-.tc .project-panel-preview .project-document-diff { justify-self: end; border: 0; background: transparent; }
-.tc .project-panel-preview .project-document-diff > summary { padding: 6px 8px; min-height: 36px; }
-.tc .project-panel-preview .project-document-diff .project-document-meta { display: none; }
-.tc .project-panel-preview .project-document-diff[open] { grid-column: 1 / -1; justify-self: stretch; border: 1px solid var(--tc-border-subtle); }
-.tc .project-panel-preview .project-document-diff[open] .project-document-meta { display: inline; }
-.tc .project-panel-preview .project-document-view > div > button { min-height: 36px; }
-.tc .project-document-action-error { padding: 8px; font-size: 12px; color: var(--tc-content-project-danger); }
+.tc .artifact-diff-line del {
+  background: var(--tc-border-project-error);
+  border-radius: 2px;
+  text-decoration: none;
+}
+.tc .artifact-diff-gap {
+  margin: 2px 0;
+  padding-left: 18px;
+  font: 11px/1.6 var(--tc-typography-family-ui);
+  color: var(--tc-content-muted);
+}
+.tc .project-document-action-error {
+  padding: 8px;
+  font-size: 12px;
+  color: var(--tc-content-project-danger);
+}

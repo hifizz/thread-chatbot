@@ -35,14 +35,18 @@ export function DocumentView({ artifact, currentRevisionId, client, navigationBl
   const latest = revisions.find((revision) => revision.id === currentRevisionId)
   const previous = revisions.find((revision) => revision.id === selected?.parentRevisionId)
   return <div className="project-document-view">
-    {errorDocumentId === documentId && <p role="alert">{DOCUMENT_UI_COPY.historyFailed} <button type="button" onClick={() => setRefresh((value) => value + 1)}>重新加载版本</button></p>}
     <DocumentVersionHistory revisions={revisions} revisionId={document.revisionId}
       currentRevisionId={currentRevisionId ?? document.revisionId} disabled={navigationBlocked} onSelect={(revision) => onSelect(revision.artifactId)} />
     {previous && <DocumentDiff key={`diff:${artifact.id}`} before={previous} after={artifact} client={client} />}
-    {latest && latest.id !== document.revisionId && <p>
-      正在查看历史版本 <button type="button" className="project-secondary" disabled={navigationBlocked} onClick={() => onSelect(latest.artifactId)}>查看最新版本</button>
-    </p>}
-    {artifact.sourceMessageStatus !== "completed" && <p>此版本已保存。来源回复尚未成功完成，暂时不能从这里开启分支。</p>}
+    {errorDocumentId === documentId && <p className="artifact-view-hint" role="alert">{DOCUMENT_UI_COPY.historyFailed} <button type="button" onClick={() => setRefresh((value) => value + 1)}>重新加载版本</button></p>}
+    {navigationBlocked && <p className="artifact-view-hint" role="status">{DOCUMENT_UI_COPY.navigationBlocked}</p>}
+    {latest && latest.id !== document.revisionId && (
+      <button type="button" className="artifact-version-jump"
+        disabled={navigationBlocked} onClick={() => onSelect(latest.artifactId)}>
+        回到最新
+      </button>
+    )}
+    {artifact.sourceMessageStatus !== "completed" && <p className="artifact-view-hint">此版本已保存。来源回复尚未成功完成，暂时不能从这里开启分支。</p>}
 
   </div>
 }

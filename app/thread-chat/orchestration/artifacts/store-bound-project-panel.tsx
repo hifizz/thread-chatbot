@@ -114,6 +114,16 @@ export function StoreBoundProjectPanel({
       }),
     [state.artifactOrder, state.artifactsById, state.documentsById]
   )
+  const threadDepths = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.values(state.threadsById).map((thread) => [
+          thread.id,
+          thread.depth,
+        ])
+      ),
+    [state.threadsById]
+  )
 
   // 分支来源导航：openArtifact 同步带上 anchor，这里在对应 Artifact 渲染完成后
   // 精确定位并短暂高亮。重试有固定上限，绝不在其他文档或消息正文中按相同句子猜测。
@@ -244,6 +254,7 @@ export function StoreBoundProjectPanel({
       project={state.project}
       files={files}
       artifacts={artifacts}
+      threadDepths={threadDepths}
       open={open}
       activeId={activeId}
       threads={state.threadsById}
