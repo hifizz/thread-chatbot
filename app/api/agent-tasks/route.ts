@@ -16,7 +16,7 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  let body: { goal?: string; repo?: string; idempotencyKey?: string };
+  let body: { goal?: string; repo?: string; baseBranch?: string; idempotencyKey?: string };
   try {
     body = await req.json();
   } catch {
@@ -29,6 +29,10 @@ export async function POST(req: Request) {
   const repo = (body.repo?.trim() || DEFAULT_REPO).replace(/\.git$/, "");
   if (!REPO_PATTERN.test(repo)) {
     return Response.json({ error: "repo 必须是 owner/name 形式" }, { status: 400 });
+  }
+  const baseBranch = body.baseBranch?.trim() || "main";
+  if (!/^[\w.\/-]+$/.test(baseBranch)) {
+    return Response.json({ error: "baseBranch 不合法" }, { status: 400 });
   }
 
   if (body.idempotencyKey) {
@@ -51,6 +55,7 @@ export async function POST(req: Request) {
     title,
     repo,
     branch: "",
+    baseBranch,
     environment,
     workspacePath: "",
   });
@@ -65,5 +70,6 @@ export async function POST(req: Request) {
     title: task.title,
     repo: task.repo,
     branch: task.branch,
+    baseBranch: task.baseBranch,
   });
 }

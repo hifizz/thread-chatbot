@@ -59,6 +59,66 @@ export async function publishDraftPr(input: {
   return { number: pr.number, url: pr.html_url, headSha: pr.head.sha };
 }
 
+export type RepoSummary = {
+  fullName: string;
+  defaultBranch: string;
+  private: boolean;
+  description: string | null;
+  updatedAt: string;
+};
+
+/** 列出 token 可见的全部仓库（own + collaborator + org），分页拉取，上限 500。 */
+export async function listUserRepos(token: string): Promise<RepoSummary[]> {
+  const out: RepoSummary[] = [];
+  for (let page = 1; page <= 5; page++) {
+    const res = await fetch(
+      `https://api.github.com/user/repos?per_page=100&page=${page}&sort=updated&affiliation=owner,collaborator,organization_member`,
+      { headers: headers(token) }
+    );
+    if (!res.ok) throw new Error(`拉取仓库列表失败: ${res.status}`);
+    const list = (await res.json()) as {
+      full_name: string;
+      default_branch: string;
+      private: boolean;
+      description: string | null;
+      updated_at: string;
+    }[];
+    for (const r of list) {
+      out.push({
+        fullName: r.full_name,
+        defaultBranch: r.default_branch,
+        private: r.private,
+        description: r.description,
+        updatedAt: r.updated_at,
+      });
+    }
+    if (list.length < 100) break;
+  }
+  return out;
+}
+
+export type RepoBranches = { defaultBranch: string; branches: string[] };
+
+/** 列出仓库分支（上限 300）及默认分支。 */
+export async function listBranches(repo: string, token: string): Promise<RepoBranches> {
+  const repoRes = await fetch(`https://api.github.com/repos/${repo}`, { headers: headers(token) });
+  if (!repoRes.ok) throw new Error(`查询仓库失败: ${repoRes.status}`);
+  const repoData = (await repoRes.json()) as { default_branch: string };
+
+  const names: string[] = [];
+  for (let page = 1; page <= 3; page++) {
+    const res = await fetch(
+      `https://api.github.com/repos/${repo}/branches?per_page=100&page=${page}`,
+      { headers: headers(token) }
+    );
+    if (!res.ok) break;
+    const list = (await res.json()) as { name: string }[];
+    names.push(...list.map((b) => b.name));
+    if (list.length < 100) break;
+  }
+  return { defaultBranch: repoData.default_branch, branches: names };
+}
+
 export type PrCheck = { name: string; status: string; conclusion: string | null };
 
 export type PullRequestState = {

@@ -11,7 +11,7 @@ import {
   LocalDriver,
   type WorkspaceDriver,
 } from "@/lib/agent-demo/environment";
-import { getDefaultBranch, publishDraftPr } from "@/lib/agent-demo/github";
+import { publishDraftPr } from "@/lib/agent-demo/github";
 import { emit, getTask, isCancelRequested, registerRunHandles, setRunStatus } from "@/lib/agent-demo/store";
 import { createWorkspaceTools } from "@/lib/agent-demo/tools";
 
@@ -97,6 +97,7 @@ async function runTask(taskId: string) {
           taskId: task.id,
           repo: task.repo,
           branch: task.branch,
+          baseBranch: task.baseBranch,
           githubToken: githubToken!,
           onPhase: (label) => phase(taskId, "environment", label),
         });
@@ -113,6 +114,7 @@ async function runTask(taskId: string) {
           taskId: task.id,
           repo: task.repo,
           branch: task.branch,
+          baseBranch: task.baseBranch,
           githubToken: githubToken!,
           onPhase: (label) => phase(taskId, "environment", label),
         });
@@ -270,12 +272,11 @@ async function runTask(taskId: string) {
         return;
       }
 
-      const base = await getDefaultBranch(task.repo, githubToken!);
       pullRequest = await publishDraftPr({
         repo: task.repo,
         token: githubToken!,
         head: task.branch,
-        base,
+        base: task.baseBranch,
         title: `[agent] ${task.title}`,
         body: `由 ThreadChat Agent 任务 ${task.id} 生成。\n\n目标：${task.goal}\n\n— Draft PR，请人工审阅后再合入。`,
         expectedHeadSha: commitSha ?? "",

@@ -64,6 +64,7 @@ export type TaskSnapshot = {
   lastSeq: number;
   repo: string;
   branch: string;
+  baseBranch: string;
   environment: string;
   workspacePath: string;
   result: TaskResult | null;

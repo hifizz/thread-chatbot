@@ -162,6 +162,7 @@ export async function createE2bEnvironment(input: {
   taskId: string;
   repo: string;
   branch: string;
+  baseBranch: string;
   githubToken: string;
   onPhase?: (label: string) => void;
 }): Promise<E2bEnvironment> {
@@ -183,7 +184,7 @@ export async function createE2bEnvironment(input: {
   }
 
   const setup = await driver.exec(
-    `git checkout -b ${shQuote(input.branch)} && ` +
+    `git checkout -b ${shQuote(input.branch)} ${shQuote(`origin/${input.baseBranch}`)} && ` +
       `git config user.email 'agent@thread-chat.demo' && git config user.name 'ThreadChat Agent'`
   );
   if (setup.exitCode !== 0) {
@@ -206,6 +207,7 @@ export async function createBoxdEnvironment(input: {
   taskId: string;
   repo: string; // owner/name
   branch: string;
+  baseBranch: string;
   githubToken: string;
   onPhase?: (label: string) => void;
 }): Promise<BoxdEnvironment> {
@@ -232,7 +234,7 @@ export async function createBoxdEnvironment(input: {
   }
 
   const setup = await driver.exec(
-    `git checkout -b ${shQuote(input.branch)} && ` +
+    `git checkout -b ${shQuote(input.branch)} ${shQuote(`origin/${input.baseBranch}`)} && ` +
       `git config user.email 'agent@thread-chat.demo' && git config user.name 'ThreadChat Agent'`
   );
   if (setup.exitCode !== 0) {

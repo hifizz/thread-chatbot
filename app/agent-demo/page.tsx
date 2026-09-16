@@ -41,6 +41,7 @@ type Snapshot = {
   lastSeq: number;
   repo: string;
   branch: string;
+  baseBranch: string;
   environment: string;
   result: TaskResultView | null;
   error: { userMessage: string } | null;
@@ -57,6 +58,14 @@ type TaskListItem = {
   createdAt: string;
   updatedAt: string;
   pullRequest: { url: string; number: number } | null;
+};
+
+type RepoSummary = {
+  fullName: string;
+  defaultBranch: string;
+  private: boolean;
+  description: string | null;
+  updatedAt: string;
 };
 
 type PullRequestState = {
@@ -139,7 +148,12 @@ export default function AgentDemoPage() {
   const [tasks, setTasks] = useState<TaskListItem[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [repo, setRepo] = useState(DEFAULT_REPO);
+  const [baseBranch, setBaseBranch] = useState("main");
   const [goal, setGoal] = useState(DEFAULT_GOAL);
+  const [repoList, setRepoList] = useState<RepoSummary[] | null>(null);
+  const [repoListError, setRepoListError] = useState<string | null>(null);
+  const [repoDropdownOpen, setRepoDropdownOpen] = useState(false);
+  const [branches, setBranches] = useState<{ defaultBranch: string; branches: string[] } | null>(null);
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [blocks, setBlocks] = useState<ViewBlock[]>([]);
   const [pr, setPr] = useState<PullRequestState | null>(null);
@@ -272,7 +286,7 @@ export default function AgentDemoPage() {
       const res = await fetch("/api/agent-tasks", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ goal, repo, idempotencyKey: crypto.randomUUID() }),
+        body: JSON.stringify({ goal, repo, baseBranch, idempotencyKey: crypto.randomUUID() }),
       });
       const data = (await res.json()) as { taskId?: string; error?: string };
       if (!res.ok || !data.taskId) {
@@ -292,15 +306,35 @@ export default function AgentDemoPage() {
     refreshTasks();
   };
 
+  // 选中仓库后拉取分支，默认回落到仓库默认分支（通常 main/master）
+  const pickRepo = useCallback(async (fullName: string) => {
+    setRepo(fullName);
+    setRepoDropdownOpen(false);
+    setBranches(null);
+    const res = await fetch(`/api/agent-repos/branches?repo=${encodeURIComponent(fullName)}`);
+    if (res.ok) {
+      const data = (await res.json()) as { defaultBranch: string; branches: string[] };
+      setBranches(data);
+      setBaseBranch(data.defaultBranch);
+    }
+  }, []);
+
   const refreshTasks = useCallback(async () => {
     const res = await fetch("/api/agent-tasks");
     if (res.ok) setTasks(((await res.json()) as { tasks: TaskListItem[] }).tasks);
   }, []);
 
-  // 任务列表轮询；URL ?task= 恢复
+  // 任务列表轮询；URL ?task= 恢复；预拉仓库列表
   useEffect(() => {
     refreshTasks();
     const timer = setInterval(refreshTasks, 3000);
+    fetch("/api/agent-repos")
+      .then(async (res) => {
+        const data = (await res.json()) as { repos?: RepoSummary[]; error?: string };
+        if (res.ok && data.repos) setRepoList(data.repos);
+        else setRepoListError(data.error ?? "仓库列表不可用");
+      })
+      .catch(() => setRepoListError("仓库列表不可用"));
     const initial = new URLSearchParams(window.location.search).get("task");
     if (initial) setTimeout(() => void selectTask(initial), 0);
     return () => clearInterval(timer);
@@ -420,12 +454,77 @@ export default function AgentDemoPage() {
             <p className="mt-1 mb-6 text-neutral-500">
               gpt-5.6-terra · e2b 沙箱 · GitHub Draft PR
             </p>
-            <input
-              className="mb-3 w-full rounded-md border border-neutral-300 bg-transparent px-3 py-2 font-mono text-[13px] outline-none focus:border-neutral-500 dark:border-neutral-600"
-              value={repo}
-              onChange={(e) => setRepo(e.target.value)}
-              placeholder="owner/name"
-            />
+            {/* 仓库：GitHub 拉取 + 搜索 */}
+            <div className="relative mb-3">
+              <input
+                className="w-full rounded-md border border-neutral-300 bg-transparent px-3 py-2 font-mono text-[13px] outline-none focus:border-neutral-500 dark:border-neutral-600"
+                value={repo}
+                onChange={(e) => {
+                  setRepo(e.target.value);
+                  setRepoDropdownOpen(true);
+                  setBranches(null);
+                }}
+                onFocus={() => setRepoDropdownOpen(true)}
+                onBlur={() => setTimeout(() => setRepoDropdownOpen(false), 150)}
+                placeholder="搜索仓库 owner/name…"
+              />
+              {repoDropdownOpen && repoList && (
+                <div className="absolute z-10 mt-1 max-h-64 w-full overflow-y-auto rounded-md border border-neutral-200 bg-white shadow-lg dark:border-neutral-700 dark:bg-neutral-900">
+                  {repoList
+                    .filter((r) => r.fullName.toLowerCase().includes(repo.toLowerCase()))
+                    .slice(0, 50)
+                    .map((r) => (
+                      <button
+                        key={r.fullName}
+                        onMouseDown={() => pickRepo(r.fullName)}
+                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-[13px] hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                      >
+                        <code className="truncate">{r.fullName}</code>
+                        {r.private && (
+                          <span className="shrink-0 rounded border border-neutral-300 px-1 text-[10px] text-neutral-400 dark:border-neutral-600">
+                            private
+                          </span>
+                        )}
+                        <span className="ml-auto shrink-0 text-[11px] text-neutral-400">{r.defaultBranch}</span>
+                      </button>
+                    ))}
+                  {repoList.filter((r) => r.fullName.toLowerCase().includes(repo.toLowerCase())).length === 0 && (
+                    <div className="px-3 py-2 text-xs text-neutral-400">无匹配仓库</div>
+                  )}
+                </div>
+              )}
+              {repoDropdownOpen && repoList === null && !repoListError && (
+                <div className="absolute z-10 mt-1 w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-xs text-neutral-400 shadow-lg dark:border-neutral-700 dark:bg-neutral-900">
+                  正在拉取 GitHub 仓库…
+                </div>
+              )}
+            </div>
+            {repoListError && (
+              <p className="mb-3 text-xs text-red-500">仓库列表加载失败：{repoListError}（仍可手动输入 owner/name）</p>
+            )}
+
+            {/* 基准分支 */}
+            <div className="mb-3 flex items-center gap-2">
+              <label className="text-xs text-neutral-500">基准分支</label>
+              <select
+                className="rounded-md border border-neutral-300 bg-transparent px-2 py-1.5 font-mono text-[13px] outline-none focus:border-neutral-500 dark:border-neutral-600 dark:bg-neutral-900"
+                value={baseBranch}
+                onChange={(e) => setBaseBranch(e.target.value)}
+                disabled={!branches}
+              >
+                {!branches && <option value={baseBranch}>{baseBranch}</option>}
+                {branches?.branches.map((b) => (
+                  <option key={b} value={b}>
+                    {b}
+                    {b === branches.defaultBranch ? "（默认）" : ""}
+                  </option>
+                ))}
+              </select>
+              {branches === null && repo.includes("/") && (
+                <span className="text-xs text-neutral-400">拉取分支中…</span>
+              )}
+            </div>
+
             <textarea
               className="w-full resize-y rounded-md border border-neutral-300 bg-transparent p-3 font-mono text-[13px] leading-relaxed outline-none focus:border-neutral-500 dark:border-neutral-600"
               rows={4}
@@ -471,7 +570,9 @@ export default function AgentDemoPage() {
               </div>
               <div className="mt-2 flex items-center gap-3 text-xs text-neutral-500">
                 <code className="rounded bg-neutral-100 px-1.5 py-0.5 dark:bg-neutral-800">{snapshot?.repo}</code>
-                <code className="rounded bg-neutral-100 px-1.5 py-0.5 dark:bg-neutral-800">{snapshot?.branch}</code>
+                <code className="rounded bg-neutral-100 px-1.5 py-0.5 dark:bg-neutral-800">
+                  {snapshot?.branch} → {snapshot?.baseBranch}
+                </code>
                 <span>{snapshot?.environment}</span>
                 {/* 阶段步进条 */}
                 <div className="ml-auto flex items-center gap-1.5">

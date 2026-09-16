@@ -18,6 +18,7 @@ type TaskRecord = {
   title: string;
   repo: string;
   branch: string;
+  baseBranch: string;
   environment: string;
   status: TaskStatus;
   currentRunId: string;
@@ -69,6 +70,7 @@ export function createTask(input: {
   title: string;
   repo: string;
   branch: string;
+  baseBranch: string;
   environment: string;
   workspacePath: string;
 }) {
@@ -78,6 +80,7 @@ export function createTask(input: {
     title: input.title,
     repo: input.repo,
     branch: input.branch,
+    baseBranch: input.baseBranch,
     environment: input.environment,
     status: "queued",
     currentRunId: `run-${crypto.randomUUID().slice(0, 8)}`,
@@ -115,6 +118,7 @@ export function getSnapshot(taskId: string): TaskSnapshot | null {
     lastSeq: task.nextEventSeq - 1,
     repo: task.repo,
     branch: task.branch,
+    baseBranch: task.baseBranch ?? "main",
     environment: task.environment,
     workspacePath: task.workspacePath,
     result: task.result,
