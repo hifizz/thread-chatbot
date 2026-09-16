@@ -26,11 +26,13 @@ import type {
   ArtifactSummaryDTO,
   ProjectDTO,
   ProjectFileDTO,
+  ThreadDTO,
 } from "@/lib/thread-chat/contracts/dto"
 import { MarkdownBody } from "../../chat/message/markdown-body"
 import { ArtifactPreviewActions } from "./artifact-preview-actions"
 import { toViewThreadId } from "../../core/projections"
 import { uploadProjectFile } from "../../net/project-file-upload"
+import { accentOf } from "../../theme"
 
 export interface ProjectPanelProps {
   project: ProjectDTO | null
@@ -44,7 +46,7 @@ export interface ProjectPanelProps {
   renderDocumentControls?(artifact: ArtifactDTO): React.ReactNode
   open: boolean
   activeId: string | null
-  artifactAccent?: string
+  threads: Readonly<Record<string, Pick<ThreadDTO, "depth">>>
   onClose(): void
   onSelect(id: string): void
   onLocate(threadId: string, sourceMessageId: string): void
@@ -99,7 +101,7 @@ export function ProjectPanel({
   onRetryArtifact,
   open,
   activeId,
-  artifactAccent,
+  threads,
   onClose,
   onSelect,
   onLocate,
@@ -151,6 +153,8 @@ export function ProjectPanel({
   )
   const selectedContent = activeId ? artifactContents[activeId] : undefined
   const selectedArtifact = selectedMetadata && selectedContent !== undefined ? { ...selectedMetadata, content: selectedContent } : null
+  const sourceThread = selectedMetadata ? threads[selectedMetadata.threadId] : undefined
+  const artifactAccent = sourceThread ? accentOf(sourceThread) : undefined
   const sortedArtifacts = useMemo(
     () => {
       return currentArtifacts

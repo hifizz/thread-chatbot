@@ -4,7 +4,6 @@ import { useMemo } from "react"
 import type { ArtifactDTO, ProjectDTO } from "@/lib/thread-chat/contracts/dto"
 import type { MessageStatus, ThreadTreeState } from "../../core/types"
 import { ProjectPanel } from "./project-panel"
-import { accentOf } from "../../theme"
 
 export interface ArtifactDrawerProps {
   state: ThreadTreeState
@@ -37,8 +36,6 @@ export function ArtifactDrawer({
   onLocate,
 }: ArtifactDrawerProps) {
   const root = state.threads.main ?? Object.values(state.threads).find((thread) => thread.parentId === null)
-  const sourceThreadId = activeId ? state.artifacts[activeId]?.sourceThreadId : undefined
-  const sourceThread = sourceThreadId ? state.threads[sourceThreadId] : undefined
   const project = useMemo<ProjectDTO | null>(
     () =>
       root
@@ -96,7 +93,7 @@ export function ArtifactDrawer({
       artifactContents={Object.fromEntries(artifacts.map(a => [a.id, a.content]))}
       open={open}
       activeId={activeId}
-      artifactAccent={sourceThread ? accentOf(sourceThread) : undefined}
+      threads={state.threads}
       onClose={onClose}
       onSelect={onSelect}
       onLocate={onLocate}

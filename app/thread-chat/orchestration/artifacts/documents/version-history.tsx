@@ -13,7 +13,11 @@ export function DocumentVersionHistory({ revisions, revisionId, currentRevisionI
 }) {
   const container = useRef<HTMLDivElement>(null)
   const selected = revisions.find((revision) => revision.id === revisionId)
-  return <div ref={container} title={disabled ? DOCUMENT_UI_COPY.navigationBlocked : undefined}><DropdownMenu>
+  const disabledReason = disabled ? DOCUMENT_UI_COPY.navigationBlocked : undefined
+  return <div ref={container} title={disabledReason}>
+    {/* 提问开合不能推移正文，否则滚动锚定会触发全局选区关闭监听。 */}
+    <span className="sr-only" role="status">{disabledReason}</span>
+    <DropdownMenu>
     <DropdownMenuTrigger disabled={disabled} className="project-secondary" aria-label="选择文档版本">
       V{selected?.revisionNumber ?? "…"}{revisionId === currentRevisionId ? " · 最新" : " · 历史"} <ChevronDown size={12} />
     </DropdownMenuTrigger>
