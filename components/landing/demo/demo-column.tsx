@@ -1,14 +1,15 @@
 "use client"
 
 /**
- * demo/demo-column —— 演示分栏：列头（面包屑/标题/深度徽标）+ 消息流 + 仿制输入框。
+ * demo/demo-column —— 演示分栏：列头（面包屑/标题/深度徽标/操作按钮）+ 消息流 + 仿制输入框。
  * DOM 结构与 .tc .column 对齐；主线列的 composer 承载打字、胶囊与 @ 弹层。
  */
 
-import { ArrowUp, Plus } from "lucide-react"
+import { ArrowUp, ListTree, Plus } from "lucide-react"
 import { useEffect, useRef, type ReactElement, type RefObject } from "react"
 
 import {
+  childCountOf,
   findAnchor,
   type DemoColumn,
   type DemoScenario,
@@ -22,8 +23,15 @@ interface Props {
   scenario: DemoScenario
   column: DemoColumn
   view: DemoView
+  /** 播放器当前揭示进度（消息打字 / 划选 / 气泡打字共用） */
   revealChars: number
   onAnchor: (anchorId: string) => void
+  /** 列头「收起」 */
+  onCloseColumn: (columnId: string) => void
+  /** 列头「⇄ 切换」：在同层兄弟分支间轮换 */
+  onSwitchColumn: (columnId: string) => void
+  /** 列头子树按钮：展开第一个子分支 */
+  onOpenChild: (columnId: string) => void
   onPick: Parameters<typeof ArtifactPicker>[0]["onPick"]
   onClosePicker: () => void
   composerRef?: RefObject<HTMLDivElement | null>
@@ -35,24 +43,40 @@ export function DemoColumnView({
   view,
   revealChars,
   onAnchor,
+  onCloseColumn,
+  onSwitchColumn,
+  onOpenChild,
   onPick,
   onClosePicker,
   composerRef,
 }: Props): ReactElement {
   const isMain = column.depth === 0
   const listRef = useRef<HTMLDivElement>(null)
-  const signature = `${view.shown.size}:${view.revealing ?? ""}:${view.revealing ? revealChars : 0}:${view.composerText}:${view.capsule?.id ?? ""}`
+  const signature = `${view.shown.size}:${view.revealing ?? ""}:${view.revealing ? revealChars : 0}:${view.composerText}:${view.capsule?.id ?? ""}:${view.columnIds.join(",")}`
   useEffect(() => {
     const el = listRef.current
     if (el) el.scrollTop = el.scrollHeight
   }, [signature])
   const fc = ((column.depth || 1) - 1) % 5 + 1
+  const childCount = childCountOf(scenario, column.id)
   const source = column.sourceAnchor
     ? findAnchor(scenario, column.sourceAnchor)
     : undefined
   const fnote = column.sourceAnchor
     ? view.footnotes[column.sourceAnchor]
     : undefined
+
+  const subtreeBtn = (
+    <button
+      type="button"
+      className="cbtn tree"
+      title={`查看子分支（${childCount}）`}
+      onClick={() => onOpenChild(column.id)}
+    >
+      <ListTree size={12} aria-hidden />
+      <span className="n">{childCount}</span>
+    </button>
+  )
 
   return (
     <section
@@ -62,25 +86,56 @@ export function DemoColumnView({
       data-column={column.id}
     >
       <header className="col-head">
-        <div className="crumb">
-          {column.crumb.map((seg, i) => {
-            const last = i === column.crumb.length - 1
-            return (
-              <span key={i} style={{ display: "contents" }}>
-                {i > 0 && <span className="chev">›</span>}
-                <span className={last ? "here" : "seg2"}>{seg}</span>
-              </span>
-            )
-          })}
+        <div className="lane">
+          {isMain ? (
+            <>
+              <div className="ctitle-row">
+                <span className="anchor-tag">锚定</span>
+                <span className="ctitle main">主线</span>
+                <div className="cactions">{subtreeBtn}</div>
+              </div>
+              <div className="col-sub">{column.sub}</div>
+            </>
+          ) : (
+            <>
+              <div className="crumb">
+                {column.crumb.map((seg, i) => {
+                  const last = i === column.crumb.length - 1
+                  return (
+                    <span key={i} style={{ display: "contents" }}>
+                      {i > 0 && <span className="chev">›</span>}
+                      <span className={last ? "here" : "seg2"}>{seg}</span>
+                    </span>
+                  )
+                })}
+              </div>
+              <div className="ctitle-row">
+                <span className="depth-badge">L{column.depth}</span>
+                <span className="ctitle">{column.title}</span>
+                <div className="cactions">
+                  {subtreeBtn}
+                  <button
+                    type="button"
+                    className="cbtn"
+                    title="把本列切换为任意会话"
+                    onClick={() => onSwitchColumn(column.id)}
+                  >
+                    ⇄ 切换
+                  </button>
+                  <button
+                    type="button"
+                    className="cbtn"
+                    title="收起本列"
+                    data-cursor-target={`close-${column.id}`}
+                    onClick={() => onCloseColumn(column.id)}
+                  >
+                    收起
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
         </div>
-        <div className="ctitle-row">
-          {!isMain && <span className="depth-badge">D{column.depth}</span>}
-          <span className="ctitle">{column.title}</span>
-          <span className="cbtn tree" aria-hidden>
-            <span className="n">{column.crumb.length > 1 ? "⌘" : "⌘1"}</span>
-          </span>
-        </div>
-        <div className="col-sub">{column.sub}</div>
       </header>
 
       <div className="msg-list" ref={listRef}>
@@ -121,6 +176,7 @@ export function DemoColumnView({
                 columnId={column.id}
                 message={m}
                 visibleChars={revealing ? revealChars : undefined}
+                progressChars={revealChars}
                 view={view}
                 onAnchor={onAnchor}
               />

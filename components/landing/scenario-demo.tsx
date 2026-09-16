@@ -127,6 +127,8 @@ export function ScenarioDemo(): ReactElement {
         revealChars={player.revealChars}
         stepIndex={player.stepIndex}
         onAnchor={player.openAnchorBranch}
+        onCloseColumn={player.closeColumn}
+        onSwitchColumn={player.switchColumn}
         onPick={player.pickArtifact}
         onClosePicker={player.closePicker}
       />

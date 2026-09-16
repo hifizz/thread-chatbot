@@ -12,7 +12,7 @@ import {
   type ReactElement,
 } from "react"
 
-import type { DemoScenario } from "@/constants/landing-demo"
+import { childrenOf, type DemoScenario } from "@/constants/landing-demo"
 
 import { ArtifactPicker } from "./artifact-picker"
 import { DemoColumnView } from "./demo-column"
@@ -25,6 +25,8 @@ interface Props {
   revealChars: number
   stepIndex: number
   onAnchor: (anchorId: string) => void
+  onCloseColumn: (columnId: string) => void
+  onSwitchColumn: (columnId: string) => void
   onPick: Parameters<typeof ArtifactPicker>[0]["onPick"]
   onClosePicker: () => void
 }
@@ -35,6 +37,8 @@ export function DemoFrame({
   revealChars,
   stepIndex,
   onAnchor,
+  onCloseColumn,
+  onSwitchColumn,
   onPick,
   onClosePicker,
 }: Props): ReactElement {
@@ -51,6 +55,19 @@ export function DemoFrame({
       behavior: "smooth",
     })
   }, [stepIndex, view.scrollTo])
+
+  /* 子树按钮：子分支已展开则滚过去，未展开则走锚点展开流程。 */
+  const handleOpenChild = (columnId: string) => {
+    const child = childrenOf(scenario, columnId)[0]
+    if (!child) return
+    if (view.columnIds.includes(child.id)) {
+      colsRef.current
+        ?.querySelector(`[data-column="${child.id}"]`)
+        ?.scrollIntoView({ behavior: "smooth", inline: "nearest", block: "nearest" })
+    } else if (child.sourceAnchor) {
+      onAnchor(child.sourceAnchor)
+    }
+  }
 
   return (
     <div className="ld" ref={rootRef}>
@@ -86,6 +103,9 @@ export function DemoFrame({
               view={view}
               revealChars={revealChars}
               onAnchor={onAnchor}
+              onCloseColumn={onCloseColumn}
+              onSwitchColumn={onSwitchColumn}
+              onOpenChild={handleOpenChild}
               onPick={onPick}
               onClosePicker={onClosePicker}
               composerRef={column.depth === 0 ? composerRef : undefined}

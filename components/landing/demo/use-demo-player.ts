@@ -15,7 +15,9 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 
 import {
   branchOfAnchor,
+  findAnchor,
   findMessage,
+  siblingsOf,
   messageTextLength,
   type DemoArtifact,
   type DemoScenario,
@@ -35,10 +37,14 @@ export interface DemoView {
   revealing?: string
   /** anchorId → 已分配脚注号 */
   footnotes: Record<string, number>
-  /** 已选中的锚点（高亮 + 可点击） */
+  /** 已提交划选的锚点（下划线 + 脚注 + 可点击） */
   selectedAnchors: Set<string>
-  /** 正在展示的划选气泡（锚点 id，仅当前步骤） */
-  bubbleAnchor?: string
+  /** 正处于划选中的锚点（划选高亮，尚无脚注） */
+  selectingAnchor?: string
+  /** 当前步骤仍在逐字划选（revealChars 控制已选字数） */
+  selectRevealing: boolean
+  /** 划选气泡：划满后浮出，提交步骤仍保留，划选清除后消失 */
+  bubble?: { anchorId: string; text: string; typing: boolean }
   /** 主线 composer 文本（完整目标值；渲染时按 revealChars 截断） */
   composerText: string
   /** composer 是否处于打字中 */
@@ -61,6 +67,12 @@ function revealLenOf(scenario: DemoScenario, step: DemoStep): number {
     return found ? messageTextLength(found.message) : 0
   }
   if (step.revealComposer) return step.revealComposer.length
+  if (step.bubbleText) return step.bubbleText.length
+  /* 纯划选步才按锚点字数逐字高亮；提交步（带 selectAnchor）立即生效 */
+  if (step.selecting && !step.selectAnchor) {
+    const found = findAnchor(scenario, step.selecting)
+    return found ? found.text.length : 0
+  }
   return 0
 }
 
@@ -74,18 +86,23 @@ export function buildView(
   revealDone: boolean,
   pickedId?: string,
   pickerClosed?: boolean,
+  closedColumns?: ReadonlySet<string>,
+  swappedColumns?: ReadonlyMap<string, string>,
 ): DemoView {
   const view: DemoView = {
     columnIds: ["main"],
     shown: new Set(),
     footnotes: {},
     selectedAnchors: new Set(),
+    selectRevealing: false,
     composerText: "",
     composerTyping: false,
     pickerOpen: false,
   }
   let fnote = 0
   const last = Math.min(stepIndex, scenario.steps.length - 1)
+  let bubbleText = ""
+  let bubbleTyping = false
 
   for (let i = 0; i <= last; i++) {
     const step = scenario.steps[i]
@@ -99,12 +116,29 @@ export function buildView(
       if (done) view.shown.add(step.revealMessage)
       else view.revealing = step.revealMessage
     }
+
+    /* 划选状态：selecting 字段驱动，缺省即清除；逐字划选只在
+       「纯划选」步骤进行（带 bubbleText 的步骤划选已完成，改在气泡里打字）。 */
+    view.selectingAnchor = step.selecting
+    view.selectRevealing = false
+    if (
+      step.selecting &&
+      isCurrent &&
+      !done &&
+      !step.bubbleText &&
+      !step.selectAnchor
+    )
+      view.selectRevealing = true
+    if (step.bubbleText !== undefined) {
+      bubbleText = step.bubbleText
+      bubbleTyping = isCurrent && !done
+    }
     if (step.selectAnchor) {
       if (!(step.selectAnchor in view.footnotes))
         view.footnotes[step.selectAnchor] = ++fnote
       view.selectedAnchors.add(step.selectAnchor)
     }
-    if (isCurrent && step.showBubble) view.bubbleAnchor = step.showBubble
+
     if (step.cursor !== undefined)
       view.cursor = step.cursor === null ? undefined : step.cursor
 
@@ -128,6 +162,33 @@ export function buildView(
     }
     if (isCurrent && step.scrollTo) view.scrollTo = step.scrollTo
   }
+
+  /* 划满之后才浮出气泡；提交步（selecting 仍在）保留气泡，
+     后续不带 selecting 的步骤把它清掉。 */
+  if (view.selectingAnchor && !view.selectRevealing)
+    view.bubble = {
+      anchorId: view.selectingAnchor,
+      text: bubbleText,
+      typing: bubbleTyping,
+    }
+  if (closedColumns?.size)
+    view.columnIds = view.columnIds.filter((id) => !closedColumns.has(id))
+  /* 「⇄ 切换」：把列槽位换成兄弟分支；换进来的列按完整会话展示。 */
+  if (swappedColumns?.size) {
+    const swappedIn = new Set<string>()
+    view.columnIds = view.columnIds.map((id) => {
+      const to = swappedColumns.get(id)
+      if (to) swappedIn.add(to)
+      return to ?? id
+    })
+    view.columnIds = view.columnIds.filter(
+      (id, i) => view.columnIds.indexOf(id) === i,
+    )
+    for (const to of swappedIn) {
+      const col = scenario.columns.find((c) => c.id === to)
+      for (const m of col?.messages ?? []) view.shown.add(m.id)
+    }
+  }
   return view
 }
 
@@ -145,6 +206,10 @@ export interface DemoPlayer {
   jumpTo(step: number): void
   /** 点击锚点：停自动播放，直接展开对应分支的完整状态 */
   openAnchorBranch(anchorId: string): void
+  /** 列头「收起」：手动关掉该列并暂停 */
+  closeColumn(columnId: string): void
+  /** 列头「⇄ 切换」：本列轮换到下一个兄弟分支并暂停 */
+  switchColumn(columnId: string): void
   /** picker 打开期间的手动选择 */
   pickArtifact(artifact: DemoArtifact): void
   closePicker(): void
@@ -163,6 +228,12 @@ export function useDemoPlayer(
   const [pickedId, setPickedId] = useState<string>()
   /** 手动 Esc 关闭过弹层 */
   const [pickerClosed, setPickerClosed] = useState(false)
+  /** 手动收起的列 */
+  const [closedCols, setClosedCols] = useState<ReadonlySet<string>>(new Set())
+  /** 手动切换的列：槽位 id → 当前显示的兄弟列 id */
+  const [swappedCols, setSwappedCols] = useState<ReadonlyMap<string, string>>(
+    new Map(),
+  )
 
   /* 场景切换在渲染期归零（React 认可的 adjust-state-during-render），
      避免 effect 里的同步 setState 造成二次渲染。 */
@@ -174,6 +245,8 @@ export function useDemoPlayer(
     setUserStarted(false)
     setPickedId(undefined)
     setPickerClosed(false)
+    setClosedCols(new Set())
+    setSwappedCols(new Map())
   }
 
   const step = scenario.steps[Math.min(stepIndex, scenario.steps.length - 1)]
@@ -183,8 +256,25 @@ export function useDemoPlayer(
     opts.active && !userPaused && (opts.autoPlay || userStarted)
 
   const view = useMemo(
-    () => buildView(scenario, stepIndex, revealDone, pickedId, pickerClosed),
-    [scenario, stepIndex, revealDone, pickedId, pickerClosed],
+    () =>
+      buildView(
+        scenario,
+        stepIndex,
+        revealDone,
+        pickedId,
+        pickerClosed,
+        closedCols,
+        swappedCols,
+      ),
+    [
+      scenario,
+      stepIndex,
+      revealDone,
+      pickedId,
+      pickerClosed,
+      closedCols,
+      swappedCols,
+    ],
   )
 
   /* 主循环：揭示 → 停留 → 下一章。每个 effect 只清自己创建的计时器。 */
@@ -233,6 +323,8 @@ export function useDemoPlayer(
     setUserStarted(true)
     setPickedId(undefined)
     setPickerClosed(false)
+    setClosedCols(new Set())
+    setSwappedCols(new Map())
   }, [])
 
   const replay = useCallback(() => jumpTo(0), [jumpTo])
@@ -253,9 +345,37 @@ export function useDemoPlayer(
       if (!branch) return
       const openIdx = scenario.steps.findIndex((s) => s.addColumn === branch.id)
       if (openIdx < 0) return
+      setClosedCols((prev) => {
+        if (!prev.has(branch.id)) return prev
+        const next = new Set(prev)
+        next.delete(branch.id)
+        return next
+      })
       settleAt(openIdx)
     },
     [scenario, settleAt],
+  )
+
+  const closeColumn = useCallback((columnId: string) => {
+    if (columnId === "main") return
+    setUserPaused(true)
+    setClosedCols((prev) => new Set(prev).add(columnId))
+  }, [])
+
+  const switchColumn = useCallback(
+    (columnId: string) => {
+      const sibs = siblingsOf(scenario, columnId)
+      if (!sibs.length) return
+      setUserPaused(true)
+      setSwappedCols((prev) => {
+        const cur = prev.get(columnId) ?? columnId
+        const idx = sibs.findIndex((s) => s.id === cur)
+        const next = new Map(prev)
+        next.set(columnId, sibs[(idx + 1) % sibs.length].id)
+        return next
+      })
+    },
+    [scenario],
   )
 
   const pickArtifact = useCallback(
@@ -284,6 +404,8 @@ export function useDemoPlayer(
     replay,
     jumpTo,
     openAnchorBranch,
+    closeColumn,
+    switchColumn,
     pickArtifact,
     closePicker,
   }

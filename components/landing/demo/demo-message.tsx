@@ -6,6 +6,7 @@
  * 锚点是 span[role=button]，划选气泡作为同层 span 绝对定位挂出。
  */
 
+import { GitMerge } from "lucide-react"
 import type { ReactElement } from "react"
 
 import {
@@ -23,6 +24,8 @@ interface Props {
   message: DemoMessage
   /** 正在打字揭示：可见字符数；undefined 表示完整显示 */
   visibleChars?: number
+  /** 播放器当前的揭示进度（划选逐字高亮 / 气泡打字也用它） */
+  progressChars: number
   view: DemoView
   onAnchor: (anchorId: string) => void
 }
@@ -56,11 +59,13 @@ function Inline({
   scenario,
   nodes,
   view,
+  progressChars,
   onAnchor,
 }: {
   scenario: DemoScenario
   nodes: InlineNode[]
   view: DemoView
+  progressChars: number
   onAnchor: (id: string) => void
 }): ReactElement {
   return (
@@ -72,13 +77,23 @@ function Inline({
           const fc = ((branch?.depth ?? 1) - 1) % 5 + 1 || 1
           const fnote = view.footnotes[node.anchorId]
           const selected = view.selectedAnchors.has(node.anchorId)
-          const bubble = view.bubbleAnchor === node.anchorId
+          const selecting = view.selectingAnchor === node.anchorId
+          const selChars =
+            selecting && view.selectRevealing
+              ? Math.min(progressChars, node.text.length)
+              : node.text.length
+          const bubble = view.bubble?.anchorId === node.anchorId ? view.bubble : undefined
+          const bubbleText = bubble
+            ? bubble.typing
+              ? bubble.text.slice(0, progressChars)
+              : bubble.text
+            : ""
           return (
             <span key={i} className="anchor-wrap">
               <span
                 role="button"
                 tabIndex={0}
-                className={`anchored fc-${fc}${selected ? " selected" : ""}`}
+                className={`anchored fc-${fc}${selected ? " selected" : ""}${selecting && !selected ? " selecting" : ""}`}
                 data-cursor-target={`anchor-${node.anchorId}`}
                 onClick={() => onAnchor(node.anchorId)}
                 onKeyDown={(e) => {
@@ -89,15 +104,35 @@ function Inline({
                 }}
                 aria-label={`就「${node.text}」展开分支`}
               >
-                {node.text}
+                {selecting && !selected ? (
+                  <>
+                    <span className="sel">{node.text.slice(0, selChars)}</span>
+                    {node.text.slice(selChars)}
+                  </>
+                ) : (
+                  node.text
+                )}
                 {fnote !== undefined && <sup className="fnote">{fnote}</sup>}
               </span>
               {bubble && (
-                <span className="sel-bubble" aria-hidden>
-                  <span className="lbl">划选片段</span>
+                <span className="sel-bubble">
+                  <span className="lbl">在新分支中讨论这段</span>
                   <span className="quote">{node.text}</span>
-                  <span className="ask">{branch?.messages[0] ? "→ " : ""}在这里开分支继续问</span>
-                  <span className="go">展开分支</span>
+                  <span className="ask" data-cursor-target="bubble-input">
+                    {bubbleText || (
+                      <span className="ph">就这段问点什么…（可留空）</span>
+                    )}
+                    {bubble.typing && <span className="caret" aria-hidden />}
+                  </span>
+                  <button
+                    type="button"
+                    className="go"
+                    data-cursor-target="bubble-submit"
+                    onClick={() => onAnchor(node.anchorId)}
+                  >
+                    <GitMerge size={13} aria-hidden />
+                    {bubbleText.trim() ? "带着问题开分支" : "开启分支讨论"}
+                  </button>
                 </span>
               )}
             </span>
@@ -113,6 +148,7 @@ export function DemoMessageView({
   scenario,
   message,
   visibleChars,
+  progressChars,
   view,
   onAnchor,
 }: Props): ReactElement {
@@ -144,6 +180,7 @@ export function DemoMessageView({
               scenario={scenario}
               nodes={nodes}
               view={view}
+              progressChars={progressChars}
               onAnchor={onAnchor}
             />
           </p>

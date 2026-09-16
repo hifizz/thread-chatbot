@@ -94,7 +94,7 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  height: 560px;
+  height: clamp(620px, 76vh, 820px);
   overflow: hidden;
   border: 1px solid var(--tc-border-strong);
   border-radius: 14px;
@@ -240,6 +240,15 @@
   border-radius: 6px;
 }
 .ld .ctitle-row { display: flex; align-items: center; gap: 8px; }
+.ld .anchor-tag {
+  font-family: var(--tc-typography-family-code);
+  font-size: 10px;
+  color: var(--tc-content-secondary);
+  border: 1px solid var(--tc-border-strong);
+  border-radius: 5px;
+  padding: 1px 6px;
+  flex: none;
+}
 .ld .depth-badge {
   font-family: var(--tc-typography-family-code);
   font-size: 10px;
@@ -270,15 +279,28 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.ld .cactions { display: flex; gap: 5px; flex: none; }
 .ld .cbtn {
+  cursor: pointer;
   border: 1px solid var(--tc-border-strong);
   background: var(--tc-surface-plain);
   border-radius: 7px;
   padding: 3px 8px;
+  font: inherit;
   font-size: 11px;
   color: var(--tc-content-secondary);
   line-height: 1;
+  white-space: nowrap;
 }
+.ld .cbtn:hover {
+  border-color: var(--tc-accent, var(--tc-depth-1));
+  color: var(--tc-accent, var(--tc-depth-1));
+}
+.ld .cbtn:focus-visible {
+  outline: 2px solid var(--tc-accent, var(--tc-depth-1));
+  outline-offset: 1px;
+}
+.ld .cbtn.tree { display: inline-flex; align-items: center; gap: 4px; }
 .ld .cbtn .n {
   font-family: var(--tc-typography-family-code);
   font-size: 10px;
@@ -346,6 +368,7 @@
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  overflow-x: clip;
   padding: 12px 16px 8px;
   scrollbar-width: thin;
 }
@@ -426,6 +449,16 @@
   outline: 2px solid var(--fc);
   outline-offset: 1px;
 }
+/* 划选中：撤掉锚点底色/下划线，只留逐字推进的「选中区」高亮 */
+.ld .anchored.selecting {
+  border-bottom-color: transparent;
+  background: transparent;
+}
+.ld .anchored.selecting:hover { background: transparent; }
+.ld .anchored .sel {
+  background: color-mix(in srgb, var(--fc) 28%, transparent);
+  border-radius: 2px;
+}
 .ld sup.fnote {
   font-family: var(--tc-typography-family-code);
   font-size: 9px;
@@ -440,7 +473,7 @@
   user-select: none;
 }
 
-/* 划选气泡（移植 .sel-bubble 的深底面板观感，演示版静态挂出） */
+/* 划选气泡（移植 .sel-bubble 深底面板：引用 + 提问输入 + 提交按钮） */
 .ld .sel-bubble {
   position: absolute;
   top: calc(100% + 8px);
@@ -448,8 +481,8 @@
   z-index: 30;
   display: flex;
   flex-direction: column;
-  width: 218px;
-  padding: 9px 10px 10px;
+  width: 246px;
+  padding: 10px 11px 11px;
   border-radius: 10px;
   background: var(--tc-surface-ink);
   box-shadow: 0 8px 18px var(--tc-shadow-pop);
@@ -472,18 +505,38 @@
   color: var(--tc-onink-primary);
 }
 .ld .sel-bubble .ask {
-  font-size: 11px;
-  color: var(--tc-onink-muted);
+  display: block;
+  min-height: 32px;
+  padding: 6px 8px;
   margin-bottom: 8px;
+  border-radius: 7px;
+  border: 1px solid color-mix(in srgb, var(--tc-onink-faint) 35%, transparent);
+  background: color-mix(in srgb, var(--tc-surface-plain) 8%, transparent);
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--tc-onink-primary);
 }
+.ld .sel-bubble .ask .ph { color: var(--tc-onink-placeholder); }
+.ld .sel-bubble .caret { background: var(--tc-onink-muted); }
 .ld .sel-bubble .go {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 0;
   border-radius: 7px;
   padding: 6px;
+  font: inherit;
   font-size: 12px;
   font-weight: 600;
-  text-align: center;
+  cursor: pointer;
   color: var(--tc-content-on-accent);
   background: var(--tc-depth-1);
+}
+.ld .sel-bubble .go:hover { filter: brightness(1.06); }
+.ld .sel-bubble .go:focus-visible {
+  outline: 2px solid var(--tc-onink-primary);
+  outline-offset: 1px;
 }
 
 /* ═══ 输入框（移植 .tc .composer/.box/.send + 真实底栏工具行） ═══ */
@@ -700,34 +753,45 @@
 .ld-tabs {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: 10px;
-}
-.ld-tabs.sub { margin-top: -2px; margin-bottom: 8px; }
-.ld-tab {
+  justify-content: center;
+  gap: 3px;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 auto 14px;
+  padding: 5px;
   border: 1px solid var(--rule, #d3cbb8);
-  border-radius: 999px;
+  border-radius: 15px;
+  background: var(--paper-2, #efe9dd);
+}
+.ld-tabs.sub { margin: -6px auto 10px; padding: 3px; border-radius: 12px; }
+.ld-tab {
+  border: 0;
+  border-radius: 11px;
   background: transparent;
   color: var(--ink-soft, #6a6357);
   font: inherit;
-  font-size: 0.82rem;
-  padding: 6px 14px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  padding: 9px 20px;
   cursor: pointer;
-  transition: background 140ms ease, color 140ms ease, border-color 140ms ease;
+  transition: background 140ms ease, color 140ms ease;
 }
-.ld-tab:hover { color: var(--ink, #24211b); border-color: var(--ink, #24211b); }
+.ld-tab:hover {
+  color: var(--ink, #24211b);
+  background: color-mix(in srgb, var(--ink, #24211b) 6%, transparent);
+}
 .ld-tab.on {
   background: var(--ink, #24211b);
-  border-color: var(--ink, #24211b);
   color: var(--paper, #f5f2ea);
   font-weight: 600;
 }
-.ld-tabs.sub .ld-tab { font-size: 0.76rem; padding: 4px 11px; }
-.ld-tabs.sub .ld-tab.on { background: var(--green, #2f7d6b); border-color: var(--green, #2f7d6b); color: #fff; }
+.ld-tabs.sub .ld-tab { font-size: 0.8rem; padding: 5px 14px; border-radius: 9px; }
+.ld-tabs.sub .ld-tab.on { background: var(--green, #2f7d6b); color: #fff; }
 .ld-tab:focus-visible { outline: 3px solid var(--green, #2f7d6b); outline-offset: 2px; }
 
 .ld-desc {
   margin: 0 0 14px;
+  text-align: center;
   color: var(--ink-soft, #6a6357);
   font-size: 0.88rem;
   line-height: 1.6;
@@ -837,11 +901,18 @@
 
 /* ═══ 移动端 ═══ */
 @media (max-width: 720px) {
-  .ld { height: 480px; border-radius: 11px; }
+  .ld { height: min(600px, 74vh); border-radius: 11px; }
   .ld .column { min-width: 88%; }
   .ld .topbar .seg { display: none; }
+  .ld .sel-bubble { width: 216px; }
+  .ld .col-head { padding: 8px 12px; }
+  .ld .ctitle-row { gap: 6px; }
+  .ld .cactions { gap: 4px; }
+  .ld .cbtn { padding: 3px 6px; }
+  .ld .col-sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .ld-step-label { display: none; }
   .ld-step-bar { width: 18px; }
+  .ld-tab { font-size: 0.85rem; padding: 7px 14px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

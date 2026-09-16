@@ -70,14 +70,19 @@ export interface DemoStep {
   /* —— 步骤开始即生效 —— */
   addColumn?: string
   showMessages?: string[]
+  /** 提交划选：锚点获得下划线 + 脚注（列也随之开） */
   selectAnchor?: string
-  showBubble?: string
+  /** 正处于「划选中」的锚点：本步内按打字进度逐字高亮，划满后浮出提问气泡；
+      带 selecting 的后续步骤（提问/提交）保持选中态，不带则清除 */
+  selecting?: string
   scrollTo?: "start" | "end"
   pickArtifact?: DemoArtifact
 
   /* —— 打字揭示 —— */
   revealMessage?: string
   revealComposer?: string
+  /** 在划选气泡输入框里打字（该步需同时带 selecting） */
+  bubbleText?: string
 
   /* —— 揭示完成后生效 —— */
   sendComposer?: string
@@ -217,30 +222,56 @@ const prd: DemoScenario = {
     {
       id: "select",
       label: "划选片段",
-      selectAnchor: "a-ctx",
-      showBubble: "a-ctx",
+      selecting: "a-ctx",
       cursor: "anchor-a-ctx",
-      holdMs: 1600,
+      holdMs: 700,
+    },
+    {
+      id: "q1",
+      label: "气泡提问",
+      selecting: "a-ctx",
+      bubbleText: "分叉时，应该继承哪些上下文？",
+      cursor: "bubble-input",
+      holdMs: 700,
     },
     {
       id: "open",
       label: "展开分支",
+      selecting: "a-ctx",
+      selectAnchor: "a-ctx",
       addColumn: "b1",
       showMessages: ["b1-u1"],
       scrollTo: "end",
-      cursor: null,
-      holdMs: 1000,
+      cursor: "bubble-submit",
+      holdMs: 1100,
     },
-    { id: "b1-answer", label: "分支回答", revealMessage: "b1-a1", holdMs: 1200 },
+    { id: "b1-answer", label: "分支回答", revealMessage: "b1-a1", cursor: null, holdMs: 1200 },
     {
-      id: "again",
-      label: "再开一条分支",
+      id: "select2",
+      label: "再次划选",
+      selecting: "a-edit",
+      scrollTo: "start",
+      cursor: "anchor-a-edit",
+      holdMs: 700,
+    },
+    {
+      id: "q2",
+      label: "气泡提问",
+      selecting: "a-edit",
+      bubbleText: "如果主线后来被编辑，已经创建的分支应该跟着变化吗？",
+      cursor: "bubble-input",
+      holdMs: 700,
+    },
+    {
+      id: "open2",
+      label: "再开分支",
+      selecting: "a-edit",
       selectAnchor: "a-edit",
       addColumn: "b2",
       showMessages: ["b2-u1"],
       scrollTo: "end",
-      cursor: "anchor-a-edit",
-      holdMs: 900,
+      cursor: "bubble-submit",
+      holdMs: 1000,
     },
     { id: "b2-answer", label: "得到答案", revealMessage: "b2-a1", cursor: null, holdMs: 2600 },
   ],
@@ -342,29 +373,54 @@ const tech: DemoScenario = {
     {
       id: "select",
       label: "划选片段",
-      selectAnchor: "t-art",
-      showBubble: "t-art",
+      selecting: "t-art",
       cursor: "anchor-t-art",
-      holdMs: 1600,
+      holdMs: 700,
+    },
+    {
+      id: "q1",
+      label: "气泡提问",
+      selecting: "t-art",
+      bubbleText: "把结论整理成 Artifact，再在主线用 @ 引用，应该怎么设计？",
+      cursor: "bubble-input",
+      holdMs: 700,
     },
     {
       id: "open",
       label: "展开分支",
+      selecting: "t-art",
+      selectAnchor: "t-art",
       addColumn: "b1",
       showMessages: ["b1-u1"],
       scrollTo: "end",
-      cursor: null,
-      holdMs: 1000,
+      cursor: "bubble-submit",
+      holdMs: 1100,
     },
-    { id: "b1-answer", label: "分支讨论", revealMessage: "b1-a1", holdMs: 1100 },
+    { id: "b1-answer", label: "分支讨论", revealMessage: "b1-a1", cursor: null, holdMs: 1100 },
     {
-      id: "again",
+      id: "select2",
+      label: "再次划选",
+      selecting: "t-ref",
+      cursor: "anchor-t-ref",
+      holdMs: 700,
+    },
+    {
+      id: "q2",
+      label: "气泡提问",
+      selecting: "t-ref",
+      bubbleText: "引用时传完整内容还是引用标记？已经在上下文中的内容，需要重复传吗？",
+      cursor: "bubble-input",
+      holdMs: 700,
+    },
+    {
+      id: "open2",
       label: "再追一层",
+      selecting: "t-ref",
       selectAnchor: "t-ref",
       addColumn: "b2",
       showMessages: ["b2-u1"],
       scrollTo: "end",
-      cursor: "anchor-t-ref",
+      cursor: "bubble-submit",
       holdMs: 900,
     },
     { id: "conclude", label: "形成结论", revealMessage: "b2-a1", cursor: null, holdMs: 1600 },
@@ -471,30 +527,56 @@ const marketing: DemoScenario = {
     {
       id: "select",
       label: "划选片段",
-      selectAnchor: "m-why",
-      showBubble: "m-why",
+      selecting: "m-why",
       cursor: "anchor-m-why",
-      holdMs: 1600,
+      holdMs: 700,
+    },
+    {
+      id: "q1",
+      label: "气泡提问",
+      selecting: "m-why",
+      bubbleText: "用户已经在用 AI，为什么还需要 ThreadChat？",
+      cursor: "bubble-input",
+      holdMs: 700,
     },
     {
       id: "open",
       label: "展开分支",
+      selecting: "m-why",
+      selectAnchor: "m-why",
       addColumn: "b1",
       showMessages: ["b1-u1"],
       scrollTo: "end",
-      cursor: null,
-      holdMs: 1000,
+      cursor: "bubble-submit",
+      holdMs: 1100,
     },
-    { id: "b1-answer", label: "分支回答", revealMessage: "b1-a1", holdMs: 1200 },
+    { id: "b1-answer", label: "分支回答", revealMessage: "b1-a1", cursor: null, holdMs: 1200 },
     {
-      id: "again",
-      label: "再开一条分支",
+      id: "select2",
+      label: "再次划选",
+      selecting: "m-demo",
+      scrollTo: "start",
+      cursor: "anchor-m-demo",
+      holdMs: 700,
+    },
+    {
+      id: "q2",
+      label: "气泡提问",
+      selecting: "m-demo",
+      bubbleText: "怎样用一段 30 秒演示，让用户看懂这个价值？",
+      cursor: "bubble-input",
+      holdMs: 700,
+    },
+    {
+      id: "open2",
+      label: "再开分支",
+      selecting: "m-demo",
       selectAnchor: "m-demo",
       addColumn: "b2",
       showMessages: ["b2-u1"],
       scrollTo: "end",
-      cursor: "anchor-m-demo",
-      holdMs: 900,
+      cursor: "bubble-submit",
+      holdMs: 1000,
     },
     { id: "b2-answer", label: "得到答案", revealMessage: "b2-a1", cursor: null, holdMs: 2600 },
   ],
@@ -575,30 +657,56 @@ const research: DemoScenario = {
     {
       id: "select",
       label: "划选片段",
-      selectAnchor: "r-diff",
-      showBubble: "r-diff",
+      selecting: "r-diff",
       cursor: "anchor-r-diff",
-      holdMs: 1600,
+      holdMs: 700,
+    },
+    {
+      id: "q1",
+      label: "气泡提问",
+      selecting: "r-diff",
+      bubbleText: "它和普通 AI 聊天工具的核心区别是什么？",
+      cursor: "bubble-input",
+      holdMs: 700,
     },
     {
       id: "open",
       label: "展开分支",
+      selecting: "r-diff",
+      selectAnchor: "r-diff",
       addColumn: "b1",
       showMessages: ["b1-u1"],
       scrollTo: "end",
-      cursor: null,
-      holdMs: 1000,
+      cursor: "bubble-submit",
+      holdMs: 1100,
     },
-    { id: "b1-answer", label: "分支回答", revealMessage: "b1-a1", holdMs: 1200 },
+    { id: "b1-answer", label: "分支回答", revealMessage: "b1-a1", cursor: null, holdMs: 1200 },
     {
-      id: "again",
-      label: "再开一条分支",
+      id: "select2",
+      label: "再次划选",
+      selecting: "r-verify",
+      scrollTo: "start",
+      cursor: "anchor-r-verify",
+      holdMs: 700,
+    },
+    {
+      id: "q2",
+      label: "气泡提问",
+      selecting: "r-verify",
+      bubbleText: "哪些实际功能能证明这个区别？哪些表述还需要验证？",
+      cursor: "bubble-input",
+      holdMs: 700,
+    },
+    {
+      id: "open2",
+      label: "再开分支",
+      selecting: "r-verify",
       selectAnchor: "r-verify",
       addColumn: "b2",
       showMessages: ["b2-u1"],
       scrollTo: "end",
-      cursor: "anchor-r-verify",
-      holdMs: 900,
+      cursor: "bubble-submit",
+      holdMs: 1000,
     },
     { id: "b2-answer", label: "得到答案", revealMessage: "b2-a1", cursor: null, holdMs: 2600 },
   ],
@@ -680,29 +788,54 @@ const learnAi: DemoScenario = {
     {
       id: "select",
       label: "划选片段",
-      selectAnchor: "l-llm",
-      showBubble: "l-llm",
+      selecting: "l-llm",
       cursor: "anchor-l-llm",
-      holdMs: 1600,
+      holdMs: 700,
+    },
+    {
+      id: "q1",
+      label: "气泡提问",
+      selecting: "l-llm",
+      bubbleText: "它是怎么理解和生成文字的？",
+      cursor: "bubble-input",
+      holdMs: 700,
     },
     {
       id: "open",
       label: "展开分支",
+      selecting: "l-llm",
+      selectAnchor: "l-llm",
       addColumn: "b1",
       showMessages: ["b1-u1"],
       scrollTo: "end",
-      cursor: null,
-      holdMs: 1000,
+      cursor: "bubble-submit",
+      holdMs: 1100,
     },
-    { id: "b1-answer", label: "分支回答", revealMessage: "b1-a1", holdMs: 1200 },
+    { id: "b1-answer", label: "分支回答", revealMessage: "b1-a1", cursor: null, holdMs: 1200 },
     {
-      id: "again",
+      id: "select2",
+      label: "再次划选",
+      selecting: "l-token",
+      cursor: "anchor-l-token",
+      holdMs: 700,
+    },
+    {
+      id: "q2",
+      label: "气泡提问",
+      selecting: "l-token",
+      bubbleText: "它和一个字、一个词有什么区别？",
+      cursor: "bubble-input",
+      holdMs: 700,
+    },
+    {
+      id: "open2",
       label: "再追一层",
+      selecting: "l-token",
       selectAnchor: "l-token",
       addColumn: "b2",
       showMessages: ["b2-u1"],
       scrollTo: "end",
-      cursor: "anchor-l-token",
+      cursor: "bubble-submit",
       holdMs: 900,
     },
     { id: "b2-answer", label: "得到答案", revealMessage: "b2-a1", cursor: null, holdMs: 2600 },
@@ -785,29 +918,54 @@ const learnCompany: DemoScenario = {
     {
       id: "select",
       label: "划选片段",
-      selectAnchor: "c-cash",
-      showBubble: "c-cash",
+      selecting: "c-cash",
       cursor: "anchor-c-cash",
-      holdMs: 1600,
+      holdMs: 700,
+    },
+    {
+      id: "q1",
+      label: "气泡提问",
+      selecting: "c-cash",
+      bubbleText: "利润和现金流有什么区别？",
+      cursor: "bubble-input",
+      holdMs: 700,
     },
     {
       id: "open",
       label: "展开分支",
+      selecting: "c-cash",
+      selectAnchor: "c-cash",
       addColumn: "b1",
       showMessages: ["b1-u1"],
       scrollTo: "end",
-      cursor: null,
-      holdMs: 1000,
+      cursor: "bubble-submit",
+      holdMs: 1100,
     },
-    { id: "b1-answer", label: "分支回答", revealMessage: "b1-a1", holdMs: 1200 },
+    { id: "b1-answer", label: "分支回答", revealMessage: "b1-a1", cursor: null, holdMs: 1200 },
     {
-      id: "again",
+      id: "select2",
+      label: "再次划选",
+      selecting: "c-gap",
+      cursor: "anchor-c-gap",
+      holdMs: 700,
+    },
+    {
+      id: "q2",
+      label: "气泡提问",
+      selecting: "c-gap",
+      bubbleText: "为什么公司盈利，却可能没有足够现金？",
+      cursor: "bubble-input",
+      holdMs: 700,
+    },
+    {
+      id: "open2",
       label: "再追一层",
+      selecting: "c-gap",
       selectAnchor: "c-gap",
       addColumn: "b2",
       showMessages: ["b2-u1"],
       scrollTo: "end",
-      cursor: "anchor-c-gap",
+      cursor: "bubble-submit",
       holdMs: 900,
     },
     { id: "b2-answer", label: "得到答案", revealMessage: "b2-a1", cursor: null, holdMs: 2600 },
@@ -854,4 +1012,33 @@ export function findMessage(scenario: DemoScenario, messageId: string) {
 /** 锚点 → 它展开的分支列 id（branch.sourceAnchor === anchorId）。 */
 export function branchOfAnchor(scenario: DemoScenario, anchorId: string) {
   return scenario.columns.find((c) => c.sourceAnchor === anchorId)
+}
+
+/** 某列的直接子分支（列头「子分支」按钮导航目标）。
+    以面包屑前缀判父子：子列 crumb = 父列 crumb + 子列标题。 */
+export function childrenOf(scenario: DemoScenario, columnId: string) {
+  const col = scenario.columns.find((c) => c.id === columnId)
+  if (!col) return []
+  return scenario.columns.filter(
+    (c) =>
+      c.id !== columnId &&
+      c.crumb.length === col.crumb.length + 1 &&
+      c.crumb.slice(0, -1).every((seg, i) => seg === col.crumb[i]),
+  )
+}
+
+export function childCountOf(scenario: DemoScenario, columnId: string) {
+  return childrenOf(scenario, columnId).length
+}
+
+/** 同层兄弟分支（同父、同深度、不同 id），供列头「⇄ 切换」轮换。 */
+export function siblingsOf(scenario: DemoScenario, columnId: string) {
+  const col = scenario.columns.find((c) => c.id === columnId)
+  if (!col) return []
+  return scenario.columns.filter(
+    (c) =>
+      c.id !== columnId &&
+      c.crumb.length === col.crumb.length &&
+      c.crumb.slice(0, -1).every((seg, i) => seg === col.crumb[i]),
+  )
 }
