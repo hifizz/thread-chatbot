@@ -9,7 +9,7 @@ import type { MarkdownGenerationProgress } from "../../core/types"
 import type { MarkdownArtifactProgressEvent } from "@/lib/chat/markdown-artifact"
 import { AnchoredMarkdown } from "./anchored-markdown"
 import { assistantPartRenderPlan } from "./assistant-part-render-plan"
-import { ReasoningTrace, SearchTrace, ToolTrace } from "./thinking-trace"
+import { ReasoningTrace, SearchTrace, ToolTrace, DocumentTrace } from "./thinking-trace"
 import { MarkdownArtifactToolPart } from "../../orchestration/artifacts/markdown-artifact-card"
 import { DocumentUpdateTool } from "../../chat/message/document-update-tool"
 
@@ -53,7 +53,7 @@ export function AnchoredAssistantBody({
 
   return (
     <>
-      {renderPlan.map(({ kind, part, index, activities }) => {
+      {renderPlan.map(({ kind, part, index, activities, documents }) => {
         if (kind === "text" && part.type === "text") {
           return (
             <AnchoredMarkdown
@@ -134,14 +134,24 @@ export function AnchoredAssistantBody({
           )
         }
 
-        if (
-          kind === "document" &&
-          (part.type === "tool-findProjectDocuments" ||
-            part.type === "tool-readProjectDocument" ||
-            part.type === "tool-updateProjectDocument")
-        ) {
+        if (kind === "document") {
+          const documentParts = documents ?? []
+          const settled =
+            message.status !== "pending" && message.status !== "streaming"
           return (
-            <DocumentUpdateTool key={part.toolCallId} part={part} />
+            <div key={`document-${index}`}>
+              <DocumentTrace parts={documentParts} settled={settled} />
+              {documentParts.map((documentPart) =>
+                documentPart.type === "tool-updateProjectDocument" &&
+                (documentPart.state === "output-available" ||
+                  documentPart.state === "output-error") ? (
+                  <DocumentUpdateTool
+                    key={documentPart.toolCallId}
+                    part={documentPart}
+                  />
+                ) : null
+              )}
+            </div>
           )
         }
 

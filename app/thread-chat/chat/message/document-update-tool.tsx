@@ -1,12 +1,8 @@
 "use client"
 
 import { DOCUMENT_RESULT_COPY } from "@/constants/project-documents"
-import type { ThreadChatUIMessage } from "@/lib/thread-chat/contracts/ui-message"
+import type { DocumentToolPart } from "../../branching/assistant/assistant-part-render-plan"
 import { useArtifactNavigation } from "../composer/artifact-resources"
-
-type DocumentToolPart = Extract<ThreadChatUIMessage["parts"][number], {
-  type: "tool-findProjectDocuments" | "tool-readProjectDocument" | "tool-updateProjectDocument"
-}>
 export function DocumentUpdateTool({ part }: { part: DocumentToolPart }) {
   const open = useArtifactNavigation()
   if (part.state === "output-error") return <p role="status">文档操作失败：{part.errorText}</p>
