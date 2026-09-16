@@ -266,3 +266,75 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+
+/* ---------------- 仓库上下文 chip ---------------- */
+.tc .repo-context-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--muted-foreground);
+  background: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 3px 8px;
+  margin: 4px 0 8px;
+}
+.tc .repo-context-chip.unavailable {
+  color: var(--destructive);
+  border-color: var(--destructive);
+}
+.tc .repo-context-icon {
+  font-size: 13px;
+}
+.tc .repo-context-repo {
+  font-weight: 500;
+  color: var(--foreground);
+}
+.tc .repo-context-sep {
+  color: var(--muted-foreground);
+}
+.tc .repo-context-branch {
+  color: var(--foreground);
+}
+.tc .repo-context-sha {
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+.tc .repo-context-hint {
+  font-size: 10px;
+  color: var(--tc-accent);
+  background: var(--tc-accent-wash, var(--muted));
+  border-radius: 4px;
+  padding: 1px 4px;
+  margin-left: 2px;
+}
+
+/* ---------------- 仓库工具过程卡 ---------------- */
+.tc .repo-tool-card {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--muted-foreground);
+  background: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 3px 8px;
+  margin: 2px 0;
+}
+.tc .repo-tool-card.done {
+  color: var(--foreground);
+  border-color: var(--tc-accent-edge);
+}
+.tc .repo-tool-icon {
+  font-size: 11px;
+}
+.tc .repo-tool-label {
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 280px;
+}

@@ -5,7 +5,7 @@ import { contextLimitFailure } from "../application/context-budget"
 import type { LanguageModelUsage, TextStreamPart, ToolSet } from "ai"
 import type { GenerationSettings } from "@/constants/generation-settings"
 import { db } from "@/lib/db"
-import type { ThreadChatUIMessageChunk } from "@/lib/thread-chat/contracts/ui-message"
+import type { ThreadChatUIMessageChunk, RepoContextData } from "@/lib/thread-chat/contracts/ui-message"
 import { compileModelContextWithProject } from "@/lib/thread-chat/application/compile-model-context"
 import {
   findOwnedMessage,
@@ -85,6 +85,28 @@ function rawUsage(
 ): Record<string, unknown> | undefined {
   if (!usage) return undefined
   return JSON.parse(JSON.stringify(usage)) as Record<string, unknown>
+}
+
+/** 从历史 assistant 消息中找到最近一次的 repo-context data part。 */
+function findPreviousRepoContext(
+  rows: Array<{ role: string; parts: unknown }>
+): RepoContextData | null {
+  for (const row of [...rows].reverse()) {
+    if (row.role !== "assistant") continue
+    const parts = row.parts
+    if (!Array.isArray(parts)) continue
+    for (const part of parts) {
+      if (
+        typeof part === "object" &&
+        part !== null &&
+        (part as Record<string, unknown>).type === "data-repo-context"
+      ) {
+        const data = (part as Record<string, unknown>).data as RepoContextData
+        if (data && data.status === "ready") return data
+      }
+    }
+  }
+  return null
 }
 
 async function loadGenerationIdentity({
@@ -184,6 +206,12 @@ async function runGenerationCore({
       modelMessages: compiledContext.messages,
       promptCacheBoundaries: compiledContext.boundaries,
       abortSignal: session.signal,
+      ...(thread.repoBinding
+        ? { repoBinding: thread.repoBinding }
+        : {}),
+      ...(thread.repoBinding
+        ? { previousRepoContext: findPreviousRepoContext(currentRows) }
+        : {}),
     })
     pipelineEnd = await consumeUIMessagePipeline({
       textStream: prepared.textStream,

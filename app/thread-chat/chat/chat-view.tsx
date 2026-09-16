@@ -1,6 +1,7 @@
 "use client"
 
 import type { MessageContentInput } from "@/lib/thread-chat/contracts/message-content"
+import type { ThreadRepositoryBinding } from "@/lib/thread-chat/contracts/dto"
 /**
  * chat/chat-view —— 单会话视图：消息列表 + composer + who 标签。
  *
@@ -58,6 +59,8 @@ export interface ChatViewProps {
   onSend: (content: MessageContentInput) => unknown | Promise<unknown>
   /** 只读快照：composer 位渲染静态条而非输入框；消息动作命令不传入时按钮自然缺席 */
   readOnly?: boolean
+  repoBinding?: ThreadRepositoryBinding | null
+  onRepoBindingChange?: (binding: ThreadRepositoryBinding | null) => void | Promise<unknown>
   messageActionState?: MessageActionViewState
   messageCommands?: ThreadMessageActionCommands
   editableUserMessageId?: string
@@ -84,6 +87,8 @@ export function ChatView({
   onModelChange,
   onSend,
   readOnly = false,
+  repoBinding,
+  onRepoBindingChange,
   messageActionState,
   messageCommands,
   editableUserMessageId,
@@ -147,6 +152,8 @@ export function ChatView({
                 onModelChange={onModelChange}
                 onSend={onSend}
                 onStop={onStop}
+                repoBinding={repoBinding}
+                onRepoBindingChange={onRepoBindingChange}
               />
             )}
           </div>

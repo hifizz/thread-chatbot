@@ -301,6 +301,9 @@ export function updateThread(
           ...(command.customTitle !== undefined
             ? { customTitle: command.customTitle }
             : {}),
+          ...(command.repoBinding !== undefined
+            ? { repoBinding: command.repoBinding }
+            : {}),
           updatedAt: now,
         }
         const [updated] = await tx

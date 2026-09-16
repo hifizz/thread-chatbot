@@ -16,6 +16,7 @@ export type AssistantPartRenderKind =
   | "artifact"
   | "document"
   | "tool"
+  | "repo-context"
 
 const DOCUMENT_TOOL_PART_TYPES: ReadonlySet<string> = new Set(
   DOCUMENT_TOOL_NAMES.map((name) => `tool-${name}`)
@@ -57,6 +58,10 @@ export function assistantPartRenderPlan(
         return
       }
       plan.push({ kind: "research", part, index, activities: [part.data] })
+      return
+    }
+    if (part.type === "data-repo-context") {
+      plan.push({ kind: "repo-context", part, index })
       return
     }
     if (part.type === "file" || part.type === "reasoning-file") {

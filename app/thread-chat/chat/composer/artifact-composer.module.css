@@ -137,3 +137,170 @@
     line-height: 24px;
   }
 }
+
+/* 仓库绑定选择器 */
+:global(.tc) .repo-binding-picker {
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding: 0 4px 6px;
+}
+
+:global(.tc) .repo-binding-add {
+  font-size: 12px;
+  color: var(--muted-foreground);
+  background: transparent;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+:global(.tc) .repo-binding-add:hover:not(:disabled) {
+  color: var(--foreground);
+  border-color: var(--tc-accent-edge);
+}
+
+:global(.tc) .repo-binding-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--foreground);
+  background: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px 8px;
+}
+
+:global(.tc) .repo-binding-icon {
+  font-size: 13px;
+}
+
+:global(.tc) .repo-binding-label {
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 240px;
+}
+
+:global(.tc) .repo-binding-action {
+  font-size: 11px;
+  color: var(--muted-foreground);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0 2px;
+}
+
+:global(.tc) .repo-binding-action:hover:not(:disabled) {
+  color: var(--tc-accent);
+}
+
+:global(.tc) .repo-binding-popover {
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 4px;
+  z-index: 50;
+  min-width: 280px;
+  max-width: 360px;
+  max-height: 320px;
+  overflow-y: auto;
+  background: var(--popover);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px -4px var(--tc-shadow-composer);
+  padding: 6px;
+}
+
+:global(.tc) .repo-binding-search {
+  width: 100%;
+  font-size: 13px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--background);
+  color: var(--foreground);
+  margin-bottom: 4px;
+}
+
+:global(.tc) .repo-binding-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+:global(.tc) .repo-binding-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  text-align: left;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--foreground);
+  cursor: pointer;
+}
+
+:global(.tc) .repo-binding-item:hover {
+  background: var(--muted);
+}
+
+:global(.tc) .repo-binding-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+:global(.tc) .repo-binding-private {
+  font-size: 10px;
+  color: var(--muted-foreground);
+  background: var(--muted);
+  border-radius: 4px;
+  padding: 1px 4px;
+}
+
+:global(.tc) .repo-binding-default {
+  font-size: 11px;
+  color: var(--muted-foreground);
+  flex-shrink: 0;
+}
+
+:global(.tc) .repo-binding-back {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--muted-foreground);
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
+}
+
+:global(.tc) .repo-binding-back button {
+  font-size: 12px;
+  background: transparent;
+  border: none;
+  color: var(--tc-accent);
+  cursor: pointer;
+}
+
+:global(.tc) .repo-binding-loading,
+:global(.tc) .repo-binding-error,
+:global(.tc) .repo-binding-empty {
+  font-size: 12px;
+  color: var(--muted-foreground);
+  padding: 12px;
+  text-align: center;
+}
+
+:global(.tc) .repo-binding-error {
+  color: var(--destructive);
+}

@@ -18,6 +18,7 @@ import React from "react"
 import { FileText, ListTree } from "lucide-react"
 import type { TextAnchor } from "@/lib/thread-chat/domain/text-anchor"
 import type { Message, ThreadTreeState } from "../core/types"
+import type { ThreadRepositoryBinding } from "@/lib/thread-chat/contracts/dto"
 import {
   activeMessagePath,
   collectInherited,
@@ -65,6 +66,8 @@ export interface BranchableChatProps {
   onSend: (content: MessageContentInput) => unknown | Promise<unknown>
   /** 只读快照：composer 位渲染静态条，透传给 ChatView */
   readOnly?: boolean
+  repoBinding?: ThreadRepositoryBinding | null
+  onRepoBindingChange?: (binding: ThreadRepositoryBinding | null) => void | Promise<unknown>
   messageActionState?: MessageActionViewState
   messageCommands?: ThreadMessageActionCommands
 }
@@ -89,6 +92,8 @@ export function BranchableChat({
   onModelChange,
   onSend,
   readOnly = false,
+  repoBinding,
+  onRepoBindingChange,
   messageActionState,
   messageCommands,
 }: BranchableChatProps) {
@@ -298,6 +303,8 @@ export function BranchableChat({
       onModelChange={onModelChange}
       onSend={onSend}
       readOnly={readOnly}
+      repoBinding={repoBinding}
+      onRepoBindingChange={onRepoBindingChange}
       messageActionState={messageActionState}
       messageCommands={messageCommands}
       editableUserMessageId={presentation?.latestUserMessageId}

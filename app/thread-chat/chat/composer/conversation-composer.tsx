@@ -11,6 +11,7 @@ import { ComposerAttachmentTray } from "./composer-attachment-tray"
 import { THREAD_COMPOSER_ACCEPT } from "./thread-attachment-model"
 import { ComposerModelSelector } from "./composer-model-selector"
 import { GenerationSettingsControls } from "./generation-settings-controls"
+import { RepoBindingPicker } from "./repo-binding-picker"
 import { useComposerAttachmentInput } from "./use-composer-attachment-input"
 import { useConversationComposer } from "./use-conversation-composer"
 import type { ConversationComposerProps } from "./conversation-composer-types"
@@ -23,10 +24,13 @@ export function ConversationComposer(props: ConversationComposerProps) {
 }
 
 function ComposerContent(props: ConversationComposerProps) {
-  const { isMain, busy, modelId, modelSelectorDisabled, modelSelectorDisabledReason, onModelChange, onSend, onStop } = props
+  const { isMain, busy, modelId, modelSelectorDisabled, modelSelectorDisabledReason, onModelChange, onSend, onStop, repoBinding, onRepoBindingChange } = props
   const { artifacts, editorRef, attachments, submitting, changingModel, changeModel, entry, update, hasQuestion, attachmentsReady, submit } = useConversationComposer(props)
   const { fileInputRef, inputProps, surfaceProps, openFilePicker } = useComposerAttachmentInput(attachments.add, submitting)
   return <Composer className="max-w-(--lane-max)">
+    {isMain && onRepoBindingChange && (
+      <RepoBindingPicker binding={repoBinding ?? null} onChange={onRepoBindingChange} disabled={submitting || busy} />
+    )}
     <ComposerBar className={styles.bar} {...surfaceProps} onClick={(event) => {
       const target = event.target
       // 空白处沿用编辑器光标；按钮、原生输入和弹层保留自己的交互。

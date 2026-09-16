@@ -15,6 +15,17 @@ export interface ThreadChatMessageMetadata {
   modelId?: string
 }
 
+/** 仓库上下文：本轮生成固定使用的仓库与 commit。 */
+export interface RepoContextData {
+  repositoryFullName: string
+  branch: string
+  commitSha: string | null
+  previousCommitSha: string | null
+  bindingChanged: boolean
+  status: "ready" | "unavailable"
+  error?: string
+}
+
 export type ThreadChatDataParts = {
   "artifact-reference": ArtifactReferenceData
   "project-document-updates": ProjectDocumentUpdates
@@ -24,6 +35,7 @@ export type ThreadChatDataParts = {
   "research-route": ResearchRoute
   "research-plan": ResearchPlan
   "artifact-progress": MarkdownArtifactProgressEvent
+  "repo-context": RepoContextData
 }
 
 export interface MarkdownArtifactOutput {
@@ -51,6 +63,18 @@ export type ThreadChatTools = {
   readUrl: {
     input: { url: string }
     output: { url: string; content: string }
+  }
+  listRepositoryFiles: {
+    input: { path: string }
+    output: unknown
+  }
+  readRepositoryFile: {
+    input: { path: string; startLine?: number; endLine?: number }
+    output: unknown
+  }
+  findRepositoryPaths: {
+    input: { query: string }
+    output: unknown
   }
 }
 
