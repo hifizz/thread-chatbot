@@ -132,7 +132,7 @@
 
 /* ---------------- Project workspace ---------------- */
 .tc .project-panel { width: min(max(46vw, 520px), 94vw); }
-.tc .project-panel-head svg { color: var(--tc-content-project-accent); }
+.tc .project-panel-head > svg { color: var(--tc-content-project-accent); }
 .tc .project-version,
 .tc .project-readonly,
 .tc .project-sections button span {
@@ -187,9 +187,8 @@
   gap: 18px;
   margin-bottom: 18px;
 }
-.tc .project-section-heading h4 { margin: 3px 0 5px; font: 600 18px/1.25 var(--tc-typography-family-read); color: var(--tc-content-primary); }
+.tc .project-section-heading h4 { margin: 0 0 6px; font: 600 18px/1.25 var(--tc-typography-family-read); color: var(--tc-content-primary); }
 .tc .project-section-heading p { margin: 0; max-width: 620px; color: var(--tc-content-secondary); font: 12px/1.65 var(--tc-typography-family-ui); }
-.tc .project-eyebrow { color: var(--tc-content-project-accent); font: 700 10px/1.3 var(--tc-typography-family-ui); letter-spacing: .08em; }
 .tc .project-field { display: block; margin: 0 0 18px; }
 .tc .project-field > span { display: block; margin-bottom: 7px; color: var(--tc-content-primary); font: 600 12px var(--tc-typography-family-ui); }
 .tc .project-field textarea {
@@ -219,7 +218,6 @@
 .tc .project-actions { display: flex; justify-content: flex-end; gap: 8px; }
 .tc .project-primary,
 .tc .project-secondary,
-.tc .project-back,
 .tc .project-icon-button {
   border: 1px solid var(--tc-border-strong);
   border-radius: 8px;
@@ -301,8 +299,7 @@
 }
 .tc .project-icon-button:hover { color: var(--tc-content-primary); border-color: var(--tc-content-muted); }
 .tc .project-icon-button.danger:hover { color: var(--tc-content-project-danger); border-color: var(--tc-border-project-danger); }
-.tc .project-status,
-.tc .project-kind {
+.tc .project-status {
   flex: none;
   border-radius: 999px;
   padding: 2px 6px;
@@ -312,8 +309,6 @@
 }
 .tc .project-status.ready { background: var(--tc-surface-project-ready); color: var(--tc-content-project-ready); }
 .tc .project-status.failed { background: var(--tc-surface-project-failed); color: var(--tc-content-project-failed); }
-.tc .project-artifact-row { cursor: pointer; }
-.tc .project-artifact-row:hover { border-color: var(--tc-border-project-hover); background: var(--tc-surface-plain); }
 .tc .project-search {
   display: flex;
   align-items: center;
@@ -326,10 +321,40 @@
   color: var(--tc-content-muted);
 }
 .tc .project-search input { flex: 1; border: 0; outline: 0; background: transparent; padding: 8px 0; color: var(--tc-content-primary); font: 12px var(--tc-typography-family-ui); }
-.tc .project-back { margin-bottom: 12px; padding: 5px 8px; background: transparent; color: var(--tc-content-secondary); }
-.tc .project-back:hover { background: var(--tc-surface-plain); color: var(--tc-content-primary); }
-.tc .artifact-detail-heading { border-bottom: 1px solid var(--tc-border-subtle); padding-bottom: 14px; }
 .tc .project-artifact-content { padding: 2px 2px 20px; }
+
+/* 骨架屏：延迟 320ms 淡入（reduced-motion 下动画被禁用、直接显示），
+ * 快加载时骨架对用户不可见；bar 上叠扫光。 */
+.tc .skel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  animation: tc-fade-in 160ms ease-out 320ms backwards;
+}
+.tc .skel-bar {
+  display: block;
+  height: 12px;
+  border-radius: 6px;
+  background: linear-gradient(
+    90deg,
+    var(--tc-surface-project-status) 30%,
+    var(--tc-surface-plain) 50%,
+    var(--tc-surface-project-status) 70%
+  );
+  background-size: 230% 100%;
+  animation: tc-skel-sheen 1.4s linear infinite;
+}
+.tc .skel-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--tc-border-subtle);
+  border-radius: 12px;
+}
+.tc .skel-thumb { width: 34px; height: 40px; flex: none; }
+.tc .skel-card-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.tc .skel-card-main .skel-bar { height: 10px; }
 
 @media (max-width: 720px) {
   .tc .project-panel { width: 94vw; min-width: 0; }

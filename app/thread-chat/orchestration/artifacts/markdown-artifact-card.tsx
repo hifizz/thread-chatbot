@@ -10,6 +10,10 @@ export interface MarkdownArtifactCardProps {
   sourceDepth: number | null
   onOpen?: (artifactId: string) => void
   compact?: boolean
+  /** 覆盖副标题行（项目目录里用来放来源/状态/时间等元信息）。 */
+  caption?: string
+  /** 撑满容器宽度（目录列表用），默认卡片限宽 460px。 */
+  fill?: boolean
 }
 
 /** Markdown 标记：M + 下箭头，对应 markdown logo 的极简线稿。 */
@@ -250,15 +254,19 @@ export function MarkdownArtifactCard({
   sourceDepth,
   onOpen,
   compact = false,
+  caption: captionOverride,
+  fill = false,
 }: MarkdownArtifactCardProps) {
   const depthClass =
     sourceDepth !== null && sourceDepth > 0 ? `fc-${dc(sourceDepth)}` : ""
   const isMarkdown = artifact.kind === "markdown"
-  const caption = isMarkdown
-    ? "Markdown"
-    : artifact.kind === "code"
-      ? (artifact.lang ?? "Code")
-      : "Note"
+  const caption =
+    captionOverride ??
+    (isMarkdown
+      ? "Markdown"
+      : artifact.kind === "code"
+        ? (artifact.lang ?? "Code")
+        : "Note")
 
   const inner = (
     <>
@@ -286,7 +294,7 @@ export function MarkdownArtifactCard({
   if (!onOpen) {
     return (
       <div
-        className={`acard acard-static tc-fork-context ${depthClass} ${compact ? "compact" : ""}`}
+        className={`acard acard-static tc-fork-context ${depthClass} ${compact ? "compact" : ""} ${fill ? "fill" : ""}`}
       >
         {inner}
       </div>
@@ -295,7 +303,7 @@ export function MarkdownArtifactCard({
   // 内部有下载按钮，外层不能再用 <button>（嵌套按钮是非法 HTML）。
   return (
     <div
-      className={`acard tc-fork-context ${depthClass} ${compact ? "compact" : ""}`}
+      className={`acard tc-fork-context ${depthClass} ${compact ? "compact" : ""} ${fill ? "fill" : ""}`}
       role="button"
       tabIndex={0}
       onClick={() => onOpen(artifact.id)}

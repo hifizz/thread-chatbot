@@ -102,3 +102,12 @@
     opacity: 0;
   }
 }
+
+@keyframes tc-skel-sheen {
+  from {
+    background-position: 130% 0;
+  }
+  to {
+    background-position: -130% 0;
+  }
+}

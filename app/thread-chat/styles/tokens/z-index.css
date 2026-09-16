@@ -21,4 +21,7 @@
   /* ── 组件内部分层（划选气泡 shape/content 夹层） ── */
   --tc-z-sel-shape: 0; /* 气泡轮廓背景层 */
   --tc-z-sel-content: 1; /* 气泡内容层 */
+
+  /* ── 抽屉内局部层（.art-drawer 层叠上下文内） ── */
+  --tc-z-drawer-overlay: 1; /* 版本差异浮层（压 drawer 正文、让位划选浮层） */
 }

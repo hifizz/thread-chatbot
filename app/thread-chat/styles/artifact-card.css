@@ -104,6 +104,11 @@
 .tc .acard .dl:hover {
   background: var(--tc-surface-sunken);
 }
+/* 目录列表形态：撑满面板宽度，去掉消息流里的外边距（列表容器自带 gap）。 */
+.tc .acard.fill {
+  max-width: none;
+  margin: 0;
+}
 /* 不可点击的占位 / 静态形态（等待落库、无打开回调） */
 .tc .acard-static {
   cursor: default;
