@@ -2,6 +2,7 @@ import Image from "next/image"
 import Link from "next/link"
 import type { ReactElement } from "react"
 
+import { LANDING_COPY } from "@/constants/landing"
 import { PROJECT } from "@/constants/project"
 import { ROUTES } from "@/constants/routes"
 
@@ -25,9 +26,14 @@ export function LandingHeader(): ReactElement {
             className={styles.brandLogo}
             preload
           />
+          <span className={styles.brandName}>{PROJECT.name}</span>
         </Link>
+        <nav className={styles.headerNav} aria-label="页内导航">
+          <a href="#scenarios">{LANDING_COPY.nav.scenarios}</a>
+          <a href="#faq">{LANDING_COPY.nav.faq}</a>
+        </nav>
         <LandingCtaLink
-          cta={{ label: "立刻开始", href: ROUTES.startChat }}
+          cta={{ label: LANDING_COPY.nav.cta, href: ROUTES.startChat }}
           className={styles.headerCta}
         />
       </div>

@@ -15,11 +15,6 @@ export function LandingFooter(): ReactElement {
         <nav aria-label="页脚导航">
           <ul className={styles.footerLinks}>
             <li>
-              <a href={PROJECT.repositoryUrl} target="_blank" rel="noreferrer">
-                GitHub
-              </a>
-            </li>
-            <li>
               <Link href="/privacy">隐私政策</Link>
             </li>
             <li>
