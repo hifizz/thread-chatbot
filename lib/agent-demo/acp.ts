@@ -43,6 +43,8 @@ export class AcpBridge {
   private logFile = "";
   private fileOffset = 0;
   private filePollTimer: ReturnType<typeof setInterval> | null = null;
+  private pollFailures = 0;
+  private pollIncidentId: string | null = null;
   private closed = false;
 
   /** 本轮 prompt 累积的正文（用于结果摘要）。 */
@@ -100,20 +102,52 @@ export class AcpBridge {
     return bridge;
   }
 
-  /** 每 1.2s 从 tee 落盘的 jsonl 文件增量读取，作为唯一权威事件源。 */
+  /** 每 1.2s 从 tee 落盘的 jsonl 文件增量读取，作为唯一权威事件源。
+   *  e2b API 偶发抖动会让 files.read 连续失败——失败后持续重试即可恢复
+   *  （文件在沙箱内持续累积，恢复后一次性补读）；连续失败时发伪工具事件
+   *  让页面可见"在重连"而不是无声卡死。 */
   private startFilePoller() {
     this.filePollTimer = setInterval(() => {
       if (this.closed) return;
       void this.sandbox.files
         .read(this.logFile)
         .then((text) => {
+          if (this.pollFailures > 0) this.reportPollRecovered();
           if (text.length <= this.fileOffset) return;
           const fresh = text.slice(this.fileOffset);
           this.fileOffset = text.length;
           this.feedStdout(fresh);
         })
-        .catch(() => {});
+        .catch((err) => this.reportPollFailure(err));
     }, 1200);
+  }
+
+  private reportPollFailure(err: unknown) {
+    this.pollFailures += 1;
+    if (this.pollFailures === 3) {
+      this.pollIncidentId = `env-sync-${crypto.randomUUID().slice(0, 8)}`;
+      this.emitEvent({
+        type: "tool.started",
+        toolCallId: this.pollIncidentId,
+        name: "event-stream",
+        input: { title: "事件流同步" } as never,
+      });
+      this.emitEvent({
+        type: "tool.output.updated",
+        toolCallId: this.pollIncidentId,
+        mode: "append",
+        output: `沙箱连接抖动，事件流读取失败（${err instanceof Error ? err.message : String(err)}），后台重试中…`,
+      });
+    }
+  }
+
+  private reportPollRecovered() {
+    const id = this.pollIncidentId;
+    this.pollFailures = 0;
+    this.pollIncidentId = null;
+    if (!id) return;
+    this.emitEvent({ type: "tool.output.updated", toolCallId: id, mode: "append", output: "\n连接恢复，补读中断期间的事件。" });
+    this.emitEvent({ type: "tool.finished", toolCallId: id, isError: false, output: null });
   }
 
   private feedStdout(data: string) {
@@ -227,7 +261,14 @@ export class AcpBridge {
   private request(method: string, params: unknown): Promise<unknown> {
     const id = ++this.nextId;
     const p = new Promise<unknown>((resolve, reject) => this.pending.set(id, { resolve, reject }));
-    void this.sendRaw({ jsonrpc: "2.0", id, method, params });
+    void this.sendRaw({ jsonrpc: "2.0", id, method, params }).catch((err) => {
+      // 请求本身没送达（stdin 通道故障）时必须 reject，否则 pending 永久悬挂
+      const pendingReq = this.pending.get(id);
+      if (pendingReq) {
+        this.pending.delete(id);
+        pendingReq.reject(err instanceof Error ? err : new Error(String(err)));
+      }
+    });
     return p;
   }
 
@@ -235,8 +276,21 @@ export class AcpBridge {
     return this.sendRaw({ jsonrpc: "2.0", id, result });
   }
 
-  private sendRaw(msg: JsonRpc): Promise<void> {
-    return this.handle.sendStdin(JSON.stringify(msg) + "\n");
+  /** stdin 写入带重试：e2b 通道瞬断时权限应答/控制消息不能静默丢失——
+   *  devin 会永远等待未被应答的 request_permission。 */
+  private async sendRaw(msg: JsonRpc): Promise<void> {
+    const line = JSON.stringify(msg) + "\n";
+    let lastErr: unknown;
+    for (let attempt = 0; attempt < 4; attempt++) {
+      try {
+        await this.handle.sendStdin(line);
+        return;
+      } catch (err) {
+        lastErr = err;
+        await new Promise((r) => setTimeout(r, 500 * (attempt + 1)));
+      }
+    }
+    throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
   }
 
   /** 发送 prompt，返回 stopReason；中途的 session/update 已映射为事件。 */
