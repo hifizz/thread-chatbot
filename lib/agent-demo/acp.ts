@@ -40,6 +40,10 @@ export class AcpBridge {
   private thoughtBlockId: string | null = null;
   private exited: Promise<unknown>;
   private _lastMessage = "";
+  private logFile = "";
+  private fileOffset = 0;
+  private filePollTimer: ReturnType<typeof setInterval> | null = null;
+  private closed = false;
 
   /** 本轮 prompt 累积的正文（用于结果摘要）。 */
   get lastMessage(): string {
@@ -54,30 +58,32 @@ export class AcpBridge {
     this.exited = handle.wait().catch(() => {});
   }
 
-  /** 在沙箱内启动 `devin acp` 并完成 initialize + session/new。 */
+  /** 在沙箱内启动 `devin acp` 并完成 initialize + session/new。
+   *  e2b 的 onStdout 推送曾实测中途静默断开，因此 acp 的 stdout 同时 tee 到
+   *  日志文件，并以轮询文件作为权威事件源（onStdout 仅作加速，按行内容去重）。 */
   static async start(input: {
     sandbox: Sandbox;
     cwd: string;
     devinBin: string;
     emitEvent: (payload: TaskEvent) => void;
   }): Promise<AcpBridge> {
-    // onStdout 可能早于 bridge 赋值触发，先缓冲再回放
-    let bridge: AcpBridge | null = null;
-    let preBuf = "";
-    const handle = await input.sandbox.commands.run(`${input.devinBin} acp`, {
-      background: true,
-      stdin: true,
-      cwd: input.cwd,
-      timeoutMs: 0,
-      onStdout: (data: string) => {
-        if (bridge) bridge.feedStdout(data);
-        else preBuf += data;
-      },
-      // acp 的 INFO 日志走 stderr，不进事件流（避免噪音与泄露）
-      onStderr: () => {},
-    });
-    bridge = new AcpBridge(input.sandbox, handle, input.emitEvent);
-    if (preBuf) bridge.feedStdout(preBuf);
+    const logFile = `/tmp/devin-acp-${crypto.randomUUID().slice(0, 8)}.jsonl`;
+    // e2b 的 onStdout 推送实测会中途静默断开，因此 stdout 用 tee 落盘，
+    // 事件统一从日志文件轮询读取（onStdout 只排空不用）。
+    const handle = await input.sandbox.commands.run(
+      `bash -lc ${JSON.stringify(`${input.devinBin} acp 2>/dev/null | tee -a ${logFile}`)}`,
+      {
+        background: true,
+        stdin: true,
+        cwd: input.cwd,
+        timeoutMs: 0,
+        onStdout: () => {},
+        onStderr: () => {},
+      }
+    );
+    const bridge = new AcpBridge(input.sandbox, handle, input.emitEvent);
+    bridge.logFile = logFile;
+    bridge.startFilePoller();
 
     await bridge.request("initialize", {
       protocolVersion: 1,
@@ -92,6 +98,22 @@ export class AcpBridge {
     })) as { sessionId: string };
     bridge.sessionId = sess.sessionId;
     return bridge;
+  }
+
+  /** 每 1.2s 从 tee 落盘的 jsonl 文件增量读取，作为唯一权威事件源。 */
+  private startFilePoller() {
+    this.filePollTimer = setInterval(() => {
+      if (this.closed) return;
+      void this.sandbox.files
+        .read(this.logFile)
+        .then((text) => {
+          if (text.length <= this.fileOffset) return;
+          const fresh = text.slice(this.fileOffset);
+          this.fileOffset = text.length;
+          this.feedStdout(fresh);
+        })
+        .catch(() => {});
+    }, 1200);
   }
 
   private feedStdout(data: string) {
@@ -236,6 +258,8 @@ export class AcpBridge {
   }
 
   async close(): Promise<void> {
+    this.closed = true;
+    if (this.filePollTimer) clearInterval(this.filePollTimer);
     try {
       await this.sandbox.commands.kill(this.handle.pid);
     } catch {
