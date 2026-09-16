@@ -143,6 +143,32 @@ assert.deepEqual(
   "createMarkdownArtifact 工具 part 必须在正文流中原位渲染为 artifact"
 )
 
+const documentPlan = assistantPartRenderPlan({
+  ...message,
+  uiParts: [
+    { type: "text", text: "先查文档", state: "done" },
+    {
+      type: "tool-readProjectDocument",
+      toolCallId: "read-1",
+      state: "output-available",
+      input: { documentId: "doc-1" },
+      output: {},
+    },
+    {
+      type: "tool-updateProjectDocument",
+      toolCallId: "update-1",
+      state: "output-error",
+      input: { documentId: "doc-1" },
+      errorText: "资源不存在",
+    },
+  ],
+})
+assert.deepEqual(
+  documentPlan.map((item) => item.kind),
+  ["text", "document", "document"],
+  "文档工具 part 必须走专属渲染分支，不得落入 createMarkdownArtifact 的“生成文档”轨迹"
+)
+
 const assistantBodySource = fs.readFileSync(
   "app/thread-chat/branching/assistant/anchored-assistant-body.tsx",
   "utf8"
@@ -161,6 +187,11 @@ assert.match(
   assistantBodySource,
   /artifact=\{\s*artifactId \? state\.artifacts\[artifactId\] : undefined\s*\}/,
   "artifact 卡片必须从 store 按 output.artifactId 取实体"
+)
+assert.match(
+  assistantBodySource,
+  /<DocumentUpdateTool key=\{part\.toolCallId\} part=\{part\} \/>/,
+  "文档工具 part 必须分发到 DocumentUpdateTool，不得套用“生成文档/生成失败”文案"
 )
 
 const css = fs.readFileSync("app/thread-chat/styles/columns.css", "utf8")
