@@ -4,12 +4,14 @@ import { DOCUMENT_LIMITS } from "@/constants/project-documents"
 import { registerDocumentArtifact } from "./writes"
 import type { ConversationExecutor, ConversationTransaction } from "../transaction"
 
+export type DocumentRegistrationScope = { userId: string; projectId: string; artifactId?: string }
+
 /** 一个旧产物一个事务；与生成提交相同的 Project → Message 锁顺序。 */
-export async function registerExistingDocumentInTransaction(tx: ConversationTransaction, artifactId: string): Promise<boolean> {
+export async function registerExistingDocumentInTransaction(tx: ConversationTransaction, artifactId: string, scope?: DocumentRegistrationScope): Promise<boolean> {
     const [source] = await tx.select().from(artifacts).where(eq(artifacts.id, artifactId))
-    if (!source || source.kind !== "markdown") return false
+    if (!source || source.kind !== "markdown" || (scope && source.projectId !== scope.projectId)) return false
     const [project] = await tx.select().from(projects).where(eq(projects.id, source.projectId)).for("share")
-    if (!project) return false
+    if (!project || (scope && project.userId !== scope.userId)) return false
     const [message] = await tx.select().from(messages).where(and(
       eq(messages.id, source.sourceMessageId), eq(messages.projectId, source.projectId),
       eq(messages.threadId, source.threadId),
@@ -21,13 +23,16 @@ export async function registerExistingDocumentInTransaction(tx: ConversationTran
     return Boolean(await registerDocumentArtifact(tx, source, project.userId))
 }
 
-export function listUnregisteredDocuments(executor: ConversationExecutor, cursor?: string) {
+export function listUnregisteredDocuments(executor: ConversationExecutor, cursor?: string, scope?: DocumentRegistrationScope) {
   return executor.select({ id: artifacts.id }).from(artifacts)
+      .innerJoin(projects, eq(projects.id, artifacts.projectId))
       .innerJoin(messages, and(eq(messages.id, artifacts.sourceMessageId),
         eq(messages.projectId, artifacts.projectId), eq(messages.threadId, artifacts.threadId)))
       .leftJoin(documentRevisions, eq(documentRevisions.artifactId, artifacts.id))
       .where(and(eq(artifacts.kind, "markdown"), eq(messages.role, "assistant"),
         eq(messages.status, "completed"), isNull(documentRevisions.id),
-        cursor ? gt(artifacts.id, cursor) : undefined))
+        cursor ? gt(artifacts.id, cursor) : undefined,
+        scope ? and(eq(projects.userId, scope.userId), eq(artifacts.projectId, scope.projectId),
+          scope.artifactId ? eq(artifacts.id, scope.artifactId) : undefined) : undefined))
       .orderBy(asc(artifacts.id)).limit(DOCUMENT_LIMITS.backfillBatch)
 }

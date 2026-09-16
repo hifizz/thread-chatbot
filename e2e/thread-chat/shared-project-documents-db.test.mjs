@@ -13,7 +13,7 @@ if (process.env.THREADCHAT_TEST_DB_MODULE) {
   } })
   if (process.env.THREADCHAT_TEST_DB_SETUP) await import(pathToFileURL(process.env.THREADCHAT_TEST_DB_SETUP).href)
 }
-const [{ db }, schema, service, repository, { and, eq, sql }, contextService, { requestMessageStop }, { toMessageDTO }, { finalizeGeneration }] = await Promise.all([
+const [{ db }, schema, service, repository, { eq, sql }, contextService, { requestMessageStop }, { toMessageDTO }, { finalizeGeneration }] = await Promise.all([
   import('../../lib/db/index.ts'), import('../../lib/db/schema.ts'),
   import('../../lib/thread-chat/application/documents/service.ts'),
   import('../../lib/thread-chat/persistence/documents/writes.ts'), import('drizzle-orm'),
@@ -221,6 +221,55 @@ try {
   await testDb.insert(artifacts).values({ id: unavailableId, projectId, threadId: threadB,
     sourceMessageId: messageB, kind: 'markdown', title: '未完成', content: '不能登记' })
   assert.equal(await registerExistingDocument(unavailableId), false); checks++
+  // 在线惰性登记：用户/项目隔离、精确查询、并发幂等、自然语言工具链及面板目录。
+  const { DOCUMENT_LIMITS } = await import('../../constants/project-documents.ts')
+  const lazyIds = Array.from({ length: DOCUMENT_LIMITS.backfillBatch + 2 }, id)
+  await testDb.insert(artifacts).values(lazyIds.map(artifactId => ({ id: artifactId, projectId,
+    threadId: rootId, sourceMessageId: sourceMessage, kind: 'markdown', title: '历史惰性文档', content: '旧文档原文' })))
+  assert.deepEqual(await service.findProjectDocuments({ ...identities[0], userId: 'other-user' }, {}), [])
+  assert.deepEqual(await service.findProjectDocuments({ ...identities[0], projectId: id() }, { artifactId: lazyIds[0] }), [])
+  assert.equal(await documentQueries.documentForArtifact(testDb, userId, projectId, lazyIds[0]), null,
+    '越权查询不能触发旧产物登记')
+  const concurrentFinds = await Promise.all([0, 1].map(() =>
+    service.findProjectDocuments(identities[0], { artifactId: lazyIds[0] })))
+  assert.equal(concurrentFinds[0].length, 1)
+  assert.deepEqual(concurrentFinds[0], concurrentFinds[1])
+  assert.equal((await testDb.select().from(documentRevisions).where(eq(documentRevisions.artifactId, lazyIds[0]))).length, 1)
+  assert.equal(await documentQueries.documentForArtifact(testDb, userId, projectId, lazyIds[1]), null,
+    '按产物查询不补登其他产物')
+  const lazyMessageId = id()
+  await testDb.insert(messages).values({ id: lazyMessageId, projectId, threadId: rootId,
+    sequence: 60, role: 'assistant', parts: [], status: 'generating', modelId: 'test-model' })
+  const lazyIdentity = { userId, projectId, threadId: rootId, messageId: lazyMessageId }
+  const lazyDocumentId = concurrentFinds[0][0].id
+  const lazyRead = await service.readProjectDocument(lazyIdentity, { documentId: lazyDocumentId }, 'lazy-read')
+  const lazyUpdate = await service.updateProjectDocument(lazyIdentity, { documentId: lazyDocumentId,
+    expectedRevisionId: lazyRead.revision.id, readId: lazyRead.readId,
+    edits: [{ oldText: '旧文档原文', newText: '更新后的文档' }], changeSummary: '更新历史文档' }, 'lazy-update')
+  assert.equal(lazyUpdate.status, 'committed')
+  assert.deepEqual((await service.getDocumentHistory(userId, lazyDocumentId)).map(r => r.revisionNumber), [2, 1])
+  assert.equal((await service.getProjectDocument(userId, lazyDocumentId)).revision.content, '更新后的文档')
+  assert.equal((await testDb.select().from(artifacts).where(eq(artifacts.id, lazyIds[0])))[0].content, '旧文档原文')
+  const titleMatches = await service.findProjectDocuments(identities[0], { query: '历史惰性' })
+  assert.equal(titleMatches.length, lazyIds.length, '标题查询必须跨分页补登项目内其余旧文档，即使已有其他已登记文档')
+  assert.equal(await documentQueries.documentForArtifact(testDb, userId, projectId, unavailableId), null,
+    '未完成产物仍不可登记')
+  const panelArtifactId = id()
+  await testDb.insert(artifacts).values({ id: panelArtifactId, projectId, threadId: rootId,
+    sourceMessageId: sourceMessage, kind: 'markdown', title: '面板旧文档', content: '原文' })
+  const panel = await service.getProjectDocuments(userId, projectId)
+  assert.equal(panel.artifacts.find(item => item.id === panelArtifactId).document.revisionNumber, 1)
+  const bootstrapArtifactId = id()
+  await testDb.insert(artifacts).values({ id: bootstrapArtifactId, projectId, threadId: rootId,
+    sourceMessageId: sourceMessage, kind: 'markdown', title: '打开项目旧文档', content: '原文' })
+  const bootstrapService = await import('../../lib/thread-chat/application/queries.ts')
+  const lazyBootstrap = await bootstrapService.getProjectBootstrap(userId, projectId)
+  assert.equal(lazyBootstrap.artifacts.find(item => item.id === bootstrapArtifactId).document.revisionNumber, 1)
+  assert.deepEqual(await service.findProjectDocuments(identities[0], { artifactId: lazyIds[0] }),
+    titleMatches.filter(doc => doc.id === lazyDocumentId), '旧产物查找应返回更新后的同一文档')
+  await finalizeGeneration({ messageId: lazyMessageId, status: 'completed',
+    snapshot: { id: lazyMessageId, role: 'assistant', parts: [] } })
+  checks += 10
   // 所有 Thread 接收固定摘要；回执各自独立，重试不追随 head。
   const { sendMessage } = await import('../../lib/thread-chat/application/send-message.ts')
   const { retryMessage } = await import('../../lib/thread-chat/application/retry-message.ts')
