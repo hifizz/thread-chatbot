@@ -3,10 +3,9 @@
 /**
  * demo/demo-message —— 演示里的单条消息。
  * 复刻 .tc 的 .message/.who/.bubble/.anchored/.fnote/.acard 结构；
- * 锚点是 span[role=button]，划选气泡作为同层 span 绝对定位挂出。
+ * 锚点是 span[role=button]；划选气泡在 demo-frame 的 .ld 根级渲染。
  */
 
-import { GitMerge } from "lucide-react"
 import type { ReactElement } from "react"
 
 import {
@@ -82,59 +81,38 @@ function Inline({
             selecting && view.selectRevealing
               ? Math.min(progressChars, node.text.length)
               : node.text.length
-          const bubble = view.bubble?.anchorId === node.anchorId ? view.bubble : undefined
-          const bubbleText = bubble
-            ? bubble.typing
-              ? bubble.text.slice(0, progressChars)
-              : bubble.text
-            : ""
           return (
-            <span key={i} className="anchor-wrap">
-              <span
-                role="button"
-                tabIndex={0}
-                className={`anchored fc-${fc}${selected ? " selected" : ""}${selecting && !selected ? " selecting" : ""}`}
-                data-cursor-target={`anchor-${node.anchorId}`}
-                onClick={() => onAnchor(node.anchorId)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault()
-                    onAnchor(node.anchorId)
-                  }
-                }}
-                aria-label={`就「${node.text}」展开分支`}
-              >
-                {selecting && !selected ? (
-                  <>
-                    <span className="sel">{node.text.slice(0, selChars)}</span>
-                    {node.text.slice(selChars)}
-                  </>
-                ) : (
-                  node.text
-                )}
-                {fnote !== undefined && <sup className="fnote">{fnote}</sup>}
-              </span>
-              {bubble && (
-                <span className="sel-bubble">
-                  <span className="lbl">在新分支中讨论这段</span>
-                  <span className="quote">{node.text}</span>
-                  <span className="ask" data-cursor-target="bubble-input">
-                    {bubbleText || (
-                      <span className="ph">就这段问点什么…（可留空）</span>
-                    )}
-                    {bubble.typing && <span className="caret" aria-hidden />}
+            <span
+              key={i}
+              role="button"
+              tabIndex={0}
+              className={`anchored fc-${fc}${selected ? " selected" : ""}${selecting && !selected ? " selecting" : ""}`}
+              data-cursor-target={`anchor-${node.anchorId}`}
+              onClick={() => onAnchor(node.anchorId)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault()
+                  onAnchor(node.anchorId)
+                }
+              }}
+              aria-label={`就「${node.text}」展开分支`}
+            >
+              {selecting && !selected ? (
+                <>
+                  <span className="sel">
+                    {node.text.slice(0, selChars)}
+                    <i
+                      className="sel-tail"
+                      data-cursor-target="selend"
+                      aria-hidden
+                    />
                   </span>
-                  <button
-                    type="button"
-                    className="go"
-                    data-cursor-target="bubble-submit"
-                    onClick={() => onAnchor(node.anchorId)}
-                  >
-                    <GitMerge size={13} aria-hidden />
-                    {bubbleText.trim() ? "带着问题开分支" : "开启分支讨论"}
-                  </button>
-                </span>
+                  {node.text.slice(selChars)}
+                </>
+              ) : (
+                node.text
               )}
+              {fnote !== undefined && <sup className="fnote">{fnote}</sup>}
             </span>
           )
         }

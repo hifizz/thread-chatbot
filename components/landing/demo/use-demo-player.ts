@@ -27,6 +27,9 @@ import {
 const DEFAULT_HOLD_MS = 900
 const CHARS_PER_TICK = 3
 const TICK_MS = 30
+/** 划选逐字推进更慢，让「拖动」过程可见 */
+const SELECT_CHARS_PER_TICK = 1
+const SELECT_TICK_MS = 40
 
 export interface DemoView {
   /** 当前可见列（按展开顺序） */
@@ -141,6 +144,14 @@ export function buildView(
 
     if (step.cursor !== undefined)
       view.cursor = step.cursor === null ? undefined : step.cursor
+    /* 纯划选章：光标跟随选区末尾（sel-tail 标记），而不是锚点中心 */
+    if (
+      isCurrent &&
+      step.selecting &&
+      !step.selectAnchor &&
+      !step.bubbleText
+    )
+      view.cursor = "selend"
 
     if (step.revealComposer) {
       view.composerText = step.revealComposer
@@ -283,10 +294,16 @@ export function useDemoPlayer(
     let cancelled = false
 
     if (!revealDone) {
-      const id = window.setInterval(() => {
-        if (cancelled) return
-        setRevealCount((n) => Math.min(n + CHARS_PER_TICK, revealLen))
-      }, TICK_MS)
+      const selStep = view.selectRevealing
+      const id = window.setInterval(
+        () => {
+          if (cancelled) return
+          setRevealCount((n) =>
+            Math.min(n + (selStep ? SELECT_CHARS_PER_TICK : CHARS_PER_TICK), revealLen),
+          )
+        },
+        selStep ? SELECT_TICK_MS : TICK_MS,
+      )
       return () => {
         cancelled = true
         window.clearInterval(id)
@@ -308,7 +325,7 @@ export function useDemoPlayer(
       cancelled = true
       window.clearTimeout(id)
     }
-  }, [playing, stepIndex, revealDone, revealLen, scenario, step.holdMs])
+  }, [playing, stepIndex, revealDone, revealLen, scenario, step.holdMs, view.selectRevealing])
 
   const play = useCallback(() => {
     setUserPaused(false)

@@ -435,30 +435,26 @@
   overflow: hidden;
 }
 
-/* 可划选片段（移植 .anchored + .fnote） */
-.ld .anchor-wrap { position: relative; }
+/* 可划选片段：未划选前是普通文字；划选中下划线随选区逐字「画」出；
+   提交后（.selected）定住下划线 + 脚注。 */
 .ld .anchored {
-  border-bottom: 2px solid var(--tc-fc-underline);
-  background: var(--tc-fc-wash);
   border-radius: 2px;
   padding: 0 1px;
   cursor: pointer;
 }
-.ld .anchored:hover { background: color-mix(in srgb, var(--fc) 16%, transparent); }
+.ld .anchored:hover { background: var(--tc-fc-wash); }
 .ld .anchored:focus-visible {
   outline: 2px solid var(--fc);
   outline-offset: 1px;
 }
-/* 划选中：撤掉锚点底色/下划线，只留逐字推进的「选中区」高亮 */
-.ld .anchored.selecting {
-  border-bottom-color: transparent;
-  background: transparent;
-}
-.ld .anchored.selecting:hover { background: transparent; }
-.ld .anchored .sel {
-  background: color-mix(in srgb, var(--fc) 28%, transparent);
+.ld .anchored .sel,
+.ld .anchored.selected {
+  border-bottom: 2px solid var(--tc-fc-underline);
+  background: var(--tc-fc-wash);
   border-radius: 2px;
 }
+.ld .anchored.selecting:hover { background: transparent; }
+.ld .sel-tail { display: inline-block; width: 0; height: 1em; }
 .ld sup.fnote {
   font-family: var(--tc-typography-family-code);
   font-size: 9px;
@@ -473,12 +469,11 @@
   user-select: none;
 }
 
-/* 划选气泡（移植 .sel-bubble 深底面板：引用 + 提问输入 + 提交按钮） */
+/* 划选气泡（移植 .sel-bubble 深底面板：引用 + 提问输入 + 提交按钮）。
+   渲染在 .ld 根级：高于所有分栏，不被相邻列裁剪或盖住。 */
 .ld .sel-bubble {
   position: absolute;
-  top: calc(100% + 8px);
-  left: 0;
-  z-index: 30;
+  z-index: 45;
   display: flex;
   flex-direction: column;
   width: 246px;

@@ -34,8 +34,8 @@ export function DemoCursor({ rootRef, target }: Props): ReactElement | null {
       setPos({ x: r.left - cr.left + r.width / 2, y: r.top - cr.top + r.height / 2 })
     }
     rafRef.current = requestAnimationFrame(measure)
-    /* 目标可能随流式文本移动，低频复测。 */
-    const id = window.setInterval(measure, 400)
+    /* 目标可能随流式文本/划选移动，较高频复测以跟手。 */
+    const id = window.setInterval(measure, 90)
     return () => {
       cancelAnimationFrame(rafRef.current)
       window.clearInterval(id)

@@ -17,6 +17,7 @@ import { childrenOf, type DemoScenario } from "@/constants/landing-demo"
 import { ArtifactPicker } from "./artifact-picker"
 import { DemoColumnView } from "./demo-column"
 import { DemoCursor } from "./demo-cursor"
+import { DemoSelBubble } from "./demo-sel-bubble"
 import type { DemoView } from "./use-demo-player"
 
 interface Props {
@@ -113,6 +114,15 @@ export function DemoFrame({
           )
         })}
       </div>
+      {view.bubble && (
+        <DemoSelBubble
+          scenario={scenario}
+          bubble={view.bubble}
+          chars={revealChars}
+          rootRef={rootRef}
+          onSubmit={() => onAnchor(view.bubble!.anchorId)}
+        />
+      )}
       <DemoCursor rootRef={rootRef} target={view.cursor} />
     </div>
   )
