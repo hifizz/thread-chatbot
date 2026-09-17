@@ -21,6 +21,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { THREAD_CHAT_SHORTCUTS } from "@/constants/thread-chat"
+import { ThemeMenu, ThemeMenuItems } from "@/components/theme-menu"
 import type { PlacementMode } from "../columns/placement"
 import { AccountButton, AccountMenuRow } from "./account-button"
 import { ShortcutHint } from "../overlays/shortcut-hint"
@@ -155,6 +156,8 @@ export function ThreadChatMobileMenu({
               </DropdownMenuGroup>
             </>
           )}
+          <DropdownMenuSeparator />
+          <ThemeMenuItems />
           <DropdownMenuSeparator />
           <AccountMenuRow />
       </DropdownMenuContent>
@@ -301,6 +304,7 @@ export function ThreadChatTopbar(props: ThreadChatNavigationProps) {
         Project
         <span className="cnt">{markdownCount}</span>
       </button>
+      <ThemeMenu />
       <AccountButton />
     </div>
   )
