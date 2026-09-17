@@ -114,7 +114,6 @@ export function ScenarioDemo(): ReactElement {
         steps={scenario.steps}
         stepIndex={player.stepIndex}
         playing={player.playing}
-        progress={player.progress}
         onPlay={player.play}
         onPause={player.pause}
         onReplay={player.replay}

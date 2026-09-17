@@ -12,7 +12,6 @@ interface Props {
   steps: { id: string; label: string }[]
   stepIndex: number
   playing: boolean
-  progress: number
   onPlay(): void
   onPause(): void
   onReplay(): void
@@ -23,7 +22,6 @@ export function ChapterStepper({
   steps,
   stepIndex,
   playing,
-  progress,
   onPlay,
   onPause,
   onReplay,
@@ -54,15 +52,6 @@ export function ChapterStepper({
               onClick={() => onJump(i)}
             >
               <span className="ld-step-dot">{i + 1}</span>
-              <span className="ld-step-bar">
-                {status === "done" && <i className="fill" />}
-                {status === "active" && (
-                  <i
-                    className="fill"
-                    style={{ width: `${Math.round(progress * 100)}%` }}
-                  />
-                )}
-              </span>
               <span className="ld-step-label">{s.label}</span>
             </button>
           )

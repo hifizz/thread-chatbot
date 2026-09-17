@@ -870,14 +870,6 @@
   font-weight: 700;
   color: var(--ink-soft, #6a6357);
 }
-.ld-step-bar {
-  width: 26px;
-  height: 3px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--ink, #24211b) 12%, transparent);
-  overflow: hidden;
-}
-.ld-step-bar .fill { display: block; height: 100%; background: var(--green, #2f7d6b); }
 .ld-step-label {
   font-size: 0.72rem;
   color: var(--ink-soft, #6a6357);
@@ -917,7 +909,6 @@
   .ld .cbtn { padding: 3px 6px; }
   .ld .col-sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .ld-step-label { display: none; }
-  .ld-step-bar { width: 18px; }
   .ld-tab { font-size: 0.85rem; padding: 7px 14px; }
 }
 
