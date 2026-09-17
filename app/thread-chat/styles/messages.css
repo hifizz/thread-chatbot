@@ -310,57 +310,108 @@
   margin-left: 2px;
 }
 
-/* ---------------- 仓库工具过程卡 ---------------- */
-.tc .repo-tool-card {
-  display: inline-flex;
+/* ---------------- 仓库工具分组卡 ---------------- */
+.tc .repo-tool-group {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin: 4px 0 8px;
+  font-size: 12px;
+  overflow: hidden;
+}
+.tc .repo-tool-group summary {
+  display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
-  color: var(--muted-foreground);
+  padding: 6px 10px;
   background: var(--muted);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 3px 8px;
-  margin: 2px 0;
+  cursor: pointer;
+  user-select: none;
+  color: var(--muted-foreground);
+  list-style: none;
 }
-.tc .repo-tool-card.done {
-  color: var(--foreground);
-  border-color: var(--tc-accent-edge);
+.tc .repo-tool-group summary::before {
+  content: "▸";
+  display: inline-block;
+  transition: transform 0.15s;
+  font-size: 10px;
 }
-.tc .repo-tool-card.error {
-  border-color: var(--destructive);
+.tc .repo-tool-group[open] summary::before {
+  transform: rotate(90deg);
 }
-.tc .repo-tool-icon {
-  font-size: 11px;
-  flex-shrink: 0;
+.tc .repo-tool-group summary::-webkit-details-marker {
+  display: none;
 }
-.tc .repo-tool-name {
+.tc .repo-tool-group-icon {
+  font-size: 13px;
+}
+.tc .repo-tool-group-title {
   font-weight: 500;
-  flex-shrink: 0;
+  color: var(--foreground);
 }
-.tc .repo-tool-input {
+.tc .repo-tool-group-errors {
+  font-size: 10px;
+  color: var(--destructive);
+  background: var(--destructive-wash, rgba(239, 68, 68, 0.1));
+  border-radius: 4px;
+  padding: 1px 4px;
+}
+.tc .repo-tool-group-count {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+.tc .repo-tool-rows {
+  padding: 4px 0;
+}
+.tc .repo-tool-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  font-size: 12px;
+}
+.tc .repo-tool-row:hover {
+  background: var(--muted);
+}
+.tc .repo-tool-row-icon {
+  font-size: 12px;
+  flex-shrink: 0;
+  width: 18px;
+  text-align: center;
+}
+.tc .repo-tool-row-name {
+  color: var(--muted-foreground);
+  flex-shrink: 0;
+  width: 44px;
+}
+.tc .repo-tool-row-input {
   font-family: var(--font-mono, monospace);
   font-size: 11px;
-  color: var(--muted-foreground);
+  color: var(--foreground);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 200px;
+  max-width: 240px;
 }
-.tc .repo-tool-output {
+.tc .repo-tool-row-output {
   font-size: 11px;
   color: var(--muted-foreground);
   flex-shrink: 0;
+  margin-left: auto;
 }
-.tc .repo-tool-output.error {
+.tc .repo-tool-row-output.error {
   color: var(--destructive);
 }
-.tc .repo-tool-output a {
+.tc .repo-tool-row-output a {
   color: var(--tc-accent);
   text-decoration: none;
 }
-.tc .repo-tool-output a:hover {
+.tc .repo-tool-row-output a:hover {
   text-decoration: underline;
+}
+.tc .repo-tool-row-pending {
+  color: var(--muted-foreground);
+  font-size: 11px;
 }
 
 /* ---------------- 仓库绑定选择器（composer 上方） ---------------- */
