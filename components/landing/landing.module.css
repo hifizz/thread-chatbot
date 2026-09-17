@@ -153,6 +153,9 @@
 .demoSection {
   padding-block: clamp(30px, 4vw, 48px);
   scroll-margin-top: 80px;
+  /* 演示区比正文栏宽：突破 .main 的 1180px 上限，最多用到 1440px */
+  width: min(100vw - 32px, 1440px);
+  margin-inline: calc((100% - min(100vw - 32px, 1440px)) / 2);
 }
 .sectionTitle {
   max-width: 720px;
