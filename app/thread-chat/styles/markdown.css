@@ -22,6 +22,10 @@
 .tc .tc-prose p {
   margin: 0 0 var(--tc-prose-paragraph-gap);
 }
+/* 长链接、连续英文和行内代码在正文内断行，避免撑出消息阅读通道。 */
+.tc .tc-prose :is(p, li, blockquote, h1, h2, h3, h4, h5, h6) {
+  overflow-wrap: anywhere;
+}
 .tc .tc-prose :is(h1, h2, h3, h4, h5, h6) {
   font-family: var(--tc-typography-family-heading);
 }
@@ -100,6 +104,8 @@
   font-style: italic;
 }
 .tc .tc-prose .md-inline-code {
+  white-space: normal;
+  overflow-wrap: anywhere;
   font-family: var(--tc-typography-family-code);
   font-size: var(--tc-prose-inline-code-size);
   color: var(--tc-danger-deep);
