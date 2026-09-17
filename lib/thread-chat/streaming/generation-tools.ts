@@ -8,6 +8,7 @@ import {
 import { createResearchTools } from "@/lib/chat/research-tools"
 import { artifactIdForTool } from "@/lib/thread-chat/domain/tool-identity"
 import type { RepoReadTools } from "@/lib/thread-chat/streaming/repo-tools"
+import type { AgentTaskTools } from "@/lib/thread-chat/streaming/agent-task-tools"
 
 export function createMarkdownArtifactTool(messageId: string) {
   return tool({
@@ -27,6 +28,7 @@ export function buildGenerationTools(input: {
   budget?: WebBudget
   routeReason?: string
   repoTools?: RepoReadTools
+  agentTaskTools?: AgentTaskTools
 }) {
   const { readUrl: readUrlTool, webSearch: webSearchTool } =
     createResearchTools({ routeReason: input.routeReason, budget: input.budget })
@@ -43,6 +45,12 @@ export function buildGenerationTools(input: {
           listRepositoryFiles: input.repoTools.listRepositoryFiles,
           readRepositoryFile: input.repoTools.readRepositoryFile,
           findRepositoryPaths: input.repoTools.findRepositoryPaths,
+        }
+      : {}),
+    ...(input.agentTaskTools
+      ? {
+          dispatchAgentTask: input.agentTaskTools.dispatchAgentTask,
+          checkAgentTask: input.agentTaskTools.checkAgentTask,
         }
       : {}),
   }

@@ -37,6 +37,8 @@ const REPO_TOOL_NAMES = new Set([
   "tool-listRepositoryFiles",
   "tool-readRepositoryFile",
   "tool-findRepositoryPaths",
+  "tool-dispatchAgentTask",
+  "tool-checkAgentTask",
 ])
 
 function isRepoToolPart(part: ThreadChatUIPart): boolean {

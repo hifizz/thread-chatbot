@@ -76,6 +76,14 @@ export type ThreadChatTools = {
     input: { query: string }
     output: unknown
   }
+  dispatchAgentTask: {
+    input: { goal: string }
+    output: unknown
+  }
+  checkAgentTask: {
+    input: { taskId: string }
+    output: unknown
+  }
 }
 
 /**
