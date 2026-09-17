@@ -435,25 +435,28 @@
   overflow: hidden;
 }
 
-/* 可划选片段：未划选前是普通文字；划选中下划线随选区逐字「画」出；
-   提交后（.selected）定住下划线 + 脚注。 */
+/* 可划选片段：未提交前是普通文字；划选中（.sel）是拖蓝选区，
+   随光标逐字扩张；提交后（.selected）才定住下划线 + 脚注、可点击开列。 */
 .ld .anchored {
   border-radius: 2px;
   padding: 0 1px;
-  cursor: pointer;
 }
-.ld .anchored:hover { background: var(--tc-fc-wash); }
-.ld .anchored:focus-visible {
-  outline: 2px solid var(--fc);
-  outline-offset: 1px;
-}
-.ld .anchored .sel,
 .ld .anchored.selected {
   border-bottom: 2px solid var(--tc-fc-underline);
   background: var(--tc-fc-wash);
-  border-radius: 2px;
+  cursor: pointer;
 }
-.ld .anchored.selecting:hover { background: transparent; }
+.ld .anchored.selected:hover { background: var(--tc-fc-wash); }
+.ld .anchored.selected:focus-visible {
+  outline: 2px solid var(--fc);
+  outline-offset: 1px;
+}
+/* 拖蓝：剧本划选与真实文本选区用同一颜色 */
+.ld ::selection,
+.ld .anchored .sel {
+  background: color-mix(in srgb, #4d7cc4 34%, transparent);
+}
+.ld .anchored .sel { border-radius: 2px; }
 .ld .sel-tail { display: inline-block; width: 0; height: 1em; }
 .ld sup.fnote {
   font-family: var(--tc-typography-family-code);
@@ -501,17 +504,25 @@
 }
 .ld .sel-bubble .ask {
   display: block;
+  width: 100%;
   min-height: 32px;
   padding: 6px 8px;
   margin-bottom: 8px;
   border-radius: 7px;
   border: 1px solid color-mix(in srgb, var(--tc-onink-faint) 35%, transparent);
   background: color-mix(in srgb, var(--tc-surface-plain) 8%, transparent);
+  font: inherit;
   font-size: 12px;
   line-height: 1.45;
   color: var(--tc-onink-primary);
+  resize: none;
 }
-.ld .sel-bubble .ask .ph { color: var(--tc-onink-placeholder); }
+.ld .sel-bubble .ask::placeholder { color: var(--tc-onink-placeholder); }
+.ld .sel-bubble .ask:focus {
+  outline: none;
+  border-color: var(--tc-depth-1);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--tc-depth-1) 30%, transparent);
+}
 .ld .sel-bubble .caret { background: var(--tc-onink-muted); }
 .ld .sel-bubble .go {
   display: flex;

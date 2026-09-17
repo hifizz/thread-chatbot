@@ -11,15 +11,23 @@
  *     暂停只是停掉计时器，画面原样保留。
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react"
 
 import {
   branchOfAnchor,
   findAnchor,
   findMessage,
+  makeManualColumn,
   siblingsOf,
   messageTextLength,
   type DemoArtifact,
+  type DemoColumn,
   type DemoScenario,
   type DemoStep,
 } from "@/constants/landing-demo"
@@ -27,6 +35,8 @@ import {
 const DEFAULT_HOLD_MS = 900
 const CHARS_PER_TICK = 3
 const TICK_MS = 30
+/** 点「带着问题开分支」后，thread 列延迟出现（模拟开分支的处理间隔） */
+const OPEN_DELAY_MS = 1400
 /** 划选逐字推进更慢，让「拖动」过程可见 */
 const SELECT_CHARS_PER_TICK = 1
 const SELECT_TICK_MS = 40
@@ -91,6 +101,10 @@ export function buildView(
   pickerClosed?: boolean,
   closedColumns?: ReadonlySet<string>,
   swappedColumns?: ReadonlyMap<string, string>,
+  manualColumns?: readonly DemoColumn[],
+  bubbleHidden?: boolean,
+  /** 当前步的开列延迟是否已到点（未到点则暂不渲染新列） */
+  openReady?: boolean,
 ): DemoView {
   const view: DemoView = {
     columnIds: ["main"],
@@ -112,7 +126,13 @@ export function buildView(
     const isCurrent = i === last
     const done = !isCurrent || revealDone
 
-    if (step.addColumn && !view.columnIds.includes(step.addColumn))
+    /* 当前步的提交开列延迟 ~1.4s 才出现（openReady 由计时器到点）；
+       历史步的开列照常渲染。 */
+    if (
+      step.addColumn &&
+      (!isCurrent || openReady !== false) &&
+      !view.columnIds.includes(step.addColumn)
+    )
       view.columnIds.push(step.addColumn)
     for (const id of step.showMessages ?? []) view.shown.add(id)
     if (step.revealMessage) {
@@ -171,12 +191,14 @@ export function buildView(
       view.capsule = undefined
       view.composerTyping = false
     }
-    if (isCurrent && step.scrollTo) view.scrollTo = step.scrollTo
+    /* 开列延迟期间不滚动：列出现后再滚（frame 监听列数变化） */
+    if (isCurrent && step.scrollTo && !(step.addColumn && openReady === false))
+      view.scrollTo = step.scrollTo
   }
 
   /* 划满之后才浮出气泡；提交步（selecting 仍在）保留气泡，
-     后续不带 selecting 的步骤把它清掉。 */
-  if (view.selectingAnchor && !view.selectRevealing)
+     后续不带 selecting 的步骤把它清掉；手动操作可整体压住。 */
+  if (view.selectingAnchor && !view.selectRevealing && !bubbleHidden)
     view.bubble = {
       anchorId: view.selectingAnchor,
       text: bubbleText,
@@ -200,6 +222,14 @@ export function buildView(
       for (const m of col?.messages ?? []) view.shown.add(m.id)
     }
   }
+  /* 手动划选开出的列：插到父列右侧，消息按完整会话展示；
+     父列不可见时排到末尾。 */
+  for (const mc of manualColumns ?? []) {
+    if (view.columnIds.includes(mc.id) || closedColumns?.has(mc.id)) continue
+    const pi = mc.parentId ? view.columnIds.indexOf(mc.parentId) : -1
+    view.columnIds.splice(pi >= 0 ? pi + 1 : view.columnIds.length, 0, mc.id)
+    for (const m of mc.messages) view.shown.add(m.id)
+  }
   return view
 }
 
@@ -215,8 +245,18 @@ export interface DemoPlayer {
   pause(): void
   replay(): void
   jumpTo(step: number): void
-  /** 点击锚点：停自动播放，直接展开对应分支的完整状态 */
+  /** 点击已提交锚点：定位/恢复对应分支列（不弹提问气泡） */
   openAnchorBranch(anchorId: string): void
+  /** 手动划选提交：开一条带用户问题与本地示例回答的新列 */
+  openManualBranch(opts: {
+    quote: string
+    question: string
+    parentId?: string
+  }): void
+  /** 手动划选开出的列（渲染时并入 scenario.columns 查询） */
+  manualCols: DemoColumn[]
+  /** 压住当前提问气泡（用户手动划选/点击已提交锚点时） */
+  dismissBubble(): void
   /** 列头「收起」：手动关掉该列并暂停 */
   closeColumn(columnId: string): void
   /** 列头「⇄ 切换」：本列轮换到下一个兄弟分支并暂停 */
@@ -245,6 +285,14 @@ export function useDemoPlayer(
   const [swappedCols, setSwappedCols] = useState<ReadonlyMap<string, string>>(
     new Map(),
   )
+  /** 手动划选开出的列 */
+  const [manualCols, setManualCols] = useState<DemoColumn[]>([])
+  /** 手动压住提问气泡（直到下一次章节推进） */
+  const [hideBubble, setHideBubble] = useState(false)
+  /** 当前步的开列延迟是否到点（~1.4s 计时器） */
+  const [openReady, setOpenReady] = useState(false)
+  /** 场景 id 快照，防止延迟计时器把列加进已切换的场景 */
+  const scenarioIdRef = useRef(scenario.id)
 
   /* 场景切换在渲染期归零（React 认可的 adjust-state-during-render），
      避免 effect 里的同步 setState 造成二次渲染。 */
@@ -258,13 +306,28 @@ export function useDemoPlayer(
     setPickerClosed(false)
     setClosedCols(new Set())
     setSwappedCols(new Map())
+    setManualCols([])
+    setHideBubble(false)
+    setOpenReady(false)
   }
+  useEffect(() => {
+    scenarioIdRef.current = scenario.id
+  }, [scenario.id])
 
   const step = scenario.steps[Math.min(stepIndex, scenario.steps.length - 1)]
   const revealLen = opts.instantReveal ? 0 : revealLenOf(scenario, step)
   const revealDone = revealLen === 0 || revealCount >= revealLen
   const playing =
     opts.active && !userPaused && (opts.autoPlay || userStarted)
+  /** 提交步（带 addColumn）的列延迟出现；减少动态偏好下立即出现 */
+  const isDelayedOpen = !opts.instantReveal && !!step?.addColumn
+
+  /* 章节推进时重置开列延迟（渲染期调整状态） */
+  const [prevStepIdx, setPrevStepIdx] = useState(stepIndex)
+  if (prevStepIdx !== stepIndex) {
+    setPrevStepIdx(stepIndex)
+    setOpenReady(false)
+  }
 
   const view = useMemo(
     () =>
@@ -276,6 +339,9 @@ export function useDemoPlayer(
         pickerClosed,
         closedCols,
         swappedCols,
+        manualCols,
+        hideBubble,
+        isDelayedOpen ? openReady : true,
       ),
     [
       scenario,
@@ -285,8 +351,20 @@ export function useDemoPlayer(
       pickerClosed,
       closedCols,
       swappedCols,
+      manualCols,
+      hideBubble,
+      isDelayedOpen,
+      openReady,
     ],
   )
+
+  /* 开列延迟计时器：提交 ~1.4s 后列才出现；与播放状态无关
+     （点击已经发生，暂停不该拦住列的出现）。 */
+  useEffect(() => {
+    if (!isDelayedOpen) return
+    const id = window.setTimeout(() => setOpenReady(true), OPEN_DELAY_MS)
+    return () => window.clearTimeout(id)
+  }, [isDelayedOpen, stepIndex, scenario.id])
 
   /* 主循环：揭示 → 停留 → 下一章。每个 effect 只清自己创建的计时器。 */
   useEffect(() => {
@@ -310,6 +388,9 @@ export function useDemoPlayer(
       }
     }
 
+    /* 开列延迟未到点：等列出现再进入下一章 */
+    if (isDelayedOpen && !openReady) return
+
     const id = window.setTimeout(
       () => {
         if (cancelled) return
@@ -317,6 +398,7 @@ export function useDemoPlayer(
         else {
           setStepIndex(stepIndex + 1)
           setRevealCount(0)
+          setHideBubble(false)
         }
       },
       step.holdMs ?? DEFAULT_HOLD_MS,
@@ -325,7 +407,7 @@ export function useDemoPlayer(
       cancelled = true
       window.clearTimeout(id)
     }
-  }, [playing, stepIndex, revealDone, revealLen, scenario, step.holdMs, view.selectRevealing])
+  }, [playing, stepIndex, revealDone, revealLen, scenario, step.holdMs, view.selectRevealing, isDelayedOpen, openReady])
 
   const play = useCallback(() => {
     setUserPaused(false)
@@ -342,6 +424,7 @@ export function useDemoPlayer(
     setPickerClosed(false)
     setClosedCols(new Set())
     setSwappedCols(new Map())
+    setHideBubble(false)
   }, [])
 
   const replay = useCallback(() => jumpTo(0), [jumpTo])
@@ -356,22 +439,73 @@ export function useDemoPlayer(
     [scenario],
   )
 
+  /* 点击已提交锚点：列已开由 frame 负责滚过去；被收起/换掉则恢复；
+     剧本尚未演到则定格到开列那章。都不再弹提问气泡。 */
   const openAnchorBranch = useCallback(
     (anchorId: string) => {
       const branch = branchOfAnchor(scenario, anchorId)
       if (!branch) return
+      setUserPaused(true)
+      setHideBubble(true)
+      if (closedCols.has(branch.id)) {
+        setClosedCols((prev) => {
+          const next = new Set(prev)
+          next.delete(branch.id)
+          return next
+        })
+        return
+      }
+      const swappedSlot = [...swappedCols.entries()].find(
+        ([, to]) => to === branch.id,
+      )
+      if (swappedSlot) {
+        setSwappedCols((prev) => {
+          const next = new Map(prev)
+          next.delete(swappedSlot[0])
+          return next
+        })
+        return
+      }
+      if (view.columnIds.includes(branch.id)) return
       const openIdx = scenario.steps.findIndex((s) => s.addColumn === branch.id)
-      if (openIdx < 0) return
-      setClosedCols((prev) => {
-        if (!prev.has(branch.id)) return prev
-        const next = new Set(prev)
-        next.delete(branch.id)
-        return next
-      })
-      settleAt(openIdx)
+      if (openIdx >= 0) settleAt(openIdx)
     },
-    [scenario, settleAt],
+    [scenario, settleAt, closedCols, swappedCols, view.columnIds],
   )
+
+  const openManualBranch = useCallback(
+    (req: { quote: string; question: string; parentId?: string }) => {
+      setUserPaused(true)
+      setHideBubble(true)
+      const sid = scenario.id
+      const make = (prev: DemoColumn[]) => {
+        const parent = [...scenario.columns, ...prev].find(
+          (c) => c.id === req.parentId,
+        )
+        return makeManualColumn(
+          `manual-${prev.length + 1}`,
+          parent,
+          req.quote,
+          req.question,
+        )
+      }
+      /* 与剧本提交一致：~1.4s 后列才出现 */
+      if (opts.instantReveal) {
+        setManualCols((prev) => [...prev, make(prev)])
+      } else {
+        window.setTimeout(() => {
+          if (scenarioIdRef.current === sid)
+            setManualCols((prev) => [...prev, make(prev)])
+        }, OPEN_DELAY_MS)
+      }
+    },
+    [scenario, opts.instantReveal],
+  )
+
+  const dismissBubble = useCallback(() => {
+    setHideBubble(true)
+    setUserPaused(true)
+  }, [])
 
   const closeColumn = useCallback((columnId: string) => {
     if (columnId === "main") return
@@ -421,6 +555,9 @@ export function useDemoPlayer(
     replay,
     jumpTo,
     openAnchorBranch,
+    openManualBranch,
+    dismissBubble,
+    manualCols,
     closeColumn,
     switchColumn,
     pickArtifact,

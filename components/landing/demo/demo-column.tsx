@@ -9,7 +9,7 @@ import { ArrowUp, ListTree, Plus } from "lucide-react"
 import { useEffect, useRef, type ReactElement, type RefObject } from "react"
 
 import {
-  childCountOf,
+  childrenOfColumns,
   findAnchor,
   type DemoColumn,
   type DemoScenario,
@@ -22,6 +22,8 @@ import type { DemoView } from "./use-demo-player"
 interface Props {
   scenario: DemoScenario
   column: DemoColumn
+  /** 剧本列 + 手动划选开出的列（子树计数等跨列查询用） */
+  allColumns: readonly DemoColumn[]
   view: DemoView
   /** 播放器当前揭示进度（消息打字 / 划选 / 气泡打字共用） */
   revealChars: number
@@ -40,6 +42,7 @@ interface Props {
 export function DemoColumnView({
   scenario,
   column,
+  allColumns,
   view,
   revealChars,
   onAnchor,
@@ -58,10 +61,11 @@ export function DemoColumnView({
     if (el) el.scrollTop = el.scrollHeight
   }, [signature])
   const fc = ((column.depth || 1) - 1) % 5 + 1
-  const childCount = childCountOf(scenario, column.id)
+  const childCount = childrenOfColumns(allColumns, column.id).length
   const source = column.sourceAnchor
     ? findAnchor(scenario, column.sourceAnchor)
     : undefined
+  const sourceText = column.sourceText ?? source?.text
   const fnote = column.sourceAnchor
     ? view.footnotes[column.sourceAnchor]
     : undefined
@@ -140,13 +144,13 @@ export function DemoColumnView({
 
       <div className="msg-list" ref={listRef}>
         <div className="lane">
-          {source && (
+          {sourceText && (
             <div className="branch-context">
               <div className="focus-banner">
                 <span className="fn">{fnote ?? "·"}</span>
                 <span className="ft">
                   <span className="lbl">来自{isMain ? "主线" : column.crumb[column.crumb.length - 2] ?? "主线"}</span>
-                  <q>{source.text}</q>
+                  <q>{sourceText}</q>
                 </span>
               </div>
               {column.inheritedCount !== undefined && (

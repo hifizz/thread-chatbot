@@ -53,6 +53,10 @@ export interface DemoColumn {
   crumb: string[]
   /** 从哪个锚点开出（分支列才有）；主线为 undefined */
   sourceAnchor?: string
+  /** 手动划选开出的列：来源原文（替代 sourceAnchor，不占用剧本脚注） */
+  sourceText?: string
+  /** 手动划选列的父列 id（决定插入位置与面包屑） */
+  parentId?: string
   /** 「继承的上文」条数 */
   inheritedCount?: number
   messages: DemoMessage[]
@@ -237,7 +241,6 @@ const prd: DemoScenario = {
     {
       id: "open",
       label: "展开分支",
-      selecting: "a-ctx",
       selectAnchor: "a-ctx",
       addColumn: "b1",
       showMessages: ["b1-u1"],
@@ -265,7 +268,6 @@ const prd: DemoScenario = {
     {
       id: "open2",
       label: "再开分支",
-      selecting: "a-edit",
       selectAnchor: "a-edit",
       addColumn: "b2",
       showMessages: ["b2-u1"],
@@ -388,7 +390,6 @@ const tech: DemoScenario = {
     {
       id: "open",
       label: "展开分支",
-      selecting: "t-art",
       selectAnchor: "t-art",
       addColumn: "b1",
       showMessages: ["b1-u1"],
@@ -415,7 +416,6 @@ const tech: DemoScenario = {
     {
       id: "open2",
       label: "再追一层",
-      selecting: "t-ref",
       selectAnchor: "t-ref",
       addColumn: "b2",
       showMessages: ["b2-u1"],
@@ -542,7 +542,6 @@ const marketing: DemoScenario = {
     {
       id: "open",
       label: "展开分支",
-      selecting: "m-why",
       selectAnchor: "m-why",
       addColumn: "b1",
       showMessages: ["b1-u1"],
@@ -570,7 +569,6 @@ const marketing: DemoScenario = {
     {
       id: "open2",
       label: "再开分支",
-      selecting: "m-demo",
       selectAnchor: "m-demo",
       addColumn: "b2",
       showMessages: ["b2-u1"],
@@ -672,7 +670,6 @@ const research: DemoScenario = {
     {
       id: "open",
       label: "展开分支",
-      selecting: "r-diff",
       selectAnchor: "r-diff",
       addColumn: "b1",
       showMessages: ["b1-u1"],
@@ -700,7 +697,6 @@ const research: DemoScenario = {
     {
       id: "open2",
       label: "再开分支",
-      selecting: "r-verify",
       selectAnchor: "r-verify",
       addColumn: "b2",
       showMessages: ["b2-u1"],
@@ -803,7 +799,6 @@ const learnAi: DemoScenario = {
     {
       id: "open",
       label: "展开分支",
-      selecting: "l-llm",
       selectAnchor: "l-llm",
       addColumn: "b1",
       showMessages: ["b1-u1"],
@@ -830,7 +825,6 @@ const learnAi: DemoScenario = {
     {
       id: "open2",
       label: "再追一层",
-      selecting: "l-token",
       selectAnchor: "l-token",
       addColumn: "b2",
       showMessages: ["b2-u1"],
@@ -933,7 +927,6 @@ const learnCompany: DemoScenario = {
     {
       id: "open",
       label: "展开分支",
-      selecting: "c-cash",
       selectAnchor: "c-cash",
       addColumn: "b1",
       showMessages: ["b1-u1"],
@@ -960,7 +953,6 @@ const learnCompany: DemoScenario = {
     {
       id: "open2",
       label: "再追一层",
-      selecting: "c-gap",
       selectAnchor: "c-gap",
       addColumn: "b2",
       showMessages: ["b2-u1"],
@@ -1017,9 +1009,17 @@ export function branchOfAnchor(scenario: DemoScenario, anchorId: string) {
 /** 某列的直接子分支（列头「子分支」按钮导航目标）。
     以面包屑前缀判父子：子列 crumb = 父列 crumb + 子列标题。 */
 export function childrenOf(scenario: DemoScenario, columnId: string) {
-  const col = scenario.columns.find((c) => c.id === columnId)
+  return childrenOfColumns(scenario.columns, columnId)
+}
+
+/** 在任意列集合里找直接子分支（覆盖手动划选开出的列）。 */
+export function childrenOfColumns(
+  cols: readonly DemoColumn[],
+  columnId: string,
+) {
+  const col = cols.find((c) => c.id === columnId)
   if (!col) return []
-  return scenario.columns.filter(
+  return cols.filter(
     (c) =>
       c.id !== columnId &&
       c.crumb.length === col.crumb.length + 1 &&
@@ -1041,4 +1041,39 @@ export function siblingsOf(scenario: DemoScenario, columnId: string) {
       c.crumb.length === col.crumb.length &&
       c.crumb.slice(0, -1).every((seg, i) => seg === col.crumb[i]),
   )
+}
+
+/* ═══ 手动划选开出的列 ═══ */
+
+/** 用户自由提问后的本地示例回答（不调用模型）。 */
+export const MANUAL_BRANCH_REPLY =
+  "这是首页演示里的本地示例回答：真实产品中，AI 会带着这段上文继续讨论你的问题。\n\n你可以继续在任意回答里划选新的片段，也可以点左侧带下划线的文字回到已经展开的分支。"
+
+/** 构造用户手动划选开出的分支列。 */
+export function makeManualColumn(
+  id: string,
+  parent: DemoColumn | undefined,
+  quote: string,
+  question: string,
+): DemoColumn {
+  const depth = Math.min((parent?.depth ?? 0) + 1, 2) as 0 | 1 | 2
+  const title = question.trim()
+    ? question.trim().replace(/\s+/g, " ").slice(0, 14)
+    : "自由提问"
+  return {
+    id,
+    depth,
+    title,
+    sub: "来自演示中的自由划选",
+    crumb: [...(parent?.crumb ?? ["主线"]), title],
+    sourceText: quote,
+    parentId: parent?.id,
+    inheritedCount: 2,
+    messages: [
+      msg(`${id}-u`, "user", question.trim() || "就这段内容继续讨论", {
+        quote,
+      }),
+      msg(`${id}-a`, "assistant", MANUAL_BRANCH_REPLY),
+    ],
+  }
 }

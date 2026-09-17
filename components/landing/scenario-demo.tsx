@@ -126,7 +126,11 @@ export function ScenarioDemo(): ReactElement {
         view={player.view}
         revealChars={player.revealChars}
         stepIndex={player.stepIndex}
+        manualColumns={player.manualCols}
         onAnchor={player.openAnchorBranch}
+        onManualBranch={player.openManualBranch}
+        onUserInteract={player.dismissBubble}
+        onBubbleFocus={player.pause}
         onCloseColumn={player.closeColumn}
         onSwitchColumn={player.switchColumn}
         onPick={player.pickArtifact}

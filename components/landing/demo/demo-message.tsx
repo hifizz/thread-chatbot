@@ -81,21 +81,36 @@ function Inline({
             selecting && view.selectRevealing
               ? Math.min(progressChars, node.text.length)
               : node.text.length
+          const interactive = selected && !selecting
           return (
             <span
               key={i}
-              role="button"
-              tabIndex={0}
+              role={interactive ? "button" : undefined}
+              tabIndex={interactive ? 0 : undefined}
               className={`anchored fc-${fc}${selected ? " selected" : ""}${selecting && !selected ? " selecting" : ""}`}
               data-cursor-target={`anchor-${node.anchorId}`}
-              onClick={() => onAnchor(node.anchorId)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault()
-                  onAnchor(node.anchorId)
-                }
-              }}
-              aria-label={`就「${node.text}」展开分支`}
+              onClick={
+                interactive
+                  ? () => {
+                      /* 拖选经过锚点时也忽略 click，交给文本划选流程 */
+                      if (window.getSelection()?.isCollapsed === false) return
+                      onAnchor(node.anchorId)
+                    }
+                  : undefined
+              }
+              onKeyDown={
+                interactive
+                  ? (e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault()
+                        onAnchor(node.anchorId)
+                      }
+                    }
+                  : undefined
+              }
+              aria-label={
+                interactive ? `打开「${node.text}」的分支` : undefined
+              }
             >
               {selecting && !selected ? (
                 <>
