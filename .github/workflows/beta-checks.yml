@@ -1,0 +1,59 @@
+name: Beta checks
+
+on:
+  pull_request:
+    paths:
+      - "app/**"
+      - "components/**"
+      - "constants/**"
+      - "lib/**"
+      - "hooks/**"
+      - "messages/**"
+      - "e2e/beta/**"
+      - "scripts/beta/**"
+      - "openspec/changes/internationalization/**"
+      - ".github/workflows/beta-checks.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: beta-checks-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # 临时离线审查包；不包含 .git、运行时环境变量或任何 CI 凭据。
+      # 完成实现后删除此步骤，常规 CI 仅保留测试结果。
+      - name: Prepare offline review workspace
+        run: |
+          git archive --format=tar.gz -o /tmp/beta-source.tar.gz HEAD
+          tar -czf /tmp/beta-dependencies.tar.gz node_modules
+      - uses: actions/upload-artifact@v4
+        with:
+          name: beta-offline-review
+          path: |
+            /tmp/beta-source.tar.gz
+            /tmp/beta-dependencies.tar.gz
+          retention-days: 1
+      - name: Typecheck
+        run: pnpm typecheck
+      - name: Beta regression tests
+        run: |
+          if [ -d e2e/beta ]; then
+            find e2e/beta -name '*.test.mjs' -print0 | sort -z | xargs -0 -r -n 1 node --import tsx
+          fi
