@@ -28,9 +28,9 @@ export const WEB_DOCUMENT_CHAR_LIMIT = 1_000_000
 export const WEB_SNAPSHOT_CHAR_LIMIT = 2_000_000
 /** 搜索响应按完整结果条目限制，标题与 URL 也计入。 */
 export const WEB_SEARCH_RESPONSE_CHAR_LIMIT = 6_000
-/** 深入研究允许更多上游尝试，普通查询沿用较小额度。 */
-export const WEB_RESEARCH_MAX_PROVIDER_ATTEMPTS = 16
-export const WEB_RESEARCH_MAX_DURATION_MS = 180_000
+/** 临时放宽研究预算，容纳多来源读取与备用尝试；后续按线上用量校准。 */
+export const WEB_RESEARCH_MAX_PROVIDER_ATTEMPTS = 64
+export const WEB_RESEARCH_MAX_DURATION_MS = 900_000
 /** 模糊路由分类最多参考的最近消息数，避免为决策重复发送整段长会话。 */
 export const RESEARCH_ROUTER_CONTEXT_MESSAGES = 6
 /** 结构化 Router 的输出上限；只生成一个很小的分类对象。 */
@@ -109,9 +109,9 @@ export const DIRECT_FETCH_SYSTEM_PROMPT = [
   "最终回答只引用实际取得的有效来源；若取得经核对的同文转载，可简短标明转载来源。原文任务无法完成时说明缺口，不要暴露内部工具参数或错误细节。",
 ].join("\n")
 
-/** 试行整轮联网预算：含备用；首个上游请求开始计时。 */
-export const WEB_MAX_PROVIDER_ATTEMPTS = 6
-export const WEB_MAX_DURATION_MS = 45_000
+/** 临时放宽整轮联网预算：含失败与备用；首个请求起连续计时（含模型思考）。 */
+export const WEB_MAX_PROVIDER_ATTEMPTS = 24
+export const WEB_MAX_DURATION_MS = 300_000
 export const WEB_MAX_CONCURRENCY = 3
 /** 可选的同 URL 正文备用；只在配置 EXA_API_KEY 时调用。 */
 export const EXA_CONTENTS_API_URL = "https://api.exa.ai/contents"
