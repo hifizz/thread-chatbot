@@ -3,22 +3,10 @@
 import { Check, Pencil, Trash2, X } from "lucide-react"
 import { CUSTOM_TITLE_MAX_LEN } from "@/constants/thread-chat"
 import type { ProjectListItemDTO } from "@/lib/thread-chat/contracts/dto"
+import { useState } from "react"
+import { formatRelativeTime } from "@/lib/i18n/dictionary"
+import { useI18n } from "@/lib/i18n/client"
 
-/** 相对时间：「刚刚 / N 分钟前 / N 小时前 / N 天前 / M月D日」 */
-function relativeTime(iso: string): string {
-  const time = new Date(iso).getTime()
-  if (Number.isNaN(time)) return ""
-  const diff = Date.now() - time
-  const minutes = Math.floor(diff / 60_000)
-  if (minutes < 1) return "刚刚"
-  if (minutes < 60) return `${minutes} 分钟前`
-  const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `${hours} 小时前`
-  const days = Math.floor(hours / 24)
-  if (days < 30) return `${days} 天前`
-  const date = new Date(time)
-  return `${date.getMonth() + 1}月${date.getDate()}日`
-}
 
 export interface TreeListRowProps {
   item: ProjectListItemDTO
@@ -56,6 +44,9 @@ export function TreeListRow({
   onConfirmDelete,
   onCancelDelete,
 }: TreeListRowProps) {
+  const { locale, t } = useI18n()
+  const [now] = useState(() => Date.now())
+
   return (
     <div
       data-scroll-memory-anchor={item.id}
@@ -87,19 +78,19 @@ export function TreeListRow({
       ) : (
         <>
           <span className="t">{item.title}</span>
-          {unsaved && <span className="st tlx-unsaved">未保存</span>}
-          {isCurrent && !unsaved && <span className="st">当前</span>}
+          {unsaved && <span className="st tlx-unsaved">{t("ui.notSaved")}</span>}
+          {isCurrent && !unsaved && <span className="st">{t("ui.current")}</span>}
           <span className="tlx-meta">
             {item.threadCount > 1 && (
               <span
                 className="tlx-badge"
-                title={`${item.threadCount - 1} 个分支`}
+                title={t("common.branchCount", { count: item.threadCount - 1 })}
               >
                 ⑂ {item.threadCount - 1}
               </span>
             )}
             {item.updatedAt && (
-              <span className="tlx-time">{relativeTime(item.updatedAt)}</span>
+              <span className="tlx-time">{formatRelativeTime(locale, item.updatedAt, now)}</span>
             )}
           </span>
           <span
@@ -111,15 +102,14 @@ export function TreeListRow({
               <>
                 <button
                   className="tlx-act danger confirm"
-                  title="确认删除（不可撤销）"
+                  title={t("ui.confirmDeletionCannotBeUndone")}
                   onClick={onConfirmDelete}
                 >
                   <Check size={12} />
-                  确认删除
-                </button>
+                  {t("ui.confirmDeletion")}</button>
                 <button
                   className="tlx-act"
-                  title="取消"
+                  title={t("common.cancel")}
                   onClick={onCancelDelete}
                 >
                   <X size={12} />
@@ -130,7 +120,7 @@ export function TreeListRow({
                 {!unsaved && (
                   <button
                     className="tlx-act"
-                    title="重命名"
+                    title={t("ui.rename")}
                     onClick={onStartEdit}
                   >
                     <Pencil size={12} />
@@ -139,7 +129,7 @@ export function TreeListRow({
                 {!unsaved && (
                   <button
                     className="tlx-act danger"
-                    title="删除此对话"
+                    title={t("ui.deleteThisConversation")}
                     disabled={deleting}
                     onClick={onRequestDelete}
                   >

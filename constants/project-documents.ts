@@ -47,3 +47,30 @@ export const DOCUMENT_UI_COPY = {
   shareFailed: "分享失败，请重试或导出此版本。",
   exportFailed: "导出失败，请重试。",
 } as const
+
+/** 仅用于界面翻译；服务端持久化的既有收据文案保持兼容。 */
+export const DOCUMENT_UI_KEYS = {
+  contextLimit: "documentUi.contextLimit",
+  syncFailed: "documentUi.syncFailed",
+  historyFailed: "documentUi.historyFailed",
+  navigationBlocked: "documentUi.navigationBlocked",
+  versionFailed: "documentUi.versionFailed",
+  diffFailed: "documentUi.diffFailed",
+  shareUnsupported: "documentUi.shareUnsupported",
+  shareFailed: "documentUi.shareFailed",
+  exportFailed: "documentUi.exportFailed",
+} as const
+
+/** 仅用于界面翻译；服务端持久化的既有收据文案保持兼容。 */
+export const DOCUMENT_RESULT_KEYS = {
+  SOURCE_NOT_FOUND: "documentResult.SOURCE_NOT_FOUND",
+  SOURCE_AMBIGUOUS: "documentResult.SOURCE_AMBIGUOUS",
+  OVERLAPPING_EDITS: "documentResult.OVERLAPPING_EDITS",
+  INVALID_EDIT: "documentResult.INVALID_EDIT",
+  DOCUMENT_READ_ONLY: "documentResult.DOCUMENT_READ_ONLY",
+  READ_REQUIRED: "documentResult.READ_REQUIRED",
+  DOCUMENT_UNAVAILABLE: "documentResult.DOCUMENT_UNAVAILABLE",
+  EXECUTION_INACTIVE: "documentResult.EXECUTION_INACTIVE",
+  RETRY_LIMIT: "documentResult.RETRY_LIMIT",
+  WRITES_DISABLED: "documentResult.WRITES_DISABLED",
+} as const

@@ -25,7 +25,7 @@
 | 现有邮件模块的 templates | locale/template/variables → subject/html/text | 重试及投递状态 |
 | LanguageSwitcher | 用户选择 → preference mutation | 第二套设置页面 |
 
-next-intl 作为实现候选，版本由实现时锁文件确认。词典按功能 namespace 分组，不让每个模块复制一份 Locale。移动端复用已有 Drawer；可访问标签、toast、空状态、时间和费用格式一起翻译。
+实现采用 Next.js 官方字典加载模式与单一 React Context，不新增 next-intl：当前只需两种语言、稳定工作区 URL 和轻量插值，现有 Intl 已覆盖日期/金额。Locale、词典和错误映射仍只有一个所有者。词典按功能 namespace 分组，不让每个模块复制一份 Locale。移动端复用已有 Drawer；可访问标签、toast、空状态、时间和费用格式一起翻译。
 
 ### 3. 类型与 DTO
 

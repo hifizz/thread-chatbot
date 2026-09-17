@@ -15,7 +15,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react"
 
 import type { GenerationSettings } from "@/constants/generation-settings"
 import { resolveGenerationSettings } from "@/lib/thread-chat/generation-settings"
-import { COMPOSER_MODEL_COPY } from "@/constants/composer-model"
+import { COMPOSER_MODEL_KEYS } from "@/constants/composer-model"
 import { DEFAULT_THREAD_CHAT_MODEL_ID } from "@/constants/models"
 import { PROJECT_TITLE_FALLBACK } from "@/constants/project-workspace"
 import {
@@ -77,6 +77,15 @@ import {
 } from "./orchestration/overlays/workspace-toast"
 import { useConversationRuntime } from "./orchestration/workspace/use-conversation-runtime"
 import { useNormalizedWorkspace } from "./orchestration/workspace/use-normalized-workspace"
+import { localizeError } from "@/lib/i18n/errors"
+import type { Locale } from "@/constants/i18n"
+import { useI18n } from "@/lib/i18n/client"
+
+
+function CanvasLoading() {
+  const { t } = useI18n()
+  return <div className="canvas-loading">{t("ui.loadingCanvas")}</div>
+}
 
 const ThreadCanvas = dynamic(
   () =>
@@ -85,7 +94,7 @@ const ThreadCanvas = dynamic(
     ),
   {
     ssr: false,
-    loading: () => <div className="canvas-loading">画布加载中…</div>,
+    loading: CanvasLoading,
   }
 )
 
@@ -134,27 +143,29 @@ function actionResult(input: {
   }
 }
 
-function actionFailure(error: unknown): GenerationActionResult {
+function actionFailure(error: unknown, locale: Locale): GenerationActionResult {
   return {
     ok: false,
     code: "network_error",
-    message: error instanceof Error ? error.message : "请求失败，请重试",
+    message: localizeError(locale, error),
   }
 }
 
 export function ThreadChatDemo({ treeId }: { treeId: string }) {
+  const { t } = useI18n()
+
   const runtime = useConversationRuntime(treeId)
   if (runtime.status === "loading") {
     return (
       <div className="tc">
-        <div className="boot-loading">对话加载中…</div>
+        <div className="boot-loading">{t("ui.loadingConversation")}</div>
       </div>
     )
   }
   if (runtime.status === "error") {
     return (
       <div className="tc">
-        <div className="boot-loading">对话加载失败，请刷新重试。</div>
+        <div className="boot-loading">{t("ui.couldNotLoadTheConversationPlease")}</div>
       </div>
     )
   }
@@ -172,6 +183,8 @@ function NormalizedThreadChat({
   treeId: string
   runtime: ReturnType<typeof useConversationRuntime>
 }) {
+  const { locale, t } = useI18n()
+
   const [questionArtifactId, setQuestionArtifactId] = useState<string | null>(null)
   const router = useRouter()
   const state = useConversationStore(runtime.store, (value) => value)
@@ -192,9 +205,9 @@ function NormalizedThreadChat({
       }
       return runtime.commands
         .updateThread(threadId, { modelId })
-        .catch(() => showToast(COMPOSER_MODEL_COPY.failed))
+        .catch(() => showToast(t(COMPOSER_MODEL_KEYS.failed)))
     },
-    [runtime.commands, runtime.store, showToast]
+    [runtime.commands, runtime.store, showToast, t]
   )
   const projectedStore = useMemo(
     () =>
@@ -281,7 +294,7 @@ function NormalizedThreadChat({
             sourceAssistantMessageId: assistantMessageId,
           })
         } catch (error) {
-          return actionFailure(error)
+          return actionFailure(error, locale)
         }
       },
       async retryUserTurn(viewThreadId, userMessageId) {
@@ -289,7 +302,7 @@ function NormalizedThreadChat({
           const threadId = fromConversationViewThreadId(state, viewThreadId)
           const source = state.messagesById[userMessageId]
           if (!source)
-            return { ok: false, code: "not_found", message: "消息不存在" }
+            return { ok: false, code: "not_found", message: t("ui.messageNotFound") }
           const assistant = selectVisibleMessages(state, threadId).find(
             (message) =>
               message.role === "assistant" && message.sequence > source.sequence
@@ -311,7 +324,7 @@ function NormalizedThreadChat({
             sourceAssistantMessageId: assistant?.id,
           })
         } catch (error) {
-          return actionFailure(error)
+          return actionFailure(error, locale)
         }
       },
       async editAndRegenerate(viewThreadId, userMessageId, content) {
@@ -342,7 +355,7 @@ function NormalizedThreadChat({
             sourceAssistantMessageId: assistant?.id,
           })
         } catch (error) {
-          return actionFailure(error)
+          return actionFailure(error, locale)
         }
       },
       async submitFeedback(viewThreadId, messageId, feedback) {
@@ -360,7 +373,7 @@ function NormalizedThreadChat({
         }
       },
     }),
-    [generationSettings, runtime.commands, state, treeId]
+    [generationSettings, runtime.commands, state, treeId, locale, t]
   )
 
   const send = useCallback(
@@ -391,12 +404,13 @@ function NormalizedThreadChat({
             content,
           })
       return operation.catch((error) => {
-        showToast(error instanceof Error ? error.message : "发送失败，请重试")
+        showToast(localizeError(locale, error))
         throw error
       })
     },
     [
       draftModelId,
+      locale,
       generationSettings,
       runtime.commands,
       runtime.store,
@@ -417,9 +431,9 @@ function NormalizedThreadChat({
       if (!active) return
       void runtime.commands
         .stopMessage(active.id)
-        .catch(() => showToast("停止失败，请重试"))
+        .catch(() => showToast(t("ui.couldNotStopPleaseTryAgain")))
     },
-    [runtime.commands, runtime.store, showToast]
+    [runtime.commands, runtime.store, showToast, t]
   )
   const retry = useCallback(
     (viewThreadId: string, message: Message) => {
@@ -438,7 +452,7 @@ function NormalizedThreadChat({
       const effect = workspace.columns.openThread(id, sourceId ?? null, hint)
       if (effect.kind === "replaced") {
         showToast(
-          `第 ${effect.idx + 2} 列已替换：「${threadTitle(tree, effect.replacedId)}」→「${threadTitle(tree, id)}」`,
+          t("chat.replacedColumn", { number: effect.idx + 2, oldTitle: threadTitle(tree, effect.replacedId), title: threadTitle(tree, id) }),
           () => {
             workspace.columns.restoreSlots(effect.prevSlots)
             workspace.columns.flashThread(effect.replacedId)
@@ -446,11 +460,11 @@ function NormalizedThreadChat({
         )
       } else if (effect.kind === "folded") {
         showToast(
-          `已打开「${threadTitle(tree, id)}」，「${threadTitle(tree, effect.foldedId)}」已折叠为细条`
+          t("chat.openedFolded", { title: threadTitle(tree, id), foldedTitle: threadTitle(tree, effect.foldedId) })
         )
       }
     },
-    [showToast, tree, workspace]
+    [showToast, tree, workspace, t]
   )
 
   const handleFork = useCallback(
@@ -495,16 +509,17 @@ function NormalizedThreadChat({
             info.text.length > 13 ? `${info.text.slice(0, 13)}…` : info.text
           if (workspace.viewMode === "canvas") {
             workspace.focusCanvasNode(command.threadId)
-            showToast(`已开启分支 · ${title}`)
+            showToast(t("chat.branchOpened", { title }))
             return
           }
           openBranchUI(command.threadId, info.threadId, hint)
-          showToast(`已开启分支 · ${title}`)
+          showToast(t("chat.branchOpened", { title }))
         })
-        .catch(() => showToast("创建分支失败，请重试"))
+        .catch(() => showToast(t("ui.couldNotCreateABranchPlease")))
     },
     [
       closeDrawer,
+      t,
       generationSettings,
       openBranchUI,
       runtime.commands,
@@ -522,12 +537,10 @@ function NormalizedThreadChat({
       const dropped = workspace.columns.normalizeToReplace()
       if (dropped.length)
         showToast(
-          `已切回替换⑥：细条全部展开后，超出列数的「${dropped
-            .map((id) => threadTitle(tree, id))
-            .join("」「")}」已收起`
+          t("chat.columnsCollapsed", { titles: dropped.map((id) => threadTitle(tree, id)).join(", ") })
         )
     },
-    [showToast, tree, workspace]
+    [showToast, tree, workspace, t]
   )
 
   const pickRow = useCallback(
@@ -630,7 +643,7 @@ function NormalizedThreadChat({
 
       // 空树已经是新对话；反复点击不应让 URL 持续变化。
       if (!mainHasMessage) {
-        showToast("当前就是全新对话，直接开聊吧")
+        showToast(t("ui.thisIsAlreadyANewConversation"))
         return
       }
       router.push(newConversationUrl)

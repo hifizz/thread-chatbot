@@ -1,4 +1,8 @@
+"use client"
+
 import type { PlacePreview, Slot } from "../../orchestration/columns/placement"
+import { useI18n } from "@/lib/i18n/client"
+
 
 export function SelectionPlacementMap({
   sourceThreadId,
@@ -15,6 +19,8 @@ export function SelectionPlacementMap({
   titleOf: (threadId: string) => string
   onToggleOverride: (threadId: string) => void
 }) {
+  const { t } = useI18n()
+
   const cells: React.ReactNode[] = [
     <span
       key="main"
@@ -29,7 +35,7 @@ export function SelectionPlacementMap({
     <span
       key={key}
       className="smcell ghost"
-      title="新分支将插入此处"
+      title={t("ui.theNewBranchWillOpenHere")}
       aria-hidden="true"
     >
       +
@@ -46,14 +52,14 @@ export function SelectionPlacementMap({
     const willFold = preview.foldId === slot.id
     const caption = willReplace
       ? isSource
-        ? "本列·替"
-        : "将替换"
+        ? t("ui.thisReplace")
+        : t("ui.willReplace")
       : willFold
         ? isSource
-          ? "本列·折"
-          : "将折叠"
+          ? t("ui.thisFold")
+          : t("ui.willFold")
         : isSource
-          ? "本列"
+          ? t("ui.thisColumn")
           : null
     const toggle = () => onToggleOverride(slot.id)
     cells.push(
@@ -90,7 +96,7 @@ export function SelectionPlacementMap({
     <div
       className="slotmap"
       role="group"
-      aria-label="新分支的放置目标（点小格指定让位列）"
+      aria-label={t("ui.chooseWhereToPlaceTheNew")}
     >
       {cells}
     </div>

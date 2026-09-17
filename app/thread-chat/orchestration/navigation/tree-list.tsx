@@ -33,6 +33,8 @@ import { dialogCloseToShell } from "../overlays/dialog-close-to-shell"
 import { ShortcutHint } from "../overlays/shortcut-hint"
 import { useScrollMemory } from "../../scroll/use-scroll-memory"
 import { TreeListRow } from "./tree-list-row"
+import { useI18n } from "@/lib/i18n/client"
+
 
 export interface TreeListProps {
   /** 当前打开的树（用于高亮置顶与「未保存」合成） */
@@ -81,6 +83,8 @@ export function TreeList({
   closing = false,
   container,
 }: TreeListProps) {
+  const { t } = useI18n()
+
   const listRef = useScrollMemory("project-list", { ready: items !== null })
   /** 内联重命名中的树 id + 草稿 */
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -145,12 +149,12 @@ export function TreeList({
     setEditingId(null)
     if (next === "" || next === prev) return
     if (next.length > CUSTOM_TITLE_MAX_LEN) {
-      onToast(`标题最长 ${CUSTOM_TITLE_MAX_LEN} 字，未保存`)
+      onToast(t("chat.titleLimit", { limit: CUSTOM_TITLE_MAX_LEN }))
       return
     }
     // 乐观改本地列表；未入库的当前树没有可 PATCH 的行，直接提示
     if (id === currentTreeId && currentSaved === null) {
-      onToast("当前对话尚未保存，发出第一条消息后才能重命名")
+      onToast(t("ui.sendTheFirstMessageBeforeRenaming"))
       return
     }
     renameItem(id, next)
@@ -159,7 +163,7 @@ export function TreeList({
         if (id === currentTreeId) onRenamedCurrent?.(next)
       })
       .catch(() => {
-        onToast("重命名失败，已恢复原名")
+        onToast(t("ui.renameFailedTheOriginalNameHas"))
       })
   }
 
@@ -171,7 +175,7 @@ export function TreeList({
       await deleteItem(id)
     } catch {
       setDeletingId(null)
-      onToast("删除失败，请重试")
+      onToast(t("ui.couldNotDeletePleaseTryAgain"))
       return
     }
     const remaining = (items ?? []).filter((t) => t.id !== id)
@@ -181,7 +185,7 @@ export function TreeList({
       const next = remaining.find((t) => t.id !== currentTreeId)
       onDeleteCurrent(next?.id ?? null)
     } else {
-      onToast("对话已删除")
+      onToast(t("ui.conversationDeleted"))
     }
   }
 
@@ -206,8 +210,7 @@ export function TreeList({
         >
           <div className="swx-title">
             <ListTodo size={14} />
-            对话列表
-            <ShortcutHint
+            {t("chat.list")}<ShortcutHint
               {...THREAD_CHAT_SHORTCUTS.openTreeList}
               className="ml-auto shrink-0"
             />
@@ -215,7 +218,7 @@ export function TreeList({
               <div
                 className="tlx-refresh"
                 role="progressbar"
-                aria-label="正在更新对话列表"
+                aria-label={t("ui.updatingConversations")}
               >
                 <span />
               </div>
@@ -223,10 +226,10 @@ export function TreeList({
           </div>
           <div className="swx-list" ref={listRef}>
             {items === null && !loadFailed && (
-              <div className="swx-empty">加载中…</div>
+              <div className="swx-empty">{t("common.loading")}</div>
             )}
             {items === null && loadFailed && (
-              <div className="swx-empty">加载失败，请稍后重新打开</div>
+              <div className="swx-empty">{t("ui.couldNotLoadPleaseReopenLater")}</div>
             )}
             {items !== null &&
               rows.map(({ item, isCurrent, unsaved }) => {
@@ -261,16 +264,14 @@ export function TreeList({
               })}
             {items !== null && rows.length === 1 && rows[0].unsaved && (
               <div className="swx-empty">
-                还没有保存过的对话——发出第一条消息即自动保存
-              </div>
+                {t("ui.noSavedConversationsYetSendingYour")}</div>
             )}
           </div>
           <div className="swx-foot">
-            <span>点击切换</span>
-            <span>悬停条目可重命名 / 删除</span>
+            <span>{t("ui.clickToSwitch")}</span>
+            <span>{t("ui.hoverToRenameOrDelete")}</span>
             <span>
-              <ShortcutHint {...THREAD_CHAT_SHORTCUTS.closeDialog} /> 关闭
-            </span>
+              <ShortcutHint {...THREAD_CHAT_SHORTCUTS.closeDialog} /> {t("common.close")}</span>
           </div>
         </DialogPrimitive.Popup>
       </DialogPortal>

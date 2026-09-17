@@ -5,9 +5,13 @@ import { useRouter } from "next/navigation"
 import { LogOutIcon } from "lucide-react"
 import { signOut, useSession } from "@/lib/auth/client"
 import { TooltipIconButton } from "@/components/assistant-ui/tooltip-icon-button"
+import { useI18n } from "@/lib/i18n/client"
+
 
 // 侧栏底部的账户信息：点击进入账户/充值页；expanded 时额外显示登出按钮。
 export function UserMenu({ collapsed }: { collapsed?: boolean }) {
+  const { t } = useI18n()
+
   const router = useRouter()
   const { data: session, isPending } = useSession()
 
@@ -30,7 +34,7 @@ export function UserMenu({ collapsed }: { collapsed?: boolean }) {
     >
       <Link
         href="/account"
-        title={collapsed ? `${label}（账户与充值）` : "账户与充值"}
+        title={collapsed ? t("common.accountFor", { name: label }) : t("ui.accountAndCredit")}
         className="flex min-w-0 flex-1 items-center gap-2 rounded-md px-1.5 py-1.5 transition-colors hover:bg-accent"
       >
         <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-accent text-xs font-medium text-accent-foreground">
@@ -49,7 +53,7 @@ export function UserMenu({ collapsed }: { collapsed?: boolean }) {
       </Link>
       {!collapsed && (
         <TooltipIconButton
-          tooltip="登出"
+          tooltip={t("ui.signOut")}
           side="top"
           variant="ghost"
           size="icon"

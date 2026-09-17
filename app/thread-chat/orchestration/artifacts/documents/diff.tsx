@@ -3,11 +3,13 @@
 import { ChevronRight } from "lucide-react"
 import { useEffect, useMemo, useState } from "react"
 import { diffLines, diffWordsWithSpace } from "diff"
-import { DOCUMENT_UI_COPY } from "@/constants/project-documents"
+import { DOCUMENT_UI_KEYS } from "@/constants/project-documents"
 import type { ArtifactDTO } from "@/lib/thread-chat/contracts/dto"
 import type { DocumentRevisionSummaryDTO } from "@/lib/thread-chat/contracts/document"
 import type { ThreadChatClient } from "../../../net/client"
 import { ArtifactDiffSkeleton } from "../skeleton"
+import { useI18n } from "@/lib/i18n/client"
+
 
 /** 变更行上下保留的上下文行数；更长的未变更段折叠成「省略 N 行」。 */
 const DIFF_CONTEXT_LINES = 1
@@ -98,6 +100,8 @@ export function DocumentDiff({
   after: ArtifactDTO
   client: ThreadChatClient
 }) {
+  const { t } = useI18n()
+
   const [open, setOpen] = useState(false)
   const [previous, setPrevious] = useState<ArtifactDTO | null>(null)
   const [error, setError] = useState(false)
@@ -137,10 +141,9 @@ export function DocumentDiff({
         onClick={() => setOpen((value) => !value)}
       >
         <ChevronRight size={12} aria-hidden="true" />
-        版本差异
-      </button>
+        {t("ui.versionChanges")}</button>
       {open && (
-        <div className="artifact-diff-panel" aria-label="版本差异">
+        <div className="artifact-diff-panel" aria-label={t("ui.versionChanges")}>
           <p className="artifact-diff-head">
             <span>
               V{before.revisionNumber} → V{after.document?.revisionNumber}
@@ -153,21 +156,19 @@ export function DocumentDiff({
           </p>
           {error ? (
             <p role="alert">
-              {DOCUMENT_UI_COPY.diffFailed}
+              {t(DOCUMENT_UI_KEYS.diffFailed)}
               <button type="button" onClick={() => setRetry((v) => v + 1)}>
-                重新加载差异
-              </button>
+                {t("ui.reloadChanges")}</button>
             </p>
           ) : !result ? (
             <ArtifactDiffSkeleton />
           ) : result.rows.length === 0 ? (
-            <p role="status">两个版本内容一致。</p>
+            <p role="status">{t("ui.theseVersionsHaveIdenticalContent")}</p>
           ) : (
             result.rows.map((row, index) =>
               row.kind === "gap" ? (
                 <p key={index} className="artifact-diff-gap">
-                  ··· 省略 {row.count} 行未变更内容 ···
-                </p>
+                  {t("ui.omitted")}{row.count} {t("ui.unchangedLines")}</p>
               ) : (
                 <div key={index} className={`artifact-diff-line ${row.kind}`}>
                   <span className="artifact-diff-sign" aria-hidden="true">

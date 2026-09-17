@@ -61,6 +61,8 @@ import {
   BUBBLE_TAIL_MARGIN,
   BUBBLE_W,
 } from "@/constants/selection-bubble"
+import { useI18n } from "@/lib/i18n/client"
+
 
 export type { SelectionInfo } from "./use-assistant-text-selection"
 
@@ -90,6 +92,8 @@ export function SelectionBubble({
   maxExpanded,
   lastActiveOf,
 }: SelectionBubbleProps) {
+  const { t } = useI18n()
+
   const draftStore = useComposerDraftStore()
   const mobile = useIsMobile()
   const [panel, setPanel] = useState<"toolbar" | "question">("toolbar")
@@ -296,19 +300,19 @@ export function SelectionBubble({
   /* —— 按钮文案四态（优先级）：列条 override > ⌘ 按住 > 有输入 > 默认 —— */
   // 按钮只表达「动作」（两态、长度稳定）；「放置后果」下沉到列条下的提示行——
   // 变长的列标题在提示行里可单行省略，按钮宽度不再被撑爆（用户定的通用方案）
-  const btnLabel = hasQuestion ? "带着问题开分支" : "开启分支讨论"
+  const btnLabel = hasQuestion ? t("ui.openABranchWithYourQuestion") : t("ui.startABranchDiscussion")
 
   /** 放置后果提示行：override 优先，其次 ⌘ 跟踪态，否则读 placement 预览 */
   const placeHint = ov
-    ? `将${mode === "replace" ? "替换" : "折叠"}『${threadTitle(state, ov)}』`
+    ? t("chat.willPlace", { action: mode === "replace" ? t("ui.replace") : t("ui.fold"), title: threadTitle(state, ov) })
     : metaHeld
-      ? "⌘ 保留本列 · 新列开在紧邻右侧"
+      ? t("ui.keepThisColumnOpenNextTo")
       : preview?.replaceId
-        ? `默认替换『${threadTitle(state, preview.replaceId)}』（点小格可换）`
+        ? t("chat.defaultReplace", { title: threadTitle(state, preview.replaceId) })
         : preview?.foldId
-          ? `默认折叠『${threadTitle(state, preview.foldId)}』（点小格可换）`
+          ? t("chat.defaultFold", { title: threadTitle(state, preview.foldId) })
           : preview
-            ? "将在右侧新开一列"
+            ? t("ui.aNewColumnWillOpenOn")
             : null
 
   /** 统一提交：按钮点击与输入框 Enter 共用（事件瞬时修饰键与跟踪态任一为真即 keepSource）。
@@ -383,7 +387,7 @@ export function SelectionBubble({
           )}
         </div>
         <div className="sb-content" ref={contentRef}>
-          <div className="lbl">在新分支中讨论这段</div>
+          <div className="lbl">{t("ui.discussThisInANewBranch")}</div>
           <div className="quote">{sel.text}</div>
           <div className="ask">
             <textarea
@@ -396,9 +400,9 @@ export function SelectionBubble({
                   "--selection-question-max-height": `${SELECTION_QUESTION_MAX_HEIGHT}px`,
                 } as React.CSSProperties
               }
-              placeholder="就这段问点什么…（可留空）"
+              placeholder={t("ui.askAboutThisTextOptional")}
               enterKeyHint="enter"
-              aria-label="就这段划选文字提出你的问题（可留空，留空则预填代拟问题待确认）"
+              aria-label={t("ui.askAboutTheSelectedTextOr")}
               onChange={(e) => {
                 setQuestion(e.target.value)
                 // 自增高：到达同一尺寸源定义的上限后转为内部滚动。
@@ -447,8 +451,7 @@ export function SelectionBubble({
         {/* 有草稿时新划选被忽略的轻提示：绝对定位悬挂在面板外，不改变面板高度/定位 */}
         {draftHint && (
           <div className="draft-hint" role="status">
-            已有草稿 · 提交或清空后才能换划选
-          </div>
+            {t("ui.draftInProgressSendOrClear")}</div>
         )}
       </div>
       {/* Esc 确认弹窗：提示会清空已输入内容；点遮罩 / 再按 Esc = 继续编辑（保留内容） */}
@@ -469,22 +472,18 @@ export function SelectionBubble({
             onMouseDown={(e) => e.stopPropagation()}
           >
             <div className="sb-confirm-title" id="sb-confirm-title">
-              清空输入内容？
-            </div>
+              {t("ui.clearYourDraft")}</div>
             <div className="sb-confirm-body" id="sb-confirm-desc">
-              气泡里已输入的内容将被清空，划选分支也会关闭，此操作不可撤销。
-            </div>
+              {t("ui.thisWillClearYourDraftAnd")}</div>
             <div className="sb-confirm-actions">
               <button
                 className="ghost"
                 autoFocus
                 onClick={() => setConfirming(false)}
               >
-                继续编辑
-              </button>
+                {t("ui.keepEditing")}</button>
               <button className="danger" onClick={discardDraft}>
-                清空并关闭
-              </button>
+                {t("ui.clearAndClose")}</button>
             </div>
           </div>
         </div>

@@ -17,12 +17,17 @@ import { $importComposerDraft } from "./composer-codec"
 import { ComposerSyncPlugin } from "./composer-sync-plugin"
 import { ComposerSubmitPlugin } from "./composer-submit-plugin"
 import { ArtifactMentionPlugin } from "./artifact-mention-plugin"
+import { useI18n } from "@/lib/i18n/client"
 
-export function MessageEditor({ scope, draft, revision = 0, artifacts, onChange, onSubmit, editorRef, placeholder = "输入问题…", mentions = true, disabled = false, className }: {
+
+export function MessageEditor({ scope, draft, revision = 0, artifacts, onChange, onSubmit, editorRef, placeholder, mentions = true, disabled = false, className }: {
   scope?: string; draft: ThreadComposerDraft; revision?: number; artifacts: Record<string, ArtifactSummaryDTO>;
   onChange: (draft: ThreadComposerDraft) => void; onSubmit?: () => void;
   editorRef?: RefObject<LexicalEditor | null>; placeholder?: string; mentions?: boolean; disabled?: boolean; className?: string
 }) {
+  const { t } = useI18n()
+
+  const placeholderText = placeholder ?? t("ui.askAQuestion")
   const [initialConfig] = useState(() => ({
     namespace: "thread-chat-message", nodes: [ComposerCapsuleNode],
     onError: (error: Error) => { throw error },
@@ -30,7 +35,7 @@ export function MessageEditor({ scope, draft, revision = 0, artifacts, onChange,
   }))
   return <LexicalComposer initialConfig={initialConfig}>
     <div className={`composer-editor-wrap${className ? ` ${className}` : ""}`}>
-      <PlainTextPlugin contentEditable={<ContentEditable className="composer-editor" aria-label={placeholder} enterKeyHint="enter" placeholder={null} />} placeholder={<span className="composer-placeholder">{placeholder}</span>} ErrorBoundary={LexicalErrorBoundary} />
+      <PlainTextPlugin contentEditable={<ContentEditable className="composer-editor" aria-label={placeholderText} enterKeyHint="enter" placeholder={null} />} placeholder={<span className="composer-placeholder">{placeholderText}</span>} ErrorBoundary={LexicalErrorBoundary} />
     </div>
     <HistoryPlugin />
     <ComposerClipboardPlugin />

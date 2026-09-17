@@ -6,7 +6,7 @@ import { db } from "@/lib/db"
 import { user, session, account, verification } from "@/lib/db/schema"
 import { ensureUserCredits } from "@/lib/billing/credits"
 import { isEmailConfigured, sendEmail } from "@/lib/email/client"
-import { verificationEmail, resetPasswordEmail } from "@/lib/email/templates"
+import { verificationEmail, resetPasswordEmail, authEmailLocale } from "@/lib/email/templates"
 import { getGoogleAuthConfig } from "@/lib/auth/social"
 
 // 邮箱验证是否可用：需已配置邮件服务。未配置时（如本地开发）优雅降级为「注册即用」，
@@ -36,6 +36,7 @@ if (TURNSTILE_SECRET) {
 plugins.push(nextCookies())
 
 export const auth = betterAuth({
+  user: { additionalFields: { locale: { type: "string", required: false, input: false } } },
   advanced: authCookiePrefix ? { cookiePrefix: authCookiePrefix } : undefined,
   database: drizzleAdapter(db, {
     provider: "pg",
@@ -48,18 +49,18 @@ export const auth = betterAuth({
     // 配了邮件服务才强制邮箱验证；否则注册后直接可用（开发友好）。
     requireEmailVerification: emailReady,
     // 找回密码：发送重置链接邮件。
-    sendResetPassword: async ({ user: u, url }) => {
-      const { subject, html } = resetPasswordEmail(url)
-      await sendEmail({ to: u.email, subject, html })
+    sendResetPassword: async ({ user: u, url }, request) => {
+      const email = resetPasswordEmail(url, authEmailLocale("locale" in u ? u.locale : null, request))
+      await sendEmail({ to: u.email, ...email })
     },
   },
   emailVerification: {
     // 注册后自动发验证邮件（仅在邮件服务就绪时）。
     sendOnSignUp: emailReady,
     autoSignInAfterVerification: true,
-    sendVerificationEmail: async ({ user: u, url }) => {
-      const { subject, html } = verificationEmail(url)
-      await sendEmail({ to: u.email, subject, html })
+    sendVerificationEmail: async ({ user: u, url }, request) => {
+      const email = verificationEmail(url, authEmailLocale("locale" in u ? u.locale : null, request))
+      await sendEmail({ to: u.email, ...email })
     },
     // 关键防薅：初始额度改到「邮箱验证通过后」才发放，抬高白嫖门槛。
     afterEmailVerification: async (verifiedUser) => {

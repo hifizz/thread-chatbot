@@ -2,7 +2,7 @@
 
 import { ARTIFACT_REFERENCE_COPY } from "@/constants/artifact-reference"
 import { COMPOSER_ATTACHMENT_COPY } from "@/constants/attachment"
-import { COMPOSER_MODEL_COPY } from "@/constants/composer-model"
+import { COMPOSER_MODEL_KEYS } from "@/constants/composer-model"
 import { Composer, ComposerActions, ComposerAttachButton, ComposerBar, ComposerSend, ComposerToolbar } from "@/components/assistant-ui/elements/composer/layout"
 import { ComposerVoiceButton } from "@/components/assistant-ui/elements/composer/voice"
 import { ComposerTheme } from "@/components/assistant-ui/elements/composer/theme"
@@ -15,6 +15,8 @@ import { useComposerAttachmentInput } from "./use-composer-attachment-input"
 import { useConversationComposer } from "./use-conversation-composer"
 import type { ConversationComposerProps } from "./conversation-composer-types"
 import styles from "./artifact-composer.module.css"
+import { useI18n } from "@/lib/i18n/client"
+
 
 export function ConversationComposer(props: ConversationComposerProps) {
   return <ComposerTheme key={props.threadId} className={props.variant === "canvas" ? `${styles.frame} ${styles.canvasFrame}` : styles.frame}>
@@ -23,6 +25,8 @@ export function ConversationComposer(props: ConversationComposerProps) {
 }
 
 function ComposerContent(props: ConversationComposerProps) {
+  const { t } = useI18n()
+
   const { isMain, busy, modelId, modelSelectorDisabled, modelSelectorDisabledReason, onModelChange, onSend, onStop } = props
   const { artifacts, editorRef, attachments, submitting, changingModel, changeModel, entry, update, hasQuestion, attachmentsReady, submit } = useConversationComposer(props)
   const { fileInputRef, inputProps, surfaceProps, openFilePicker } = useComposerAttachmentInput(attachments.add, submitting)
@@ -46,10 +50,10 @@ function ComposerContent(props: ConversationComposerProps) {
           <ComposerModelSelector modelId={modelId} disabled={!isMain || modelSelectorDisabled || busy || submitting || changingModel || !onModelChange}
             disabledReason={!isMain ? "branch" : modelSelectorDisabledReason ?? (busy || submitting ? "busy" : undefined)} onValueChange={changeModel} />
           {modelId && <GenerationSettingsControls modelId={modelId} disabled={!isMain || busy || submitting || changingModel}
-            disabledReason={!isMain ? COMPOSER_MODEL_COPY.branchLocked : COMPOSER_MODEL_COPY.busy} />}
+            disabledReason={!isMain ? t(COMPOSER_MODEL_KEYS.branchLocked) : t(COMPOSER_MODEL_KEYS.busy)} />}
         </ComposerActions>
         <ComposerActions className="ms-auto shrink-0">
-          <ComposerVoiceButton active={false} aria-label="语音输入" title="语音输入稍后接入" disabled className="size-7 opacity-30" />
+          <ComposerVoiceButton active={false} aria-label={t("ui.voiceInput")} title={t("ui.voiceInputIsNotAvailableYet")} disabled className="size-7 opacity-30" />
           <ComposerSend streaming={busy} idle={!hasQuestion} disabled={busy ? !onStop : submitting || changingModel || !hasQuestion || !attachmentsReady || !onSend}
             onClick={busy ? onStop : () => void submit()} />
         </ComposerActions>

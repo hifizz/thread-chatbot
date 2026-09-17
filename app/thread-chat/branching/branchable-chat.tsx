@@ -28,6 +28,8 @@ import { MessageArtifacts } from "../orchestration/artifacts/message-artifacts"
 import { AnchoredAssistantBody } from "./assistant/anchored-assistant-body"
 import type { MessageActionViewState } from "../chat/actions/message-action-types"
 import type { ThreadMessageActionCommands } from "../chat/actions/message-action-commands"
+import { useI18n } from "@/lib/i18n/client"
+
 
 export interface BranchableChatProps {
   state: ThreadTreeState
@@ -84,6 +86,8 @@ export function BranchableChat({
   messageActionState,
   messageCommands,
 }: BranchableChatProps) {
+  const { t } = useI18n()
+
   const thread = state.threads[threadId]
   if (!thread) return null
   const isMain = threadId === "main"
@@ -130,7 +134,7 @@ export function BranchableChat({
   const subtreeBtn = (
     <button
       className="cbtn tree"
-      title={`查看子分支（${childCount}）`}
+      title={t("chat.viewBranches", { count: childCount })}
       onClick={(e) => onOpenSubtree(e.currentTarget)}
     >
       <ListTree size={12} />
@@ -145,8 +149,8 @@ export function BranchableChat({
         {isMain ? (
           <>
             <div className="ctitle-row">
-              <span className="anchor-tag">锚定</span>
-              <span className="ctitle main">主线</span>
+              <span className="anchor-tag">{t("ui.pinned")}</span>
+              <span className="ctitle main">{t("chat.main")}</span>
               <div className="cactions">
                 {subtreeBtn}
                 {mainHeaderActions}
@@ -164,7 +168,7 @@ export function BranchableChat({
                     <span
                       className={here ? "here" : "seg2"}
                       onClick={here ? undefined : () => onCrumbNav(c.id)}
-                      title={here ? c.title : `回到「${c.title}」`}
+                      title={here ? c.title : t("chat.returnTo", { title: c.title })}
                     >
                       {c.title}
                     </span>
@@ -180,14 +184,12 @@ export function BranchableChat({
                 {subtreeBtn}
                 <button
                   className="cbtn"
-                  title="把本列切换为任意会话"
+                  title={t("ui.switchThisColumnToAnotherThread")}
                   onClick={(e) => onOpenSwitcher(e.currentTarget)}
                 >
-                  ⇄ 切换
-                </button>
-                <button className="cbtn" title="收起本列" onClick={onCollapse}>
-                  收起
-                </button>
+                  {t("ui.switch")}</button>
+                <button className="cbtn" title={t("ui.collapseThisColumn")} onClick={onCollapse}>
+                  {t("ui.collapse")}</button>
               </div>
             </div>
           </>
@@ -204,12 +206,11 @@ export function BranchableChat({
         <span className="fn">{thread.footnote}</span>
         <div className="ft">
           <span className="lbl">
-            讨论焦点 · 划选自
-            {sourceArtifact ? (
+            {t("ui.discussionFocusSelectedFrom2")}{sourceArtifact ? (
               <button
                 type="button"
                 className="focus-source-artifact"
-                title={`打开来源文档「${sourceArtifact.title}」并定位原文`}
+                title={t("chat.sourceDocument", { title: sourceArtifact.title })}
                 onClick={() =>
                   onOpenArtifact(
                     sourceArtifact.id,
@@ -221,13 +222,13 @@ export function BranchableChat({
                 《{sourceArtifact.title}》
               </button>
             ) : thread.parentId === "main" ? (
-              "主线"
+              t("chat.main")
             ) : (
               `「${threadTitle(state, thread.parentId!)}」`
             )}
           </span>
           <details className="focus-quote">
-            <summary title="展开或收起完整引用">
+            <summary title={t("ui.expandOrCollapseTheFullQuote")}>
               <q>{thread.anchorText}</q>
             </summary>
             <q className="focus-quote-full">{thread.anchorText}</q>
@@ -235,18 +236,17 @@ export function BranchableChat({
         </div>
         {sourceProvenance && !sourceProvenance.isOnActivePath && (
           <div className="inactive-source">
-            <span>基于历史回复 · 当前时间线不展示该回复</span>
+            <span>{t("ui.basedOnAHistoricalReplyNot")}</span>
           </div>
         )}
       </div>
       <details className="inherited">
         <summary>
-          <span className="tw">▸</span>继承的上文 · {inherited.length} 条
-        </summary>
+          <span className="tw">▸</span>{t("ui.inheritedContext")}{inherited.length} {t("ui.messages")}</summary>
         <div className="inherited-body">
           {inherited.map((m) => (
             <div key={m.id} className="inh-msg">
-              <span className="who">{m.role === "user" ? "你" : "AI"}</span>
+              <span className="who">{m.role === "user" ? t("ui.you2") : "AI"}</span>
               {m.text.length > 130 ? m.text.slice(0, 130) + "…" : m.text}
             </div>
           ))}

@@ -1,24 +1,25 @@
+import type { MessageKey } from "@/lib/i18n/dictionary"
 import type { Message, ConversationViewMessage, MessageFeedback } from "../../core/types"
 import type { ThreadMessageActionCommands } from "./message-action-commands"
 import type { SourceProvenance } from "../../core/message-graph"
 
-export const MESSAGE_ACTION_LABELS = {
-  toolbar: "消息操作",
-  copy: "复制",
-  copied: "已复制",
-  edit: "重新编辑",
-  regenerate: "重新生成",
-  positive: "点赞",
-  negative: "点踩",
-} as const
+export const MESSAGE_ACTION_LABEL_KEYS = {
+  toolbar: "ui.messageActions",
+  copy: "chat.copy",
+  copied: "chat.copied",
+  edit: "ui.editAgain",
+  regenerate: "chat.regenerate",
+  positive: "ui.helpful",
+  negative: "ui.notHelpful",
+} as const satisfies Record<string, MessageKey>
 
-export const MESSAGE_ACTION_ERRORS = {
-  clipboard: "复制失败，请检查浏览器剪贴板权限",
-  latestUserOnly: "仅支持编辑当前最后一轮",
-  latestAssistantOnly: "仅支持重新生成当前最后一轮",
-  noMarkdown: "该回复没有可复制的 Markdown 正文",
-  feedbackSave: "反馈保存失败，请重试",
-} as const
+export const MESSAGE_ACTION_ERROR_KEYS = {
+  clipboard: "ui.couldNotCopyCheckYourBrowser",
+  latestUserOnly: "ui.onlyTheLatestTurnCanBe",
+  latestAssistantOnly: "ui.onlyTheLatestTurnCanBe2",
+  noMarkdown: "ui.thisReplyHasNoMarkdownContent",
+  feedbackSave: "ui.couldNotSaveYourFeedbackPlease",
+} as const satisfies Record<string, MessageKey>
 
 /** Legacy recovery UI shape retained only as a read-only presentation slot. */
 export interface RecoverableTurn {

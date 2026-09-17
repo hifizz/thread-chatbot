@@ -7,13 +7,15 @@ import { useArtifactResources } from "../composer/artifact-resources"
 import { useState } from "react"
 import { Check, Copy, Pencil, RotateCcw, X } from "lucide-react"
 import {
-  MESSAGE_ACTION_ERRORS,
-  MESSAGE_ACTION_LABELS,
+  MESSAGE_ACTION_ERROR_KEYS,
+  MESSAGE_ACTION_LABEL_KEYS,
   type EditableUserMessageProps,
 } from "../actions/message-action-types"
 import { MessageToolbar } from "../actions/message-toolbar"
 import { useCopyMarkdown } from "../actions/use-copy-markdown"
 import { UserMessageContent } from "./user-message-content"
+import { useI18n } from "@/lib/i18n/client"
+
 
 export function EditableUserMessage({
   threadId,
@@ -22,6 +24,8 @@ export function EditableUserMessage({
   recovery,
   commands,
 }: EditableUserMessageProps) {
+  const { t } = useI18n()
+
   const [editing, setEditing] = useState(false)
   const artifacts = useArtifactResources()
   const restoreDraft = () => messagePartsToComposerDraft(message.uiParts ?? [{ type: "text", text: message.text }])
@@ -34,7 +38,7 @@ export function EditableUserMessage({
   const submit = async () => {
     if (submitting) return
     const parsed = (() => { try { return composerDraftToMessageContent(draft) } catch { return null } })()
-    if (!parsed) { setError("请保留有效问题文字"); return }
+    if (!parsed) { setError(t("ui.pleaseKeepSomeQuestionText")); return }
     setSubmitting(true)
     setError(null)
     const result = await commands.editAndRegenerate(threadId, message.id, parsed)
@@ -60,7 +64,7 @@ export function EditableUserMessage({
       >
         {editing ? (
           <>
-            <MessageEditor disabled={submitting} draft={draft} artifacts={artifacts} onChange={setDraft} onSubmit={() => void submit()} placeholder="编辑用户消息" mentions={false} />
+            <MessageEditor disabled={submitting} draft={draft} artifacts={artifacts} onChange={setDraft} onSubmit={() => void submit()} placeholder={t("ui.editUserMessage")} mentions={false} />
             <div className="user-edit-actions">
               <button
                 type="button"
@@ -72,15 +76,14 @@ export function EditableUserMessage({
                 disabled={submitting}
               >
                 <X size={14} />
-                取消
-              </button>
+                {t("common.cancel")}</button>
               <button
                 type="button"
                 className="primary"
                 onClick={() => void submit()}
                 disabled={submitting || !draft.parts.some((part) => part.type === "text" && part.text.trim())}
               >
-                {submitting ? "提交中…" : "发送"}
+                {submitting ? t("auth.submitting") : t("chat.send")}
               </button>
             </div>
           </>
@@ -95,40 +98,39 @@ export function EditableUserMessage({
             {
               key: "copy",
               label: copied
-                ? MESSAGE_ACTION_LABELS.copied
-                : MESSAGE_ACTION_LABELS.copy,
+                ? t(MESSAGE_ACTION_LABEL_KEYS.copied)
+                : t(MESSAGE_ACTION_LABEL_KEYS.copy),
               icon: copied ? Check : Copy,
               onSelect: () => void copy(message.text),
             },
             {
               key: "edit",
-              label: MESSAGE_ACTION_LABELS.edit,
+              label: t(MESSAGE_ACTION_LABEL_KEYS.edit),
               icon: Pencil,
               onSelect: () => {
                 setDraft(restoreDraft())
                 setEditing(true)
               },
               disabled: !editable,
-              disabledReason: MESSAGE_ACTION_ERRORS.latestUserOnly,
+              disabledReason: t(MESSAGE_ACTION_ERROR_KEYS.latestUserOnly),
             },
           ]}
         />
       )}
       {recovery && (
         <div className="recoverable-turn" role="status">
-          <span>这条消息没有可恢复的 AI 回复。</span>
+          <span>{t("ui.thereIsNoRecoverableAiReply")}</span>
           <button
             type="button"
             disabled={retrying}
             onClick={() => void retry()}
           >
             <RotateCcw size={13} />
-            {retrying ? "重试中…" : "重试"}
+            {retrying ? t("ui.retrying") : t("common.retry")}
           </button>
           <button type="button" onClick={() => setEditing(true)}>
             <Pencil size={13} />
-            编辑后重试
-          </button>
+            {t("ui.editAndRetry")}</button>
         </div>
       )}
       {error && (
