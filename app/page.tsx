@@ -15,7 +15,7 @@ import { LANDING_COPY } from "@/constants/landing"
 export const metadata: Metadata = {
   title: "Thread Chat — 一款能开分叉的 AI",
   description:
-    "做调研、写方案、学知识：从一句话开启分支，带着已有背景深入讨论；主线与分支并排阅读，需要时再把结论带回来。",
+    "做调研、写方案、学知识：从一句话开启分支，继承上下文深入讨论，在子话题继续开启分支，直到心中的问题都被解答。",
 }
 
 export default function LandingPage(): ReactElement {
