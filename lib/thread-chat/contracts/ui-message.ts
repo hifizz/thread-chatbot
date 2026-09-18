@@ -72,8 +72,8 @@ export type ThreadChatTools = {
     input: { path: string; startLine?: number; endLine?: number }
     output: unknown
   }
-  findRepositoryPaths: {
-    input: { query: string }
+  searchRepositoryCode: {
+    input: { query: string; path?: string }
     output: unknown
   }
   dispatchAgentTask: {

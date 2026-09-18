@@ -1,14 +1,17 @@
-// 仓库只读工具：listRepositoryFiles / readRepositoryFile / findRepositoryPaths。
+// 仓库只读工具：listRepositoryFiles / readRepositoryFile / searchRepositoryCode。
+// 数据来自服务端本地缓存的仓库 tarball 检出（见 lib/github/repo-cache.ts）。
 // 仓库与 commit 由服务端闭包固定，模型不能通过参数指定其他仓库。
 
 import { tool } from "ai"
 import { z } from "zod"
 import {
-  findRepositoryPaths,
-  listRepositoryFiles,
-  readRepositoryFile,
-  type RepositoryReadContext,
-} from "@/lib/github/repo-reader"
+  ensureRepoCheckout,
+  grepRepo,
+  listRepoDir,
+  readRepoFile,
+  type RepoCheckout,
+} from "@/lib/github/repo-cache"
+import type { RepoReadError } from "@/lib/github/repo-reader"
 
 // 测试阶段放宽上限；产品化时应收紧并结合 token 预算控制
 const MAX_CALLS_PER_TURN = 100
@@ -22,12 +25,21 @@ export interface RepoToolContext {
 
 export function createRepoReadTools(ctx: RepoToolContext) {
   let callsThisTurn = 0
-  const readContext: RepositoryReadContext = {
-    repositoryFullName: ctx.repositoryFullName,
-    branch: ctx.branch,
-    commitSha: ctx.commitSha,
-    token: ctx.token,
+  let checkoutPromise: Promise<RepoCheckout> | null = null
+
+  // 首次调用（或创建时预热）触发 tarball 下载解压；同一 commit 命中进程/磁盘缓存。
+  function checkout(): Promise<RepoCheckout> {
+    if (!checkoutPromise) {
+      checkoutPromise = ensureRepoCheckout({
+        repositoryFullName: ctx.repositoryFullName,
+        commitSha: ctx.commitSha,
+        token: ctx.token,
+      })
+    }
+    return checkoutPromise
   }
+  // fire-and-forget 预热：模型思考期间先开始下载
+  void checkout().catch(() => {})
 
   function checkBudget() {
     if (callsThisTurn >= MAX_CALLS_PER_TURN) {
@@ -41,6 +53,17 @@ export function createRepoReadTools(ctx: RepoToolContext) {
     return null
   }
 
+  async function withCheckout<T>(
+    run: (checkout: RepoCheckout) => Promise<{ ok: true; data: T } | RepoReadError>
+  ) {
+    try {
+      return await run(await checkout())
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      return { ok: false as const, code: "server_error" as const, message: `仓库检出失败：${message}` }
+    }
+  }
+
   const listRepositoryFilesTool = tool({
     description:
       "列出 GitHub 仓库中指定目录下的文件和子目录。path 为空或 '/' 表示仓库根目录。返回文件名、路径、类型和大小。",
@@ -52,9 +75,11 @@ export function createRepoReadTools(ctx: RepoToolContext) {
     execute: async ({ path }) => {
       const budget = checkBudget()
       if (budget) return budget
-      const result = await listRepositoryFiles(readContext, path || "/")
-      if (!result.ok) return result
-      return { ok: true, data: { entries: result.data, commitSha: ctx.commitSha } }
+      return withCheckout(async (c) => {
+        const result = await listRepoDir(c, path || "/")
+        if (!result.ok) return result
+        return { ok: true as const, data: { entries: result.data, commitSha: ctx.commitSha } }
+      })
     },
   })
 
@@ -79,30 +104,40 @@ export function createRepoReadTools(ctx: RepoToolContext) {
     execute: async ({ path, startLine, endLine }) => {
       const budget = checkBudget()
       if (budget) return budget
-      const result = await readRepositoryFile(readContext, path, startLine, endLine)
-      return result
+      return withCheckout((c) => readRepoFile(c, path, startLine, endLine))
     },
   })
 
-  const findRepositoryPathsTool = tool({
+  const searchRepositoryCodeTool = tool({
     description:
-      "按文件路径关键词查找仓库中的文件路径（不是内容搜索）。query 是路径子串，如 'auth' 匹配所有路径含 'auth' 的文件。返回匹配的路径列表。",
+      "在仓库文件内容中做正则搜索（类似 grep）。query 是正则表达式，含大写字母时区分大小写；可选 path 限定搜索的子目录。返回匹配的文件路径、行号和行内容（最多 100 条）。",
     inputSchema: z.object({
-      query: z.string().describe("路径关键词，如 'auth'、'login'、'api/route'"),
+      query: z
+        .string()
+        .describe("搜索正则，如 'useState'、'function\\s+auth'；非法正则自动按字面量处理"),
+      path: z
+        .string()
+        .optional()
+        .describe("限定搜索的子目录，如 'src'；缺省搜索整个仓库"),
     }),
-    execute: async ({ query }) => {
+    execute: async ({ query, path }) => {
       const budget = checkBudget()
       if (budget) return budget
-      const result = await findRepositoryPaths(readContext, query)
-      if (!result.ok) return result
-      return { ok: true, data: { ...result.data, commitSha: ctx.commitSha } }
+      return withCheckout(async (c) => {
+        const result = await grepRepo(c, query, path)
+        if (!result.ok) return result
+        return {
+          ok: true as const,
+          data: { ...result.data, matchCount: result.data.matches.length, commitSha: ctx.commitSha },
+        }
+      })
     },
   })
 
   return {
     listRepositoryFiles: listRepositoryFilesTool,
     readRepositoryFile: readRepositoryFileTool,
-    findRepositoryPaths: findRepositoryPathsTool,
+    searchRepositoryCode: searchRepositoryCodeTool,
   }
 }
 

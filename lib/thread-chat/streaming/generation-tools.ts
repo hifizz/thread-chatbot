@@ -44,7 +44,7 @@ export function buildGenerationTools(input: {
       ? {
           listRepositoryFiles: input.repoTools.listRepositoryFiles,
           readRepositoryFile: input.repoTools.readRepositoryFile,
-          findRepositoryPaths: input.repoTools.findRepositoryPaths,
+          searchRepositoryCode: input.repoTools.searchRepositoryCode,
         }
       : {}),
     ...(input.agentTaskTools
