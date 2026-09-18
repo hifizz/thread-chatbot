@@ -36,6 +36,8 @@ export interface ChatViewProps {
   intro?: React.ReactNode
   /** 注入 assistant 正文渲染（锚点高亮 + 脚注上标） */
   renderAssistantBody?: (msg: ConversationViewMessage) => React.ReactNode
+  /** 注入 assistant 操作行的附加动作（与复制/点赞同排，如分叉入口） */
+  renderAssistantActions?: (msg: ConversationViewMessage) => React.ReactNode
   /** 注入 assistant 消息气泡之后的附加内容（artifact 卡片） */
   renderAfterMessage?: (msg: ConversationViewMessage) => React.ReactNode
   /** 流式生成中：发送键变「停止」（textarea 仍可输入，Enter 提交被拦） */
@@ -70,6 +72,7 @@ export function ChatView({
   banner,
   intro,
   renderAssistantBody,
+  renderAssistantActions,
   renderAfterMessage,
   busy = false,
   onRetry,
@@ -109,6 +112,7 @@ export function ChatView({
                         showRoleLabel
                         assistantBubbleClassName="bubble mt-3 mb-1"
                         renderAssistantBody={renderAssistantBody}
+                        renderAssistantActions={renderAssistantActions}
                         renderAfterMessage={renderAfterMessage}
                         onRetry={onRetry}
                         messageActionState={messageActionState}

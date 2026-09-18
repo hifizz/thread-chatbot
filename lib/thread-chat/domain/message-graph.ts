@@ -127,7 +127,7 @@ function validateThreadTopology(threads: Record<string, Thread>): void {
           child.forkFromMsgId !== message.id ||
           child.depth !== fork.depth ||
           child.footnote !== fork.num ||
-          child.anchorText !== fork.text
+          (child.anchorText ?? "") !== fork.text
         )
           throw new InvalidMessageGraphError(
             `Message ${message.id} has an invalid thread fork ${fork.threadId}`
@@ -159,7 +159,7 @@ function validateThreadTopology(threads: Record<string, Thread>): void {
       !sourceFork ||
       sourceFork.depth !== thread.depth ||
       sourceFork.num !== thread.footnote ||
-      sourceFork.text !== thread.anchorText
+      sourceFork.text !== (thread.anchorText ?? "")
     )
       throw new InvalidMessageGraphError(
         `Thread ${thread.id} has an invalid fork source`

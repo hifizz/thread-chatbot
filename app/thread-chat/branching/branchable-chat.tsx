@@ -1,5 +1,7 @@
 "use client"
 
+import { hasSelectedForkText } from "@/lib/thread-chat/domain/fork-origin"
+
 import type { MessageContentInput } from "@/lib/thread-chat/contracts/message-content"
 /**
  * branching/branchable-chat —— 装饰层：把「分支能力」注入单会话 ChatView。
@@ -26,6 +28,7 @@ import {
 import { ChatView } from "../chat/chat-view"
 import { MessageArtifacts } from "../orchestration/artifacts/message-artifacts"
 import { AnchoredAssistantBody } from "./assistant/anchored-assistant-body"
+import { MessageForkActions } from "./message-fork-actions"
 import type { MessageActionViewState } from "../chat/actions/message-action-types"
 import type { ThreadMessageActionCommands } from "../chat/actions/message-action-commands"
 
@@ -41,6 +44,7 @@ export interface BranchableChatProps {
       opts.keepSource：⌘/Ctrl 点击 = 保留本列，把目标开在紧邻右侧 */
   onOpenThread: (targetId: string, opts?: { keepSource?: boolean }) => void
   onOpenArtifact: (artifactId: string, anchor?: TextAnchor) => void
+  onForkMessage?: (message: Message) => Promise<void>
   /** 面包屑就地回退（collapse 语义由 orchestration 实现） */
   onCrumbNav: (targetId: string) => void
   /** ⇄ 把本列切换为任意会话（弹出 local 切换器，锚定在按钮上） */
@@ -73,6 +77,7 @@ export function BranchableChat({
   mainHeaderActions,
   onOpenThread,
   onOpenArtifact,
+  onForkMessage,
   onCrumbNav,
   onOpenSwitcher,
   onOpenSubtree,
@@ -118,7 +123,17 @@ export function BranchableChat({
     )
   }
 
-  /* ---------- 注入：消息下方的 artifact 卡片 ---------- */
+  /* ---------- 注入：assistant 操作行的分叉入口与消息下方的 artifact 卡片 ---------- */
+  const renderAssistantActions = (msg: Message) => {
+    return (
+      <MessageForkActions
+        state={state}
+        message={msg}
+        onFork={onForkMessage ? () => onForkMessage(msg) : undefined}
+        onOpenThread={onOpenThread}
+      />
+    )
+  }
   const renderAfterMessage = (msg: Message) => {
     return (
       <MessageArtifacts
@@ -207,7 +222,7 @@ export function BranchableChat({
         <span className="fn">{thread.footnote}</span>
         <div className="ft">
           <span className="lbl">
-            讨论焦点 · 划选自
+            {hasSelectedForkText(thread) ? "讨论焦点 · 划选自" : "分叉聊天 · 续接自"}
             {sourceArtifact ? (
               <button
                 type="button"
@@ -229,12 +244,14 @@ export function BranchableChat({
               `「${threadTitle(state, thread.parentId!)}」`
             )}
           </span>
-          <details className="focus-quote">
-            <summary title="展开或收起完整引用">
-              <q>{thread.anchorText}</q>
-            </summary>
-            <q className="focus-quote-full">{thread.anchorText}</q>
-          </details>
+          {hasSelectedForkText(thread) && (
+            <details className="focus-quote">
+              <summary title="展开或收起完整引用">
+                <q>{thread.anchorText}</q>
+              </summary>
+              <q className="focus-quote-full">{thread.anchorText}</q>
+            </details>
+          )}
         </div>
         {sourceProvenance && !sourceProvenance.isOnActivePath && (
           <div className="inactive-source">
@@ -267,6 +284,7 @@ export function BranchableChat({
       banner={banner}
       intro={intro}
       renderAssistantBody={renderAssistantBody}
+      renderAssistantActions={renderAssistantActions}
       renderAfterMessage={renderAfterMessage}
       busy={busy}
       onRetry={onRetry}

@@ -205,8 +205,9 @@ export const threads = dbSchema.table(
           ${table.footnote} is null and ${table.forkContext} = '[]'::jsonb)
         or
         (${table.parentId} is not null and ${table.depth} > 0 and
-          ${table.forkMessageId} is not null and ${table.forkAnchor} is not null and
-          ${table.anchorText} is not null and ${table.footnote} is not null and
+          ${table.forkMessageId} is not null and ${table.footnote} is not null and
+          ((${table.forkAnchor} is null and ${table.anchorText} is null and ${table.forkArtifactId} is null) or
+           (${table.forkAnchor} is not null and ${table.anchorText} is not null)) and
           jsonb_array_length(${table.forkContext}) > 0)
       )`
     ),

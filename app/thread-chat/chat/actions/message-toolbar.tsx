@@ -1,5 +1,6 @@
 "use client"
 
+import type { ReactNode } from "react"
 import type { LucideIcon } from "lucide-react"
 import {
   Tooltip,
@@ -30,9 +31,11 @@ export function messageToolbarTooltip(action: MessageToolbarAction): string {
 export function MessageToolbar({
   align,
   actions,
+  trailing,
 }: {
   align: "start" | "end"
   actions: readonly MessageToolbarAction[]
+  trailing?: ReactNode
 }) {
   return (
     <TooltipProvider delay={300}>
@@ -46,7 +49,7 @@ export function MessageToolbar({
           const button = (
             <button
               type="button"
-              className="message-action mt-1"
+              className="message-action"
               aria-label={action.label}
               aria-pressed={action.pressed}
               aria-busy={action.busy || undefined}
@@ -75,6 +78,7 @@ export function MessageToolbar({
             </Tooltip>
           )
         })}
+        {trailing}
       </div>
     </TooltipProvider>
   )

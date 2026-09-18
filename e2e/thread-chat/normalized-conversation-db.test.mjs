@@ -58,7 +58,7 @@ async function settle(messageId, status = "failed") {
     .update(schema.messages)
     .set({
       status,
-      finishedAt: new Date(),
+      finishedAt: status === "generating" ? null : new Date(),
       errorCode: status === "failed" ? "TEST_FAILURE" : null,
       errorMessage: status === "failed" ? "受控测试失败" : null,
       updatedAt: new Date(),
@@ -226,11 +226,11 @@ try {
   await db.insert(schema.attachments).values({
     id: foreignAttachmentId,
     userId: userB,
-    key: `attachments/${foreignAttachmentId}.pdf`,
-    filename: "foreign.txt",
-    mimeType: "text/plain",
+    key: `attachments/${foreignAttachmentId}.png`,
+    filename: "foreign.png",
+    mimeType: "image/png",
     size: 10,
-    kind: "document",
+    kind: "image",
     status: "ready",
   })
   await settle(editResult.result.generation.assistantMessage.id)
@@ -243,14 +243,11 @@ try {
         modelId,
         parts: [
           { type: "text", text: "尝试引用他人的附件" },
-          {
-            type: "file",
-            file: {
-              url: `/api/attachments/${foreignAttachmentId}`,
-              mediaType: "text/plain",
-              filename: "foreign.txt",
-            },
-          },
+          { type: "file", file: {
+            url: `/api/attachments/${foreignAttachmentId}`,
+            mediaType: "image/png",
+            filename: "foreign.png",
+          } },
         ],
       }),
     (error) => error.code === "NOT_FOUND"
@@ -387,6 +384,45 @@ try {
     threadId: forkCommand.threadId,
   })
   assert.ok(compiledContext.length > 0)
+
+  const directForkCommand = {
+    commandId: id(),
+    threadId: id(),
+    sourceMessageId: sendCommand.assistantMessageId,
+    modelId,
+  }
+  const directFork = await commands.forkThread(userA, rootA, directForkCommand)
+  assert.equal(directFork.result.generation, null)
+  assert.equal(directFork.result.thread.anchorText, null)
+  assert.equal(directFork.result.thread.forkAnchor, null)
+  assert.deepEqual(directFork.result.thread.forkContext, forked.result.thread.forkContext)
+  assert.equal((await commands.forkThread(userA, rootA, directForkCommand)).replayed, true)
+  const directMessages = await db.select().from(schema.messages)
+    .where(eq(schema.messages.threadId, directForkCommand.threadId))
+  assert.equal(directMessages.length, 0, "空分叉不创建消息")
+  assert.deepEqual(await commands.compileModelContext({ userId: userA, threadId: directForkCommand.threadId, modelId }), compiledContext)
+
+  await assert.rejects(() => commands.forkThread(userB, rootA, { ...directForkCommand, commandId: id(), threadId: id() }))
+  await assert.rejects(() => commands.forkThread(userA, rootA, { ...directForkCommand, commandId: id(), threadId: id(), sourceMessageId: sendCommand.userMessageId }))
+  for (const status of ["generating", "stopped", "failed"]) {
+    await settle(sendCommand.assistantMessageId, status)
+    await assert.rejects(() => commands.forkThread(userA, rootA, { ...directForkCommand, commandId: id(), threadId: id() }))
+  }
+  await settle(sendCommand.assistantMessageId, "completed")
+
+  const directQuestion = {
+    commandId: id(), userMessageId: id(), assistantMessageId: id(),
+    modelId, parts: [{ type: "text", text: "继续解释上一条回复" }],
+  }
+  const directTurn = await commands.sendMessage(userA, directForkCommand.threadId, directQuestion)
+  assert.deepEqual(directTurn.result.userMessage.parts, directQuestion.parts)
+  const directContext = await commands.compileModelContext({
+    userId: userA, threadId: directForkCommand.threadId, modelId,
+    excludeAssistantMessageId: directQuestion.assistantMessageId,
+  })
+  assert.deepEqual(directContext.slice(0, compiledContext.length), compiledContext)
+  assert.equal(directContext.at(-1).role, "user")
+  await settle(directQuestion.assistantMessageId, "completed")
 
   assert.equal(await commands.claimTitleGenerationAttempt(userA, rootA), true)
   assert.equal(await commands.claimTitleGenerationAttempt(userA, rootA), false)
