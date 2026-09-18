@@ -24,6 +24,7 @@ import {
 import { THREAD_CHAT_SHORTCUTS } from "@/constants/thread-chat"
 import type { PlacementMode } from "../columns/placement"
 import { AccountButton, AccountMenuRow } from "./account-button"
+import { ShareBadge } from "../sharing/share-chrome"
 import { ShortcutHint } from "../overlays/shortcut-hint"
 import { COL_MIN_W } from "../columns/use-column-viewport"
 import { columnCountChoices } from "./thread-chat-topbar-logic"
@@ -223,7 +224,7 @@ export function ThreadChatTopbar(props: ThreadChatNavigationProps) {
       )}
       <div className="brand">
         <span className="mark">Thread Chat</span>
-        {readOnly && <span className="share-badge">只读快照</span>}
+        {readOnly && <ShareBadge />}
       </div>
       <div className="spacer" />
       <ThreadChatMobileMenu {...props} />

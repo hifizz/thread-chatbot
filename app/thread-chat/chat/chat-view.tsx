@@ -22,6 +22,7 @@ import type { MessageActionViewState } from "./actions/message-action-types"
 import type { ThreadMessageActionCommands } from "./actions/message-action-commands"
 
 import { RememberedViewport } from "../scroll/remembered-message-viewport"
+import { ReadOnlyStrip } from "../orchestration/sharing/share-chrome"
 
 export interface ChatViewProps {
   /** 会话 id：写到 .msg-list 的 data-list 上（划选气泡靠它反查消息） */
@@ -133,7 +134,7 @@ export function ChatView({
           </MessageScroller.Button>
           <div className="chat-composer-dock" ref={dockRef}>
             {readOnly ? (
-              <div className="composer read-only-strip">只读快照 · 内容在分享时冻结</div>
+              <ReadOnlyStrip />
             ) : (
               <ConversationComposer
                 variant="column"
