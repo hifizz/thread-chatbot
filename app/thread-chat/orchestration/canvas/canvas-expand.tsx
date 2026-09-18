@@ -5,6 +5,7 @@ import { AnchoredAssistantBody } from "../../branching/assistant/anchored-assist
 import { ConversationComposer } from "../../chat/composer/conversation-composer"
 import { ConversationMessage } from "../../chat/message/conversation-message"
 import { MessageArtifacts } from "../artifacts/message-artifacts"
+import { MessageForkActions } from "../../branching/message-fork-actions"
 import { CanvasActionsContext } from "./canvas-actions"
 import { CANVAS_EXPAND_WIDTH } from "./canvas-dimensions"
 import type { CanvasCardData } from "./canvas-node"
@@ -74,6 +75,18 @@ export function CanvasExpand({
                   onOpenArtifact={actions.openArtifact}
                   sourceDepth={data.depth}
                   density="compact"
+                />
+              ) : null
+            }
+            renderAssistantActions={(sourceMessage) =>
+              state && actions ? (
+                <MessageForkActions
+                  state={state}
+                  message={sourceMessage}
+                  onFork={actions.forkMessage
+                    ? () => actions.forkMessage!(threadId, sourceMessage.id)
+                    : undefined}
+                  onOpenThread={(id) => actions.focusThread(id)}
                 />
               ) : null
             }

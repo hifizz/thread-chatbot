@@ -2,11 +2,15 @@
 
 .tc .message-toolbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 3px;
-  margin-top: 5px;
+  margin-top: 9px;
   color: var(--tc-content-muted);
   transition: opacity 0.16s ease;
+}
+.tc .message-toolbar > .message-action-error {
+  flex-basis: 100%;
 }
 .tc .message-toolbar.end {
   justify-content: flex-end;
@@ -16,12 +20,39 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 2px;
+  transition: opacity 0.16s ease;
+}
+.tc .assistant-actions-row > .message-action-error {
+  flex-basis: 100%;
+}
+.tc .message-fork-count {
+  align-self: center;
+  border: 0;
+  background: none;
+  padding: 0;
+  margin-left: 4px;
+  color: var(--tc-content-muted);
+  font-size: 11px;
+  cursor: pointer;
+}
+.tc .message-fork-count:hover {
+  color: var(--tc-content-secondary);
+  text-decoration: underline;
+}
+.tc .message-action svg.is-spinning {
+  animation: tc-progress-spin 0.9s linear infinite;
 }
 .tc .message.user > .message-toolbar {
   opacity: 0;
 }
+.tc .message.assistant > .assistant-actions-row {
+  opacity: 0;
+}
 .tc .message.user:hover > .message-toolbar,
-.tc .message.user:focus-within > .message-toolbar {
+.tc .message.user:focus-within > .message-toolbar,
+.tc .message.assistant:hover > .assistant-actions-row,
+.tc .message.assistant:focus-within > .assistant-actions-row,
+.tc .message.assistant > .assistant-actions-row:has([data-popup-open]) {
   opacity: 1;
 }
 .tc .message-action-trigger {
@@ -117,13 +148,15 @@
   font-size: 12px;
 }
 @media (hover: none), (pointer: coarse) {
-  .tc .message.user > .message-toolbar {
+  .tc .message.user > .message-toolbar,
+  .tc .message.assistant > .assistant-actions-row {
     opacity: 1;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .tc .message-toolbar {
+  .tc .message-toolbar,
+  .tc .assistant-actions-row {
     transition: none;
   }
 }
