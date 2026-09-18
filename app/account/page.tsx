@@ -23,6 +23,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { TopupPacks } from "@/components/account/topup-packs"
 import { TopupResultToast } from "@/components/account/topup-result-toast"
+import { NEW_CHECKOUTS_ENABLED } from "@/constants/billing"
 
 const PAYMENT_STATUS: Record<string, string> = {
   paid: "已到账",
@@ -91,13 +92,16 @@ export default async function AccountPage() {
           <CardHeader>
             <CardDescription>当前余额</CardDescription>
             <CardTitle className="text-3xl tabular-nums">
-              {formatYuan(data.balanceMicros, 2)}
+              {formatYuan(data.availableMicros, 2)}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex gap-6 text-sm text-muted-foreground tabular-nums">
               <span>累计充值 {formatYuan(data.totalToppedUpMicros, 2)}</span>
               <span>累计消耗 {formatYuan(data.totalSpentMicros, 2)}</span>
+              {data.reservedMicros > 0 ? (
+                <span>任务预占 {formatYuan(data.reservedMicros, 2)}</span>
+              ) : null}
             </div>
           </CardContent>
         </Card>
@@ -111,7 +115,13 @@ export default async function AccountPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <TopupPacks packs={packs} creemConfigured={creemConfigured} />
+            {NEW_CHECKOUTS_ENABLED ? (
+              <TopupPacks packs={packs} creemConfigured={creemConfigured} />
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Beta 期间暂不开放新充值，已有额度与历史订单不受影响。
+              </p>
+            )}
           </CardContent>
         </Card>
 

@@ -8,6 +8,7 @@ export const ROUTES = {
   flagship: "/thread-chat", // 旗舰跳板（裸路径 → /thread-chat/{uuid}）
   signIn: "/sign-in",
   account: "/account",
+  beta: "/beta",
 } as const
 
 export type RouteKey = keyof typeof ROUTES

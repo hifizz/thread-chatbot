@@ -2,11 +2,19 @@ import { randomUUID } from "node:crypto"
 import { getCurrentUserId } from "@/lib/auth/server"
 import { getTopupPack, topupProductId } from "@/constants/creem"
 import { createCheckout, isCreemConfigured } from "@/lib/payments/creem"
+import { NEW_CHECKOUTS_ENABLED } from "@/constants/billing"
 
 // 发起充值：创建 Creem checkout 会话，返回支付链接供前端跳转。
 export async function POST(req: Request) {
   const userId = await getCurrentUserId()
   if (!userId) return Response.json({ error: "未登录" }, { status: 401 })
+
+  if (!NEW_CHECKOUTS_ENABLED) {
+    return Response.json(
+      { error: "Beta 期间暂不开放新充值", code: "CHECKOUT_DISABLED" },
+      { status: 403 }
+    )
+  }
 
   if (!isCreemConfigured()) {
     return Response.json(

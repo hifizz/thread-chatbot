@@ -8,6 +8,7 @@ import {
   assertAllowedGenerationSettings,
   assertAllowedModel,
   assertThreadReadyForTurn,
+  reservePaidGeneration,
   touchProjectAndThread,
 } from "@/lib/thread-chat/application/command-utils"
 import { notFound, stateConflict } from "@/lib/thread-chat/application/errors"
@@ -107,6 +108,12 @@ export function sendMessage(
             },
           ])
           .returning()
+        await reservePaidGeneration(tx, {
+          userId,
+          generationId: assistantMessage.id,
+          modelId: command.modelId,
+          generationSettings: command.generationSettings,
+        })
         await touchProjectAndThread(tx, project.id, thread.id, command.modelId)
         const rootThreadId = await findRootThreadId(tx, project.id)
         if (!rootThreadId) stateConflict("Project 缺少根 Thread")

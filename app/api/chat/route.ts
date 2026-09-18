@@ -13,6 +13,8 @@ import { resolveAttachmentParts } from "@/lib/chat/resolve-attachments"
 import { isSearchConfigured } from "@/lib/ai/search"
 import { RESEARCH_MAX_STEPS } from "@/constants/research"
 import { MAX_OUTPUT_TOKENS } from "@/constants/model"
+import { reserveGeneration, settleGeneration } from "@/lib/billing/reservations"
+import { BillingAdmissionError } from "@/lib/billing/errors"
 import { MODEL_CALL_PURPOSE } from "@/constants/model-call"
 import { resolveChatModel } from "@/lib/ai/llm/model-routes"
 import {
@@ -58,6 +60,30 @@ export async function POST(req: Request) {
     const modelCallTrace: ModelCallTrace = {
       requestId: crypto.randomUUID(),
       ...(linearThreadId ? { threadId: linearThreadId } : {}),
+    }
+    if (!isUnbilledPreview) {
+      try {
+        await reserveGeneration({
+          userId,
+          generationId: modelCallTrace.requestId!,
+          modelId,
+          maxOutputTokens: MAX_OUTPUT_TOKENS,
+        })
+      } catch (error) {
+        if (error instanceof BillingAdmissionError) {
+          const status =
+            error.code === "TOO_MANY_ACTIVE_RUNS"
+              ? 429
+              : error.code === "MODEL_PRICING_UNAVAILABLE"
+                ? 400
+                : 402
+          return Response.json(
+            { error: error.message, code: error.code },
+            { status }
+          )
+        }
+        throw error
+      }
     }
     const legacyTraceInput = await buildLegacyChatTraceInput({
       userId,
@@ -105,6 +131,7 @@ export async function POST(req: Request) {
             model,
             unbilledPreview: isUnbilledPreview,
             linearThreadId,
+            generationId: modelCallTrace.requestId!,
           })
 
           const result = streamText({
@@ -206,6 +233,16 @@ export async function POST(req: Request) {
           })
           return response
         } catch (error) {
+          if (!isUnbilledPreview) {
+            await settleGeneration({
+              generationId: modelCallTrace.requestId!,
+              userId,
+              modelId,
+              threadId: linearThreadId ?? null,
+            }).catch((settlementError) => {
+              console.error("[billing] 初始化失败结算异常", settlementError)
+            })
+          }
           legacyObservation.update({
             level: "ERROR",
             statusMessage: "legacy request initialization failed",

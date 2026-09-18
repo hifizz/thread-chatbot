@@ -1,8 +1,9 @@
 import type { ProviderMetadata } from "ai"
 import type { ChatModel } from "@/constants/model"
 import { GENERATION_ERRORS } from "@/constants/generation"
-import { chargeUsage } from "@/lib/billing/credits"
 import { usageCostEvidence } from "@/lib/billing/usage-cost-evidence"
+import { settleGeneration } from "@/lib/billing/reservations"
+import { usdToMicros } from "@/constants/pricing"
 import type { OpenRouterStepLike } from "@/lib/ai/llm/openrouter"
 import { logger } from "@/lib/axiom/server"
 import { safeErrorMetadata } from "@/lib/observability/error"
@@ -20,14 +21,15 @@ type StreamLifecycleInput = {
   model: Pick<ChatModel, "id" | "provider">
   unbilledPreview: boolean
   linearThreadId?: string
+  generationId: string
 }
 
 type StreamLifecycleDependencies = {
-  charge: typeof chargeUsage
+  settle: typeof settleGeneration
 }
 
 const defaultDependencies: StreamLifecycleDependencies = {
-  charge: chargeUsage,
+  settle: settleGeneration,
 }
 
 /** 请求级 stream usage/error 状态；handler 写入，持久化终态只读取 snapshot。 */
@@ -38,6 +40,7 @@ export function createStreamLifecycle(
     model,
     unbilledPreview,
     linearThreadId,
+    generationId,
   }: StreamLifecycleInput,
   dependencies: StreamLifecycleDependencies = defaultDependencies
 ) {
@@ -81,13 +84,21 @@ export function createStreamLifecycle(
           costSource: costEvidence.source,
         })
       }
-      await dependencies.charge({
+      await dependencies.settle({
+        generationId,
         userId,
-        model: modelId,
-        inputTokens: usage.inputTokens ?? 0,
-        outputTokens: usage.outputTokens ?? 0,
+        modelId,
         threadId: linearThreadId ?? null,
-        costEvidence,
+        providerUsage: {
+          inputTokens: usage.inputTokens ?? 0,
+          outputTokens: usage.outputTokens ?? 0,
+        },
+        ...(costEvidence.source === "openrouter"
+          ? {
+              providerCostMicros: usdToMicros(costEvidence.costUsd),
+              costSource: "openrouter" as const,
+            }
+          : {}),
       })
     },
 

@@ -48,7 +48,9 @@ import { failOrphanedGeneratingMessage } from "@/lib/thread-chat/streaming/final
 import { getSessionStore } from "@/lib/thread-chat/streaming/session-store"
 import { createSessionSseResponse } from "@/lib/thread-chat/streaming/sse"
 import { GENERATION_CANCEL_REASONS } from "@/constants/generation"
+import { THREAD_TITLE_MODEL_ID } from "@/constants/model"
 import { scheduleFeedbackMirrorAfterCommit } from "@/lib/observability/feedback-post-commit"
+import { requireBetaAccess } from "@/lib/beta/entitlements"
 
 const idSchema = z.uuid()
 
@@ -93,6 +95,7 @@ export function handleStartProject(
 ): Promise<Response> {
   return withThreadChatRoute(request, async (userId) => {
     const command = await parseJson(request, startProjectCommandSchema)
+    await requireBetaAccess(userId, command.modelId)
     if (command.projectId !== parseId(projectId))
       validation("path projectId 与请求体不一致")
     const result = await startProject(userId, command)
@@ -212,9 +215,12 @@ export function handleGenerateThreadTitle(
   request: Request,
   threadId: string
 ): Promise<Response> {
-  return withThreadChatRoute(request, async (userId) =>
-    jsonNoCache(await generateAndSaveThreadTitle(userId, parseId(threadId)))
-  )
+  return withThreadChatRoute(request, async (userId) => {
+    await requireBetaAccess(userId, THREAD_TITLE_MODEL_ID)
+    return jsonNoCache(
+      await generateAndSaveThreadTitle(userId, parseId(threadId))
+    )
+  })
 }
 
 export function handleSendMessage(
@@ -223,6 +229,7 @@ export function handleSendMessage(
 ): Promise<Response> {
   return withThreadChatRoute(request, async (userId) => {
     const command = await parseJson(request, sendMessageCommandSchema)
+    await requireBetaAccess(userId, command.modelId)
     const result = await sendMessage(userId, parseId(threadId), command)
     if (!result.replayed)
       startSessionAfterCommit(
@@ -240,6 +247,7 @@ export function handleForkThread(
 ): Promise<Response> {
   return withThreadChatRoute(request, async (userId) => {
     const command = await parseJson(request, forkThreadCommandSchema)
+    await requireBetaAccess(userId, command.modelId)
     const result = await forkThread(userId, parseId(threadId), command)
     if (!result.replayed && result.result.generation)
       startSessionAfterCommit(
@@ -257,6 +265,7 @@ export function handleEditMessage(
 ): Promise<Response> {
   return withThreadChatRoute(request, async (userId) => {
     const command = await parseJson(request, editLatestTurnCommandSchema)
+    await requireBetaAccess(userId, command.modelId)
     const result = await editLatestTurn(userId, parseId(messageId), command)
     if (!result.replayed) {
       if (result.result.abortMessageId)
@@ -283,6 +292,7 @@ export function handleRetryMessage(
 ): Promise<Response> {
   return withThreadChatRoute(request, async (userId) => {
     const command = await parseJson(request, retryMessageCommandSchema)
+    await requireBetaAccess(userId, command.modelId)
     const result = await retryMessage(userId, parseId(messageId), command)
     if (!result.replayed)
       startSessionAfterCommit(

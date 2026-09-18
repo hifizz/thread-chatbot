@@ -12,6 +12,7 @@ import {
   requireThreadChatUser,
   ThreadChatUnauthorizedError,
 } from "@/lib/thread-chat/server/auth"
+import { BetaAccessError, requireBetaAccess } from "@/lib/beta/entitlements"
 
 const JSON_NO_CACHE_HEADERS = {
   "Cache-Control": "private, no-store, max-age=0",
@@ -72,6 +73,8 @@ function errorResponse(
 }
 
 export function mapRouteError(error: unknown): Response {
+  if (error instanceof BetaAccessError)
+    return errorResponse(403, error.code, error.message)
   if (error instanceof ThreadChatUnauthorizedError)
     return errorResponse(401, "NOT_FOUND", error.message)
   if (error instanceof ZodError) {
@@ -86,13 +89,20 @@ export function mapRouteError(error: unknown): Response {
   if (error instanceof CommandIdConflictError)
     return errorResponse(409, error.code, error.message)
   if (error instanceof ConversationApplicationError) {
-    const status =
-      error.code === "NOT_FOUND"
-        ? 404
-        : error.code === "VALIDATION_ERROR" ||
-            error.code === "MODEL_NOT_ALLOWED"
-          ? 400
-          : 409
+    let status = 409
+    if (error.code === "NOT_FOUND") status = 404
+    else if (
+      error.code === "CREDIT_EXHAUSTED" ||
+      error.code === "RUN_RESERVATION_INSUFFICIENT"
+    )
+      status = 402
+    else if (error.code === "TOO_MANY_ACTIVE_RUNS") status = 429
+    else if (
+      error.code === "VALIDATION_ERROR" ||
+      error.code === "MODEL_NOT_ALLOWED" ||
+      error.code === "MODEL_PRICING_UNAVAILABLE"
+    )
+      status = 400
     return errorResponse(status, error.code, error.message)
   }
   if (error instanceof Error && error.message === "SESSION_NOT_AVAILABLE")
@@ -112,6 +122,7 @@ export async function withThreadChatRoute(
   try {
     await ensureThreadChatRuntimeInitialized()
     const userId = await requireThreadChatUser(request.headers)
+    await requireBetaAccess(userId)
     return await execute(userId)
   } catch (error) {
     return mapRouteError(error)

@@ -1,23 +1,28 @@
 import { randomUUID } from "node:crypto"
-import { and, desc, eq, isNotNull, sql } from "drizzle-orm"
+import { and, desc, eq, inArray, isNotNull, sql } from "drizzle-orm"
 import { db } from "@/lib/db"
-import { userCredits, usageRecords, payments } from "@/lib/db/schema"
 import {
-  INITIAL_CREDIT_MICROS,
+  billingReservations,
+  userCredits,
+  usageRecords,
+  payments,
+} from "@/lib/db/schema"
+import {
   costMicros,
   priceMicros,
   priceFromCost,
   usdToMicros,
 } from "@/constants/pricing"
 import { getGenerationCostUsd } from "@/lib/payments/vercel-gateway"
+import { appendLedgerEntryOnce } from "@/lib/billing/ledger"
 
 // 用户额度与用量记账。金额单位为「微元」（见 constants/pricing.ts）。
 
-/** 确保用户额度行存在；首次创建时赠送初始额度。幂等。 */
+/** 确保账户行存在；赠额由验证/邀请激活流程显式调用。 */
 export async function ensureUserCredits(userId: string): Promise<void> {
   await db
     .insert(userCredits)
-    .values({ userId, balanceMicros: INITIAL_CREDIT_MICROS })
+    .values({ userId, balanceMicros: 0 })
     .onConflictDoNothing({ target: userCredits.userId })
 }
 
@@ -30,9 +35,43 @@ export async function getBalanceMicros(userId: string): Promise<number> {
   return row?.balance ?? 0
 }
 
+export async function getCreditSummary(userId: string): Promise<{
+  balanceMicros: number
+  reservedMicros: number
+  availableMicros: number
+}> {
+  const [[account], [held]] = await Promise.all([
+    db
+      .select({ balanceMicros: userCredits.balanceMicros })
+      .from(userCredits)
+      .where(eq(userCredits.userId, userId)),
+    db
+      .select({
+        reservedMicros: sql<number>`coalesce(sum(${billingReservations.customerReservedMicros}), 0)`,
+      })
+      .from(billingReservations)
+      .where(
+        and(
+          eq(billingReservations.userId, userId),
+          inArray(billingReservations.status, [
+            "held",
+            "reconciliation_required",
+          ])
+        )
+      ),
+  ])
+  const balanceMicros = account?.balanceMicros ?? 0
+  const reservedMicros = Number(held?.reservedMicros ?? 0)
+  return {
+    balanceMicros,
+    reservedMicros,
+    availableMicros: Math.max(0, balanceMicros - reservedMicros),
+  }
+}
+
 /** 余额是否为正（是否允许发起新对话）。 */
 export async function hasPositiveBalance(userId: string): Promise<boolean> {
-  return (await getBalanceMicros(userId)) > 0
+  return (await getCreditSummary(userId)).availableMicros > 0
 }
 
 export type UsageCostEvidence =
@@ -97,7 +136,7 @@ async function ensureUserCreditsInTransaction(
 ) {
   await tx
     .insert(userCredits)
-    .values({ userId, balanceMicros: INITIAL_CREDIT_MICROS })
+    .values({ userId, balanceMicros: 0 })
     .onConflictDoNothing({ target: userCredits.userId })
 }
 
@@ -141,14 +180,20 @@ async function chargeUsageInTransaction(
     }
   }
 
+  await appendLedgerEntryOnce(tx, {
+    userId: input.userId,
+    kind: "charge",
+    amountMicros: -charge.priceMicros,
+    idempotencyKey: appGenerationId
+      ? `generation-charge-v1:${appGenerationId}`
+      : `usage-charge-v1:${inserted.id}`,
+    referenceId: appGenerationId ?? inserted.id,
+    reason: `模型用量结算 ${input.model}`,
+  })
   const [row] = await tx
-    .update(userCredits)
-    .set({
-      balanceMicros: sql`${userCredits.balanceMicros} - ${charge.priceMicros}`,
-      updatedAt: new Date(),
-    })
+    .select({ balance: userCredits.balanceMicros })
+    .from(userCredits)
     .where(eq(userCredits.userId, input.userId))
-    .returning({ balance: userCredits.balanceMicros })
 
   return {
     ...charge,
@@ -247,14 +292,18 @@ export async function recordCreemTopup(
       return { granted: false, balanceMicros: current?.balance ?? 0 }
     }
 
+    await appendLedgerEntryOnce(tx, {
+      userId: input.userId,
+      kind: "grant",
+      amountMicros: input.creditMicros,
+      idempotencyKey: `creem-topup-v1:${input.orderId}`,
+      referenceId: input.orderId,
+      reason: "Creem 历史订单到账",
+    })
     const [row] = await tx
-      .update(userCredits)
-      .set({
-        balanceMicros: sql`${userCredits.balanceMicros} + ${input.creditMicros}`,
-        updatedAt: new Date(),
-      })
+      .select({ balance: userCredits.balanceMicros })
+      .from(userCredits)
       .where(eq(userCredits.userId, input.userId))
-      .returning({ balance: userCredits.balanceMicros })
 
     return { granted: true, balanceMicros: row?.balance ?? 0 }
   })
@@ -311,23 +360,30 @@ export async function reconcilePendingCosts(
 
     // 修正流水 + 按差额调整余额放进同一事务，保持一致
     await db.transaction(async (tx) => {
-      await tx
+      const [updated] = await tx
         .update(usageRecords)
         .set({
           costMicros: realCost,
           priceMicros: newPrice,
           costSource: "gateway",
         })
-        .where(eq(usageRecords.id, row.id))
+        .where(
+          and(
+            eq(usageRecords.id, row.id),
+            eq(usageRecords.costSource, "estimate")
+          )
+        )
+        .returning({ id: usageRecords.id })
 
-      if (delta !== 0) {
-        await tx
-          .update(userCredits)
-          .set({
-            balanceMicros: sql`${userCredits.balanceMicros} - ${delta}`,
-            updatedAt: new Date(),
-          })
-          .where(eq(userCredits.userId, row.userId))
+      if (updated && delta !== 0) {
+        await appendLedgerEntryOnce(tx, {
+          userId: row.userId,
+          kind: delta > 0 ? "charge" : "refund",
+          amountMicros: -delta,
+          idempotencyKey: `usage-reconcile-v1:${row.id}`,
+          referenceId: row.id,
+          reason: "供应商真实成本对账",
+        })
       }
     })
     reconciled++

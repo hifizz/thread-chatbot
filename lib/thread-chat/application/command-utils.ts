@@ -8,6 +8,9 @@ import {
 } from "@/constants/attachment"
 
 import type { GenerationSettings } from "@/constants/generation-settings"
+import { MAX_OUTPUT_TOKENS, getChatModel, isUnbilledPreviewModel } from "@/constants/model"
+import { BillingAdmissionError } from "@/lib/billing/errors"
+import { reserveGenerationInTransaction } from "@/lib/billing/reservations"
 import {
   getModelGenerationSettingsCapability,
   isThreadChatModelId,
@@ -67,6 +70,40 @@ export function assertAllowedGenerationSettings(
       "VALIDATION_ERROR",
       "当前模型不支持所选生成参数"
     )
+  }
+}
+
+/** 在生成消息写入的同一事务中冻结价格并占用额度。免费预览模型不创建账务记录。 */
+export async function reservePaidGeneration(
+  tx: ConversationTransaction,
+  input: {
+    userId: string
+    generationId: string
+    modelId: string
+    generationSettings?: GenerationSettings
+  }
+): Promise<void> {
+  const model = getChatModel(input.modelId)
+  if (!model) {
+    throw new ConversationApplicationError(
+      "MODEL_NOT_ALLOWED",
+      "当前模型不可用"
+    )
+  }
+  if (isUnbilledPreviewModel(model)) return
+  try {
+    await reserveGenerationInTransaction(tx, {
+      userId: input.userId,
+      generationId: input.generationId,
+      modelId: input.modelId,
+      maxOutputTokens:
+        input.generationSettings?.maxOutputTokens ?? MAX_OUTPUT_TOKENS,
+    })
+  } catch (error) {
+    if (error instanceof BillingAdmissionError) {
+      throw new ConversationApplicationError(error.code, error.message)
+    }
+    throw error
   }
 }
 

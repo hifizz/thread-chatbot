@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation"
 import { getSession } from "@/lib/auth/server"
 import { ROUTES, signInWithRedirect } from "@/constants/routes"
+import { BetaAccessNotice } from "@/components/beta/beta-access-notice"
+import { decideBetaAccess } from "@/lib/beta/entitlements"
 import { ProjectListStoreProvider } from "./core/project-list-store"
 import "./thread-chat.css"
 
@@ -16,5 +18,8 @@ export default async function ThreadChatLayout({
 }) {
   const session = await getSession()
   if (!session) redirect(signInWithRedirect(ROUTES.flagship))
+  const access = await decideBetaAccess(session.user.id)
+  if (!access.allowed)
+    return <BetaAccessNotice suspended={access.code === "ACCOUNT_SUSPENDED"} />
   return <ProjectListStoreProvider>{children}</ProjectListStoreProvider>
 }

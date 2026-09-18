@@ -51,3 +51,28 @@ export function resetPasswordEmail(url: string): {
     ),
   }
 }
+
+export function betaInviteEmail(
+  url: string,
+  locale: "zh-CN" | "en"
+): { subject: string; html: string } {
+  if (locale === "en")
+    return {
+      subject: `Your ${APP_NAME} private beta invitation`,
+      html: layout(
+        "Your private beta access is ready",
+        `<p style="font-size:14px;color:#444;line-height:1.6;">Sign in with this invited email address, then explicitly activate your access. Opening this link alone will not consume the invitation.</p>
+         <p style="margin:20px 0;">${button(url, "Review invitation")}</p>
+         <p style="font-size:12px;color:#9aa0a6;line-height:1.6;">This invitation expires in 7 days. If you did not request it, you can ignore this email.</p>`
+      ),
+    }
+  return {
+    subject: `你的 ${APP_NAME} 私测邀请`,
+    html: layout(
+      "私测资格已准备好",
+      `<p style="font-size:14px;color:#444;line-height:1.6;">请使用收到邀请的邮箱登录，再明确确认激活。仅打开此链接不会消耗邀请。</p>
+       <p style="margin:20px 0;">${button(url, "查看邀请")}</p>
+       <p style="font-size:12px;color:#9aa0a6;line-height:1.6;">邀请 7 天内有效；若并非你本人申请，可忽略本邮件。</p>`
+    ),
+  }
+}
