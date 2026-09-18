@@ -1,5 +1,14 @@
 import type { AgentSuite } from "@/evals/agent/schema"
 
+/** 工具模拟评测保存完整调用证据；只允许合成资料进入此执行器。 */
+export type EvaluationToolCall = {
+  toolCallId: string
+  toolName: string
+  input: unknown
+  output?: unknown
+  error?: string
+}
+
 export type EvaluationScore = {
   name: string
   value: number | string
@@ -24,6 +33,8 @@ export type AgentExperimentResult = {
     text: string
     route?: "answer" | "fetch" | "search" | "research"
     tools: string[]
+    toolCalls?: EvaluationToolCall[]
+    finishReason?: string
     terminalState: "completed" | "stopped" | "failed"
   }
   timing: {
@@ -45,6 +56,8 @@ export type AgentExecutionOutput = {
   text: string
   route?: AgentExperimentResult["output"]["route"]
   tools?: string[]
+  toolCalls?: EvaluationToolCall[]
+  finishReason?: string
   terminalState?: AgentExperimentResult["output"]["terminalState"]
   usage?: Record<string, number>
   providerAttempts?: AgentExperimentResult["providerAttempts"]

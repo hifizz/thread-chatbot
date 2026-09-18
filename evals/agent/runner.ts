@@ -187,6 +187,8 @@ export async function runAgentEvaluation(
           text: output.text,
           ...(output.route ? { route: output.route } : {}),
           tools: output.tools ?? [],
+          ...(output.toolCalls ? { toolCalls: output.toolCalls } : {}),
+          ...(output.finishReason ? { finishReason: output.finishReason } : {}),
           terminalState: output.terminalState ?? "completed",
         },
         timing: {

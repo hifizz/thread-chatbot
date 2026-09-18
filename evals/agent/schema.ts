@@ -39,7 +39,7 @@ export const agentCaseSchema = z
     ]),
     tags: z.array(z.string().min(1).max(80)).min(1),
     sensitivity: z.enum(["synthetic", "public", "authorized-private"]),
-    execution: z.enum(["fixture", "content", "lifecycle"]),
+    execution: z.enum(["fixture", "content", "lifecycle", "tool-simulation"]),
     input: z
       .object({
         messages: z
@@ -55,6 +55,14 @@ export const agentCaseSchema = z
         attachments: z.array(attachmentFixtureSchema).default([]),
         projectContext: projectContextSchema.optional(),
         lifecycleScenario: z.enum(["complete", "stop", "fail"]).optional(),
+        documentTools: z.object({
+          documents: z.array(z.object({
+            id: z.uuid(), revisionId: z.uuid(), artifactId: z.uuid(), title: z.string(), content: z.string(),
+          }).strict()),
+          page: z.object({ url: z.url(), snapshotId: z.uuid(), content: z.string() }).strict(),
+          history: z.enum(["none", "web-snapshot", "failed-document-read"]),
+          knownDocumentIds: z.boolean(),
+        }).strict().optional(),
       })
       .strict(),
     expected: z
@@ -74,6 +82,10 @@ export const agentCaseSchema = z
         fallbackExpected: z.boolean().optional(),
         errorCategory: z.string().min(1).optional(),
         rubric: z.string().min(1).max(4_000).optional(),
+        documentTools: z.object({
+          documentIds: z.array(z.uuid()), urls: z.array(z.url()),
+          answerFacts: z.record(z.string(), z.number()),
+        }).strict().optional(),
       })
       .strict(),
     fixtureResult: z

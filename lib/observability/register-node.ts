@@ -160,10 +160,12 @@ export async function flushObservability(): Promise<void> {
   await state().remote?.forceFlush()
 }
 
-export async function resetObservabilityRegistrationForTests(): Promise<void> {
+export async function shutdownObservability(): Promise<void> {
   const target = globalThis as typeof globalThis & {
     [STATE_KEY]?: RegistrationState
   }
   await target[STATE_KEY]?.remote?.shutdown()
   delete target[STATE_KEY]
 }
+
+export const resetObservabilityRegistrationForTests = shutdownObservability

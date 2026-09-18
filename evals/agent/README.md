@@ -1,5 +1,7 @@
 # Thread Chat Agent evals
 
+项目文档工具修复的六场景对比入口是 `pnpm eval:agent:documents`。它复用本目录的 schema、runner、scorer、snapshot、compare 和 Langfuse 导出，使用真实模型与模拟工具；运行方式与判分规则见 [document-tools/README.md](./document-tools/README.md)。默认仅预览，不调用模型。独立专项题集不改变现有 fixture 的默认 manifest 和基线。
+
 仓库 case 是可复现事实源；Langfuse Dataset 是带稳定 item ID 的远端镜像，不以其“最新版本”替代 Git revision。`manifests/v1.json` 明确固定 smoke、CI、scheduled、release 的默认 case IDs。每次 run 都记录 mode、manifest fingerprint、完整 candidate fingerprint、dataset revision、case-level Trace ID、输出、usage、attempt、终态和分项 score。
 
 ## 本地使用
