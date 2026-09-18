@@ -7,48 +7,48 @@ import { Dialog, DialogPortal } from "@/components/ui/dialog"
 import { THREAD_CHAT_SHORTCUTS } from "@/constants/thread-chat"
 import { dialogCloseToShell } from "./dialog-close-to-shell"
 import { ShortcutHint } from "./shortcut-hint"
+import { useI18n } from "@/lib/i18n/client"
+
 
 /** 首次内联提示与手动 Help Dialog 共用的功能要点。 */
 function UsageTips() {
+  const { t } = useI18n()
+
   return (
     <div className="helpx-list">
       <section className="helpx-section">
-        <h3 className="helpx-section-title">分支对话</h3>
+        <h3 className="helpx-section-title">{t("ui.branchingConversations")}</h3>
         <ul>
           <li>
-            <b>划选 AI 回复里的文字</b>
-            开分支，输入框预填相关问题，改写后回车确认
-          </li>
+            <b>{t("ui.selectTextInAnAiReply")}</b>
+            {t("ui.openABranchEditTheSuggested")}</li>
           <li>
-            按住 <ShortcutHint {...THREAD_CHAT_SHORTCUTS.keepSourceColumn} />
-            /Ctrl 划选或点脚注 = <b>保留本列</b>
-            ，新会话开在紧邻右侧
-          </li>
-          <li>列数随屏宽自适应（2–4 列），列满默认替换来源列（可撤销）</li>
+            {t("ui.hold")}<ShortcutHint {...THREAD_CHAT_SHORTCUTS.keepSourceColumn} />
+            {t("ui.ctrlWhenSelectingTextOrClicking")}<b>{t("ui.keepThisColumn")}</b>
+            {t("ui.andOpenTheNewThreadNext")}</li>
+          <li>{t("ui.columnsAdaptToTheScreen2")}</li>
         </ul>
       </section>
 
       <section className="helpx-section">
-        <h3 className="helpx-section-title">导航与布局</h3>
+        <h3 className="helpx-section-title">{t("ui.navigationAndLayout")}</h3>
         <ul>
-          <li>拖动列间分割线调宽度，双击恢复均分</li>
-          <li>面包屑可就地回退到上游会话</li>
+          <li>{t("ui.dragBetweenColumnsToResizeDouble")}</li>
+          <li>{t("ui.useBreadcrumbsToReturnToAn")}</li>
           <li>
             <ShortcutHint {...THREAD_CHAT_SHORTCUTS.openThreadTree} />{" "}
-            搜索并打开任意会话
-          </li>
+            {t("ui.findAndOpenAnyThread")}</li>
           <li>
-            点列头 <b>⇄</b> 把该列切换成任意会话，<b>⑂</b> 查看子分支
-          </li>
+            {t("ui.clickInTheColumnHeader")}<b>⇄</b> {t("ui.toSwitchThatColumnToAny")}<b>⑂</b> {t("ui.viewChildBranches")}</li>
         </ul>
       </section>
 
       <section className="helpx-section">
-        <h3 className="helpx-section-title">内容与视图</h3>
+        <h3 className="helpx-section-title">{t("ui.contentAndViews")}</h3>
         <ul>
-          <li>对话里生成的 Markdown 会插入消息流，点击后在右侧面板预览</li>
-          <li>顶栏可切换画布视图纵览全树，单击节点就地对话，双击回到列模式</li>
-          <li>对话自动保存，刷新或同链接重开可恢复；「新对话」另起一棵树</li>
+          <li>{t("ui.generatedMarkdownAppearsInTheMessage")}</li>
+          <li>{t("ui.useTheTopBarToSwitch")}</li>
+          <li>{t("ui.conversationsAreSavedAutomaticallyAndRestored")}</li>
         </ul>
       </section>
     </div>
@@ -61,6 +61,8 @@ export interface UsageHintProps {
 
 /** 空白新对话中的首次内联提示。 */
 export function UsageHint({ onDismiss }: UsageHintProps) {
+  const { t } = useI18n()
+
   return (
     <div className="hint">
       <Highlighter size={15} color="var(--tc-depth-2)" />
@@ -68,7 +70,7 @@ export function UsageHint({ onDismiss }: UsageHintProps) {
       <button
         type="button"
         className="close"
-        aria-label="关闭使用提示"
+        aria-label={t("ui.closeHelp")}
         onClick={onDismiss}
       >
         ✕
@@ -89,6 +91,8 @@ export function HelpPanel({
   container,
   onClose,
 }: HelpPanelProps) {
+  const { t } = useI18n()
+
   return (
     <Dialog
       open={!closing}
@@ -104,16 +108,14 @@ export function HelpPanel({
         >
           <DialogPrimitive.Title className="swx-title">
             <CircleHelp size={14} />
-            使用提示
-          </DialogPrimitive.Title>
+            {t("chat.help")}</DialogPrimitive.Title>
           <div className="helpx-body">
             <UsageTips />
           </div>
           <div className="swx-foot">
-            <span>点击遮罩关闭</span>
+            <span>{t("ui.clickOutsideToClose")}</span>
             <span>
-              <ShortcutHint {...THREAD_CHAT_SHORTCUTS.closeDialog} /> 关闭
-            </span>
+              <ShortcutHint {...THREAD_CHAT_SHORTCUTS.closeDialog} /> {t("common.close")}</span>
           </div>
         </DialogPrimitive.Popup>
       </DialogPortal>

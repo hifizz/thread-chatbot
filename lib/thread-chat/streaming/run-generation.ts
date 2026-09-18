@@ -1,3 +1,4 @@
+import type { Locale } from "@/constants/i18n"
 import { documentReceiptForParts } from "./documents/context-receipt"
 import { AI_DIAGNOSTIC_EVENTS } from "@/constants/observability"
 import { logDiagnostic } from "@/lib/observability/diagnostic-log"
@@ -123,6 +124,7 @@ async function runGenerationCore({
   identity,
   observabilityContext,
   generationSettings,
+  uiLocale,
   dependencies = {},
 }: {
   userId: string
@@ -130,6 +132,7 @@ async function runGenerationCore({
   identity: GenerationIdentity
   observabilityContext: ObservabilityContext
   generationSettings?: GenerationSettings
+  uiLocale?: Locale
   dependencies?: RunGenerationDependencies
 }): Promise<GenerationRunResult> {
   const { message, thread, project } = identity
@@ -163,6 +166,7 @@ async function runGenerationCore({
   try {
     prepared = await prepare({
       userId,
+      uiLocale,
       documentUpdates: documentReceiptForParts(latestUser.parts),
       messageId: message.id,
       projectId: message.projectId,
@@ -311,6 +315,7 @@ export async function runGeneration(input: {
   messageId: string
   session: StreamSessionController
   generationSettings?: GenerationSettings
+  uiLocale?: Locale
   dependencies?: RunGenerationDependencies
 }): Promise<void> {
   try {
@@ -325,6 +330,7 @@ export async function runGeneration(input: {
     await runAgentTrace(traceInput, async (observation) => {
       const result = await runGenerationCore({
         userId: input.userId,
+        uiLocale: input.uiLocale,
         session: input.session,
         identity,
         observabilityContext: traceInput.context,

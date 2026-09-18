@@ -39,6 +39,8 @@ import {
   markdownSettlementRevision,
   type MarkdownSettlementBatch,
 } from "@/lib/markdown/settlement-batch"
+import { useI18n } from "@/lib/i18n/client"
+
 
 interface MarkdownSettlementContextValue {
   batch: MarkdownSettlementBatch
@@ -58,6 +60,8 @@ function CodeBlock({
   code: string
   meta?: string
 }) {
+  const { t } = useI18n()
+
   const { resolvedTheme } = useTheme()
   const settlement = useContext(MarkdownSettlementContext)
   const settlementBatch = settlement?.batch
@@ -94,7 +98,7 @@ function CodeBlock({
     )
   }
   const copyButton = (
-    <button className="copy" onClick={onCopy} title="复制代码">
+    <button className="copy" onClick={onCopy} title={t("ui.copyCode")}>
       {copied ? <Check size={13} /> : <Copy size={13} />}
     </button>
   )
@@ -160,6 +164,11 @@ function MarkdownCode({
   )
 }
 
+function MarkdownTable({ children }: ComponentProps<"table"> & ExtraProps) {
+  const { t } = useI18n()
+  return <div className="md-table-scroll" role="region" aria-label={t("ui.table")} tabIndex={0}><table>{children}</table></div>
+}
+
 const components: Components = {
   a: ({ children, href, title }) => (
     <a href={href} title={title} target="_blank" rel="noopener noreferrer">
@@ -170,11 +179,7 @@ const components: Components = {
   // 避免出现 <pre><div class=md-code> 的多余嵌套。
   pre: ({ children }) => <>{children}</>,
   code: MarkdownCode,
-  table: ({ children }) => (
-    <div className="md-table-scroll" role="region" aria-label="表格" tabIndex={0}>
-      <table>{children}</table>
-    </div>
-  ),
+  table: MarkdownTable,
 }
 
 export type MarkdownDensity = "default" | "compact"

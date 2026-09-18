@@ -1,3 +1,4 @@
+import { SUPPORTED_LOCALES } from "@/constants/i18n"
 import { text, timestamp, boolean } from "drizzle-orm/pg-core"
 import { dbSchema } from "./pg-schema"
 
@@ -12,6 +13,7 @@ export const user = dbSchema.table("user", {
     .$defaultFn(() => false)
     .notNull(),
   image: text("image"),
+  locale: text("locale", { enum: SUPPORTED_LOCALES }),
   createdAt: timestamp("created_at")
     .$defaultFn(() => new Date())
     .notNull(),

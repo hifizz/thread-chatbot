@@ -3,11 +3,15 @@
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu"
 import { Download, Share2 } from "lucide-react"
 import { useState } from "react"
-import { DOCUMENT_UI_COPY } from "@/constants/project-documents"
+import { DOCUMENT_UI_KEYS } from "@/constants/project-documents"
 import type { ArtifactDTO } from "@/lib/thread-chat/contracts/dto"
 import { documentExportSnapshot } from "@/lib/thread-chat/domain/documents/export"
+import { useI18n } from "@/lib/i18n/client"
+
 
 export function DocumentExportActions({ artifact }: { artifact: ArtifactDTO }) {
+  const { t } = useI18n()
+
   const [error, setError] = useState<string | null>(null)
   const [sharing, setSharing] = useState(false)
   const createFile = () => {
@@ -25,7 +29,7 @@ export function DocumentExportActions({ artifact }: { artifact: ArtifactDTO }) {
         link.download = file.name
         link.click()
       } finally { window.setTimeout(() => URL.revokeObjectURL(url), 0) }
-    } catch { setError(DOCUMENT_UI_COPY.exportFailed) }
+    } catch { setError(t(DOCUMENT_UI_KEYS.exportFailed)) }
   }
   const share = async () => {
     setError(null)
@@ -33,17 +37,17 @@ export function DocumentExportActions({ artifact }: { artifact: ArtifactDTO }) {
     try {
       const file = createFile()
       if (!navigator.canShare?.({ files: [file] })) {
-        setError(DOCUMENT_UI_COPY.shareUnsupported)
+        setError(t(DOCUMENT_UI_KEYS.shareUnsupported))
         return
       }
       await navigator.share({ files: [file], title: artifact.title })
     } catch (cause) {
-      if (!(cause instanceof DOMException && cause.name === "AbortError")) setError(DOCUMENT_UI_COPY.shareFailed)
+      if (!(cause instanceof DOMException && cause.name === "AbortError")) setError(t(DOCUMENT_UI_KEYS.shareFailed))
     } finally { setSharing(false) }
   }
   return <>
     {error && <p className="project-document-action-error" role="alert">{error}</p>}
-    <DropdownMenuItem onClick={download} closeOnClick={false}><Download size={14} />导出当前版本</DropdownMenuItem>
-    <DropdownMenuItem disabled={sharing} closeOnClick={false} onClick={() => void share()}><Share2 size={14} />分享当前版本文件</DropdownMenuItem>
+    <DropdownMenuItem onClick={download} closeOnClick={false}><Download size={14} />{t("ui.exportThisVersion")}</DropdownMenuItem>
+    <DropdownMenuItem disabled={sharing} closeOnClick={false} onClick={() => void share()}><Share2 size={14} />{t("ui.shareThisVersionAsAFile")}</DropdownMenuItem>
   </>
 }

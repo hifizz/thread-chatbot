@@ -1,5 +1,7 @@
 "use client"
 
+import { useI18n } from "@/lib/i18n/client"
+
 import type { LucideIcon } from "lucide-react"
 import {
   Tooltip,
@@ -7,7 +9,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { MESSAGE_ACTION_LABELS } from "./message-action-types"
+import { MESSAGE_ACTION_LABEL_KEYS } from "./message-action-types"
 
 export interface MessageToolbarAction {
   key: string
@@ -34,12 +36,13 @@ export function MessageToolbar({
   align: "start" | "end"
   actions: readonly MessageToolbarAction[]
 }) {
+  const { t } = useI18n()
   return (
     <TooltipProvider delay={300}>
       <div
         className={`message-toolbar ${align}`}
         role="toolbar"
-        aria-label={MESSAGE_ACTION_LABELS.toolbar}
+        aria-label={t(MESSAGE_ACTION_LABEL_KEYS.toolbar)}
       >
         {actions.map((action) => {
           const Icon = action.icon

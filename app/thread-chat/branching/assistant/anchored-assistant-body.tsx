@@ -12,6 +12,8 @@ import { assistantPartRenderPlan } from "./assistant-part-render-plan"
 import { ReasoningTrace, SearchTrace, ToolTrace } from "./thinking-trace"
 import { MarkdownArtifactToolPart } from "../../orchestration/artifacts/markdown-artifact-card"
 import { DocumentUpdateTool } from "../../chat/message/document-update-tool"
+import { useI18n } from "@/lib/i18n/client"
+
 
 /** data-artifact-progress 是 transient part（追加在 parts 尾部、不持久化）；
  * 按 toolCallId 取最后一次进度，与对应 tool part 原位配对。 */
@@ -49,6 +51,8 @@ export function AnchoredAssistantBody({
   sourceDepth?: number | null
   density?: MarkdownDensity
 }) {
+  const { t } = useI18n()
+
   const renderPlan = assistantPartRenderPlan(message)
 
   return (
@@ -93,7 +97,7 @@ export function AnchoredAssistantBody({
               href={part.url}
               download={part.type === "file" ? part.filename : undefined}
             >
-              {part.type === "file" ? (part.filename ?? "附件") : "推理文件"}
+              {part.type === "file" ? (part.filename ?? t("ui.attachment")) : t("ui.reasoningFile")}
             </a>
           )
         }

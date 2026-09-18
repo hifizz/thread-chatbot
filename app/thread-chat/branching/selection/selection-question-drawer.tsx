@@ -7,6 +7,8 @@ import {
   Drawer, DrawerClose, DrawerContent, DrawerDescription,
   DrawerFooter, DrawerHeader, DrawerTitle,
 } from "@/components/ui/drawer"
+import { useI18n } from "@/lib/i18n/client"
+
 
 /** 仅手机提问外壳；选区快照和草稿由父组件持有，收起不丢失。 */
 export function SelectionQuestionDrawer({ open, text, question, onQuestionChange, onClose, onSubmit }: {
@@ -17,6 +19,8 @@ export function SelectionQuestionDrawer({ open, text, question, onQuestionChange
   onClose(): void
   onSubmit(): void
 }) {
+  const { t } = useI18n()
+
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const [viewport, setViewport] = useState<{ height: number; bottom: number } | null>(null)
   useEffect(() => {
@@ -45,21 +49,21 @@ export function SelectionQuestionDrawer({ open, text, question, onQuestionChange
       portalClassName="tc selection-question-portal"
       style={viewport ? { bottom: viewport.bottom, maxHeight: Math.max(0, viewport.height - 24) } : undefined}>
       <DrawerHeader>
-        <DrawerTitle>此处提问</DrawerTitle>
-        <DrawerDescription>围绕选中的内容，开启分支讨论</DrawerDescription>
+        <DrawerTitle>{t("chat.askHere")}</DrawerTitle>
+        <DrawerDescription>{t("ui.startADiscussionAboutTheSelected")}</DrawerDescription>
       </DrawerHeader>
       <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">
         <details className="rounded-lg bg-muted p-3 text-sm">
-          <summary className="cursor-pointer truncate">引用：{text}</summary>
+          <summary className="cursor-pointer truncate">{t("ui.quote")}{text}</summary>
           <p className="mt-2 whitespace-pre-wrap break-words">{text}</p>
         </details>
         <Textarea ref={inputRef} value={question} rows={3} className="min-h-24 shrink-0 text-base"
-          aria-label="就这段内容提问" placeholder="就这段问点什么…（可留空）" enterKeyHint="enter"
+          aria-label={t("ui.askAboutThisText")} placeholder={t("ui.askAboutThisTextOptional")} enterKeyHint="enter"
           onChange={(event) => onQuestionChange(event.target.value)} />
       </div>
       <DrawerFooter className="pb-[max(1rem,env(safe-area-inset-bottom))]">
-        <Button onClick={onSubmit}>{question.trim() ? "带着问题开分支" : "开启分支讨论"}</Button>
-        <DrawerClose render={<Button variant="outline" />}>收起，稍后继续</DrawerClose>
+        <Button onClick={onSubmit}>{question.trim() ? t("ui.openABranchWithYourQuestion") : t("ui.startABranchDiscussion")}</Button>
+        <DrawerClose render={<Button variant="outline" />}>{t("ui.collapseAndContinueLater")}</DrawerClose>
       </DrawerFooter>
     </DrawerContent>
   </Drawer>

@@ -5,9 +5,9 @@
 
 ## 2. 同意实现
 
-- [ ] 2.1 实现 ConsentSnapshot、设备/账户范围、revision、过期和服务端保存接口。
-- [ ] 2.2 接入 Banner、Dialog/Drawer、页脚与设置入口，拒绝/接受同级显示。
-- [ ] 2.3 实现浏览器/服务端 analytics gate、队列撤回、退出 reset；关闭 replay/autocapture。
+- [x] 2.1 实现 ConsentSnapshot、设备/账户范围、revision、过期和服务端保存接口。
+- [x] 2.2 接入 Banner、Dialog/Drawer、页脚与设置入口，拒绝/接受同级显示。
+- [x] 2.3 实现浏览器/服务端 analytics gate、队列撤回、退出 reset；关闭 replay/autocapture。
 - [ ] 2.4 校验语言偏好、账务与反馈不依赖分析同意。
 
 ## 3. 数据请求

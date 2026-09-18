@@ -40,6 +40,7 @@ export * from "./auth-schema"
 export * from "./admin-schema"
 export * from "./billing-schema"
 export * from "./payment-schema"
+export * from "./privacy-schema"
 
 export const attachments = dbSchema.table(
   "attachments",

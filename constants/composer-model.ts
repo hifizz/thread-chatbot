@@ -7,3 +7,13 @@ export const COMPOSER_MODEL_COPY = {
   busy: "回复生成中，暂不可切换模型",
   unavailable: "当前会话暂不可切换模型",
 } as const
+
+/** 仅用于界面翻译；服务端持久化的既有收据文案保持兼容。 */
+export const COMPOSER_MODEL_KEYS = {
+  choose: "composerModel.choose",
+  failed: "composerModel.failed",
+  current: "composerModel.current",
+  branchLocked: "composerModel.branchLocked",
+  busy: "composerModel.busy",
+  unavailable: "composerModel.unavailable",
+} as const

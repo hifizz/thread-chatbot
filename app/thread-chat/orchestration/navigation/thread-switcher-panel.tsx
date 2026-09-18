@@ -14,6 +14,8 @@ import { dotColorOf, dvar } from "../../theme"
 import type { Slot } from "../columns/placement"
 import { useScrollMemory } from "../../scroll/use-scroll-memory"
 import { ShortcutHint } from "../overlays/shortcut-hint"
+import { useI18n } from "@/lib/i18n/client"
+
 
 export type SwitcherMode =
   | { kind: "global" }
@@ -36,6 +38,8 @@ export function ThreadSwitcherPanel({
   recents,
   onPick,
 }: ThreadSwitcherPanelProps) {
+  const { t } = useI18n()
+
   const [query, setQuery] = useState("")
   const [hi, setHi] = useState(0)
   const listRef = useScrollMemory(JSON.stringify(["thread-list", mode.kind, mode.kind === "subtree" ? mode.rootId : mode.kind === "column" ? mode.vpIndex : "global", query]))
@@ -61,10 +65,10 @@ export function ThreadSwitcherPanel({
   }
 
   const statusOf = (id: string): { label: string } | null => {
-    if (id === "main") return { label: "锚定" }
+    if (id === "main") return { label: t("ui.pinned") }
     const index = slots.findIndex((slot) => slot.id === id)
     if (index < 0) return null
-    return { label: slots[index].folded ? "细条" : `第 ${index + 2} 列` }
+    return { label: slots[index].folded ? t("ui.strip2") : t("chat.columnNumber", { number: index + 2 }) }
   }
   const currentColumnId =
     mode.kind === "column" ? (slots[mode.vpIndex]?.id ?? null) : null
@@ -77,8 +81,7 @@ export function ThreadSwitcherPanel({
     <>
       {isSubtree ? (
         <div className="swx-title">
-          <ListTree size={14} />『{threadTitle(state, mode.rootId)}』的子分支
-        </div>
+          <ListTree size={14} />『{threadTitle(state, mode.rootId)}{t("ui.branches")}</div>
       ) : (
         <div className="swx-search">
           <Search size={14} />
@@ -86,7 +89,7 @@ export function ThreadSwitcherPanel({
             autoFocus
             value={query}
             placeholder={
-              isGlobal ? "搜索会话（标题 / 划选原文）…" : "把本列切换为…"
+              isGlobal ? t("ui.findThreadsByTitleOrSelected") : t("ui.switchThisColumnTo")
             }
             onChange={(event) => {
               setQuery(event.target.value)
@@ -114,7 +117,7 @@ export function ThreadSwitcherPanel({
 
       {recentRows.length > 0 && (
         <>
-          <div className="swx-hd">最近访问</div>
+          <div className="swx-hd">{t("ui.recentlyVisited")}</div>
           <div className="swx-recent">
             {recentRows.map((id) => {
               const recentThread = state.threads[id]
@@ -155,8 +158,8 @@ export function ThreadSwitcherPanel({
         {rows.length === 0 && (
           <div className="swx-empty">
             {isSubtree
-              ? "此会话还没有子分支——划选一段文字即可开出第一个"
-              : `没有匹配「${query}」的会话`}
+              ? t("ui.noBranchesYetSelectSomeText")
+              : t("chat.noMatch", { query })}
           </div>
         )}
         {rows.map((row, index) => {
@@ -176,7 +179,7 @@ export function ThreadSwitcherPanel({
                   paddingLeft: filtering ? 9 : 9 + row.relDepth * 16,
                 } as React.CSSProperties
               }
-              title={row.anchor ? `划选自：「${row.anchor}」` : undefined}
+              title={row.anchor ? t("chat.selectedQuote", { quote: row.anchor }) : undefined}
               onMouseEnter={() => setHi(index)}
               onClick={() => onPick(row, mode)}
             >
@@ -191,11 +194,11 @@ export function ThreadSwitcherPanel({
                 <span className="anch">「{row.anchor}」</span>
               )}
               {isCurrent ? (
-                <span className="st">本列</span>
+                <span className="st">{t("ui.thisColumn")}</span>
               ) : status ? (
                 <span className="st">{status.label}</span>
               ) : mode.kind === "column" && row.isMain ? (
-                <span className="st">⇐ 收起本列</span>
+                <span className="st">{t("ui.collapseThisColumn2")}</span>
               ) : null}
             </div>
           )
@@ -205,26 +208,22 @@ export function ThreadSwitcherPanel({
       <div className="swx-foot">
         {isSubtree ? (
           <>
-            <span>点击行打开（列满走当前策略）</span>
+            <span>{t("ui.clickARowToOpenThe")}</span>
             <span>
-              <ShortcutHint {...THREAD_CHAT_SHORTCUTS.closeDialog} /> 关闭
-            </span>
+              <ShortcutHint {...THREAD_CHAT_SHORTCUTS.closeDialog} /> {t("common.close")}</span>
           </>
         ) : (
           <>
             <span>
-              <ShortcutHint {...THREAD_CHAT_SHORTCUTS.moveSelection} /> 选择
-            </span>
+              <ShortcutHint {...THREAD_CHAT_SHORTCUTS.moveSelection} /> {t("ui.select")}</span>
             <span>
-              <ShortcutHint {...THREAD_CHAT_SHORTCUTS.openSelection} /> 打开
-            </span>
+              <ShortcutHint {...THREAD_CHAT_SHORTCUTS.openSelection} /> {t("ui.open")}</span>
             <span>
-              <ShortcutHint {...THREAD_CHAT_SHORTCUTS.closeDialog} /> 关闭
-            </span>
+              <ShortcutHint {...THREAD_CHAT_SHORTCUTS.closeDialog} /> {t("common.close")}</span>
             {isGlobal ? (
-              <span>点击 = 智能放置（列满走当前策略）</span>
+              <span>{t("ui.clickToPlaceAutomaticallyUsingThe")}</span>
             ) : (
-              <span>点击 = 在本列打开</span>
+              <span>{t("ui.clickToOpenInThisColumn")}</span>
             )}
           </>
         )}

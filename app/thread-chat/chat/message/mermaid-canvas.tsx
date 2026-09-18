@@ -4,6 +4,8 @@ import { useEffect, useRef, useState, type ReactNode, type PointerEvent } from "
 import { Maximize, Minus, Plus, RotateCcw } from "lucide-react"
 import { MERMAID_CANVAS as C } from "@/constants/mermaid"
 import { automaticDiagramScale, constrainDiagram, fitDiagram, zoomDiagram, type DiagramSize, type DiagramTransform } from "@/lib/markdown/mermaid-viewport"
+import { useI18n } from "@/lib/i18n/client"
+
 
 type Point = { x: number; y: number }
 
@@ -15,6 +17,8 @@ export function MermaidCanvas({ url, hidden, viewControls, onLoad, onError }: {
   onLoad: () => void
   onError: () => void
 }) {
+  const { t } = useI18n()
+
   const viewportRef = useRef<HTMLDivElement>(null)
   const imageRef = useRef<HTMLImageElement>(null)
   const [state, setState] = useState<{
@@ -112,15 +116,15 @@ export function MermaidCanvas({ url, hidden, viewControls, onLoad, onError }: {
     <div className="md-mermaid-canvas">
       <div className="md-mermaid-toolbar">
         {viewControls}
-        <div hidden={hidden} className="md-mermaid-tools" role="group" aria-label="图表缩放">
-          <button type="button" aria-label="缩小图表" title="缩小" disabled={!state || scale <= Math.min(C.minScale, fitDiagram(state.image, state.canvas))} onClick={() => zoom(scale / C.zoomStep)}><Minus size={16} /></button>
-          <button type="button" className="md-mermaid-scale" aria-label={`当前缩放 ${Math.round(scale * 100)}%，恢复 100%`} title="恢复 100%" disabled={!state} onClick={() => zoom(1)}>{Math.round(scale * 100)}%</button>
-          <button type="button" aria-label="放大图表" title="放大" disabled={!state || scale >= C.maxScale} onClick={() => zoom(scale * C.zoomStep)}><Plus size={16} /></button>
-          <button type="button" aria-label="适应画布" title="适应画布" disabled={!state} onClick={() => { if (state) zoom(fitDiagram(state.image, state.canvas)) }}><Maximize size={16} /></button>
-          <button type="button" aria-label="重置图表" title="重置为默认自适应" disabled={!state} onClick={reset}><RotateCcw size={16} /></button>
+        <div hidden={hidden} className="md-mermaid-tools" role="group" aria-label={t("ui.diagramZoom")}>
+          <button type="button" aria-label={t("ui.zoomOutOfDiagram")} title={t("ui.zoomOut")} disabled={!state || scale <= Math.min(C.minScale, fitDiagram(state.image, state.canvas))} onClick={() => zoom(scale / C.zoomStep)}><Minus size={16} /></button>
+          <button type="button" className="md-mermaid-scale" aria-label={t("chat.zoomPercent", { percent: Math.round(scale * 100) })} title={t("ui.restore100")} disabled={!state} onClick={() => zoom(1)}>{Math.round(scale * 100)}%</button>
+          <button type="button" aria-label={t("ui.zoomIntoDiagram")} title={t("ui.zoomIn")} disabled={!state || scale >= C.maxScale} onClick={() => zoom(scale * C.zoomStep)}><Plus size={16} /></button>
+          <button type="button" aria-label={t("ui.fitToCanvas")} title={t("ui.fitToCanvas")} disabled={!state} onClick={() => { if (state) zoom(fitDiagram(state.image, state.canvas)) }}><Maximize size={16} /></button>
+          <button type="button" aria-label={t("ui.resetDiagram")} title={t("ui.resetToAutomaticFit")} disabled={!state} onClick={reset}><RotateCcw size={16} /></button>
         </div>
       </div>
-      <div hidden={hidden} ref={viewportRef} className="md-mermaid-viewport" role="region" aria-label="Mermaid 图表，可拖动或用方向键移动" tabIndex={hidden ? -1 : 0}
+      <div hidden={hidden} ref={viewportRef} className="md-mermaid-viewport" role="region" aria-label={t("ui.mermaidDiagramDragOrUseThe")} tabIndex={hidden ? -1 : 0}
         style={{ height: state?.canvas.height ?? C.minHeight }}
         onKeyDown={(event) => {
           if (event.ctrlKey || event.metaKey || event.altKey) return
@@ -145,7 +149,7 @@ export function MermaidCanvas({ url, hidden, viewControls, onLoad, onError }: {
         onLostPointerCapture={(event) => pointers.current.delete(event.pointerId)}
       >
         {/* eslint-disable-next-line @next/next/no-img-element -- SVG 图片隔离，保留原始尺寸供画布计算。 */}
-        <img ref={imageRef} src={url} alt="Mermaid 图表（可切换查看源码）" draggable={false} onLoad={() => {
+        <img ref={imageRef} src={url} alt={t("ui.mermaidDiagramSourceViewAvailable")} draggable={false} onLoad={() => {
           // 可见图表等待尺寸提交后再结算，避免聊天自动滚动采用占位高度。
           if (!viewportRef.current?.clientWidth) onLoad()
         }} onError={onError}
