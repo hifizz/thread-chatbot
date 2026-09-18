@@ -8,6 +8,7 @@ import {
   ListTodo,
   Menu,
   Network,
+  Share2,
   Waypoints,
 } from "lucide-react"
 import type { MouseEvent } from "react"
@@ -37,6 +38,8 @@ export interface ThreadChatNavigationProps {
   placementMode: PlacementMode
   branchCount: number
   markdownCount: number
+  /** 只读分享：隐藏新对话/对话列表/账号等私有入口，顶栏显示只读徽标 */
+  readOnly?: boolean
   onNewConversation(openInNewPage: boolean): void
   onToggleTreeList(): void
   onOpenHelp(): void
@@ -46,6 +49,8 @@ export interface ThreadChatNavigationProps {
   onPlacementModeChange(mode: PlacementMode): void
   onToggleThreadTree(): void
   onToggleMarkdown(): void
+  /** 分享入口：缺席或 readOnly 时不渲染按钮 */
+  onShare?(): void
 }
 
 export function ThreadChatMobileMenu({
@@ -55,6 +60,7 @@ export function ThreadChatMobileMenu({
   placementMode,
   branchCount,
   markdownCount,
+  readOnly = false,
   onNewConversation,
   onToggleTreeList,
   onOpenHelp,
@@ -80,13 +86,17 @@ export function ThreadChatMobileMenu({
       >
           <DropdownMenuGroup>
             <DropdownMenuLabel>对话</DropdownMenuLabel>
-            <DropdownMenuItem onClick={() => onNewConversation(false)}>
-              新对话
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={onToggleTreeList}>
-              <ListTodo />
-              对话列表
-            </DropdownMenuItem>
+            {!readOnly && (
+              <>
+                <DropdownMenuItem onClick={() => onNewConversation(false)}>
+                  新对话
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={onToggleTreeList}>
+                  <ListTodo />
+                  对话列表
+                </DropdownMenuItem>
+              </>
+            )}
             <DropdownMenuItem onClick={onToggleThreadTree}>
               <Network />
               会话树{branchCount > 0 ? ` · ${branchCount}` : ""}
@@ -155,8 +165,12 @@ export function ThreadChatMobileMenu({
               </DropdownMenuGroup>
             </>
           )}
-          <DropdownMenuSeparator />
-          <AccountMenuRow />
+          {!readOnly && (
+            <>
+              <DropdownMenuSeparator />
+              <AccountMenuRow />
+            </>
+          )}
       </DropdownMenuContent>
     </DropdownMenu>
   )
@@ -171,6 +185,7 @@ export function ThreadChatTopbar(props: ThreadChatNavigationProps) {
     placementMode,
     branchCount,
     markdownCount,
+    readOnly = false,
     onNewConversation,
     onToggleTreeList,
     onOpenHelp,
@@ -180,29 +195,35 @@ export function ThreadChatTopbar(props: ThreadChatNavigationProps) {
     onPlacementModeChange,
     onToggleThreadTree,
     onToggleMarkdown,
+    onShare,
   } = props
   return (
     <div className="topbar">
-      <button
-        className="tbtn"
-        title="开启一棵全新的分支对话树；按住 Command 点击可在新页面打开（当前对话已自动保存，可经其 URL 随时回访）"
-        onClick={(event: MouseEvent<HTMLButtonElement>) =>
-          onNewConversation(event.metaKey)
-        }
-      >
-        新对话
-      </button>
-      <button
-        className="tbtn"
-        title="查看全部对话，可切换 / 重命名 / 删除（⌘⇧K）"
-        onClick={onToggleTreeList}
-      >
-        <ListTodo size={13} />
-        对话列表
-        <ShortcutHint {...THREAD_CHAT_SHORTCUTS.openTreeList} />
-      </button>
+      {!readOnly && (
+        <>
+          <button
+            className="tbtn"
+            title="开启一棵全新的分支对话树；按住 Command 点击可在新页面打开（当前对话已自动保存，可经其 URL 随时回访）"
+            onClick={(event: MouseEvent<HTMLButtonElement>) =>
+              onNewConversation(event.metaKey)
+            }
+          >
+            新对话
+          </button>
+          <button
+            className="tbtn"
+            title="查看全部对话，可切换 / 重命名 / 删除（⌘⇧K）"
+            onClick={onToggleTreeList}
+          >
+            <ListTodo size={13} />
+            对话列表
+            <ShortcutHint {...THREAD_CHAT_SHORTCUTS.openTreeList} />
+          </button>
+        </>
+      )}
       <div className="brand">
         <span className="mark">Thread Chat</span>
+        {readOnly && <span className="share-badge">只读快照</span>}
       </div>
       <div className="spacer" />
       <ThreadChatMobileMenu {...props} />
@@ -301,7 +322,17 @@ export function ThreadChatTopbar(props: ThreadChatNavigationProps) {
         Project
         <span className="cnt">{markdownCount}</span>
       </button>
-      <AccountButton />
+      {!readOnly && onShare && (
+        <button
+          className="tbtn"
+          title="把当前 Project 冻结为匿名只读链接"
+          onClick={onShare}
+        >
+          <Share2 size={13} />
+          分享
+        </button>
+      )}
+      {!readOnly && <AccountButton />}
     </div>
   )
 }

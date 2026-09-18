@@ -78,6 +78,20 @@
       "when": 1789532980552,
       "tag": "0010_huge_monster_badoon",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1789721565627,
+      "tag": "0011_motionless_wong",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1789732627109,
+      "tag": "0012_fresh_dreaming_celestial",
+      "breakpoints": true
     }
   ]
 }

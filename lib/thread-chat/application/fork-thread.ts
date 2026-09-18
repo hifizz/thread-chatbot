@@ -1,5 +1,6 @@
 import { appendDocumentNotices } from "./documents/notices"
 import { resolveForkModelId } from "@/lib/thread-chat/application/fork-model"
+import { resolveForkOrigin } from "@/lib/thread-chat/domain/fork-origin"
 import { resolveUserContent } from "./resolve-user-content"
 import { messages, threads } from "@/lib/db/schema"
 import type { ForkThreadCommand } from "@/lib/thread-chat/contracts/commands"
@@ -63,9 +64,11 @@ export function forkThread(
         const { project, thread: parent } = locked
         if (project.archivedAt) stateConflict("已归档 Project 不可创建分支")
         if (parent.archivedAt) stateConflict("已归档 Thread 不可创建分支")
-        const target = command.target
-        const anchor = target.anchor
-        const anchorText = anchor.quote.exact
+        const target = command.target ?? null
+        const origin = resolveForkOrigin({
+          anchor: target?.anchor,
+          anchorText: target?.anchor.quote.exact,
+        })
         const parentMessages = await listThreadMessageRows(
           tx,
           project.id,
@@ -82,7 +85,7 @@ export function forkThread(
           stateConflict("分支来源尚未完成")
 
         let forkArtifactId: string | null = null
-        if (target.type === "artifact") {
+        if (target?.type === "artifact") {
           const row = await findOwnedArtifact(tx, userId, target.artifactId)
           if (!row) notFound()
           const artifact = row.artifact
@@ -116,8 +119,8 @@ export function forkThread(
             forkMessageId: source.id,
             forkArtifactId,
             forkContext,
-            forkAnchor: anchor,
-            anchorText,
+            forkAnchor: origin.forkAnchor,
+            anchorText: origin.anchorText,
             footnote,
             depth: parent.depth + 1,
             modelId,
@@ -127,16 +130,19 @@ export function forkThread(
           await touchProjectAndThread(tx, project.id, child.id)
           return { thread: toThreadDTO(child), generation: null }
         }
-        const frozenFirstQuote = {
-          schemaVersion: THREAD_QUOTE_SCHEMA_VERSION,
-          text: anchorText,
-          source: forkQuoteSource({
-            messageId: source.id,
-            artifactId:
-              target.type === "artifact" ? target.artifactId : null,
-            anchor,
-          }),
-        }
+        const frozenFirstQuote =
+          origin.kind === "selection"
+            ? {
+                schemaVersion: THREAD_QUOTE_SCHEMA_VERSION,
+                text: origin.anchorText,
+                source: forkQuoteSource({
+                  messageId: source.id,
+                  artifactId:
+                    target?.type === "artifact" ? target.artifactId : null,
+                  anchor: origin.forkAnchor,
+                }),
+              }
+            : undefined
         const parts = await resolveUserContent({
           tx,
           userId,

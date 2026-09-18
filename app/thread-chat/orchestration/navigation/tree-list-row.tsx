@@ -111,7 +111,7 @@ export function TreeListRow({
               <>
                 <button
                   className="tlx-act danger confirm"
-                  title="确认删除（不可撤销）"
+                  title="确认删除（不可撤销；关联的分享链接会一并失效）"
                   onClick={onConfirmDelete}
                 >
                   <Check size={12} />

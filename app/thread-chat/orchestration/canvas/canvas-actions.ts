@@ -10,9 +10,12 @@ import type { ThreadMessageActionCommands } from "../../chat/actions/message-act
 
 /** 壳层用 chat-controller 组装后注入画布的会话动作。 */
 export interface CanvasChatActions extends ThreadMessageActionCommands {
+  forkMessage?: (threadId: string, messageId: string) => Promise<void>
   send: (threadId: string, content: MessageContentInput) => unknown | Promise<unknown>
   stop: (threadId: string) => void
   retry: (threadId: string, messageId: string) => void
+  /** 只读快照：画布内 composer 渲染静态条，消息动作缺席 */
+  readOnly?: boolean
 }
 
 /** 画布节点面板可用的完整组合能力。 */

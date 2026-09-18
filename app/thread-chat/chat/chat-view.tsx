@@ -36,6 +36,8 @@ export interface ChatViewProps {
   intro?: React.ReactNode
   /** 注入 assistant 正文渲染（锚点高亮 + 脚注上标） */
   renderAssistantBody?: (msg: ConversationViewMessage) => React.ReactNode
+  /** 注入 assistant 操作行的附加动作（与复制/点赞同排，如分叉入口） */
+  renderAssistantActions?: (msg: ConversationViewMessage) => React.ReactNode
   /** 注入 assistant 消息气泡之后的附加内容（artifact 卡片） */
   renderAfterMessage?: (msg: ConversationViewMessage) => React.ReactNode
   /** 流式生成中：发送键变「停止」（textarea 仍可输入，Enter 提交被拦） */
@@ -54,6 +56,8 @@ export interface ChatViewProps {
   modelSelectorDisabledReason?: "branch" | "busy"
   onModelChange: (modelId: string) => void | Promise<unknown>
   onSend: (content: MessageContentInput) => unknown | Promise<unknown>
+  /** 只读快照：composer 位渲染静态条而非输入框；消息动作命令不传入时按钮自然缺席 */
+  readOnly?: boolean
   messageActionState?: MessageActionViewState
   messageCommands?: ThreadMessageActionCommands
   editableUserMessageId?: string
@@ -68,6 +72,7 @@ export function ChatView({
   banner,
   intro,
   renderAssistantBody,
+  renderAssistantActions,
   renderAfterMessage,
   busy = false,
   onRetry,
@@ -78,6 +83,7 @@ export function ChatView({
   modelSelectorDisabledReason,
   onModelChange,
   onSend,
+  readOnly = false,
   messageActionState,
   messageCommands,
   editableUserMessageId,
@@ -106,6 +112,7 @@ export function ChatView({
                         showRoleLabel
                         assistantBubbleClassName="bubble mt-3 mb-1"
                         renderAssistantBody={renderAssistantBody}
+                        renderAssistantActions={renderAssistantActions}
                         renderAfterMessage={renderAfterMessage}
                         onRetry={onRetry}
                         messageActionState={messageActionState}
@@ -125,19 +132,23 @@ export function ChatView({
             <span className="scroll-end-icon">↓</span>
           </MessageScroller.Button>
           <div className="chat-composer-dock" ref={dockRef}>
-            <ConversationComposer
-              variant="column"
-              threadId={threadId}
-              isMain={isMain}
-              busy={busy}
-              prefill={composerPrefill}
-              modelId={modelId}
-              modelSelectorDisabled={modelSelectorDisabled}
-              modelSelectorDisabledReason={modelSelectorDisabledReason}
-              onModelChange={onModelChange}
-              onSend={onSend}
-              onStop={onStop}
-            />
+            {readOnly ? (
+              <div className="composer read-only-strip">只读快照 · 内容在分享时冻结</div>
+            ) : (
+              <ConversationComposer
+                variant="column"
+                threadId={threadId}
+                isMain={isMain}
+                busy={busy}
+                prefill={composerPrefill}
+                modelId={modelId}
+                modelSelectorDisabled={modelSelectorDisabled}
+                modelSelectorDisabledReason={modelSelectorDisabledReason}
+                onModelChange={onModelChange}
+                onSend={onSend}
+                onStop={onStop}
+              />
+            )}
           </div>
         </MessageScroller.Root>
       </MessageScroller.Provider>

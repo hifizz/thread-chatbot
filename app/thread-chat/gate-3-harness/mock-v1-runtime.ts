@@ -1,3 +1,4 @@
+import { resolveForkOrigin } from "@/lib/thread-chat/domain/fork-origin"
 import { artifactReferenceData } from "@/lib/thread-chat/contracts/artifact-reference"
 import { messageContentToUiParts, type MessageContentInput } from "@/lib/thread-chat/contracts/message-content"
 
@@ -12,6 +13,7 @@ import type {
 import { PROJECT_TITLE_FALLBACK } from "@/constants/project-workspace"
 import { DEFAULT_THREAD_CHAT_MODEL_ID } from "@/constants/models"
 import { textFromMessageParts } from "@/lib/thread-chat/contracts/ui-message"
+import { buildFrozenForkContext } from "@/lib/thread-chat/domain/fork-context"
 import type { ThreadChatClient } from "../net/client"
 
 export type Gate3HarnessScenario =
@@ -517,6 +519,9 @@ export function createGate3MockRuntime(
     async listThreadArtifacts(threadId: string) { return [...artifacts.values()].filter(artifact => artifact.threadId === threadId) },
     async listDocuments() { return { documents: [], artifacts: [...artifacts.values()] } },
     async getDocumentHistory() { return [] },
+    async createShare() { throw new Error("mock: sharing not implemented") },
+    async listShares() { return [] },
+    async revokeShare() { throw new Error("mock: sharing not implemented") },
     async listProjects(archived = false) {
       return project && Boolean(project.archivedAt) === archived
         ? [
@@ -644,18 +649,24 @@ export function createGate3MockRuntime(
     async forkThread(parentThreadId, input) {
       const parent = threads.get(parentThreadId)
       if (!parent) throw new Error("THREAD_NOT_FOUND")
-      const anchor = input.target.anchor
-      const anchorText = anchor.quote.exact
       const stamp = now()
+      const origin = resolveForkOrigin({
+        anchor: input.target?.anchor,
+        anchorText: input.target?.anchor.quote.exact,
+      })
       const thread: ThreadDTO = {
         id: input.threadId,
         projectId,
         parentId: parentThreadId,
         forkMessageId: input.sourceMessageId,
-        forkContext: [],
-        forkArtifactId: input.target.type === "artifact" ? input.target.artifactId : null,
-        forkAnchor: anchor,
-        anchorText,
+        forkContext: buildFrozenForkContext({
+          parentForkContext: parent.forkContext,
+          parentMessages: [...messages.values()].filter((message) => message.threadId === parentThreadId),
+          sourceMessageId: input.sourceMessageId,
+        }),
+        forkArtifactId: input.target?.type === "artifact" ? input.target.artifactId : null,
+        forkAnchor: origin.forkAnchor,
+        anchorText: origin.anchorText,
         footnote:
           Math.max(
             0,
@@ -663,7 +674,7 @@ export function createGate3MockRuntime(
           ) + 1,
         depth: parent.depth + 1,
         modelId: input.modelId,
-        autoTitle: anchorText.slice(0, 13),
+        autoTitle: origin.anchorText?.slice(0, 13) ?? null,
         customTitle: null,
         titleGenerationAttempted: false,
         titleGenerated: false,

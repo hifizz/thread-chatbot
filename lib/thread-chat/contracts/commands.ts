@@ -116,7 +116,7 @@ export const forkThreadCommandSchema = z
     commandId: commandIdSchema,
     threadId: entityIdSchema,
     sourceMessageId: entityIdSchema,
-    target: forkTargetSchema,
+    target: forkTargetSchema.nullish(),
     modelId: modelIdSchema,
     ...generationSettingsField,
     firstTurn: firstForkTurnSchema.optional(),

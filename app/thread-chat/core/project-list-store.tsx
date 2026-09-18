@@ -90,11 +90,14 @@ const ProjectListStoreContext = createContext<ProjectListStore | null>(null)
 
 export function ProjectListStoreProvider({
   children,
+  client,
 }: {
   children: React.ReactNode
+  /** 覆盖默认 API client（只读分享页喂快照 client，避免私有请求） */
+  client?: Pick<ThreadChatClient, "listProjects">
 }) {
   const [store] = useState(() =>
-    createProjectListStore(createThreadChatClient())
+    createProjectListStore(client ?? createThreadChatClient())
   )
 
   useEffect(() => {

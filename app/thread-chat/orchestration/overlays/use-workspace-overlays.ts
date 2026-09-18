@@ -16,7 +16,10 @@ export interface ArtifactSourceNav {
   anchor: TextAnchor
 }
 
-export function useWorkspaceOverlays() {
+export function useWorkspaceOverlays(initial?: {
+  drawerOpen?: boolean
+  activeArtifactId?: string | null
+}) {
   const rootRef = useRef<HTMLDivElement | null>(null)
   const [selection, setSelection] = useState<SelectionInfo | null>(null)
   const [switcher, setSwitcher] = useState<
@@ -24,8 +27,10 @@ export function useWorkspaceOverlays() {
   >(null)
   const [treeList, setTreeList] = useState<ClosingOverlay | null>(null)
   const [helpPanel, setHelpPanel] = useState<ClosingOverlay | null>(null)
-  const [drawerOpen, setDrawerOpen] = useState(false)
-  const [activeArtifactId, setActiveArtifactId] = useState<string | null>(null)
+  const [drawerOpen, setDrawerOpen] = useState(initial?.drawerOpen ?? false)
+  const [activeArtifactId, setActiveArtifactId] = useState<string | null>(
+    initial?.activeArtifactId ?? null
+  )
   const [artifactSourceNav, setArtifactSourceNav] =
     useState<ArtifactSourceNav | null>(null)
   const switcherSequenceRef = useRef(0)

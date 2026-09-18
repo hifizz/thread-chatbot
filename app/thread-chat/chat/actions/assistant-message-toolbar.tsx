@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, type ReactNode } from "react"
 import { Check, Copy, RotateCcw, ThumbsDown, ThumbsUp } from "lucide-react"
 import {
   MESSAGE_ACTION_ERRORS,
@@ -16,7 +16,8 @@ export function AssistantMessageToolbar({
   regeneratable,
   feedback,
   commands,
-}: AssistantMessageToolbarProps) {
+  trailing,
+}: AssistantMessageToolbarProps & { trailing?: ReactNode }) {
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const { copied, copy } = useCopyMarkdown(setError)
@@ -88,6 +89,7 @@ export function AssistantMessageToolbar({
             busy: busy === "negative",
           },
         ]}
+        trailing={trailing}
       />
       {error && (
         <div className="message-action-error" role="alert">
