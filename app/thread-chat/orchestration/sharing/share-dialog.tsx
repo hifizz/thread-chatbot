@@ -58,7 +58,7 @@ async function copyLink(token: string) {
     await navigator.clipboard.writeText(shareUrl(token))
     toast.success(SHARE_UI_COPY.copied)
   } catch {
-    toast.error(SHARE_UI_COPY.createFailed)
+    toast.error(SHARE_UI_COPY.copyFailed)
   }
 }
 
@@ -75,6 +75,7 @@ export function ShareDialog({
   const [expiry, setExpiry] = useState<ShareExpiry>(SHARE_EXPIRY_DEFAULT)
   const [creating, setCreating] = useState(false)
   const [loadFailed, setLoadFailed] = useState(false)
+  const hasActive = (shares ?? []).some((row) => row.status === "active")
 
   const resourceKey = resource
     ? `${resource.resourceType}:${resource.resourceId}`
@@ -93,7 +94,7 @@ export function ShareDialog({
   }, [open, resourceKey, client])
 
   const create = useCallback(async () => {
-    if (!resource || creating) return
+    if (!resource || creating || hasActive) return
     setCreating(true)
     try {
       const base = {
@@ -123,7 +124,7 @@ export function ShareDialog({
     } finally {
       setCreating(false)
     }
-  }, [client, creating, expiry, overlay, resource, store])
+  }, [client, creating, expiry, hasActive, overlay, resource, store])
 
   const revoke = useCallback(
     async (share: ShareDTO) => {
@@ -161,7 +162,7 @@ export function ShareDialog({
           </div>
 
           <div className="px-4 pb-3.5 pt-3">
-            <p className="mb-3 text-xs leading-relaxed text-[var(--tc-depth-1)]">
+            <p className="mb-3 text-xs leading-relaxed text-[var(--tc-content-secondary)]">
               {SHARE_UI_COPY.shareNotice}
             </p>
 
@@ -170,7 +171,7 @@ export function ShareDialog({
               role="radiogroup"
               aria-label={SHARE_UI_COPY.expiryLabel}
             >
-              <span className="mr-1 text-xs text-[var(--tc-depth-1)]">
+              <span className="mr-1 text-xs text-[var(--tc-content-secondary)]">
                 {SHARE_UI_COPY.expiryLabel}
               </span>
               {SHARE_EXPIRY_OPTIONS.map((option) => (
@@ -180,9 +181,9 @@ export function ShareDialog({
                   role="radio"
                   aria-checked={expiry === option.value}
                   className={cn(
-                    "cursor-pointer rounded-lg border border-[var(--tc-border-strong)] bg-[var(--tc-surface-plain)] px-2.5 py-1 text-xs",
+                    "cursor-pointer rounded-lg border border-[var(--tc-border-strong)] bg-[var(--tc-surface-plain)] px-2.5 py-1 text-xs text-[var(--tc-content-secondary)] hover:text-[var(--tc-content-primary)]",
                     expiry === option.value &&
-                      "border-[var(--tc-depth-1)] text-[var(--tc-depth-1)]"
+                      "border-[var(--tc-content-muted)] text-[var(--tc-content-primary)]"
                   )}
                   onClick={() => setExpiry(option.value)}
                 >
@@ -193,61 +194,66 @@ export function ShareDialog({
 
             <button
               type="button"
-              className="w-full cursor-pointer rounded-lg border border-[var(--tc-border-strong)] bg-[var(--tc-surface-plain)] py-2 text-[13px] disabled:cursor-default disabled:opacity-50"
-              disabled={creating || !resource}
+              className="w-full cursor-pointer rounded-lg border border-[var(--tc-border-strong)] bg-[var(--tc-surface-plain)] py-2 text-[13px] text-[var(--tc-content-primary)] disabled:cursor-default disabled:opacity-50"
+              disabled={creating || !resource || hasActive}
               onClick={() => void create()}
             >
               {creating ? "创建中…" : SHARE_UI_COPY.createAction}
             </button>
-          </div>
+            {hasActive && (
+              <p className="mt-1.5 text-center text-xs text-[var(--tc-content-muted)]">
+                {SHARE_UI_COPY.oneActiveHint}
+              </p>
+            )}
 
-          <div className="swx-list max-h-60">
-            {shares === null && !loadFailed && (
-              <div className="swx-empty">加载中…</div>
-            )}
-            {loadFailed && (
-              <div className="swx-empty">加载失败，请稍后重新打开</div>
-            )}
-            {shares !== null && shares.length === 0 && (
-              <div className="swx-empty">{SHARE_UI_COPY.listEmpty}</div>
-            )}
-            {(shares ?? []).map((share) => (
-              <div
-                className="flex items-center gap-2 border-t border-[var(--tc-border-subtle)] py-2 text-xs"
-                key={share.id}
-              >
-                <span
-                  className={cn(
-                    "flex-none rounded-lg border border-[var(--tc-border-strong)] px-2 py-0.5",
-                    share.status !== "active" && "text-[var(--tc-depth-1)]"
-                  )}
+            <div className="max-h-60 overflow-y-auto">
+              {shares === null && !loadFailed && (
+                <div className="swx-empty">加载中…</div>
+              )}
+              {loadFailed && (
+                <div className="swx-empty">加载失败，请稍后重新打开</div>
+              )}
+              {shares !== null && shares.length === 0 && (
+                <div className="swx-empty">{SHARE_UI_COPY.listEmpty}</div>
+              )}
+              {(shares ?? []).map((share) => (
+                <div
+                  className="flex items-center gap-2 border-t border-[var(--tc-border-subtle)] py-2 text-xs"
+                  key={share.id}
                 >
-                  {statusLabel(share)}
-                </span>
-                <span className="flex-1 text-[var(--tc-depth-1)]">
-                  {share.createdAt.slice(0, 10)}
-                  {share.expiresAt ? ` · 至 ${share.expiresAt.slice(0, 10)}` : " · 无限期"}
-                </span>
-                {share.status === "active" && (
-                  <>
-                    <button
-                      type="button"
-                      className="flex-none cursor-pointer rounded-lg border border-[var(--tc-border-strong)] bg-[var(--tc-surface-plain)] px-2 py-1 text-xs"
-                      onClick={() => void copyLink(share.token)}
-                    >
-                      {SHARE_UI_COPY.copyAction}
-                    </button>
-                    <button
-                      type="button"
-                      className="flex-none cursor-pointer rounded-lg border border-[var(--tc-border-strong)] bg-[var(--tc-surface-plain)] px-2 py-1 text-xs text-[var(--tc-danger,#b03030)]"
-                      onClick={() => void revoke(share)}
-                    >
-                      {SHARE_UI_COPY.revokeAction}
-                    </button>
-                  </>
-                )}
-              </div>
-            ))}
+                  <span
+                    className={cn(
+                      "flex-none rounded-lg border border-[var(--tc-border-strong)] px-2 py-0.5 text-[var(--tc-content-secondary)]",
+                      share.status !== "active" && "text-[var(--tc-content-muted)]"
+                    )}
+                  >
+                    {statusLabel(share)}
+                  </span>
+                  <span className="flex-1 text-[var(--tc-content-secondary)]">
+                    {share.createdAt.slice(0, 10)}
+                    {share.expiresAt ? ` · 至 ${share.expiresAt.slice(0, 10)}` : " · 无限期"}
+                  </span>
+                  {share.status === "active" && (
+                    <>
+                      <button
+                        type="button"
+                        className="flex-none cursor-pointer rounded-lg border border-[var(--tc-border-strong)] bg-[var(--tc-surface-plain)] px-2 py-1 text-xs text-[var(--tc-content-secondary)] hover:border-[var(--tc-content-muted)] hover:text-[var(--tc-content-primary)]"
+                        onClick={() => void copyLink(share.token)}
+                      >
+                        {SHARE_UI_COPY.copyAction}
+                      </button>
+                      <button
+                        type="button"
+                        className="flex-none cursor-pointer rounded-lg border border-[var(--tc-border-strong)] bg-[var(--tc-surface-plain)] px-2 py-1 text-xs text-[var(--tc-content-secondary)] hover:border-[var(--tc-danger-edge)] hover:text-[var(--tc-danger)]"
+                        onClick={() => void revoke(share)}
+                      >
+                        {SHARE_UI_COPY.revokeAction}
+                      </button>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         </DialogPrimitive.Popup>
       </DialogPortal>

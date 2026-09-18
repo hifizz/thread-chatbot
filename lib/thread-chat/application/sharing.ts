@@ -29,6 +29,7 @@ import {
 import { listProjectMessageRows } from "@/lib/thread-chat/persistence/message-repository"
 import { findOwnedProject } from "@/lib/thread-chat/persistence/project-repository"
 import {
+  findActiveShare,
   findOwnedShare,
   findShareByToken,
   insertShare,
@@ -70,6 +71,8 @@ async function createProjectShare(
 ): Promise<ShareDTO> {
   const project = await findOwnedProject(tx, userId, command.projectId)
   if (!project) notFound()
+  if (await findActiveShare(tx, userId, "project", project.id))
+    stateConflict("该 Project 已有有效分享链接，撤销后可重新创建")
   const [threadRows, messageRows, artifactRows, documentItems] =
     await Promise.all([
       listProjectThreadRows(tx, project.id),
@@ -109,6 +112,8 @@ async function createDocumentShare(
 ): Promise<ShareDTO> {
   const document = await findOwnedDocument(tx, userId, command.documentId)
   if (!document || document.currentRevisionId === null) notFound()
+  if (await findActiveShare(tx, userId, "document", document.id))
+    stateConflict("该文档已有有效分享链接，撤销后可重新创建")
   const revision = await readDocumentRevision(
     tx,
     document.id,

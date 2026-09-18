@@ -16,7 +16,7 @@ export function ShareBadge() {
 
 export function ReadOnlyStrip() {
   return (
-    <div className="composer flex items-center justify-center text-xs text-[var(--tc-content-dim,var(--tc-depth-1))]">
+    <div className="composer flex items-center justify-center bg-[var(--tc-surface-plain)] text-xs text-[var(--tc-content-secondary)]">
       {SHARE_UI_COPY.readOnlyBadge} · 内容在分享时冻结
     </div>
   )

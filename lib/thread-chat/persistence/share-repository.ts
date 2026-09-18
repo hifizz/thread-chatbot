@@ -1,4 +1,4 @@
-import { and, desc, eq } from "drizzle-orm"
+import { and, desc, eq, gt, isNull, or } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { shares } from "@/lib/db/schema"
 import type {
@@ -78,6 +78,30 @@ export async function listOwnedShares(
       )
     )
     .orderBy(desc(shares.createdAt))
+}
+
+/** 有效分享：未撤销且未过期。同一资源同时只允许一条（创建/撤销前后端双重约束）。 */
+export async function findActiveShare(
+  executor: ConversationExecutor,
+  userId: string,
+  resourceType: "project" | "document",
+  resourceId: string,
+  now = new Date()
+): Promise<ShareRow | null> {
+  const [row] = await executor
+    .select()
+    .from(shares)
+    .where(
+      and(
+        eq(shares.ownerId, userId),
+        eq(shares.resourceType, resourceType),
+        eq(shares.resourceId, resourceId),
+        isNull(shares.revokedAt),
+        or(isNull(shares.expiresAt), gt(shares.expiresAt, now))
+      )
+    )
+    .limit(1)
+  return row ?? null
 }
 
 export async function findOwnedShare(
