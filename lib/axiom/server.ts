@@ -22,7 +22,7 @@ const BATCH_SIZE = 25
 const FLUSH_INTERVAL_MS = 250
 const SERVICE_NAME = "thread-chat"
 
-let queue: ServerLogEvent[] = []
+const queue: ServerLogEvent[] = []
 let timer: ReturnType<typeof setTimeout> | undefined
 let flushing: Promise<void> | undefined
 

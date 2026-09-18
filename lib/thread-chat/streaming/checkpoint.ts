@@ -7,7 +7,8 @@ import { stripTransientParts } from "@/lib/thread-chat/application/command-utils
 
 export type CheckpointWriter = (
   messageId: string,
-  parts: ThreadChatUIMessage["parts"]
+  parts: ThreadChatUIMessage["parts"],
+  meta?: { firstTokenAt?: Date }
 ) => Promise<boolean>
 
 export type CheckpointSummary = {
@@ -20,11 +21,16 @@ export type CheckpointSummary = {
 
 async function writeCheckpoint(
   messageId: string,
-  parts: ThreadChatUIMessage["parts"]
+  parts: ThreadChatUIMessage["parts"],
+  meta?: { firstTokenAt?: Date }
 ): Promise<boolean> {
   const [updated] = await db
     .update(messages)
-    .set({ parts, updatedAt: new Date() })
+    .set({
+      parts,
+      updatedAt: new Date(),
+      ...(meta?.firstTokenAt ? { firstTokenAt: meta.firstTokenAt } : {}),
+    })
     .where(and(eq(messages.id, messageId), eq(messages.status, "generating")))
     .returning({ id: messages.id })
   return Boolean(updated)
@@ -33,6 +39,7 @@ async function writeCheckpoint(
 export class MessageCheckpointer {
   private pending: ThreadChatUIMessage["parts"] | null = null
   private pendingSerialized: string | null = null
+  private firstTokenAtMs: number | null = null
   private lastWritten = "[]"
   private lastWriteAt = 0
   private timer: ReturnType<typeof setTimeout> | null = null
@@ -56,6 +63,9 @@ export class MessageCheckpointer {
   schedule(snapshot: ThreadChatUIMessage): void {
     if (!this.active) return
     const parts = stripTransientParts(snapshot.parts)
+    if (this.firstTokenAtMs === null && parts.length > 0) {
+      this.firstTokenAtMs = this.now()
+    }
     const serialized = JSON.stringify(parts)
     if (
       serialized === this.lastWritten ||
@@ -81,6 +91,9 @@ export class MessageCheckpointer {
   async flush(snapshot?: ThreadChatUIMessage): Promise<boolean> {
     if (snapshot && this.active) {
       const parts = stripTransientParts(snapshot.parts)
+      if (this.firstTokenAtMs === null && parts.length > 0) {
+        this.firstTokenAtMs = this.now()
+      }
       const serialized = JSON.stringify(parts)
       if (serialized !== this.lastWritten) {
         if (serialized !== this.pendingSerialized)
@@ -120,7 +133,13 @@ export class MessageCheckpointer {
     this.writeChain = this.writeChain.then(async (stillGenerating) => {
       if (!stillGenerating) return false
       this.summary.writeAttempts += 1
-      const updated = await this.writer(this.messageId, parts)
+      const updated = await this.writer(
+        this.messageId,
+        parts,
+        this.firstTokenAtMs !== null
+          ? { firstTokenAt: new Date(this.firstTokenAtMs) }
+          : undefined
+      )
       if (updated) {
         this.summary.successfulWrites += 1
         this.lastWritten = serialized

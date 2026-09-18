@@ -8,6 +8,8 @@ import {
   assertAllowedGenerationSettings,
   assertAllowedModel,
   assertThreadReadyForTurn,
+  assistantGenerationTraceColumns,
+  emitGenerationAcceptedEvent,
   touchProjectAndThread,
 } from "@/lib/thread-chat/application/command-utils"
 import { notFound, stateConflict } from "@/lib/thread-chat/application/errors"
@@ -26,14 +28,14 @@ import {
   withConversationTransaction,
 } from "@/lib/thread-chat/persistence/transaction"
 
-export function sendMessage(
+export async function sendMessage(
   userId: string,
   threadId: string,
   command: SendMessageCommand
 ) {
   assertAllowedModel(command.modelId)
   assertAllowedGenerationSettings(command.modelId, command.generationSettings)
-  return withConversationTransaction(async (tx) =>
+  const outcome = await withConversationTransaction(async (tx) =>
     executeIdempotentCommand({
       tx,
       userId,
@@ -81,6 +83,9 @@ export function sendMessage(
           2
         )
         const now = new Date()
+        const traceColumns = await assistantGenerationTraceColumns(
+          command.assistantMessageId
+        )
         const [userMessage, assistantMessage] = await tx
           .insert(messages)
           .values([
@@ -104,6 +109,7 @@ export function sendMessage(
               status: "generating",
               modelId: command.modelId,
               startedAt: now,
+              ...traceColumns,
             },
           ])
           .returning()
@@ -120,4 +126,12 @@ export function sendMessage(
       },
     })
   )
+  if (!outcome.replayed) {
+    emitGenerationAcceptedEvent({
+      userId,
+      assistantMessageId: command.assistantMessageId,
+      modelId: command.modelId,
+    })
+  }
+  return outcome
 }

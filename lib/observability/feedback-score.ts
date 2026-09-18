@@ -8,8 +8,8 @@ import {
 import { resolveObservabilityConfig } from "@/lib/observability/config"
 import { classifyObservabilityError } from "@/lib/observability/error"
 import {
-  assistantMessageTraceId,
   feedbackScoreId,
+  resolveMessageTraceId,
 } from "@/lib/observability/identity"
 
 export type FeedbackScoreValue =
@@ -43,6 +43,9 @@ export type FeedbackMirrorInput = {
   feedback: MessageFeedback | null
   updatedAt: string
   version?: number
+  /** outbox 提交时保存的投递目标快照；缺省（历史行）回退 v1 计算。 */
+  traceId?: string | null
+  traceMappingVersion?: number | null
 }
 
 export type FeedbackMirrorResult =
@@ -109,9 +112,14 @@ export async function prepareFeedbackScore(
   input: FeedbackMirrorInput,
   environment = resolveObservabilityConfig().environment
 ): Promise<FeedbackScoreBody> {
+  const trace = await resolveMessageTraceId({
+    id: input.messageId,
+    traceId: input.traceId,
+    traceMappingVersion: input.traceMappingVersion,
+  })
   return {
     id: await feedbackScoreId(input.messageId),
-    traceId: await assistantMessageTraceId(input.messageId),
+    traceId: trace.traceId,
     name: SCORE_NAMES.productFeedback,
     value: feedbackValue(input.feedback),
     dataType: "CATEGORICAL",

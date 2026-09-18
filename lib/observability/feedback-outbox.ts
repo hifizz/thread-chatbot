@@ -12,6 +12,9 @@ export type FeedbackOutboxItem = {
   version: number
   attempts: number
   lockToken: string
+  /** 入队时保存的投递目标；null = v1 历史行，按 messageId 计算。 */
+  traceId?: string | null
+  traceMappingVersion?: number | null
 }
 
 export type FeedbackOutboxStore = {
@@ -98,6 +101,8 @@ export const databaseFeedbackOutboxStore: FeedbackOutboxStore = {
         version: row.version,
         attempts: row.attempts,
         lockToken,
+        traceId: row.traceId,
+        traceMappingVersion: row.traceMappingVersion,
       }))
     })
   },
@@ -195,6 +200,8 @@ function mirrorInput(item: FeedbackOutboxItem): FeedbackMirrorInput {
     feedback: item.value === "cleared" ? null : item.value,
     updatedAt: item.sourceUpdatedAt.toISOString(),
     version: item.version,
+    traceId: item.traceId,
+    traceMappingVersion: item.traceMappingVersion,
   }
 }
 

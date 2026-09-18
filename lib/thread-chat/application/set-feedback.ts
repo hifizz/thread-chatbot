@@ -5,6 +5,7 @@ import { notFound, stateConflict } from "@/lib/thread-chat/application/errors"
 import { executeIdempotentCommand } from "@/lib/thread-chat/persistence/command-repository"
 import { enqueueFeedbackScore } from "@/lib/thread-chat/persistence/feedback-score-outbox-repository"
 import { toMessageDTO } from "@/lib/thread-chat/persistence/mappers"
+import { resolveMessageTraceId } from "@/lib/observability/identity"
 import { lockOwnedMessage } from "@/lib/thread-chat/persistence/message-repository"
 import { withConversationTransaction } from "@/lib/thread-chat/persistence/transaction"
 
@@ -33,10 +34,13 @@ export function setMessageFeedback(
           .set({ feedback: command.feedback, updatedAt })
           .where(eq(messages.id, message.id))
           .returning()
+        const trace = await resolveMessageTraceId(message)
         await enqueueFeedbackScore(tx, {
           messageId: message.id,
           feedback: command.feedback,
           sourceUpdatedAt: updatedAt,
+          traceId: trace.traceId,
+          traceMappingVersion: trace.traceMappingVersion,
         })
         return toMessageDTO(updated)
       },

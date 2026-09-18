@@ -9,6 +9,8 @@ export function enqueueFeedbackScore(
     messageId: string
     feedback: MessageFeedback | null
     sourceUpdatedAt: Date
+    traceId?: string | null
+    traceMappingVersion?: number | null
   }
 ) {
   const value = input.feedback ?? "cleared"
@@ -19,12 +21,16 @@ export function enqueueFeedbackScore(
       value,
       sourceUpdatedAt: input.sourceUpdatedAt,
       nextAttemptAt: input.sourceUpdatedAt,
+      traceId: input.traceId ?? null,
+      traceMappingVersion: input.traceMappingVersion ?? null,
     })
     .onConflictDoUpdate({
       target: feedbackScoreOutbox.messageId,
       set: {
         value,
         sourceUpdatedAt: input.sourceUpdatedAt,
+        traceId: input.traceId ?? null,
+        traceMappingVersion: input.traceMappingVersion ?? null,
         version: sql`${feedbackScoreOutbox.version} + 1`,
         attempts: 0,
         nextAttemptAt: input.sourceUpdatedAt,

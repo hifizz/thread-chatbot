@@ -10,6 +10,8 @@ import {
 } from "@/constants/model"
 import { isModelConfigured } from "@/lib/ai/llm/model-routes"
 import { hasPositiveBalance } from "@/lib/billing/credits"
+import { emitProductEventDetached } from "@/lib/analytics/dispatch"
+import { utcToday } from "@/lib/analytics/utc-day"
 
 type ChatRequestBody = {
   messages: UIMessage[]
@@ -137,6 +139,13 @@ export async function prepareChatRequestContext(
 
   const isUnbilledPreview = dependencies.unbilledPreview(model)
   if (!isUnbilledPreview && !(await dependencies.positiveBalance(userId))) {
+    // 余额拒绝是真实业务事实：同一用户同一 UTC 日只记一次，避免刷新刷事件。
+    emitProductEventDetached({
+      name: "credit.exhausted",
+      factId: `${userId}:${utcToday()}`,
+      userId,
+      payload: { generationId: null },
+    })
     return {
       kind: "response" as const,
       response: Response.json(

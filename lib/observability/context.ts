@@ -4,9 +4,9 @@ import {
 } from "@/constants/observability"
 import { resolveObservabilityConfig } from "@/lib/observability/config"
 import {
-  assistantMessageTraceId,
   pseudonymizeUserId,
   requestTraceId,
+  resolveMessageTraceId,
 } from "@/lib/observability/identity"
 import type { AgentTraceInput } from "@/lib/observability/trace"
 import type { ObservabilityContext } from "@/lib/observability/types"
@@ -52,6 +52,8 @@ export async function buildThreadChatTraceInput(input: {
   threadId: string
   assistantMessageId: string
   modelId: string
+  persistedTraceId?: string | null
+  persistedTraceMappingVersion?: number | null
 }): Promise<AgentTraceInput> {
   const config = resolveObservabilityConfig()
   const anonymousUser = pseudonymousUserId(
@@ -59,16 +61,23 @@ export async function buildThreadChatTraceInput(input: {
     config.idSalt,
     config.enabled
   )
+  const trace = await resolveMessageTraceId({
+    id: input.assistantMessageId,
+    traceId: input.persistedTraceId,
+    traceMappingVersion: input.persistedTraceMappingVersion,
+  })
   return {
     name: TRACE_NAMES.threadChatGeneration,
-    traceId: await assistantMessageTraceId(input.assistantMessageId),
-    sessionId: input.projectId,
+    traceId: trace.traceId,
+    sessionId: input.threadId,
     tags: ["thread-chat", "normalized"],
     context: {
       requestId: crypto.randomUUID(),
       projectId: input.projectId,
       threadId: input.threadId,
       assistantMessageId: input.assistantMessageId,
+      generationId: input.assistantMessageId,
+      traceMappingVersion: trace.traceMappingVersion,
       modelId: input.modelId,
       environment: config.environment,
       release: config.release,

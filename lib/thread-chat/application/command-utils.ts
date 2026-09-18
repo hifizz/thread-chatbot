@@ -19,6 +19,8 @@ import {
 } from "@/lib/thread-chat/contracts/message-content"
 import type { ConversationTransaction } from "@/lib/thread-chat/persistence/transaction"
 import { persistentMessageParts } from "@/lib/thread-chat/persistence/message-parts"
+import { emitProductEventDetached } from "@/lib/analytics/dispatch"
+import { generationTraceMapping } from "@/lib/observability/identity"
 import {
   ConversationApplicationError,
   stateConflict,
@@ -159,6 +161,31 @@ export function stripTransientParts(
   parts: ThreadChatUIMessage["parts"]
 ): ThreadChatUIMessage["parts"] {
   return persistentMessageParts(parts)
+}
+
+/** 新 Generation（assistant Message）落库时的 v2 Trace 映射列。 */
+export async function assistantGenerationTraceColumns(assistantMessageId: string) {
+  return generationTraceMapping(assistantMessageId)
+}
+
+/**
+ * Generation 受理事实提交后的产品事件：只在命令事务真正提交
+ * （非幂等重放）后由调用方触发，投递失败不影响业务。
+ */
+export function emitGenerationAcceptedEvent(input: {
+  userId: string
+  assistantMessageId: string
+  modelId: string
+}): void {
+  emitProductEventDetached({
+    name: "generation.started",
+    factId: input.assistantMessageId,
+    userId: input.userId,
+    payload: {
+      generationId: input.assistantMessageId,
+      modelId: input.modelId,
+    },
+  })
 }
 
 export async function assertThreadReadyForTurn(

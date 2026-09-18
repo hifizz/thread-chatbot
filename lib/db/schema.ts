@@ -243,6 +243,10 @@ export const messages = dbSchema.table(
     finishReason: text("finish_reason"),
     errorCode: text("error_code"),
     errorMessage: text("error_message"),
+    // Generation-scope Trace 映射（v2 落库；null = 历史 v1，按 messageId 计算）。
+    traceId: text("trace_id"),
+    traceMappingVersion: integer("trace_mapping_version"),
+    firstTokenAt: timestamp("first_token_at", { withTimezone: true }),
     startedAt: timestamp("started_at", { withTimezone: true }),
     finishedAt: timestamp("finished_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
@@ -316,6 +320,9 @@ export const feedbackScoreOutbox = dbSchema.table(
     sourceUpdatedAt: timestamp("source_updated_at", {
       withTimezone: true,
     }).notNull(),
+    // 投递目标快照：入队时从被反馈的 Generation 解析；null = v1 历史行。
+    traceId: text("trace_id"),
+    traceMappingVersion: integer("trace_mapping_version"),
     version: integer("version").notNull().default(1),
     deliveredVersion: integer("delivered_version").notNull().default(0),
     attempts: integer("attempts").notNull().default(0),
@@ -456,6 +463,30 @@ export const conversationCommands = dbSchema.table(
       columns: [table.userId, table.id],
     }),
     index("conversation_commands_scope_idx").on(table.userId, table.scopeId),
+  ]
+)
+
+// 告警规则的去重/冷却状态：同一规则键的最近一次状态与通知时间持久化，
+// 多实例间共享，重启不丢失。实际送达记录见通知通道侧，不在这里累积。
+export const alertRuleStates = dbSchema.table(
+  "alert_rule_states",
+  {
+    key: text("key").primaryKey(), // `${ruleKey}:${dedupScope}`
+    state: text("state", { enum: ["firing", "ok"] }).notNull(),
+    firedAt: timestamp("fired_at", { withTimezone: true }).notNull(),
+    lastNotifiedAt: timestamp("last_notified_at", { withTimezone: true }),
+    notifiedCount: integer("notified_count").notNull().default(0),
+    lastEvaluatedAt: timestamp("last_evaluated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    lastValue: text("last_value"),
+  },
+  (table) => [
+    index("alert_rule_states_state_idx").on(table.state),
+    check(
+      "alert_rule_states_notified_count_nonnegative",
+      sql`${table.notifiedCount} >= 0`
+    ),
   ]
 )
 

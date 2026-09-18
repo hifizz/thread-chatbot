@@ -2,7 +2,7 @@ import { lockDocumentExecution } from "../persistence/documents/commands"
 import { registerDocumentArtifact } from "../persistence/documents/writes"
 import { and, eq } from "drizzle-orm"
 import { db } from "@/lib/db"
-import { artifacts, messages, projects } from "@/lib/db/schema"
+import { artifacts, messages, projects, threads } from "@/lib/db/schema"
 import type { MessageDTO } from "@/lib/thread-chat/contracts/dto"
 import type { ThreadChatUIMessage } from "@/lib/thread-chat/contracts/ui-message"
 import { stripTransientParts } from "@/lib/thread-chat/application/command-utils"
@@ -13,6 +13,7 @@ import {
   hasDisplayableParts,
 } from "@/lib/thread-chat/streaming/artifacts"
 import { AI_DIAGNOSTIC_EVENTS } from "@/constants/observability"
+import { emitProductEventDetached } from "@/lib/analytics/dispatch"
 import { logDiagnostic } from "@/lib/observability/diagnostic-log"
 
 export type RequestedTerminalStatus = "completed" | "stopped" | "failed"
@@ -64,11 +65,14 @@ export async function finalizeGeneration({
     )
   }
 
-  return db.transaction(async (tx) => {
+  const { dto, terminal } = await db.transaction(async (tx) => {
     // 结束生成可能插入 Artifact（外键访问 Project），也必须先锁父级。
     const [identity] = await tx.select({ projectId: messages.projectId,
-      threadId: messages.threadId, userId: projects.userId }).from(messages)
-      .innerJoin(projects, eq(projects.id, messages.projectId)).where(eq(messages.id, messageId))
+      threadId: messages.threadId, userId: projects.userId,
+      parentThreadId: threads.parentId }).from(messages)
+      .innerJoin(projects, eq(projects.id, messages.projectId))
+      .innerJoin(threads, eq(threads.id, messages.threadId))
+      .where(eq(messages.id, messageId))
     if (!identity || !await lockDocumentExecution(tx, { ...identity, messageId })) {
       throw new Error("MESSAGE_NOT_FOUND_DURING_FINALIZE")
     }
@@ -95,7 +99,7 @@ export async function finalizeGeneration({
         .where(eq(messages.id, messageId))
         .limit(1)
       if (!existing) throw new Error("MESSAGE_NOT_FOUND_DURING_FINALIZE")
-      return toMessageDTO(existing)
+      return { dto: toMessageDTO(existing), terminal: null }
     }
 
     if (finalArtifacts.length > 0) {
@@ -111,8 +115,60 @@ export async function finalizeGeneration({
       if (!project) throw new Error("PROJECT_NOT_FOUND")
       for (const artifact of inserted) await registerDocumentArtifact(tx, artifact, project.userId)
     }
-    return toMessageDTO(updated)
+    return {
+      dto: toMessageDTO(updated),
+      terminal: {
+        userId: identity.userId,
+        projectId: identity.projectId,
+        threadId: identity.threadId,
+        parentThreadId: identity.parentThreadId,
+        status,
+        errorCode: updated.errorCode,
+        durationMs:
+          updated.startedAt && updated.finishedAt
+            ? Math.max(
+                0,
+                updated.finishedAt.getTime() - updated.startedAt.getTime()
+              )
+            : null,
+      },
+    }
   })
+  // 终态事实提交后才发产品事件；stopped 不在事件字典内，不发。
+  if (terminal?.status === "completed") {
+    emitProductEventDetached({
+      name: "generation.completed",
+      factId: messageId,
+      userId: terminal.userId,
+      payload: {
+        generationId: messageId,
+        durationMs: terminal.durationMs ?? 0,
+      },
+    })
+    // 核心流程：分支 Thread 内获得有效回答。
+    if (terminal.parentThreadId) {
+      emitProductEventDetached({
+        name: "core_flow.completed",
+        factId: terminal.threadId,
+        userId: terminal.userId,
+        payload: {
+          projectId: terminal.projectId,
+          threadId: terminal.threadId,
+        },
+      })
+    }
+  } else if (terminal?.status === "failed") {
+    emitProductEventDetached({
+      name: "generation.failed",
+      factId: messageId,
+      userId: terminal.userId,
+      payload: {
+        generationId: messageId,
+        errorCode: terminal.errorCode ?? "GENERATION_FAILED",
+      },
+    })
+  }
+  return dto
 }
 
 export async function failOrphanedGeneratingMessage(
@@ -135,5 +191,19 @@ export async function failOrphanedGeneratingMessage(
     })
     .where(and(eq(messages.id, messageId), eq(messages.status, "generating")))
     .returning()
-  return updated ? toMessageDTO(updated) : null
+  if (!updated) return null
+  const [owner] = await db
+    .select({ userId: projects.userId })
+    .from(projects)
+    .where(eq(projects.id, updated.projectId))
+    .limit(1)
+  if (owner) {
+    emitProductEventDetached({
+      name: "generation.failed",
+      factId: messageId,
+      userId: owner.userId,
+      payload: { generationId: messageId, errorCode: code },
+    })
+  }
+  return toMessageDTO(updated)
 }
