@@ -20,9 +20,13 @@ server.stderr.on('data',chunk=>output.push(chunk.toString()))
 let browser
 const results=[]
 const errors=[]
+const optionalAnalyticsRequests=[]
 const addPage=async(context)=>{
   const page=await context.newPage()
   page.on('pageerror',error=>errors.push(error.message))
+  page.on('request',request=>{
+    if(/posthog|analytics/i.test(new URL(request.url()).hostname))optionalAnalyticsRequests.push(request.url())
+  })
   return page
 }
 try {
@@ -40,6 +44,11 @@ try {
   await page.goto(base,{waitUntil:'networkidle'})
   assert.equal(await page.locator('html').getAttribute('lang'),'en')
   await page.getByRole('heading',{name:'Design branching in ThreadChat'}).waitFor()
+  assert.equal(optionalAnalyticsRequests.length,0,'未选择前不得发送可选分析')
+  const rejection=page.waitForResponse(response=>response.url().endsWith('/api/privacy/consent')&&response.request().method()==='PUT')
+  await page.getByRole('button',{name:'Reject optional analytics'}).click()
+  assert.ok((await rejection).ok(),'拒绝选择成功持久化')
+  assert.ok((await anonymous.cookies()).some(c=>c.name==='tc_consent'),'拒绝选择使用签名 cookie 持久化')
   assert.equal((await anonymous.cookies()).some(c=>c.name==='tc-locale'),false,'自动识别不固化为手动语言 cookie')
   await page.screenshot({path:'test-results/beta/home-en-desktop.png'})
   await page.getByRole('combobox').first().selectOption('zh-CN')
@@ -51,6 +60,11 @@ try {
   const mobilePage=await addPage(mobile)
   await mobilePage.goto(base,{waitUntil:'networkidle'})
   assert.equal(await mobilePage.locator('html').getAttribute('lang'),'zh-CN')
+  await mobilePage.getByRole('button',{name:'自定义'}).click()
+  await mobilePage.getByRole('switch',{name:'产品分析'}).click()
+  const mobileConsent=mobilePage.waitForResponse(response=>response.url().endsWith('/api/privacy/consent')&&response.request().method()==='PUT')
+  await mobilePage.getByRole('button',{name:'保存'}).click()
+  assert.ok((await mobileConsent).ok(),'移动端同意成功持久化')
   assert.ok(await mobilePage.locator('body').evaluate(el=>el.scrollWidth<=window.innerWidth+2),'移动端页面不横向溢出')
   await mobilePage.screenshot({path:'test-results/beta/home-zh-mobile.png'})
   await mobilePage.goto(`${base}/sign-in`,{waitUntil:'networkidle'})
@@ -65,6 +79,14 @@ try {
   const accountPage=await addPage(account)
   await accountPage.goto(`${base}/account`,{waitUntil:'networkidle'})
   assert.ok(accountPage.url().endsWith('/account'))
+  const accountConsent=accountPage.waitForResponse(response=>response.url().endsWith('/api/privacy/consent')&&response.request().method()==='PUT')
+  await accountPage.getByRole('button',{name:'Accept optional analytics'}).click()
+  assert.ok((await accountConsent).ok(),'账户设备同意成功持久化')
+  const privacyRequest=await account.request.post(`${base}/api/privacy/requests`,{
+    headers:{Origin:base},data:{kind:'export'},
+  })
+  assert.equal(privacyRequest.status(),202,'数据请求仅进入待验证队列')
+  assert.equal((await privacyRequest.json()).status,'requested')
   const update=accountPage.waitForResponse(response=>response.url().endsWith('/api/settings/locale')&&response.request().method()==='PATCH')
   await accountPage.getByRole('combobox').first().selectOption('zh-CN')
   assert.deepEqual(await (await update).json(),{locale:'zh-CN',persisted:'account'})
@@ -74,6 +96,13 @@ try {
   const otherPage=await addPage(otherDevice)
   await otherPage.goto(`${base}/account`,{waitUntil:'networkidle'})
   assert.equal(await otherPage.locator('html').getAttribute('lang'),'zh-CN','账户偏好覆盖浏览器且不依赖设备 cookie')
+  const separateDeviceState=await account.storageState()
+  separateDeviceState.cookies=separateDeviceState.cookies.filter(c=>c.name!=='tc_consent')
+  const separateDevice=await browser.newContext({locale:'en-US',storageState:separateDeviceState})
+  const separateDevicePage=await addPage(separateDevice)
+  await separateDevicePage.goto(`${base}/account`,{waitUntil:'networkidle'})
+  await separateDevicePage.getByRole('button',{name:'接受可选分析'}).waitFor()
+  results.push({case:'consent-is-device-scoped',status:'pass'})
   const rejected=await account.request.patch(`${base}/api/settings/locale`,{headers:{Origin:'https://evil.invalid'},data:{locale:'en'}})
   assert.equal(rejected.status(),403)
   const invalid=await account.request.patch(`${base}/api/settings/locale`,{headers:{Origin:base},data:{locale:'../../en'}})
@@ -84,6 +113,7 @@ try {
   assert.equal(await freshPage.locator('html').getAttribute('lang'),'en','不跨用户缓存账户语言')
   results.push({case:'account-persistence-cross-device-and-origin-validation',status:'pass'})
   assert.deepEqual(errors,[],'浏览器没有运行时错误')
+  assert.equal(optionalAnalyticsRequests.length,0,'拒绝和撤回路径不发送可选分析')
   console.log(JSON.stringify({status:'pass',results},null,2))
 } catch(error) {
   console.error(error)

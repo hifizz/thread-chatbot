@@ -4,6 +4,7 @@ import React from 'react'
 import { renderToString } from 'react-dom/server'
 import { AppRouterContext } from 'next/dist/shared/lib/app-router-context.shared-runtime.js'
 import { I18nProvider } from '../../lib/i18n/client.tsx'
+import { PrivacyProvider } from '../../lib/privacy/client.tsx'
 import Landing from '../../components/landing/landing.tsx'
 import { englishScenarios } from '../../constants/landing-demo-en.ts'
 import { scenarios } from '../../constants/landing-demo.ts'
@@ -12,7 +13,8 @@ globalThis.React = React
 const router = { refresh(){}, push(){}, replace(){}, prefetch(){}, back(){}, forward(){} }
 function render(locale) {
   return renderToString(React.createElement(AppRouterContext.Provider,{value:router},
-    React.createElement(I18nProvider,{locale},React.createElement(Landing))))
+    React.createElement(I18nProvider,{locale},
+      React.createElement(PrivacyProvider,{initialConsent:{state:'unresolved',analytics:false}},React.createElement(Landing)))))
 }
 test('英文首页 SSR 没有中文闪屏或未翻译的场景',()=> {
   const html=render('en')

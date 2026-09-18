@@ -24,6 +24,7 @@ import { TopupResultToast } from "@/components/account/topup-result-toast"
 import { getRequestLocale } from "@/lib/i18n/server"
 import { createTranslator, formatCredit, formatTimestamp } from "@/lib/i18n/dictionary"
 import { LanguageSwitcher } from "@/components/i18n/language-switcher"
+import { PrivacySettingsButton } from "@/components/privacy/consent-controls"
 
 
 export default async function AccountPage() {
@@ -243,6 +244,7 @@ const SUB_STATUS: Record<string, string> = {
 
         {/* 法务链接 */}
         <div className="flex justify-center gap-4 text-xs text-muted-foreground">
+          <PrivacySettingsButton className="hover:text-foreground" />
           <Link href="/terms" className="hover:text-foreground">
             {t("common.terms")}</Link>
           <Link href="/privacy" className="hover:text-foreground">
