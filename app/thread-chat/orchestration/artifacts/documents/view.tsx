@@ -7,6 +7,7 @@ import type { DocumentRevisionSummaryDTO } from "@/lib/thread-chat/contracts/doc
 import type { ThreadChatClient } from "../../../net/client"
 import { DocumentVersionHistory } from "./version-history"
 import { DocumentDiff } from "./diff"
+import { VersionPillSkeleton } from "../skeleton"
 
 /** 只管理版本目录；导航资格由持有选区/草稿的上层明确传入。 */
 export function DocumentView({ artifact, currentRevisionId, client, navigationBlocked, onShare, onSelect }: {
@@ -18,7 +19,9 @@ export function DocumentView({ artifact, currentRevisionId, client, navigationBl
 }) {
   const document = artifact.document
   const documentId = document?.id
-  const [history, setHistory] = useState<DocumentRevisionSummaryDTO[]>([])
+  // null = 尚未返回；[] = 已返回但无版本（或失败按错误分支提示）。此前 [] 兼作初值，
+  // 使「已加载但缺 selected」与「加载中」无法区分，版本胶囊骨架会一直转。
+  const [history, setHistory] = useState<DocumentRevisionSummaryDTO[] | null>(null)
   const [errorDocumentId, setErrorDocumentId] = useState<string | null>(null)
   const [refresh, setRefresh] = useState(0)
   useEffect(() => {
@@ -26,19 +29,23 @@ export function DocumentView({ artifact, currentRevisionId, client, navigationBl
     let active = true
     void client.getDocumentHistory(documentId).then((rows) => {
       if (active) { setHistory(rows); setErrorDocumentId(null) }
-    }).catch(() => { if (active) setErrorDocumentId(documentId) })
+    }).catch(() => { if (active) { setHistory([]); setErrorDocumentId(documentId) } })
     return () => { active = false }
   }, [client, documentId, currentRevisionId, refresh])
   if (!document) return null
   // 切换文档时组件可能复用，history 会保留上一份文档的数据，直到新请求成功。
   // active 只阻止旧请求写入；此处过滤避免加载中或失败时显示上一份文档的版本。
-  const revisions = history.filter((revision) => revision.documentId === document.id)
+  const revisions = (history ?? []).filter((revision) => revision.documentId === document.id)
   const selected = revisions.find((revision) => revision.id === document.revisionId)
   const latest = revisions.find((revision) => revision.id === currentRevisionId)
   const previous = revisions.find((revision) => revision.id === selected?.parentRevisionId)
   return <div className="project-document-view">
-    <DocumentVersionHistory revisions={revisions} revisionId={document.revisionId}
-      currentRevisionId={currentRevisionId ?? document.revisionId} disabled={navigationBlocked} onSelect={(revision) => onSelect(revision.artifactId)} />
+    {history === null ? (
+      <VersionPillSkeleton />
+    ) : selected ? (
+      <DocumentVersionHistory revisions={revisions} revisionId={document.revisionId}
+        currentRevisionId={currentRevisionId ?? document.revisionId} disabled={navigationBlocked} onSelect={(revision) => onSelect(revision.artifactId)} />
+    ) : null}
     {previous && <DocumentDiff key={`diff:${artifact.id}`} before={previous} after={artifact} client={client} />}
     {errorDocumentId === documentId && <p className="artifact-view-hint" role="alert">{DOCUMENT_UI_COPY.historyFailed} <button type="button" onClick={() => setRefresh((value) => value + 1)}>重新加载版本</button></p>}
     {navigationBlocked && <p className="artifact-view-hint" role="status">{DOCUMENT_UI_COPY.navigationBlocked}</p>}
