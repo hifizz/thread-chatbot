@@ -2,6 +2,7 @@ import { getRequestLocaleContext } from "@/lib/i18n/server"
 import { I18nProvider } from "@/lib/i18n/client"
 import { getRequestConsentState } from "@/lib/privacy/server"
 import { PrivacyProvider } from "@/lib/privacy/client"
+import { AnalyticsBridge } from "@/lib/analytics/client"
 import { ConsentBanner, ConsentPreferences } from "@/components/privacy/consent-controls"
 import { fontVariables } from "./fonts"
 
@@ -33,6 +34,7 @@ export default async function RootLayout({
       <body>
         <I18nProvider key={identity} locale={locale} source={source}>
         <PrivacyProvider key={identity} initialConsent={initialConsent}>
+        <AnalyticsBridge />
         <ThemeProvider>
           <TooltipProvider>{children}</TooltipProvider>
           <ConsentBanner />

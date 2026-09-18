@@ -1,4 +1,5 @@
 import { appendDocumentNotices } from "./documents/notices"
+import { emitProductEventDetached } from "@/lib/analytics/dispatch"
 import { resolveForkModelId } from "@/lib/thread-chat/application/fork-model"
 import { resolveUserContent } from "./resolve-user-content"
 import { messages, threads } from "@/lib/db/schema"
@@ -15,6 +16,8 @@ import { buildFrozenForkContext } from "@/lib/thread-chat/domain/fork-context"
 import {
   assertAllowedGenerationSettings,
   assertAllowedModel,
+  assistantGenerationTraceColumns,
+  emitGenerationAcceptedEvent,
   touchProjectAndThread,
 } from "@/lib/thread-chat/application/command-utils"
 import { notFound, stateConflict } from "@/lib/thread-chat/application/errors"
@@ -41,7 +44,7 @@ export type ForkThreadResult =
   | { thread: ThreadDTO; generation: null }
   | { thread: ThreadDTO; generation: GenerationAcceptedDTO }
 
-export function forkThread(
+export async function forkThread(
   userId: string,
   parentThreadId: string,
   command: ForkThreadCommand
@@ -49,7 +52,7 @@ export function forkThread(
   const modelId = resolveForkModelId(command.modelId) ?? command.modelId
   assertAllowedModel(modelId)
   assertAllowedGenerationSettings(modelId, command.generationSettings)
-  return withConversationTransaction(async (tx) =>
+  const outcome = await withConversationTransaction(async (tx) =>
     executeIdempotentCommand({
       tx,
       userId,
@@ -179,6 +182,9 @@ export function forkThread(
               status: "generating",
               modelId,
               startedAt: now,
+              ...(await assistantGenerationTraceColumns(
+                command.firstTurn.assistantMessageId
+              )),
             },
           ])
           .returning()
@@ -198,4 +204,23 @@ export function forkThread(
       },
     })
   )
+  if (!outcome.replayed) {
+    emitProductEventDetached({
+      name: "branch.created",
+      factId: outcome.result.thread.id,
+      userId,
+      payload: {
+        threadId: outcome.result.thread.id,
+        parentThreadId,
+      },
+    })
+    if (command.firstTurn) {
+      emitGenerationAcceptedEvent({
+        userId,
+        assistantMessageId: command.firstTurn.assistantMessageId,
+        modelId,
+      })
+    }
+  }
+  return outcome
 }

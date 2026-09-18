@@ -53,7 +53,11 @@ export function resolveObservabilityConfig(
     enabled,
     environment,
     release:
-      source.AI_OBSERVABILITY_RELEASE?.trim() || DEFAULT_OBSERVABILITY_RELEASE,
+      source.AI_OBSERVABILITY_RELEASE?.trim() ||
+      source.VERCEL_GIT_COMMIT_SHA?.trim() ||
+      source.GITHUB_SHA?.trim() ||
+      source.GIT_COMMIT_SHA?.trim() ||
+      DEFAULT_OBSERVABILITY_RELEASE,
     devtoolsEnabled:
       enabled &&
       source.NODE_ENV !== "production" &&

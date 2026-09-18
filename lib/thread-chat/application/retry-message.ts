@@ -6,6 +6,8 @@ import { canRetryLatestAssistant } from "@/lib/thread-chat/domain/timeline"
 import {
   assertAllowedGenerationSettings,
   assertAllowedModel,
+  assistantGenerationTraceColumns,
+  emitGenerationAcceptedEvent,
   touchProjectAndThread,
 } from "@/lib/thread-chat/application/command-utils"
 import { notFound, stateConflict } from "@/lib/thread-chat/application/errors"
@@ -28,7 +30,7 @@ import {
   withConversationTransaction,
 } from "@/lib/thread-chat/persistence/transaction"
 
-export function retryMessage(
+export async function retryMessage(
   userId: string,
   messageId: string,
   command: RetryMessageCommand
@@ -38,7 +40,7 @@ export function retryMessage(
     command.modelId,
     command.generationSettings
   )
-  return withConversationTransaction(async (tx) =>
+  const outcome = await withConversationTransaction(async (tx) =>
     executeIdempotentCommand({
       tx,
       userId,
@@ -78,6 +80,9 @@ export function retryMessage(
             modelId: command.modelId,
             replacesMessageId: source.id,
             startedAt: now,
+            ...(await assistantGenerationTraceColumns(
+              command.assistantMessageId
+            )),
           })
           .returning()
         const [superseded] = await tx
@@ -98,4 +103,12 @@ export function retryMessage(
       },
     })
   )
+  if (!outcome.replayed) {
+    emitGenerationAcceptedEvent({
+      userId,
+      assistantMessageId: command.assistantMessageId,
+      modelId: command.modelId,
+    })
+  }
+  return outcome
 }

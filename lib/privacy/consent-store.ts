@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto"
-import { and, eq } from "drizzle-orm"
+import { and, eq, gt } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { privacyConsents } from "@/lib/db/schema"
 import type { ConsentCookiePayload } from "./types"
@@ -35,6 +35,29 @@ export async function saveAccountConsent(
       target: [privacyConsents.userId, privacyConsents.deviceIdHash],
       set: values,
     })
+}
+
+/**
+ * 账户级分析授权：任一设备存在未过期的 accepted 记录即有效。
+ * 服务端事实事件在投递前调用它重查当前状态；用户全部撤回后返回 false。
+ */
+export async function hasAccountAnalyticsConsent(
+  userId: string,
+  now = new Date()
+): Promise<boolean> {
+  const [stored] = await db
+    .select({ id: privacyConsents.id })
+    .from(privacyConsents)
+    .where(
+      and(
+        eq(privacyConsents.userId, userId),
+        eq(privacyConsents.decision, "accepted"),
+        eq(privacyConsents.analytics, true),
+        gt(privacyConsents.expiresAt, now)
+      )
+    )
+    .limit(1)
+  return Boolean(stored)
 }
 
 export async function accountConsentMatchesDevice(

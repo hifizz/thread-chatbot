@@ -72,6 +72,7 @@ export const OBSERVABILITY_ATTRIBUTE_KEYS = [
   "experiment",
   "caseId",
   "candidate",
+  "traceMappingVersion",
 ] as const
 
 export type ObservabilityAttributeKey =
@@ -101,4 +102,8 @@ export const AI_DIAGNOSTIC_EVENTS = {
   streamProtocolError: "stream.protocol_error",
   generationException: "generation.exception",
   generationInitializationError: "generation.initialization_error",
+  analyticsDeliveryFailed: "analytics.delivery_failed",
+  alertEvaluationFailed: "alert.evaluation_failed",
+  alertDeliveryFailed: "alert.delivery_failed",
+  alertDeliverySkipped: "alert.delivery_skipped",
 } as const

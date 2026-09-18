@@ -6,6 +6,8 @@ import type { GenerationAcceptedDTO } from "@/lib/thread-chat/contracts/dto"
 import {
   assertAllowedGenerationSettings,
   assertAllowedModel,
+  assistantGenerationTraceColumns,
+  emitGenerationAcceptedEvent,
 } from "@/lib/thread-chat/application/command-utils"
 import { notFound, stateConflict } from "@/lib/thread-chat/application/errors"
 import { executeIdempotentCommand } from "@/lib/thread-chat/persistence/command-repository"
@@ -19,10 +21,10 @@ import {
   withConversationTransaction,
 } from "@/lib/thread-chat/persistence/transaction"
 
-export function startProject(userId: string, command: StartProjectCommand) {
+export async function startProject(userId: string, command: StartProjectCommand) {
   assertAllowedModel(command.modelId)
   assertAllowedGenerationSettings(command.modelId, command.generationSettings)
-  return withConversationTransaction(async (tx) =>
+  const outcome = await withConversationTransaction(async (tx) =>
     executeIdempotentCommand({
       tx,
       userId,
@@ -83,6 +85,9 @@ export function startProject(userId: string, command: StartProjectCommand) {
               status: "generating",
               modelId: command.modelId,
               startedAt: now,
+              ...(await assistantGenerationTraceColumns(
+                command.assistantMessageId
+              )),
             },
           ])
           .returning()
@@ -96,4 +101,12 @@ export function startProject(userId: string, command: StartProjectCommand) {
       },
     })
   )
+  if (!outcome.replayed) {
+    emitGenerationAcceptedEvent({
+      userId,
+      assistantMessageId: command.assistantMessageId,
+      modelId: command.modelId,
+    })
+  }
+  return outcome
 }

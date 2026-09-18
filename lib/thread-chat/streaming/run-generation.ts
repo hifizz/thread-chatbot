@@ -23,7 +23,7 @@ import { resolveGenerationTerminalOutcome } from "@/lib/thread-chat/streaming/ge
 import { OBSERVATION_NAMES, TRACE_NAMES } from "@/constants/observability"
 import { buildThreadChatTraceInput } from "@/lib/observability/context"
 import { resolveObservabilityConfig } from "@/lib/observability/config"
-import { assistantMessageTraceId } from "@/lib/observability/identity"
+import { resolveMessageTraceId } from "@/lib/observability/identity"
 import { safeErrorMetadata } from "@/lib/observability/error"
 import { observeAppOperation, runAgentTrace } from "@/lib/observability/trace"
 import type { ObservabilityContext } from "@/lib/observability/types"
@@ -326,6 +326,8 @@ export async function runGeneration(input: {
       threadId: identity.thread.id,
       assistantMessageId: identity.message.id,
       modelId: identity.message.modelId!,
+      persistedTraceId: identity.message.traceId,
+      persistedTraceMappingVersion: identity.message.traceMappingVersion,
     })
     await runAgentTrace(traceInput, async (observation) => {
       const result = await runGenerationCore({
@@ -361,13 +363,24 @@ export async function runGeneration(input: {
   } catch (error) {
     const snapshot = input.session.getSnapshot()
     const config = resolveObservabilityConfig()
+    const persisted = await findOwnedMessage(db, input.userId, input.messageId).catch(
+      () => null
+    )
+    const initTrace = await resolveMessageTraceId(
+      persisted ?? { id: input.messageId }
+    )
     await runAgentTrace(
       {
         name: TRACE_NAMES.threadChatGeneration,
-        traceId: await assistantMessageTraceId(input.messageId),
+        traceId: initTrace.traceId,
         tags: ["thread-chat", "initialization-failure"],
         context: {
           assistantMessageId: input.messageId,
+          generationId: input.messageId,
+          traceMappingVersion: initTrace.traceMappingVersion,
+          ...(persisted
+            ? { projectId: persisted.projectId, threadId: persisted.threadId }
+            : {}),
           environment: config.environment,
           release: config.release,
           entrypoint: "thread-chat",

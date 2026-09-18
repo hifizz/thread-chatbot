@@ -8,6 +8,8 @@ import { latestTurn } from "@/lib/thread-chat/domain/timeline"
 import {
   assertAllowedGenerationSettings,
   assertAllowedModel,
+  assistantGenerationTraceColumns,
+  emitGenerationAcceptedEvent,
   touchProjectAndThread,
 } from "@/lib/thread-chat/application/command-utils"
 import { notFound, stateConflict } from "@/lib/thread-chat/application/errors"
@@ -35,14 +37,14 @@ export interface EditTurnResult {
   abortMessageId: string | null
 }
 
-export function editLatestTurn(
+export async function editLatestTurn(
   userId: string,
   messageId: string,
   command: EditLatestTurnCommand
 ) {
   assertAllowedModel(command.modelId)
   assertAllowedGenerationSettings(command.modelId, command.generationSettings)
-  return withConversationTransaction(async (tx) =>
+  const outcome = await withConversationTransaction(async (tx) =>
     executeIdempotentCommand({
       tx,
       userId,
@@ -110,6 +112,9 @@ export function editLatestTurn(
               modelId: command.modelId,
               replacesMessageId: turn.assistantMessage?.id ?? null,
               startedAt: now,
+              ...(await assistantGenerationTraceColumns(
+                command.assistantMessageId
+              )),
             },
           ])
           .returning()
@@ -132,4 +137,12 @@ export function editLatestTurn(
       },
     })
   )
+  if (!outcome.replayed) {
+    emitGenerationAcceptedEvent({
+      userId,
+      assistantMessageId: command.assistantMessageId,
+      modelId: command.modelId,
+    })
+  }
+  return outcome
 }

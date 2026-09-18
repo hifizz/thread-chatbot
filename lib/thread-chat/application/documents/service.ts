@@ -1,3 +1,4 @@
+import { emitProductEventDetached } from "@/lib/analytics/dispatch"
 import { listOwnedProjectArtifactCatalog } from "../../persistence/artifact-repository"
 import { findOwnedProject } from "../../persistence/project-repository"
 import type { ProjectDocumentsDTO } from "../../contracts/document"
@@ -68,7 +69,7 @@ export async function readProjectDocument(identity: DocumentExecution, input: { 
 
 export async function updateProjectDocument(identity: DocumentExecution, raw: UpdateDocumentInput, toolCallId: string): Promise<UpdateDocumentResult> {
   const input = updateDocumentInputSchema.parse(raw)
-  return withConversationTransaction(async (tx) => {
+  const { result, committed } = await withConversationTransaction(async (tx) => {
     const owned = await findOwnedDocument(tx, identity.userId, input.documentId)
     if (!owned || owned.projectId !== identity.projectId) notFound()
     // 幂等命令预留先于业务锁，和现有 Stop/归档命令保持顺序一致。
@@ -81,8 +82,29 @@ export async function updateProjectDocument(identity: DocumentExecution, raw: Up
     if (!receipt.replayed) await saveDocumentToolResult(tx, identity.messageId, {
       type: "tool-updateProjectDocument", toolCallId, state: "output-available", input, output: receipt.result,
     })
-    return receipt.result
+    return {
+      result: receipt.result,
+      committed:
+        !receipt.replayed && receipt.result.status === "committed"
+          ? {
+              artifactId: receipt.result.artifactId,
+              revisionId: receipt.result.revisionId,
+            }
+          : null,
+    }
   })
+  if (committed) {
+    emitProductEventDetached({
+      name: "artifact.updated",
+      factId: committed.revisionId,
+      userId: identity.userId,
+      payload: {
+        artifactId: committed.artifactId,
+        revisionId: committed.revisionId,
+      },
+    })
+  }
+  return result
 }
 
 

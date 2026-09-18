@@ -11,7 +11,7 @@ import {
   type ReactNode,
 } from "react"
 import { CONSENT_API_PATH, CONSENT_BROADCAST_CHANNEL } from "@/constants/privacy"
-import { isSafeAnalyticsEvent, type AnalyticsEvent } from "./analytics-gate"
+import { isClientAnalyticsEvent, type AnalyticsEvent } from "./analytics-gate"
 import type {
   ConsentDecision,
   ConsentState,
@@ -113,7 +113,7 @@ export function PrivacyProvider({ initialConsent, children }: {
   const analyticsEnabled =
     consent.state === "valid" && consent.snapshot.analytics === true
   const capture = useCallback((event: AnalyticsEvent): boolean => {
-    if (!analyticsEnabled || !isSafeAnalyticsEvent(event)) return false
+    if (!analyticsEnabled || !isClientAnalyticsEvent(event)) return false
     // PostHog 接入只能订阅此事件；本模块不缓存，也不补传同意前事件。
     window.dispatchEvent(new CustomEvent("threadchat:analytics", { detail: event }))
     return true
