@@ -858,6 +858,7 @@ export function NormalizedThreadChat({
           store={runtime.store}
           client={runtime.client}
           overlay={{ drawerOpen, activeArtifactId }}
+          container={rootRef}
         />
       )}
       <WorkspaceToast toast={toast} onDismiss={dismissToast} />

@@ -39,6 +39,7 @@ export interface ShareDialogProps {
   store: ConversationStore
   client: ThreadChatClient
   overlay: { drawerOpen: boolean; activeArtifactId: string | null }
+  container?: React.RefObject<HTMLElement | null>
 }
 
 function shareUrl(token: string): string {
@@ -67,6 +68,7 @@ export function ShareDialog({
   store,
   client,
   overlay,
+  container,
 }: ShareDialogProps) {
   const [shares, setShares] = useState<ShareDTO[] | null>(null)
   const [expiry, setExpiry] = useState<ShareExpiry>(SHARE_EXPIRY_DEFAULT)
@@ -146,7 +148,7 @@ export function ShareDialog({
       modal={false}
       disablePointerDismissal
     >
-      <DialogPortal>
+      <DialogPortal container={container}>
         <DialogPrimitive.Backdrop className="swx-scrim" onMouseDown={onClose} />
         <DialogPrimitive.Popup className="swx global share-dialog" initialFocus={false}>
           <div className="swx-title">

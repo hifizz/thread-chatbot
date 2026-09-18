@@ -54,28 +54,28 @@
 }
 
 /* ── 分享弹层：沿用 swx 弹层语言，本区块只补分享专属行件 ── */
-.share-dialog {
+.tc .share-dialog {
   width: 420px;
   max-width: calc(100vw - 24px);
 }
-.share-dialog .share-notice {
+.tc .share-dialog .share-notice {
   font-size: 12px;
   line-height: 1.6;
   color: var(--tc-depth-1);
   margin: 8px 0 12px;
 }
-.share-dialog .share-expiry {
+.tc .share-dialog .share-expiry {
   display: flex;
   align-items: center;
   gap: 6px;
   margin-bottom: 12px;
 }
-.share-dialog .share-expiry-label {
+.tc .share-dialog .share-expiry-label {
   font-size: 12px;
   color: var(--tc-depth-1);
   margin-right: 4px;
 }
-.share-dialog .share-expiry-choice {
+.tc .share-dialog .share-expiry-choice {
   font-size: 12px;
   padding: 4px 10px;
   border: 1px solid var(--tc-border-strong);
@@ -83,11 +83,11 @@
   background: var(--tc-surface-plain);
   cursor: pointer;
 }
-.share-dialog .share-expiry-choice.active {
+.tc .share-dialog .share-expiry-choice.active {
   border-color: var(--tc-depth-1);
   color: var(--tc-depth-1);
 }
-.share-dialog .share-create {
+.tc .share-dialog .share-create {
   width: 100%;
   font-size: 13px;
   padding: 8px 0;
@@ -96,15 +96,15 @@
   background: var(--tc-surface-plain);
   cursor: pointer;
 }
-.share-dialog .share-create:disabled {
+.tc .share-dialog .share-create:disabled {
   opacity: 0.5;
   cursor: default;
 }
-.share-dialog .share-list {
+.tc .share-dialog .share-list {
   margin-top: 12px;
   max-height: 240px;
 }
-.share-dialog .share-row {
+.tc .share-dialog .share-row {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -112,21 +112,21 @@
   border-top: 1px solid var(--tc-border-subtle);
   font-size: 12px;
 }
-.share-dialog .share-status {
+.tc .share-dialog .share-status {
   flex: none;
   padding: 2px 8px;
   border-radius: 8px;
   border: 1px solid var(--tc-border-strong);
 }
-.share-dialog .share-status.expired,
-.share-dialog .share-status.revoked {
+.tc .share-dialog .share-status.expired,
+.tc .share-dialog .share-status.revoked {
   color: var(--tc-depth-1);
 }
-.share-dialog .share-row-meta {
+.tc .share-dialog .share-row-meta {
   flex: 1;
   color: var(--tc-depth-1);
 }
-.share-dialog .share-row-action {
+.tc .share-dialog .share-row-action {
   flex: none;
   font-size: 12px;
   padding: 4px 8px;
@@ -135,6 +135,6 @@
   background: var(--tc-surface-plain);
   cursor: pointer;
 }
-.share-dialog .share-row-action.danger {
+.tc .share-dialog .share-row-action.danger {
   color: var(--tc-danger, #b03030);
 }
