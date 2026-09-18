@@ -334,6 +334,8 @@ export async function prepareGeneration(input: PrepareGenerationInput) {
       } },
     }), MODEL_CALL_PURPOSE.chatAnswer, trace),
     abortSignal: input.abortSignal,
+    // 上游中转偶发连接超时；多步生成每个 step 都新建请求，多给两次重试机会。
+    maxRetries: 4,
     ...generationOptions,
     instructions: cachedPrompt.instructions,
     messages: cachedPrompt.messages,

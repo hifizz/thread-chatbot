@@ -87,6 +87,18 @@ function rawUsage(
   return JSON.parse(JSON.stringify(usage)) as Record<string, unknown>
 }
 
+/** 失败消息附带真实错误摘要，便于定位上游/网络问题；需要对外掩码时收紧这里。 */
+function generationFailureMessage(error: unknown): string {
+  const base = "生成过程中发生错误"
+  const detail =
+    error instanceof Error
+      ? `${error.name}: ${error.message}`
+      : typeof error === "string"
+        ? error
+        : ""
+  return detail ? `${base}（${detail.slice(0, 240)}）` : base
+}
+
 /** 从历史 assistant 消息中找到最近一次的 repo-context data part。 */
 function findPreviousRepoContext(
   rows: Array<{ role: string; parts: unknown }>
@@ -276,6 +288,10 @@ async function runGenerationCore({
       : undefined
   const resolvedFinishReason =
     pipelineEnd?.finishReason ?? (outcome.failed ? "error" : undefined)
+  const failureCause =
+    thrown ??
+    protocolError ??
+    (pipelineEnd?.outcome.status === "failed" ? pipelineEnd.outcome.error : null)
   const terminal = await observeAppOperation(
     OBSERVATION_NAMES.generationFinalize,
     {
@@ -297,9 +313,9 @@ async function runGenerationCore({
         providerUsage,
         ...(outcome.failed
           ? {
-              error: contextLimitFailure(thrown ?? protocolError ?? (pipelineEnd?.outcome.status === "failed" ? pipelineEnd.outcome.error : null)) ?? {
+              error: contextLimitFailure(failureCause) ?? {
                 code: "GENERATION_FAILED",
-                message: "生成过程中发生错误",
+                message: generationFailureMessage(failureCause),
               },
             }
           : {}),
@@ -328,8 +344,8 @@ async function runGenerationCore({
       : {}),
     ...(promptCacheObservation ? { promptCacheObservation } : {}),
     checkpoint: checkpointer.getSummary(),
-    ...(outcome.failed && (thrown || protocolError)
-      ? { error: safeErrorMetadata(thrown ?? protocolError) }
+    ...(outcome.failed && failureCause
+      ? { error: safeErrorMetadata(failureCause) }
       : {}),
   }
 }

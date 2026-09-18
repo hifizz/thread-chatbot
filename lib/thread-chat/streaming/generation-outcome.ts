@@ -28,6 +28,8 @@ export function resolveGenerationTerminalOutcome(input: {
   }
   const failed =
     input.finishReason === "error" ||
+    // 流在没有任何终止信号（finish/error/abort）的情况下结束，属于异常截断。
+    input.sdkOutcome?.status === "unknown" ||
     (input.protocolError !== null && input.sdkOutcome?.status !== "completed")
   return {
     status: failed ? "failed" : "completed",

@@ -47,9 +47,16 @@ export function classifyObservabilityError(
 export function safeErrorMetadata(error: unknown) {
   const name = error instanceof Error ? error.name : "UnknownError"
   const code = errorCode(error)
+  const message =
+    error instanceof Error
+      ? error.message
+      : typeof error === "string"
+        ? error
+        : ""
   return {
     errorCategory: classifyObservabilityError(error),
     errorName: name.slice(0, 100),
+    ...(message ? { errorMessage: message.slice(0, 300) } : {}),
     ...(code ? { errorCode: code.slice(0, 100) } : {}),
     ...(errorStatus(error) !== undefined ? { httpStatus: errorStatus(error) } : {}),
   }
