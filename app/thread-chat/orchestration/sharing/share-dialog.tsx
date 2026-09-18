@@ -186,9 +186,10 @@ export function ShareDialog({
                     aria-checked={expiry === option.value}
                     disabled={hasActive}
                     className={cn(
-                      "cursor-pointer rounded-md py-2 text-[13px] text-[var(--tc-content-secondary)] hover:text-[var(--tc-content-primary)] disabled:cursor-default",
-                      expiry === option.value &&
-                        "bg-[var(--tc-surface-ink)] text-[var(--tc-content-on-ink)] hover:text-[var(--tc-content-on-ink)]"
+                      "cursor-pointer rounded-md py-2 text-[13px] transition-colors disabled:cursor-default",
+                      expiry === option.value
+                        ? "bg-[var(--tc-surface-ink)] text-[var(--tc-content-on-ink)]"
+                        : "text-[var(--tc-content-secondary)] hover:bg-[var(--tc-surface-raised)] hover:text-[var(--tc-content-primary)]"
                     )}
                     onClick={() => setExpiry(option.value)}
                   >
@@ -200,7 +201,7 @@ export function ShareDialog({
 
             <button
               type="button"
-              className="w-full cursor-pointer rounded-lg border border-[var(--tc-border-strong)] bg-[var(--tc-surface-plain)] py-2 text-[13px] text-[var(--tc-content-primary)] disabled:cursor-default disabled:opacity-50"
+              className="w-full cursor-pointer rounded-lg border border-[var(--tc-border-strong)] bg-[var(--tc-surface-plain)] py-2 text-[13px] text-[var(--tc-content-primary)] transition-colors hover:border-[var(--tc-content-muted)] hover:bg-[var(--tc-surface-raised)] disabled:cursor-default disabled:opacity-50"
               disabled={creating || !resource || hasActive}
               onClick={() => void create()}
             >
@@ -221,7 +222,7 @@ export function ShareDialog({
               )}
               {(shares ?? []).map((share) => (
                 <div
-                  className="flex items-center gap-2 border-t border-[var(--tc-border-subtle)] py-2 text-xs"
+                  className="flex items-center gap-2 border-t border-[var(--tc-border-subtle)] py-2 text-xs transition-colors hover:bg-[var(--tc-surface-raised)]"
                   key={share.id}
                 >
                   <span
@@ -240,14 +241,14 @@ export function ShareDialog({
                     <>
                       <button
                         type="button"
-                        className="flex-none cursor-pointer rounded-lg border border-[var(--tc-border-strong)] bg-[var(--tc-surface-plain)] px-2 py-1 text-xs text-[var(--tc-content-secondary)] hover:border-[var(--tc-content-muted)] hover:text-[var(--tc-content-primary)]"
+                        className="flex-none cursor-pointer rounded-lg border border-[var(--tc-border-strong)] bg-[var(--tc-surface-plain)] px-2 py-1 text-xs text-[var(--tc-content-secondary)] transition-colors hover:border-[var(--tc-content-muted)] hover:text-[var(--tc-content-primary)]"
                         onClick={() => void copyLink(share.token)}
                       >
                         {SHARE_UI_COPY.copyAction}
                       </button>
                       <button
                         type="button"
-                        className="flex-none cursor-pointer rounded-lg border border-[var(--tc-border-strong)] bg-[var(--tc-surface-plain)] px-2 py-1 text-xs text-[var(--tc-content-secondary)] hover:border-[var(--tc-danger-edge)] hover:text-[var(--tc-danger)]"
+                        className="flex-none cursor-pointer rounded-lg border border-[var(--tc-border-strong)] bg-[var(--tc-surface-plain)] px-2 py-1 text-xs text-[var(--tc-content-secondary)] transition-colors hover:border-[var(--tc-danger-edge)] hover:text-[var(--tc-danger)]"
                         onClick={() => void revoke(share)}
                       >
                         {SHARE_UI_COPY.revokeAction}
