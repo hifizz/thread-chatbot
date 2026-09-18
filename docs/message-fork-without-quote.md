@@ -49,7 +49,7 @@ Quote 内容由消息 parts 管理，Thread 来源只负责定位与展示。不
 
 共享 `handleFork` 返回失败的 Promise；消息按钮负责局部错误和重试，划选入口在自己的调用边界显示 Toast。两条 UI 路径各自处理错误，避免共享函数吞错导致上层误判成功。
 
-## Rebase 到 main（b3dae83）
+## Rebase 到 main（a66113f）
 
 沿用 main 的完整有序内容契约及新版 Composer，不恢复已被替代的引用修复提交。分叉命令通过可选 `firstTurn.parts` 携带首问；无引用首问不构造 Quote。发送和编辑按用户提交的内容保存，不从 Thread 自动补回已删除的引用。保留 main 的划选工具条、生成设置、Artifact 引用和提示缓存实现。
 
