@@ -13,6 +13,8 @@ import {
   type WebResearchActivity,
 } from "@/lib/chat/web-research-activity"
 import type { MarkdownGenerationProgress } from "../../core/types"
+import { useI18n } from "@/lib/i18n/client"
+
 
 /* 把消息上已投影的 reasoning / 联网活动 / 工具事件映射为 beautiful-ui
  * ThinkingState 轨迹。官方 token 由 `.bui` 作用域提供（app/beautifui/foundation.css），
@@ -68,6 +70,8 @@ function InlineMarkdown({ text }: { text: string }) {
 
 /** 思维链：reasoning part 的分段文本 → Reasoning 变体；耗时在客户端首次捕获。 */
 export function ReasoningTrace({ part }: { part: { text: string; state?: string } }) {
+  const { t } = useI18n()
+
   const working = part.state === "streaming"
   const startRef = useRef<number | null>(null)
   const [elapsedSeconds, setElapsedSeconds] = useState<number | null>(null)
@@ -104,9 +108,9 @@ export function ReasoningTrace({ part }: { part: { text: string; state?: string 
       <ThinkingState
         variant="Reasoning"
         working={working}
-        active="思考中"
+        active={t("ui.thinking")}
         done={
-          elapsedSeconds === null ? "思考完成" : `思考了 ${elapsedSeconds} 秒`
+          elapsedSeconds === null ? t("ui.thinkingComplete") : t("chat.thinkingSeconds", { seconds: elapsedSeconds })
         }
         rows={rows}
         renderPrimary={(row) => <InlineMarkdown text={row.primary} />}
@@ -128,6 +132,8 @@ export function SearchTrace({
   complete: boolean
   settled?: boolean
 }) {
+  const { t } = useI18n()
+
   if (activities.length === 0) return null
 
   const currentActivities = settledResearchActivities(activities, settled)
@@ -141,12 +147,12 @@ export function SearchTrace({
     if (activity.status === "failed") failedCount++
     if (activity.kind === "search") {
       rows.push({
-        primary: activity.query ?? "搜索网络",
+        primary: activity.query ?? t("ui.searchTheWeb"),
         icon: "search",
         subtle: true,
         running: activity.status === "running",
         failed: activity.status === "failed",
-        secondary: activity.status === "failed" ? "搜索失败" : undefined,
+        secondary: activity.status === "failed" ? t("ui.searchFailed") : undefined,
       })
       for (const source of activity.sources) {
         if (byUrl.has(source.url)) continue
@@ -177,12 +183,12 @@ export function SearchTrace({
       } else {
         existing.secondary =
           activity.status === "running"
-            ? `${host} · 读取中`
+            ? t("chat.readingHost", { host })
             : activity.status === "failed"
-              ? `${host} · 读取失败`
+              ? t("chat.failedHost", { host })
               : activity.truncated
-                ? `${host} · 已读（部分）`
-                : `${host} · 已读`
+                ? t("chat.partialHost", { host })
+                : t("chat.readHost", { host })
       }
       continue
     }
@@ -190,9 +196,9 @@ export function SearchTrace({
       primary: activity.title ?? host,
       secondary:
         activity.status === "failed"
-          ? `${host} · 读取失败`
+          ? t("chat.failedHost", { host })
           : activity.truncated && activity.status === "complete"
-            ? `${host} · 部分读取`
+            ? t("chat.partReadHost", { host })
             : host,
       href: url,
       icon: "book-open",
@@ -214,24 +220,24 @@ export function SearchTrace({
     .find((activity) => activity.status === "running")
   const active =
     runningActivity?.kind === "read" && runningActivity.url
-      ? `正在读取 ${hostOf(runningActivity.url)}`
+      ? t("chat.readingPage", { host: hostOf(runningActivity.url) })
       : readMode
-        ? "正在读取网页"
-        : "正在搜索网络"
+        ? t("ui.readingWebpage")
+        : t("ui.searchingTheWeb")
 
   const readCount = readUrls.size
   const done = (() => {
     if (sourceCount === 0 && readCount === 0) {
       return failedCount
-        ? "联网核实失败"
+        ? t("ui.webVerificationFailed")
         : readMode
-          ? "已读取网页"
-          : "已搜索网络"
+          ? t("ui.webpageRead")
+          : t("ui.webSearched")
     }
     const segments: string[] = []
-    if (sourceCount) segments.push(`已搜索网络 · ${sourceCount} 个来源`)
-    if (readCount) segments.push(`已读取 ${readCount} 个网页`)
-    if (failedCount) segments.push(`${failedCount} 项失败`)
+    if (sourceCount) segments.push(t("chat.sourcesCount", { count: sourceCount }))
+    if (readCount) segments.push(t("chat.readCount", { count: readCount }))
+    if (failedCount) segments.push(t("chat.failureCount", { count: failedCount }))
     return segments.join(" · ")
   })()
 
@@ -279,13 +285,15 @@ export function ToolTrace({
   toolState?: string
   progress?: MarkdownGenerationProgress
 }) {
+  const { t } = useI18n()
+
   const finished = toolState === "output-available" || toolState === "output-error"
   const secondary = progress?.partialTitle
     ? progress.characterCount > 0
-      ? `${progress.partialTitle} · ${progress.characterCount} 字`
+      ? t("chat.titleCharacters", { title: progress.partialTitle, count: progress.characterCount })
       : progress.partialTitle
     : progress && progress.characterCount > 0
-      ? `${progress.characterCount} 字`
+      ? t("chat.characters", { count: progress.characterCount })
       : undefined
 
   return (
@@ -293,9 +301,9 @@ export function ToolTrace({
       <ThinkingState
         variant="Coding"
         working={!finished}
-        active="正在生成文档"
-        done={toolState === "output-error" ? "生成失败" : "已生成文档"}
-        rows={[{ primary: "生成文档", secondary, mono: true }]}
+        active={t("ui.creatingDocument")}
+        done={toolState === "output-error" ? t("ui.generationFailed") : t("ui.documentCreated")}
+        rows={[{ primary: t("ui.createDocument"), secondary, mono: true }]}
       />
     </div>
   )

@@ -26,6 +26,9 @@ import { AccountButton, AccountMenuRow } from "./account-button"
 import { ShortcutHint } from "../overlays/shortcut-hint"
 import { COL_MIN_W } from "../columns/use-column-viewport"
 import { columnCountChoices } from "./thread-chat-topbar-logic"
+import { LanguageSwitcher } from "@/components/i18n/language-switcher"
+import { useI18n } from "@/lib/i18n/client"
+
 
 type ViewMode = "columns" | "canvas"
 
@@ -65,12 +68,14 @@ export function ThreadChatMobileMenu({
   onToggleThreadTree,
   onToggleMarkdown,
 }: ThreadChatNavigationProps) {
+  const { t } = useI18n()
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
         className="cbtn mobile-nav"
-        aria-label="打开导航菜单"
-        title="导航菜单"
+        aria-label={t("ui.openNavigationMenu")}
+        title={t("ui.navigationMenu")}
       >
         <Menu size={16} />
       </DropdownMenuTrigger>
@@ -79,17 +84,15 @@ export function ThreadChatMobileMenu({
         className="w-52 max-w-[calc(100vw-24px)] font-mono"
       >
           <DropdownMenuGroup>
-            <DropdownMenuLabel>对话</DropdownMenuLabel>
+            <DropdownMenuLabel>{t("ui.chat")}</DropdownMenuLabel>
             <DropdownMenuItem onClick={() => onNewConversation(false)}>
-              新对话
-            </DropdownMenuItem>
+              {t("chat.new")}</DropdownMenuItem>
             <DropdownMenuItem onClick={onToggleTreeList}>
               <ListTodo />
-              对话列表
-            </DropdownMenuItem>
+              {t("chat.list")}</DropdownMenuItem>
             <DropdownMenuItem onClick={onToggleThreadTree}>
               <Network />
-              会话树{branchCount > 0 ? ` · ${branchCount}` : ""}
+              {t("chat.tree")}{branchCount > 0 ? ` · ${branchCount}` : ""}
             </DropdownMenuItem>
             <DropdownMenuItem onClick={onToggleMarkdown}>
               <FolderKanban />
@@ -98,30 +101,27 @@ export function ThreadChatMobileMenu({
             {showHelp && (
               <DropdownMenuItem onClick={onOpenHelp}>
                 <CircleHelp />
-                使用提示
-              </DropdownMenuItem>
+                {t("chat.help")}</DropdownMenuItem>
             )}
           </DropdownMenuGroup>
           <DropdownMenuSeparator />
           <DropdownMenuGroup>
-            <DropdownMenuLabel>视图</DropdownMenuLabel>
+            <DropdownMenuLabel>{t("ui.view")}</DropdownMenuLabel>
             <DropdownMenuItem onClick={onShowColumns}>
               <Columns3 />
-              列视图
-              {viewMode === "columns" && <Check className="mobile-nav-check" />}
+              {t("chat.columns")}{viewMode === "columns" && <Check className="mobile-nav-check" />}
             </DropdownMenuItem>
             <DropdownMenuItem onClick={onShowCanvas}>
               <Waypoints />
-              画布视图
-              {viewMode === "canvas" && <Check className="mobile-nav-check" />}
+              {t("chat.canvas")}{viewMode === "canvas" && <Check className="mobile-nav-check" />}
             </DropdownMenuItem>
           </DropdownMenuGroup>
           {viewMode === "columns" && (
             <>
               <DropdownMenuSeparator />
               <DropdownMenuGroup>
-                <DropdownMenuLabel>列数</DropdownMenuLabel>
-                {columnCountChoices(forceCols).map((choice) => (
+                <DropdownMenuLabel>{t("ui.columns2")}</DropdownMenuLabel>
+                {columnCountChoices(forceCols, t("ui.auto")).map((choice) => (
                   <DropdownMenuItem
                     key={choice.value}
                     onClick={() =>
@@ -135,20 +135,18 @@ export function ThreadChatMobileMenu({
               </DropdownMenuGroup>
               <DropdownMenuSeparator />
               <DropdownMenuGroup>
-                <DropdownMenuLabel>列满时</DropdownMenuLabel>
+                <DropdownMenuLabel>{t("ui.whenColumnsAreFull")}</DropdownMenuLabel>
                 <DropdownMenuItem
                   onClick={() => onPlacementModeChange("replace")}
                 >
-                  替换⑥
-                  {placementMode === "replace" && (
+                  {t("ui.replace2")}{placementMode === "replace" && (
                     <Check className="mobile-nav-check" />
                   )}
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={() => onPlacementModeChange("fold")}
                 >
-                  细条⑤
-                  {placementMode === "fold" && (
+                  {t("ui.strip")}{placementMode === "fold" && (
                     <Check className="mobile-nav-check" />
                   )}
                 </DropdownMenuItem>
@@ -156,13 +154,15 @@ export function ThreadChatMobileMenu({
             </>
           )}
           <DropdownMenuSeparator />
-          <AccountMenuRow />
+          <LanguageSwitcher /><AccountMenuRow />
       </DropdownMenuContent>
     </DropdownMenu>
   )
 }
 
 export function ThreadChatTopbar(props: ThreadChatNavigationProps) {
+  const { t } = useI18n()
+
   const {
     viewMode,
     showHelp,
@@ -185,21 +185,19 @@ export function ThreadChatTopbar(props: ThreadChatNavigationProps) {
     <div className="topbar">
       <button
         className="tbtn"
-        title="开启一棵全新的分支对话树；按住 Command 点击可在新页面打开（当前对话已自动保存，可经其 URL 随时回访）"
+        title={t("ui.startANewConversationTreeCommand")}
         onClick={(event: MouseEvent<HTMLButtonElement>) =>
           onNewConversation(event.metaKey)
         }
       >
-        新对话
-      </button>
+        {t("chat.new")}</button>
       <button
         className="tbtn"
-        title="查看全部对话，可切换 / 重命名 / 删除（⌘⇧K）"
+        title={t("ui.viewAllConversationsSwitchRenameOr")}
         onClick={onToggleTreeList}
       >
         <ListTodo size={13} />
-        对话列表
-        <ShortcutHint {...THREAD_CHAT_SHORTCUTS.openTreeList} />
+        {t("chat.list")}<ShortcutHint {...THREAD_CHAT_SHORTCUTS.openTreeList} />
       </button>
       <div className="brand">
         <span className="mark">Thread Chat</span>
@@ -207,47 +205,45 @@ export function ThreadChatTopbar(props: ThreadChatNavigationProps) {
       <div className="spacer" />
       <ThreadChatMobileMenu {...props} />
       {showHelp && (
-        <button className="tbtn help" title="使用提示" onClick={onOpenHelp}>
+        <button className="tbtn help" title={t("chat.help")} onClick={onOpenHelp}>
           <CircleHelp size={14} />
         </button>
       )}
       <div
         className="seg"
         role="group"
-        aria-label="视图模式"
-        title="列 = 并排深读；画布 = 纵览整棵会话树"
+        aria-label={t("ui.viewMode")}
+        title={t("ui.columnsForDetailedReadingCanvasFor")}
       >
         <button
           className={`mode ${viewMode === "columns" ? "on" : ""}`}
           aria-pressed={viewMode === "columns"}
-          title="列视图：并排深读多个会话"
+          title={t("ui.columnViewReadMultipleThreadsSide")}
           onClick={onShowColumns}
         >
-          <Columns3 size={12} />列
-        </button>
+          <Columns3 size={12} />{t("ui.columns")}</button>
         <button
           className={`mode ${viewMode === "canvas" ? "on" : ""}`}
           aria-pressed={viewMode === "canvas"}
-          title="画布视图：纵览整棵会话树，单击节点就地对话，双击回到列模式"
+          title={t("ui.canvasViewBrowseTheTreeClick")}
           onClick={onShowCanvas}
         >
           <Waypoints size={12} />
-          画布
-        </button>
+          {t("ui.canvas")}</button>
       </div>
       {viewMode === "columns" && (
         <>
           <div
             className="seg"
             role="group"
-            aria-label="列数"
+            aria-label={t("ui.columns2")}
             title={
               windowWidth === null
                 ? undefined
-                : `列数：视口 ${windowWidth}px，约每 ${COL_MIN_W}px 一列`
+                : t("chat.columnWidths", { width: windowWidth, column: COL_MIN_W })
             }
           >
-            {columnCountChoices(forceCols).map((choice) => (
+            {columnCountChoices(forceCols, t("ui.auto")).map((choice) => (
               <button
                 key={choice.value}
                 className={choice.active ? "on" : ""}
@@ -263,45 +259,43 @@ export function ThreadChatTopbar(props: ThreadChatNavigationProps) {
           <div
             className="seg"
             role="group"
-            aria-label="列满时的放置策略"
-            title="列满时的放置策略"
+            aria-label={t("ui.placementWhenColumnsAreFull")}
+            title={t("ui.placementWhenColumnsAreFull")}
           >
             <button
               className={placementMode === "replace" ? "on" : ""}
               aria-pressed={placementMode === "replace"}
               onClick={() => onPlacementModeChange("replace")}
             >
-              替换⑥
-            </button>
+              {t("ui.replace2")}</button>
             <button
               className={placementMode === "fold" ? "on" : ""}
               aria-pressed={placementMode === "fold"}
               onClick={() => onPlacementModeChange("fold")}
             >
-              细条⑤
-            </button>
+              {t("ui.strip")}</button>
           </div>
         </>
       )}
       <button
         className="tbtn"
-        title="搜索并打开任意会话（⌘K）"
+        title={t("ui.findAndOpenAnyThreadK")}
         onClick={onToggleThreadTree}
       >
         <Network size={13} />
-        会话树{branchCount > 0 ? ` · ${branchCount}` : ""}
+        {t("chat.tree")}{branchCount > 0 ? ` · ${branchCount}` : ""}
         <ShortcutHint {...THREAD_CHAT_SHORTCUTS.openThreadTree} />
       </button>
       <button
         className="tbtn"
-        title="打开 / 收起 Project Workspace"
+        title={t("ui.expandOrCollapseTheProjectWorkspace")}
         onClick={onToggleMarkdown}
       >
         <FolderKanban size={13} />
         Project
         <span className="cnt">{markdownCount}</span>
       </button>
-      <AccountButton />
+      <LanguageSwitcher /><AccountButton />
     </div>
   )
 }

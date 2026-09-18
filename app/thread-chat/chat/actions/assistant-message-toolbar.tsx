@@ -1,10 +1,12 @@
 "use client"
 
+import { useI18n } from "@/lib/i18n/client"
+
 import { useState } from "react"
 import { Check, Copy, RotateCcw, ThumbsDown, ThumbsUp } from "lucide-react"
 import {
-  MESSAGE_ACTION_ERRORS,
-  MESSAGE_ACTION_LABELS,
+  MESSAGE_ACTION_ERROR_KEYS,
+  MESSAGE_ACTION_LABEL_KEYS,
   type AssistantMessageToolbarProps,
 } from "./message-action-types"
 import { MessageToolbar } from "./message-toolbar"
@@ -17,6 +19,7 @@ export function AssistantMessageToolbar({
   feedback,
   commands,
 }: AssistantMessageToolbarProps) {
+  const { t } = useI18n()
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const { copied, copy } = useCopyMarkdown(setError)
@@ -35,7 +38,7 @@ export function AssistantMessageToolbar({
     try {
       await commands.submitFeedback(threadId, message.id, next ?? null)
     } catch {
-      setError(MESSAGE_ACTION_ERRORS.feedbackSave)
+      setError(t(MESSAGE_ACTION_ERROR_KEYS.feedbackSave))
     } finally {
       setBusy(null)
     }
@@ -49,25 +52,25 @@ export function AssistantMessageToolbar({
           {
             key: "copy",
             label: copied
-              ? MESSAGE_ACTION_LABELS.copied
-              : MESSAGE_ACTION_LABELS.copy,
+              ? t(MESSAGE_ACTION_LABEL_KEYS.copied)
+              : t(MESSAGE_ACTION_LABEL_KEYS.copy),
             icon: copied ? Check : Copy,
             onSelect: () => void copy(message.text),
             disabled: message.text.trim() === "",
-            disabledReason: MESSAGE_ACTION_ERRORS.noMarkdown,
+            disabledReason: t(MESSAGE_ACTION_ERROR_KEYS.noMarkdown),
           },
           {
             key: "regenerate",
-            label: MESSAGE_ACTION_LABELS.regenerate,
+            label: t(MESSAGE_ACTION_LABEL_KEYS.regenerate),
             icon: RotateCcw,
             onSelect: () => void regenerate(),
             busy: busy === "regenerate",
             disabled: !regeneratable,
-            disabledReason: MESSAGE_ACTION_ERRORS.latestAssistantOnly,
+            disabledReason: t(MESSAGE_ACTION_ERROR_KEYS.latestAssistantOnly),
           },
           {
             key: "positive",
-            label: MESSAGE_ACTION_LABELS.positive,
+            label: t(MESSAGE_ACTION_LABEL_KEYS.positive),
             icon: ThumbsUp,
             onSelect: () =>
               void submitFeedback(
@@ -78,7 +81,7 @@ export function AssistantMessageToolbar({
           },
           {
             key: "negative",
-            label: MESSAGE_ACTION_LABELS.negative,
+            label: t(MESSAGE_ACTION_LABEL_KEYS.negative),
             icon: ThumbsDown,
             onSelect: () =>
               void submitFeedback(

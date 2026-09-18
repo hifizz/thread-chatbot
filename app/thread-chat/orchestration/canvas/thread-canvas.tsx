@@ -46,6 +46,8 @@ import { CanvasCard, type CanvasCardNode } from "./canvas-node"
 import { CANVAS_EXPAND_WIDTH } from "./canvas-dimensions"
 import { useCanvasLayout, type CanvasViewState } from "./use-canvas-layout"
 import type { MessageActionViewState } from "../../chat/actions/message-action-types"
+import { useI18n } from "@/lib/i18n/client"
+
 
 /** nodeTypes 稳定引用：模块级定义，避免 React Flow 整树重挂（skill 契约 #4） */
 const nodeTypes = { threadCard: CanvasCard }
@@ -92,6 +94,8 @@ function CanvasFlow({
   messageActionState,
   focusNode,
 }: ThreadCanvasProps) {
+  const { t } = useI18n()
+
   const version = useThreadStore(store)
   const { nodes, edges, onNodesChange, resetLayout, selectNode, pinCount } =
     useCanvasLayout({
@@ -198,15 +202,14 @@ function CanvasFlow({
           <Panel position="top-left" className="canvas-panel">
             <button
               className="cbtn"
-              title="清除手动固定的节点位置，重新自动布局并适配视口"
+              title={t("ui.clearPinnedNodePositionsArrangeAutomatically")}
               onClick={onRelayout}
             >
               <RotateCcw size={10} />
-              重新排列{pinCount > 0 ? ` · 已固定 ${pinCount}` : ""}
+              {t("ui.rearrange")}{pinCount > 0 ? t("chat.pinCount", { count: pinCount }) : ""}
             </button>
             <span className="canvas-tip">
-              单击节点就地对话（可划选开分支）· 拖动固定位置 · 双击回列模式
-            </span>
+              {t("ui.clickToChatAndBranchHere")}</span>
           </Panel>
         </ReactFlow>
       </CanvasActionsContext.Provider>

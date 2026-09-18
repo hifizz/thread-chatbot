@@ -1,3 +1,5 @@
+import { responseLanguageInstruction } from "@/lib/i18n/response-language"
+import { DEFAULT_LOCALE, type Locale } from "@/constants/i18n"
 import { db } from "@/lib/db"
 import { DOCUMENT_TOOL_NAMES } from "@/constants/project-documents"
 import { withDocumentContextReceipt } from "./documents/context-receipt"
@@ -45,6 +47,7 @@ import type { ObservabilityContext } from "@/lib/observability/types"
 
 export interface PrepareGenerationInput {
   userId: string
+  uiLocale?: Locale
   documentUpdates?: DocumentContextReceipt
   messageId: string
   projectId: string
@@ -62,6 +65,7 @@ export interface PrepareGenerationInput {
 }
 
 export async function prepareGeneration(input: PrepareGenerationInput) {
+  const uiLocale = input.uiLocale ?? DEFAULT_LOCALE
   const registeredModel = getChatModel(input.modelId)
   if (!registeredModel) throw new Error("MODEL_NOT_ALLOWED")
   const resolvedModel = resolveChatModelWithRoute(input.modelId)
@@ -175,6 +179,7 @@ export async function prepareGeneration(input: PrepareGenerationInput) {
   const stableInstructions = [
     ...generationMode.systemParts.slice(0, 1),
     projectContract,
+    responseLanguageInstruction(uiLocale),
     ...generationMode.systemParts.slice(1),
   ]
     .filter((part): part is string => part !== null)

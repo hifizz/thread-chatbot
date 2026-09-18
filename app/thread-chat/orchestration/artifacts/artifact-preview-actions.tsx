@@ -13,6 +13,8 @@ import {
 import type { ArtifactDTO } from "@/lib/thread-chat/contracts/dto"
 import { useCopyMarkdown } from "../../chat/actions/use-copy-markdown"
 import { DocumentExportActions } from "./documents/export-actions"
+import { useI18n } from "@/lib/i18n/client"
+
 
 /** 阅读屏头部的操作菜单；来源与时间已展示在标题下的 meta 行，菜单只留动作。 */
 export function ArtifactPreviewActions({
@@ -22,6 +24,8 @@ export function ArtifactPreviewActions({
   artifact: ArtifactDTO
   onLocate(): void
 }) {
+  const { t } = useI18n()
+
   const container = useRef<HTMLDivElement>(null)
   const [error, setError] = useState<string | null>(null)
   const { copied, copy } = useCopyMarkdown(setError)
@@ -30,8 +34,8 @@ export function ArtifactPreviewActions({
       <DropdownMenu>
         <DropdownMenuTrigger
           className="artifact-more"
-          aria-label="文档操作"
-          title="文档操作"
+          aria-label={t("ui.documentActions")}
+          title={t("ui.documentActions")}
         >
           <MoreHorizontal size={18} />
         </DropdownMenuTrigger>
@@ -43,15 +47,14 @@ export function ArtifactPreviewActions({
           <DropdownMenuGroup>
             <DropdownMenuItem onClick={onLocate}>
               <LocateFixed size={14} />
-              定位来源
-            </DropdownMenuItem>
+              {t("ui.goToSource")}</DropdownMenuItem>
             {artifact.kind === "markdown" && (
               <DropdownMenuItem
                 closeOnClick={false}
                 onClick={() => void copy(artifact.content)}
               >
                 {copied ? <Check size={14} /> : <Copy size={14} />}
-                {copied ? "已复制" : "复制 Markdown"}
+                {copied ? t("chat.copied") : t("ui.copyMarkdown")}
               </DropdownMenuItem>
             )}
           </DropdownMenuGroup>

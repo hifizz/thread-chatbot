@@ -2,6 +2,8 @@
 import type { ConversationViewMessage } from "../../core/types"
 import { useArtifactNavigation } from "../composer/artifact-resources"
 import { UIMessageSupplementalParts } from "./ui-message-parts"
+import { useI18n } from "@/lib/i18n/client"
+
 
 type OpenArtifact = NonNullable<ReturnType<typeof useArtifactNavigation>>
 type QuotePart = Extract<
@@ -10,6 +12,8 @@ type QuotePart = Extract<
 >
 
 function QuoteContent({ part, open }: { part: QuotePart; open: OpenArtifact | null }) {
+  const { t } = useI18n()
+
   const data = part.data
   // legacy data-quote 只有 text；V1 才有 source，进一步收窄出 artifact 来源
   const artifactSource =
@@ -31,7 +35,7 @@ function QuoteContent({ part, open }: { part: QuotePart; open: OpenArtifact | nu
     <button
       type="button"
       className="msg-quote msg-quote-source"
-      title="打开引用的 Artifact 并定位原文"
+      title={t("ui.openTheReferencedArtifactAtThe")}
       disabled={!open}
       onClick={() => open?.(artifactSource.artifactId, artifactSource.anchor)}
     >

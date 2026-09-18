@@ -1,5 +1,6 @@
 import { NextResponse, type NextFetchEvent, type NextRequest } from "next/server"
 import { getSessionCookie } from "better-auth/cookies"
+import { getAuthCookieOptions } from "@/lib/auth/cookie-options"
 import { ROUTES } from "@/constants/routes"
 import { logger } from "@/lib/axiom/server"
 
@@ -19,7 +20,7 @@ export function proxy(request: NextRequest, event: NextFetchEvent) {
   // API 仍由各 Route Handler 自己鉴权；这里只记录请求，不改变现有 API 行为。
   if (pathname.startsWith("/api/")) return NextResponse.next()
 
-  const hasSession = getSessionCookie(request) != null
+  const hasSession = getSessionCookie(request, getAuthCookieOptions()) != null
 
   // 无需登录即可访问的页面（公开落地页 + 登录/注册/找回密码 + 法务页）
   const publicPages = new Set([

@@ -1,3 +1,4 @@
+import { getAuthCookieOptions } from "@/lib/auth/cookie-options"
 import { betterAuth, type BetterAuthPlugin } from "better-auth"
 import { drizzleAdapter } from "better-auth/adapters/drizzle"
 import { nextCookies } from "better-auth/next-js"
@@ -6,7 +7,7 @@ import { db } from "@/lib/db"
 import { user, session, account, verification } from "@/lib/db/schema"
 import { ensureUserCredits } from "@/lib/billing/credits"
 import { isEmailConfigured, sendEmail } from "@/lib/email/client"
-import { verificationEmail, resetPasswordEmail } from "@/lib/email/templates"
+import { verificationEmail, resetPasswordEmail, authEmailLocale } from "@/lib/email/templates"
 import { getGoogleAuthConfig } from "@/lib/auth/social"
 
 // 邮箱验证是否可用：需已配置邮件服务。未配置时（如本地开发）优雅降级为「注册即用」，
@@ -17,7 +18,6 @@ const emailReady = isEmailConfigured()
 const TURNSTILE_SECRET = process.env.TURNSTILE_SECRET_KEY
 
 // localhost 的 Cookie 不按端口隔离；每个 worktree 使用独立前缀，避免登录态互相覆盖。
-const authCookiePrefix = process.env.BETTER_AUTH_COOKIE_PREFIX?.trim()
 
 // Google 社交登录：同时配齐 client id/secret 才启用（判定来自 lib/auth/social，
 // 登录页据同一来源决定是否显示按钮，无需额外的 NEXT_PUBLIC 开关）。
@@ -36,7 +36,8 @@ if (TURNSTILE_SECRET) {
 plugins.push(nextCookies())
 
 export const auth = betterAuth({
-  advanced: authCookiePrefix ? { cookiePrefix: authCookiePrefix } : undefined,
+  user: { additionalFields: { locale: { type: "string", required: false, input: false } } },
+  advanced: getAuthCookieOptions(),
   database: drizzleAdapter(db, {
     provider: "pg",
     schema: { user, session, account, verification },
@@ -48,18 +49,18 @@ export const auth = betterAuth({
     // 配了邮件服务才强制邮箱验证；否则注册后直接可用（开发友好）。
     requireEmailVerification: emailReady,
     // 找回密码：发送重置链接邮件。
-    sendResetPassword: async ({ user: u, url }) => {
-      const { subject, html } = resetPasswordEmail(url)
-      await sendEmail({ to: u.email, subject, html })
+    sendResetPassword: async ({ user: u, url }, request) => {
+      const email = resetPasswordEmail(url, authEmailLocale("locale" in u ? u.locale : null, request))
+      await sendEmail({ to: u.email, ...email })
     },
   },
   emailVerification: {
     // 注册后自动发验证邮件（仅在邮件服务就绪时）。
     sendOnSignUp: emailReady,
     autoSignInAfterVerification: true,
-    sendVerificationEmail: async ({ user: u, url }) => {
-      const { subject, html } = verificationEmail(url)
-      await sendEmail({ to: u.email, subject, html })
+    sendVerificationEmail: async ({ user: u, url }, request) => {
+      const email = verificationEmail(url, authEmailLocale("locale" in u ? u.locale : null, request))
+      await sendEmail({ to: u.email, ...email })
     },
     // 关键防薅：初始额度改到「邮箱验证通过后」才发放，抬高白嫖门槛。
     afterEmailVerification: async (verifiedUser) => {

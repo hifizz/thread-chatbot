@@ -4,6 +4,8 @@ import { FileText } from "lucide-react"
 import ThinkingState from "@/components/primitives/ThinkingState"
 import type { Artifact, MarkdownGenerationProgress } from "../../core/types"
 import { dc } from "../../theme"
+import { useI18n } from "@/lib/i18n/client"
+
 
 export interface MarkdownArtifactCardProps {
   artifact: Pick<Artifact, "id" | "title" | "kind" | "lang" | "content">
@@ -118,16 +120,18 @@ export function MarkdownArtifactStreamTrace({
   progress?: MarkdownGenerationProgress
   compact?: boolean
 }) {
+  const { t } = useI18n()
+
   const preview = progress?.preview ?? ""
   const active = progress?.partialTitle
-    ? `正在生成 ${progress.partialTitle}`
-    : "正在生成 Markdown"
+    ? t("chat.generatingNamed", { title: progress.partialTitle })
+    : t("ui.creatingMarkdown")
   const stats =
     progress && progress.characterCount > 0
-      ? `已生成 ${progress.characterCount.toLocaleString()} 字 · ${progress.lineCount.toLocaleString()} 行`
+      ? t("chat.documentProgress", { characters: progress.characterCount, lines: progress.lineCount })
       : progress?.phase === "starting" || !progress
-        ? "正在准备文档结构…"
-        : "正在起草 Markdown…"
+        ? t("ui.preparingTheDocumentStructure")
+        : t("ui.draftingMarkdown")
 
   return (
     <div className={`thinking-trace bui ${compact ? "compact" : ""}`}>
@@ -206,6 +210,8 @@ export function MarkdownArtifactToolPart({
   compact?: boolean
   onOpen?: (artifactId: string) => void
 }) {
+  const { t } = useI18n()
+
   if (part.state === "output-available") {
     const artifactId =
       typeof part.output?.artifactId === "string"
@@ -227,8 +233,8 @@ export function MarkdownArtifactToolPart({
      * 标题渲染不可点击占位卡，拿到实体后自动替换为可点击卡片。 */
     return (
       <MarkdownArtifactStaticCard
-        title={inputTitle ?? artifact?.title ?? "Markdown 文档"}
-        caption={artifactId ? "Markdown" : "文档已生成"}
+        title={inputTitle ?? artifact?.title ?? t("ui.markdownDocument")}
+        caption={artifactId ? "Markdown" : t("ui.documentGenerated")}
         sourceDepth={sourceDepth}
         compact={compact}
       />
@@ -237,8 +243,8 @@ export function MarkdownArtifactToolPart({
   if (part.state === "output-error" || settled) {
     return (
       <MarkdownArtifactStaticCard
-        title="Markdown 文档"
-        caption={part.state === "output-error" ? "生成失败" : "生成未完成"}
+        title={t("ui.markdownDocument")}
+        caption={part.state === "output-error" ? t("ui.generationFailed") : t("ui.generationIncomplete")}
         sourceDepth={sourceDepth}
         compact={compact}
         failed
@@ -257,6 +263,8 @@ export function MarkdownArtifactCard({
   caption: captionOverride,
   fill = false,
 }: MarkdownArtifactCardProps) {
+  const { t } = useI18n()
+
   const depthClass =
     sourceDepth !== null && sourceDepth > 0 ? `fc-${dc(sourceDepth)}` : ""
   const isMarkdown = artifact.kind === "markdown"
@@ -279,14 +287,13 @@ export function MarkdownArtifactCard({
         <button
           type="button"
           className="dl"
-          aria-label={`下载 ${artifact.title}`}
+          aria-label={t("chat.downloadNamed", { title: artifact.title })}
           onClick={(event) => {
             event.stopPropagation()
             downloadArtifact(artifact)
           }}
         >
-          下载
-        </button>
+          {t("ui.download")}</button>
       )}
     </>
   )

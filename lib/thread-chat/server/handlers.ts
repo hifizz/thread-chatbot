@@ -1,3 +1,4 @@
+import { getHttpLocale } from "@/lib/i18n/server"
 import { z } from "zod"
 import {
   addProjectFileCommandSchema,
@@ -100,7 +101,8 @@ export function handleStartProject(
       startSessionAfterCommit(
         userId,
         result.result,
-        command.generationSettings
+        command.generationSettings,
+        await getHttpLocale(request)
       )
     return commandResponse(result)
   })
@@ -228,7 +230,8 @@ export function handleSendMessage(
       startSessionAfterCommit(
         userId,
         result.result,
-        command.generationSettings
+        command.generationSettings,
+        await getHttpLocale(request)
       )
     return commandResponse(result)
   })
@@ -245,7 +248,8 @@ export function handleForkThread(
       startSessionAfterCommit(
         userId,
         result.result.generation,
-        command.generationSettings
+        command.generationSettings,
+        await getHttpLocale(request)
       )
     return commandResponse(result)
   })
@@ -270,7 +274,8 @@ export function handleEditMessage(
       startSessionAfterCommit(
         userId,
         result.result.generation,
-        command.generationSettings
+        command.generationSettings,
+        await getHttpLocale(request)
       )
     }
     return commandResponse(result)
@@ -288,7 +293,8 @@ export function handleRetryMessage(
       startSessionAfterCommit(
         userId,
         result.result,
-        command.generationSettings
+        command.generationSettings,
+        await getHttpLocale(request)
       )
     return commandResponse(result)
   })

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
-import { DOCUMENT_UI_COPY } from "@/constants/project-documents"
+import { DOCUMENT_UI_KEYS } from "@/constants/project-documents"
 import {
   ARTIFACT_SOURCE_HIGHLIGHT_MS,
   ARTIFACT_SOURCE_LOCATE_ATTEMPTS,
@@ -21,6 +21,8 @@ import { selectCurrentProjectArtifacts, selectArtifactWithCurrentSourceStatus } 
 import { DocumentView } from "./documents/view"
 import type { ArtifactSourceNav } from "../overlays/use-workspace-overlays"
 import { ProjectPanel } from "./project-panel"
+import { useI18n } from "@/lib/i18n/client"
+
 
 function findMessageElement(messageId: string): HTMLElement | null {
   return (
@@ -78,6 +80,8 @@ export function StoreBoundProjectPanel({
   onSelect(id: string): void
   onLocate(threadId: string, sourceMessageId: string): void
 }) {
+  const { t } = useI18n()
+
   const versionRequest = useRef({ sequence: 0 })
   useEffect(() => {
     const pending = versionRequest.current
@@ -156,7 +160,7 @@ export function StoreBoundProjectPanel({
           )
         } else {
           onConsumePendingSource()
-          toast.error("已打开来源文档，但未能准确定位原文")
+          toast.error(t("ui.openedTheSourceDocumentButCould"))
         }
         return
       }
@@ -166,7 +170,7 @@ export function StoreBoundProjectPanel({
       })
       if (!located) {
         onConsumePendingSource()
-        toast.error("已打开来源文档，但未能准确定位原文")
+        toast.error(t("ui.openedTheSourceDocumentButCould"))
         return
       }
 
@@ -201,7 +205,7 @@ export function StoreBoundProjectPanel({
       )
       if (root) clearHighlights(root, markId)
     }
-  }, [activeId, open, loadedContent, pendingSource, onConsumePendingSource])
+  }, [activeId, open, loadedContent, pendingSource, onConsumePendingSource, t])
 
   const saveContract = useCallback(
     async (target: string, instructions: string) => {
@@ -246,7 +250,7 @@ export function StoreBoundProjectPanel({
           window.getSelection()?.removeAllRanges()
           onSelect(id)
         })
-          .catch(() => { if (request === versionRequest.current.sequence) toast.error(DOCUMENT_UI_COPY.versionFailed) })
+          .catch(() => { if (request === versionRequest.current.sequence) toast.error(t(DOCUMENT_UI_KEYS.versionFailed)) })
       }} />}
       artifactContents={state.artifactContentsById}
       artifactLoadError={artifactError === activeId}

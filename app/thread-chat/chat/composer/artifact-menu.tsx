@@ -9,6 +9,8 @@ import { ComposerMenu, ComposerMenuItem } from "@/components/assistant-ui/elemen
 import { ComposerTheme } from "@/components/assistant-ui/elements/composer/theme"
 import { ARTIFACT_REFERENCE_COPY } from "@/constants/artifact-reference"
 import { scrollMenuOptionIntoView } from "@/lib/thread-chat/scroll-menu-option"
+import { useI18n } from "@/lib/i18n/client"
+
 
 /** 复用 Lexical 官方 NodeContextMenuPlugin 的 Floating UI 组合；只定位自己渲染的菜单。 */
 export function ArtifactMenu<T extends MenuOption & { artifact: ArtifactSummaryDTO }>({ resolution, root, query, options, selectedIndex, setHighlightedIndex, selectOptionAndCleanUp }: {
@@ -16,6 +18,8 @@ export function ArtifactMenu<T extends MenuOption & { artifact: ArtifactSummaryD
   query: string;
   setHighlightedIndex: (index: number) => void; selectOptionAndCleanUp: (option: T) => void
 }) {
+  const { t } = useI18n()
+
   const { refs: { setFloating, setPositionReference, floating }, floatingStyles, update } = useFloating({
     open: true, placement: "top-start", strategy: "fixed",
     middleware: [offset(8), flip({ padding: 12 }), shift({ padding: 12 }), size({ padding: 12, apply({ availableHeight, availableWidth, elements }) {
@@ -51,7 +55,7 @@ export function ArtifactMenu<T extends MenuOption & { artifact: ArtifactSummaryD
       ref={(element) => option.setRefElement(element)} active={selectedIndex === index}
       onMouseDown={(event) => event.preventDefault()} onMouseEnter={() => setHighlightedIndex(index)} onClick={() => selectOptionAndCleanUp(option)}>
       <FileTextIcon className="size-5 shrink-0 text-foreground/45" />
-      <span className="flex min-w-0 flex-1 flex-col text-start"><span className="truncate">{option.artifact.title}</span><span className="truncate text-xs text-foreground/45">Markdown · {option.artifact.sourceThreadTitle ?? "未命名 Thread"}</span></span>
+      <span className="flex min-w-0 flex-1 flex-col text-start"><span className="truncate">{option.artifact.title}</span><span className="truncate text-xs text-foreground/45">Markdown · {option.artifact.sourceThreadTitle ?? t("ui.untitledThread")}</span></span>
     </ComposerMenuItem>)}
   </ComposerMenu></ComposerTheme>, document.body)
 }
