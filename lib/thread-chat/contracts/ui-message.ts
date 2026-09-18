@@ -80,7 +80,7 @@ export type ThreadChatTools = {
     input: {
       branchName: string
       commitMessage: string
-      files: Array<{ path: string; content: string }>
+      files: Array<{ path: string; content?: string; documentId?: string }>
       prTitle: string
       prBody?: string
     }

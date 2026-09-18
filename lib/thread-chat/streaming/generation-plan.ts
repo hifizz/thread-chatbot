@@ -74,7 +74,7 @@ const REPO_WRITE_SYSTEM_PROMPT = `你还可以把变更写回仓库，有两条�
 
 规则：
 1. 交付物内容已确定（文档、已写好的文件）→ commitFilesToRepository；需要 agent 去实现、修改或验证代码 → dispatchAgentTask。
-2. commitFilesToRepository 的 files 必须来自已确认的材料（读到的文档/Artifact 内容或你刚撰写的内容），不得凭空编造；分支名冲突时换一个更具体的名字重试。
+2. commitFilesToRepository 的 files 必须来自已确认的材料，不得凭空编造；提交已有项目文档时用 documentId 引用（服务端取最新版本，内容与库中一字不差），只有本轮新撰写的内容才放 content；分支名冲突时换一个更具体的名字重试。
 3. dispatchAgentTask 是异步的：派发成功后如实告知"任务已派发、正在后台执行"，不要声称代码已写好或 PR 已创建，状态以 checkAgentTask 为准。
 4. 写操作完成后如实汇报分支名、commit 和 PR 链接；一次请求不要重复派发相同任务。`
 
@@ -232,6 +232,8 @@ export async function prepareGeneration(input: PrepareGenerationInput) {
         branch: input.repoBinding.branch,
         commitSha: commitResult.commitSha,
         token,
+        userId: input.userId,
+        projectId: input.projectId,
       })
       agentTaskTools = createAgentTaskTools({
         repositoryFullName: input.repoBinding.repositoryFullName,
