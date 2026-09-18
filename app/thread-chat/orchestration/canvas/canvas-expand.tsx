@@ -78,25 +78,25 @@ export function CanvasExpand({
                 />
               ) : null
             }
-            renderAfterMessage={(sourceMessage) => (
-              <>
-                <MessageArtifacts
+            renderAssistantActions={(sourceMessage) =>
+              state && actions ? (
+                <MessageForkActions
                   state={state}
                   message={sourceMessage}
-                  compact
-                  onOpen={actions?.openArtifact}
+                  onFork={actions.forkMessage
+                    ? () => actions.forkMessage!(threadId, sourceMessage.id)
+                    : undefined}
+                  onOpenThread={(id) => actions.focusThread(id)}
                 />
-                {state && actions && (
-                  <MessageForkActions
-                    state={state}
-                    message={sourceMessage}
-                    onFork={actions.forkMessage
-                      ? () => actions.forkMessage!(threadId, sourceMessage.id)
-                      : undefined}
-                    onOpenThread={(id) => actions.focusThread(id)}
-                  />
-                )}
-              </>
+              ) : null
+            }
+            renderAfterMessage={(sourceMessage) => (
+              <MessageArtifacts
+                state={state}
+                message={sourceMessage}
+                compact
+                onOpen={actions?.openArtifact}
+              />
             )}
             onRetry={(failedMessage) =>
               actions?.retry(threadId, failedMessage.id)

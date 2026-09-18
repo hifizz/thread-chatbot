@@ -117,7 +117,7 @@ const render = (message) => renderToStaticMarkup(React.createElement(MessageFork
 }))
 const html = render(viewMessage)
 assert.match(html, /开启分叉聊天/)
-assert.match(html, /新分支/)
+assert.match(html, /1 个分支/)
 assert.doesNotMatch(html, /<q>/)
 for (const status of ["pending", "streaming", "stopped", "error"]) {
   assert.equal(render({ ...viewMessage, status }), "")

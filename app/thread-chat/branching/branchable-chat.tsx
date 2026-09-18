@@ -120,22 +120,24 @@ export function BranchableChat({
     )
   }
 
-  /* ---------- 注入：消息下方的 artifact 卡片与分叉入口 ---------- */
+  /* ---------- 注入：assistant 操作行的分叉入口与消息下方的 artifact 卡片 ---------- */
+  const renderAssistantActions = (msg: Message) => {
+    return (
+      <MessageForkActions
+        state={state}
+        message={msg}
+        onFork={onForkMessage ? () => onForkMessage(msg) : undefined}
+        onOpenThread={onOpenThread}
+      />
+    )
+  }
   const renderAfterMessage = (msg: Message) => {
     return (
-      <>
-        <MessageArtifacts
-          state={state}
-          message={msg}
-          onOpen={onOpenArtifact}
-        />
-        <MessageForkActions
-          state={state}
-          message={msg}
-          onFork={onForkMessage ? () => onForkMessage(msg) : undefined}
-          onOpenThread={onOpenThread}
-        />
-      </>
+      <MessageArtifacts
+        state={state}
+        message={msg}
+        onOpen={onOpenArtifact}
+      />
     )
   }
 
@@ -279,6 +281,7 @@ export function BranchableChat({
       banner={banner}
       intro={intro}
       renderAssistantBody={renderAssistantBody}
+      renderAssistantActions={renderAssistantActions}
       renderAfterMessage={renderAfterMessage}
       busy={busy}
       onRetry={onRetry}

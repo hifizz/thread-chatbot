@@ -49,6 +49,7 @@ export interface ConversationMessageProps {
   showRoleLabel?: boolean
   assistantBubbleClassName?: string
   renderAssistantBody?: (message: ConversationViewMessage) => React.ReactNode
+  renderAssistantActions?: (message: ConversationViewMessage) => React.ReactNode
   renderAfterMessage?: (message: ConversationViewMessage) => React.ReactNode
   renderUserFallback?: (message: ConversationViewMessage) => React.ReactNode
   onRetry?: (message: ConversationViewMessage) => void
@@ -64,6 +65,7 @@ export function ConversationMessage({
   showRoleLabel = false,
   assistantBubbleClassName = "bubble",
   renderAssistantBody = defaultAssistantBody,
+  renderAssistantActions,
   renderAfterMessage,
   renderUserFallback = defaultUserFallback,
   onRetry,
@@ -156,19 +158,23 @@ export function ConversationMessage({
               )}
             </div>
           )}
-          {messageCommands && hasCompletedAssistantActions(message) && (
-            <div className="assistant-actions-row">
-              <AssistantMessageToolbar
-                threadId={threadId}
-                message={message}
-                regeneratable={regeneratable}
-                feedback={messageActionState?.feedbackByMessageId.get(
-                  message.id
+          {hasCompletedAssistantActions(message) &&
+            (messageCommands || renderAssistantActions) && (
+              <div className="assistant-actions-row">
+                {messageCommands && (
+                  <AssistantMessageToolbar
+                    threadId={threadId}
+                    message={message}
+                    regeneratable={regeneratable}
+                    feedback={messageActionState?.feedbackByMessageId.get(
+                      message.id
+                    )}
+                    commands={messageCommands}
+                  />
                 )}
-                commands={messageCommands}
-              />
-            </div>
-          )}
+                {renderAssistantActions?.(message)}
+              </div>
+            )}
           {renderAfterMessage?.(message)}
         </>
       )}
