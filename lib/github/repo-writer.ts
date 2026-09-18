@@ -36,17 +36,36 @@ function apiError(code: RepoReadError["code"], message: string): RepoReadError {
   return { ok: false, code, message }
 }
 
+// 单次 GitHub 请求超时：挂起的连接不能无限等待，否则工具调用永不返回。
+const REQUEST_TIMEOUT_MS = 30_000
+
 async function ghPost(
   url: string,
   token: string,
   body: unknown,
-  method = "POST"
+  method = "POST",
+  signal?: AbortSignal
 ): Promise<{ ok: true; data: Record<string, unknown> } | RepoReadError> {
-  const res = await fetch(url, {
-    method,
-    headers: ghHeaders(token),
-    ...(body !== null ? { body: JSON.stringify(body) } : {}),
-  })
+  let res: Response
+  try {
+    res = await fetch(url, {
+      method,
+      headers: ghHeaders(token),
+      signal: signal
+        ? AbortSignal.any([AbortSignal.timeout(REQUEST_TIMEOUT_MS), signal])
+        : AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      ...(body !== null ? { body: JSON.stringify(body) } : {}),
+    })
+  } catch (e) {
+    if (signal?.aborted) return apiError("unknown", "请求已取消")
+    const isTimeout =
+      e instanceof Error &&
+      (e.name === "TimeoutError" || e.name === "AbortError")
+    return apiError(
+      "server_error",
+      isTimeout ? `GitHub 请求超时（${REQUEST_TIMEOUT_MS / 1000}s）` : `GitHub 请求失败：${e instanceof Error ? e.message : "网络错误"}`
+    )
+  }
   const text = await res.text()
   if (!res.ok) {
     let detail = text.slice(0, 300)
@@ -96,6 +115,7 @@ export async function commitFilesToBranch(input: {
   files: RepoCommitFile[]
   prTitle?: string
   prBody?: string
+  signal?: AbortSignal
 }): Promise<RepoReadResult<RepoCommitResult>> {
   const branch = validateBranchName(input.branchName)
   if (!branch) return apiError("unknown", `分支名非法：${input.branchName}`)
@@ -116,7 +136,7 @@ export async function commitFilesToBranch(input: {
   const commitMessage = input.commitMessage.trim().slice(0, MAX_COMMIT_MESSAGE_CHARS)
   if (!commitMessage) return apiError("unknown", "commitMessage 为空")
 
-  const base = await resolveBranchCommit(input.repositoryFullName, input.baseBranch, input.token)
+  const base = await resolveBranchCommit(input.repositoryFullName, input.baseBranch, input.token, input.signal)
   if (!base.ok) return base
   const baseSha = base.commitSha
 
@@ -125,7 +145,8 @@ export async function commitFilesToBranch(input: {
     `https://api.github.com/repos/${input.repositoryFullName}/git/commits/${baseSha}`,
     input.token,
     null,
-    "GET"
+    "GET",
+    input.signal
   )
   if (!baseCommit.ok) return baseCommit
   const baseTreeSha = (baseCommit.data.tree as { sha: string } | undefined)?.sha
@@ -137,7 +158,9 @@ export async function commitFilesToBranch(input: {
     const blob = await ghPost(
       `https://api.github.com/repos/${input.repositoryFullName}/git/blobs`,
       input.token,
-      { content: f.content, encoding: "utf-8" }
+      { content: f.content, encoding: "utf-8" },
+      "POST",
+      input.signal
     )
     if (!blob.ok) return blob
     blobs.push({ path: f.path, sha: blob.data.sha as string })
@@ -150,7 +173,9 @@ export async function commitFilesToBranch(input: {
     {
       base_tree: baseTreeSha,
       tree: blobs.map((b) => ({ path: b.path, mode: "100644", type: "blob", sha: b.sha })),
-    }
+    },
+    "POST",
+    input.signal
   )
   if (!tree.ok) return tree
 
@@ -158,7 +183,9 @@ export async function commitFilesToBranch(input: {
   const commit = await ghPost(
     `https://api.github.com/repos/${input.repositoryFullName}/git/commits`,
     input.token,
-    { message: commitMessage, tree: tree.data.sha, parents: [baseSha] }
+    { message: commitMessage, tree: tree.data.sha, parents: [baseSha] },
+    "POST",
+    input.signal
   )
   if (!commit.ok) return commit
   const commitSha = commit.data.sha as string
@@ -167,7 +194,9 @@ export async function commitFilesToBranch(input: {
   const ref = await ghPost(
     `https://api.github.com/repos/${input.repositoryFullName}/git/refs`,
     input.token,
-    { ref: `refs/heads/${branch}`, sha: commitSha }
+    { ref: `refs/heads/${branch}`, sha: commitSha },
+    "POST",
+    input.signal
   )
   if (!ref.ok) {
     if (ref.code === "unknown")
@@ -186,7 +215,9 @@ export async function commitFilesToBranch(input: {
       base: input.baseBranch,
       body: (input.prBody ?? "").slice(0, MAX_PR_BODY_CHARS),
       draft: true,
-    }
+    },
+    "POST",
+    input.signal
   )
   const pullRequest = pr.ok
     ? {

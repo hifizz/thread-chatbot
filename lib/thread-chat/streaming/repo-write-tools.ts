@@ -32,7 +32,7 @@ export function createRepoWriteTools(ctx: RepoToolContext) {
       prTitle: z.string().describe("Draft PR 标题"),
       prBody: z.string().optional().describe("PR 描述正文（可选）"),
     }),
-    execute: async ({ branchName, commitMessage, files, prTitle, prBody }) => {
+    execute: async ({ branchName, commitMessage, files, prTitle, prBody }, { abortSignal }) => {
       if (commitCount >= MAX_COMMITS_PER_TURN)
         return {
           ok: false as const,
@@ -50,6 +50,7 @@ export function createRepoWriteTools(ctx: RepoToolContext) {
         files,
         prTitle,
         prBody,
+        signal: abortSignal,
       })
       if (!res.ok) return { ok: false as const, code: res.code, message: res.message }
       return {

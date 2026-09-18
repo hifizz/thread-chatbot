@@ -70,10 +70,10 @@ function classifyError(status: number, body: string): RepoReadError {
   return { ok: false, code: "unknown", message: `GitHub API 错误: ${status}` }
 }
 
-async function ghFetch(url: string, token: string): Promise<Response> {
+async function ghFetch(url: string, token: string, signal?: AbortSignal): Promise<Response> {
   // 5xx 限流重试一次
   for (let attempt = 0; attempt < 2; attempt++) {
-    const res = await fetch(url, { headers: ghHeaders(token) })
+    const res = await fetch(url, { headers: ghHeaders(token), signal })
     if (res.status >= 500 || res.status === 403) {
       const body = await res.text()
       if (res.status === 403 && body.includes("rate limit") && attempt === 0) {
@@ -87,7 +87,7 @@ async function ghFetch(url: string, token: string): Promise<Response> {
     }
     return res
   }
-  return await fetch(url, { headers: ghHeaders(token) })
+  return await fetch(url, { headers: ghHeaders(token), signal })
 }
 
 // ── 公开 API ──────────────────────────────────────────────────
@@ -95,11 +95,13 @@ async function ghFetch(url: string, token: string): Promise<Response> {
 export async function resolveBranchCommit(
   repo: string,
   branch: string,
-  token: string
+  token: string,
+  signal?: AbortSignal
 ): Promise<{ ok: true; commitSha: string } | RepoReadError> {
   const res = await ghFetch(
     `https://api.github.com/repos/${repo}/branches/${encodeURIComponent(branch)}`,
-    token
+    token,
+    signal
   )
   if (!res.ok) {
     const body = await res.text()
