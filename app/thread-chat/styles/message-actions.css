@@ -1,5 +1,17 @@
 /* ── 消息操作：仅在 .tc 内生效，列与画布共用 ── */
 
+.tc .message-fork-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+.tc .message-fork-actions button:disabled {
+  cursor: wait;
+  opacity: 0.5;
+}
+
 .tc .message-toolbar {
   display: flex;
   align-items: center;
