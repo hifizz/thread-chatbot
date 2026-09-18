@@ -6,6 +6,7 @@ import type {
 } from "@/lib/thread-chat/contracts/dto"
 import type { DocumentListItemDTO } from "@/lib/thread-chat/contracts/document"
 import type { ThreadChatUIMessage } from "@/lib/thread-chat/contracts/ui-message"
+import { DOCUMENT_UNAVAILABLE_FAILURE } from "@/constants/project-documents"
 import {
   isSafeShareUrl,
   sanitizeShareMarkdown,
@@ -318,6 +319,8 @@ function sanitizeReadDocumentPart(part: Part): SanitizedPart | null {
     state: string
     input?: { documentId?: string; revisionId?: string }
     output?: {
+      status?: string
+      code?: string
       document?: { id: string; projectId: string; currentRevisionId: string; title: string }
       revision?: Record<string, unknown> & { content?: string }
       readId?: string
@@ -325,6 +328,10 @@ function sanitizeReadDocumentPart(part: Part): SanitizedPart | null {
     }
   }
   const output = tool.output
+  if (tool.state === "output-available" && output?.status === "error" && output.code === "DOCUMENT_UNAVAILABLE") {
+    return { type: "tool-readProjectDocument", toolCallId: tool.toolCallId, state: "output-available",
+      input: { documentId: "" }, output: { ...DOCUMENT_UNAVAILABLE_FAILURE } }
+  }
   if (tool.state !== "output-available" || !output?.document || !output.revision)
     return null
   return {
@@ -363,7 +370,8 @@ function sanitizeUpdateDocumentPart(part: Part): SanitizedPart | null {
     output?: Record<string, unknown>
   }
   if (tool.state !== "output-available" || !tool.output) return null
-  const output = { ...tool.output }
+  const output: Record<string, unknown> = tool.output.status === "error" && tool.output.code === "DOCUMENT_UNAVAILABLE"
+    ? { ...DOCUMENT_UNAVAILABLE_FAILURE } : { ...tool.output }
   if (typeof output.changeSummary === "string")
     output.changeSummary = sanitizeShareText(output.changeSummary)
   return {

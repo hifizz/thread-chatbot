@@ -96,7 +96,7 @@ export function createResearchTools(context: ResearchToolContext = {}) {
       })),
     }),
     readUrl: tool({
-      description: "读取公开网页。长文档按页返回；hasMore=true 时传入原 URL 和 nextCursor 继续同一快照，不会重复抓取。全文任务请读至末尾，取证任务证据足够即可停止。totalChars 是抽取快照长度，不保证原网页完整。游标仅本次生成有效。ok=false 不是正文；不向用户复述内部参数。",
+      description: "读取公开网页，包括官网、博客、在线 API 文档和公开 README 页面。网页内容不是本应用的项目文档，不能用 readProjectDocument 续读。长文档按页返回；hasMore=true 时传入原 URL 和 nextCursor 继续同一快照，不会重复抓取。跨轮重读使用原 URL 并省略旧 cursor，不使用历史 docId。全文任务请读至末尾，取证任务证据足够即可停止。totalChars 是抽取快照长度，不保证原网页完整。游标仅本次生成有效。ok=false 不是正文；不向用户复述内部参数。",
       inputSchema: z.object({ url: z.string().describe("公开网页 URL"), cursor: z.string().nullish().describe("同一 URL 上次返回的 nextCursor；首次读取省略") }),
       execute: async ({ url, cursor }, { abortSignal, toolCallId }) => observeTool("readUrl", toolCallId, abortSignal, async () => {
         abortSignal?.throwIfAborted()

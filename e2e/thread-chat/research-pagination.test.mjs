@@ -60,7 +60,9 @@ await test("并行同页只抓一次，内容修改不影响快照；取消后�
   const fetchPage = async () => { fetches++; await new Promise((r) => setTimeout(r, 5)); return { url: "https://example.com", content: "A".repeat(20_000) } }
   const [first, second] = await Promise.all([store.read("https://example.com", undefined, undefined, fetchPage), store.read("https://example.com", undefined, undefined, fetchPage)])
   assert.equal(fetches, 1)
-  assert.equal(first.docId, second.docId)
+  assert.equal("docId" in first, false)
+  assert.equal("docId" in second, false)
+  assert.equal(first.fetchedAt, second.fetchedAt)
   const next = await store.read("https://example.com", first.nextCursor, undefined, async () => ({ url: "https://example.com", content: "B" }))
   assert.equal(next.content, "A".repeat(4000))
   await assert.rejects(store.read("https://example.com", undefined, AbortSignal.abort(), fetchPage), { name: "AbortError" })

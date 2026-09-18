@@ -1,21 +1,28 @@
 import type { ArtifactSummaryDTO } from "./dto"
 import { z } from "zod"
-import { DOCUMENT_LIMITS, DOCUMENT_RECEIPT_KIND } from "@/constants/project-documents"
+import { DOCUMENT_LIMITS, DOCUMENT_RECEIPT_KIND, DOCUMENT_UNAVAILABLE_FAILURE } from "@/constants/project-documents"
+
+const projectDocumentIdSchema = z.uuid().describe("本应用项目文档 ID：findProjectDocuments 结果的 id、成功读取的 document.id 或系统项目文档上下文的 documentId。不是 artifactId、revisionId、网页 docId、URL 或仓库路径。")
+export type DocumentToolFailure = typeof DOCUMENT_UNAVAILABLE_FAILURE
 
 export const markdownEditSchema = z.object({
   oldText: z.string().min(1).max(DOCUMENT_LIMITS.contentChars),
   newText: z.string().max(DOCUMENT_LIMITS.contentChars),
 }).strict()
 export const updateDocumentInputSchema = z.object({
-  documentId: z.uuid(), expectedRevisionId: z.uuid(), readId: z.uuid(),
+  documentId: projectDocumentIdSchema,
+  expectedRevisionId: z.uuid().describe("本轮完整读取最新版返回的 revision.id，不是 documentId。"),
+  readId: z.uuid().describe("本轮 readProjectDocument 成功返回的 readId，不得使用旧轮次收据。"),
   edits: z.array(markdownEditSchema).min(1).max(DOCUMENT_LIMITS.edits),
   changeSummary: z.string().trim().min(1).max(DOCUMENT_LIMITS.summaryChars),
 }).strict()
 export const readDocumentInputSchema = z.object({
-  documentId: z.uuid(), revisionId: z.uuid().optional(),
+  documentId: projectDocumentIdSchema,
+  revisionId: z.uuid().optional().describe("仅读取该文档的历史版本时填写；读取最新版或准备修改时省略。不是 documentId。"),
 }).strict()
 export const findDocumentsInputSchema = z.object({
-  query: z.string().max(200).optional(), artifactId: z.uuid().optional(),
+  query: z.string().max(200).optional().describe("本应用内已保存项目文档的标题关键词；省略则列出候选。不是网页搜索词或 URL。"),
+  artifactId: z.uuid().optional().describe("来自本应用 @artifact 引用的 artifactId；本工具将其定位为项目文档。不可直接当作 documentId。"),
 }).strict()
 export type MarkdownEdit = z.infer<typeof markdownEditSchema>
 export type UpdateDocumentInput = z.infer<typeof updateDocumentInputSchema>
