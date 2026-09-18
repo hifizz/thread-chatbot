@@ -1,6 +1,6 @@
 "use client"
 
-import { DOCUMENT_UI_COPY } from "@/constants/project-documents"
+import { DOCUMENT_UI_KEYS } from "@/constants/project-documents"
 
 import React, { useEffect, useId, useMemo, useRef, useState } from "react"
 import {
@@ -33,6 +33,10 @@ import { ProjectPanelSkeleton, ResourceListSkeleton } from "./skeleton"
 import { toViewThreadId } from "../../core/projections"
 import { uploadProjectFile } from "../../net/project-file-upload"
 import { accentOf } from "../../theme"
+import type { Locale } from "@/constants/i18n"
+import { createTranslator } from "@/lib/i18n/dictionary"
+import { useI18n } from "@/lib/i18n/client"
+
 
 export interface ProjectPanelProps {
   project: ProjectDTO | null
@@ -65,10 +69,11 @@ function formatBytes(size: number) {
   return `${(size / (1024 * 1024)).toFixed(1)} MB`
 }
 
-function fileStatusLabel(file: ProjectFileDTO) {
-  if (file.status === "ready") return "可用"
-  if (file.status === "failed") return "失败"
-  return "处理中"
+function fileStatusLabel(file: ProjectFileDTO, locale: Locale) {
+  const t = createTranslator(locale)
+  if (file.status === "ready") return t("ui.ready")
+  if (file.status === "failed") return t("ui.failed")
+  return t("ui.processing")
 }
 
 /**
@@ -97,6 +102,8 @@ export function ProjectPanel({
   documentSyncError,
   threadDepths,
 }: ProjectPanelProps) {
+  const { locale, t } = useI18n()
+
   const titleId = useId()
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const closeButtonRef = useRef<HTMLButtonElement | null>(null)
@@ -203,7 +210,7 @@ export function ProjectPanel({
         onAttachmentCreated: onAddProjectFile,
       })
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "文件上传失败")
+      setError(cause instanceof Error ? cause.message : t("ui.fileUploadFailed"))
     } finally {
       setUploading(false)
       if (fileInputRef.current) fileInputRef.current.value = ""
@@ -213,14 +220,14 @@ export function ProjectPanel({
   const remove = async (file: ProjectFileDTO) => {
     if (!project || archived) return
     const confirmed = window.confirm(
-      `从 Project 中移除「${file.filename}」？历史消息中的附件不会被删除。`
+      t("chat.unlinkFile", { name: file.filename })
     )
     if (!confirmed) return
     setError(null)
     try {
       await onRemoveProjectFile(file.attachmentId)
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "移除文件失败")
+      setError(cause instanceof Error ? cause.message : t("ui.couldNotRemoveTheFile"))
     }
   }
 
@@ -266,14 +273,14 @@ export function ProjectPanel({
         <>
           <div className="art-head project-panel-head">
             <FolderKanban size={16} />
-            <h3 id={titleId}>项目空间</h3>
-            {archived && <span className="project-readonly">只读</span>}
+            <h3 id={titleId}>{t("ui.projectWorkspace")}</h3>
+            {archived && <span className="project-readonly">{t("ui.readOnly")}</span>}
             <button
               ref={closeButtonRef}
               type="button"
               className="art-x"
-              title="收起项目空间"
-              aria-label="收起项目空间"
+              title={t("ui.collapseProjectWorkspace")}
+              aria-label={t("ui.collapseProjectWorkspace")}
               onClick={onClose}
             >
               <X size={13} />
@@ -283,25 +290,24 @@ export function ProjectPanel({
           <div
             className="project-sections"
             role="tablist"
-            aria-label="项目空间"
+            aria-label={t("ui.projectWorkspace")}
           >
             <button
               className={displayedSection === "overview" ? "on" : ""}
               onClick={() => selectSection("overview")}
             >
-              概览
-            </button>
+              {t("ui.overview")}</button>
             <button
               className={displayedSection === "files" ? "on" : ""}
               onClick={() => selectSection("files")}
             >
-              文件 <span>{files.length}</span>
+              {t("ui.file")}<span>{files.length}</span>
             </button>
             <button
               className={displayedSection === "artifacts" ? "on" : ""}
               onClick={() => selectSection("artifacts")}
             >
-              文档与产物 <span>{currentArtifacts.length}</span>
+              {t("ui.documentsAndArtifacts")}<span>{currentArtifacts.length}</span>
             </button>
           </div>
 
@@ -314,7 +320,7 @@ export function ProjectPanel({
 
           <div className="art-body project-panel-body">
             {documentSyncError ? (
-              <p role="status">{DOCUMENT_UI_COPY.syncFailed}</p>
+              <p role="status">{t(DOCUMENT_UI_KEYS.syncFailed)}</p>
             ) : null}
             {loading && displayedSection === "overview" ? (
               <ProjectPanelSkeleton />
@@ -324,16 +330,13 @@ export function ProjectPanel({
               <section className="project-overview">
                 <div className="project-section-heading">
                   <div>
-                    <h4>目标与长期指令</h4>
+                    <h4>{t("ui.goalAndPersistentInstructions")}</h4>
                     <p>
-                      保存后只影响之后启动的生成，不改写历史消息、Artifact 或
-                      Fork Context。
-                    </p>
+                      {t("ui.changesApplyOnlyToNewGenerations")}</p>
                   </div>
                   {!archived && !editing && project && (
                     <button className="project-secondary" onClick={beginEdit}>
-                      <Pencil size={12} /> 编辑
-                    </button>
+                      <Pencil size={12} /> {t("chat.edit")}</button>
                   )}
                 </div>
 
@@ -344,12 +347,12 @@ export function ProjectPanel({
                       value={targetDraft}
                       maxLength={PROJECT_TARGET_MAX_CHARS}
                       onChange={(event) => setTargetDraft(event.target.value)}
-                      placeholder="这个 Project 最终希望达成什么？"
+                      placeholder={t("ui.whatShouldThisProjectAccomplish")}
                       rows={5}
                     />
                   ) : (
                     <div className="project-read-value">
-                      {project?.target || "尚未设置 Target。"}
+                      {project?.target || t("ui.noGoalSetYet")}
                     </div>
                   )}
                   {editing && (
@@ -368,12 +371,12 @@ export function ProjectPanel({
                       onChange={(event) =>
                         setInstructionsDraft(event.target.value)
                       }
-                      placeholder="模型在这个 Project 中应持续遵循哪些工作方式、约束和偏好？"
+                      placeholder={t("ui.whatWorkingStyleConstraintsAndPreferences")}
                       rows={10}
                     />
                   ) : (
                     <div className="project-read-value project-instructions-value">
-                      {project?.instructions || "尚未设置 Instructions。"}
+                      {project?.instructions || t("ui.noInstructionsSetYet")}
                     </div>
                   )}
                   {editing && (
@@ -391,14 +394,13 @@ export function ProjectPanel({
                       disabled={saving}
                       onClick={cancelEdit}
                     >
-                      取消
-                    </button>
+                      {t("common.cancel")}</button>
                     <button
                       className="project-primary"
                       disabled={saving}
                       onClick={() => void saveContract()}
                     >
-                      {saving ? "保存中…" : "保存 Contract"}
+                      {saving ? t("ui.saving") : t("ui.saveProjectContext")}
                     </button>
                   </div>
                 )}
@@ -409,11 +411,9 @@ export function ProjectPanel({
               <section className="project-files">
                 <div className="project-section-heading">
                   <div>
-                    <h4>跨 Thread 可用的原始资料</h4>
+                    <h4>{t("ui.sourceMaterialSharedAcrossThreads")}</h4>
                     <p>
-                      Ready 文件会在统一预算内参与未来生成；移除只解除 Project
-                      成员关系。
-                    </p>
+                      {t("ui.readyFilesMayBeIncludedIn")}</p>
                   </div>
                   {!archived && project && (
                     <>
@@ -433,7 +433,7 @@ export function ProjectPanel({
                         onClick={() => fileInputRef.current?.click()}
                       >
                         <Upload size={12} />{" "}
-                        {uploading ? "上传中…" : "上传文件"}
+                        {uploading ? t("ui.uploading") : t("ui.uploadFile")}
                       </button>
                     </>
                   )}
@@ -444,11 +444,9 @@ export function ProjectPanel({
                 ) : sortedFiles.length === 0 ? (
                   <div className="project-empty">
                     <Paperclip size={18} />
-                    <strong>还没有 Project File</strong>
+                    <strong>{t("ui.noProjectFilesYet")}</strong>
                     <span>
-                      上传资料后，同一 Project 的所有 Thread
-                      都可以在后续生成中使用它。
-                    </span>
+                      {t("ui.afterUploadingAllThreadsInThis")}</span>
                   </div>
                 ) : (
                   <div className="project-resource-list">
@@ -464,13 +462,13 @@ export function ProjectPanel({
                           <div className="project-resource-title-row">
                             <strong title={file.filename}>{file.filename}</strong>
                             <span className={`project-status ${file.status}`}>
-                              {fileStatusLabel(file)}
+                              {fileStatusLabel(file, locale)}
                             </span>
                           </div>
                           <div className="project-resource-meta">
                             {file.mimeType} · {formatBytes(file.size)}
-                            {file.pageCount ? ` · ${file.pageCount} 页` : ""}
-                            {` · 加入于 ${formatDate(file.addedAt)}`}
+                            {file.pageCount ? t("chat.pageCount", { count: file.pageCount }) : ""}
+                            {` · ${t("common.addedAt", { time: formatDate(file.addedAt, locale) })}`}
                           </div>
                           {file.summary && <p>{file.summary}</p>}
                           {file.error && (
@@ -483,14 +481,14 @@ export function ProjectPanel({
                             href={file.url}
                             target="_blank"
                             rel="noreferrer"
-                            title="打开文件"
+                            title={t("ui.openFile")}
                           >
                             <ExternalLink size={13} />
                           </a>
                           {!archived && (
                             <button
                               className="project-icon-button danger"
-                              title="从 Project 移除"
+                              title={t("ui.removeFromProject")}
                               onClick={() => void remove(file)}
                             >
                               <Trash2 size={13} />
@@ -508,11 +506,9 @@ export function ProjectPanel({
               <section className="project-artifacts">
                 <div className="project-section-heading">
                   <div>
-                    <h4>整个 Project 的持久化成果</h4>
+                    <h4>{t("ui.savedResultsAcrossTheProject")}</h4>
                     <p>
-                      包含根 Thread 和所有 Fork 产生的
-                      Artifact；仅发现与查看，不会自动注入无关 Thread。
-                    </p>
+                      {t("ui.artifactsFromTheMainThreadAnd")}</p>
                   </div>
                 </div>
                 <label className="project-search">
@@ -520,7 +516,7 @@ export function ProjectPanel({
                   <input
                     value={artifactQuery}
                     onChange={(event) => setArtifactQuery(event.target.value)}
-                    placeholder="搜索标题、类型或来源 Thread"
+                    placeholder={t("ui.searchByTitleTypeOrSource")}
                   />
                 </label>
                 {loading ? (
@@ -528,11 +524,9 @@ export function ProjectPanel({
                 ) : sortedArtifacts.length === 0 ? (
                   <div className="project-empty">
                     <FileText size={18} />
-                    <strong>还没有 Artifact</strong>
+                    <strong>{t("ui.noArtifactsYet")}</strong>
                     <span>
-                      在任意 Thread 中生成 Markdown、Code 或 Note
-                      后会出现在这里。
-                    </span>
+                      {t("ui.markdownCodeAndNotesGeneratedIn")}</span>
                   </div>
                 ) : (
                   <div className="project-resource-list">
@@ -546,7 +540,7 @@ export function ProjectPanel({
                           lang: artifact.language ?? undefined,
                           content: null,
                         }}
-                        caption={artifactCaption(artifact)}
+                        caption={artifactCaption(artifact, locale)}
                         sourceDepth={threadDepths?.[artifact.threadId] ?? null}
                         onOpen={onSelect}
                         fill

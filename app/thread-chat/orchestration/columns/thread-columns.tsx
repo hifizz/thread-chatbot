@@ -17,6 +17,8 @@ import type { Thread, ThreadTreeState } from "../../core/types"
 import { accentOf } from "../../theme"
 import type { Slot } from "./placement"
 import { useColumnResize, type ColumnResizeHandlers } from "./use-column-resize"
+import { useI18n } from "@/lib/i18n/client"
+
 
 /* ---------------- 列容器组件 ---------------- */
 
@@ -62,13 +64,15 @@ function ColumnResizer({
   label: string
   rz: ColumnResizeHandlers
 }) {
+  const { t } = useI18n()
+
   return (
     <div
       className="col-resizer"
       role="separator"
       aria-orientation="vertical"
       aria-label={label}
-      title="拖动调整两侧列宽 · 双击恢复均分（聚焦后 ←/→ 微调）"
+      title={t("ui.dragToResizeColumnsDoubleClick")}
       tabIndex={0}
       onPointerDown={(e) => rz.onPointerDown(e, leftId, rightId)}
       onPointerMove={rz.onPointerMove}
@@ -88,12 +92,13 @@ function FoldedStrip({
   thread: Thread
   onClick: () => void
 }) {
+  const { t } = useI18n()
   return (
     <button
       className="col-strip tc-accent-context"
       data-thread-id={thread.id}
       style={{ "--tc-accent": accentOf(thread) } as React.CSSProperties}
-      title={`「${thread.title}」已折叠为细条 · 点击原地展开`}
+      title={t("chat.foldedNamed", { title: thread.title })}
       onClick={onClick}
     >
       {thread.footnote !== null && (
@@ -132,6 +137,7 @@ export function ThreadColumns({
   onCommitWidths,
   onResetWidths,
 }: ThreadColumnsProps) {
+  const { t } = useI18n()
   const rz = useColumnResize({
     colsRef,
     hasWidth: (id) => widths[id] !== undefined,
@@ -157,7 +163,7 @@ export function ThreadColumns({
           key={`rz:${prev.thread.id}:${c.thread.id}`}
           leftId={prev.thread.id}
           rightId={c.thread.id}
-          label={`调整「${prev.thread.title}」与「${c.thread.title}」的列宽`}
+          label={t("chat.resizeNamed", { left: prev.thread.title, right: c.thread.title })}
           rz={rz}
         />
       )

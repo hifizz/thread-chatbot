@@ -17,6 +17,8 @@ import {
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
 } from "@/components/ui/dropdown-menu"
+import { useI18n } from "@/lib/i18n/client"
+
 
 /**
  * thread-chat 顶栏的账户入口：
@@ -30,6 +32,8 @@ import {
  * 内联登录/个人资料/退出登录，样式与其他 MenuItem 对齐。
  */
 export function AccountMenuRow() {
+  const { t } = useI18n()
+
   const router = useRouter()
   const { data: session, isPending } = useSession()
 
@@ -43,8 +47,7 @@ export function AccountMenuRow() {
     return (
       <DropdownMenuItem render={<Link href={`/sign-in?redirect=${encodeURIComponent(from)}`} />}>
         <CircleUserRound size={16} />
-        登录
-      </DropdownMenuItem>
+        {t("common.signIn")}</DropdownMenuItem>
     )
   }
 
@@ -74,17 +77,17 @@ export function AccountMenuRow() {
       </DropdownMenuSubTrigger>
       <DropdownMenuSubContent>
         <DropdownMenuItem render={<Link href="/account" />}>
-          个人资料
-        </DropdownMenuItem>
+          {t("ui.profile")}</DropdownMenuItem>
         <DropdownMenuItem variant="destructive" onClick={handleSignOut}>
-          退出登录
-        </DropdownMenuItem>
+          {t("common.signOut")}</DropdownMenuItem>
       </DropdownMenuSubContent>
     </DropdownMenuSub>
   )
 }
 
 export function AccountButton() {
+  const { t } = useI18n()
+
   const router = useRouter()
   const { data: session, isPending } = useSession()
 
@@ -100,11 +103,10 @@ export function AccountButton() {
       <Link
         className="tbtn"
         href={`/sign-in?redirect=${encodeURIComponent(from)}`}
-        title="登录以使用对话"
+        title={t("ui.signInToChat")}
       >
         <CircleUserRound size={13} />
-        登录
-      </Link>
+        {t("common.signIn")}</Link>
     )
   }
 
@@ -142,11 +144,9 @@ export function AccountButton() {
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuItem render={<Link href="/account" />}>
-          个人资料
-        </DropdownMenuItem>
+          {t("ui.profile")}</DropdownMenuItem>
         <DropdownMenuItem variant="destructive" onClick={handleSignOut}>
-          退出登录
-        </DropdownMenuItem>
+          {t("common.signOut")}</DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   )

@@ -1,3 +1,4 @@
+import { useI18n } from "@/lib/i18n/client"
 import { createElement, type ReactNode, type MouseEvent } from "react"
 import { $applyNodeReplacement, $createTextNode, $getNodeByKey, DecoratorNode, type LexicalEditor, type NodeKey, type SerializedLexicalNode } from "lexical"
 import { messageContentPartInputSchema } from "@/lib/thread-chat/contracts/message-content"
@@ -8,7 +9,9 @@ type CapsulePart = Exclude<ComposerMessagePartDraft, { type: "text" }>
 type SerializedCapsule = SerializedLexicalNode & { part: CapsulePart; label: string }
 
 function CapsuleContent({ part, label, editor, nodeKey }: { part: CapsulePart; label: string; editor: LexicalEditor; nodeKey: NodeKey }) {
+  const { t } = useI18n()
   const openArtifact = useArtifactNavigation()
+  const displayLabel = part.type === "quote" ? `${t("ui.quote")} ${part.quote.text.slice(0, 40)}` : part.type === "file" ? `${t("ui.attachment")} · ${part.file.filename ?? t("ui.file")}` : label
   const onMouseDown = (event: MouseEvent<HTMLElement>) => {
     if (event.button !== 0 || !editor.isEditable()) return
     event.preventDefault()
@@ -16,11 +19,11 @@ function CapsuleContent({ part, label, editor, nodeKey }: { part: CapsulePart; l
     editor.update(() => { $getNodeByKey(nodeKey)?.selectNext() })
   }
   if (part.type === "artifact-reference") return createElement("button", {
-    type: "button", className: "composer-capsule-action", title: `预览 ${label}`,
+    type: "button", className: "composer-capsule-action", title: t("common.previewNamed", { name: label }),
     disabled: !openArtifact, onMouseDown,
     onClick: () => openArtifact?.(part.artifactId),
-  }, label)
-  return createElement("span", { title: part.type === "quote" ? part.quote.text : label, onMouseDown }, label)
+  }, displayLabel)
+  return createElement("span", { title: part.type === "quote" ? part.quote.text : label, onMouseDown }, displayLabel)
 }
 
 /** 官方行内 DecoratorNode：Lexical 将其设为不可编辑，光标只在胶囊两侧移动。 */

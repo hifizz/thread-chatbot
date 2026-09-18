@@ -1,5 +1,7 @@
 "use client"
 
+import { localizeError } from "@/lib/i18n/errors"
+import { useI18n } from "@/lib/i18n/client"
 import { useState } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
@@ -17,6 +19,7 @@ import {
 } from "@/components/ui/card"
 
 export function ResetPasswordForm() {
+  const { locale, t } = useI18n()
   const router = useRouter()
   const params = useSearchParams()
   // better-auth 重置链接回跳时带 token（也可能带 error=invalid_token）
@@ -35,13 +38,13 @@ export function ResetPasswordForm() {
         token,
       })
       if (res.error) {
-        toast.error(res.error.message || "重置失败，链接可能已失效")
+        toast.error(localizeError(locale, res.error))
         return
       }
-      toast.success("密码已重置，请用新密码登录")
+      toast.success(t("auth.resetSuccess"))
       router.push("/sign-in")
     } catch {
-      toast.error("网络错误，请稍后重试")
+      toast.error(t("errors.network"))
     } finally {
       setLoading(false)
     }
@@ -52,18 +55,18 @@ export function ResetPasswordForm() {
   return (
     <Card className="w-full max-w-sm">
       <CardHeader>
-        <CardTitle>设置新密码</CardTitle>
+        <CardTitle>{t("auth.newPasswordTitle")}</CardTitle>
         <CardDescription>
           {invalid
-            ? "链接无效或已过期，请重新发起找回密码。"
-            : "输入新的登录密码。"}
+            ? t("auth.invalidReset")
+            : t("auth.resetDescription")}
         </CardDescription>
       </CardHeader>
       <CardContent>
         {!invalid && (
           <form onSubmit={onSubmit} className="flex flex-col gap-4">
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="password">新密码</Label>
+              <Label htmlFor="password">{t("auth.newPassword")}</Label>
               <Input
                 id="password"
                 type="password"
@@ -71,12 +74,12 @@ export function ResetPasswordForm() {
                 minLength={8}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="至少 8 位"
+                placeholder={t("auth.passwordPlaceholder")}
                 autoComplete="new-password"
               />
             </div>
             <Button type="submit" disabled={loading} className="mt-1 w-full">
-              {loading ? "提交中…" : "重置密码"}
+              {loading ? t("auth.submitting") : t("email.resetAction")}
             </Button>
           </form>
         )}
@@ -85,7 +88,7 @@ export function ResetPasswordForm() {
             href={invalid ? "/forgot-password" : "/sign-in"}
             className="font-medium text-foreground underline underline-offset-4"
           >
-            {invalid ? "重新找回密码" : "返回登录"}
+            {invalid ? t("auth.resendReset") : t("auth.backSignIn")}
           </Link>
         </p>
       </CardContent>

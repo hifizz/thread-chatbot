@@ -46,3 +46,6 @@ e2e/thread-chat/shots/
 
 .local-backups
 .devtools
+
+# Browser and integration test output
+/test-results/

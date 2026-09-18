@@ -5,6 +5,8 @@ import {
   workspaceToastDuration,
   type WorkspaceToastState,
 } from "./workspace-toast-logic"
+import { useI18n } from "@/lib/i18n/client"
+
 
 export function useWorkspaceToast() {
   const [toast, setToast] = useState<WorkspaceToastState | null>(null)
@@ -32,6 +34,8 @@ export function WorkspaceToast({
   toast: WorkspaceToastState | null
   onDismiss(): void
 }) {
+  const { t } = useI18n()
+
   return (
     <div className={`toast ${toast ? "show" : ""}`}>
       <span>{toast?.message}</span>
@@ -43,8 +47,7 @@ export function WorkspaceToast({
             onDismiss()
           }}
         >
-          撤销
-        </button>
+          {t("admin.revoke")}</button>
       )}
     </div>
   )

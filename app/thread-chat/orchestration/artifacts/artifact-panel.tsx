@@ -11,23 +11,21 @@ import { MarkdownBody } from "../../chat/message/markdown-body"
 import { toViewThreadId } from "../../core/projections"
 import { ArtifactPreviewActions } from "./artifact-preview-actions"
 import { ArtifactBodySkeleton } from "./skeleton"
+import { DEFAULT_LOCALE, type Locale } from "@/constants/i18n"
+import { createTranslator, formatTimestamp } from "@/lib/i18n/dictionary"
+import { useI18n } from "@/lib/i18n/client"
 
-export function formatDate(value: string) {
-  return new Intl.DateTimeFormat("zh-CN", {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(value))
+
+export function formatDate(value: string, locale: Locale = DEFAULT_LOCALE) {
+  return formatTimestamp(locale, value)
 }
 
-export function sourceStatusLabel(
-  status: ArtifactSummaryDTO["sourceMessageStatus"]
-) {
-  if (status === "completed") return "已完成"
-  if (status === "stopped") return "已停止"
-  if (status === "failed") return "失败"
-  return "生成中"
+export function sourceStatusLabel(status: ArtifactSummaryDTO["sourceMessageStatus"], locale: Locale = DEFAULT_LOCALE) {
+  const t = createTranslator(locale)
+  if (status === "completed") return t("ui.completed")
+  if (status === "stopped") return t("ui.stopped")
+  if (status === "failed") return t("ui.failed")
+  return t("ui.generating")
 }
 
 export function artifactKindLabel(kind: ArtifactSummaryDTO["kind"]) {
@@ -45,14 +43,15 @@ function artifactKindBadge(artifact: ArtifactSummaryDTO) {
 }
 
 /** 目录卡片副标题：类型 · 版本 · 来源 Thread · 状态 · 时间，一行截断。 */
-export function artifactCaption(artifact: ArtifactSummaryDTO) {
+export function artifactCaption(artifact: ArtifactSummaryDTO, locale: Locale = DEFAULT_LOCALE) {
+  const t = createTranslator(locale)
   const parts = [artifactKindLabel(artifact.kind)]
   if (artifact.document) parts.push(`V${artifact.document.revisionNumber}`)
-  parts.push(artifact.sourceThreadTitle ?? "未命名 Thread")
+  parts.push(artifact.sourceThreadTitle ?? t("ui.untitledThread"))
   if (artifact.sourceThreadFootnote !== null)
-    parts.push(`脚注 ${artifact.sourceThreadFootnote}`)
-  parts.push(sourceStatusLabel(artifact.sourceMessageStatus))
-  parts.push(formatDate(artifact.createdAt))
+    parts.push(t("common.footnote", { number: artifact.sourceThreadFootnote }))
+  parts.push(sourceStatusLabel(artifact.sourceMessageStatus, locale))
+  parts.push(formatDate(artifact.createdAt, locale))
   return parts.join(" · ")
 }
 
@@ -89,6 +88,8 @@ export function ArtifactPanel({
   accent,
   renderDocumentControls,
 }: ArtifactPanelProps) {
+  const { locale, t } = useI18n()
+
   const selected =
     artifact && content !== undefined ? { ...artifact, content } : null
   const status = artifact ? artifact.sourceMessageStatus : null
@@ -99,8 +100,8 @@ export function ArtifactPanel({
         <button
           type="button"
           className="artifact-back"
-          aria-label="返回文档列表"
-          title="返回文档列表"
+          aria-label={t("ui.backToDocuments")}
+          title={t("ui.backToDocuments")}
           onClick={onBack}
         >
           <ArrowLeft size={18} />
@@ -108,7 +109,7 @@ export function ArtifactPanel({
         <div className="artifact-heading">
           <div className="artifact-title-line">
             <h3 id={titleId} title={artifact?.title}>
-              {artifact?.title ?? "文档"}
+              {artifact?.title ?? t("ui.document")}
             </h3>
             {artifact && (
               <span className="artifact-kind">
@@ -122,18 +123,18 @@ export function ArtifactPanel({
               <button
                 type="button"
                 className="artifact-meta-source"
-                title={`定位来源：${artifact.sourceThreadTitle ?? "未命名 Thread"}`}
+                title={t("chat.locateSource", { title: artifact.sourceThreadTitle ?? t("ui.untitledThread") })}
                 onClick={onLocate}
               >
                 <LocateFixed size={11} />
-                <span>{artifact.sourceThreadTitle ?? "未命名 Thread"}</span>
+                <span>{artifact.sourceThreadTitle ?? t("ui.untitledThread")}</span>
               </button>
               <time dateTime={artifact.createdAt}>
-                {formatDate(artifact.createdAt)}
+                {formatDate(artifact.createdAt, locale)}
               </time>
               {status && status !== "completed" && (
                 <span className={`artifact-meta-status ${status}`}>
-                  {sourceStatusLabel(status)}
+                  {sourceStatusLabel(status, locale)}
                 </span>
               )}
             </div>
@@ -149,8 +150,8 @@ export function ArtifactPanel({
         <button
           type="button"
           className="art-x"
-          title="关闭文档"
-          aria-label="关闭文档"
+          title={t("ui.closeDocument")}
+          aria-label={t("ui.closeDocument")}
           onClick={onClose}
         >
           <X size={13} />
@@ -191,10 +192,8 @@ export function ArtifactPanel({
           </div>
         ) : loadError ? (
           <p role="alert">
-            文档加载失败。
-            <button type="button" onClick={onRetry}>
-              重新加载
-            </button>
+            {t("ui.couldNotLoadTheDocument")}<button type="button" onClick={onRetry}>
+              {t("ui.reload")}</button>
           </p>
         ) : (
           <ArtifactBodySkeleton />

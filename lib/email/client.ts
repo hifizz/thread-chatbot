@@ -18,7 +18,7 @@ export function isEmailConfigured(): boolean {
   return Boolean(API_KEY)
 }
 
-export type SendEmailInput = { to: string; subject: string; html: string }
+export type SendEmailInput = { to: string; subject: string; html: string; text?: string }
 
 /** 发送邮件。未配置时抛错（调用方应先判断 isEmailConfigured 或允许失败）。 */
 export async function sendEmail(input: SendEmailInput): Promise<void> {
@@ -29,6 +29,7 @@ export async function sendEmail(input: SendEmailInput): Promise<void> {
     to: input.to,
     subject: input.subject,
     html: input.html,
+    ...(input.text ? { text: input.text } : {}),
   })
   if (error) throw new Error(`发送邮件失败：${error.message}`)
 }

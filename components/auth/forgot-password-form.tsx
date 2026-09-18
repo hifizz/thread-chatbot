@@ -1,5 +1,7 @@
 "use client"
 
+import { localizeError } from "@/lib/i18n/errors"
+import { useI18n } from "@/lib/i18n/client"
 import { useState } from "react"
 import Link from "next/link"
 import { toast } from "sonner"
@@ -16,6 +18,7 @@ import {
 } from "@/components/ui/card"
 
 export function ForgotPasswordForm() {
+  const { locale, t } = useI18n()
   const [email, setEmail] = useState("")
   const [loading, setLoading] = useState(false)
   const [sent, setSent] = useState(false)
@@ -29,13 +32,13 @@ export function ForgotPasswordForm() {
         redirectTo: "/reset-password",
       })
       if (res.error) {
-        toast.error(res.error.message || "发送失败，请重试")
+        toast.error(localizeError(locale, res.error))
         return
       }
       // 不泄露邮箱是否存在：统一显示已发送
       setSent(true)
     } catch {
-      toast.error("网络错误，请稍后重试")
+      toast.error(t("errors.network"))
     } finally {
       setLoading(false)
     }
@@ -44,18 +47,18 @@ export function ForgotPasswordForm() {
   return (
     <Card className="w-full max-w-sm">
       <CardHeader>
-        <CardTitle>找回密码</CardTitle>
+        <CardTitle>{t("auth.recoverTitle")}</CardTitle>
         <CardDescription>
           {sent
-            ? `若 ${email} 已注册，我们已发送重置密码链接，请查收邮件。`
-            : "输入注册邮箱，我们会发送重置密码的链接。"}
+            ? t("auth.recoverSent", { email })
+            : t("auth.recoverDescription")}
         </CardDescription>
       </CardHeader>
       <CardContent>
         {!sent && (
           <form onSubmit={onSubmit} className="flex flex-col gap-4">
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="email">邮箱</Label>
+              <Label htmlFor="email">{t("common.email")}</Label>
               <Input
                 id="email"
                 type="email"
@@ -67,7 +70,7 @@ export function ForgotPasswordForm() {
               />
             </div>
             <Button type="submit" disabled={loading} className="mt-1 w-full">
-              {loading ? "发送中…" : "发送重置链接"}
+              {loading ? t("auth.sending") : t("auth.sendReset")}
             </Button>
           </form>
         )}
@@ -76,8 +79,7 @@ export function ForgotPasswordForm() {
             href="/sign-in"
             className="font-medium text-foreground underline underline-offset-4"
           >
-            返回登录
-          </Link>
+            {t("auth.backSignIn")}</Link>
         </p>
       </CardContent>
     </Card>

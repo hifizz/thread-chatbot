@@ -15,6 +15,8 @@ import {
   hasCompletedAssistantActions,
   type MessageActionViewState,
 } from "../actions/message-action-types"
+import { useI18n } from "@/lib/i18n/client"
+
 
 /** 把换行转成 br；默认 assistant 正文用它保留段内换行。 */
 function withBreaks(text: string, keyBase: string): React.ReactNode[] {
@@ -72,13 +74,15 @@ export function ConversationMessage({
   editableUserMessageId,
   regeneratableAssistantMessageId,
 }: ConversationMessageProps) {
+  const { t } = useI18n()
+
   const presentation = assistantMessagePresentation(message)
   const regeneratable = message.id === regeneratableAssistantMessageId
 
   return (
     <div className={`message ${message.role}`} data-msg-id={message.id}>
       {showRoleLabel && (
-        <div className="who">{message.role === "user" ? "你" : "AI"}</div>
+        <div className="who">{message.role === "user" ? t("ui.you2") : "AI"}</div>
       )}
       {message.role === "user" ? (
         messageCommands ? (
@@ -110,7 +114,7 @@ export function ConversationMessage({
                   aria-label={
                     message.backgroundGeneration
                       ? GENERATION_BACKGROUND_LABEL
-                      : "正在生成回复"
+                      : t("ui.generatingReply")
                   }
                 >
                   <i />
@@ -124,7 +128,7 @@ export function ConversationMessage({
                     <span
                       className="typing typing-inline"
                       role="status"
-                      aria-label="正在生成回复"
+                      aria-label={t("ui.generatingReply")}
                     >
                       <i />
                       <i />
@@ -138,11 +142,10 @@ export function ConversationMessage({
           )}
           {message.status === "error" && (
             <div className="msg-error">
-              {message.error ?? "生成失败"}
+              {message.error ?? t("ui.generationFailed")}
               {regeneratable && onRetry && (
                 <button className="retry" onClick={() => onRetry(message)}>
-                  重试
-                </button>
+                  {t("common.retry")}</button>
               )}
             </div>
           )}
@@ -151,8 +154,7 @@ export function ConversationMessage({
               <span>{GENERATION_STOPPED_LABEL}</span>
               {regeneratable && onRetry && (
                 <button className="retry" onClick={() => onRetry(message)}>
-                  重试
-                </button>
+                  {t("common.retry")}</button>
               )}
             </div>
           )}

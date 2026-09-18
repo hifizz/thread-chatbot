@@ -1,7 +1,6 @@
 import { Suspense } from "react"
 import Link from "next/link"
 import { redirect } from "next/navigation"
-import { format } from "date-fns"
 import { ArrowLeftIcon } from "lucide-react"
 import { getSession } from "@/lib/auth/server"
 import { getAccountData } from "@/lib/billing/account"
@@ -11,7 +10,6 @@ import {
   subscriptionPlanName,
 } from "@/constants/creem"
 import { isCreemConfigured } from "@/lib/payments/creem"
-import { formatYuan } from "@/constants/pricing"
 import { getChatModel } from "@/constants/model"
 import {
   Card,
@@ -23,28 +21,35 @@ import {
 import { Button } from "@/components/ui/button"
 import { TopupPacks } from "@/components/account/topup-packs"
 import { TopupResultToast } from "@/components/account/topup-result-toast"
+import { getRequestLocale } from "@/lib/i18n/server"
+import { createTranslator, formatCredit, formatTimestamp } from "@/lib/i18n/dictionary"
+import { LanguageSwitcher } from "@/components/i18n/language-switcher"
+import { PrivacySettingsButton } from "@/components/privacy/consent-controls"
 
+
+export default async function AccountPage() {
+  const locale = await getRequestLocale()
+  const t = createTranslator(locale)
+  const fmtTime = (value: string | null) => formatTimestamp(locale, value)
+  const formatYuan = (micros: number, digits = 2) => formatCredit(locale, micros, digits)
 const PAYMENT_STATUS: Record<string, string> = {
-  paid: "已到账",
-  pending: "处理中",
-  failed: "失败",
-  refunded: "已退款",
+  paid: t("ui.credited"),
+  pending: t("ui.processing"),
+  failed: t("ui.failed"),
+  refunded: t("ui.refunded"),
 }
 
 const SUB_STATUS: Record<string, string> = {
-  active: "生效中",
-  trialing: "试用中",
-  canceled: "已取消",
-  past_due: "逾期",
-  expired: "已过期",
-  paused: "已暂停",
+  active: t("ui.active"),
+  trialing: t("ui.trial"),
+  canceled: t("ui.canceled"),
+  past_due: t("ui.pastDue"),
+  expired: t("ui.expired"),
+  paused: t("ui.paused"),
 }
 
-function fmtTime(iso: string | null): string {
-  return iso ? format(new Date(iso), "yyyy-MM-dd HH:mm") : "—"
-}
 
-export default async function AccountPage() {
+
   const session = await getSession()
   if (!session) redirect("/sign-in?redirect=/account")
 
@@ -55,7 +60,7 @@ export default async function AccountPage() {
     id: p.id,
     name: p.name,
     priceLabel: p.priceLabel,
-    creditLabel: `${formatYuan(p.creditMicros, 0)} 额度`,
+    creditLabel: t("billing.creditValue", { value: formatYuan(p.creditMicros, 0) }),
     bonusLabel: p.bonusLabel,
     available: isTopupPackAvailable(p),
   }))
@@ -74,30 +79,32 @@ export default async function AccountPage() {
             className="size-8"
             // 渲染成链接（<a>）而非原生 <button>，需关掉 nativeButton 以符合 Base UI 语义
             nativeButton={false}
-            render={<Link href="/" aria-label="返回对话" />}
+            render={<Link href="/" aria-label={t("ui.backToChat")} />}
           >
             <ArrowLeftIcon className="size-4" />
           </Button>
           <div>
-            <h1 className="text-lg font-semibold">账户与计费</h1>
+            <h1 className="text-lg font-semibold">{t("billing.title")}</h1>
             <p className="text-sm text-muted-foreground">
               {session.user.name || session.user.email}
             </p>
           </div>
         </div>
 
+        <LanguageSwitcher />
+
         {/* 余额 */}
         <Card>
           <CardHeader>
-            <CardDescription>当前余额</CardDescription>
+            <CardDescription>{t("billing.balance")}</CardDescription>
             <CardTitle className="text-3xl tabular-nums">
               {formatYuan(data.balanceMicros, 2)}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex gap-6 text-sm text-muted-foreground tabular-nums">
-              <span>累计充值 {formatYuan(data.totalToppedUpMicros, 2)}</span>
-              <span>累计消耗 {formatYuan(data.totalSpentMicros, 2)}</span>
+              <span>{t("ui.totalAdded")}{formatYuan(data.totalToppedUpMicros, 2)}</span>
+              <span>{t("billing.used")}{formatYuan(data.totalSpentMicros, 2)}</span>
             </div>
           </CardContent>
         </Card>
@@ -105,10 +112,9 @@ export default async function AccountPage() {
         {/* 充值 */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">充值</CardTitle>
+            <CardTitle className="text-base">{t("ui.topUp")}</CardTitle>
             <CardDescription>
-              选择充值包，通过 Creem 安全支付，到账后自动增加余额。
-            </CardDescription>
+              {t("ui.chooseACreditPackAndPay")}</CardDescription>
           </CardHeader>
           <CardContent>
             <TopupPacks packs={packs} creemConfigured={creemConfigured} />
@@ -118,7 +124,7 @@ export default async function AccountPage() {
         {/* 订阅 */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">订阅</CardTitle>
+            <CardTitle className="text-base">{t("ui.subscription")}</CardTitle>
           </CardHeader>
           <CardContent>
             {data.subscription ? (
@@ -126,7 +132,7 @@ export default async function AccountPage() {
                 <div className="flex items-center gap-2">
                   <span className="font-medium">
                     {subscriptionPlanName(data.subscription.productId) ??
-                      "订阅计划"}
+                      t("ui.subscriptionPlan")}
                   </span>
                   <span className="rounded-full bg-secondary px-2 py-0.5 text-xs text-secondary-foreground">
                     {SUB_STATUS[data.subscription.status] ??
@@ -134,11 +140,11 @@ export default async function AccountPage() {
                   </span>
                 </div>
                 <span className="text-xs text-muted-foreground">
-                  当前周期至 {fmtTime(data.subscription.currentPeriodEnd)}
+                  {t("ui.currentPeriodEnds")}{fmtTime(data.subscription.currentPeriodEnd)}
                 </span>
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground">暂无订阅。</p>
+              <p className="text-sm text-muted-foreground">{t("ui.noSubscriptionYet")}</p>
             )}
           </CardContent>
         </Card>
@@ -146,21 +152,21 @@ export default async function AccountPage() {
         {/* 充值记录 */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">充值记录</CardTitle>
+            <CardTitle className="text-base">{t("ui.paymentHistory")}</CardTitle>
           </CardHeader>
           <CardContent>
             {data.payments.length === 0 ? (
-              <p className="text-sm text-muted-foreground">暂无充值记录。</p>
+              <p className="text-sm text-muted-foreground">{t("ui.noPaymentsYet")}</p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead className="text-xs text-muted-foreground">
                     <tr className="border-b border-border/60 text-left">
-                      <th className="py-2 font-normal">时间</th>
-                      <th className="py-2 font-normal">类型</th>
-                      <th className="py-2 font-normal">金额</th>
-                      <th className="py-2 text-right font-normal">到账额度</th>
-                      <th className="py-2 text-right font-normal">状态</th>
+                      <th className="py-2 font-normal">{t("common.time")}</th>
+                      <th className="py-2 font-normal">{t("common.type")}</th>
+                      <th className="py-2 font-normal">{t("common.amount")}</th>
+                      <th className="py-2 text-right font-normal">{t("ui.creditAdded")}</th>
+                      <th className="py-2 text-right font-normal">{t("common.status")}</th>
                     </tr>
                   </thead>
                   <tbody className="tabular-nums">
@@ -173,7 +179,7 @@ export default async function AccountPage() {
                           {fmtTime(p.paidAt ?? p.createdAt)}
                         </td>
                         <td className="py-2">
-                          {p.type === "topup" ? "充值" : "订阅"}
+                          {p.type === "topup" ? t("ui.topUp") : t("ui.subscription")}
                         </td>
                         <td className="py-2">{p.priceLabel ?? "—"}</td>
                         <td className="py-2 text-right">
@@ -194,22 +200,22 @@ export default async function AccountPage() {
         {/* 消耗记录 */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">消耗记录</CardTitle>
-            <CardDescription>最近 20 条按 token 计费的调用。</CardDescription>
+            <CardTitle className="text-base">{t("ui.usageHistory")}</CardTitle>
+            <CardDescription>{t("ui.the20MostRecentTokenBilled")}</CardDescription>
           </CardHeader>
           <CardContent>
             {data.usage.length === 0 ? (
-              <p className="text-sm text-muted-foreground">暂无消耗记录。</p>
+              <p className="text-sm text-muted-foreground">{t("ui.noUsageYet")}</p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead className="text-xs text-muted-foreground">
                     <tr className="border-b border-border/60 text-left">
-                      <th className="py-2 font-normal">时间</th>
-                      <th className="py-2 font-normal">模型</th>
-                      <th className="py-2 text-right font-normal">输入</th>
-                      <th className="py-2 text-right font-normal">输出</th>
-                      <th className="py-2 text-right font-normal">费用</th>
+                      <th className="py-2 font-normal">{t("common.time")}</th>
+                      <th className="py-2 font-normal">{t("common.model")}</th>
+                      <th className="py-2 text-right font-normal">{t("ui.input")}</th>
+                      <th className="py-2 text-right font-normal">{t("ui.output")}</th>
+                      <th className="py-2 text-right font-normal">{t("ui.cost")}</th>
                     </tr>
                   </thead>
                   <tbody className="tabular-nums">
@@ -238,15 +244,13 @@ export default async function AccountPage() {
 
         {/* 法务链接 */}
         <div className="flex justify-center gap-4 text-xs text-muted-foreground">
+          <PrivacySettingsButton className="hover:text-foreground" />
           <Link href="/terms" className="hover:text-foreground">
-            服务条款
-          </Link>
+            {t("common.terms")}</Link>
           <Link href="/privacy" className="hover:text-foreground">
-            隐私政策
-          </Link>
+            {t("common.privacy")}</Link>
           <Link href="/refund" className="hover:text-foreground">
-            退款政策
-          </Link>
+            {t("common.refund")}</Link>
         </div>
       </div>
     </div>

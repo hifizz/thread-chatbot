@@ -25,6 +25,8 @@ import { Handle, Position, type Node, type NodeProps } from "@xyflow/react"
 import type { Message } from "../../core/types"
 import { CANVAS_CARD_DIMENSIONS } from "./canvas-card-dimensions"
 import { CanvasExpand } from "./canvas-expand"
+import { useI18n } from "@/lib/i18n/client"
+
 
 export interface CanvasCardData extends Record<string, unknown> {
   isMain: boolean
@@ -55,6 +57,8 @@ export const CanvasCard = memo(function CanvasCard({
   data,
   selected,
 }: NodeProps<CanvasCardNode>) {
+  const { t } = useI18n()
+
   return (
     <div
       className="canvas-card tc-accent-context" /* 选中态样式由 .react-flow__node.selected 提供；此前的条件类拼接丢空格产出 canvas-cardexpanded 单 token，选中即丢全部卡片样式（codex review P1） */
@@ -80,13 +84,13 @@ export const CanvasCard = memo(function CanvasCard({
           "--canvas-card-summary-margin-bottom": `${CANVAS_CARD_DIMENSIONS.summaryMarginBottom}px`,
         } as React.CSSProperties
       }
-      title={selected ? undefined : "单击：就地展开对话 · 双击：回到列模式打开"}
+      title={selected ? undefined : t("ui.clickToExpandHereDoubleClick")}
     >
       {/* LR 横向树：入边锚在左缘、出边锚在右缘（与 dagre rankdir:LR 对应） */}
       <Handle type="target" position={Position.Left} isConnectable={false} />
       <div className="chead">
         {data.isMain ? (
-          <span className="anchor-tag">锚定</span>
+          <span className="anchor-tag">{t("ui.pinned")}</span>
         ) : (
           data.footnote !== null && <span className="fn">{data.footnote}</span>
         )}
@@ -98,7 +102,7 @@ export const CanvasCard = memo(function CanvasCard({
           故这只改本卡内部高度、不改布局输入——零重排（D1） */}
       {!selected && data.summary && <div className="sum">{data.summary}</div>}
       <div className="meta">
-        <span>{data.msgCount} 条消息</span>
+        <span>{data.msgCount} {t("ui.messages2")}</span>
         {data.artifactCount > 0 && (
           <span className="am">
             <span className="dot" style={{ background: data.dot }} />

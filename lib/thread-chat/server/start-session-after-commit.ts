@@ -1,3 +1,4 @@
+import type { Locale } from "@/constants/i18n"
 import type { GenerationSettings } from "@/constants/generation-settings"
 import type { GenerationAcceptedDTO } from "@/lib/thread-chat/contracts/dto"
 import { getSessionStore } from "@/lib/thread-chat/streaming/session-store"
@@ -7,7 +8,8 @@ import { runGeneration } from "@/lib/thread-chat/streaming/run-generation"
 export function startSessionAfterCommit(
   userId: string,
   generation: GenerationAcceptedDTO,
-  generationSettings?: GenerationSettings
+  generationSettings?: GenerationSettings,
+  uiLocale?: Locale
 ): boolean {
   const assistant = generation.assistantMessage
   return getSessionStore().start({
@@ -20,6 +22,7 @@ export function startSessionAfterCommit(
     run: (session) =>
       runGeneration({
         userId,
+        uiLocale,
         messageId: assistant.id,
         session,
         ...(generationSettings ? { generationSettings } : {}),

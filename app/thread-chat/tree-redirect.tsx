@@ -9,8 +9,12 @@
 import { useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useProjectListStore } from "./core/project-list-store"
+import { useI18n } from "@/lib/i18n/client"
+
 
 export function TreeRedirect() {
+  const { t } = useI18n()
+
   const router = useRouter()
   const refreshProjects = useProjectListStore((state) => state.refresh)
   useEffect(() => {
@@ -31,7 +35,7 @@ export function TreeRedirect() {
   }, [refreshProjects, router])
   return (
     <div className="tc">
-      <div className="boot-loading">正在打开对话…</div>
+      <div className="boot-loading">{t("ui.openingConversation")}</div>
     </div>
   )
 }

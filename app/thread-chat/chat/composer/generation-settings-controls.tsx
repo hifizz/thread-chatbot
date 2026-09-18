@@ -17,17 +17,21 @@ import { useGenerationSettings } from "./generation-settings-context"
 import { resolveGenerationSettings } from "@/lib/thread-chat/generation-settings"
 import styles from "./artifact-composer.module.css"
 import { DisabledComposerOption } from "./disabled-composer-option"
-import { COMPOSER_MODEL_COPY } from "@/constants/composer-model"
+import { COMPOSER_MODEL_KEYS } from "@/constants/composer-model"
+import { useI18n } from "@/lib/i18n/client"
+
 
 export function GenerationSettingsControls({
   modelId,
   disabled,
-  disabledReason = COMPOSER_MODEL_COPY.unavailable,
+  disabledReason,
 }: {
   modelId: string
   disabled: boolean
   disabledReason?: string
 }) {
+  const { t } = useI18n()
+
   const capability = getModelGenerationSettingsCapability(modelId)
   const { settings: preferredSettings, setSettings } = useGenerationSettings()
   const settings = resolveGenerationSettings(modelId, preferredSettings)
@@ -47,11 +51,11 @@ export function GenerationSettingsControls({
           setSettings({ ...settings, effort })
         }}
       >
-        <DisabledComposerOption disabled={disabled} reason={disabledReason}>
+        <DisabledComposerOption disabled={disabled} reason={disabledReason ?? t(COMPOSER_MODEL_KEYS.unavailable)}>
         <SelectTrigger
           size="sm"
           disabled={disabled}
-          aria-label="选择推理强度"
+          aria-label={t("ui.chooseReasoningEffort")}
         >
           <SelectValue><span className={styles.parameterLabel}>Effort:</span> {settings.effort}</SelectValue>
         </SelectTrigger>
@@ -78,11 +82,11 @@ export function GenerationSettingsControls({
           setSettings({ ...settings, maxOutputTokens })
         }}
       >
-        <DisabledComposerOption disabled={disabled} reason={disabledReason}>
+        <DisabledComposerOption disabled={disabled} reason={disabledReason ?? t(COMPOSER_MODEL_KEYS.unavailable)}>
         <SelectTrigger
           size="sm"
           disabled={disabled}
-          aria-label="选择最大输出 token"
+          aria-label={t("ui.chooseTheMaximumOutputTokens")}
         >
           <SelectValue>
             <span className={styles.parameterLabel}>Max:</span> {MAX_OUTPUT_TOKEN_LABELS[settings.maxOutputTokens]}

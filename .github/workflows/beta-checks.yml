@@ -1,0 +1,79 @@
+name: Beta checks
+
+on:
+  pull_request:
+    paths:
+      - "app/**"
+      - "components/**"
+      - "constants/**"
+      - "lib/**"
+      - "hooks/**"
+      - "messages/**"
+      - "e2e/beta/**"
+      - "scripts/beta/**"
+      - "openspec/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/beta-checks.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: beta-checks-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: beta_test
+          POSTGRES_PASSWORD: isolated_test_only
+          POSTGRES_DB: thread_chat_eval_beta
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U beta_test -d thread_chat_eval_beta"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+      DATABASE_URL: postgres://beta_test:isolated_test_only@localhost:5432/thread_chat_eval_beta
+      BETTER_AUTH_URL: http://localhost:3100
+      BETTER_AUTH_SECRET: ci-only-not-a-production-secret-at-least-32-chars
+      BETTER_AUTH_COOKIE_PREFIX: beta-ci
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Typecheck
+        run: pnpm typecheck
+      - name: Beta regression tests
+        run: find e2e/beta -name '*.test.mjs' -print0 | sort -z | xargs -0 -r -n 1 node --import tsx
+      - name: OpenSpec
+        run: pnpm exec openspec validate --all --strict
+      - name: Prepare isolated database (no migration generation)
+        run: node scripts/beta/prepare-database.mjs
+      - name: Install browser from the locked dependency
+        run: node node_modules/playwright-core/cli.js install --with-deps chromium
+      - name: Desktop and mobile browser acceptance
+        run: node e2e/beta/i18n-browser.mjs
+      - name: Upload test evidence only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: beta-test-evidence
+          path: test-results/beta/
+          if-no-files-found: ignore
+          retention-days: 7

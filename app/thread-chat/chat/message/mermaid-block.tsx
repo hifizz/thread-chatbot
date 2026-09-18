@@ -4,6 +4,8 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "re
 import { useTheme } from "next-themes"
 import { MermaidCanvas } from "./mermaid-canvas"
 import type { MarkdownSettlementBatch } from "@/lib/markdown/settlement-batch"
+import { useI18n } from "@/lib/i18n/client"
+
 
 /** SVG 通过图片隔离展示，避免图内样式、脚本和重复 id 进入正文 DOM。 */
 export function MermaidBlock({ code, streaming, batch, children }: {
@@ -12,6 +14,8 @@ export function MermaidBlock({ code, streaming, batch, children }: {
   batch?: MarkdownSettlementBatch
   children: ReactNode
 }) {
+  const { t } = useI18n()
+
   const { resolvedTheme } = useTheme()
   const rootRef = useRef<HTMLDivElement>(null)
   const registrationRef = useRef<ReturnType<MarkdownSettlementBatch["register"]> | null>(null)
@@ -54,9 +58,9 @@ export function MermaidBlock({ code, streaming, batch, children }: {
   }, [failed, batch])
 
   const viewControls = (
-    <div className="md-mermaid-tools" role="group" aria-label="Mermaid 显示方式">
-      <button type="button" aria-pressed={!showCode} disabled={failed} onClick={() => setView("diagram")}>图表</button>
-      <button type="button" aria-pressed={showCode} onClick={() => setView("code")}>源码</button>
+    <div className="md-mermaid-tools" role="group" aria-label={t("ui.mermaidDisplayMode")}>
+      <button type="button" aria-pressed={!showCode} disabled={failed} onClick={() => setView("diagram")}>{t("ui.diagram")}</button>
+      <button type="button" aria-pressed={showCode} onClick={() => setView("code")}>{t("ui.source")}</button>
     </div>
   )
 
@@ -68,11 +72,11 @@ export function MermaidBlock({ code, streaming, batch, children }: {
           onError={() => setResult({ code, theme: resolvedTheme, url: null })} />
       ) : <>
         <div className="md-mermaid-toolbar">{viewControls}</div>
-        <div hidden={showCode} className="md-mermaid-status">{streaming ? "图表生成中…" : "正在绘制图表…"}</div>
+        <div hidden={showCode} className="md-mermaid-status">{streaming ? t("ui.generatingDiagram") : t("ui.drawingDiagram")}</div>
       </>}
       {/* 保留源码 DOM，避免切换视图反复挂载高亮体。 */}
       <div hidden={!showCode}>{children}</div>
-      {failed && <div className="md-mermaid-status">暂时无法绘制此图，已显示源码。</div>}
+      {failed && <div className="md-mermaid-status">{t("ui.thisDiagramCouldNotBeRendered")}</div>}
     </div>
   )
 }

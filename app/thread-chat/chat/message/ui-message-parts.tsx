@@ -21,11 +21,17 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import type { ConversationViewMessage } from "../../core/types"
+import type { Locale } from "@/constants/i18n"
+import { createTranslator } from "@/lib/i18n/dictionary"
+import { localizeError } from "@/lib/i18n/errors"
+import { useI18n } from "@/lib/i18n/client"
 
-function attachmentTypeLabel(filename: string | undefined, mediaType: string) {
+
+function attachmentTypeLabel(filename: string | undefined, mediaType: string, locale: Locale) {
+  const t = createTranslator(locale)
   const extension = filename?.match(/\.([^.]+)$/)?.[1]
-  if (extension) return `${extension.toUpperCase()} 文件`
-  return mediaType === "text/plain" ? "文本文件" : "附件"
+  if (extension) return t("common.fileType", { type: extension.toUpperCase() })
+  return mediaType === "text/plain" ? t("ui.textFile") : t("ui.attachment")
 }
 
 type MessageFilePart = Extract<
@@ -39,6 +45,8 @@ type TextPreviewState =
   | { status: "error"; message: string }
 
 function TextAttachmentPreview({ part }: { part: MessageFilePart }) {
+  const { locale, t } = useI18n()
+
   const [open, setOpen] = useState(false)
   const [requestVersion, setRequestVersion] = useState(0)
   const [preview, setPreview] = useState<TextPreviewState>({ status: "idle" })
@@ -55,20 +63,20 @@ function TextAttachmentPreview({ part }: { part: MessageFilePart }) {
         const body = (await response.json().catch(() => null)) as {
           error?: string
         } | null
-        throw new Error(body?.error ?? "文件打开失败，请重试")
+        throw new Error(body?.error ?? t("ui.couldNotOpenTheFilePlease"))
       })
       .then((content) => setPreview({ status: "ready", content }))
       .catch((error) => {
         if (error instanceof DOMException && error.name === "AbortError") return
         setPreview({
           status: "error",
-          message: error instanceof Error ? error.message : "文件打开失败，请重试",
+          message: localizeError(locale, error),
         })
       })
     return () => controller.abort()
-  }, [open, part.url, requestVersion])
+  }, [open, part.url, requestVersion, t, locale])
 
-  const filename = part.filename ?? "附件"
+  const filename = part.filename ?? t("ui.attachment")
 
   return (
     <Dialog
@@ -85,14 +93,14 @@ function TextAttachmentPreview({ part }: { part: MessageFilePart }) {
         <AttachmentContent>
           <AttachmentTitle title={filename}>{filename}</AttachmentTitle>
           <AttachmentDescription>
-            {attachmentTypeLabel(part.filename, part.mediaType)}
+            {attachmentTypeLabel(part.filename, part.mediaType, locale)}
           </AttachmentDescription>
         </AttachmentContent>
         <DialogTrigger
           render={
             <button
               type="button"
-              aria-label={`预览 ${filename}`}
+              aria-label={t("common.previewNamed", { name: filename })}
               className="absolute inset-0 z-10 cursor-pointer rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-ring"
             />
           }
@@ -102,13 +110,13 @@ function TextAttachmentPreview({ part }: { part: MessageFilePart }) {
         <div className="min-w-0 pe-10">
           <DialogTitle className="truncate">{filename}</DialogTitle>
           <DialogDescription className="mt-1 text-xs">
-            {attachmentTypeLabel(part.filename, part.mediaType)}
+            {attachmentTypeLabel(part.filename, part.mediaType, locale)}
           </DialogDescription>
         </div>
         <div className="min-h-0 overflow-auto rounded-xl border bg-muted/30">
           {(preview.status === "idle" || preview.status === "loading") && (
             <div className="space-y-3 p-4" role="status">
-              <span className="sr-only">文件加载中</span>
+              <span className="sr-only">{t("ui.loadingFile")}</span>
               <div className="space-y-3" aria-hidden="true">
                 <Skeleton className="h-3 w-2/5" />
                 <Skeleton className="h-3 w-full" />
@@ -136,8 +144,7 @@ function TextAttachmentPreview({ part }: { part: MessageFilePart }) {
                 }}
               >
                 <RotateCcw aria-hidden="true" />
-                重试
-              </Button>
+                {t("common.retry")}</Button>
             </div>
           )}
           {preview.status === "ready" &&
@@ -153,8 +160,7 @@ function TextAttachmentPreview({ part }: { part: MessageFilePart }) {
                 className="flex min-h-full items-center justify-center p-4 text-muted-foreground"
                 role="status"
               >
-                这个文件没有内容
-              </div>
+                {t("ui.thisFileIsEmpty")}</div>
             ))}
         </div>
         <div className="flex justify-end">
@@ -167,8 +173,7 @@ function TextAttachmentPreview({ part }: { part: MessageFilePart }) {
             }
           >
             <Download aria-hidden="true" />
-            下载文件
-          </Button>
+            {t("ui.downloadFile")}</Button>
         </div>
       </DialogContent>
     </Dialog>
@@ -184,6 +189,8 @@ export function UIMessageSupplementalParts({
 }: {
   message: ConversationViewMessage
 }) {
+  const { t } = useI18n()
+
   const parts = message.uiParts ?? []
   const reasoning = parts.filter(
     (part): part is Extract<typeof part, { type: "reasoning" }> =>
@@ -204,7 +211,7 @@ export function UIMessageSupplementalParts({
     <div data-ui-message-supplemental="true">
       {reasoning.length > 0 && (
         <details className="inherited">
-          <summary>思考过程</summary>
+          <summary>{t("ui.reasoning")}</summary>
           <div className="inherited-body">
             {reasoning.map((part, index) => (
               <p key={index}>{part.text}</p>
@@ -222,12 +229,12 @@ export function UIMessageSupplementalParts({
               <Dialog key={`${part.url}-${index}`}>
                 <DialogTrigger
                   type="button"
-                  aria-label={`预览 ${part.filename ?? "用户上传的图片"}`}
+                  aria-label={t("common.previewNamed", { name: part.filename ?? t("ui.userUploadedImage") })}
                   className="block w-fit max-w-[min(18rem,72vw)] cursor-zoom-in rounded-md border-0 bg-transparent p-0 outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   <Image
                     src={part.url}
-                    alt={part.filename ?? "用户上传的图片"}
+                    alt={part.filename ?? t("ui.userUploadedImage")}
                     width={640}
                     height={480}
                     sizes="(max-width: 480px) 72vw, 288px"
@@ -237,12 +244,12 @@ export function UIMessageSupplementalParts({
                 </DialogTrigger>
                 <DialogContent className="max-h-[calc(100dvh-2rem)] gap-0 overflow-hidden p-2 sm:max-w-5xl">
                   <DialogTitle className="sr-only">
-                    {part.filename ?? "用户上传的图片"}
+                    {part.filename ?? t("ui.userUploadedImage")}
                   </DialogTitle>
                   <div className="flex max-h-[calc(100dvh-3rem)] min-h-32 items-center justify-center overflow-hidden">
                     <Image
                       src={part.url}
-                      alt={part.filename ?? "用户上传的图片"}
+                      alt={part.filename ?? t("ui.userUploadedImage")}
                       width={2048}
                       height={2048}
                       sizes="calc(100vw - 3rem)"
@@ -277,7 +284,7 @@ export function UIMessageSupplementalParts({
         const state = "state" in part ? String(part.state) : ""
         return (
           <span key={`${part.type}-${index}`} hidden={state === "output-available"}>
-            {state ? `工具：${state}` : ""}
+            {state ? t("chat.toolState", { state }) : ""}
           </span>
         )
       })}
