@@ -3,16 +3,18 @@
 import { useEffect, useRef, useState } from "react"
 import Markdown from "react-markdown"
 import remarkGfm from "remark-gfm"
-import { BookOpen } from "lucide-react"
+import { BookOpen, FileText } from "lucide-react"
 import ThinkingState, {
   TraceFavicon,
 } from "@/components/primitives/ThinkingState"
+import { DOCUMENT_RESULT_COPY } from "@/constants/project-documents"
 import type { ResearchRoute } from "@/lib/chat/research-contract"
 import {
   settledResearchActivities,
   type WebResearchActivity,
 } from "@/lib/chat/web-research-activity"
 import type { MarkdownGenerationProgress } from "../../core/types"
+import type { DocumentToolPart } from "./assistant-part-render-plan"
 
 /* 把消息上已投影的 reasoning / 联网活动 / 工具事件映射为 beautiful-ui
  * ThinkingState 轨迹。官方 token 由 `.bui` 作用域提供（app/beautifui/foundation.css），
@@ -23,7 +25,7 @@ interface TraceRow {
   secondary?: string
   mono?: boolean
   href?: string
-  icon?: "book-open" | "search"
+  icon?: "book-open" | "search" | "file-pen"
   /** 行内 spinner（进行中的读取/搜索）。 */
   running?: boolean
   /** 失败行：图标与副文本转警示色。 */
@@ -265,6 +267,172 @@ export function SearchTrace({
         active={active}
         done={done}
         icon={icon}
+        rows={rows}
+      />
+    </div>
+  )
+}
+
+/** 项目文档轨迹：连续的查找/读取/提交调用合并为一个时序块，
+ * 每行给出步骤名与结果；update 的提交结果卡片由 DocumentUpdateTool 另行渲染。 */
+export function DocumentTrace({
+  parts,
+  settled,
+}: {
+  parts: DocumentToolPart[]
+  settled: boolean
+}) {
+  if (parts.length === 0) return null
+
+  const rows: TraceRow[] = parts.map((part) => {
+    const finished =
+      part.state === "output-available" || part.state === "output-error"
+    const running = !settled && !finished
+    const failed =
+      part.state === "output-error" || (settled && !finished)
+    if (part.type === "tool-findProjectDocuments") {
+      const query = part.input?.query?.trim()
+      const done = part.state === "output-available"
+      const found = done ? part.output.length : 0
+      return {
+        primary: part.input?.artifactId
+          ? "定位引用的文档"
+          : query
+            ? `查找文档“${query}”`
+            : "查找项目文档",
+        icon: "search" as const,
+        running,
+        failed,
+        secondary: failed
+          ? "查找失败"
+          : done
+            ? found === 0
+              ? "未找到"
+              : found === 1
+                ? `找到「${part.output[0].title}」`
+                : `${found} 份候选`
+            : undefined,
+      }
+    }
+    if (part.type === "tool-readProjectDocument") {
+      const done = part.state === "output-available"
+      return {
+        primary: done
+          ? `读取「${part.output.revision.title}」`
+          : "读取项目文档",
+        icon: "book-open" as const,
+        running,
+        failed,
+        secondary: failed
+          ? "读取失败"
+          : done
+            ? `V${part.output.revision.revisionNumber}${part.output.isCurrent ? "" : " · 非最新"}`
+            : undefined,
+      }
+    }
+    const out = part.state === "output-available" ? part.output : undefined
+    const editCount = part.input?.edits?.length
+    return {
+      primary: "提交文档修改",
+      icon: "file-pen" as const,
+      running,
+      failed,
+      secondary: failed
+        ? "保存失败"
+        : running && part.input?.changeSummary
+          ? part.input.changeSummary
+          : out?.status === "committed"
+            ? editCount
+              ? `已保存 ${editCount} 处修改`
+              : "已保存"
+            : out?.status === "unchanged"
+              ? "无需修改"
+              : out?.status === "conflict"
+                ? "版本冲突"
+                : out?.status === "rejected"
+                  ? (DOCUMENT_RESULT_COPY[out.code] ?? "未保存")
+                  : undefined,
+    }
+  })
+
+  const runningPart = parts.find(
+    (part) =>
+      part.state !== "output-available" && part.state !== "output-error"
+  )
+  const working = Boolean(!settled && runningPart)
+  const runningFindQuery =
+    runningPart?.type === "tool-findProjectDocuments"
+      ? runningPart.input?.query?.trim()
+      : undefined
+  const runningEditCount =
+    runningPart?.type === "tool-updateProjectDocument"
+      ? runningPart.input?.edits?.length
+      : undefined
+  const active =
+    runningPart?.type === "tool-findProjectDocuments"
+      ? runningFindQuery
+        ? `正在查找“${runningFindQuery}”`
+        : "正在查找项目文档"
+      : runningPart?.type === "tool-readProjectDocument"
+        ? "正在读取项目文档"
+        : runningPart?.type === "tool-updateProjectDocument"
+          ? runningEditCount
+            ? `正在提交 ${runningEditCount} 处修改`
+            : "正在提交文档修改"
+          : "正在处理项目文档"
+
+  const done = (() => {
+    const segments: string[] = []
+    let failedCount = 0
+    for (const part of parts) {
+      if (
+        part.state === "output-error" ||
+        (settled && part.state !== "output-available")
+      ) {
+        failedCount++
+        continue
+      }
+      if (part.state !== "output-available") continue
+      if (part.type === "tool-findProjectDocuments") {
+        segments.push(
+          part.output.length === 0
+            ? "未找到匹配文档"
+            : part.output.length === 1
+              ? `找到「${part.output[0].title}」`
+              : `找到 ${part.output.length} 份候选文档`
+        )
+      } else if (part.type === "tool-readProjectDocument") {
+        segments.push(
+          `已读取「${part.output.revision.title}」V${part.output.revision.revisionNumber}`
+        )
+      } else {
+        const out = part.output
+        const edits = part.input?.edits?.length
+        segments.push(
+          out.status === "committed"
+            ? edits
+              ? `已保存 ${edits} 处修改`
+              : "已保存修改"
+            : out.status === "unchanged"
+              ? "无需修改"
+              : out.status === "conflict"
+                ? "版本冲突"
+                : "未保存"
+        )
+      }
+    }
+    if (failedCount) segments.push(`${failedCount} 项失败`)
+    return segments.join(" · ") || "文档操作完成"
+  })()
+
+  return (
+    <div className="thinking-trace bui">
+      <ThinkingState
+        variant="Search"
+        working={working}
+        active={active}
+        done={done}
+        icon={<FileText aria-hidden className="size-3.5" />}
         rows={rows}
       />
     </div>

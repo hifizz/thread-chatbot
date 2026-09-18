@@ -161,12 +161,30 @@ const documentPlan = assistantPartRenderPlan({
       input: { documentId: "doc-1" },
       errorText: "资源不存在",
     },
+    { type: "reasoning", text: "审视结果", state: "done" },
+    {
+      type: "tool-updateProjectDocument",
+      toolCallId: "update-2",
+      state: "output-available",
+      input: { documentId: "doc-1" },
+      output: { status: "committed" },
+    },
   ],
 })
 assert.deepEqual(
   documentPlan.map((item) => item.kind),
-  ["text", "document", "document"],
+  ["text", "document", "reasoning", "document"],
   "文档工具 part 必须走专属渲染分支，不得落入 createMarkdownArtifact 的“生成文档”轨迹"
+)
+assert.equal(
+  documentPlan[1].documents.length,
+  2,
+  "连续的文档工具调用必须合并为一个时序轨迹块"
+)
+assert.equal(
+  documentPlan[3].documents.length,
+  1,
+  "被思考分隔的文档调用必须拆分为独立轨迹块"
 )
 
 const assistantBodySource = fs.readFileSync(
@@ -190,8 +208,13 @@ assert.match(
 )
 assert.match(
   assistantBodySource,
-  /<DocumentUpdateTool key=\{part\.toolCallId\} part=\{part\} \/>/,
-  "文档工具 part 必须分发到 DocumentUpdateTool，不得套用“生成文档/生成失败”文案"
+  /<DocumentTrace parts=\{documentParts\} settled=\{settled\} \/>/,
+  "文档工具 part 必须分发到 DocumentTrace 时序轨迹"
+)
+assert.match(
+  assistantBodySource,
+  /<DocumentUpdateTool/,
+  "updateProjectDocument 的提交结果必须保留 DocumentUpdateTool 结果卡片"
 )
 
 const css = fs.readFileSync("app/thread-chat/styles/columns.css", "utf8")
@@ -267,7 +290,10 @@ const thinkingStateSource = fs.readFileSync(
   "components/primitives/ThinkingState.tsx",
   "utf8"
 )
-assert.match(thinkingStateSource, /import \{ BookOpen \} from "lucide-react"/)
+assert.match(
+  thinkingStateSource,
+  /import \{ BookOpen, FilePenLine \} from "lucide-react"/
+)
 assert.match(thinkingStateSource, /row\.icon === "book-open"/)
 assert.match(thinkingStateSource, /<BookOpen aria-hidden/)
 

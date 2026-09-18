@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { BookOpen } from "lucide-react";
+import { BookOpen, FilePenLine } from "lucide-react";
 
 /* ─────────────────────────────────────────────────────────
  * THINKING — expandable agent trace, four variants
@@ -33,7 +33,7 @@ type Row = {
   add?: number;
   del?: number;
   href?: string;
-  icon?: "book-open" | "search";
+  icon?: "book-open" | "search" | "file-pen";
   /** row is in-flight: leading glyph becomes a spinner */
   running?: boolean;
   /** row failed: glyph and secondary text take the danger tone */
@@ -365,6 +365,8 @@ export default function ThinkingState({
                 {variant === "Search" && (
                   row.running ? (
                     <Spinner />
+                  ) : row.icon === "file-pen" ? (
+                    <FilePenLine aria-hidden className={`size-3.5 shrink-0 ${row.failed ? "text-red" : "text-ink-3"}`} />
                   ) : row.icon === "book-open" ? (
                     <BookOpen aria-hidden className={`size-3.5 shrink-0 ${row.failed ? "text-red" : "text-ink-3"}`} />
                   ) : row.icon === "search" ? (

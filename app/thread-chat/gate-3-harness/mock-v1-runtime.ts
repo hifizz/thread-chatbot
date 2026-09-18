@@ -9,13 +9,27 @@ import type {
   ProjectDTO,
   ThreadDTO,
 } from "@/lib/thread-chat/contracts/dto"
+import type {
+  DocumentDTO,
+  DocumentListItemDTO,
+  DocumentRevisionDTO,
+  UpdateDocumentInput,
+  UpdateDocumentResult,
+} from "@/lib/thread-chat/contracts/document"
 import { PROJECT_TITLE_FALLBACK } from "@/constants/project-workspace"
 import { DEFAULT_THREAD_CHAT_MODEL_ID } from "@/constants/models"
-import { textFromMessageParts } from "@/lib/thread-chat/contracts/ui-message"
+import { textFromMessageParts, type ThreadChatUIMessageChunk } from "@/lib/thread-chat/contracts/ui-message"
 import type { ThreadChatClient } from "../net/client"
 
 export type Gate3HarnessScenario =
-  "normal" | "late-sse" | "disconnect" | "failure" | "artifact" | "research"
+  | "normal" | "late-sse" | "disconnect" | "failure" | "artifact" | "research"
+  | "document-commit" | "document-retry" | "document-unchanged"
+  | "document-conflict" | "document-rejected" | "document-error"
+
+const DOCUMENT_SCENARIOS: ReadonlySet<Gate3HarnessScenario> = new Set([
+  "document-commit", "document-retry", "document-unchanged",
+  "document-conflict", "document-rejected", "document-error",
+])
 
 const ROOT_THREAD_ID = "00000000-0000-4000-8000-000000000010"
 const CHILD_THREAD_ID = "00000000-0000-4000-8000-000000000020"
@@ -27,7 +41,21 @@ const CHILD_ASSISTANT_ID = "00000000-0000-4000-8000-000000000202"
 const INITIAL_ARTIFACT_ID = "00000000-0000-4000-8000-000000000401"
 const BACKGROUND_USER_ID = "00000000-0000-4000-8000-000000000501"
 const BACKGROUND_ASSISTANT_ID = "00000000-0000-4000-8000-000000000502"
+const DEMO_DOCUMENT_ID = "00000000-0000-4000-8000-000000000601"
+const DEMO_DOCUMENT_TITLE = "Gate 3 演示文档"
+const DEMO_CONCURRENT_MESSAGE_ID = "00000000-0000-4000-8000-000000000720"
 const MODEL_ID = DEFAULT_THREAD_CHAT_MODEL_ID
+const DEMO_REVISION_COUNT = 5
+const DEMO_MESSAGE_SEQUENCES = 14
+
+const demoRevisionId = (n: number) =>
+  `00000000-0000-4000-8000-000000000${610 + n}`
+const demoArtifactId = (n: number) =>
+  `00000000-0000-4000-8000-000000000${620 + n}`
+const demoMessageId = (n: number) =>
+  `00000000-0000-4000-8000-000000000${700 + n}`
+const demoReadId = (n: number) =>
+  `00000000-0000-4000-8000-000000000${740 + n}`
 
 function clone<T>(value: T): T {
   return structuredClone(value)
@@ -43,6 +71,412 @@ function textOf(message: MessageDTO): string {
 
 function commandResponse<T>(data: T) {
   return { ok: true as const, replayed: false, data }
+}
+
+type DemoParts = MessageDTO["parts"]
+
+/* 文档工具演示 fixture：一份 5 版本文档 + 主线 6 组对话，覆盖 committed /
+ * 冲突重试 / unchanged / 终态 conflict / rejected / output-error 全部结果态。 */
+function demoDocumentDto(projectId: string, currentRevisionId: string): DocumentDTO {
+  return { id: DEMO_DOCUMENT_ID, projectId, currentRevisionId, title: DEMO_DOCUMENT_TITLE }
+}
+
+function demoFindPart(
+  projectId: string,
+  toolCallId: string,
+  currentRevisionId: string
+): DemoParts[number] {
+  return {
+    type: "tool-findProjectDocuments",
+    toolCallId,
+    state: "output-available",
+    input: { query: DEMO_DOCUMENT_TITLE },
+    output: [demoDocumentDto(projectId, currentRevisionId)],
+  }
+}
+
+function demoReadPart(
+  projectId: string,
+  toolCallId: string,
+  revision: DocumentRevisionDTO,
+  options: {
+    readId: string
+    isCurrent: boolean
+    currentRevisionId: string
+    pinned?: boolean
+  }
+): DemoParts[number] {
+  return {
+    type: "tool-readProjectDocument",
+    toolCallId,
+    state: "output-available",
+    input: {
+      documentId: DEMO_DOCUMENT_ID,
+      ...(options.pinned ? { revisionId: revision.id } : {}),
+    },
+    output: {
+      document: demoDocumentDto(projectId, options.currentRevisionId),
+      revision,
+      readId: options.readId,
+      isCurrent: options.isCurrent,
+    },
+  }
+}
+
+function demoUpdateInput(
+  expectedRevisionId: string,
+  readId: string,
+  changeSummary: string,
+  edit: { oldText: string; newText: string }
+): UpdateDocumentInput {
+  return {
+    documentId: DEMO_DOCUMENT_ID,
+    expectedRevisionId,
+    readId,
+    changeSummary,
+    edits: [edit],
+  }
+}
+
+function demoUpdatePart(
+  toolCallId: string,
+  input: UpdateDocumentInput,
+  output: UpdateDocumentResult
+): DemoParts[number] {
+  return {
+    type: "tool-updateProjectDocument",
+    toolCallId,
+    state: "output-available",
+    input,
+    output,
+  }
+}
+
+function demoUpdateErrorPart(
+  toolCallId: string,
+  input: UpdateDocumentInput,
+  errorText: string
+): DemoParts[number] {
+  return {
+    type: "tool-updateProjectDocument",
+    toolCallId,
+    state: "output-error",
+    input,
+    errorText,
+  }
+}
+
+function demoTextPart(text: string): DemoParts[number] {
+  return { type: "text", text, state: "done" }
+}
+
+function demoArtifactForRevision(
+  projectId: string,
+  revision: DocumentRevisionDTO
+): ArtifactDTO {
+  const onRoot = revision.sourceThreadId === ROOT_THREAD_ID
+  return {
+    id: revision.artifactId,
+    projectId,
+    threadId: revision.sourceThreadId,
+    sourceMessageId: revision.sourceMessageId,
+    sourceThreadTitle: onRoot ? "规范化会话验收" : "断流恢复",
+    sourceThreadFootnote: onRoot ? null : 1,
+    sourceMessageStatus: "completed",
+    kind: "markdown",
+    title: revision.title,
+    content: revision.content,
+    language: null,
+    metadata: {},
+    createdAt: revision.createdAt,
+    updatedAt: revision.createdAt,
+    document: {
+      id: DEMO_DOCUMENT_ID,
+      revisionId: revision.id,
+      revisionNumber: revision.revisionNumber,
+    },
+  }
+}
+
+interface DocumentDemoFixture {
+  document: DocumentListItemDTO
+  revisions: DocumentRevisionDTO[]
+  artifacts: ArtifactDTO[]
+  messages: MessageDTO[]
+}
+
+/** 把终态 parts 还原成标准 UI message chunk 序列（tool-input-available →
+ * tool-output-* / text-start-delta-end），供 mock SSE 逐步发送。 */
+function partsToStreamChunks(
+  parts: MessageDTO["parts"]
+): ThreadChatUIMessageChunk[] {
+  const chunks: ThreadChatUIMessageChunk[] = []
+  for (const part of parts) {
+    if (part.type.startsWith("tool-") && "toolCallId" in part) {
+      chunks.push({
+        type: "tool-input-available",
+        toolCallId: part.toolCallId,
+        toolName: part.type.slice("tool-".length),
+        input: part.input,
+      })
+      if (part.state === "output-available")
+        chunks.push({
+          type: "tool-output-available",
+          toolCallId: part.toolCallId,
+          output: part.output,
+        })
+      else if (part.state === "output-error")
+        chunks.push({
+          type: "tool-output-error",
+          toolCallId: part.toolCallId,
+          errorText: part.errorText,
+        })
+      continue
+    }
+    if (part.type === "text") {
+      const id = `text-${chunks.length}`
+      chunks.push(
+        { type: "text-start", id },
+        { type: "text-delta", id, delta: part.text },
+        { type: "text-end", id }
+      )
+    }
+  }
+  return chunks
+}
+
+function createDocumentDemoFixture(projectId: string): DocumentDemoFixture {
+  const stamp = now()
+  const v1 =
+    "# Gate 3 演示文档\n\n## 1. 写作约定\n\n- 标题简洁\n- 先结论后细节\n\n## 2. 待办\n\n- [ ] 确定评分方案"
+  const v2 = `${v1}\n- [ ] 校对标题层级`
+  const v3 = v2.replace("## 1. 写作约定", "## 1. 团队写作准则")
+  const v4 = v3.replace("## 2. 待办", "## 2. 评测维度与待办")
+  const v5 = v4.replace(
+    "- [ ] 校对标题层级",
+    "- [ ] 校对标题层级\n- [ ] 引用质量逐条核对"
+  )
+  const provenance = [
+    { changeSummary: "创建初始版本", threadId: ROOT_THREAD_ID, messageId: ROOT_ASSISTANT_ID },
+    { changeSummary: "补充 TODO 校对项", threadId: ROOT_THREAD_ID, messageId: ROOT_ASSISTANT_ID },
+    { changeSummary: "修改第 1 节标题为「团队写作准则」", threadId: ROOT_THREAD_ID, messageId: demoMessageId(2) },
+    { changeSummary: "第 2 节更名「评测维度与待办」", threadId: CHILD_THREAD_ID, messageId: DEMO_CONCURRENT_MESSAGE_ID },
+    { changeSummary: "TODO 补充「引用质量」核对项", threadId: ROOT_THREAD_ID, messageId: demoMessageId(4) },
+  ]
+  const revisions: DocumentRevisionDTO[] = [v1, v2, v3, v4, v5].map(
+    (content, index) => {
+      const n = index + 1
+      const source = provenance[index]
+      return {
+        id: demoRevisionId(n),
+        documentId: DEMO_DOCUMENT_ID,
+        revisionNumber: n,
+        parentRevisionId: n > 1 ? demoRevisionId(n - 1) : null,
+        artifactId: demoArtifactId(n),
+        title: DEMO_DOCUMENT_TITLE,
+        sourceThreadId: source.threadId,
+        sourceMessageId: source.messageId,
+        sourceMessageStatus: "completed",
+        changeSummary: source.changeSummary,
+        content,
+        createdAt: stamp,
+      }
+    }
+  )
+  const rev = (n: number) => revisions[n - 1]
+  const artifacts = revisions.map((revision) =>
+    demoArtifactForRevision(projectId, revision)
+  )
+  const latest = revisions[DEMO_REVISION_COUNT - 1]
+  const document: DocumentListItemDTO = {
+    id: DEMO_DOCUMENT_ID,
+    projectId,
+    currentRevisionId: latest.id,
+    title: DEMO_DOCUMENT_TITLE,
+    revisionNumber: latest.revisionNumber,
+    sourceMessageStatus: "completed",
+    currentArtifactId: latest.artifactId,
+    sourceThreadId: ROOT_THREAD_ID,
+    sourceMessageId: demoMessageId(4),
+  }
+  const done = (
+    id: string,
+    sequence: number,
+    role: "user" | "assistant",
+    parts: DemoParts
+  ): MessageDTO => ({
+    id,
+    projectId,
+    threadId: ROOT_THREAD_ID,
+    sequence,
+    role,
+    parts,
+    status: "completed",
+    modelId: role === "assistant" ? MODEL_ID : null,
+    replacesMessageId: null,
+    supersededAt: null,
+    feedback: null,
+    error: null,
+    createdAt: stamp,
+    updatedAt: stamp,
+    finishedAt: stamp,
+  })
+  const userText = (text: string): DemoParts => [{ type: "text", text }]
+  const todoEdit = {
+    oldText: "- [ ] 校对标题层级",
+    newText: "- [ ] 校对标题层级\n- [ ] 引用质量逐条核对",
+  }
+  const messages: MessageDTO[] = [
+    // 成功：find → read V2 → committed V3，出可点击结果卡
+    done(demoMessageId(1), 3, "user", userText("把「Gate 3 演示文档」第 1 节标题改成「团队写作准则」")),
+    done(demoMessageId(2), 4, "assistant", [
+      demoFindPart(projectId, "demo-a-find", rev(2).id),
+      demoReadPart(projectId, "demo-a-read", rev(2), {
+        readId: demoReadId(1),
+        isCurrent: true,
+        currentRevisionId: rev(2).id,
+      }),
+      demoUpdatePart(
+        "demo-a-update",
+        demoUpdateInput(demoRevisionId(2), demoReadId(1), "修改第 1 节标题为「团队写作准则」", {
+          oldText: "## 1. 写作约定",
+          newText: "## 1. 团队写作准则",
+        }),
+        {
+          status: "committed",
+          documentId: DEMO_DOCUMENT_ID,
+          previousRevisionId: demoRevisionId(2),
+          revisionId: demoRevisionId(3),
+          artifactId: demoArtifactId(3),
+          changeSummary: "修改第 1 节标题为「团队写作准则」",
+        }
+      ),
+      demoTextPart("已将第 1 节标题更新为「团队写作准则」，保存为 V3。"),
+    ]),
+    // 冲突重试：中间 conflict 只留在轨迹行，最终 committed 出卡
+    done(demoMessageId(3), 5, "user", userText("TODO 里再补一条「引用质量」核对项")),
+    done(demoMessageId(4), 6, "assistant", [
+      demoFindPart(projectId, "demo-b-find", rev(3).id),
+      demoReadPart(projectId, "demo-b-read-1", rev(3), {
+        readId: demoReadId(2),
+        isCurrent: true,
+        currentRevisionId: rev(3).id,
+      }),
+      demoUpdatePart(
+        "demo-b-update-1",
+        demoUpdateInput(demoRevisionId(3), demoReadId(2), "TODO 补充「引用质量」核对项", todoEdit),
+        {
+          status: "conflict",
+          code: "DOCUMENT_CHANGED",
+          documentId: DEMO_DOCUMENT_ID,
+          currentRevisionId: demoRevisionId(4),
+          requiresRead: true,
+        }
+      ),
+      demoReadPart(projectId, "demo-b-read-2", rev(4), {
+        readId: demoReadId(3),
+        isCurrent: true,
+        currentRevisionId: rev(4).id,
+      }),
+      demoUpdatePart(
+        "demo-b-update-2",
+        demoUpdateInput(demoRevisionId(4), demoReadId(3), "TODO 补充「引用质量」核对项", todoEdit),
+        {
+          status: "committed",
+          documentId: DEMO_DOCUMENT_ID,
+          previousRevisionId: demoRevisionId(4),
+          revisionId: demoRevisionId(5),
+          artifactId: demoArtifactId(5),
+          changeSummary: "TODO 补充「引用质量」核对项",
+        }
+      ),
+      demoTextPart("提交时检测到并发修改（V4），已按最新版本重新提交，保存为 V5。"),
+    ]),
+    // unchanged：静态收据「内容已满足要求，无需修改」
+    done(demoMessageId(5), 7, "user", userText("把第 1 节标题改成「团队写作准则」")),
+    done(demoMessageId(6), 8, "assistant", [
+      demoFindPart(projectId, "demo-c-find", rev(5).id),
+      demoReadPart(projectId, "demo-c-read", rev(5), {
+        readId: demoReadId(4),
+        isCurrent: true,
+        currentRevisionId: rev(5).id,
+      }),
+      demoUpdatePart(
+        "demo-c-update",
+        demoUpdateInput(demoRevisionId(5), demoReadId(4), "修改第 1 节标题为「团队写作准则」", {
+          oldText: "## 1. 团队写作准则",
+          newText: "## 1. 团队写作准则",
+        }),
+        { status: "unchanged", documentId: DEMO_DOCUMENT_ID, revisionId: demoRevisionId(5) }
+      ),
+      demoTextPart("第 1 节标题已经是「团队写作准则」，内容已满足要求，无需重复保存。"),
+    ]),
+    // 终态冲突：读取旧版（非最新行）→ conflict 静态失败卡
+    done(demoMessageId(7), 9, "user", userText("把第 2 节标题改成「评测标准」")),
+    done(demoMessageId(8), 10, "assistant", [
+      demoFindPart(projectId, "demo-d-find", rev(5).id),
+      demoReadPart(projectId, "demo-d-read", rev(4), {
+        readId: demoReadId(5),
+        isCurrent: false,
+        currentRevisionId: rev(5).id,
+        pinned: true,
+      }),
+      demoUpdatePart(
+        "demo-d-update",
+        demoUpdateInput(demoRevisionId(4), demoReadId(5), "修改第 2 节标题为「评测标准」", {
+          oldText: "## 2. 评测维度与待办",
+          newText: "## 2. 评测标准",
+        }),
+        {
+          status: "conflict",
+          code: "DOCUMENT_CHANGED",
+          documentId: DEMO_DOCUMENT_ID,
+          currentRevisionId: demoRevisionId(5),
+          requiresRead: true,
+        }
+      ),
+      demoTextPart("提交时文档已更新到 V5，本次未保存。如需继续修改请重试，我会先读取最新版本。"),
+    ]),
+    // rejected：SOURCE_NOT_FOUND 静态失败卡
+    done(demoMessageId(9), 11, "user", userText("删掉「不存在的章节」一节")),
+    done(demoMessageId(10), 12, "assistant", [
+      demoFindPart(projectId, "demo-e-find", rev(5).id),
+      demoReadPart(projectId, "demo-e-read", rev(5), {
+        readId: demoReadId(6),
+        isCurrent: true,
+        currentRevisionId: rev(5).id,
+      }),
+      demoUpdatePart(
+        "demo-e-update",
+        demoUpdateInput(demoRevisionId(5), demoReadId(6), "删除「不存在的章节」一节", {
+          oldText: "## 9. 不存在的章节\n\n（正文）",
+          newText: "",
+        }),
+        { status: "rejected", code: "SOURCE_NOT_FOUND" }
+      ),
+      demoTextPart("未在原文中找到目标章节，本次未保存。"),
+    ]),
+    // output-error：通用失败卡，不露 errorText
+    done(demoMessageId(11), 13, "user", userText("把文档标题改成「评测计划」")),
+    done(demoMessageId(12), 14, "assistant", [
+      demoFindPart(projectId, "demo-f-find", rev(5).id),
+      demoReadPart(projectId, "demo-f-read", rev(5), {
+        readId: demoReadId(7),
+        isCurrent: true,
+        currentRevisionId: rev(5).id,
+      }),
+      demoUpdateErrorPart(
+        "demo-f-update",
+        demoUpdateInput(demoRevisionId(5), demoReadId(7), "修改文档标题为「评测计划」", {
+          oldText: "# Gate 3 演示文档",
+          newText: "# 评测计划",
+        }),
+        "DOCUMENT_STORE_TIMEOUT"
+      ),
+      demoTextPart("保存时发生错误，请稍后重试。"),
+    ]),
+  ]
+  return { document, revisions, artifacts, messages }
 }
 
 function initialBootstrap(
@@ -246,7 +680,7 @@ function initialBootstrap(
         id: BACKGROUND_USER_ID,
         projectId,
         threadId: ROOT_THREAD_ID,
-        sequence: 3,
+        sequence: DEMO_MESSAGE_SEQUENCES + 1,
         role: "user",
         parts: [{ type: "text", text: "刷新后恢复后台生成" }],
         status: "completed",
@@ -263,7 +697,7 @@ function initialBootstrap(
         id: BACKGROUND_ASSISTANT_ID,
         projectId,
         threadId: ROOT_THREAD_ID,
-        sequence: 4,
+        sequence: DEMO_MESSAGE_SEQUENCES + 2,
         role: "assistant",
         parts: [
           { type: "text", text: "刷新前 checkpoint", state: "streaming" },
@@ -315,6 +749,10 @@ export function createGate3MockRuntime(
   options: { backgroundRecovery?: boolean } = {}
 ) {
   const seed = initialBootstrap(projectId, options)
+  const documentDemo = createDocumentDemoFixture(projectId)
+  seed.documents.push(documentDemo.document)
+  seed.artifacts.push(...documentDemo.artifacts)
+  seed.messages.push(...documentDemo.messages)
   let project = clone(seed.project)
   const threads = new Map(
     seed.threads.map((thread) => [thread.id, clone(thread)])
@@ -325,6 +763,13 @@ export function createGate3MockRuntime(
   const artifacts = new Map(
     seed.artifacts.map((artifact) => [artifact.id, clone(artifact)])
   )
+  const documents = new Map([[documentDemo.document.id, clone(documentDemo.document)]])
+  const revisions = new Map(
+    documentDemo.revisions.map((revision) => [revision.id, clone(revision)])
+  )
+  /* 流式按 chunk 逐步发出的 parts 与终态必须一致；先构建后缓存，
+   * 供 fetchStream 与 finalMessage（含轮询路径）共用。 */
+  const documentPartsByMessageId = new Map<string, MessageDTO["parts"]>()
   const userParts = (content: MessageContentInput) => messageContentToUiParts(content, (id) => {
     const artifact = artifacts.get(id)
     if (!artifact) throw new Error("引用的 Artifact 不存在")
@@ -342,7 +787,7 @@ export function createGate3MockRuntime(
     files: [],
     threads: [...threads.values()].map(clone),
     messages: [...messages.values()].map(clone),
-    documents: [],
+    documents: [...documents.values()].map(clone),
     artifacts: [...artifacts.values()].map(clone),
     activeGenerationIds: [...messages.values()]
       .filter((message) => message.status === "generating")
@@ -422,6 +867,218 @@ export function createGate3MockRuntime(
     streamUrl: `mock://thread-chat/${assistantMessage.id}`,
   })
 
+  /** 在演示文档上提交一个新版本：写 revisions / artifacts / 目录项。 */
+  const commitDemoRevision = (input: {
+    changeSummary: string
+    content: string
+    sourceThreadId: string
+    sourceMessageId: string
+  }): DocumentRevisionDTO | null => {
+    const document = documents.get(DEMO_DOCUMENT_ID)
+    if (!document) return null
+    const parent = revisions.get(document.currentRevisionId)
+    if (!parent) return null
+    const revision: DocumentRevisionDTO = {
+      id: crypto.randomUUID(),
+      documentId: DEMO_DOCUMENT_ID,
+      revisionNumber: parent.revisionNumber + 1,
+      parentRevisionId: parent.id,
+      artifactId: crypto.randomUUID(),
+      title: document.title,
+      sourceThreadId: input.sourceThreadId,
+      sourceMessageId: input.sourceMessageId,
+      sourceMessageStatus: "completed",
+      changeSummary: input.changeSummary,
+      content: input.content,
+      createdAt: now(),
+    }
+    revisions.set(revision.id, revision)
+    artifacts.set(revision.artifactId, demoArtifactForRevision(projectId, revision))
+    documents.set(document.id, {
+      ...document,
+      currentRevisionId: revision.id,
+      revisionNumber: revision.revisionNumber,
+      currentArtifactId: revision.artifactId,
+      sourceThreadId: input.sourceThreadId,
+      sourceMessageId: input.sourceMessageId,
+    })
+    return revision
+  }
+
+  /** document-* 场景的完整 parts；构建即有副作用（并发版/新版本入库），
+   * 结果缓存供流式 chunk 与终态共用。 */
+  const documentTurnParts = (
+    message: MessageDTO,
+    scenario: Gate3HarnessScenario
+  ): MessageDTO["parts"] => {
+    const cached = documentPartsByMessageId.get(message.id)
+    if (cached) return cached
+    const parts = buildDocumentTurnParts(message, scenario)
+    documentPartsByMessageId.set(message.id, parts)
+    return parts
+  }
+
+  const buildDocumentTurnParts = (
+    message: MessageDTO,
+    scenario: Gate3HarnessScenario
+  ): MessageDTO["parts"] => {
+    const document = documents.get(DEMO_DOCUMENT_ID)
+    if (!document)
+      return [demoTextPart("演示文档不可用，已按普通回复完成。")]
+    const current = revisions.get(document.currentRevisionId)
+    if (!current)
+      return [demoTextPart("演示文档版本缺失，已按普通回复完成。")]
+    const call = (step: string) => `doc-${message.id}-${step}`
+    const readId = () => crypto.randomUUID()
+    const find = demoFindPart(projectId, call("find"), current.id)
+    const read = demoReadPart(projectId, call("read"), current, {
+      readId: readId(),
+      isCurrent: true,
+      currentRevisionId: current.id,
+    })
+    const edit = {
+      oldText: "- [ ] 确定评分方案",
+      newText: "- [ ] 确定评分方案\n- [ ] Harness 演示新增项",
+    }
+    const summary = "TODO 补充「Harness 演示新增项」"
+    const concurrentCommit = () =>
+      commitDemoRevision({
+        changeSummary: "另一线程并发修改",
+        content: `${current.content}\n- [ ] 并发写入项`,
+        sourceThreadId: CHILD_THREAD_ID,
+        sourceMessageId: DEMO_CONCURRENT_MESSAGE_ID,
+      })
+    const committedUpdate = (
+      base: DocumentRevisionDTO,
+      key: string
+    ): MessageDTO["parts"][number] => {
+      const committed = commitDemoRevision({
+        changeSummary: summary,
+        content: base.content.replace(edit.oldText, edit.newText),
+        sourceThreadId: message.threadId,
+        sourceMessageId: message.id,
+      })
+      if (!committed) {
+        return demoUpdateErrorPart(
+          call(key),
+          demoUpdateInput(base.id, readId(), summary, edit),
+          "DEMO_DOCUMENT_UNAVAILABLE"
+        )
+      }
+      return demoUpdatePart(
+        call(key),
+        demoUpdateInput(base.id, readId(), summary, edit),
+        {
+          status: "committed",
+          documentId: DEMO_DOCUMENT_ID,
+          previousRevisionId: base.id,
+          revisionId: committed.id,
+          artifactId: committed.artifactId,
+          changeSummary: summary,
+        }
+      )
+    }
+    const conflictResult = (currentRevisionId: string): UpdateDocumentResult => ({
+      status: "conflict",
+      code: "DOCUMENT_CHANGED",
+      documentId: DEMO_DOCUMENT_ID,
+      currentRevisionId,
+      requiresRead: true,
+    })
+
+    switch (scenario) {
+      case "document-commit":
+        return [
+          find,
+          read,
+          committedUpdate(current, "update"),
+          demoTextPart("已按最新版本提交修改并保存。"),
+        ]
+      case "document-retry": {
+        const concurrent = concurrentCommit()
+        if (!concurrent)
+          return [find, read, demoTextPart("演示文档不可用。")]
+        const reread = demoReadPart(projectId, call("read-2"), concurrent, {
+          readId: readId(),
+          isCurrent: true,
+          currentRevisionId: concurrent.id,
+        })
+        return [
+          find,
+          read,
+          demoUpdatePart(
+            call("update-1"),
+            demoUpdateInput(current.id, readId(), summary, edit),
+            conflictResult(concurrent.id)
+          ),
+          reread,
+          committedUpdate(concurrent, "update-2"),
+          demoTextPart("提交时检测到并发修改，已按最新版本重读并重新提交。"),
+        ]
+      }
+      case "document-unchanged":
+        return [
+          find,
+          read,
+          demoUpdatePart(
+            call("update"),
+            demoUpdateInput(current.id, readId(), summary, {
+              oldText: edit.oldText,
+              newText: edit.oldText,
+            }),
+            {
+              status: "unchanged",
+              documentId: DEMO_DOCUMENT_ID,
+              revisionId: current.id,
+            }
+          ),
+          demoTextPart("目标内容已满足要求，无需重复保存。"),
+        ]
+      case "document-conflict": {
+        const concurrent = concurrentCommit()
+        if (!concurrent)
+          return [find, read, demoTextPart("演示文档不可用。")]
+        return [
+          find,
+          read,
+          demoUpdatePart(
+            call("update"),
+            demoUpdateInput(current.id, readId(), summary, edit),
+            conflictResult(concurrent.id)
+          ),
+          demoTextPart("提交时文档已被其他线程更新，本次未保存，请重试。"),
+        ]
+      }
+      case "document-rejected":
+        return [
+          find,
+          read,
+          demoUpdatePart(
+            call("update"),
+            demoUpdateInput(current.id, readId(), "删除不存在的章节", {
+              oldText: "## 9. 不存在的章节",
+              newText: "",
+            }),
+            { status: "rejected", code: "SOURCE_NOT_FOUND" }
+          ),
+          demoTextPart("未在原文中找到目标内容，本次未保存。"),
+        ]
+      case "document-error":
+        return [
+          find,
+          read,
+          demoUpdateErrorPart(
+            call("update"),
+            demoUpdateInput(current.id, readId(), summary, edit),
+            "DOCUMENT_STORE_TIMEOUT"
+          ),
+          demoTextPart("保存时发生错误，请稍后重试。"),
+        ]
+      default:
+        return [demoTextPart(`已通过 ${scenario} 场景完成规范化 parts 收敛。`)]
+    }
+  }
+
   const finalMessage = (messageId: string): MessageDTO => {
     const current = messages.get(messageId)
     if (!current) throw new Error("MESSAGE_NOT_FOUND")
@@ -500,6 +1157,8 @@ export function createGate3MockRuntime(
           title: "AI SDK 文档",
         },
       ]
+    } else if (DOCUMENT_SCENARIOS.has(scenario)) {
+      parts = documentTurnParts(current, scenario)
     }
     const terminal: MessageDTO = {
       ...current,
@@ -515,8 +1174,12 @@ export function createGate3MockRuntime(
 
   const client: ThreadChatClient = {
     async listThreadArtifacts(threadId: string) { return [...artifacts.values()].filter(artifact => artifact.threadId === threadId) },
-    async listDocuments() { return { documents: [], artifacts: [...artifacts.values()] } },
-    async getDocumentHistory() { return [] },
+    async listDocuments() { return { documents: [...documents.values()].map(clone), artifacts: [...artifacts.values()].map(clone) } },
+    async getDocumentHistory(documentId: string) {
+      return [...revisions.values()]
+        .filter((revision) => revision.documentId === documentId)
+        .map(clone)
+    },
     async listProjects(archived = false) {
       return project && Boolean(project.archivedAt) === archived
         ? [
@@ -829,6 +1492,9 @@ export function createGate3MockRuntime(
       threads.clear()
       messages.clear()
       artifacts.clear()
+      documents.clear()
+      revisions.clear()
+      documentPartsByMessageId.clear()
       return commandResponse({ projectId, deleted: true as const })
     },
   }
@@ -866,6 +1532,28 @@ export function createGate3MockRuntime(
             throughSeq: 0,
             replay: [],
           })
+          if (DOCUMENT_SCENARIOS.has(scenario)) {
+            /* 文档场景逐 chunk 发送：轨迹行能看到查找/读取/提交的进行中
+             * spinner 与失败标红，终态与流式 parts 一致。 */
+            const chunks = partsToStreamChunks(
+              documentTurnParts(current, scenario)
+            )
+            let seq = 0
+            const emitNext = () => {
+              if (disconnected) return
+              const chunk = chunks[seq]
+              if (!chunk) {
+                send({ type: "terminal", message: finalMessage(messageId) })
+                close()
+                return
+              }
+              seq += 1
+              send({ type: "chunk", seq, chunk })
+              setTimeout(emitNext, 260)
+            }
+            setTimeout(emitNext, 120)
+            return
+          }
           send({
             type: "chunk",
             seq: 1,

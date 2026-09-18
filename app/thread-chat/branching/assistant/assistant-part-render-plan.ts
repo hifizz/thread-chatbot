@@ -4,9 +4,17 @@ import {
 } from "@/lib/chat/web-research-activity"
 import type { ConversationViewMessage } from "../../core/types"
 import type { ThreadChatUIMessage } from "@/lib/thread-chat/contracts/ui-message"
-import { DOCUMENT_TOOL_NAMES } from "@/constants/project-documents"
 
 export type ThreadChatUIPart = ThreadChatUIMessage["parts"][number]
+export type DocumentToolPart = Extract<
+  ThreadChatUIPart,
+  {
+    type:
+      | "tool-findProjectDocuments"
+      | "tool-readProjectDocument"
+      | "tool-updateProjectDocument"
+  }
+>
 export type AssistantPartRenderKind =
   | "text"
   | "reasoning"
@@ -17,16 +25,14 @@ export type AssistantPartRenderKind =
   | "document"
   | "tool"
 
-const DOCUMENT_TOOL_PART_TYPES: ReadonlySet<string> = new Set(
-  DOCUMENT_TOOL_NAMES.map((name) => `tool-${name}`)
-)
-
 export interface AssistantPartRenderPlanItem {
   kind: AssistantPartRenderKind
   part: ThreadChatUIPart
   index: number
   /** 连续的联网活动合并为一个轨迹块展示；仅 research 项携带。 */
   activities?: WebResearchActivity[]
+  /** 连续的文档工具调用合并为一个时序轨迹块；仅 document 项携带。 */
+  documents?: DocumentToolPart[]
 }
 
 function fallbackParts(message: ConversationViewMessage): ThreadChatUIPart[] {
@@ -75,8 +81,18 @@ export function assistantPartRenderPlan(
       return
     }
     // 文档工具走专属渲染；不得落入 createMarkdownArtifact 的"生成文档"轨迹文案。
-    if (DOCUMENT_TOOL_PART_TYPES.has(part.type)) {
-      plan.push({ kind: "document", part, index })
+    // 连续调用合并为一个时序轨迹块（查找→读取→提交）。
+    if (
+      part.type === "tool-findProjectDocuments" ||
+      part.type === "tool-readProjectDocument" ||
+      part.type === "tool-updateProjectDocument"
+    ) {
+      const last = plan.at(-1)
+      if (last?.kind === "document") {
+        last.documents?.push(part)
+        return
+      }
+      plan.push({ kind: "document", part, index, documents: [part] })
       return
     }
     if (part.type.startsWith("tool-")) {

@@ -29,14 +29,25 @@ export function MessageArtifacts({
   onOpen?: (artifactId: string) => void
 }) {
   const inlineArtifactIds = new Set(
-    (message.uiParts ?? []).flatMap((part) =>
-      part.type === "tool-createMarkdownArtifact" &&
-      part.state === "output-available" &&
-      part.output?.created &&
-      typeof part.output.artifactId === "string"
-        ? [part.output.artifactId]
-        : []
-    )
+    (message.uiParts ?? []).flatMap((part) => {
+      if (
+        part.type === "tool-createMarkdownArtifact" &&
+        part.state === "output-available" &&
+        part.output?.created &&
+        typeof part.output.artifactId === "string"
+      )
+        return [part.output.artifactId]
+      // 文档更新提交的修订版本 artifact：详情由 DocumentUpdateTool 结果卡片承载，
+      // 不在气泡后重复渲染。
+      if (
+        part.type === "tool-updateProjectDocument" &&
+        part.state === "output-available" &&
+        part.output?.status === "committed" &&
+        typeof part.output.artifactId === "string"
+      )
+        return [part.output.artifactId]
+      return []
+    })
   )
   const hasToolPart = (message.uiParts ?? []).some(
     (part) =>

@@ -68,6 +68,12 @@ const SCENARIOS: Array<{ id: Gate3HarnessScenario; label: string }> = [
   { id: "failure", label: "可重试失败" },
   { id: "artifact", label: "Artifact-only" },
   { id: "research", label: "研究 parts" },
+  { id: "document-commit", label: "文档·成功保存" },
+  { id: "document-retry", label: "文档·冲突重试" },
+  { id: "document-unchanged", label: "文档·无需修改" },
+  { id: "document-conflict", label: "文档·版本冲突" },
+  { id: "document-rejected", label: "文档·修改被拒" },
+  { id: "document-error", label: "文档·保存报错" },
 ]
 
 function legacyFeedback(value: "up" | "down" | null): MessageFeedback | null {
