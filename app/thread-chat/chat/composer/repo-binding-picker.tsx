@@ -163,7 +163,7 @@ export function RepoBindingPicker({
   }
 
   const filtered = repos.filter((r) =>
-    r.fullName.toLowerCase().includes(search.toLowerCase())
+    (r.fullName ?? "").toLowerCase().includes(search.toLowerCase())
   )
 
   const popoverContent = (
