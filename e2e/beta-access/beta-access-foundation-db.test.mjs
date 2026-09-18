@@ -7,7 +7,7 @@ assert.ok(
 )
 process.env.BETTER_AUTH_URL ??= "http://localhost:4040"
 
-const [{ eq }, { db }, schema, waitlist, invites, emailEvents, cryptoModule, pricing] =
+const [{ eq, inArray }, { db }, schema, waitlist, invites, emailEvents, cryptoModule, pricing] =
   await Promise.all([
     import("drizzle-orm"),
     import("../../lib/db/index.ts"),
@@ -172,6 +172,12 @@ try {
 
   console.log("PASS  beta invite hashing, email matching, atomic redemption, and grant idempotency")
 } finally {
+  await db
+    .delete(schema.adminAuditLogs)
+    .where(inArray(schema.adminAuditLogs.actorId, [userId, adminId]))
+  await db
+    .delete(schema.betaWaitlistEntries)
+    .where(eq(schema.betaWaitlistEntries.emailNormalized, invitedEmail))
   await db.delete(schema.user).where(eq(schema.user.id, userId))
   await db.delete(schema.user).where(eq(schema.user.id, adminId))
 }
