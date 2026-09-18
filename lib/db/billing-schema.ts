@@ -3,6 +3,7 @@ import {
   timestamp,
   integer,
   bigint,
+  jsonb,
   index,
   uniqueIndex,
 } from "drizzle-orm/pg-core"
@@ -64,5 +65,160 @@ export const usageRecords = dbSchema.table(
     uniqueIndex("usage_records_app_generation_id_uq").on(
       table.appGenerationId
     ),
+  ]
+)
+
+/** 不可变额度流水。余额是快速读取值，流水是赠额、扣款与人工调整的审计依据。 */
+export const creditLedger = dbSchema.table(
+  "credit_ledger",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    kind: text("kind", {
+      enum: [
+        "opening_balance",
+        "grant",
+        "charge",
+        "refund",
+        "adjustment",
+      ],
+    }).notNull(),
+    amountMicros: bigint("amount_micros", { mode: "number" }).notNull(),
+    idempotencyKey: text("idempotency_key").notNull(),
+    referenceId: text("reference_id").notNull(),
+    reason: text("reason").notNull(),
+    actorId: text("actor_id"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("credit_ledger_idempotency_key_uq").on(table.idempotencyKey),
+    index("credit_ledger_user_created_idx").on(table.userId, table.createdAt),
+  ]
+)
+
+export type BillingPriceRates = Array<{
+  unit: string
+  decimalPrice: string
+  perUnits: number
+}>
+
+/** 每轮生成冻结的定价、汇率与用户扣额政策，不随之后的配置修改而变化。 */
+export const billingPriceSnapshots = dbSchema.table(
+  "billing_price_snapshots",
+  {
+    id: text("id").primaryKey(),
+    generationId: text("generation_id").notNull(),
+    providerId: text("provider_id").notNull(),
+    serviceId: text("service_id").notNull(),
+    currency: text("currency", { enum: ["CNY", "USD"] }).notNull(),
+    rates: jsonb("rates").$type<BillingPriceRates>().notNull(),
+    fxToCny: text("fx_to_cny").notNull(),
+    chargingPolicyVersion: text("charging_policy_version").notNull(),
+    effectiveAt: timestamp("effective_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("billing_price_snapshots_generation_uq").on(
+      table.generationId
+    ),
+  ]
+)
+
+/** 生成启动前的额度占用；只在短事务内创建或改变状态。 */
+export const billingReservations = dbSchema.table(
+  "billing_reservations",
+  {
+    id: text("id").primaryKey(),
+    generationId: text("generation_id").notNull(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    priceSnapshotId: text("price_snapshot_id")
+      .notNull()
+      .references(() => billingPriceSnapshots.id),
+    customerReservedMicros: bigint("customer_reserved_micros", {
+      mode: "number",
+    }).notNull(),
+    supplierReservedMicros: bigint("supplier_reserved_micros", {
+      mode: "number",
+    }).notNull(),
+    customerChargedMicros: bigint("customer_charged_micros", {
+      mode: "number",
+    }),
+    supplierCostMicros: bigint("supplier_cost_micros", { mode: "number" }),
+    status: text("status", {
+      enum: ["held", "settled", "released", "reconciliation_required"],
+    })
+      .notNull()
+      .default("held"),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    settledAt: timestamp("settled_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("billing_reservations_generation_uq").on(table.generationId),
+    index("billing_reservations_user_status_idx").on(
+      table.userId,
+      table.status
+    ),
+    index("billing_reservations_status_expires_idx").on(
+      table.status,
+      table.expiresAt
+    ),
+  ]
+)
+
+/** 一次真实供应商调用的一种互斥计量单位。 */
+export const billingUsageLines = dbSchema.table(
+  "billing_usage_lines",
+  {
+    id: text("id").primaryKey(),
+    generationId: text("generation_id").notNull(),
+    operationId: text("operation_id").notNull(),
+    attemptId: text("attempt_id").notNull(),
+    providerRequestId: text("provider_request_id"),
+    kind: text("kind", { enum: ["llm", "search", "fetch"] }).notNull(),
+    unit: text("unit", {
+      enum: [
+        "uncached_input_token",
+        "cached_input_token",
+        "cache_write_token",
+        "output_token",
+        "request",
+        "page",
+        "credit",
+      ],
+    }).notNull(),
+    quantity: bigint("quantity", { mode: "number" }).notNull(),
+    providerCostMicros: bigint("provider_cost_micros", { mode: "number" }),
+    userChargeMicros: bigint("user_charge_micros", { mode: "number" }),
+    evidence: text("evidence", {
+      enum: ["reported", "estimated", "unknown"],
+    }).notNull(),
+    pricingSnapshotId: text("pricing_snapshot_id")
+      .notNull()
+      .references(() => billingPriceSnapshots.id),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("billing_usage_lines_attempt_unit_price_uq").on(
+      table.attemptId,
+      table.unit,
+      table.pricingSnapshotId
+    ),
+    index("billing_usage_lines_generation_idx").on(table.generationId),
   ]
 )

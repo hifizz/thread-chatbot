@@ -1,0 +1,49 @@
+name: Beta billing
+
+on:
+  pull_request:
+    paths:
+      - "app/api/chat/**"
+      - "constants/billing.ts"
+      - "constants/pricing.ts"
+      - "lib/auth/**"
+      - "lib/billing/**"
+      - "lib/db/billing-schema.ts"
+      - "lib/thread-chat/**"
+      - "e2e/billing/**"
+      - ".github/workflows/beta-billing.yml"
+
+jobs:
+  billing:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: billing_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d billing_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/billing_test
+      DIRECT_URL: postgres://postgres:postgres@localhost:5432/billing_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.32.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm db:push
+      - run: pnpm test:billing:foundation
+      - run: pnpm typecheck
+

@@ -2,16 +2,16 @@ import { and, desc, eq, sql } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { usageRecords } from "@/lib/db/schema"
 import { getCurrentUserId } from "@/lib/auth/server"
-import { ensureUserCredits, getBalanceMicros } from "@/lib/billing/credits"
+import { ensureUserCredits, getCreditSummary } from "@/lib/billing/credits"
 
 // 输入框下方 token 统计的数据源：余额 + （可选）当前对话累计用量。
 export async function GET(req: Request) {
   const userId = await getCurrentUserId()
   if (!userId) return Response.json({ error: "未登录" }, { status: 401 })
 
-  // 兼容 hook 之前注册的老用户：首次拉取时补发初始额度。
+  // 兼容历史账户：只补账户行，不在读取接口隐式赠额。
   await ensureUserCredits(userId)
-  const balanceMicros = await getBalanceMicros(userId)
+  const credit = await getCreditSummary(userId)
 
   const threadId = new URL(req.url).searchParams.get("threadId")
 
@@ -77,5 +77,5 @@ export async function GET(req: Request) {
       }
     : null
 
-  return Response.json({ balanceMicros, thread, last })
+  return Response.json({ ...credit, thread, last })
 }

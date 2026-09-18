@@ -1,7 +1,7 @@
 import { desc, eq, sql } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { payments, subscriptions, usageRecords } from "@/lib/db/schema"
-import { getBalanceMicros, ensureUserCredits } from "@/lib/billing/credits"
+import { getCreditSummary, ensureUserCredits } from "@/lib/billing/credits"
 
 // 账户页所需的聚合数据：余额、充值/消耗流水、订阅、累计统计。
 
@@ -34,6 +34,8 @@ export type AccountSubscription = {
 
 export type AccountData = {
   balanceMicros: number
+  reservedMicros: number
+  availableMicros: number
   totalToppedUpMicros: number
   totalSpentMicros: number
   payments: AccountPayment[]
@@ -43,7 +45,7 @@ export type AccountData = {
 
 export async function getAccountData(userId: string): Promise<AccountData> {
   await ensureUserCredits(userId)
-  const balanceMicros = await getBalanceMicros(userId)
+  const credit = await getCreditSummary(userId)
 
   const [paymentRows, usageRows, subRows, topupAgg, spendAgg] =
     await Promise.all([
@@ -82,7 +84,7 @@ export async function getAccountData(userId: string): Promise<AccountData> {
     ])
 
   return {
-    balanceMicros,
+    ...credit,
     totalToppedUpMicros: Number(topupAgg[0]?.total ?? 0),
     totalSpentMicros: Number(spendAgg[0]?.total ?? 0),
     payments: paymentRows.map((p) => ({

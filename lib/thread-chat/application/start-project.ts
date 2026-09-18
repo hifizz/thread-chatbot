@@ -6,6 +6,7 @@ import type { GenerationAcceptedDTO } from "@/lib/thread-chat/contracts/dto"
 import {
   assertAllowedGenerationSettings,
   assertAllowedModel,
+  reservePaidGeneration,
 } from "@/lib/thread-chat/application/command-utils"
 import { notFound, stateConflict } from "@/lib/thread-chat/application/errors"
 import { executeIdempotentCommand } from "@/lib/thread-chat/persistence/command-repository"
@@ -86,6 +87,12 @@ export function startProject(userId: string, command: StartProjectCommand) {
             },
           ])
           .returning()
+        await reservePaidGeneration(tx, {
+          userId,
+          generationId: assistantMessage.id,
+          modelId: command.modelId,
+          generationSettings: command.generationSettings,
+        })
         return {
           project: toProjectDTO(project, thread.id),
           thread: toThreadDTO(thread),

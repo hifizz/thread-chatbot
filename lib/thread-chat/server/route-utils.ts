@@ -86,13 +86,20 @@ export function mapRouteError(error: unknown): Response {
   if (error instanceof CommandIdConflictError)
     return errorResponse(409, error.code, error.message)
   if (error instanceof ConversationApplicationError) {
-    const status =
-      error.code === "NOT_FOUND"
-        ? 404
-        : error.code === "VALIDATION_ERROR" ||
-            error.code === "MODEL_NOT_ALLOWED"
-          ? 400
-          : 409
+    let status = 409
+    if (error.code === "NOT_FOUND") status = 404
+    else if (
+      error.code === "CREDIT_EXHAUSTED" ||
+      error.code === "RUN_RESERVATION_INSUFFICIENT"
+    )
+      status = 402
+    else if (error.code === "TOO_MANY_ACTIVE_RUNS") status = 429
+    else if (
+      error.code === "VALIDATION_ERROR" ||
+      error.code === "MODEL_NOT_ALLOWED" ||
+      error.code === "MODEL_PRICING_UNAVAILABLE"
+    )
+      status = 400
     return errorResponse(status, error.code, error.message)
   }
   if (error instanceof Error && error.message === "SESSION_NOT_AVAILABLE")

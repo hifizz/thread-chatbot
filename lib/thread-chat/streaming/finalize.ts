@@ -14,6 +14,7 @@ import {
 } from "@/lib/thread-chat/streaming/artifacts"
 import { AI_DIAGNOSTIC_EVENTS } from "@/constants/observability"
 import { logDiagnostic } from "@/lib/observability/diagnostic-log"
+import { settleGenerationInTransaction } from "@/lib/billing/reservations"
 
 export type RequestedTerminalStatus = "completed" | "stopped" | "failed"
 
@@ -111,6 +112,15 @@ export async function finalizeGeneration({
       if (!project) throw new Error("PROJECT_NOT_FOUND")
       for (const artifact of inserted) await registerDocumentArtifact(tx, artifact, project.userId)
     }
+    if (!updated.modelId) throw new Error("GENERATION_MODEL_NOT_FOUND")
+    await settleGenerationInTransaction(tx, {
+      generationId: updated.id,
+      userId: identity.userId,
+      threadId: updated.threadId,
+      messageId: updated.id,
+      modelId: updated.modelId,
+      providerUsage,
+    })
     return toMessageDTO(updated)
   })
 }
@@ -119,21 +129,41 @@ export async function failOrphanedGeneratingMessage(
   messageId: string,
   code: "SESSION_LOST" | "PROCESS_RESTARTED" = "SESSION_LOST"
 ): Promise<MessageDTO | null> {
-  const now = new Date()
-  const [updated] = await db
-    .update(messages)
-    .set({
-      status: "failed",
-      errorCode: code,
-      errorMessage:
-        code === "PROCESS_RESTARTED"
-          ? "服务进程重启，生成未能继续"
-          : "生成会话已不可用",
-      finishReason: "error",
-      finishedAt: now,
-      updatedAt: now,
-    })
-    .where(and(eq(messages.id, messageId), eq(messages.status, "generating")))
-    .returning()
-  return updated ? toMessageDTO(updated) : null
+  return db.transaction(async (tx) => {
+    const [identity] = await tx
+      .select({ userId: projects.userId })
+      .from(messages)
+      .innerJoin(projects, eq(projects.id, messages.projectId))
+      .where(eq(messages.id, messageId))
+    if (!identity) return null
+    const now = new Date()
+    const [updated] = await tx
+      .update(messages)
+      .set({
+        status: "failed",
+        errorCode: code,
+        errorMessage:
+          code === "PROCESS_RESTARTED"
+            ? "服务进程重启，生成未能继续"
+            : "生成会话已不可用",
+        finishReason: "error",
+        finishedAt: now,
+        updatedAt: now,
+      })
+      .where(
+        and(eq(messages.id, messageId), eq(messages.status, "generating"))
+      )
+      .returning()
+    if (!updated) return null
+    if (updated.modelId) {
+      await settleGenerationInTransaction(tx, {
+        generationId: updated.id,
+        userId: identity.userId,
+        threadId: updated.threadId,
+        messageId: updated.id,
+        modelId: updated.modelId,
+      })
+    }
+    return toMessageDTO(updated)
+  })
 }

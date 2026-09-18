@@ -15,6 +15,7 @@ import { buildFrozenForkContext } from "@/lib/thread-chat/domain/fork-context"
 import {
   assertAllowedGenerationSettings,
   assertAllowedModel,
+  reservePaidGeneration,
   touchProjectAndThread,
 } from "@/lib/thread-chat/application/command-utils"
 import { notFound, stateConflict } from "@/lib/thread-chat/application/errors"
@@ -182,6 +183,12 @@ export function forkThread(
             },
           ])
           .returning()
+        await reservePaidGeneration(tx, {
+          userId,
+          generationId: assistantMessage.id,
+          modelId,
+          generationSettings: command.generationSettings,
+        })
         await touchProjectAndThread(tx, project.id, child.id, modelId)
         const rootThreadId = await findRootThreadId(tx, project.id)
         if (!rootThreadId) stateConflict("Project 缺少根 Thread")
