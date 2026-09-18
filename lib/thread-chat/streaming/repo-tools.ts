@@ -10,7 +10,8 @@ import {
   type RepositoryReadContext,
 } from "@/lib/github/repo-reader"
 
-const MAX_CALLS_PER_TURN = 30
+// 测试阶段放宽上限；产品化时应收紧并结合 token 预算控制
+const MAX_CALLS_PER_TURN = 100
 
 export interface RepoToolContext {
   repositoryFullName: string

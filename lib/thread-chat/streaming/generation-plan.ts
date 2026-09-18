@@ -48,7 +48,8 @@ import { createRepoReadTools } from "@/lib/thread-chat/streaming/repo-tools"
 import { createAgentTaskTools } from "@/lib/thread-chat/streaming/agent-task-tools"
 import { resolveBranchCommit, shortSha } from "@/lib/github/repo-reader"
 
-const REPO_MAX_STEPS = 30
+// 测试阶段放宽上限；产品化时应收紧并结合 token 预算控制
+const REPO_MAX_STEPS = 100
 
 const REPO_SYSTEM_PROMPT = `你正在查看 GitHub 仓库的代码。你有三个只读工具：
 
