@@ -50,7 +50,6 @@ export const SHARE_UI_COPY = {
   statusActive: "有效",
   statusExpired: "已过期",
   statusRevoked: "已撤销",
-  listEmpty: "还没有分享链接",
   oneActiveHint: "已有有效分享链接，撤销或过期后可重新创建",
   shareNotice:
     "此链接保存创建时的内容与布局，后续修改不会同步。任何持有链接的人均可在有效期内阅读。Instructions 与附件不会分享，但已出现在对话或文档正文中的敏感内容不会自动打码，请检查后再分享。",

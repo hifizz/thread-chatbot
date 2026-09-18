@@ -166,30 +166,36 @@ export function ShareDialog({
               {SHARE_UI_COPY.shareNotice}
             </p>
 
-            <div
-              className="mb-3 flex items-center gap-1.5"
-              role="radiogroup"
-              aria-label={SHARE_UI_COPY.expiryLabel}
-            >
-              <span className="mr-1 text-xs text-[var(--tc-content-secondary)]">
+            <div className="mb-3">
+              <span className="mb-1.5 block text-xs text-[var(--tc-content-secondary)]">
                 {SHARE_UI_COPY.expiryLabel}
               </span>
-              {SHARE_EXPIRY_OPTIONS.map((option) => (
-                <button
-                  key={option.value}
-                  type="button"
-                  role="radio"
-                  aria-checked={expiry === option.value}
-                  className={cn(
-                    "cursor-pointer rounded-lg border border-[var(--tc-border-strong)] bg-[var(--tc-surface-plain)] px-2.5 py-1 text-xs text-[var(--tc-content-secondary)] hover:text-[var(--tc-content-primary)]",
-                    expiry === option.value &&
-                      "border-[var(--tc-content-muted)] text-[var(--tc-content-primary)]"
-                  )}
-                  onClick={() => setExpiry(option.value)}
-                >
-                  {option.label}
-                </button>
-              ))}
+              <div
+                className={cn(
+                  "grid grid-cols-4 gap-1 rounded-lg border border-[var(--tc-border-subtle)] bg-[var(--tc-surface-sunken)] p-1",
+                  hasActive && "opacity-50"
+                )}
+                role="radiogroup"
+                aria-label={SHARE_UI_COPY.expiryLabel}
+              >
+                {SHARE_EXPIRY_OPTIONS.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    role="radio"
+                    aria-checked={expiry === option.value}
+                    disabled={hasActive}
+                    className={cn(
+                      "cursor-pointer rounded-md py-2 text-[13px] text-[var(--tc-content-secondary)] hover:text-[var(--tc-content-primary)] disabled:cursor-default",
+                      expiry === option.value &&
+                        "bg-[var(--tc-surface-ink)] text-[var(--tc-content-on-ink)] hover:text-[var(--tc-content-on-ink)]"
+                    )}
+                    onClick={() => setExpiry(option.value)}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <button
@@ -212,9 +218,6 @@ export function ShareDialog({
               )}
               {loadFailed && (
                 <div className="swx-empty">加载失败，请稍后重新打开</div>
-              )}
-              {shares !== null && shares.length === 0 && (
-                <div className="swx-empty">{SHARE_UI_COPY.listEmpty}</div>
               )}
               {(shares ?? []).map((share) => (
                 <div
