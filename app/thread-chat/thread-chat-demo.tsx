@@ -68,6 +68,10 @@ import {
 import { ScrollMemoryScope } from "./scroll/use-scroll-memory"
 import { TreeList } from "./orchestration/navigation/tree-list"
 import { StoreBoundProjectPanel } from "./orchestration/artifacts/store-bound-project-panel"
+import {
+  ShareDialog,
+  type ShareResource,
+} from "./orchestration/sharing/share-dialog"
 import type { CanvasChatActions } from "./orchestration/canvas/canvas-actions"
 import { HelpPanel, UsageHint } from "./orchestration/overlays/help-panel"
 import { useWorkspaceOverlays } from "./orchestration/overlays/use-workspace-overlays"
@@ -179,6 +183,7 @@ export function NormalizedThreadChat({
   initialOverlay?: { drawerOpen: boolean; activeArtifactId: string | null }
 }) {
   const [questionArtifactId, setQuestionArtifactId] = useState<string | null>(null)
+  const [shareResource, setShareResource] = useState<ShareResource | null>(null)
   const router = useRouter()
   const state = useConversationStore(runtime.store, (value) => value)
   const { settings: generationSettings } = useGenerationSettings()
@@ -629,6 +634,14 @@ export function NormalizedThreadChat({
     branchCount,
     markdownCount,
     readOnly,
+    onShare:
+      !readOnly && state.project
+        ? () =>
+            setShareResource({
+              resourceType: "project",
+              resourceId: state.project!.id,
+            })
+        : undefined,
     onNewConversation: (openInNewPage) => {
       const newConversationUrl = `/thread-chat/${crypto.randomUUID()}`
       if (openInNewPage) {
@@ -815,7 +828,20 @@ export function NormalizedThreadChat({
         onSelect={setActiveArtifactId}
         onLocate={(threadId) => openBranchUI(threadId, null)}
         readOnly={readOnly}
+        onShareDocument={(documentId) =>
+          setShareResource({ resourceType: "document", resourceId: documentId })
+        }
       />
+      {!readOnly && (
+        <ShareDialog
+          open={shareResource !== null}
+          onClose={() => setShareResource(null)}
+          resource={shareResource}
+          store={runtime.store}
+          client={runtime.client}
+          overlay={{ drawerOpen, activeArtifactId }}
+        />
+      )}
       <WorkspaceToast toast={toast} onDismiss={dismissToast} />
     </div></ArtifactNavigationProvider></ComposerDraftProvider></ArtifactResourcesProvider></ScrollMemoryScope.Provider>
   )

@@ -31,6 +31,10 @@ import type {
   ApiErrorDTO,
   CommandResponse,
 } from "@/lib/thread-chat/contracts/errors"
+import type {
+  CreateShareCommand,
+  ShareDTO,
+} from "@/lib/thread-chat/sharing/contracts"
 
 export class ThreadChatApiError extends Error {
   readonly status: number
@@ -294,6 +298,27 @@ export function createThreadChatClient(options: ThreadChatClientOptions = {}) {
         url(`/api/thread-chat/v1/projects/${projectId}`),
         "DELETE",
         input
+      )
+    },
+    createShare(input: CreateShareCommand) {
+      return command<{ share: ShareDTO }>(
+        fetcher,
+        url("/api/thread-chat/v1/shares"),
+        "POST",
+        input
+      )
+    },
+    listShares(resourceType: "project" | "document", resourceId: string) {
+      return requestJson<ShareDTO[]>(
+        fetcher,
+        url(`/api/thread-chat/v1/shares?resourceType=${resourceType}&resourceId=${resourceId}`)
+      )
+    },
+    revokeShare(shareId: string) {
+      return requestJson<{ share: ShareDTO }>(
+        fetcher,
+        url(`/api/thread-chat/v1/shares/${shareId}`),
+        { method: "DELETE" }
       )
     },
   }

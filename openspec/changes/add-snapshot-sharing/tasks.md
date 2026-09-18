@@ -32,10 +32,10 @@
 
 ## 5. 所有者入口与布局捕获
 
-- [ ] 5.1 `orchestration/sharing/share-dialog.tsx`：四期限/默认无限/创建/复制/已有列表/撤销/提示文案；键盘与移动端可用
-- [ ] 5.2 `orchestration/sharing/capture-layout.ts`：确认时读 `store.getState().workspace` + overlay（activeArtifactId/drawerOpen），剔除 recents/草稿/模型设置
-- [ ] 5.3 入口：Project 顶栏分享按钮；Document/Artifact 详情头部入口（凭 `ArtifactSummaryDTO.document` 判定可分享性）；删除 Project 确认文案提示关联分享失效
-- [ ] 5.4 测试：创建失败不显示链接、重复提交不重复创建、非 Document Artifact 不可分享
+- [x] 5.1 `orchestration/sharing/share-dialog.tsx`：四期限/默认无限/创建/复制/已有列表/撤销/提示文案；键盘与移动端可用
+- [x] 5.2 `orchestration/sharing/capture-layout.ts`：确认时读 `store.getState().workspace` + overlay（activeArtifactId/drawerOpen），剔除 recents/草稿/模型设置
+- [x] 5.3 入口：Project 顶栏分享按钮；Document/Artifact 详情头部入口（凭 `ArtifactSummaryDTO.document` 判定可分享性）；删除 Project 确认文案提示关联分享失效
+- [x] 5.4 测试：创建失败不显示链接、重复提交不重复创建、非 Document Artifact 不可分享
 
 ## 6. 分享页（复用同一组件树 + ShareRuntime）
 

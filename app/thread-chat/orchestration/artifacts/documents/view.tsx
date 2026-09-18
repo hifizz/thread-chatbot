@@ -9,9 +9,11 @@ import { DocumentVersionHistory } from "./version-history"
 import { DocumentDiff } from "./diff"
 
 /** 只管理版本目录；导航资格由持有选区/草稿的上层明确传入。 */
-export function DocumentView({ artifact, currentRevisionId, client, navigationBlocked, onSelect }: {
+export function DocumentView({ artifact, currentRevisionId, client, navigationBlocked, onShare, onSelect }: {
   currentRevisionId?: string
   artifact: ArtifactDTO; client: ThreadChatClient; navigationBlocked: boolean
+  /** 分享入口：把文档当前版冻结为匿名只读链接 */
+  onShare?(documentId: string): void
   onSelect(artifactId: string): void
 }) {
   const document = artifact.document
@@ -44,6 +46,12 @@ export function DocumentView({ artifact, currentRevisionId, client, navigationBl
       <button type="button" className="artifact-version-jump"
         disabled={navigationBlocked} onClick={() => onSelect(latest.artifactId)}>
         回到最新
+      </button>
+    )}
+    {onShare && (
+      <button type="button" className="artifact-version-jump"
+        onClick={() => onShare(document.id)}>
+        分享当前版
       </button>
     )}
     {artifact.sourceMessageStatus !== "completed" && <p className="artifact-view-hint">此版本已保存。来源回复尚未成功完成，暂时不能从这里开启分支。</p>}

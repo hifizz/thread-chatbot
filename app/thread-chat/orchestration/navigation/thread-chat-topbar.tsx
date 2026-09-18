@@ -8,6 +8,7 @@ import {
   ListTodo,
   Menu,
   Network,
+  Share2,
   Waypoints,
 } from "lucide-react"
 import type { MouseEvent } from "react"
@@ -48,6 +49,8 @@ export interface ThreadChatNavigationProps {
   onPlacementModeChange(mode: PlacementMode): void
   onToggleThreadTree(): void
   onToggleMarkdown(): void
+  /** 分享入口：缺席或 readOnly 时不渲染按钮 */
+  onShare?(): void
 }
 
 export function ThreadChatMobileMenu({
@@ -192,6 +195,7 @@ export function ThreadChatTopbar(props: ThreadChatNavigationProps) {
     onPlacementModeChange,
     onToggleThreadTree,
     onToggleMarkdown,
+    onShare,
   } = props
   return (
     <div className="topbar">
@@ -318,6 +322,16 @@ export function ThreadChatTopbar(props: ThreadChatNavigationProps) {
         Project
         <span className="cnt">{markdownCount}</span>
       </button>
+      {!readOnly && onShare && (
+        <button
+          className="tbtn"
+          title="把当前 Project 冻结为匿名只读链接"
+          onClick={onShare}
+        >
+          <Share2 size={13} />
+          分享
+        </button>
+      )}
       <AccountButton />
     </div>
   )
