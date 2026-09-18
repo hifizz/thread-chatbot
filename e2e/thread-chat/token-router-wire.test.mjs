@@ -62,15 +62,25 @@ try {
     assert.equal("max_tokens" in body, false)
     assert.equal("thinking" in body, false)
   }
-  const gemini = resolveChatModelWithRoute("iceland-gemini-3.7-flash")
+  // 逐个检查新增入口实际发送的 ID；包括由中转站维护的两个别名。
+  for (const upstreamId of [
+    "deepseek-v4.1-flash", "qwen3.8-max", "gemini-3.8-flash", "minimax-m3",
+    "kimi-k2.7-code", "hy4-preview", "qwen3.8-max-0902", "qwen3.8-flash",
+    "muse-spark-1.3", "muse-spark-1.3-contributor", "kimi-k3", "grok-4.6",
+    "union-alpha", "mimo-v2.5-pro",
+  ]) {
+    const resolved = resolveChatModelWithRoute(`token-router-${upstreamId}`)
+    await generateText({ model: resolved.model, prompt: "Reply OK", maxOutputTokens: 8, maxRetries: 0 })
+    assert.equal(requests.at(-1).url, "https://router.example.test/v1/chat/completions")
+    assert.equal(requests.at(-1).body.model, upstreamId)
+    assert.equal(resolved.route.actualProvider, "token-router")
+  }
+  const gemini = resolveChatModelWithRoute("token-router-gemini-3.8-flash")
   await generateText({ model: gemini.model, prompt: "Reply OK", maxOutputTokens: 8, maxRetries: 0 })
   assert.equal(requests.at(-1).body.max_tokens, 8)
   assert.equal("max_completion_tokens" in requests.at(-1).body, false)
   for (const upstreamId of [
-    "deepseek-v4.1-flash-expires-on-0910",
-    "deepseek-v4-flash",
-    "deepseek-v4-flash-vision-exp",
-    "deepseek-v4-pro",
+    "deepseek-v4.1-flash",
     "glm-5.3",
     "glm-5.3-flash",
   ]) {
@@ -103,7 +113,7 @@ try {
       await generateText({ model: resolved.model, prompt: "Reply OK", maxRetries: 0,
         ...chatAnswerGenerationOptions("answer", { effort, maxOutputTokens: 16_000 }, resolved.route.protocol) })
       const body = requests.at(-1).body
-      const disabled = effort === "none" && upstreamId.startsWith("deepseek-v4-")
+      const disabled = effort === "none" && upstreamId.startsWith("deepseek-")
       assert.deepEqual(body.thinking, { type: disabled ? "disabled" : "enabled" })
       assert.equal(body.reasoning_effort, disabled ? undefined : expected)
     }
@@ -120,10 +130,10 @@ console.log("PASS Token Router 原生协议、统一凭据、稳定公开 ID 与
 
 // 思考工具回合必须完整保留，且转换不能修改调用方原始对象。
 const history = [{ role: "assistant", content: null, reasoning_content: "Need a source", tool_calls: [{ id: "call_1", type: "function", function: { name: "search", arguments: "{}" } }] }, { role: "tool", tool_call_id: "call_1", content: "Source" }]
-const original = { model: "deepseek-v4-flash", messages: history, reasoning_effort: "medium", tools: [{ type: "function", function: { name: "search" } }], tool_choice: "none" }
+const original = { model: "deepseek-v4.1-flash", messages: history, reasoning_effort: "medium", tools: [{ type: "function", function: { name: "search" } }], tool_choice: "none" }
 const snapshot = structuredClone(original)
 assert.deepEqual(normalizeTokenRouterRequest(original).messages, history)
 assert.deepEqual(original, snapshot)
-assert.equal(normalizeTokenRouterRequest({ model: "gemini-3.7-flash", tool_choice: "required" }).tool_choice, "required")
+assert.equal(normalizeTokenRouterRequest({ model: "gemini-3.8-flash", tool_choice: "required" }).tool_choice, "required")
 assert.throws(() => normalizeTokenRouterRequest({ model: "glm-5.3-flash", reasoning_effort: "invalid" }), /不支持推理强度/)
 console.log("PASS 思考工具历史保留及请求转换无副作用")
