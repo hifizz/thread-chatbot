@@ -45,15 +45,15 @@
 - [x] 6.4 `/share/[token]` 页挂 `NormalizedThreadChat`：不调用 `bootConversationProject`；`treeId` 作用域 key 改 `share:{token}` 命名空间；左侧项目列表与 AccountButton 隐藏/替换为"只读快照"徽标
 - [x] 6.5 布局恢复：列/折叠/宽度/焦点、画布 pins/viewport（不被首次 fitView 覆盖）、Artifact 面板；读者操作仅本地，重开恢复初始
 - [x] 6.6 Document 阅读页：复用 MarkdownBody + 安全链接策略，无私来源入口，不自动加载图片/附件
-- [ ] 6.7 移动端适配：压缩列数保顺序/焦点，全 Thread 可达；沿用 `.tc` token 与表格局部滚动
-- [ ] 6.8 测试：hydrate 正常渲染、快照外 ID 不可达、写控件禁用态、无私有/写网络请求
+- [x] 6.7 移动端适配：压缩列数保顺序/焦点，全 Thread 可达；沿用 `.tc` token 与表格局部滚动
+- [x] 6.8 测试：hydrate 正常渲染、快照外 ID 不可达、写控件禁用态、无私有/写网络请求
 
 ## 7. 联合验收
 
-- [ ] 7.1 验收样本：多层分支 + 父来源已替换 + 文档当前版 + 附件哨兵 + 未完成消息 + 手动布局，逐条覆盖 spec 场景
-- [ ] 7.2 不可变性：创建后新增/编辑/重命名/重生成/文档新版本/改布局均不影响旧链接
-- [ ] 7.3 playwright 匿名验收：首次加载/刷新/JSON/HTML/RSC 的缓存与隐私边界；已登录所有者打开同样只读
-- [ ] 7.4 `pnpm typecheck` 每批必跑；模块完成后查重复常量/逻辑；最终 lint + e2e + `pnpm openspec:validate --strict`
+- [x] 7.1 验收样本：多层分支 + 父来源已替换 + 文档当前版 + 附件哨兵 + 未完成消息 + 手动布局，逐条覆盖 spec 场景
+- [x] 7.2 不可变性：创建后新增/编辑/重命名/重生成/文档新版本/改布局均不影响旧链接
+- [x] 7.3 playwright 匿名验收：首次加载/刷新/JSON/HTML/RSC 的缓存与隐私边界；已登录所有者打开同样只读
+- [x] 7.4 `pnpm typecheck` 每批必跑；模块完成后查重复常量/逻辑；最终 lint + e2e + `pnpm openspec:validate --strict`
 
 ## 8. 发布门槛（不在功能分支生成 migration）
 

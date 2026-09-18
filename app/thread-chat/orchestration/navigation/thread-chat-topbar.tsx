@@ -332,7 +332,7 @@ export function ThreadChatTopbar(props: ThreadChatNavigationProps) {
           分享
         </button>
       )}
-      <AccountButton />
+      {!readOnly && <AccountButton />}
     </div>
   )
 }
