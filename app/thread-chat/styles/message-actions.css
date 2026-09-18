@@ -51,7 +51,8 @@
 .tc .message.user:hover > .message-toolbar,
 .tc .message.user:focus-within > .message-toolbar,
 .tc .message.assistant:hover > .assistant-actions-row,
-.tc .message.assistant:focus-within > .assistant-actions-row {
+.tc .message.assistant:focus-within > .assistant-actions-row,
+.tc .message.assistant > .assistant-actions-row:has([data-popup-open]) {
   opacity: 1;
 }
 .tc .message-action-trigger {

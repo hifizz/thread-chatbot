@@ -92,7 +92,20 @@ export function MessageForkActions({
           </Tooltip>
         </TooltipProvider>
       )}
-      {branches.length > 0 && (
+      {branches.length === 1 && (
+        <button
+          type="button"
+          className="message-fork-count"
+          onClick={(event) =>
+            onOpenThread(branches[0].threadId, {
+              keepSource: event.metaKey || event.ctrlKey,
+            })
+          }
+        >
+          {MESSAGE_FORK_LABELS.branchCount(1)}
+        </button>
+      )}
+      {branches.length > 1 && (
         <DropdownMenu>
           <DropdownMenuTrigger className="message-fork-count">
             {MESSAGE_FORK_LABELS.branchCount(branches.length)}
