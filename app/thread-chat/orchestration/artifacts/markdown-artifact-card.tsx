@@ -53,7 +53,7 @@ function CodeMark() {
  * Claude 样产物卡左侧的「页面缩略图」：底层露出一页侧边，正面一页里
  * 上方是类型符号、下方两条正文线。高度对齐「标题 + 副标题」两行。
  */
-function ArtifactThumb({ kind }: { kind: Artifact["kind"] }) {
+export function ArtifactThumb({ kind }: { kind: Artifact["kind"] }) {
   return (
     <span className="thumb" aria-hidden="true">
       <span className="thumb-back" />

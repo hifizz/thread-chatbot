@@ -292,15 +292,25 @@ export function DocumentTrace({
       part.state === "output-error" || (settled && !finished)
     if (part.type === "tool-findProjectDocuments") {
       const query = part.input?.query?.trim()
+      const done = part.state === "output-available"
+      const found = done ? part.output.length : 0
       return {
-        primary: query ? `查找文档“${query}”` : "查找项目文档",
+        primary: part.input?.artifactId
+          ? "定位引用的文档"
+          : query
+            ? `查找文档“${query}”`
+            : "查找项目文档",
         icon: "search" as const,
         running,
         failed,
         secondary: failed
           ? "查找失败"
-          : part.state === "output-available"
-            ? `${part.output.length} 份候选`
+          : done
+            ? found === 0
+              ? "未找到"
+              : found === 1
+                ? `找到「${part.output[0].title}」`
+                : `${found} 份候选`
             : undefined,
       }
     }
@@ -316,11 +326,12 @@ export function DocumentTrace({
         secondary: failed
           ? "读取失败"
           : done
-            ? `V${part.output.revision.revisionNumber}`
+            ? `V${part.output.revision.revisionNumber}${part.output.isCurrent ? "" : " · 非最新"}`
             : undefined,
       }
     }
     const out = part.state === "output-available" ? part.output : undefined
+    const editCount = part.input?.edits?.length
     return {
       primary: "提交文档修改",
       icon: "file-pen" as const,
@@ -328,15 +339,19 @@ export function DocumentTrace({
       failed,
       secondary: failed
         ? "保存失败"
-        : out?.status === "committed"
-          ? "已保存"
-          : out?.status === "unchanged"
-            ? "无需修改"
-            : out?.status === "conflict"
-              ? "版本冲突"
-              : out?.status === "rejected"
-                ? (DOCUMENT_RESULT_COPY[out.code] ?? "未保存")
-                : undefined,
+        : running && part.input?.changeSummary
+          ? part.input.changeSummary
+          : out?.status === "committed"
+            ? editCount
+              ? `已保存 ${editCount} 处修改`
+              : "已保存"
+            : out?.status === "unchanged"
+              ? "无需修改"
+              : out?.status === "conflict"
+                ? "版本冲突"
+                : out?.status === "rejected"
+                  ? (DOCUMENT_RESULT_COPY[out.code] ?? "未保存")
+                  : undefined,
     }
   })
 
@@ -345,13 +360,25 @@ export function DocumentTrace({
       part.state !== "output-available" && part.state !== "output-error"
   )
   const working = Boolean(!settled && runningPart)
+  const runningFindQuery =
+    runningPart?.type === "tool-findProjectDocuments"
+      ? runningPart.input?.query?.trim()
+      : undefined
+  const runningEditCount =
+    runningPart?.type === "tool-updateProjectDocument"
+      ? runningPart.input?.edits?.length
+      : undefined
   const active =
     runningPart?.type === "tool-findProjectDocuments"
-      ? "正在查找项目文档"
+      ? runningFindQuery
+        ? `正在查找“${runningFindQuery}”`
+        : "正在查找项目文档"
       : runningPart?.type === "tool-readProjectDocument"
         ? "正在读取项目文档"
         : runningPart?.type === "tool-updateProjectDocument"
-          ? "正在提交文档修改"
+          ? runningEditCount
+            ? `正在提交 ${runningEditCount} 处修改`
+            : "正在提交文档修改"
           : "正在处理项目文档"
 
   const done = (() => {
@@ -367,16 +394,25 @@ export function DocumentTrace({
       }
       if (part.state !== "output-available") continue
       if (part.type === "tool-findProjectDocuments") {
-        segments.push(`找到 ${part.output.length} 份候选文档`)
+        segments.push(
+          part.output.length === 0
+            ? "未找到匹配文档"
+            : part.output.length === 1
+              ? `找到「${part.output[0].title}」`
+              : `找到 ${part.output.length} 份候选文档`
+        )
       } else if (part.type === "tool-readProjectDocument") {
         segments.push(
           `已读取「${part.output.revision.title}」V${part.output.revision.revisionNumber}`
         )
       } else {
         const out = part.output
+        const edits = part.input?.edits?.length
         segments.push(
           out.status === "committed"
-            ? "已保存修改"
+            ? edits
+              ? `已保存 ${edits} 处修改`
+              : "已保存修改"
             : out.status === "unchanged"
               ? "无需修改"
               : out.status === "conflict"

@@ -8,7 +8,10 @@ import type {
 import type { MarkdownGenerationProgress } from "../../core/types"
 import type { MarkdownArtifactProgressEvent } from "@/lib/chat/markdown-artifact"
 import { AnchoredMarkdown } from "./anchored-markdown"
-import { assistantPartRenderPlan } from "./assistant-part-render-plan"
+import {
+  assistantPartRenderPlan,
+  type DocumentToolPart,
+} from "./assistant-part-render-plan"
 import { ReasoningTrace, SearchTrace, ToolTrace, DocumentTrace } from "./thinking-trace"
 import { MarkdownArtifactToolPart } from "../../orchestration/artifacts/markdown-artifact-card"
 import { DocumentUpdateTool } from "../../chat/message/document-update-tool"
@@ -50,6 +53,38 @@ export function AnchoredAssistantBody({
   density?: MarkdownDensity
 }) {
   const renderPlan = assistantPartRenderPlan(message)
+
+  /* 文档更新结果卡按「每文档最后一次提交」出卡：committed 永远出卡；
+   * 未保存的中间结果（冲突/拒绝/错误）若同文档还有后续提交，则只留在
+   * 时序轨迹里，避免“未保存”卡片与最终成功卡片并存造成误读。消息未落定
+   * 时进行中的提交也计入后续尝试，防止先闪出将被覆盖的旧失败卡；消息落定
+   * 后只认终态尝试，保证停止/中断时最后一个真实结果仍有收据卡。 */
+  const settled = message.status !== "pending" && message.status !== "streaming"
+  const lastUpdateOutcomeByDocument = new Map<string, string>()
+  for (const item of renderPlan) {
+    for (const documentPart of item.documents ?? []) {
+      if (documentPart.type !== "tool-updateProjectDocument") continue
+      const documentId = documentPart.input?.documentId
+      if (!documentId) continue
+      const terminal =
+        documentPart.state === "output-available" ||
+        documentPart.state === "output-error"
+      if (terminal || !settled)
+        lastUpdateOutcomeByDocument.set(documentId, documentPart.toolCallId)
+    }
+  }
+  const showUpdateResultCard = (part: DocumentToolPart) => {
+    if (part.type !== "tool-updateProjectDocument") return false
+    if (part.state !== "output-available" && part.state !== "output-error")
+      return false
+    if (part.state === "output-available" && part.output.status === "committed")
+      return true
+    const documentId = part.input?.documentId
+    return (
+      !documentId ||
+      lastUpdateOutcomeByDocument.get(documentId) === part.toolCallId
+    )
+  }
 
   return (
     <>
@@ -136,18 +171,15 @@ export function AnchoredAssistantBody({
 
         if (kind === "document") {
           const documentParts = documents ?? []
-          const settled =
-            message.status !== "pending" && message.status !== "streaming"
           return (
             <div key={`document-${index}`}>
               <DocumentTrace parts={documentParts} settled={settled} />
               {documentParts.map((documentPart) =>
-                documentPart.type === "tool-updateProjectDocument" &&
-                (documentPart.state === "output-available" ||
-                  documentPart.state === "output-error") ? (
+                showUpdateResultCard(documentPart) ? (
                   <DocumentUpdateTool
                     key={documentPart.toolCallId}
                     part={documentPart}
+                    sourceDepth={sourceDepth}
                   />
                 ) : null
               )}
