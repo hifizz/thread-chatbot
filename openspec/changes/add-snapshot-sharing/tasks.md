@@ -26,9 +26,9 @@
 
 - [x] 4.1 `server/handlers.ts` +4 handler：`handleCreateShare`/`handleListShares`/`handleRevokeShare`（`withThreadChatRoute`）、`handleGetPublicShare`（无 auth，`jsonNoCache`，统一不可用响应）
 - [x] 4.2 路由：`POST/GET /api/thread-chat/v1/shares`、`DELETE /api/thread-chat/v1/shares/[shareId]`、`GET /api/share/[token]`
-- [ ] 4.3 `app/share/[token]/page.tsx`：`force-dynamic` + noindex + no-referrer；RSC 共用有效性检查后渲染只读壳
-- [ ] 4.4 `proxy.ts`：`/share/` 前缀放行，其余精确匹配不变
-- [ ] 4.5 测试：匿名读取、无效/过期/撤销统一 404、token 不授予私有访问、无私有路径误放行
+- [x] 4.3 `app/share/[token]/page.tsx`：`force-dynamic` + noindex + no-referrer；RSC 共用有效性检查后渲染只读壳
+- [x] 4.4 `proxy.ts`：`/share/` 前缀放行，其余精确匹配不变
+- [x] 4.5 测试：匿名读取、无效/过期/撤销统一 404、token 不授予私有访问、无私有路径误放行
 
 ## 5. 所有者入口与布局捕获
 
@@ -39,12 +39,12 @@
 
 ## 6. 分享页（复用同一组件树 + ShareRuntime）
 
-- [ ] 6.1 `useShareRuntime(token)`：fetch `/api/share/{token}` → `createConversationStore({workspace: snapshot.layout})` + `hydrateProject(snapshot)`；复用页面 loading/ready 状态机
-- [ ] 6.2 `readOnly` 状态位贯穿组件树：Composer、消息操作、Fork/Retry/Edit/Stop、反馈、重命名、上传、文档更新入口呈禁用态或省略；导航/折叠/拖动/缩放/复制照常
-- [ ] 6.3 stub commands 兜底：与 `createConversationCommands` 同接口，写方法不发起任何请求；含 `dispose()`
-- [ ] 6.4 `/share/[token]` 页挂 `NormalizedThreadChat`：不调用 `bootConversationProject`；`treeId` 作用域 key 改 `share:{token}` 命名空间；左侧项目列表与 AccountButton 隐藏/替换为"只读快照"徽标
-- [ ] 6.5 布局恢复：列/折叠/宽度/焦点、画布 pins/viewport（不被首次 fitView 覆盖）、Artifact 面板；读者操作仅本地，重开恢复初始
-- [ ] 6.6 Document 阅读页：复用 MarkdownBody + 安全链接策略，无私来源入口，不自动加载图片/附件
+- [x] 6.1 `useShareRuntime(token)`：fetch `/api/share/{token}` → `createConversationStore({workspace: snapshot.layout})` + `hydrateProject(snapshot)`；复用页面 loading/ready 状态机
+- [x] 6.2 `readOnly` 状态位贯穿组件树：Composer、消息操作、Fork/Retry/Edit/Stop、反馈、重命名、上传、文档更新入口呈禁用态或省略；导航/折叠/拖动/缩放/复制照常
+- [x] 6.3 stub commands 兜底：与 `createConversationCommands` 同接口，写方法不发起任何请求；含 `dispose()`
+- [x] 6.4 `/share/[token]` 页挂 `NormalizedThreadChat`：不调用 `bootConversationProject`；`treeId` 作用域 key 改 `share:{token}` 命名空间；左侧项目列表与 AccountButton 隐藏/替换为"只读快照"徽标
+- [x] 6.5 布局恢复：列/折叠/宽度/焦点、画布 pins/viewport（不被首次 fitView 覆盖）、Artifact 面板；读者操作仅本地，重开恢复初始
+- [x] 6.6 Document 阅读页：复用 MarkdownBody + 安全链接策略，无私来源入口，不自动加载图片/附件
 - [ ] 6.7 移动端适配：压缩列数保顺序/焦点，全 Thread 可达；沿用 `.tc` token 与表格局部滚动
 - [ ] 6.8 测试：hydrate 正常渲染、快照外 ID 不可达、写控件禁用态、无私有/写网络请求
 

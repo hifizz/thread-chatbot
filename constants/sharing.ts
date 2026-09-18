@@ -54,5 +54,6 @@ export const SHARE_UI_COPY = {
     "此链接保存创建时的内容与布局，后续修改不会同步。任何持有链接的人均可在有效期内阅读。Instructions 与附件不会分享，但已出现在对话或文档正文中的敏感内容不会自动打码，请检查后再分享。",
   unavailable: "此分享链接不存在、已过期或已被撤销。",
   readOnlyBadge: "只读快照",
+  readOnlyWrite: "此分享为只读快照，不能修改",
   createFailed: "创建分享失败，请稍后重试。",
 } as const

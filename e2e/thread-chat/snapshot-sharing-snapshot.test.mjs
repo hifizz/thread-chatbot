@@ -7,7 +7,6 @@ import {
 import {
   isSafeShareUrl,
   sanitizeShareMarkdown,
-  sanitizeShareText,
 } from "../../lib/thread-chat/sharing/sanitize-links.ts"
 import { normalizeShareLayout } from "../../lib/thread-chat/sharing/layout.ts"
 
@@ -85,26 +84,6 @@ function message(threadId, overrides = {}) {
     createdAt: NOW,
     updatedAt: NOW,
     finishedAt: NOW,
-    ...overrides,
-  }
-}
-
-function artifact(threadId, sourceMessageId, overrides = {}) {
-  return {
-    id: uid(),
-    projectId: PROJECT_ID,
-    threadId,
-    sourceMessageId,
-    sourceThreadTitle: "主线",
-    sourceThreadFootnote: 1,
-    sourceMessageStatus: "completed",
-    kind: "markdown",
-    title: "文档",
-    language: null,
-    metadata: { secret: "SECRET_METADATA_SENTINEL" },
-    createdAt: NOW,
-    updatedAt: NOW,
-    content: "# 标题\n正文",
     ...overrides,
   }
 }

@@ -12,7 +12,7 @@ process.env.DATABASE_URL = testUrl.toString()
 process.env.DIRECT_URL = testUrl.toString()
 
 const [
-  { eq, and },
+  { eq },
   { makeSignature },
   { auth },
   { db },

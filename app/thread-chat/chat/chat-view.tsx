@@ -54,6 +54,8 @@ export interface ChatViewProps {
   modelSelectorDisabledReason?: "branch" | "busy"
   onModelChange: (modelId: string) => void | Promise<unknown>
   onSend: (content: MessageContentInput) => unknown | Promise<unknown>
+  /** 只读快照：composer 位渲染静态条而非输入框；消息动作命令不传入时按钮自然缺席 */
+  readOnly?: boolean
   messageActionState?: MessageActionViewState
   messageCommands?: ThreadMessageActionCommands
   editableUserMessageId?: string
@@ -78,6 +80,7 @@ export function ChatView({
   modelSelectorDisabledReason,
   onModelChange,
   onSend,
+  readOnly = false,
   messageActionState,
   messageCommands,
   editableUserMessageId,
@@ -125,19 +128,23 @@ export function ChatView({
             <span className="scroll-end-icon">↓</span>
           </MessageScroller.Button>
           <div className="chat-composer-dock" ref={dockRef}>
-            <ConversationComposer
-              variant="column"
-              threadId={threadId}
-              isMain={isMain}
-              busy={busy}
-              prefill={composerPrefill}
-              modelId={modelId}
-              modelSelectorDisabled={modelSelectorDisabled}
-              modelSelectorDisabledReason={modelSelectorDisabledReason}
-              onModelChange={onModelChange}
-              onSend={onSend}
-              onStop={onStop}
-            />
+            {readOnly ? (
+              <div className="composer read-only-strip">只读快照 · 内容在分享时冻结</div>
+            ) : (
+              <ConversationComposer
+                variant="column"
+                threadId={threadId}
+                isMain={isMain}
+                busy={busy}
+                prefill={composerPrefill}
+                modelId={modelId}
+                modelSelectorDisabled={modelSelectorDisabled}
+                modelSelectorDisabledReason={modelSelectorDisabledReason}
+                onModelChange={onModelChange}
+                onSend={onSend}
+                onStop={onStop}
+              />
+            )}
           </div>
         </MessageScroller.Root>
       </MessageScroller.Provider>

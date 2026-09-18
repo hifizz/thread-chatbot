@@ -64,6 +64,7 @@ export function StoreBoundProjectPanel({
   onClose,
   onSelect,
   onLocate,
+  readOnly = false,
 }: {
   projectId: string
   questionArtifactId: string | null
@@ -77,6 +78,8 @@ export function StoreBoundProjectPanel({
   onClose(): void
   onSelect(id: string): void
   onLocate(threadId: string, sourceMessageId: string): void
+  /** 只读快照：Contract/文件写回调不下发，相关控件不渲染 */
+  readOnly?: boolean
 }) {
   const versionRequest = useRef({ sequence: 0 })
   useEffect(() => {
@@ -261,9 +264,9 @@ export function StoreBoundProjectPanel({
       onClose={onClose}
       onSelect={onSelect}
       onLocate={locate}
-      onSaveContract={saveContract}
-      onAddProjectFile={addProjectFile}
-      onRemoveProjectFile={removeProjectFile}
+      onSaveContract={readOnly ? undefined : saveContract}
+      onAddProjectFile={readOnly ? undefined : addProjectFile}
+      onRemoveProjectFile={readOnly ? undefined : removeProjectFile}
     />
   )
 }
