@@ -9,7 +9,6 @@
  */
 
 import React, { useCallback, useEffect, useState } from "react"
-import { Share2 } from "lucide-react"
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog"
 import { Dialog, DialogPortal } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
@@ -156,10 +155,7 @@ export function ShareDialog({
           className="swx global w-[420px] max-w-[calc(100vw-24px)]"
           initialFocus={false}
         >
-          <div className="swx-title">
-            <Share2 size={14} />
-            {SHARE_UI_COPY.dialogTitle}
-          </div>
+          <div className="swx-title">{SHARE_UI_COPY.dialogTitle}</div>
 
           <div className="px-4 pb-3.5 pt-3">
             <p className="mb-3 text-xs leading-relaxed text-[var(--tc-content-secondary)]">
