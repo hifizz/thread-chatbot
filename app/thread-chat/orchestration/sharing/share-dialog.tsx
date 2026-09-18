@@ -166,51 +166,46 @@ export function ShareDialog({
               {SHARE_UI_COPY.shareNotice}
             </p>
 
-            <div className="mb-3">
-              <span className="mb-1.5 block text-xs text-[var(--tc-content-secondary)]">
-                {SHARE_UI_COPY.expiryLabel}
-              </span>
-              <div
-                className={cn(
-                  "grid grid-cols-4 gap-1 rounded-lg border border-[var(--tc-border-subtle)] bg-[var(--tc-surface-sunken)] p-1",
-                  hasActive && "opacity-50"
-                )}
-                role="radiogroup"
-                aria-label={SHARE_UI_COPY.expiryLabel}
-              >
-                {SHARE_EXPIRY_OPTIONS.map((option) => (
-                  <button
-                    key={option.value}
-                    type="button"
-                    role="radio"
-                    aria-checked={expiry === option.value}
-                    disabled={hasActive}
-                    className={cn(
-                      "cursor-pointer rounded-md py-2 text-[13px] transition-colors disabled:cursor-default",
-                      expiry === option.value
-                        ? "bg-[var(--tc-surface-ink)] text-[var(--tc-content-on-ink)]"
-                        : "text-[var(--tc-content-secondary)] hover:bg-[var(--tc-surface-raised)] hover:text-[var(--tc-content-primary)]"
-                    )}
-                    onClick={() => setExpiry(option.value)}
+            {!hasActive && (
+              <>
+                <div className="mb-3">
+                  <span className="mb-1.5 block text-xs text-[var(--tc-content-secondary)]">
+                    {SHARE_UI_COPY.expiryLabel}
+                  </span>
+                  <div
+                    className="grid grid-cols-4 gap-1 rounded-lg border border-[var(--tc-border-subtle)] bg-[var(--tc-surface-sunken)] p-1"
+                    role="radiogroup"
+                    aria-label={SHARE_UI_COPY.expiryLabel}
                   >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-            </div>
+                    {SHARE_EXPIRY_OPTIONS.map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        role="radio"
+                        aria-checked={expiry === option.value}
+                        className={cn(
+                          "cursor-pointer rounded-md py-2 text-[13px] transition-colors",
+                          expiry === option.value
+                            ? "bg-[var(--tc-surface-ink)] text-[var(--tc-content-on-ink)]"
+                            : "text-[var(--tc-content-secondary)] hover:bg-[var(--tc-surface-raised)] hover:text-[var(--tc-content-primary)]"
+                        )}
+                        onClick={() => setExpiry(option.value)}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
 
-            <button
-              type="button"
-              className="w-full cursor-pointer rounded-lg border border-[var(--tc-border-strong)] bg-[var(--tc-surface-plain)] py-2 text-[13px] text-[var(--tc-content-primary)] transition-colors hover:border-[var(--tc-content-muted)] hover:bg-[var(--tc-surface-raised)] disabled:cursor-default disabled:opacity-50"
-              disabled={creating || !resource || hasActive}
-              onClick={() => void create()}
-            >
-              {creating ? "创建中…" : SHARE_UI_COPY.createAction}
-            </button>
-            {hasActive && (
-              <p className="mt-1.5 text-center text-xs text-[var(--tc-content-muted)]">
-                {SHARE_UI_COPY.oneActiveHint}
-              </p>
+                <button
+                  type="button"
+                  className="w-full cursor-pointer rounded-lg border border-[var(--tc-border-strong)] bg-[var(--tc-surface-plain)] py-2 text-[13px] text-[var(--tc-content-primary)] transition-colors hover:border-[var(--tc-content-muted)] hover:bg-[var(--tc-surface-raised)] disabled:cursor-default disabled:opacity-50"
+                  disabled={creating || !resource}
+                  onClick={() => void create()}
+                >
+                  {creating ? "创建中…" : SHARE_UI_COPY.createAction}
+                </button>
+              </>
             )}
 
             <div className="max-h-60 overflow-y-auto">
