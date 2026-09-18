@@ -160,46 +160,48 @@ export function ShareDialog({
             {SHARE_UI_COPY.dialogTitle}
           </div>
 
-          <p className="my-2 mb-3 text-xs leading-relaxed text-[var(--tc-depth-1)]">
-            {SHARE_UI_COPY.shareNotice}
-          </p>
+          <div className="px-4 pb-3.5 pt-3">
+            <p className="mb-3 text-xs leading-relaxed text-[var(--tc-depth-1)]">
+              {SHARE_UI_COPY.shareNotice}
+            </p>
 
-          <div
-            className="mb-3 flex items-center gap-1.5"
-            role="radiogroup"
-            aria-label={SHARE_UI_COPY.expiryLabel}
-          >
-            <span className="mr-1 text-xs text-[var(--tc-depth-1)]">
-              {SHARE_UI_COPY.expiryLabel}
-            </span>
-            {SHARE_EXPIRY_OPTIONS.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                role="radio"
-                aria-checked={expiry === option.value}
-                className={cn(
-                  "cursor-pointer rounded-lg border border-[var(--tc-border-strong)] bg-[var(--tc-surface-plain)] px-2.5 py-1 text-xs",
-                  expiry === option.value &&
-                    "border-[var(--tc-depth-1)] text-[var(--tc-depth-1)]"
-                )}
-                onClick={() => setExpiry(option.value)}
-              >
-                {option.label}
-              </button>
-            ))}
+            <div
+              className="mb-3 flex items-center gap-1.5"
+              role="radiogroup"
+              aria-label={SHARE_UI_COPY.expiryLabel}
+            >
+              <span className="mr-1 text-xs text-[var(--tc-depth-1)]">
+                {SHARE_UI_COPY.expiryLabel}
+              </span>
+              {SHARE_EXPIRY_OPTIONS.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={expiry === option.value}
+                  className={cn(
+                    "cursor-pointer rounded-lg border border-[var(--tc-border-strong)] bg-[var(--tc-surface-plain)] px-2.5 py-1 text-xs",
+                    expiry === option.value &&
+                      "border-[var(--tc-depth-1)] text-[var(--tc-depth-1)]"
+                  )}
+                  onClick={() => setExpiry(option.value)}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+
+            <button
+              type="button"
+              className="w-full cursor-pointer rounded-lg border border-[var(--tc-border-strong)] bg-[var(--tc-surface-plain)] py-2 text-[13px] disabled:cursor-default disabled:opacity-50"
+              disabled={creating || !resource}
+              onClick={() => void create()}
+            >
+              {creating ? "创建中…" : SHARE_UI_COPY.createAction}
+            </button>
           </div>
 
-          <button
-            type="button"
-            className="w-full cursor-pointer rounded-lg border border-[var(--tc-border-strong)] bg-[var(--tc-surface-plain)] py-2 text-[13px] disabled:cursor-default disabled:opacity-50"
-            disabled={creating || !resource}
-            onClick={() => void create()}
-          >
-            {creating ? "创建中…" : SHARE_UI_COPY.createAction}
-          </button>
-
-          <div className="swx-list mt-3 max-h-60">
+          <div className="swx-list max-h-60">
             {shares === null && !loadFailed && (
               <div className="swx-empty">加载中…</div>
             )}
