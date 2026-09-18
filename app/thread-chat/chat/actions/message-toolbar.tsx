@@ -49,7 +49,7 @@ export function MessageToolbar({
           const button = (
             <button
               type="button"
-              className="message-action mt-1"
+              className="message-action"
               aria-label={action.label}
               aria-pressed={action.pressed}
               aria-busy={action.busy || undefined}

@@ -58,7 +58,7 @@ export function MessageForkActions({
   const createButton = (
     <button
       type="button"
-      className="message-action mt-1"
+      className="message-action"
       aria-label={label}
       aria-busy={busy || undefined}
       disabled={busy}
