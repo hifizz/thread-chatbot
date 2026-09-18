@@ -43,7 +43,8 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Enable pgvector
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "create extension if not exists vector"
       - run: pnpm db:push
       - run: pnpm test:billing:foundation
       - run: pnpm typecheck
-
