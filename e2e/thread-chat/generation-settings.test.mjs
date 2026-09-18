@@ -98,7 +98,7 @@ assert.deepEqual(chatAnswerGenerationOptions("research", { effort: "none", maxOu
 })
 console.log("PASS GPT 能力矩阵、模型切换回退与协议参数隔离")
 
-for (const suffix of ["deepseek-v4-flash", "deepseek-v4-flash-vision-exp", "deepseek-v4-pro", "glm-5.3", "glm-5.3-flash"]) {
+for (const suffix of ["deepseek-v4.1-flash", "glm-5.3", "glm-5.3-flash"]) {
   const id = `token-router-${suffix}`
   const levels = suffix.startsWith("deepseek-") ? ["none", "low", "high", "max"] : ["low", "high", "max"]
   assert.deepEqual(getModelGenerationSettingsCapability(id).effortLevels, levels)
@@ -111,3 +111,16 @@ for (const suffix of ["deepseek-v4-flash", "deepseek-v4-flash-vision-exp", "deep
 }
 assert.equal(getModelGenerationSettingsCapability("token-router-deepseek-v4.1-flash-expires-on-0910"), undefined)
 console.log("PASS DeepSeek / GLM 思考能力、输出选项及切换回退")
+
+for (const suffix of ["gemini-3.8-flash", "hy4-preview"]) {
+  const id = `token-router-${suffix}`
+  assert.doesNotThrow(() => assertAllowedGenerationSettings(id, { effort: "high", maxOutputTokens: 64_000 }))
+  assert.throws(() => assertAllowedGenerationSettings(id, { effort: "high", maxOutputTokens: 128_000 }))
+}
+for (const suffix of ["qwen3.8-max", "qwen3.8-max-0902", "grok-4.6", "muse-spark-1.3", "muse-spark-1.3-contributor"]) {
+  assert.throws(() => assertAllowedGenerationSettings(`token-router-${suffix}`, { effort: "none", maxOutputTokens: 16_000 }))
+}
+for (const suffix of ["minimax-m3", "kimi-k2.7-code", "qwen3.8-flash", "mimo-v2.5-pro", "union-alpha"]) {
+  assert.equal(getModelGenerationSettingsCapability(`token-router-${suffix}`), undefined)
+}
+console.log("PASS 新模型输出上限与思考档位边界")

@@ -22,8 +22,8 @@ assert.equal(
   new Set(CHAT_MODELS.map((model) => model.id)).size,
   CHAT_MODELS.length
 )
-assert.equal(THREAD_CHAT_MODEL_OPTIONS.length, 24)
-assert.equal(AVAILABLE_MODELS.length, 24)
+assert.equal(THREAD_CHAT_MODEL_OPTIONS.length, 33)
+assert.equal(AVAILABLE_MODELS.length, 33)
 assert.ok(AVAILABLE_MODELS.every((model) => model.providerId === tokenRouterModels.id))
 assert.ok(THREAD_CHAT_MODEL_OPTIONS.every((model) => model.groupId === tokenRouterModels.id))
 assert.equal(DEFAULT_MODEL_ID, "private-relay-gpt-5.6-luna")
@@ -144,15 +144,20 @@ console.log(
   "PASS  model routes, active Token Router catalog, stable IDs, and unknown model rejection"
 )
 
-for (const [suffix, imageInput] of [["deepseek-v4-flash", false], ["deepseek-v4-flash-vision-exp", true], ["deepseek-v4-pro", false], ["glm-5.3", false], ["glm-5.3-flash", true]]) {
+for (const [suffix, imageInput] of [["deepseek-v4.1-flash", true], ["glm-5.3", false], ["glm-5.3-flash", true]]) {
   const model = AVAILABLE_MODELS.find((entry) => entry.id === `token-router-${suffix}`)
   assert.equal(model.contextLabel, "1M ctx")
   assert.equal(model.capabilities.imageInput, imageInput)
   assert.equal(model.capabilities.reasoning, true)
 }
-const preview = AVAILABLE_MODELS.find((entry) => entry.id === "token-router-deepseek-v4.1-flash-expires-on-0910")
-assert.equal(preview.name, "deepseek-v4.1-flash-expires-on-0910")
-assert.equal(preview.contextLabel, "Unknown ctx")
 assert.ok(AVAILABLE_MODELS.every((model) => !("requestPolicy" in model)))
 assert.ok(THREAD_CHAT_MODEL_OPTIONS.every((model) => !("requestPolicy" in model)))
 console.log("PASS 新模型上下文、图像能力和服务端策略隔离")
+
+assert.deepEqual(
+  AVAILABLE_MODELS.filter((model) => model.id.includes("deepseek")).map((model) => model.name),
+  ["deepseek-v4.1-flash"]
+)
+assert.ok(!AVAILABLE_MODELS.some((model) => model.id.includes("gemini-3.7")))
+assert.ok(tokenRouterModels.models.every((model) => !model.id.includes("/")))
+console.log("PASS 旧模型移除与无厂商前缀目录")

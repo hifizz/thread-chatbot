@@ -17,12 +17,20 @@ const deepseekSettings = {
   ...alwaysThinkingSettings,
   effortLevels: ["none", "low", "high", "max"],
 } as const satisfies GenerationSettingsCapability
-const deepseekCapabilities = { imageInput: false, reasoning: true, generationSettings: deepseekSettings }
+const deepseekCapabilities = { imageInput: true, reasoning: true, generationSettings: deepseekSettings }
 const glmCapabilities = { imageInput: false, reasoning: true, generationSettings: alwaysThinkingSettings }
+// 仅开放产品支持且 OpenRouter 明确列出的档位，不为无 effort 参数的模型猜测档位。
+const qwenMaxCapabilities = { reasoning: true, generationSettings: {
+  effortLevels: ["low", "medium", "high", "xhigh"],
+  maxOutputTokenOptions: MAX_OUTPUT_TOKEN_OPTIONS,
+} } as const
+const museCapabilities = { reasoning: true, generationSettings: {
+  effortLevels: ["low", "medium", "high", "xhigh", "max"],
+  maxOutputTokenOptions: MAX_OUTPUT_TOKEN_OPTIONS,
+} } as const
 // 请求兼容规则仅在 Token Router 声明，由服务端统一应用。
 const deepseekRequestPolicy = { thinking: "optional", toolChoice: "omit" } as const
 const glmRequestPolicy = { thinking: "required", toolChoice: "auto" } as const
-const previewRequestPolicy = { thinking: "required", toolChoice: "omit" } as const
 
 /** 当前入口的唯一模型目录。publicId 保留历史会话身份，与实际 provider 解耦。 */
 export const tokenRouterModels = defineProviderModels({
@@ -35,12 +43,23 @@ export const tokenRouterModels = defineProviderModels({
   },
   // contextLabel 为暂定展示值；不得用作真实 token 预算。
   models: [
-    // 临时版缺少公开规格：不宣称已知上下文，也不开放未经确认的输出上限选项。
-    { id: "deepseek-v4.1-flash-expires-on-0910", publicId: "token-router-deepseek-v4.1-flash-expires-on-0910", name: "deepseek-v4.1-flash-expires-on-0910", contextLabel: "Unknown ctx", capabilities: { imageInput: false, reasoning: true }, requestPolicy: previewRequestPolicy },
-    // https://api-docs.deepseek.com/quick_start/pricing/：1M 上下文，支持关闭思考。
-    { id: "deepseek-v4-flash", publicId: "token-router-deepseek-v4-flash", name: "DeepSeek V4 Flash", contextLabel: "1M ctx", capabilities: deepseekCapabilities, requestPolicy: deepseekRequestPolicy },
-    { id: "deepseek-v4-flash-vision-exp", publicId: "token-router-deepseek-v4-flash-vision-exp", name: "DeepSeek V4 Flash Vision Exp", contextLabel: "1M ctx", capabilities: { ...deepseekCapabilities, imageInput: true }, requestPolicy: deepseekRequestPolicy },
-    { id: "deepseek-v4-pro", publicId: "token-router-deepseek-v4-pro", name: "DeepSeek V4 Pro", contextLabel: "1M ctx", capabilities: deepseekCapabilities, requestPolicy: deepseekRequestPolicy },
+    // 2026-09-18 核对 https://openrouter.ai/api/v1/models；请求 ID 不带厂商前缀。
+    { id: "deepseek-v4.1-flash", publicId: "token-router-deepseek-v4.1-flash", contextLabel: "1M ctx", capabilities: deepseekCapabilities, requestPolicy: deepseekRequestPolicy },
+    // OpenRouter 的无日期页面已指向 0902；中转站仍可分别配置别名和固定版本。
+    { id: "qwen3.8-max", publicId: "token-router-qwen3.8-max", contextLabel: "1M ctx", capabilities: qwenMaxCapabilities },
+    { id: "qwen3.8-max-0902", publicId: "token-router-qwen3.8-max-0902", contextLabel: "1M ctx", capabilities: qwenMaxCapabilities },
+    { id: "qwen3.8-flash", publicId: "token-router-qwen3.8-flash", contextLabel: "1M ctx", capabilities: { reasoning: true } },
+    { id: "gemini-3.8-flash", publicId: "token-router-gemini-3.8-flash", contextLabel: "1M ctx", capabilities: { reasoning: true, generationSettings: { effortLevels: ["low", "medium", "high"], maxOutputTokenOptions: [16_000, 32_000, 64_000] } } },
+    { id: "minimax-m3", publicId: "token-router-minimax-m3", contextLabel: "1M ctx", capabilities: { reasoning: true } },
+    { id: "kimi-k2.7-code", publicId: "token-router-kimi-k2.7-code", contextLabel: "262K ctx", capabilities: { reasoning: true } },
+    { id: "hy4-preview", publicId: "token-router-hy4-preview", contextLabel: "1M ctx", capabilities: { imageInput: false, reasoning: true, generationSettings: { effortLevels: ["none", "low", "high"], maxOutputTokenOptions: [16_000, 32_000, 64_000] } } },
+    { id: "muse-spark-1.3", publicId: "token-router-muse-spark-1.3", contextLabel: "1M ctx", capabilities: museCapabilities },
+    { id: "muse-spark-1.3-contributor", publicId: "token-router-muse-spark-1.3-contributor", contextLabel: "1M ctx", capabilities: museCapabilities },
+    { id: "kimi-k3", publicId: "token-router-kimi-k3", contextLabel: "1M ctx", capabilities: { reasoning: true, generationSettings: deepseekSettings } },
+    { id: "grok-4.6", publicId: "token-router-grok-4.6", contextLabel: "500K ctx", capabilities: qwenMaxCapabilities },
+    // https://openrouter.ai/stealth/union-alpha：已揭晓为 Pareto；保留用户中转站别名。
+    { id: "union-alpha", publicId: "token-router-union-alpha", contextLabel: "262K ctx" },
+    { id: "mimo-v2.5-pro", publicId: "token-router-mimo-v2.5-pro", contextLabel: "1M ctx", capabilities: { imageInput: false, reasoning: true } },
     // https://docs.bigmodel.cn/cn/guide/models/text/glm-5.3：始终思考，仅 low/high/max。
     { id: "glm-5.3", publicId: "token-router-glm-5.3", name: "GLM-5.3", contextLabel: "1M ctx", capabilities: glmCapabilities, requestPolicy: glmRequestPolicy },
     { id: "glm-5.3-flash", publicId: "token-router-glm-5.3-flash", name: "GLM-5.3-Flash", contextLabel: "1M ctx", capabilities: { ...glmCapabilities, imageInput: true }, requestPolicy: glmRequestPolicy },
@@ -53,7 +72,6 @@ export const tokenRouterModels = defineProviderModels({
     { id: "claude-sonnet-5", publicId: "iceland-claude-sonnet-5", name: "Claude Sonnet 5", contextLabel: "1M ctx" },
     { id: "claude-opus-4-8", publicId: "iceland-claude-opus-4-8", name: "Claude Opus 4.8", contextLabel: "1M ctx", capabilities: adaptiveGenerationCapabilities },
     { id: "claude-haiku-4-5", publicId: "iceland-claude-haiku-4-5", name: "Claude Haiku 4.5", contextLabel: "200k ctx" },
-    { id: "gemini-3.7-flash", publicId: "iceland-gemini-3.7-flash", name: "Gemini 3.7 Flash", contextLabel: "1M ctx" },
     {
       id: "gpt-5.6-sol", publicId: "private-relay-gpt-5.6-sol", name: "GPT-5.6 Sol", contextLabel: "400k ctx", capabilities: gptCapabilities,
       description: "质量优先，适合复杂推理、复杂编码和专业工作。",
