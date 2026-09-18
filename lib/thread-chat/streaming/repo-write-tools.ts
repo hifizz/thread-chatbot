@@ -39,9 +39,13 @@ const commitFileSchema = z
         "项目文档 ID。提交已有项目文档时用引用：服务端直接取该文档最新版本内容，不要把全文放进 content 重新生成"
       ),
   })
-  .refine((f) => (f.content !== undefined) !== (f.documentId !== undefined), {
-    message: "每个文件必须提供 content 或 documentId 之一",
-  })
+  // 模型常把未用的字段补成空串；只有非空值才算"提供了"
+  .refine(
+    (f) =>
+      (typeof f.content === "string" && f.content.length > 0) !==
+      (typeof f.documentId === "string" && f.documentId.length > 0),
+    { message: "每个文件必须提供 content 或 documentId 之一" }
+  )
 
 export function createRepoWriteTools(ctx: RepoWriteContext) {
   let commitCount = 0
@@ -74,7 +78,7 @@ export function createRepoWriteTools(ctx: RepoWriteContext) {
       // documentId 引用 → 服务端查库取最新版本内容（校验归属与项目）
       const resolved: { path: string; content: string }[] = []
       for (const f of files) {
-        if (f.documentId !== undefined) {
+        if (typeof f.documentId === "string" && f.documentId.length > 0) {
           const doc = await findOwnedDocument(db, ctx.userId, f.documentId)
           if (!doc || doc.projectId !== ctx.projectId || !doc.currentRevisionId)
             return {
