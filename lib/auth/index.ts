@@ -8,6 +8,7 @@ import { grantWelcomeCreditsOnce } from "@/lib/billing/ledger"
 import { isEmailConfigured, sendEmail } from "@/lib/email/client"
 import { verificationEmail, resetPasswordEmail } from "@/lib/email/templates"
 import { getGoogleAuthConfig } from "@/lib/auth/social"
+import { BETA_ACCESS_ENFORCED } from "@/constants/beta-access"
 
 // 邮箱验证是否可用：需已配置邮件服务。未配置时（如本地开发）优雅降级为「注册即用」，
 // 避免用户因收不到验证邮件而被锁死。
@@ -63,7 +64,8 @@ export const auth = betterAuth({
     },
     // 关键防薅：初始额度改到「邮箱验证通过后」才发放，抬高白嫖门槛。
     afterEmailVerification: async (verifiedUser) => {
-      await grantWelcomeCreditsOnce(verifiedUser.id)
+      if (!BETA_ACCESS_ENFORCED)
+        await grantWelcomeCreditsOnce(verifiedUser.id)
     },
   },
   databaseHooks: {
@@ -75,7 +77,10 @@ export const auth = betterAuth({
           //   未启用邮箱验证则「注册即赠额」。
           // - 社交登录（Google）：邮箱已由提供方验证（创建时 emailVerified=true），不会走
           //   afterEmailVerification，故在此按已验证发放。账本幂等键保证双路径不重复发。
-          if (!emailReady || createdUser.emailVerified) {
+          if (
+            !BETA_ACCESS_ENFORCED &&
+            (!emailReady || createdUser.emailVerified)
+          ) {
             await grantWelcomeCreditsOnce(createdUser.id)
           }
         },

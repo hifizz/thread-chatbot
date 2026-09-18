@@ -12,6 +12,8 @@ export const apiErrorCodeSchema = z.enum([
   "RUN_RESERVATION_INSUFFICIENT",
   "MODEL_PRICING_UNAVAILABLE",
   "TOO_MANY_ACTIVE_RUNS",
+  "BETA_ACCESS_REQUIRED",
+  "ACCOUNT_SUSPENDED",
 ])
 
 export const apiErrorSchema = z

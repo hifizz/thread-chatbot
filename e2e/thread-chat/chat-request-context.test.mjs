@@ -24,6 +24,11 @@ function dependencies(overrides = {}) {
     modelConfigured: () => true,
     unbilledPreview: () => false,
     positiveBalance: async () => true,
+    accessDecision: async (userId, modelId) => ({
+      allowed: true,
+      userId,
+      modelId: modelId ?? null,
+    }),
     ...overrides,
   }
 }
@@ -41,6 +46,36 @@ const unauthorized = await prepareChatRequestContext(
 assert.equal(unauthorized.kind, "response")
 assert.equal(unauthorized.response.status, 401)
 assert.equal(parsedWithoutAuth, false)
+
+const accessDenied = await prepareChatRequestContext(
+  request({ messages, modelId: "known" }),
+  dependencies({
+    accessDecision: async () => ({
+      allowed: false,
+      code: "BETA_ACCESS_REQUIRED",
+    }),
+  })
+)
+assert.equal(accessDenied.kind, "response")
+assert.equal(accessDenied.response.status, 403)
+assert.equal((await accessDenied.response.json()).code, "BETA_ACCESS_REQUIRED")
+
+let modelAccessChecks = 0
+const modelAccessDenied = await prepareChatRequestContext(
+  request({ messages, modelId: "known" }),
+  dependencies({
+    accessDecision: async (_userId, modelId) => {
+      modelAccessChecks++
+      return modelId
+        ? { allowed: false, code: "MODEL_NOT_ALLOWED" }
+        : { allowed: true, userId: "user-1", modelId: null }
+    },
+  })
+)
+assert.equal(modelAccessDenied.kind, "response")
+assert.equal(modelAccessDenied.response.status, 403)
+assert.equal((await modelAccessDenied.response.json()).code, "MODEL_NOT_ALLOWED")
+assert.equal(modelAccessChecks, 2)
 
 const malformed = await prepareChatRequestContext(
   new Request("http://localhost/api/chat", {

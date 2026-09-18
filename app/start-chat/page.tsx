@@ -4,6 +4,7 @@ import { redirect } from "next/navigation"
 
 import { ROUTES, signInWithRedirect, threadTreeRoute } from "@/constants/routes"
 import { getSession } from "@/lib/auth/server"
+import { decideBetaAccess } from "@/lib/beta/entitlements"
 
 // A fresh tree ID must be generated for every request, never at build time.
 export const dynamic = "force-dynamic"
@@ -22,5 +23,7 @@ export default async function StartChatPage(): Promise<never> {
   if (!session) {
     redirect(signInWithRedirect(ROUTES.startChat))
   }
+  const access = await decideBetaAccess(session.user.id)
+  if (!access.allowed) redirect(ROUTES.beta)
   redirect(threadTreeRoute(randomUUID()))
 }

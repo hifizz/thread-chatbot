@@ -12,6 +12,7 @@ import {
   requireThreadChatUser,
   ThreadChatUnauthorizedError,
 } from "@/lib/thread-chat/server/auth"
+import { BetaAccessError, requireBetaAccess } from "@/lib/beta/entitlements"
 
 const JSON_NO_CACHE_HEADERS = {
   "Cache-Control": "private, no-store, max-age=0",
@@ -72,6 +73,8 @@ function errorResponse(
 }
 
 export function mapRouteError(error: unknown): Response {
+  if (error instanceof BetaAccessError)
+    return errorResponse(403, error.code, error.message)
   if (error instanceof ThreadChatUnauthorizedError)
     return errorResponse(401, "NOT_FOUND", error.message)
   if (error instanceof ZodError) {
@@ -119,6 +122,7 @@ export async function withThreadChatRoute(
   try {
     await ensureThreadChatRuntimeInitialized()
     const userId = await requireThreadChatUser(request.headers)
+    await requireBetaAccess(userId)
     return await execute(userId)
   } catch (error) {
     return mapRouteError(error)

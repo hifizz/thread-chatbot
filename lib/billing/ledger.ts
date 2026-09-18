@@ -46,7 +46,7 @@ export async function appendLedgerEntryOnce(
   return true
 }
 
-async function grantWelcomeCreditsInTransaction(
+export async function grantWelcomeCreditsInTransaction(
   tx: BillingTransaction,
   userId: string
 ): Promise<{ granted: boolean; balanceMicros: number }> {
@@ -99,4 +99,3 @@ async function grantWelcomeCreditsInTransaction(
 export function grantWelcomeCreditsOnce(userId: string) {
   return db.transaction((tx) => grantWelcomeCreditsInTransaction(tx, userId))
 }
-

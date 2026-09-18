@@ -1,0 +1,55 @@
+name: Beta access
+
+on:
+  pull_request:
+    paths:
+      - "app/api/admin/beta/**"
+      - "app/api/beta/**"
+      - "app/api/chat/**"
+      - "app/api/webhooks/resend/**"
+      - "constants/beta-access.ts"
+      - "lib/auth/**"
+      - "lib/beta/**"
+      - "lib/db/beta-access-schema.ts"
+      - "lib/email/**"
+      - "lib/thread-chat/**"
+      - "e2e/beta-access/**"
+      - ".github/workflows/beta-access.yml"
+
+jobs:
+  access:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: beta_access_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d beta_access_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/beta_access_test
+      DIRECT_URL: postgres://postgres:postgres@localhost:5432/beta_access_test
+      BETTER_AUTH_URL: http://localhost:4040
+      BETA_INVITE_ENCRYPTION_KEY: MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.32.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Enable pgvector
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "create extension if not exists vector"
+      - run: pnpm db:push
+      - run: pnpm test:beta-access:foundation
+      - run: pnpm typecheck

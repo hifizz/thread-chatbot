@@ -10,6 +10,7 @@ import {
 } from "@/constants/model"
 import { isModelConfigured } from "@/lib/ai/llm/model-routes"
 import { hasPositiveBalance } from "@/lib/billing/credits"
+import { decideBetaAccess } from "@/lib/beta/entitlements"
 
 type ChatRequestBody = {
   messages: UIMessage[]
@@ -41,6 +42,7 @@ type ChatRequestContextDependencies = {
   modelConfigured: typeof isModelConfigured
   unbilledPreview: typeof isUnbilledPreviewModel
   positiveBalance: typeof hasPositiveBalance
+  accessDecision?: typeof decideBetaAccess
 }
 
 const defaultDependencies: ChatRequestContextDependencies = {
@@ -50,6 +52,7 @@ const defaultDependencies: ChatRequestContextDependencies = {
   modelConfigured: isModelConfigured,
   unbilledPreview: isUnbilledPreviewModel,
   positiveBalance: hasPositiveBalance,
+  accessDecision: decideBetaAccess,
 }
 
 /** 鉴权、解析并完成模型/余额门禁，返回可直接进入生成编排的请求上下文。 */
@@ -64,6 +67,25 @@ export async function prepareChatRequestContext(
       response: Response.json(
         { error: "请先登录后再使用对话功能。" },
         { status: 401 }
+      ),
+    }
+  }
+
+  const accessDecision = dependencies.accessDecision
+    ? await dependencies.accessDecision(userId)
+    : { allowed: true as const, userId, modelId: null }
+  if (!accessDecision.allowed) {
+    return {
+      kind: "response" as const,
+      response: Response.json(
+        {
+          error:
+            accessDecision.code === "ACCOUNT_SUSPENDED"
+              ? "账号已暂停。"
+              : "Beta 权限尚未激活。",
+          code: accessDecision.code,
+        },
+        { status: 403 }
       ),
     }
   }
@@ -114,6 +136,26 @@ export async function prepareChatRequestContext(
 
   const modelId = typeof rawModelId === "string" ? rawModelId : DEFAULT_MODEL_ID
   const model = dependencies.getModel(modelId)!
+  const modelDecision = dependencies.accessDecision
+    ? await dependencies.accessDecision(userId, modelId)
+    : { allowed: true as const, userId, modelId }
+  if (!modelDecision.allowed) {
+    return {
+      kind: "response" as const,
+      response: Response.json(
+        {
+          error:
+            modelDecision.code === "MODEL_NOT_ALLOWED"
+              ? "当前权益不可使用该模型。"
+              : modelDecision.code === "ACCOUNT_SUSPENDED"
+                ? "账号已暂停。"
+                : "Beta 权限尚未激活。",
+          code: modelDecision.code,
+        },
+        { status: 403 }
+      ),
+    }
+  }
   if (!dependencies.linearModelAllowed(modelId)) {
     return {
       kind: "response" as const,
