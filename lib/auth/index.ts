@@ -1,3 +1,4 @@
+import { getAuthCookieOptions } from "@/lib/auth/cookie-options"
 import { betterAuth, type BetterAuthPlugin } from "better-auth"
 import { drizzleAdapter } from "better-auth/adapters/drizzle"
 import { nextCookies } from "better-auth/next-js"
@@ -17,7 +18,6 @@ const emailReady = isEmailConfigured()
 const TURNSTILE_SECRET = process.env.TURNSTILE_SECRET_KEY
 
 // localhost 的 Cookie 不按端口隔离；每个 worktree 使用独立前缀，避免登录态互相覆盖。
-const authCookiePrefix = process.env.BETTER_AUTH_COOKIE_PREFIX?.trim()
 
 // Google 社交登录：同时配齐 client id/secret 才启用（判定来自 lib/auth/social，
 // 登录页据同一来源决定是否显示按钮，无需额外的 NEXT_PUBLIC 开关）。
@@ -37,7 +37,7 @@ plugins.push(nextCookies())
 
 export const auth = betterAuth({
   user: { additionalFields: { locale: { type: "string", required: false, input: false } } },
-  advanced: authCookiePrefix ? { cookiePrefix: authCookiePrefix } : undefined,
+  advanced: getAuthCookieOptions(),
   database: drizzleAdapter(db, {
     provider: "pg",
     schema: { user, session, account, verification },
