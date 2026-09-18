@@ -1,0 +1,59 @@
+# ThreadChat Fly.io 运行时契约。
+# 部署语义见 docs/deploy-flyio.md；本文件只声明「机器如何跑」，密钥一律走 fly secrets。
+
+app = "thread-chat"
+# 单写区原则：primary_region 必须与 DATABASE_URL 指向的主写区域同区。
+# staging/production 使用各自的 fly app 与各自的数据库/桶/secrets。
+primary_region = "nrt"
+
+# 构建走仓库根 Dockerfile；同一 git SHA 产出同一镜像，staging 与 production 部署同一 release。
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  NODE_ENV = "production"
+  PORT = "8080"
+  HOSTNAME = "0.0.0.0"
+
+# 平台终止边界：SIGTERM → drain 钩子关准入、有界收尾（RUNTIME_DRAIN_TIMEOUT_MS=20s）
+# + 遥测 flush（5s）+ 退出；kill_timeout 只兜底，不用于排空长任务。
+# 长 Generation（研究型约 15min）的计划内替换必须先走 scripts/fly-drain.mjs。
+kill_signal = "SIGTERM"
+kill_timeout = "30s"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  # 后台 Generation 不依赖 HTTP 连接存活：绝不能按「无连接」停机。
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  # 常驻双实例：stop/stream 经 fly-replay 定向到属主实例。
+  min_machines_running = 2
+  # 代理层并发上限只代表 HTTP 压力，不代表后台任务活跃度；这里防止雪崩式过载。
+  [http_service.concurrency]
+    type = "requests"
+    hard_limit = 250
+    soft_limit = 200
+
+  # readiness（service check）：失败即从路由摘除——drain 中 readyz 返回 503，
+  # 新流量不再进来，在途 Generation 与 SSE 连接继续直到完成或被 SIGTERM 收尾。
+  [[http_service.checks]]
+    grace_period = "10s"
+    interval = "15s"
+    method = "GET"
+    timeout = "5s"
+    path = "/readyz"
+
+# liveness（machine check）：进程死了才重启，与 readiness 摘除分开。
+[[checks]]
+  type = "http"
+  port = 8080
+  method = "GET"
+  path = "/healthz"
+  interval = "30s"
+  timeout = "5s"
+  grace_period = "10s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "1gb"

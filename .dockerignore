@@ -1,0 +1,31 @@
+# 构建上下文裁剪：镜像只依赖构建所需文件；密钥与本地产物绝不进镜像。
+node_modules
+.next
+out
+build
+coverage
+.devtools
+evals/agent/.tmp
+evals/agent/results
+.bare
+
+# env 与本地文件
+.env*
+!.env.example
+*.pem
+.DS_Store
+*.tsbuildinfo
+next-env.d.ts
+
+# git/文档/CI 元数据
+.git
+.gitignore
+.github
+.openspec*
+openspec
+*.md
+
+# 本地脚本与测试夹具不需要进镜像
+e2e
+evals
+scripts/worktree

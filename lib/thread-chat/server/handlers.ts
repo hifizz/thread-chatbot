@@ -37,6 +37,12 @@ import {
   updateThread,
 } from "@/lib/thread-chat/application"
 import { ConversationApplicationError } from "@/lib/thread-chat/application/errors"
+import {
+  generationHeartbeatLive,
+  readGenerationLease,
+} from "@/lib/thread-chat/streaming/generation-ownership"
+import { getInstanceId, isFlyRuntime } from "@/lib/runtime/instance"
+import { isDraining } from "@/lib/runtime/drain"
 import { startSessionAfterCommit } from "@/lib/thread-chat/server/start-session-after-commit"
 import {
   commandResponse,
@@ -58,6 +64,63 @@ function parseId(value: string): string {
 
 function validation(message: string): never {
   throw new ConversationApplicationError("VALIDATION_ERROR", message)
+}
+
+/** drain 期间拒绝受理新 Generation；在读/停止等命令不受影响。 */
+function assertAcceptingGenerations(): void {
+  if (isDraining()) {
+    throw new ConversationApplicationError(
+      "CAPACITY_UNAVAILABLE",
+      "服务正在部署更新，请稍后重试"
+    )
+  }
+}
+
+/**
+ * 目标实例定向重放（Fly fly-replay）。请求经代理重放到生成属主实例；
+ * 失败由 fallback=prefer_self 回本机，此时带 fly-replay-failed 头，不再重放。
+ */
+function flyReplayResponse(ownerId: string): Response {
+  return new Response(null, {
+    status: 200,
+    headers: {
+      "fly-replay": `instance=${ownerId};timeout=5s;fallback=prefer_self`,
+    },
+  })
+}
+
+function canReplayTo(request: Request, ownerId: string | null): ownerId is string {
+  return Boolean(
+    isFlyRuntime() &&
+      ownerId &&
+      ownerId !== getInstanceId() &&
+      !request.headers.has("fly-replay-failed")
+  )
+}
+
+/**
+ * 本机没有该生成的 Session 时的多实例处置：
+ * - 属主心跳存活 → 返回 fly-replay 定向响应（或无 Fly 时返回 null，靠属主轮询标志）；
+ * - 属主已死 → 把孤儿生成终态化为 SESSION_LOST，返回 null 让调用方按正常流程响应。
+ */
+async function foreignGenerationResponse(
+  request: Request,
+  messageId: string
+): Promise<Response | null> {
+  const lease = await readGenerationLease(messageId)
+  if (!lease || lease.status !== "generating") return null
+  if (
+    generationHeartbeatLive({
+      generationHeartbeatAt: lease.generationHeartbeatAt,
+    })
+  ) {
+    if (canReplayTo(request, lease.generationOwner)) {
+      return flyReplayResponse(lease.generationOwner)
+    }
+    return null
+  }
+  await failOrphanedGeneratingMessage(messageId)
+  return null
 }
 
 export function handleListProjects(request: Request): Promise<Response> {
@@ -92,6 +155,7 @@ export function handleStartProject(
   projectId: string
 ): Promise<Response> {
   return withThreadChatRoute(request, async (userId) => {
+    assertAcceptingGenerations()
     const command = await parseJson(request, startProjectCommandSchema)
     if (command.projectId !== parseId(projectId))
       validation("path projectId 与请求体不一致")
@@ -222,6 +286,7 @@ export function handleSendMessage(
   threadId: string
 ): Promise<Response> {
   return withThreadChatRoute(request, async (userId) => {
+    assertAcceptingGenerations()
     const command = await parseJson(request, sendMessageCommandSchema)
     const result = await sendMessage(userId, parseId(threadId), command)
     if (!result.replayed)
@@ -239,6 +304,7 @@ export function handleForkThread(
   threadId: string
 ): Promise<Response> {
   return withThreadChatRoute(request, async (userId) => {
+    assertAcceptingGenerations()
     const command = await parseJson(request, forkThreadCommandSchema)
     const result = await forkThread(userId, parseId(threadId), command)
     if (!result.replayed && result.result.generation)
@@ -256,17 +322,23 @@ export function handleEditMessage(
   messageId: string
 ): Promise<Response> {
   return withThreadChatRoute(request, async (userId) => {
+    assertAcceptingGenerations()
     const command = await parseJson(request, editLatestTurnCommandSchema)
     const result = await editLatestTurn(userId, parseId(messageId), command)
-    if (!result.replayed) {
-      if (result.result.abortMessageId)
-        if (
-          !getSessionStore().abort(
-            result.result.abortMessageId,
-            GENERATION_CANCEL_REASONS.supersededByEdit
-          )
+    if (result.result.abortMessageId) {
+      const aborted = getSessionStore().abort(
+        result.result.abortMessageId,
+        GENERATION_CANCEL_REASONS.supersededByEdit
+      )
+      if (!aborted) {
+        const replay = await foreignGenerationResponse(
+          request,
+          result.result.abortMessageId
         )
-          await failOrphanedGeneratingMessage(result.result.abortMessageId)
+        if (replay) return replay
+      }
+    }
+    if (!result.replayed) {
       startSessionAfterCommit(
         userId,
         result.result.generation,
@@ -282,6 +354,7 @@ export function handleRetryMessage(
   messageId: string
 ): Promise<Response> {
   return withThreadChatRoute(request, async (userId) => {
+    assertAcceptingGenerations()
     const command = await parseJson(request, retryMessageCommandSchema)
     const result = await retryMessage(userId, parseId(messageId), command)
     if (!result.replayed)
@@ -305,12 +378,16 @@ export function handleStopMessage(
       id,
       await parseJson(request, stopMessageCommandSchema)
     )
-    if (!result.replayed && result.result.status === "generating") {
+    if (result.result.status === "generating") {
       const aborted = getSessionStore().abort(
         id,
         GENERATION_CANCEL_REASONS.userStop
       )
-      if (!aborted) await failOrphanedGeneratingMessage(id)
+      if (!aborted) {
+        // 生成在其他实例：replay 直达属主；非 Fly 环境靠属主轮询 DB 标志兜底。
+        const replay = await foreignGenerationResponse(request, id)
+        if (replay) return replay
+      }
     }
     return commandResponse(result)
   })
@@ -368,7 +445,10 @@ export function handleMessageStream(
       store: getSessionStore(),
       messageId: id,
     })
-    if (!response) throw new Error("SESSION_NOT_AVAILABLE")
-    return response
+    if (response) return response
+    // 本机无 Session：生成在别的实例时 fly-replay 到属主；属主已死则清扫孤儿。
+    const replay = await foreignGenerationResponse(request, id)
+    if (replay) return replay
+    throw new Error("SESSION_NOT_AVAILABLE")
   })
 }

@@ -234,6 +234,15 @@ export const messages = dbSchema.table(
     ),
     supersededAt: timestamp("superseded_at", { withTimezone: true }),
     stopRequestedAt: timestamp("stop_requested_at", { withTimezone: true }),
+    /**
+     * 多实例生成所有权：当前运行该生成的实例 ID 与其最近心跳。
+     * 由生成路径在启动时 CAS 认领，运行中周期刷新；心跳过期即视为孤儿，
+     * 允许其他实例清扫接管（CAS 终态写入保证不重复结算）。
+     */
+    generationOwner: text("generation_owner"),
+    generationHeartbeatAt: timestamp("generation_heartbeat_at", {
+      withTimezone: true,
+    }),
     feedback: text("feedback").$type<ConversationMessageFeedback>(),
     // 独立持久化工具结果不受流 checkpoint 覆盖；展示/模型读取必须经 restoreDocumentToolParts 合并。
     documentToolParts: jsonb("document_tool_parts").$type<ThreadChatUIMessage["parts"]>().notNull().default([]),
@@ -275,6 +284,10 @@ export const messages = dbSchema.table(
       table.supersededAt,
       table.sequence
     ),
+    // 孤儿清扫只扫描 generating 行：按心跳找过期属主。
+    index("messages_generating_heartbeat_idx")
+      .on(table.generationHeartbeatAt)
+      .where(sql`${table.status} = 'generating'`),
     check("messages_sequence_positive", sql`${table.sequence} >= 1`),
     check("messages_role_allowed", sql`${table.role} in ('user', 'assistant')`),
     check(

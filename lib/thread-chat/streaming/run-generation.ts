@@ -15,10 +15,16 @@ import { findOwnedProject } from "@/lib/thread-chat/persistence/project-reposito
 import { findOwnedThread } from "@/lib/thread-chat/persistence/thread-repository"
 import { MessageCheckpointer } from "@/lib/thread-chat/streaming/checkpoint"
 import { finalizeGeneration } from "@/lib/thread-chat/streaming/finalize"
+import {
+  claimGenerationOwnership,
+  GenerationOwnership,
+} from "@/lib/thread-chat/streaming/generation-ownership"
 import { prepareGeneration } from "@/lib/thread-chat/streaming/generation-plan"
 import type { StreamSessionController } from "@/lib/thread-chat/streaming/stream-session"
 import { consumeUIMessagePipeline } from "@/lib/thread-chat/streaming/ui-message-pipeline"
+import { getSessionStore } from "@/lib/thread-chat/streaming/session-store"
 import { resolveGenerationTerminalOutcome } from "@/lib/thread-chat/streaming/generation-outcome"
+import { GENERATION_CANCEL_REASONS } from "@/constants/generation"
 import { OBSERVATION_NAMES, TRACE_NAMES } from "@/constants/observability"
 import { buildThreadChatTraceInput } from "@/lib/observability/context"
 import { resolveObservabilityConfig } from "@/lib/observability/config"
@@ -101,6 +107,10 @@ async function loadGenerationIdentity({
     message.status !== "generating" ||
     !message.modelId
   ) {
+    throw new Error("GENERATION_MESSAGE_NOT_READY")
+  }
+  // 多实例属主认领：CAS 失败说明已被终态化或被其他活实例持有。
+  if (!(await claimGenerationOwnership(messageId))) {
     throw new Error("GENERATION_MESSAGE_NOT_READY")
   }
   const [thread, project] = await Promise.all([
@@ -230,6 +240,15 @@ async function runGenerationCore({
       ? { finishReason: pipelineEnd.finishReason }
       : {}),
   })
+  // 部署收尾触发的取消不是用户停止：标记为可重试的失败，与普通 stop/崩溃区分开。
+  const deployInterrupted =
+    session.signal.aborted &&
+    session.signal.reason instanceof Error &&
+    session.signal.reason.message === GENERATION_CANCEL_REASONS.deployDrain
+  if (deployInterrupted) {
+    outcome.status = "failed"
+    outcome.failed = true
+  }
   const promptCacheObservation = prepared?.promptCacheContext
     ? buildPromptCacheObservation(usage, prepared.promptCacheContext)
     : undefined
@@ -269,10 +288,15 @@ async function runGenerationCore({
         providerUsage,
         ...(outcome.failed
           ? {
-              error: contextLimitFailure(thrown ?? protocolError ?? (pipelineEnd?.outcome.status === "failed" ? pipelineEnd.outcome.error : null)) ?? {
-                code: "GENERATION_FAILED",
-                message: "生成过程中发生错误",
-              },
+              error: contextLimitFailure(thrown ?? protocolError ?? (pipelineEnd?.outcome.status === "failed" ? pipelineEnd.outcome.error : null)) ?? (deployInterrupted
+                ? {
+                    code: "DEPLOY_INTERRUPTED",
+                    message: "服务部署更新导致生成中断，请重试",
+                  }
+                : {
+                    code: "GENERATION_FAILED",
+                    message: "生成过程中发生错误",
+                  }),
             }
           : {}),
       })
@@ -313,8 +337,17 @@ export async function runGeneration(input: {
   generationSettings?: GenerationSettings
   dependencies?: RunGenerationDependencies
 }): Promise<void> {
+  // 跨实例控制通道：其他实例写入 stopRequestedAt/supersededAt 时本地 abort；
+  // 心跳丢失（被清扫/终态化）则守望自停，不会回写他人事实。
+  // 生命周期挂在 runGeneration 外层的 finally 上：core 中任何抛出都不会泄漏心跳。
+  const ownership = new GenerationOwnership({
+    messageId: input.messageId,
+    signal: input.session.signal,
+    onSignal: (reason) => getSessionStore().abort(input.messageId, reason),
+  })
   try {
     const identity = await loadGenerationIdentity(input)
+    ownership.start()
     const traceInput = await buildThreadChatTraceInput({
       userId: input.userId,
       projectId: identity.message.projectId,
@@ -400,5 +433,7 @@ export async function runGeneration(input: {
         })
       }
     )
+  } finally {
+    await ownership.stop()
   }
 }

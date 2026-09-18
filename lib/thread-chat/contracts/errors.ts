@@ -8,6 +8,7 @@ export const apiErrorCodeSchema = z.enum([
   "MODEL_NOT_ALLOWED",
   "SESSION_NOT_AVAILABLE",
   "GENERATION_FAILED",
+  "CAPACITY_UNAVAILABLE",
 ])
 
 export const apiErrorSchema = z

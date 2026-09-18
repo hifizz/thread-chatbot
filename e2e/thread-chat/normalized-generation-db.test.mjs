@@ -73,15 +73,14 @@ async function send(threadId, text) {
     userMessageId: id(),
     assistantMessageId: id(),
     modelId,
-    text,
-    files: [],
+    parts: [{ type: "text", text }],
   })
 }
 
+const projectId = id()
 try {
   await createUser(userId, "owner")
   await createUser(otherUserId, "other")
-  const projectId = id()
   const rootThreadId = id()
   const start = await application.startProject(userId, {
     commandId: id(),
@@ -90,8 +89,7 @@ try {
     userMessageId: id(),
     assistantMessageId: id(),
     modelId,
-    text: "创建一份 Markdown 文档",
-    files: [],
+    parts: [{ type: "text", text: "创建一份 Markdown 文档" }],
   })
   const assistantId = start.result.assistantMessage.id
   const store = new streaming.SessionStore({ startCleanupTimer: false })
@@ -262,7 +260,10 @@ try {
   const partial = terminalSnapshot(restartId, rootThreadId, "checkpoint")
   await checkpoint.flush(partial)
   checkpoint.stop()
-  const swept = await streaming.sweepInterruptedGenerations()
+  // 多实例清扫只处理陈旧行：传入超出心跳陈旧窗口的时间点，模拟重启后 orphan 收敛。
+  const swept = await streaming.sweepInterruptedGenerations(
+    new Date(Date.now() + 120_000)
+  )
   assert.equal(swept, 1)
   const restarted = await application.getMessage(userId, restartId)
   assert.equal(restarted.status, "failed")
@@ -336,6 +337,10 @@ try {
   store.dispose()
   console.log("normalized generation Gate 2 DB tests passed")
 } finally {
+  // document_revisions.actorUserId 不级联；documents 级联删除其 revisions。
+  await db
+    .delete(schema.documents)
+    .where(eq(schema.documents.projectId, projectId))
   await db.delete(schema.user).where(and(eq(schema.user.id, userId)))
   await db.delete(schema.user).where(and(eq(schema.user.id, otherUserId)))
   await globalThis.__dbClient?.end({ timeout: 5 })

@@ -118,6 +118,35 @@ export class SessionStore {
     return true
   }
 
+  /** drain 时终止本进程持有的全部在途生成；返回实际触发 abort 的数量。 */
+  abortAll(reason: GenerationCancelReason): number {
+    let count = 0
+    for (const session of this.sessions.values()) {
+      if (session.status !== "running") continue
+      abortGeneration(session.abortController, reason)
+      count += 1
+    }
+    return count
+  }
+
+  /** 仍在运行的 Generation 数；drain/readiness 用。 */
+  activeGenerationCount(): number {
+    let count = 0
+    for (const session of this.sessions.values()) {
+      if (session.status === "running") count += 1
+    }
+    return count
+  }
+
+  /** 当前 SSE 订阅总数；drain 状态上报用。 */
+  activeSubscriberCount(): number {
+    let count = 0
+    for (const session of this.sessions.values()) {
+      count += session.subscribers.size
+    }
+    return count
+  }
+
   discard(messageId: string, terminalMessage: MessageDTO): boolean {
     const session = this.sessions.get(messageId)
     if (!session) return false
