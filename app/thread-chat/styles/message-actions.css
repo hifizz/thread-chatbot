@@ -2,11 +2,15 @@
 
 .tc .message-toolbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 3px;
   margin-top: 5px;
   color: var(--tc-content-muted);
   transition: opacity 0.16s ease;
+}
+.tc .message-toolbar > .message-action-error {
+  flex-basis: 100%;
 }
 .tc .message-toolbar.end {
   justify-content: flex-end;

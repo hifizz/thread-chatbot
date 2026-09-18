@@ -161,7 +161,7 @@ export function ConversationMessage({
           {hasCompletedAssistantActions(message) &&
             (messageCommands || renderAssistantActions) && (
               <div className="assistant-actions-row">
-                {messageCommands && (
+                {messageCommands ? (
                   <AssistantMessageToolbar
                     threadId={threadId}
                     message={message}
@@ -170,9 +170,13 @@ export function ConversationMessage({
                       message.id
                     )}
                     commands={messageCommands}
+                    trailing={renderAssistantActions?.(message)}
                   />
+                ) : (
+                  <div className="message-toolbar start">
+                    {renderAssistantActions?.(message)}
+                  </div>
                 )}
-                {renderAssistantActions?.(message)}
               </div>
             )}
           {renderAfterMessage?.(message)}
