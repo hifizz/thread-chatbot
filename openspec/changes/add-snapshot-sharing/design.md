@@ -188,13 +188,154 @@ proxy.ts                                   /share/ 前缀放行
 e2e/thread-chat/snapshot-sharing-*.mjs     纯函数/DB/浏览器验收
 ```
 
+## 关键环节（Key Flows）
+
+以下为各核心环节的代码级草图，说明接缝位置而非完整实现。
+
+### A. `useShareRuntime`：与 `useConversationRuntime` 同形替换
+
+```ts
+// app/share/[token]/use-share-runtime.ts
+function useShareRuntime(token: string) {
+  const runtime = useMemo(() => ({
+    store: createConversationStore(),
+    commands: createReadOnlyCommands(),   // 同名 stub，见 C
+    readOnly: true as const,              // 禁用状态位，见 D
+  }), [])
+  const [status, setStatus] = useState<"loading" | "ready" | "error">("loading")
+
+  useEffect(() => {
+    fetch(`/api/share/${token}`)
+      .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
+      .then((snap: PublicProjectSnapshot) => {
+        const s = runtime.store.getState()
+        s.setWorkspace(snap.layout)       // 首屏布局：列/画布/面板/焦点
+        s.hydrateProject(snap.entities)   // 与 ProjectBootstrapDTO 同形的公开子集
+        setStatus("ready")
+      })
+      .catch(() => setStatus("error"))
+  }, [token, runtime])
+
+  return { ...runtime, status }
+}
+```
+
+关键点：`NormalizedThreadChat` 只在 `status === "ready"` 后挂载，`useNormalizedWorkspace` 挂载时读到的 `workspace.columnSlots/canvas.pins` 已是快照值——与私有页"boot 填充空 store 再翻 ready"完全同构，视图层零改动。`snapshot.entities` 刻意对齐 `ProjectBootstrapDTO` 结构（`{project, files:[], threads, messages, artifacts, documents, activeGenerationIds:[]}`），`hydrateProject` 无需适配器；公开 `project` 字段比 `ProjectDTO` 少（无 target/instructions），通过放宽 hydrate 入参类型解决——类型收窄本身就是白名单的编译期证明。
+
+页面挂载：
+
+```tsx
+// app/share/[token]/page.tsx（client 组件）
+const runtime = useShareRuntime(token)
+if (runtime.status !== "ready") return <BootLoading />        // 复用现有加载态
+return <NormalizedThreadChat treeId={`share:${token}`} runtime={runtime} />
+//       └─ localStorage 命名空间隔离；不挂 GenerationSettingsProvider 也可
+```
+
+### B. `shares` 表与创建事务
+
+```ts
+// lib/db/schema.ts
+export const shares = dbSchema.table("shares", {
+  id: text("id").primaryKey(),
+  token: text("token").notNull(),                    // crypto 随机 ≥128bit
+  ownerId: text("owner_id").notNull()
+    .references(() => user.id, { onDelete: "cascade" }),
+  sourceProjectId: text("source_project_id").notNull()
+    .references(() => projects.id, { onDelete: "cascade" }),
+  resourceType: text("resource_type").$type<"project" | "document">().notNull(),
+  resourceId: text("resource_id").notNull(),
+  snapshot: jsonb("snapshot").$type<PublicSnapshot>().notNull(),  // 内容+布局一体
+  schemaVersion: integer("schema_version").notNull().default(1),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }),     // null = 无限
+  revokedAt: timestamp("revoked_at", { withTimezone: true }),
+}, (t) => [
+  unique("shares_token_uq").on(t.token),
+  index("shares_owner_resource_idx").on(t.ownerId, t.resourceType, t.resourceId),
+])
+```
+
+```ts
+// application/sharing.ts —— 一致读事务；幂等由外层 commandId 收据包装
+const createShare = (userId, cmd) =>
+  db.transaction({ isolationLevel: "repeatable read" }, async (tx) => {
+    const res = await loadOwnedResource(tx, userId, cmd.resource)      // 归属+类型，失败 403/404
+    const snapshot = buildSnapshot(tx, res, cmd.layout)                // §3 闭包 → §4 白名单 → §5 布局
+    assertSnapshotBounds(snapshot)                                      // §8 上限，超限 throw
+    return insertShare(tx, { token: cryptoToken(), expiresAt: expiry(cmd.expiresIn), ... })
+  })
+```
+
+`loadOwnedResource` 对 `document` 类型沿 `documents → projects.ownerId` 校验归属，并读 `currentRevisionId` pin 版本；对 `project` 校验 `projects.ownerId`。白名单构造全部发生在 `buildSnapshot`（纯函数，可脱离事务测试——事务只保证读取时点一致）。
+
+### C. stub commands：同接口，零网络
+
+```ts
+// 与 createConversationCommands 返回类型一致
+function createReadOnlyCommands(): ConversationCommands {
+  const deny = () =>
+    Promise.reject(new ConversationApplicationError("READ_ONLY", "只读快照，内容已冻结"))
+  return {
+    sendMessage: deny, forkThread: deny, retryMessage: deny,
+    editLatestTurn: deny, requestStop: deny, setFeedback: deny,
+    updateThread: deny, renameProject: deny, deleteProject: deny,
+    updateProjectContract: deny, addProjectFile: deny,
+    removeProjectFile: deny, setProjectArchived: deny, startProject: deny,
+    dispose() {},
+  }
+}
+```
+
+正常路径下控件已被 `readOnly` 禁用，deny 不会被触发；它只保证"绕过 UI 的路径也到不了网络"。
+
+### D. `readOnly` 传递：一个 Context + 各控件认一个开关
+
+```tsx
+// NormalizedThreadChat 顶部；私有 runtime 无 readOnly 字段 → 恒 false，零行为变化
+<ReadOnlyContext.Provider value={runtime.readOnly === true}>
+  …现有组件树…
+</ReadOnlyContext.Provider>
+
+// 写控件只多认一个开关（示意）
+const ro = useReadOnly()
+<Composer disabled={ro} … />
+buildMessageActionViewState({ …, readOnly: ro })   // readOnly 时不产出写动作
+```
+
+需要认 `readOnly` 的触点（即"私有组件只多认一个禁用状态"的全部落点）：
+
+- Composer：输入框/发送/附件按钮 disabled
+- 消息操作条：`buildMessageActionViewState` 产出空写动作集（Fork/Retry/Edit/feedback 不渲染）
+- `thread-chat-topbar`：重命名/分享/归档/删除入口 disabled 或省略
+- Document/Artifact 详情：文档更新入口、分享入口（分享页内不再嵌套分享）
+- 快捷键分派：触发 `runtime.commands.*` 的键位短路
+- 项目列表侧栏 + AccountButton：分享页不渲染（`/v1/projects` 匿名 401），顶栏换"只读快照"徽标
+
+### E. 公开端点：一个函数，两种消费者
+
+```ts
+// lib/thread-chat/sharing/public.ts —— 页面 RSC 与 API 共用
+async function getPublicShare(token: string) {
+  const row = await findShareByToken(token)
+  if (!row || row.revokedAt || (row.expiresAt && Date.now() >= +row.expiresAt))
+    return null                                             // 统一不可用，不分原因
+  return serializePublic(row.snapshot)                      // 固定公开契约再序列化
+}
+
+// GET /api/share/[token] → getPublicShare ? jsonNoCache(data) : jsonNoCache(404)
+// GET /share/{token}     → getPublicShare ? <SharePage snapshot/> : <Unavailable/>（不跳登录）
+```
+
+token 是唯一授权输入：不校验 session、不接受额外参数、不回查源表。
+
 ## Risks / Trade-offs
 
 - [快照重复存储正文占空间] → JSONB 单份、幂等不重复生成、宽松上限明确失败；不上对象存储。
 - [并发修改拼贴时点] → 单事务一致读，正文只信服务端。
 - [白名单漏新 part/字段] → 默认拒绝 + 哨兵测试覆盖 JSON/HTML/RSC/DOM；每新增 part 类型必须显式裁决。
 - [Document 与旧 artifact 双身份混淆] → 分享一律锚 documentId+revisionId，正文复制进快照，不依赖可变 head。
-- [阅读壳复用私有组件带回写口] → commands/runtime 不装配 + read-only 动作视图；浏览器测试验证无写请求。
+- [阅读壳复用私有组件带回写口] → readOnly 禁用位 + stub commands 双保险；浏览器测试验证无写请求。
 - [有效期误解为收回已复制内容] → 文案明示；禁缓存防绕过。
 - [公开端点无滥用防护] → v1 接受 token 不可猜测为唯一边界；noindex+no-referrer 降暴露面。
 
