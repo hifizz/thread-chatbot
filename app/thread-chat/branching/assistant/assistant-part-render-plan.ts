@@ -39,6 +39,7 @@ const REPO_TOOL_NAMES = new Set([
   // findRepositoryPaths 已被 searchRepositoryCode 取代；保留旧名以渲染历史消息中的 part。
   "tool-findRepositoryPaths",
   "tool-searchRepositoryCode",
+  "tool-commitFilesToRepository",
   "tool-dispatchAgentTask",
   "tool-checkAgentTask",
 ])

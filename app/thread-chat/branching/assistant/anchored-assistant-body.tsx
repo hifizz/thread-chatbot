@@ -103,6 +103,9 @@ interface ToolOutput {
     truncated?: boolean
     matches?: (string | { path: string; line: number; text: string })[]
     matchCount?: number
+    commitUrl?: string
+    pullRequest?: { url: string; number: number; draft?: boolean } | null
+    warning?: string
     taskId?: string
     title?: string
     repo?: string
@@ -124,6 +127,7 @@ const TOOL_ICONS: Record<string, string> = {
   readRepositoryFile: "📄",
   findRepositoryPaths: "🔍",
   searchRepositoryCode: "🔍",
+  commitFilesToRepository: "📤",
   dispatchAgentTask: "🚀",
   checkAgentTask: "📊",
 }
@@ -137,6 +141,7 @@ function toolShortName(name: string): string {
   if (name === "readRepositoryFile") return "读文件"
   if (name === "findRepositoryPaths") return "找路径"
   if (name === "searchRepositoryCode") return "搜代码"
+  if (name === "commitFilesToRepository") return "提交PR"
   if (name === "dispatchAgentTask") return "派任务"
   if (name === "checkAgentTask") return "查任务"
   return name
@@ -169,6 +174,10 @@ function parseRepoToolPart(
     else if (toolName === "findRepositoryPaths") inputLabel = `"${input.query ?? ""}"`
     else if (toolName === "searchRepositoryCode") {
       inputLabel = `"${input.query ?? ""}"${input.path ? `  ${input.path}` : ""}`
+    }
+    else if (toolName === "commitFilesToRepository") {
+      const files = Array.isArray(input.files) ? input.files.length : 0
+      inputLabel = `${input.branchName ?? ""} · ${files} 个文件`
     }
     else if (toolName === "dispatchAgentTask") {
       const goal = String(input.goal ?? "")
@@ -216,6 +225,13 @@ function parseRepoToolPart(
             first.line
           )
         }
+      } else if (toolName === "commitFilesToRepository") {
+        const pr = output.data.pullRequest
+        outputLabel = pr
+          ? `PR #${pr.number}${pr.draft ? "（草稿）" : ""}`
+          : `已提交 ${shortSha(output.data.commitSha ?? "")}`
+        outputLink = pr?.url ?? output.data.commitUrl ?? null
+        if (output.data.warning) outputLabel += ` · ${output.data.warning}`
       } else if (toolName === "dispatchAgentTask" && output.data.taskId) {
         outputLabel = `${output.data.taskId} → ${output.data.branch ?? ""}`
         outputLink = output.data.watchUrl ?? null
@@ -258,21 +274,26 @@ function RepoToolGroup({
     (r) => (r.name === "找路径" || r.name === "搜代码") && !r.isError
   ).length
   const taskCount = rows.filter((r) => r.name === "派任务" && !r.isError).length
+  const commitCount = rows.filter(
+    (r) => r.name === "提交PR" && !r.isError
+  ).length
 
   const items = [
     fileCount > 0 ? `${fileCount} 个文件` : null,
     dirCount > 0 ? `${dirCount} 个目录` : null,
     searchCount > 0 ? `${searchCount} 次查找` : null,
+    commitCount > 0 ? `提交 ${commitCount} 个 PR` : null,
     taskCount > 0 ? `派发 ${taskCount} 个任务` : null,
   ].filter(Boolean)
 
+  const readCount = fileCount + dirCount + searchCount
   const summary =
     okCount === 0
       ? "读取失败"
       : items.length > 0
-        ? fileCount + dirCount + searchCount === 0
-          ? items.join("，")
-          : `读取了 ${items.join("，")}`
+        ? readCount > 0 && commitCount + taskCount === 0
+          ? `读取了 ${items.join("，")}`
+          : items.join("，")
         : "读取完成"
 
   return (

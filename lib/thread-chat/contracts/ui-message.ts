@@ -76,6 +76,16 @@ export type ThreadChatTools = {
     input: { query: string; path?: string }
     output: unknown
   }
+  commitFilesToRepository: {
+    input: {
+      branchName: string
+      commitMessage: string
+      files: Array<{ path: string; content: string }>
+      prTitle: string
+      prBody?: string
+    }
+    output: unknown
+  }
   dispatchAgentTask: {
     input: { goal: string }
     output: unknown
