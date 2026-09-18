@@ -127,4 +127,5 @@ try {
   console.log("PASS  billing reservation concurrency and settlement idempotency")
 } finally {
   await db.delete(schema.user).where(eq(schema.user.id, userId))
+  await globalThis.__dbClient?.end({ timeout: 5 })
 }

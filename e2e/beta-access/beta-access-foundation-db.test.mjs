@@ -180,4 +180,5 @@ try {
     .where(eq(schema.betaWaitlistEntries.emailNormalized, invitedEmail))
   await db.delete(schema.user).where(eq(schema.user.id, userId))
   await db.delete(schema.user).where(eq(schema.user.id, adminId))
+  await globalThis.__dbClient?.end({ timeout: 5 })
 }
