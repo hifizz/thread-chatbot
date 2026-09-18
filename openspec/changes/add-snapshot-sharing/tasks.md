@@ -2,30 +2,30 @@
 
 ## 1. 契约与常量
 
-- [ ] 1.1 `constants/sharing.ts`：有效期枚举（3/7/30天/无限，默认无限）、token 格式、宽松上限（snapshot ≤16MB、messages ≤5000、layout ≤512KB）、提示文案
-- [ ] 1.2 `lib/thread-chat/sharing/contracts.ts`：创建命令判别联合（project/document）、`PublicProjectSnapshot`/`PublicDocumentSnapshot`、`ShareDTO` zod schema；严格拒绝正文/owner/token/自定义期限
-- [ ] 1.3 测试：枚举与边界值、未知字段拒绝
+- [x] 1.1 `constants/sharing.ts`：有效期枚举（3/7/30天/无限，默认无限）、token 格式、宽松上限（snapshot ≤16MB、messages ≤5000、layout ≤512KB）、提示文案
+- [x] 1.2 `lib/thread-chat/sharing/contracts.ts`：创建命令判别联合（project/document）、`PublicProjectSnapshot`/`PublicDocumentSnapshot`、`ShareDTO` zod schema；严格拒绝正文/owner/token/自定义期限
+- [x] 1.3 测试：枚举与边界值、未知字段拒绝
 
 ## 2. 快照构造与白名单（纯函数）
 
-- [ ] 2.1 `snapshot.ts`：Project 闭包选取——全部 Thread + 当前消息 ∪ forkContext/forkMessageId 来源 ∪ Artifact/Document 来源链；同 Project 校验，跨 Project/缺失引用失败
-- [ ] 2.2 `snapshot.ts`：全部 Artifact（含 content）+ Document 目录 pin 当前版本；生成中/stopped/failed 消息静态化
-- [ ] 2.3 `whitelist.ts`：字段级剔除（instructions/target/feedback/error/providerUsage/documentContextUsed/modelId/标题内部态）+ parts 逐类型裁决表（含 research 三件套、文档工具折叠、readUrl 丢 content、updates/notices 剔除、file→占位）
-- [ ] 2.4 `sanitize-links.ts`：Markdown AST 清洗 `/api/attachments/*`、R2/签名地址、危险协议；覆盖 inline/reference/autolink/image/纯文本；外链 noreferrer 标记
-- [ ] 2.5 `layout.ts`：布局白名单规范化——ID 属于快照、数值有限有界、失效引用安全回退
-- [ ] 2.6 测试：分支闭包/无关旧消息不公开/跨项目失败/未知 part 默认排除/哨兵值不出现在快照 JSON
+- [x] 2.1 `snapshot.ts`：Project 闭包选取——全部 Thread + 当前消息 ∪ forkContext/forkMessageId 来源 ∪ Artifact/Document 来源链；同 Project 校验，跨 Project/缺失引用失败
+- [x] 2.2 `snapshot.ts`：全部 Artifact（含 content）+ Document 目录 pin 当前版本；生成中/stopped/failed 消息静态化
+- [x] 2.3 `whitelist.ts`：字段级剔除（instructions/target/feedback/error/providerUsage/documentContextUsed/modelId/标题内部态）+ parts 逐类型裁决表（含 research 三件套、文档工具折叠、readUrl 丢 content、updates/notices 剔除、file→占位）
+- [x] 2.4 `sanitize-links.ts`：Markdown AST 清洗 `/api/attachments/*`、R2/签名地址、危险协议；覆盖 inline/reference/autolink/image/纯文本；外链 noreferrer 标记
+- [x] 2.5 `layout.ts`：布局白名单规范化——ID 属于快照、数值有限有界、失效引用安全回退
+- [x] 2.6 测试：分支闭包/无关旧消息不公开/跨项目失败/未知 part 默认排除/哨兵值不出现在快照 JSON
 
 ## 3. 持久化与所有者命令
 
-- [ ] 3.1 `lib/db/schema.ts` 加 `shares` 表（token 唯一、ownerId/sourceProjectId 级联、类型/时间约束、管理索引）；仅本地库 `db:push`，不动 `drizzle/`
-- [ ] 3.2 `persistence/share-repository.ts`：REPEATABLE READ 创建事务（所有权→闭包→白名单→expiresAt→原子写）、按 token 查有效分享、按资源列表、幂等撤销
-- [ ] 3.3 `application/sharing.ts`：`createShare`（接 `conversationCommands` 幂等）/`listShares`/`revokeShare`/`getPublicShare`
-- [ ] 3.4 测试：跨用户拒绝、幂等重放与冲突、各期限与边界、重复撤销、级联失效、归档不改快照
+- [x] 3.1 `lib/db/schema.ts` 加 `shares` 表（token 唯一、ownerId/sourceProjectId 级联、类型/时间约束、管理索引）；仅本地库 `db:push`，不动 `drizzle/`
+- [x] 3.2 `persistence/share-repository.ts`：REPEATABLE READ 创建事务（所有权→闭包→白名单→expiresAt→原子写）、按 token 查有效分享、按资源列表、幂等撤销
+- [x] 3.3 `application/sharing.ts`：`createShare`（接 `conversationCommands` 幂等）/`listShares`/`revokeShare`/`getPublicShare`
+- [x] 3.4 测试：跨用户拒绝、幂等重放与冲突、各期限与边界、重复撤销、级联失效、归档不改快照
 
 ## 4. 路由与公开访问面
 
-- [ ] 4.1 `server/handlers.ts` +4 handler：`handleCreateShare`/`handleListShares`/`handleRevokeShare`（`withThreadChatRoute`）、`handleGetPublicShare`（无 auth，`jsonNoCache`，统一不可用响应）
-- [ ] 4.2 路由：`POST/GET /api/thread-chat/v1/shares`、`DELETE /api/thread-chat/v1/shares/[shareId]`、`GET /api/share/[token]`
+- [x] 4.1 `server/handlers.ts` +4 handler：`handleCreateShare`/`handleListShares`/`handleRevokeShare`（`withThreadChatRoute`）、`handleGetPublicShare`（无 auth，`jsonNoCache`，统一不可用响应）
+- [x] 4.2 路由：`POST/GET /api/thread-chat/v1/shares`、`DELETE /api/thread-chat/v1/shares/[shareId]`、`GET /api/share/[token]`
 - [ ] 4.3 `app/share/[token]/page.tsx`：`force-dynamic` + noindex + no-referrer；RSC 共用有效性检查后渲染只读壳
 - [ ] 4.4 `proxy.ts`：`/share/` 前缀放行，其余精确匹配不变
 - [ ] 4.5 测试：匿名读取、无效/过期/撤销统一 404、token 不授予私有访问、无私有路径误放行
