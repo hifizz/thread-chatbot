@@ -5,7 +5,7 @@ import { MarkdownBody } from "@/app/thread-chat/chat/message/markdown-body"
 import { ProjectListStoreProvider } from "@/app/thread-chat/core/project-list-store"
 import { NormalizedThreadChat } from "@/app/thread-chat/thread-chat-demo"
 import "@/app/thread-chat/thread-chat.css"
-import { SHARE_UI_COPY } from "@/constants/sharing"
+import { ShareBadge } from "@/app/thread-chat/orchestration/sharing/share-chrome"
 import type { PublicSnapshot } from "@/lib/thread-chat/sharing/contracts"
 import { useShareRuntime } from "../read-only-runtime"
 
@@ -46,17 +46,19 @@ function DocumentShareShell({
   snapshot: Extract<PublicSnapshot, { kind: "document" }>
 }) {
   return (
-    <div className="tc share-document">
+    <div className="tc flex min-h-screen flex-col bg-[var(--tc-surface-base)]">
       <div className="topbar">
         <div className="brand">
           <span className="mark">Thread Chat</span>
-          <span className="share-badge">{SHARE_UI_COPY.readOnlyBadge}</span>
+          <ShareBadge />
         </div>
       </div>
-      <main className="share-document-body">
-        <header className="share-document-head">
-          <h1>{snapshot.document.title}</h1>
-          <span className="share-document-meta">
+      <main className="mx-auto w-full max-w-[760px] flex-1 px-5 pb-12 pt-6">
+        <header className="mb-5 border-b border-[var(--tc-border-subtle)] pb-3">
+          <h1 className="m-0 mb-1.5 font-[family-name:var(--tc-typography-family-read)] text-2xl font-semibold">
+            {snapshot.document.title}
+          </h1>
+          <span className="text-xs text-[var(--tc-content-dim,var(--tc-depth-1))]">
             第 {snapshot.document.revisionNumber} 版 ·{" "}
             {snapshot.document.createdAt.slice(0, 10)}
           </span>

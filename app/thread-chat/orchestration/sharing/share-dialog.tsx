@@ -9,9 +9,9 @@
  */
 
 import React, { useCallback, useEffect, useState } from "react"
-import { Share2 } from "lucide-react"
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog"
 import { Dialog, DialogPortal } from "@/components/ui/dialog"
+import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 import {
   SHARE_EXPIRY_OPTIONS,
@@ -39,6 +39,7 @@ export interface ShareDialogProps {
   store: ConversationStore
   client: ThreadChatClient
   overlay: { drawerOpen: boolean; activeArtifactId: string | null }
+  container?: React.RefObject<HTMLElement | null>
 }
 
 function shareUrl(token: string): string {
@@ -56,7 +57,7 @@ async function copyLink(token: string) {
     await navigator.clipboard.writeText(shareUrl(token))
     toast.success(SHARE_UI_COPY.copied)
   } catch {
-    toast.error(SHARE_UI_COPY.createFailed)
+    toast.error(SHARE_UI_COPY.copyFailed)
   }
 }
 
@@ -67,11 +68,13 @@ export function ShareDialog({
   store,
   client,
   overlay,
+  container,
 }: ShareDialogProps) {
   const [shares, setShares] = useState<ShareDTO[] | null>(null)
   const [expiry, setExpiry] = useState<ShareExpiry>(SHARE_EXPIRY_DEFAULT)
   const [creating, setCreating] = useState(false)
   const [loadFailed, setLoadFailed] = useState(false)
+  const hasActive = (shares ?? []).some((row) => row.status === "active")
 
   const resourceKey = resource
     ? `${resource.resourceType}:${resource.resourceId}`
@@ -90,7 +93,7 @@ export function ShareDialog({
   }, [open, resourceKey, client])
 
   const create = useCallback(async () => {
-    if (!resource || creating) return
+    if (!resource || creating || hasActive) return
     setCreating(true)
     try {
       const base = {
@@ -120,7 +123,7 @@ export function ShareDialog({
     } finally {
       setCreating(false)
     }
-  }, [client, creating, expiry, overlay, resource, store])
+  }, [client, creating, expiry, hasActive, overlay, resource, store])
 
   const revoke = useCallback(
     async (share: ShareDTO) => {
@@ -146,80 +149,106 @@ export function ShareDialog({
       modal={false}
       disablePointerDismissal
     >
-      <DialogPortal>
+      <DialogPortal container={container}>
         <DialogPrimitive.Backdrop className="swx-scrim" onMouseDown={onClose} />
-        <DialogPrimitive.Popup className="swx global share-dialog" initialFocus={false}>
-          <div className="swx-title">
-            <Share2 size={14} />
-            {SHARE_UI_COPY.dialogTitle}
-          </div>
+        <DialogPrimitive.Popup
+          className="swx global w-[420px] max-w-[calc(100vw-24px)]"
+          initialFocus={false}
+        >
+          <div className="swx-title">{SHARE_UI_COPY.dialogTitle}</div>
 
-          <p className="share-notice">{SHARE_UI_COPY.shareNotice}</p>
+          <div className="px-4 pb-3.5 pt-3">
+            <p className="mb-3 text-xs leading-relaxed text-[var(--tc-content-secondary)]">
+              {SHARE_UI_COPY.shareNotice}
+            </p>
 
-          <div className="share-expiry" role="radiogroup" aria-label={SHARE_UI_COPY.expiryLabel}>
-            <span className="share-expiry-label">{SHARE_UI_COPY.expiryLabel}</span>
-            {SHARE_EXPIRY_OPTIONS.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                role="radio"
-                aria-checked={expiry === option.value}
-                className={`share-expiry-choice ${expiry === option.value ? "active" : ""}`}
-                onClick={() => setExpiry(option.value)}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
+            {!hasActive && (
+              <>
+                <div className="mb-3">
+                  <span className="mb-1.5 block text-xs text-[var(--tc-content-secondary)]">
+                    {SHARE_UI_COPY.expiryLabel}
+                  </span>
+                  <div
+                    className="grid grid-cols-4 gap-1 rounded-lg border border-[var(--tc-border-subtle)] bg-[var(--tc-surface-sunken)] p-1"
+                    role="radiogroup"
+                    aria-label={SHARE_UI_COPY.expiryLabel}
+                  >
+                    {SHARE_EXPIRY_OPTIONS.map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        role="radio"
+                        aria-checked={expiry === option.value}
+                        className={cn(
+                          "cursor-pointer rounded-md py-2 text-[13px] transition-colors",
+                          expiry === option.value
+                            ? "bg-[var(--tc-surface-ink)] text-[var(--tc-content-on-ink)]"
+                            : "text-[var(--tc-content-secondary)] hover:bg-[var(--tc-surface-raised)] hover:text-[var(--tc-content-primary)]"
+                        )}
+                        onClick={() => setExpiry(option.value)}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
 
-          <button
-            type="button"
-            className="share-create"
-            disabled={creating || !resource}
-            onClick={() => void create()}
-          >
-            {creating ? "创建中…" : SHARE_UI_COPY.createAction}
-          </button>
-
-          <div className="swx-list share-list">
-            {shares === null && !loadFailed && (
-              <div className="swx-empty">加载中…</div>
+                <button
+                  type="button"
+                  className="w-full cursor-pointer rounded-lg border border-[var(--tc-border-strong)] bg-[var(--tc-surface-plain)] py-2 text-[13px] text-[var(--tc-content-primary)] transition-colors hover:border-[var(--tc-content-muted)] hover:bg-[var(--tc-surface-raised)] disabled:cursor-default disabled:opacity-50"
+                  disabled={creating || !resource}
+                  onClick={() => void create()}
+                >
+                  {creating ? "创建中…" : SHARE_UI_COPY.createAction}
+                </button>
+              </>
             )}
-            {loadFailed && (
-              <div className="swx-empty">加载失败，请稍后重新打开</div>
-            )}
-            {shares !== null && shares.length === 0 && (
-              <div className="swx-empty">{SHARE_UI_COPY.listEmpty}</div>
-            )}
-            {(shares ?? []).map((share) => (
-              <div className="share-row" key={share.id}>
-                <span className={`share-status ${share.status}`}>
-                  {statusLabel(share)}
-                </span>
-                <span className="share-row-meta">
-                  {share.createdAt.slice(0, 10)}
-                  {share.expiresAt ? ` · 至 ${share.expiresAt.slice(0, 10)}` : " · 无限期"}
-                </span>
-                {share.status === "active" && (
-                  <>
-                    <button
-                      type="button"
-                      className="share-row-action"
-                      onClick={() => void copyLink(share.token)}
-                    >
-                      {SHARE_UI_COPY.copyAction}
-                    </button>
-                    <button
-                      type="button"
-                      className="share-row-action danger"
-                      onClick={() => void revoke(share)}
-                    >
-                      {SHARE_UI_COPY.revokeAction}
-                    </button>
-                  </>
-                )}
-              </div>
-            ))}
+
+            <div className="max-h-60 overflow-y-auto">
+              {shares === null && !loadFailed && (
+                <div className="swx-empty">加载中…</div>
+              )}
+              {loadFailed && (
+                <div className="swx-empty">加载失败，请稍后重新打开</div>
+              )}
+              {(shares ?? []).map((share) => (
+                <div
+                  className="flex items-center gap-2 border-t border-[var(--tc-border-subtle)] py-2 text-xs transition-colors hover:bg-[var(--tc-surface-raised)]"
+                  key={share.id}
+                >
+                  <span
+                    className={cn(
+                      "flex-none rounded-lg border border-[var(--tc-border-strong)] px-2 py-0.5 text-[var(--tc-content-secondary)]",
+                      share.status !== "active" && "text-[var(--tc-content-muted)]"
+                    )}
+                  >
+                    {statusLabel(share)}
+                  </span>
+                  <span className="flex-1 text-[var(--tc-content-secondary)]">
+                    {share.createdAt.slice(0, 10)}
+                    {share.expiresAt ? ` · 至 ${share.expiresAt.slice(0, 10)}` : " · 无限期"}
+                  </span>
+                  {share.status === "active" && (
+                    <>
+                      <button
+                        type="button"
+                        className="flex-none cursor-pointer rounded-lg border border-[var(--tc-border-strong)] bg-[var(--tc-surface-plain)] px-2 py-1 text-xs text-[var(--tc-content-secondary)] transition-colors hover:border-[var(--tc-content-muted)] hover:text-[var(--tc-content-primary)]"
+                        onClick={() => void copyLink(share.token)}
+                      >
+                        {SHARE_UI_COPY.copyAction}
+                      </button>
+                      <button
+                        type="button"
+                        className="flex-none cursor-pointer rounded-lg border border-[var(--tc-border-strong)] bg-[var(--tc-surface-plain)] px-2 py-1 text-xs text-[var(--tc-content-secondary)] transition-colors hover:border-[var(--tc-danger-edge)] hover:text-[var(--tc-danger)]"
+                        onClick={() => void revoke(share)}
+                      >
+                        {SHARE_UI_COPY.revokeAction}
+                      </button>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         </DialogPrimitive.Popup>
       </DialogPortal>

@@ -6,6 +6,7 @@ import { ConversationComposer } from "../../chat/composer/conversation-composer"
 import { ConversationMessage } from "../../chat/message/conversation-message"
 import { MessageArtifacts } from "../artifacts/message-artifacts"
 import { MessageForkActions } from "../../branching/message-fork-actions"
+import { ReadOnlyStrip } from "../sharing/share-chrome"
 import { CanvasActionsContext } from "./canvas-actions"
 import { CANVAS_EXPAND_WIDTH } from "./canvas-dimensions"
 import type { CanvasCardData } from "./canvas-node"
@@ -111,7 +112,7 @@ export function CanvasExpand({
         ))}
       </div>
       {actions?.readOnly ? (
-        <div className="composer read-only-strip">只读快照 · 内容在分享时冻结</div>
+        <ReadOnlyStrip />
       ) : (
         <ConversationComposer
           variant="canvas"

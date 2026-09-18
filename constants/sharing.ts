@@ -44,12 +44,12 @@ export const SHARE_UI_COPY = {
   createAction: "创建分享链接",
   copyAction: "复制链接",
   copied: "已复制链接",
+  copyFailed: "复制失败，请在列表中重试",
   revokeAction: "撤销",
   revoked: "已撤销",
   statusActive: "有效",
   statusExpired: "已过期",
   statusRevoked: "已撤销",
-  listEmpty: "还没有分享链接",
   shareNotice:
     "此链接保存创建时的内容与布局，后续修改不会同步。任何持有链接的人均可在有效期内阅读。Instructions 与附件不会分享，但已出现在对话或文档正文中的敏感内容不会自动打码，请检查后再分享。",
   unavailable: "此分享链接不存在、已过期或已被撤销。",
