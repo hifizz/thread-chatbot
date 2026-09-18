@@ -59,6 +59,7 @@ export function toPublicThread(thread: ThreadDTO): ThreadDTO {
     customTitle: thread.customTitle,
     titleGenerationAttempted: false,
     titleGenerated: false,
+    repoBinding: null,
     createdAt: thread.createdAt,
     updatedAt: thread.updatedAt,
   }
