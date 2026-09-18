@@ -17,17 +17,21 @@ import {
 } from "@/lib/thread-chat/contracts/commands"
 import {
   addProjectFile,
+  createShare,
   deleteProject,
   editLatestTurn,
   forkThread,
   getArtifact,
   getMessage,
   getProjectBootstrap,
+  getPublicShare,
   listProjects,
+  listShares,
   removeProjectFile,
   renameProject,
   requestMessageStop,
   retryMessage,
+  revokeShare,
   sendMessage,
   setMessageFeedback,
   setProjectArchived,
@@ -36,11 +40,17 @@ import {
   updateProjectContract,
   updateThread,
 } from "@/lib/thread-chat/application"
+import {
+  createShareCommandSchema,
+  listSharesQuerySchema,
+} from "@/lib/thread-chat/sharing/contracts"
+import { SHARE_TOKEN_PATTERN, SHARE_UI_COPY } from "@/constants/sharing"
 import { ConversationApplicationError } from "@/lib/thread-chat/application/errors"
 import { startSessionAfterCommit } from "@/lib/thread-chat/server/start-session-after-commit"
 import {
   commandResponse,
   jsonNoCache,
+  mapRouteError,
   parseJson,
   withThreadChatRoute,
 } from "@/lib/thread-chat/server/route-utils"
@@ -371,4 +381,56 @@ export function handleMessageStream(
     if (!response) throw new Error("SESSION_NOT_AVAILABLE")
     return response
   })
+}
+
+/* ========== 快照分享 ========== */
+
+export function handleCreateShare(request: Request): Promise<Response> {
+  return withThreadChatRoute(request, async (userId) => {
+    const command = await parseJson(request, createShareCommandSchema)
+    return commandResponse(await createShare(userId, command))
+  })
+}
+
+export function handleListShares(request: Request): Promise<Response> {
+  return withThreadChatRoute(request, async (userId) => {
+    const url = new URL(request.url)
+    const query = listSharesQuerySchema.parse({
+      resourceType: url.searchParams.get("resourceType") ?? undefined,
+      resourceId: url.searchParams.get("resourceId") ?? undefined,
+    })
+    return jsonNoCache(await listShares(userId, query))
+  })
+}
+
+export function handleRevokeShare(
+  request: Request,
+  shareId: string
+): Promise<Response> {
+  return withThreadChatRoute(request, async (userId) => {
+    return jsonNoCache({ share: await revokeShare(userId, parseId(shareId)) })
+  })
+}
+
+/** 匿名公开读：不走 withThreadChatRoute；无效/过期/撤销统一 404，不区分原因。 */
+export async function handleGetPublicShare(
+  _request: Request,
+  token: string
+): Promise<Response> {
+  try {
+    if (!SHARE_TOKEN_PATTERN.test(token))
+      throw new ConversationApplicationError(
+        "NOT_FOUND",
+        SHARE_UI_COPY.unavailable
+      )
+    const share = await getPublicShare(token)
+    if (!share)
+      throw new ConversationApplicationError(
+        "NOT_FOUND",
+        SHARE_UI_COPY.unavailable
+      )
+    return jsonNoCache(share)
+  } catch (error) {
+    return mapRouteError(error)
+  }
 }

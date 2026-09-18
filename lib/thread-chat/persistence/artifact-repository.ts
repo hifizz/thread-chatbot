@@ -82,6 +82,17 @@ export async function listOwnedThreadArtifactRows(executor: ConversationExecutor
     .orderBy(desc(artifacts.createdAt))
 }
 
+/** 调用方先校验 Project 所有权；返回全部 Artifact 含正文（快照构造用）。 */
+export async function listProjectArtifactRows(
+  executor: ConversationExecutor,
+  projectId: string
+) {
+  const rows = await withSource(executor)
+    .where(eq(artifacts.projectId, projectId))
+    .orderBy(artifacts.createdAt)
+  return rows.map(requireContent)
+}
+
 /** 调用方先校验 Project 所有权；返回来源状态，由应用层决定新引用规则。 */
 export async function loadProjectReferenceArtifactRows(
   executor: ConversationExecutor,

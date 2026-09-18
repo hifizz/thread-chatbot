@@ -52,9 +52,10 @@ export interface ProjectPanelProps {
   onClose(): void
   onSelect(id: string): void
   onLocate(threadId: string, sourceMessageId: string): void
-  onSaveContract(target: string, instructions: string): Promise<void>
-  onAddProjectFile(attachmentId: string): Promise<void>
-  onRemoveProjectFile(attachmentId: string): Promise<void>
+  /** 写回调缺席 = 只读：Contract 编辑、上传、移除的控件不渲染。 */
+  onSaveContract?(target: string, instructions: string): Promise<void>
+  onAddProjectFile?(attachmentId: string): Promise<void>
+  onRemoveProjectFile?(attachmentId: string): Promise<void>
 }
 
 type ProjectPanelSection = "overview" | "files" | "artifacts"
@@ -181,7 +182,7 @@ export function ProjectPanel({
     setSaving(true)
     setError(null)
     try {
-      await onSaveContract(targetDraft, instructionsDraft)
+      await onSaveContract?.(targetDraft, instructionsDraft)
       setEditing(false)
     } catch (cause) {
       setError(
@@ -200,7 +201,7 @@ export function ProjectPanel({
     setError(null)
     try {
       await uploadProjectFile(file, {
-        onAttachmentCreated: onAddProjectFile,
+        onAttachmentCreated: async (attachmentId) => onAddProjectFile?.(attachmentId),
       })
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "文件上传失败")
@@ -218,7 +219,7 @@ export function ProjectPanel({
     if (!confirmed) return
     setError(null)
     try {
-      await onRemoveProjectFile(file.attachmentId)
+      await onRemoveProjectFile?.(file.attachmentId)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "移除文件失败")
     }
@@ -330,7 +331,7 @@ export function ProjectPanel({
                       Fork Context。
                     </p>
                   </div>
-                  {!archived && !editing && project && (
+                  {!archived && !editing && project && onSaveContract && (
                     <button className="project-secondary" onClick={beginEdit}>
                       <Pencil size={12} /> 编辑
                     </button>
@@ -415,7 +416,7 @@ export function ProjectPanel({
                       成员关系。
                     </p>
                   </div>
-                  {!archived && project && (
+                  {!archived && project && onAddProjectFile && (
                     <>
                       <input
                         ref={fileInputRef}
@@ -478,23 +479,25 @@ export function ProjectPanel({
                           )}
                         </div>
                         <div className="project-resource-actions">
-                          <a
-                            className="project-icon-button"
-                            href={file.url}
-                            target="_blank"
-                            rel="noreferrer"
-                            title="打开文件"
-                          >
-                            <ExternalLink size={13} />
-                          </a>
-                          {!archived && (
-                            <button
-                              className="project-icon-button danger"
-                              title="从 Project 移除"
-                              onClick={() => void remove(file)}
-                            >
-                              <Trash2 size={13} />
-                            </button>
+                          {!archived && onRemoveProjectFile && (
+                            <>
+                              <a
+                                className="project-icon-button"
+                                href={file.url}
+                                target="_blank"
+                                rel="noreferrer"
+                                title="打开文件"
+                              >
+                                <ExternalLink size={13} />
+                              </a>
+                              <button
+                                className="project-icon-button danger"
+                                title="从 Project 移除"
+                                onClick={() => void remove(file)}
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            </>
                           )}
                         </div>
                       </article>

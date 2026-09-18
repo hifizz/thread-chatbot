@@ -63,6 +63,8 @@ export interface BranchableChatProps {
   /** 根 Thread 模型切换意图；分支 selector 仍由本层锁定。 */
   onModelChange: (modelId: string) => void | Promise<unknown>
   onSend: (content: MessageContentInput) => unknown | Promise<unknown>
+  /** 只读快照：composer 位渲染静态条，透传给 ChatView */
+  readOnly?: boolean
   messageActionState?: MessageActionViewState
   messageCommands?: ThreadMessageActionCommands
 }
@@ -86,6 +88,7 @@ export function BranchableChat({
   composerPrefill,
   onModelChange,
   onSend,
+  readOnly = false,
   messageActionState,
   messageCommands,
 }: BranchableChatProps) {
@@ -294,6 +297,7 @@ export function BranchableChat({
       }
       onModelChange={onModelChange}
       onSend={onSend}
+      readOnly={readOnly}
       messageActionState={messageActionState}
       messageCommands={messageCommands}
       editableUserMessageId={presentation?.latestUserMessageId}

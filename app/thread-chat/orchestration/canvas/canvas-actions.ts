@@ -14,6 +14,8 @@ export interface CanvasChatActions extends ThreadMessageActionCommands {
   send: (threadId: string, content: MessageContentInput) => unknown | Promise<unknown>
   stop: (threadId: string) => void
   retry: (threadId: string, messageId: string) => void
+  /** 只读快照：画布内 composer 渲染静态条，消息动作缺席 */
+  readOnly?: boolean
 }
 
 /** 画布节点面板可用的完整组合能力。 */

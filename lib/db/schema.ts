@@ -459,6 +459,43 @@ export const conversationCommands = dbSchema.table(
   ]
 )
 
+/** 匿名只读分享：snapshot 为创建时冻结的公开白名单副本，token 是外部唯一入口。 */
+export const shares = dbSchema.table(
+  "shares",
+  {
+    id: text("id").primaryKey(),
+    token: text("token").notNull(),
+    ownerId: text("owner_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    sourceProjectId: text("source_project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    resourceType: text("resource_type").notNull(),
+    resourceId: text("resource_id").notNull(),
+    snapshot: jsonb("snapshot").$type<unknown>().notNull(),
+    schemaVersion: integer("schema_version").notNull().default(1),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  },
+  (table) => [
+    uniqueIndex("shares_token_uq").on(table.token),
+    index("shares_owner_resource_idx").on(
+      table.ownerId,
+      table.resourceType,
+      table.resourceId,
+      table.createdAt
+    ),
+    check(
+      "shares_resource_type",
+      sql`${table.resourceType} in ('project','document')`
+    ),
+  ]
+)
+
 export const attachmentsRelations = relations(attachments, ({ many }) => ({
   projectMemberships: many(projectFiles),
 }))

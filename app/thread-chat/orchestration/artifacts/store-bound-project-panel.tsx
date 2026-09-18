@@ -64,6 +64,8 @@ export function StoreBoundProjectPanel({
   onClose,
   onSelect,
   onLocate,
+  readOnly = false,
+  onShareDocument,
 }: {
   projectId: string
   questionArtifactId: string | null
@@ -77,6 +79,10 @@ export function StoreBoundProjectPanel({
   onClose(): void
   onSelect(id: string): void
   onLocate(threadId: string, sourceMessageId: string): void
+  /** 只读快照：Contract/文件写回调不下发，相关控件不渲染 */
+  readOnly?: boolean
+  /** 文档分享入口：缺席时 DocumentView 不渲染分享按钮 */
+  onShareDocument?(documentId: string): void
 }) {
   const versionRequest = useRef({ sequence: 0 })
   useEffect(() => {
@@ -237,7 +243,7 @@ export function StoreBoundProjectPanel({
     <ProjectPanel
       documentSyncError={state.documentSyncError}
       currentArtifacts={selectCurrentProjectArtifacts(state)}
-      renderDocumentControls={(artifact) => <DocumentView artifact={artifact} currentRevisionId={artifact.document ? state.documentsById[artifact.document.id]?.currentRevisionId : undefined} client={client} navigationBlocked={questionArtifactId === artifact.id} onSelect={(id) => {
+      renderDocumentControls={(artifact) => <DocumentView artifact={artifact} currentRevisionId={artifact.document ? state.documentsById[artifact.document.id]?.currentRevisionId : undefined} client={client} navigationBlocked={questionArtifactId === artifact.id} onShare={readOnly || !onShareDocument ? undefined : onShareDocument} onSelect={(id) => {
         if (questionArtifactId === artifact.id) return
         const request = ++versionRequest.current.sequence
         void client.getArtifact(id).then((artifact) => {
@@ -261,9 +267,9 @@ export function StoreBoundProjectPanel({
       onClose={onClose}
       onSelect={onSelect}
       onLocate={locate}
-      onSaveContract={saveContract}
-      onAddProjectFile={addProjectFile}
-      onRemoveProjectFile={removeProjectFile}
+      onSaveContract={readOnly ? undefined : saveContract}
+      onAddProjectFile={readOnly ? undefined : addProjectFile}
+      onRemoveProjectFile={readOnly ? undefined : removeProjectFile}
     />
   )
 }

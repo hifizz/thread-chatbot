@@ -102,7 +102,7 @@ export function CanvasExpand({
               actions?.retry(threadId, failedMessage.id)
             }
             messageActionState={actions?.messageActionState}
-            messageCommands={actions ?? undefined}
+            messageCommands={actions?.readOnly ? undefined : (actions ?? undefined)}
             editableUserMessageId={presentation?.latestUserMessageId}
             regeneratableAssistantMessageId={
               presentation?.latestAssistantMessageId
@@ -110,28 +110,32 @@ export function CanvasExpand({
           />
         ))}
       </div>
-      <ConversationComposer
-        variant="canvas"
-        threadId={threadId}
-        isMain={data.isMain}
-        busy={busy}
-        prefill={data.prefill}
-        modelId={state?.threads[threadId]?.modelId}
-        modelSelectorDisabled={!data.isMain || busy}
-        modelSelectorDisabledReason={
-          !data.isMain ? "branch" : busy ? "busy" : undefined
-        }
-        onModelChange={
-          actions
-            ? (modelId) => actions.setThreadModel(threadId, modelId)
-            : undefined
-        }
-        onBeforeSend={() => {
-          stickRef.current = true
-        }}
-        onSend={actions ? (text) => actions.send(threadId, text) : undefined}
-        onStop={() => actions?.stop(threadId)}
-      />
+      {actions?.readOnly ? (
+        <div className="composer read-only-strip">只读快照 · 内容在分享时冻结</div>
+      ) : (
+        <ConversationComposer
+          variant="canvas"
+          threadId={threadId}
+          isMain={data.isMain}
+          busy={busy}
+          prefill={data.prefill}
+          modelId={state?.threads[threadId]?.modelId}
+          modelSelectorDisabled={!data.isMain || busy}
+          modelSelectorDisabledReason={
+            !data.isMain ? "branch" : busy ? "busy" : undefined
+          }
+          onModelChange={
+            actions
+              ? (modelId) => actions.setThreadModel(threadId, modelId)
+              : undefined
+          }
+          onBeforeSend={() => {
+            stickRef.current = true
+          }}
+          onSend={actions ? (text) => actions.send(threadId, text) : undefined}
+          onStop={() => actions?.stop(threadId)}
+        />
+      )}
     </div>
   )
 }

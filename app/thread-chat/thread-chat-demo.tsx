@@ -69,6 +69,10 @@ import {
 import { ScrollMemoryScope } from "./scroll/use-scroll-memory"
 import { TreeList } from "./orchestration/navigation/tree-list"
 import { StoreBoundProjectPanel } from "./orchestration/artifacts/store-bound-project-panel"
+import {
+  ShareDialog,
+  type ShareResource,
+} from "./orchestration/sharing/share-dialog"
 import type { CanvasChatActions } from "./orchestration/canvas/canvas-actions"
 import { HelpPanel, UsageHint } from "./orchestration/overlays/help-panel"
 import { useWorkspaceOverlays } from "./orchestration/overlays/use-workspace-overlays"
@@ -166,14 +170,21 @@ export function ThreadChatDemo({ treeId }: { treeId: string }) {
   )
 }
 
-function NormalizedThreadChat({
+export function NormalizedThreadChat({
   treeId,
   runtime,
+  readOnly = false,
+  initialOverlay,
 }: {
   treeId: string
   runtime: ReturnType<typeof useConversationRuntime>
+  /** 只读快照：写控件禁用/省略，commands 由调用方给空实现兜底 */
+  readOnly?: boolean
+  /** 分享时的 Artifact 抽屉初值（其余 overlay 一律关闭） */
+  initialOverlay?: { drawerOpen: boolean; activeArtifactId: string | null }
 }) {
   const [questionArtifactId, setQuestionArtifactId] = useState<string | null>(null)
+  const [shareResource, setShareResource] = useState<ShareResource | null>(null)
   const router = useRouter()
   const state = useConversationStore(runtime.store, (value) => value)
   const { settings: generationSettings } = useGenerationSettings()
@@ -240,7 +251,7 @@ function NormalizedThreadChat({
     clearArtifactSourceNav,
     toggleDrawer,
     closeDrawer,
-  } = useWorkspaceOverlays()
+  } = useWorkspaceOverlays(initialOverlay)
   useInputViewport(rootRef, workspace.viewMode === "columns")
   const [hintDismissed, setHintDismissed] = useState(false)
 
@@ -566,8 +577,9 @@ function NormalizedThreadChat({
         void messageCommands.retryAssistant(viewThreadId, messageId)
       },
       ...messageCommands,
+      readOnly,
     }),
-    [handleFork, messageCommands, send, stop]
+    [handleFork, messageCommands, send, stop, readOnly]
   )
 
   const renameTreeItem = useCallback(
@@ -631,6 +643,15 @@ function NormalizedThreadChat({
     placementMode: workspace.mode,
     branchCount,
     markdownCount,
+    readOnly,
+    onShare:
+      !readOnly && state.project
+        ? () =>
+            setShareResource({
+              resourceType: "project",
+              resourceId: state.project!.id,
+            })
+        : undefined,
     onNewConversation: (openInNewPage) => {
       const newConversationUrl = `/thread-chat/${crypto.randomUUID()}`
       if (openInNewPage) {
@@ -722,8 +743,9 @@ function NormalizedThreadChat({
                 onRetry={(message) => retry(viewThreadId, message)}
                 onStop={() => stop(viewThreadId)}
                 onSend={(content) => send(viewThreadId, content)}
+                readOnly={readOnly}
                 messageActionState={messageActionState}
-                messageCommands={messageCommands}
+                messageCommands={readOnly ? undefined : messageCommands}
               />
             )
           }}
@@ -741,27 +763,29 @@ function NormalizedThreadChat({
         />
       )}
 
-      <SelectionBubble
-        state={tree}
-        sel={selection}
-        onSelChange={setSelection}
-        onQuestionArtifactChange={setQuestionArtifactId}
-        onFork={(info, hint, question) => {
-          void handleFork(info, hint, question).catch(() =>
-            showToast(MESSAGE_FORK_LABELS.failed)
-          )
-        }}
-        slots={
-          workspace.viewMode === "canvas"
-            ? EMPTY_SLOTS
-            : workspace.columns.slots
-        }
-        mode={workspace.mode}
-        maxExpanded={workspace.maxExpanded}
-        lastActiveOf={(id) => tree.threads[id]?.lastActive ?? 0}
-      />
+      {!readOnly && (
+        <SelectionBubble
+          state={tree}
+          sel={selection}
+          onSelChange={setSelection}
+          onQuestionArtifactChange={setQuestionArtifactId}
+          onFork={(info, hint, question) => {
+            void handleFork(info, hint, question).catch(() =>
+              showToast(MESSAGE_FORK_LABELS.failed)
+            )
+          }}
+          slots={
+            workspace.viewMode === "canvas"
+              ? EMPTY_SLOTS
+              : workspace.columns.slots
+          }
+          mode={workspace.mode}
+          maxExpanded={workspace.maxExpanded}
+          lastActiveOf={(id) => tree.threads[id]?.lastActive ?? 0}
+        />
+      )}
 
-      {treeList !== null && (
+      {!readOnly && treeList !== null && (
         <TreeList
           key={treeList.n}
           currentTreeId={treeId}
@@ -821,7 +845,21 @@ function NormalizedThreadChat({
         onClose={closeDrawer}
         onSelect={setActiveArtifactId}
         onLocate={(threadId) => openBranchUI(threadId, null)}
+        readOnly={readOnly}
+        onShareDocument={(documentId) =>
+          setShareResource({ resourceType: "document", resourceId: documentId })
+        }
       />
+      {!readOnly && (
+        <ShareDialog
+          open={shareResource !== null}
+          onClose={() => setShareResource(null)}
+          resource={shareResource}
+          store={runtime.store}
+          client={runtime.client}
+          overlay={{ drawerOpen, activeArtifactId }}
+        />
+      )}
       <WorkspaceToast toast={toast} onDismiss={dismissToast} />
     </div></ArtifactNavigationProvider></ComposerDraftProvider></ArtifactResourcesProvider></ScrollMemoryScope.Provider>
   )

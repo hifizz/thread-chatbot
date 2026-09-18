@@ -519,6 +519,9 @@ export function createGate3MockRuntime(
     async listThreadArtifacts(threadId: string) { return [...artifacts.values()].filter(artifact => artifact.threadId === threadId) },
     async listDocuments() { return { documents: [], artifacts: [...artifacts.values()] } },
     async getDocumentHistory() { return [] },
+    async createShare() { throw new Error("mock: sharing not implemented") },
+    async listShares() { return [] },
+    async revokeShare() { throw new Error("mock: sharing not implemented") },
     async listProjects(archived = false) {
       return project && Boolean(project.archivedAt) === archived
         ? [
