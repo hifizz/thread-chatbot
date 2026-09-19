@@ -10,6 +10,7 @@ export type ObservabilityEnvironment =
   (typeof OBSERVABILITY_ENVIRONMENTS)[keyof typeof OBSERVABILITY_ENVIRONMENTS]
 
 export const TRACE_NAMES = {
+  documentToolEvaluation: "evaluation.document-tools",
   threadChatGeneration: "thread-chat.generation",
   legacyChatRequest: "legacy-chat.request",
 } as const

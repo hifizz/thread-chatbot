@@ -12,8 +12,12 @@ export function DocumentUpdateTool({ part }: { part: DocumentToolPart }) {
   if (part.state === "output-error") return <p role="status">文档操作失败：{part.errorText}</p>
   if (part.state !== "output-available") return <p role="status">{part.type === "tool-updateProjectDocument" ? "正在提交文档修改…" : "正在读取项目文档…"}</p>
   if (part.type === "tool-findProjectDocuments") return <p>找到 {part.output.length} 份候选文档</p>
-  if (part.type === "tool-readProjectDocument") return <p>已读取「{part.output.revision.title}」V{part.output.revision.revisionNumber}</p>
+  if (part.type === "tool-readProjectDocument") {
+    if (!("revision" in part.output)) return <p role="status">{part.output.message}</p>
+    return <p>已读取「{part.output.revision.title}」V{part.output.revision.revisionNumber}</p>
+  }
   const result = part.output
+  if (result.status === "error") return <p role="status">{result.message}</p>
   return <div className="project-resource-card" role="status">
     {result.status === "committed" ? <div>
       <strong>文档修改已保存</strong><p>{result.changeSummary}</p>

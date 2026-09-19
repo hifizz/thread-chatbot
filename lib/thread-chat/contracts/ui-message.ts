@@ -1,4 +1,4 @@
-import type { DocumentUpdateNotices, ProjectDocumentUpdates, DocumentReadResult, DocumentDTO, UpdateDocumentInput, UpdateDocumentResult } from "./document"
+import type { DocumentUpdateNotices, ProjectDocumentUpdates, DocumentReadResult, DocumentDTO, UpdateDocumentInput, UpdateDocumentResult, DocumentToolFailure } from "./document"
 import type { ArtifactReferenceData } from "./artifact-reference"
 import type { UIMessage, UIMessageChunk } from "ai"
 import type {
@@ -38,8 +38,8 @@ export type WebSearchOutput = {
 
 export type ThreadChatTools = {
   findProjectDocuments: { input: { query?: string; artifactId?: string }; output: DocumentDTO[] }
-  readProjectDocument: { input: { documentId: string; revisionId?: string }; output: DocumentReadResult }
-  updateProjectDocument: { input: UpdateDocumentInput; output: UpdateDocumentResult }
+  readProjectDocument: { input: { documentId: string; revisionId?: string }; output: DocumentReadResult | DocumentToolFailure }
+  updateProjectDocument: { input: UpdateDocumentInput; output: UpdateDocumentResult | DocumentToolFailure }
   createMarkdownArtifact: {
     input: MarkdownArtifactInput
     output: MarkdownArtifactOutput

@@ -80,6 +80,8 @@ const remotePolicy = resolveRemoteEvaluationPolicy({
 
 const declaredExecutor: AgentCaseExecutor = async (input) => {
   switch (input.evaluationCase.execution) {
+    case "tool-simulation":
+      throw new Error("工具模拟评测请使用 pnpm eval:agent:documents")
     case "fixture":
       return executeFixtureCase(input.evaluationCase)
     case "content":

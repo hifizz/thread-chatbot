@@ -2,7 +2,7 @@ import { EXTRACT_CHAR_LIMIT, WEB_DOCUMENT_CHAR_LIMIT, WEB_SNAPSHOT_CHAR_LIMIT } 
 import { WebAccessError, webContentBudgetExceeded, type WebBudget } from "@/lib/ai/web-access"
 
 type Page = { url: string; content: string; title?: string; publishedDate?: string }
-type Snapshot = { page: Page; id: string; fetchedAt: string; readThrough: number; cursors: Map<string, number> }
+type Snapshot = { page: Page; fetchedAt: string; readThrough: number; cursors: Map<string, number> }
 
 /** 优先段落/行边界。超长块允许拆分，且不拆开 UTF-16 代理对。 */
 export function documentPageEnd(content: string, start: number, limit: number): number {
@@ -34,7 +34,7 @@ export function createResearchDocuments(budget: WebBudget) {
       if (page.content.length > WEB_DOCUMENT_CHAR_LIMIT || storedChars + page.content.length > WEB_SNAPSHOT_CHAR_LIMIT) {
         throw new WebAccessError("DOCUMENT_TOO_LARGE", "资料过大，无法保存完整读取快照；请缩小资料范围或提供相关章节。", "stop")
       }
-      const snapshot = { page, id: crypto.randomUUID(), fetchedAt: new Date().toISOString(), readThrough: 0, cursors: new Map<string, number>() }
+      const snapshot = { page, fetchedAt: new Date().toISOString(), readThrough: 0, cursors: new Map<string, number>() }
       storedChars += page.content.length
       snapshots.set(url, snapshot)
       budget.registerSnapshot()
@@ -61,7 +61,7 @@ export function createResearchDocuments(budget: WebBudget) {
       // 先预留固定元数据的实际序列化大小，再选择正文；最后按真实返回大小扣账。
       const nextToken = crypto.randomUUID()
       const base = { url, title: page.title ?? null, publishedDate: page.publishedDate ?? null,
-        docId: snapshot.id, fetchedAt: snapshot.fetchedAt, cacheHit,
+        fetchedAt: snapshot.fetchedAt, cacheHit,
         totalChars: page.content.length, coverageBasis: "extracted-snapshot" as const }
       const makeResult = (end: number) => ({ ...base, content: page.content.slice(start, end),
         returnedChars: end - start, range: { start, end }, truncated: start > 0 || end < page.content.length,
