@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm"
 import { artifacts, documents, documentRevisions, messages } from "@/lib/db/schema"
-import type { DocumentExecution, DocumentRevisionDTO, UpdateDocumentInput } from "../../contracts/document"
+import type { DocumentExecution, DocumentRevisionDTO, MarkdownEdit } from "../../contracts/document"
 import { canRegisterDocument } from "../../domain/documents/execution"
 import { artifactIdForTool } from "../../domain/tool-identity"
 import type { ConversationTransaction } from "../transaction"
@@ -10,20 +10,34 @@ export async function lockDocument(tx: ConversationTransaction, documentId: stri
   return document ?? null
 }
 
+export interface AppendDocumentRevisionInput {
+  documentId: string
+  base: DocumentRevisionDTO
+  content: string
+  changeSummary: string
+  /** 新协议提交为空数组并依赖检查点审计；旧即时协议保留原始 patch。 */
+  edits: MarkdownEdit[]
+  /** 新协议正式版本回溯来源草稿；旧协议与历史行为 null。 */
+  sourceDraftId: string | null
+  toolCallId: string
+  commandId: string
+}
+
 /** 必须在持有文档锁的同一事务内追加固定正文、版本和 head。 */
 export async function appendDocumentRevision(tx: ConversationTransaction, identity: DocumentExecution,
-  input: UpdateDocumentInput, base: DocumentRevisionDTO, content: string, toolCallId: string, commandId: string) {
-  const artifactId = artifactIdForTool(identity.messageId, toolCallId)
+  input: AppendDocumentRevisionInput) {
+  const artifactId = artifactIdForTool(identity.messageId, input.toolCallId)
   const revisionId = crypto.randomUUID()
   await tx.insert(artifacts).values({ id: artifactId, projectId: identity.projectId,
     threadId: identity.threadId, sourceMessageId: identity.messageId, kind: "markdown",
-    title: base.title, content, metadata: { toolCallId, documentId: input.documentId, revisionId } })
+    title: input.base.title, content: input.content, metadata: { toolCallId: input.toolCallId, documentId: input.documentId, revisionId } })
   await tx.insert(documentRevisions).values({ id: revisionId, documentId: input.documentId, projectId: identity.projectId,
-    revisionNumber: base.revisionNumber + 1, parentRevisionId: base.id, artifactId,
+    revisionNumber: input.base.revisionNumber + 1, parentRevisionId: input.base.id, artifactId,
     changeSummary: input.changeSummary, edits: input.edits, actorUserId: identity.userId,
-    commandId, executionId: identity.messageId, toolCallId })
+    commandId: input.commandId, executionId: identity.messageId, toolCallId: input.toolCallId,
+    sourceDraftId: input.sourceDraftId })
   await tx.update(documents).set({ currentRevisionId: revisionId }).where(eq(documents.id, input.documentId))
-  return { status: "committed" as const, documentId: input.documentId, previousRevisionId: base.id,
+  return { status: "committed" as const, documentId: input.documentId, previousRevisionId: input.base.id,
     revisionId, artifactId, changeSummary: input.changeSummary }
 }
 

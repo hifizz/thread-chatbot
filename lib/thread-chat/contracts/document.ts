@@ -20,13 +20,43 @@ export const readDocumentInputSchema = z.object({
   documentId: projectDocumentIdSchema,
   revisionId: z.uuid().optional().describe("仅读取该文档的历史版本时填写；读取最新版或准备修改时省略。不是 documentId。"),
 }).strict()
+const draftIdSchema = z.uuid().describe("本轮 readProjectDocument 草稿结果返回的 draft.id，不是 documentId、revisionId 或 readId。")
+export const editDocumentInputSchema = z.object({
+  documentId: projectDocumentIdSchema,
+  draftId: draftIdSchema,
+  expectedDraftSequence: z.number().int().nonnegative().describe("本轮最近一次完整草稿读取或编辑返回的 sequence。"),
+  readId: z.uuid().describe("本轮 readProjectDocument 草稿结果返回的 readId；编辑成功后必须重新读取再改。"),
+  edits: z.array(markdownEditSchema).min(1).max(DOCUMENT_LIMITS.edits),
+}).strict()
+export const commitDocumentInputSchema = z.object({
+  documentId: projectDocumentIdSchema,
+  draftId: draftIdSchema,
+  expectedDraftSequence: z.number().int().nonnegative().describe("本轮草稿当前 sequence，与最近一次草稿读取或编辑结果一致。"),
+  changeSummary: z.string().trim().min(1).max(DOCUMENT_LIMITS.summaryChars),
+}).strict()
+export const resetDocumentDraftInputSchema = z.object({
+  documentId: projectDocumentIdSchema,
+  draftId: draftIdSchema,
+  expectedDraftSequence: z.number().int().nonnegative().describe("本轮草稿当前 sequence。"),
+  revisionId: z.uuid().describe("冲突后刚用 readProjectDocument 显式读取的新正式版本 revision.id，必须仍是当前正式版本。"),
+  readId: z.uuid().describe("读取该新正式版本返回的 readId。"),
+}).strict()
 export const findDocumentsInputSchema = z.object({
   query: z.string().max(200).optional().describe("本应用内已保存项目文档的标题关键词；省略则列出候选。不是网页搜索词或 URL。"),
   artifactId: z.uuid().optional().describe("来自本应用 @artifact 引用的 artifactId；本工具将其定位为项目文档。不可直接当作 documentId。"),
 }).strict()
 export type MarkdownEdit = z.infer<typeof markdownEditSchema>
 export type UpdateDocumentInput = z.infer<typeof updateDocumentInputSchema>
+export type ReadDocumentInput = z.infer<typeof readDocumentInputSchema>
+export type EditDocumentInput = z.infer<typeof editDocumentInputSchema>
+export type CommitDocumentInput = z.infer<typeof commitDocumentInputSchema>
+export type ResetDocumentDraftInput = z.infer<typeof resetDocumentDraftInputSchema>
 export type DocumentEditError = "SOURCE_NOT_FOUND" | "SOURCE_AMBIGUOUS" | "OVERLAPPING_EDITS" | "INVALID_EDIT"
+/** 新协议写工具的拒绝码；旧协议结果也复用其公共子集。 */
+export type DocumentWriteRejectionCode =
+  | DocumentEditError | "DOCUMENT_READ_ONLY" | "READ_REQUIRED" | "DOCUMENT_UNAVAILABLE"
+  | "EXECUTION_INACTIVE" | "RETRY_LIMIT" | "WRITES_DISABLED" | "DRAFT_NOT_FOUND"
+  | "DRAFT_CLOSED" | "DRAFT_SEQUENCE_STALE" | "FAILURE_BUDGET_EXCEEDED" | "INVALID_TOOL_INPUT"
 export interface DocumentDTO {
   id: string; projectId: string; currentRevisionId: string; title: string
 }
@@ -46,14 +76,68 @@ export interface DocumentRevisionSummaryDTO {
 export interface DocumentRevisionDTO extends DocumentRevisionSummaryDTO {
   content: string
 }
-export interface DocumentReadResult {
+export type DocumentDraftStatus = "editing" | "committed" | "unchanged" | "abandoned"
+export type DocumentCheckpointKind = "edit" | "reset"
+/** 草稿向模型暴露的最小身份视图。 */
+export interface DocumentDraftViewDTO {
+  id: string; baseRevisionId: string; sequence: number; status: DocumentDraftStatus
+}
+export interface DocumentDraftDTO extends DocumentDraftViewDTO {
+  projectId: string; messageId: string; documentId: string
+  content: string; committedRevisionId: string | null
+  finalReceipt: DocumentFinalReceipt | null
+  closeReason: string | null; createdAt: string; updatedAt: string
+}
+/** 只读 API 返回的草稿摘要；不含正文。 */
+export interface DocumentDraftSummaryDTO extends DocumentDraftViewDTO {
+  documentId: string; messageId: string
+  committedRevisionId: string | null
+  finalReceipt: DocumentFinalReceipt | null
+  closeReason: string | null; checkpointCount: number
+  createdAt: string; updatedAt: string
+}
+export interface DocumentCheckpointDTO {
+  id: string; draftId: string; sequence: number; kind: DocumentCheckpointKind
+  toolCallId: string; baseRevisionId: string; createdAt: string
+}
+export interface DocumentCheckpointSnapshotDTO extends DocumentCheckpointDTO {
+  edits: MarkdownEdit[]; content: string
+}
+export interface DocumentDraftListDTO { drafts: DocumentDraftSummaryDTO[] }
+export interface DocumentCheckpointListDTO {
+  checkpoints: DocumentCheckpointDTO[]; nextCursor: number | null
+}
+export interface DocumentRevisionReadResult {
+  source: "revision"
   document: DocumentDTO; revision: DocumentRevisionDTO; readId: string; isCurrent: boolean
 }
-export type UpdateDocumentResult =
+export interface DocumentDraftReadResult {
+  source: "draft"
+  document: DocumentDTO; draft: DocumentDraftViewDTO
+  content: string; readId: string
+}
+/** 新读取结果必须带 source 判别；无 source 的历史结果仅在兼容边界按正式结果解析。 */
+export type DocumentReadResult = DocumentRevisionReadResult | DocumentDraftReadResult
+/** 草稿终结时保存的最终正式收据；无变化的终结不产生新版本。 */
+export type DocumentFinalReceipt =
   | { status: "committed"; documentId: string; previousRevisionId: string; revisionId: string; artifactId: string; changeSummary: string }
   | { status: "unchanged"; documentId: string; revisionId: string }
+export type EditDocumentResult =
+  | { status: "edited"; documentId: string; draftId: string; sequence: number; checkpointId: string }
+  | { status: "no_change"; documentId: string; draftId: string; sequence: number }
+  | { status: "rejected"; code: DocumentWriteRejectionCode }
+export type CommitDocumentResult =
+  | DocumentFinalReceipt
   | { status: "conflict"; code: "DOCUMENT_CHANGED"; documentId: string; currentRevisionId: string; requiresRead: true }
-  | { status: "rejected"; code: DocumentEditError | "DOCUMENT_READ_ONLY" | "READ_REQUIRED" | "DOCUMENT_UNAVAILABLE" | "EXECUTION_INACTIVE" | "RETRY_LIMIT" | "WRITES_DISABLED" }
+  | { status: "rejected"; code: DocumentWriteRejectionCode }
+export type ResetDocumentDraftResult =
+  | { status: "reset"; documentId: string; draftId: string; sequence: number; checkpointId: string }
+  | { status: "conflict"; code: "DOCUMENT_CHANGED"; documentId: string; currentRevisionId: string; requiresRead: true }
+  | { status: "rejected"; code: DocumentWriteRejectionCode }
+export type UpdateDocumentResult =
+  | DocumentFinalReceipt
+  | { status: "conflict"; code: "DOCUMENT_CHANGED"; documentId: string; currentRevisionId: string; requiresRead: true }
+  | { status: "rejected"; code: DocumentWriteRejectionCode }
 
 export const documentUpdatesSchema = z.object({
   schemaVersion: z.literal(1),
