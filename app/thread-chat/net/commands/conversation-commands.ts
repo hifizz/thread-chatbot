@@ -15,6 +15,7 @@ import type {
   MessageDTO,
   ProjectDTO,
   ThreadDTO,
+  ThreadRepositoryBinding,
 } from "@/lib/thread-chat/contracts/dto"
 import type { MessageContentInput } from "@/lib/thread-chat/contracts/message-content"
 import {
@@ -237,6 +238,7 @@ export function createConversationCommands(
       footnote: null,
       depth: 0,
       modelId: command.modelId,
+      repoBinding: null,
       autoTitle: null,
       customTitle: null,
       titleGenerationAttempted: false,
@@ -392,6 +394,7 @@ export function createConversationCommands(
         footnote,
         depth: parent.depth + 1,
         modelId: command.modelId,
+        repoBinding: null,
         autoTitle: null,
         customTitle: null,
         titleGenerationAttempted: false,
@@ -594,7 +597,11 @@ export function createConversationCommands(
 
   async function updateThread(
     threadId: string,
-    update: { modelId?: string; customTitle?: string | null }
+    update: {
+      modelId?: string
+      customTitle?: string | null
+      repoBinding?: ThreadRepositoryBinding | null
+    }
   ) {
     const command = Object.freeze({ commandId: createId(), ...update })
     const response = await execute(() => client.updateThread(threadId, command))

@@ -93,6 +93,7 @@ export function toThreadDTO(row: ThreadRow): ThreadDTO {
     footnote: row.footnote,
     depth: row.depth,
     modelId: row.modelId,
+    repoBinding: row.repoBinding ?? null,
     autoTitle: row.autoTitle,
     customTitle: row.customTitle,
     titleGenerationAttempted: row.titleGenerationAttempted,

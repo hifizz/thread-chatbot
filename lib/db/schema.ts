@@ -28,6 +28,7 @@ import type { ThreadChatUIMessage } from "@/lib/thread-chat/contracts/ui-message
 import type {
   ArtifactKind,
   MessageFeedback as ConversationMessageFeedback,
+  ThreadRepositoryBinding,
 } from "@/lib/thread-chat/contracts/dto"
 import type { ConversationMessageStatus } from "@/lib/thread-chat/domain/conversation"
 
@@ -162,6 +163,8 @@ export const threads = dbSchema.table(
     footnote: integer("footnote"),
     depth: integer("depth").notNull(),
     modelId: text("model_id").notNull(),
+    /** 可选的 GitHub 仓库绑定；null = 未绑定，走普通聊天。 */
+    repoBinding: jsonb("repo_binding").$type<ThreadRepositoryBinding | null>(),
     autoTitle: text("auto_title"),
     customTitle: text("custom_title"),
     titleGenerationAttempted: boolean("title_generation_attempted")

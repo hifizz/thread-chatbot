@@ -124,6 +124,7 @@ export function forkThread(
             footnote,
             depth: parent.depth + 1,
             modelId,
+            repoBinding: parent.repoBinding,
           })
           .returning()
         if (!command.firstTurn) {

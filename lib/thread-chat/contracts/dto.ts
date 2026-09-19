@@ -10,6 +10,16 @@ import type { ThreadChatUIMessage } from "@/lib/thread-chat/contracts/ui-message
 export type MessageFeedback = "up" | "down"
 export type ArtifactKind = "markdown" | "code" | "note"
 
+/** Thread 级 GitHub 仓库绑定；null = 未绑定。 */
+export interface ThreadRepositoryBinding {
+  /** 服务端连接标识；当前固定 "github"。 */
+  connectionId: "github"
+  /** owner/name 形式的仓库全名。 */
+  repositoryFullName: string
+  /** 绑定的分支名。 */
+  branch: string
+}
+
 export interface ProjectDTO {
   id: string
   rootThreadId: string
@@ -59,6 +69,8 @@ export interface ThreadDTO {
   footnote: number | null
   depth: number
   modelId: string
+  /** GitHub 仓库绑定；null = 未绑定。 */
+  repoBinding: ThreadRepositoryBinding | null
   autoTitle: string | null
   customTitle: string | null
   titleGenerationAttempted: boolean

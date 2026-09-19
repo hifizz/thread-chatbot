@@ -46,3 +46,4 @@ e2e/thread-chat/shots/
 
 .local-backups
 .devtools
+.agent-demo-workspaces/

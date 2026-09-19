@@ -740,6 +740,15 @@ export function NormalizedThreadChat({
                   if (!state.project) setDraftModelId(modelId)
                   else return setThreadModel(threadId, modelId)
                 }}
+                repoBinding={state.threadsById[threadId]?.repoBinding ?? null}
+                onRepoBindingChange={
+                  state.project
+                    ? (binding) =>
+                        runtime.commands.updateThread(threadId, {
+                          repoBinding: binding,
+                        })
+                    : undefined
+                }
                 onRetry={(message) => retry(viewThreadId, message)}
                 onStop={() => stop(viewThreadId)}
                 onSend={(content) => send(viewThreadId, content)}

@@ -182,13 +182,28 @@ export const updateThreadCommandSchema = z
     commandId: commandIdSchema,
     modelId: modelIdSchema.optional(),
     customTitle: z.string().trim().min(1).max(60).nullable().optional(),
+    repoBinding: z
+      .object({
+        connectionId: z.literal("github"),
+        repositoryFullName: z
+          .string()
+          .trim()
+          .min(1)
+          .max(200)
+          .regex(/^[\w.-]+\/[\w.-]+$/, "必须是 owner/name 形式"),
+        branch: z.string().trim().min(1).max(200),
+      })
+      .nullable()
+      .optional(),
   })
   .strict()
   .refine(
     (command) =>
-      command.modelId !== undefined || command.customTitle !== undefined,
+      command.modelId !== undefined ||
+      command.customTitle !== undefined ||
+      command.repoBinding !== undefined,
     {
-      message: "至少提供 modelId 或 customTitle",
+      message: "至少提供 modelId、customTitle 或 repoBinding",
     }
   )
 

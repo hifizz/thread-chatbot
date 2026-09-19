@@ -266,3 +266,319 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+
+/* ---------------- 仓库上下文 chip ---------------- */
+.tc .repo-context-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--muted-foreground);
+  background: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 3px 8px;
+  margin: 4px 0 8px;
+}
+.tc .repo-context-chip.unavailable {
+  color: var(--destructive);
+  border-color: var(--destructive);
+}
+.tc .repo-context-icon {
+  font-size: 13px;
+}
+.tc .repo-context-repo {
+  font-weight: 500;
+  color: var(--foreground);
+}
+.tc .repo-context-sep {
+  color: var(--muted-foreground);
+}
+.tc .repo-context-branch {
+  color: var(--foreground);
+}
+.tc .repo-context-sha {
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+.tc .repo-context-hint {
+  font-size: 10px;
+  color: var(--tc-accent);
+  background: var(--tc-accent-wash, var(--muted));
+  border-radius: 4px;
+  padding: 1px 4px;
+  margin-left: 2px;
+}
+
+/* ---------------- 仓库工具分组卡 ---------------- */
+.tc .repo-tool-group {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin: 4px 0 8px;
+  font-size: 12px;
+  overflow: hidden;
+}
+.tc .repo-tool-group summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: var(--muted);
+  cursor: pointer;
+  user-select: none;
+  color: var(--muted-foreground);
+  list-style: none;
+}
+.tc .repo-tool-group summary::before {
+  content: "▸";
+  display: inline-block;
+  transition: transform 0.15s;
+  font-size: 10px;
+}
+.tc .repo-tool-group[open] summary::before {
+  transform: rotate(90deg);
+}
+.tc .repo-tool-group summary::-webkit-details-marker {
+  display: none;
+}
+.tc .repo-tool-group-icon {
+  font-size: 13px;
+}
+.tc .repo-tool-group-title {
+  font-weight: 500;
+  color: var(--foreground);
+}
+.tc .repo-tool-group-errors {
+  font-size: 10px;
+  color: var(--destructive);
+  background: var(--destructive-wash, rgba(239, 68, 68, 0.1));
+  border-radius: 4px;
+  padding: 1px 4px;
+}
+.tc .repo-tool-group-count {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+.tc .repo-tool-rows {
+  padding: 4px 0;
+}
+.tc .repo-tool-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  font-size: 12px;
+}
+.tc .repo-tool-row:hover {
+  background: var(--muted);
+}
+.tc .repo-tool-row-icon {
+  font-size: 12px;
+  flex-shrink: 0;
+  width: 18px;
+  text-align: center;
+}
+.tc .repo-tool-row-name {
+  color: var(--muted-foreground);
+  flex-shrink: 0;
+  width: 44px;
+}
+.tc .repo-tool-row-input {
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  color: var(--foreground);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 240px;
+}
+.tc .repo-tool-row-output {
+  font-size: 11px;
+  color: var(--muted-foreground);
+  flex-shrink: 0;
+  margin-left: auto;
+}
+.tc .repo-tool-row-output.error {
+  color: var(--destructive);
+}
+.tc .repo-tool-row-output a {
+  color: var(--tc-accent);
+  text-decoration: none;
+}
+.tc .repo-tool-row-output a:hover {
+  text-decoration: underline;
+}
+.tc .repo-tool-row-pending {
+  color: var(--muted-foreground);
+  font-size: 11px;
+}
+
+/* ---------------- 仓库绑定选择器（composer 上方） ---------------- */
+.tc .repo-binding-picker {
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding: 0 4px 6px;
+}
+
+.tc .repo-binding-add {
+  font-size: 12px;
+  color: var(--muted-foreground);
+  background: transparent;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.tc .repo-binding-add:hover:not(:disabled) {
+  color: var(--foreground);
+  border-color: var(--tc-accent-edge);
+}
+
+.tc .repo-binding-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--foreground);
+  background: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px 8px;
+}
+
+.tc .repo-binding-icon {
+  font-size: 13px;
+}
+
+.tc .repo-binding-label {
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 240px;
+}
+
+.tc .repo-binding-action {
+  font-size: 11px;
+  color: var(--muted-foreground);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0 2px;
+}
+
+.tc .repo-binding-action:hover:not(:disabled) {
+  color: var(--tc-accent);
+}
+
+.repo-binding-popover {
+  z-index: 9999;
+  min-width: 280px;
+  max-width: 360px;
+  max-height: 320px;
+  display: flex;
+  flex-direction: column;
+  background: var(--popover);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px -4px var(--tc-shadow-composer);
+  padding: 6px;
+}
+
+.repo-binding-search {
+  width: 100%;
+  font-size: 13px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--background);
+  color: var(--foreground);
+  margin-bottom: 4px;
+  flex-shrink: 0;
+}
+
+.repo-binding-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+.repo-binding-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  text-align: left;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--foreground);
+  cursor: pointer;
+}
+
+.repo-binding-item:hover {
+  background: var(--muted);
+}
+
+.repo-binding-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.repo-binding-private {
+  font-size: 10px;
+  color: var(--muted-foreground);
+  background: var(--muted);
+  border-radius: 4px;
+  padding: 1px 4px;
+}
+
+.repo-binding-default {
+  font-size: 11px;
+  color: var(--muted-foreground);
+  flex-shrink: 0;
+}
+
+.repo-binding-back {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--muted-foreground);
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
+}
+
+.repo-binding-back button {
+  font-size: 12px;
+  background: transparent;
+  border: none;
+  color: var(--tc-accent);
+  cursor: pointer;
+}
+
+.repo-binding-loading,
+.repo-binding-error,
+.repo-binding-empty {
+  font-size: 12px;
+  color: var(--muted-foreground);
+  padding: 12px;
+  text-align: center;
+}
+
+.repo-binding-error {
+  color: var(--destructive);
+}

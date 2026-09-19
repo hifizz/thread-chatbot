@@ -21,10 +21,15 @@ type ServerLogEvent = {
 const BATCH_SIZE = 25
 const FLUSH_INTERVAL_MS = 250
 const SERVICE_NAME = "thread-chat"
+/** ingest 连续失败达到阈值后暂停上报的时长；本地 edge 不可达时避免刷错误。 */
+const INGEST_MAX_CONSECUTIVE_FAILURES = 5
+const INGEST_PAUSE_MS = 60_000
 
 let queue: ServerLogEvent[] = []
 let timer: ReturnType<typeof setTimeout> | undefined
 let flushing: Promise<void> | undefined
+let consecutiveIngestFailures = 0
+let ingestPausedUntil = 0
 
 function readConfig(source: NodeJS.ProcessEnv = process.env): AxiomConfig | undefined {
   const token = source.AXIOM_TOKEN?.trim()
@@ -81,10 +86,33 @@ export function axiomConfigured(source: NodeJS.ProcessEnv = process.env): boolea
   return Boolean(readConfig(source))
 }
 
+function noteIngestFailure() {
+  consecutiveIngestFailures += 1
+  if (consecutiveIngestFailures === INGEST_MAX_CONSECUTIVE_FAILURES) {
+    ingestPausedUntil = Date.now() + INGEST_PAUSE_MS
+    console.error(
+      JSON.stringify({
+        _time: new Date().toISOString(),
+        level: "warn",
+        message: "axiom.ingest_paused",
+        source: "server-log",
+        service: SERVICE_NAME,
+        environment: process.env.AI_OBSERVABILITY_ENVIRONMENT ?? process.env.NODE_ENV ?? "unknown",
+        release: process.env.AI_OBSERVABILITY_RELEASE ?? "unknown",
+        fields: { pauseMs: INGEST_PAUSE_MS },
+      })
+    )
+  }
+}
+
 export async function flush(): Promise<void> {
   if (flushing) return flushing
   const config = readConfig()
   if (!config || queue.length === 0) return
+  if (Date.now() < ingestPausedUntil) {
+    queue.length = 0
+    return
+  }
 
   if (timer) {
     clearTimeout(timer)
@@ -106,6 +134,7 @@ export async function flush(): Promise<void> {
         }
       )
       if (!response.ok) {
+        noteIngestFailure()
         console.error(
           JSON.stringify({
             _time: new Date().toISOString(),
@@ -118,8 +147,11 @@ export async function flush(): Promise<void> {
             fields: { httpStatus: response.status, batchSize: batch.length },
           })
         )
+      } else {
+        consecutiveIngestFailures = 0
       }
     } catch (error) {
+      noteIngestFailure()
       console.error(
         JSON.stringify({
           _time: new Date().toISOString(),

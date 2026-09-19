@@ -17,6 +17,30 @@ import { logDiagnostic } from "@/lib/observability/diagnostic-log"
 
 export type RequestedTerminalStatus = "completed" | "stopped" | "failed"
 
+/**
+ * 流中断时最后一个工具调用可能停在 input-streaming/input-available，
+ * 持久化前修成 output-error，避免 UI 永久 loading、快照里留下假“进行中”状态。
+ */
+function repairInterruptedToolParts(
+  parts: ThreadChatUIMessage["parts"]
+): ThreadChatUIMessage["parts"] {
+  return parts.map((part) => {
+    if (
+      part.type.startsWith("tool-") &&
+      "state" in part &&
+      (part.state === "input-streaming" || part.state === "input-available")
+    ) {
+      return {
+        ...part,
+        ...("input" in part ? {} : { input: undefined }),
+        state: "output-error",
+        errorText: "生成中断，工具调用未完成",
+      } as ThreadChatUIMessage["parts"][number]
+    }
+    return part
+  })
+}
+
 export interface FinalizeGenerationInput {
   messageId: string
   snapshot: ThreadChatUIMessage
@@ -34,7 +58,7 @@ export async function finalizeGeneration({
   providerUsage,
   error,
 }: FinalizeGenerationInput): Promise<MessageDTO> {
-  const parts = stripTransientParts(snapshot.parts)
+  const parts = repairInterruptedToolParts(stripTransientParts(snapshot.parts))
   const empty = requestedStatus === "completed" && !hasDisplayableParts(parts)
   const status = empty ? "failed" : requestedStatus
   const resolvedError = empty

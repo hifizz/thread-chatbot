@@ -16,6 +16,8 @@ export type AssistantPartRenderKind =
   | "artifact"
   | "document"
   | "tool"
+  | "repo-context"
+  | "repo-tools"
 
 const DOCUMENT_TOOL_PART_TYPES: ReadonlySet<string> = new Set(
   DOCUMENT_TOOL_NAMES.map((name) => `tool-${name}`)
@@ -27,6 +29,23 @@ export interface AssistantPartRenderPlanItem {
   index: number
   /** 连续的联网活动合并为一个轨迹块展示；仅 research 项携带。 */
   activities?: WebResearchActivity[]
+  /** repo-tools 分组时包含的所有 part */
+  parts?: ThreadChatUIPart[]
+}
+
+const REPO_TOOL_NAMES = new Set([
+  "tool-listRepositoryFiles",
+  "tool-readRepositoryFile",
+  // findRepositoryPaths 已被 searchRepositoryCode 取代；保留旧名以渲染历史消息中的 part。
+  "tool-findRepositoryPaths",
+  "tool-searchRepositoryCode",
+  "tool-commitFilesToRepository",
+  "tool-dispatchAgentTask",
+  "tool-checkAgentTask",
+])
+
+function isRepoToolPart(part: ThreadChatUIPart): boolean {
+  return REPO_TOOL_NAMES.has(part.type)
 }
 
 function fallbackParts(message: ConversationViewMessage): ThreadChatUIPart[] {
@@ -59,6 +78,10 @@ export function assistantPartRenderPlan(
       plan.push({ kind: "research", part, index, activities: [part.data] })
       return
     }
+    if (part.type === "data-repo-context") {
+      plan.push({ kind: "repo-context", part, index })
+      return
+    }
     if (part.type === "file" || part.type === "reasoning-file") {
       plan.push({ kind: "file", part, index })
       return
@@ -77,6 +100,16 @@ export function assistantPartRenderPlan(
     // 文档工具走专属渲染；不得落入 createMarkdownArtifact 的"生成文档"轨迹文案。
     if (DOCUMENT_TOOL_PART_TYPES.has(part.type)) {
       plan.push({ kind: "document", part, index })
+      return
+    }
+    // 连续仓库工具调用合并为一个分组
+    if (isRepoToolPart(part)) {
+      const last = plan[plan.length - 1]
+      if (last && last.kind === "repo-tools" && last.parts) {
+        last.parts.push(part)
+      } else {
+        plan.push({ kind: "repo-tools", part, index, parts: [part] })
+      }
       return
     }
     if (part.type.startsWith("tool-")) {
