@@ -101,12 +101,14 @@ const STATUS_LABEL: Record<string, string> = {
   queued: "排队中",
   running: "执行中",
   cancelling: "取消中",
+  paused: "已暂停",
   completed: "已完成",
   failed: "失败",
   cancelled: "已取消",
 };
 
-const isActive = (status: string) => status === "queued" || status === "running" || status === "cancelling";
+const isActive = (status: string) =>
+  status === "queued" || status === "running" || status === "cancelling" || status === "paused";
 
 function statusColor(status: string) {
   switch (status) {
@@ -116,6 +118,8 @@ function statusColor(status: string) {
       return "bg-red-500";
     case "cancelled":
       return "bg-neutral-400";
+    case "paused":
+      return "bg-violet-500";
     case "cancelling":
       return "bg-amber-500 animate-pulse";
     default:
@@ -159,6 +163,8 @@ export default function AgentDemoPage() {
   const [pr, setPr] = useState<PullRequestState | null>(null);
   const [prError, setPrError] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
+  const [pausing, setPausing] = useState(false);
+  const [resuming, setResuming] = useState(false);
   const [now, setNow] = useState(0);
   const seenSeq = useRef(new Set<number>());
   const eventSource = useRef<EventSource | null>(null);
@@ -306,6 +312,42 @@ export default function AgentDemoPage() {
     refreshTasks();
   };
 
+  const pauseTask = async () => {
+    if (!selectedId || pausing) return;
+    setPausing(true);
+    try {
+      const res = await fetch(`/api/agent-tasks/${selectedId}/pause`, { method: "POST" });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        setBlocks((prev) => [
+          ...prev,
+          { kind: "error", id: `pause-${Date.now()}`, message: data.error ?? "暂停失败" },
+        ]);
+      }
+      refreshTasks();
+    } finally {
+      setPausing(false);
+    }
+  };
+
+  const resumeTask = async () => {
+    if (!selectedId || resuming) return;
+    setResuming(true);
+    try {
+      const res = await fetch(`/api/agent-tasks/${selectedId}/resume`, { method: "POST" });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        setBlocks((prev) => [
+          ...prev,
+          { kind: "error", id: `resume-${Date.now()}`, message: data.error ?? "恢复失败" },
+        ]);
+      }
+      refreshTasks();
+    } finally {
+      setResuming(false);
+    }
+  };
+
   // 选中仓库后拉取分支，默认回落到仓库默认分支（通常 main/master）
   const pickRepo = useCallback(async (fullName: string) => {
     setRepo(fullName);
@@ -382,9 +424,9 @@ export default function AgentDemoPage() {
     };
   }, [selectedId, snapshot?.result?.pullRequest]);
 
-  // 秒表：运行中每秒刷新
+  // 秒表：运行中每秒刷新（暂停态冻结，不计入耗时）
   useEffect(() => {
-    if (!snapshot || !isActive(snapshot.status)) return;
+    if (!snapshot || !isActive(snapshot.status) || snapshot.status === "paused") return;
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
   }, [snapshot?.status]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -399,12 +441,18 @@ export default function AgentDemoPage() {
 
   const elapsed = useMemo(() => {
     if (!snapshot) return null;
-    const end = isActive(snapshot.status) ? now : new Date(snapshot.updatedAt).getTime();
+    // paused 视为非活动：耗时冻结在最后一次更新（恢复后 updatedAt 推进，继续走表）
+    const end =
+      isActive(snapshot.status) && snapshot.status !== "paused"
+        ? now
+        : new Date(snapshot.updatedAt).getTime();
     return fmtElapsed(Math.max(0, end - new Date(snapshot.createdAt).getTime()));
   }, [snapshot, now]);
 
   const phaseIdx = snapshot?.phase ? PHASE_ORDER.indexOf(snapshot.phase) : -1;
   const running = snapshot ? isActive(snapshot.status) : false;
+  // executing 仅 running 态为真：步进条脉冲与暂停按钮用它（暂停态不该显示"执行中"）
+  const executing = snapshot?.status === "running";
 
   return (
     <div className="flex h-screen font-sans text-sm text-neutral-800 dark:text-neutral-200">
@@ -559,6 +607,24 @@ export default function AgentDemoPage() {
                   {STATUS_LABEL[snapshot?.status ?? ""] ?? snapshot?.status ?? "加载中"}
                 </span>
                 {elapsed && <span className="font-mono text-xs text-neutral-400">{elapsed}</span>}
+                {executing && snapshot?.environment === "e2b" && (
+                  <button
+                    onClick={pauseTask}
+                    disabled={pausing}
+                    className="rounded-md border border-neutral-300 px-2.5 py-1 text-xs hover:bg-neutral-100 disabled:opacity-40 dark:border-neutral-700 dark:hover:bg-neutral-800"
+                  >
+                    {pausing ? "暂停中…" : "暂停"}
+                  </button>
+                )}
+                {snapshot?.status === "paused" && (
+                  <button
+                    onClick={resumeTask}
+                    disabled={resuming}
+                    className="rounded-md border border-violet-300 px-2.5 py-1 text-xs text-violet-600 hover:bg-violet-50 disabled:opacity-40 dark:border-violet-800 dark:text-violet-400 dark:hover:bg-violet-950/40"
+                  >
+                    {resuming ? "恢复中…" : "继续"}
+                  </button>
+                )}
                 {running && (
                   <button
                     onClick={cancelTask}
@@ -583,13 +649,15 @@ export default function AgentDemoPage() {
                           i < phaseIdx || (!running && phaseIdx >= 0)
                             ? "bg-emerald-500"
                             : i === phaseIdx
-                              ? running
+                              ? executing
                                 ? "bg-blue-500 animate-pulse"
-                                : "bg-emerald-500"
+                                : snapshot?.status === "paused"
+                                  ? "bg-violet-500"
+                                  : "bg-emerald-500"
                               : "bg-neutral-300 dark:bg-neutral-700"
                         }`}
                       />
-                      <span className={i === phaseIdx && running ? "text-neutral-800 dark:text-neutral-200" : "text-neutral-400"}>
+                      <span className={i === phaseIdx && executing ? "text-neutral-800 dark:text-neutral-200" : "text-neutral-400"}>
                         {PHASE_LABEL[ph]}
                       </span>
                       {i < PHASE_ORDER.length - 1 && <span className="text-neutral-300 dark:text-neutral-700">›</span>}

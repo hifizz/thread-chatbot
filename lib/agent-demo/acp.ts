@@ -38,7 +38,7 @@ export class AcpBridge {
   private sessionId: string | null = null;
   private messageBlockId: string | null = null;
   private thoughtBlockId: string | null = null;
-  private exited: Promise<unknown>;
+  private exited!: Promise<unknown>;
   private _lastMessage = "";
   private logFile = "";
   private fileOffset = 0;
@@ -46,6 +46,9 @@ export class AcpBridge {
   private pollFailures = 0;
   private pollIncidentId: string | null = null;
   private closed = false;
+  // 沙箱暂停期间：进程被冻结而非退出，通道断开不应触发 pending 全拒——
+  // 恢复后 in-flight 的 session/prompt 会经日志文件补读继续完成。
+  private paused = false;
 
   /** 本轮 prompt 累积的正文（用于结果摘要）。 */
   get lastMessage(): string {
@@ -54,17 +57,41 @@ export class AcpBridge {
 
   private constructor(
     private readonly sandbox: Sandbox,
-    private readonly handle: CommandHandle,
+    private handle: CommandHandle,
     private readonly emitEvent: (payload: TaskEvent) => void
   ) {
+    this.watchExit(handle);
+  }
+
+  /** 进程退出（含沙箱被 e2b 超时杀掉）时，pending 请求必须全部 reject——
+   *  否则 acp.prompt 永久悬挂，任务卡死在 running。暂停期的通道断开除外；
+   *  resume 重连后旧 handle 的迟到退出回调由代次检查豁免。 */
+  private watchExit(handle: CommandHandle) {
     this.exited = handle.wait().catch(() => {});
-    // 进程退出（含沙箱被 e2b 超时杀掉）时，pending 请求必须全部 reject——
-    // 否则 acp.prompt 永久悬挂，任务卡死在 running。
     void this.exited.then(() => {
-      const err = new Error("devin acp 进程已退出（沙箱可能已回收）");
-      for (const p of this.pending.values()) p.reject(err);
-      this.pending.clear();
+      if (this.paused || this.closed || handle !== this.handle) return;
+      this.failAll("devin acp 进程已退出（沙箱可能已回收）");
     });
+  }
+
+  /** 沙箱即将暂停：命令通道断开由 watchExit 豁免，pending 保留到恢复后补读。 */
+  beginPause() {
+    this.paused = true;
+  }
+
+  /** 沙箱恢复后重连命令句柄（同一 pid 的进程已随内存快照复活）。
+   *  stdin 恢复可写——恢复后仍可能收到 request_permission 需要应答。 */
+  async resume() {
+    this.handle = await this.sandbox.commands.connect(this.handle.pid);
+    this.paused = false;
+    this.watchExit(this.handle);
+  }
+
+  /** 终止式失败：立即拒绝全部 pending（用于暂停状态下取消任务）。 */
+  failAll(reason: string) {
+    const err = new Error(reason);
+    for (const p of this.pending.values()) p.reject(err);
+    this.pending.clear();
   }
 
   /** 在沙箱内启动 `devin acp` 并完成 initialize + session/new。
@@ -286,11 +313,15 @@ export class AcpBridge {
   }
 
   /** stdin 写入带重试：e2b 通道瞬断时权限应答/控制消息不能静默丢失——
-   *  devin 会永远等待未被应答的 request_permission。 */
+   *  devin 会永远等待未被应答的 request_permission。暂停期间挂起等恢复：
+   *  冻结中的进程仍会等应答，恢复后从新句柄补发。 */
   private async sendRaw(msg: JsonRpc): Promise<void> {
     const line = JSON.stringify(msg) + "\n";
     let lastErr: unknown;
     for (let attempt = 0; attempt < 4; attempt++) {
+      while (this.paused && !this.closed) {
+        await new Promise((r) => setTimeout(r, 500));
+      }
       try {
         await this.handle.sendStdin(line);
         return;
@@ -328,6 +359,7 @@ export class AcpBridge {
     } catch {
       /* 沙箱可能已销毁 */
     }
-    await this.exited;
+    // 沙箱已整体销毁时 wait 通道可能迟迟不断——超时兜底，不阻塞 runner 收尾
+    await Promise.race([this.exited, new Promise((r) => setTimeout(r, 5000))]);
   }
 }

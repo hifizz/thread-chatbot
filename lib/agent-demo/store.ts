@@ -35,6 +35,15 @@ type TaskRecord = {
   cancelRequested: boolean;
   abortController: AbortController | null;
   releaseEnv: (() => Promise<void>) | null;
+  /** 暂停/恢复钩子：仅 e2b 路径注册；sandboxId 为跨进程恢复预留的锚点。 */
+  sandboxId: string | null;
+  pauseRun: (() => Promise<void>) | null;
+  resumeRun: (() => Promise<void>) | null;
+  /** 暂停/恢复各允许一个在飞——快照与重连都有秒级耗时，防重复触发。 */
+  pauseInFlight: boolean;
+  resumeInFlight: boolean;
+  /** 立即拒绝 in-flight 模型请求（暂停态下取消时解锁 runner）。 */
+  acpAbort: ((reason: string) => void) | null;
 };
 
 type Store = {
@@ -104,6 +113,12 @@ export function createTask(input: {
     cancelRequested: false,
     abortController: null,
     releaseEnv: null,
+    sandboxId: null,
+    pauseRun: null,
+    resumeRun: null,
+    pauseInFlight: false,
+    resumeInFlight: false,
+    acpAbort: null,
   };
   store().tasks.set(task.id, task);
   emit(task.id, "task", { type: "task.created", title: input.title });
@@ -129,6 +144,7 @@ export function getSnapshot(taskId: string): TaskSnapshot | null {
     baseBranch: task.baseBranch ?? "main",
     environment: task.environment,
     workspacePath: task.workspacePath,
+    sandboxId: task.sandboxId,
     result: task.result,
     error: task.error,
     createdAt: task.createdAt,
@@ -222,15 +238,26 @@ export function listTasks(): TaskListItem[] {
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
-/** 为当前 Run 注册中止控制器与环境释放钩子。 */
+/** 为当前 Run 注册中止控制器与环境控制钩子。 */
 export function registerRunHandles(
   taskId: string,
-  handles: { abortController?: AbortController; releaseEnv?: () => Promise<void> }
+  handles: {
+    abortController?: AbortController;
+    releaseEnv?: () => Promise<void>;
+    sandboxId?: string;
+    pauseRun?: () => Promise<void>;
+    resumeRun?: () => Promise<void>;
+    acpAbort?: (reason: string) => void;
+  }
 ) {
   const task = getTask(taskId);
   if (!task) return;
   if (handles.abortController) task.abortController = handles.abortController;
   if (handles.releaseEnv) task.releaseEnv = handles.releaseEnv;
+  if (handles.sandboxId) task.sandboxId = handles.sandboxId;
+  if (handles.pauseRun) task.pauseRun = handles.pauseRun;
+  if (handles.resumeRun) task.resumeRun = handles.resumeRun;
+  if (handles.acpAbort) task.acpAbort = handles.acpAbort;
 }
 
 export function isCancelRequested(taskId: string): boolean {
@@ -238,15 +265,62 @@ export function isCancelRequested(taskId: string): boolean {
 }
 
 /**
+ * 请求暂停：执行 runner 注册的暂停闭包（e2b 快照 + 状态置 paused）。
+ * 沙箱保留、任务记录保留，可经 requestResume 恢复。返回是否受理。
+ */
+export async function requestPause(taskId: string): Promise<boolean> {
+  const task = getTask(taskId);
+  if (!task || task.status !== "running" || !task.pauseRun || task.pauseInFlight) return false;
+  task.pauseInFlight = true;
+  try {
+    await task.pauseRun();
+  } finally {
+    task.pauseInFlight = false;
+  }
+  return true;
+}
+
+/**
+ * 请求恢复：重连 paused 沙箱（内存快照还原，进程从冻结点继续）。
+ * 返回是否受理。
+ */
+export async function requestResume(taskId: string): Promise<boolean> {
+  const task = getTask(taskId);
+  if (!task || task.status !== "paused" || !task.resumeRun || task.resumeInFlight) return false;
+  task.resumeInFlight = true;
+  try {
+    await task.resumeRun();
+  } catch (err) {
+    // 恢复失败（沙箱已回收/进程丢失）→ 判失败；同时拒绝 pending 解锁 runner、
+    // 回收环境，否则 acp.prompt 永远悬挂、沙箱泄漏。
+    const reason = `沙箱恢复失败：${err instanceof Error ? err.message : String(err)}`;
+    task.acpAbort?.(reason);
+    if (task.releaseEnv) await task.releaseEnv().catch(() => {});
+    emit(taskId, "task", {
+      type: "run.error",
+      error: { code: "resume_failed", source: "environment", userMessage: reason },
+    });
+    setRunStatus(taskId, "failed");
+    return false;
+  } finally {
+    task.resumeInFlight = false;
+  }
+  return true;
+}
+
+/**
  * 请求取消：置标记、进入 cancelling、中止模型流并回收远端环境。
- * 返回是否受理（仅运行中可取消）。
+ * 返回是否受理（运行中或已暂停可取消）。
  */
 export async function requestCancel(taskId: string): Promise<boolean> {
   const task = getTask(taskId);
-  if (!task || task.status !== "running") return false;
+  if (!task || (task.status !== "running" && task.status !== "paused")) return false;
   task.cancelRequested = true;
   setRunStatus(taskId, "cancelling");
   task.abortController?.abort();
+  // 暂停态下 stdin 不通、session/cancel 送不进去——直接拒绝 pending 解锁 runner；
+  // 运行态下同属兜底，与 abort 殊途同归。
+  task.acpAbort?.("任务已取消");
   if (task.releaseEnv) await task.releaseEnv().catch(() => {});
   return true;
 }

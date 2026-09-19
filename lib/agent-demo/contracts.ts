@@ -9,9 +9,9 @@ export type Json =
   | Json[]
   | { [key: string]: Json };
 
-export type TaskStatus = "queued" | "running" | "cancelling" | "completed" | "failed" | "cancelled";
+export type TaskStatus = "queued" | "running" | "cancelling" | "paused" | "completed" | "failed" | "cancelled";
 
-export type RunStatus = "queued" | "running" | "cancelling" | "completed" | "failed" | "cancelled";
+export type RunStatus = "queued" | "running" | "cancelling" | "paused" | "completed" | "failed" | "cancelled";
 
 export type AgentEvent =
   | { type: "agent.started" }
@@ -67,6 +67,8 @@ export type TaskSnapshot = {
   baseBranch: string;
   environment: string;
   workspacePath: string;
+  /** e2b 沙箱 ID（暂停后可经 Sandbox.connect 恢复的锚点；非 e2b 为 null）。 */
+  sandboxId: string | null;
   result: TaskResult | null;
   error: TaskError | null;
   createdAt: string;

@@ -153,6 +153,10 @@ export type E2bEnvironment = {
   sandbox: Sandbox;
   driver: E2bDriver;
   release: () => Promise<void>;
+  // 暂停：e2b 完整快照（文件系统+内存），沙箱内进程冻结但保留
+  pause: () => Promise<void>;
+  // 恢复：connect 会恢复内存快照，进程从冻结点继续（同一 Sandbox 对象原地复活）
+  resume: () => Promise<void>;
 };
 
 const DEVIN_BIN = "/home/user/.local/bin/devin";
@@ -229,11 +233,21 @@ export async function createE2bEnvironment(input: {
   const driver = new E2bDriver(sandbox, E2B_WORKDIR);
 
   // 续期心跳：任务期间每 30 分钟把 TTL 续回 58 分钟，任务可超过单次上限。
-  // 单个续期失败容忍（间隔远小于 TTL）；任务结束时 release 会清掉定时器。
-  const renew = setInterval(() => {
-    void sandbox.setTimeout(E2B_SANDBOX_TIMEOUT_MS).catch(() => {});
-  }, E2B_RENEW_INTERVAL_MS);
-  renew.unref?.();
+  // 单个续期失败容忍（间隔远小于 TTL）；pause 期间沙箱不消耗 TTL，停表即可。
+  let renew: ReturnType<typeof setInterval> | null = null;
+  const startRenew = () => {
+    renew = setInterval(() => {
+      void sandbox.setTimeout(E2B_SANDBOX_TIMEOUT_MS).catch(() => {});
+    }, E2B_RENEW_INTERVAL_MS);
+    renew.unref?.();
+  };
+  const stopRenew = () => {
+    if (renew) {
+      clearInterval(renew);
+      renew = null;
+    }
+  };
+  startRenew();
 
   input.onPhase?.("检出仓库");
   const clone = await driver.execRaw(
@@ -241,7 +255,7 @@ export async function createE2bEnvironment(input: {
     300_000
   );
   const cleanup = async () => {
-    clearInterval(renew);
+    stopRenew();
     await sandbox.kill().catch(() => {});
   };
   if (clone.exitCode !== 0) {
@@ -263,6 +277,16 @@ export async function createE2bEnvironment(input: {
     sandbox,
     driver,
     release: cleanup,
+    pause: async () => {
+      // 停表——paused 沙箱不消耗 TTL；完整内存+文件系统快照由 e2b 负责
+      stopRenew();
+      await sandbox.pause();
+    },
+    resume: async () => {
+      // connect 同一对象原地恢复：默认 restore 模式还原内存快照，进程从冻结点继续
+      await sandbox.connect({ timeoutMs: E2B_SANDBOX_TIMEOUT_MS });
+      startRenew();
+    },
   };
 }
 

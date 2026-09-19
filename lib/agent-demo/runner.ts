@@ -92,12 +92,25 @@ async function runTask(taskId: string) {
   registerRunHandles(taskId, { abortController });
   // 超时预算：到点中止 Agent（ACP 路径经 abort 监听器发 session/cancel），
   // 但不丢弃已产出内容——继续走 verify/publish，交付为 partial。
+  // 预算按"剩余时间"记账：暂停时冻结剩余额度，恢复后重新起表。
   let timedOut = false;
-  const deadline = setTimeout(() => {
-    timedOut = true;
-    phase(taskId, "agent", "已超过 55 分钟预算，中止 Agent 并收尾已有产出");
-    abortController.abort();
-  }, TASK_TIME_BUDGET_MS);
+  let deadlineRemainingMs = TASK_TIME_BUDGET_MS;
+  let deadlineStartedAt = Date.now();
+  const armDeadline = () =>
+    setTimeout(() => {
+      timedOut = true;
+      phase(taskId, "agent", "已超过 55 分钟预算，中止 Agent 并收尾已有产出");
+      abortController.abort();
+    }, deadlineRemainingMs);
+  let deadline = armDeadline();
+  const pauseDeadline = () => {
+    deadlineRemainingMs = Math.max(0, deadlineRemainingMs - (Date.now() - deadlineStartedAt));
+    clearTimeout(deadline);
+  };
+  const resumeDeadline = () => {
+    deadlineStartedAt = Date.now();
+    deadline = armDeadline();
+  };
 
   try {
     // ── 环境准备：远端沙箱 + 仓库检出（e2b 优先，boxd 次之）─────────
@@ -108,6 +121,8 @@ async function runTask(taskId: string) {
 
     let driver: WorkspaceDriver;
     let e2bSandbox: Sandbox | null = null;
+    let e2bPause: (() => Promise<void>) | null = null;
+    let e2bResume: (() => Promise<void>) | null = null;
     let acp: AcpBridge | null = null;
     if (remoteReady) {
       if (process.env.E2B_API_KEY?.trim()) {
@@ -121,8 +136,10 @@ async function runTask(taskId: string) {
         });
         driver = env.driver;
         e2bSandbox = env.sandbox;
+        e2bPause = env.pause;
+        e2bResume = env.resume;
         release = env.release;
-        registerRunHandles(taskId, { releaseEnv: env.release });
+        registerRunHandles(taskId, { releaseEnv: env.release, sandboxId: env.sandboxId });
         emit(taskId, "runner", {
           type: "phase.changed",
           phase: "environment",
@@ -169,6 +186,26 @@ async function runTask(taskId: string) {
         emitEvent: (payload) => emit(taskId, "agent", payload),
       });
       abortController.signal.addEventListener("abort", () => void acp?.cancel());
+      // 暂停/恢复钩子：沙箱整体快照，runner 挂在 acp.prompt 上不动——
+      // 恢复后 devin 进程从冻结点续跑，in-flight prompt 经日志补读自然完成。
+      registerRunHandles(taskId, {
+        acpAbort: (reason) => acp?.failAll(reason),
+        pauseRun: async () => {
+          acp?.beginPause();
+          pauseDeadline();
+          await e2bPause!();
+          setRunStatus(taskId, "paused");
+          phase(taskId, "agent", "已暂停（沙箱快照已保存，随时可恢复）");
+        },
+        resumeRun: async () => {
+          phase(taskId, "agent", "恢复沙箱中…");
+          await e2bResume!();
+          await acp?.resume();
+          resumeDeadline();
+          setRunStatus(taskId, "running");
+          phase(taskId, "agent", "已恢复，Agent 继续执行");
+        },
+      });
     }
 
     // ── Agent 执行 ──────────────────────────────────────────────
