@@ -26,6 +26,12 @@ export const THREAD_CHAT_MARKDOWN_ARTIFACT_SYSTEM =
   "用户只是要求详细回答、分析、解释、研究或总结，或者询问 Markdown 的概念、用法、语法时，不要调用工具。" +
   "When the user asks for multiple standalone Markdown/.md deliverables, call createMarkdownArtifact once for each document in the same reply. Do not call it for conceptual Markdown questions or ordinary Markdown-formatted prose."
 
+/** generate_visualization 始终挂载；主模型只决定是否需要图，不负责构造图数据。 */
+export const THREAD_CHAT_VISUALIZATION_SYSTEM =
+  "当用户明确要求用户流程图、产品流程、业务流程、Agent workflow/flow，或用图能明显提升流程理解时，调用 generate_visualization。" +
+  "只把用户要表达的流程以自然语言 prompt 和可选 LR/TB 方向交给工具；不要自行构造 nodes/edges，不要生成 SVG/HTML，也不要输出 React Flow、Dagre、ELK 等图库 schema。" +
+  "普通文字解释不需要图时不要为了装饰调用。工具返回成功后，可用一句简短正文引导用户查看图，不要重复抄写整张图。"
+
 /** ThreadTreeState JSONB 中消息 DAG 结构的当前版本。 */
 export const THREAD_TREE_SCHEMA_VERSION = 2 as const
 

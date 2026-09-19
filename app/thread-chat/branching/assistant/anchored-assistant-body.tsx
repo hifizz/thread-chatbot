@@ -7,6 +7,7 @@ import type {
 } from "../../core/types"
 import type { MarkdownGenerationProgress } from "../../core/types"
 import type { MarkdownArtifactProgressEvent } from "@/lib/chat/markdown-artifact"
+import { VisualizationBlock } from "@/components/visualization/visualization-block"
 import { AnchoredMarkdown } from "./anchored-markdown"
 import { assistantPartRenderPlan } from "./assistant-part-render-plan"
 import { ReasoningTrace, SearchTrace, ToolTrace } from "./thinking-trace"
@@ -79,6 +80,15 @@ export function AnchoredAssistantBody({
               route={message.researchRoute}
               complete={message.status === "done"}
               settled={message.status !== "pending" && message.status !== "streaming"}
+            />
+          )
+        }
+
+        if (kind === "visualization" && part.type === "data-visualization") {
+          return (
+            <VisualizationBlock
+              key={`${part.type}-${part.id ?? index}`}
+              visualization={part.data}
             />
           )
         }

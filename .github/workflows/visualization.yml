@@ -1,0 +1,48 @@
+name: Visualization
+
+on:
+  pull_request:
+    paths:
+      - "lib/visualization/**"
+      - "components/visualization/**"
+      - "lib/thread-chat/contracts/ui-message.ts"
+      - "lib/thread-chat/streaming/generation-tools.ts"
+      - "lib/thread-chat/streaming/ui-message-pipeline.ts"
+      - "app/thread-chat/branching/assistant/**"
+      - "e2e/thread-chat/user-flow-visualization.test.mjs"
+      - "openspec/changes/add-user-flow-visualization/**"
+      - ".github/workflows/visualization.yml"
+  push:
+    branches: [main]
+    paths:
+      - "lib/visualization/**"
+      - "components/visualization/**"
+      - "e2e/thread-chat/user-flow-visualization.test.mjs"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: User Flow contracts
+        run: node --import tsx e2e/thread-chat/user-flow-visualization.test.mjs
+
+      - name: Validate User Flow OpenSpec
+        run: pnpm exec openspec validate add-user-flow-visualization --strict

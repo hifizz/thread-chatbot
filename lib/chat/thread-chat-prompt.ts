@@ -6,6 +6,7 @@
 import {
   THREAD_CHAT_MARKDOWN_ARTIFACT_SYSTEM,
   THREAD_CHAT_SYSTEM,
+  THREAD_CHAT_VISUALIZATION_SYSTEM,
 } from "@/constants/thread-chat"
 
 /** Quote 只从所属 User Message Part 进入模型；Thread Anchor 不进入 System。 */
@@ -14,6 +15,7 @@ export function buildThreadChatSystem(options?: {
 }): string {
   return [
     THREAD_CHAT_SYSTEM,
+    THREAD_CHAT_VISUALIZATION_SYSTEM,
     options?.enableMarkdownArtifact
       ? THREAD_CHAT_MARKDOWN_ARTIFACT_SYSTEM
       : null,
