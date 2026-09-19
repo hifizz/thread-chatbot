@@ -23,8 +23,11 @@ import { createWorkspaceTools } from "@/lib/agent-demo/tools";
 
 const MAX_STEPS = 20;
 const MAX_OUTPUT_TOKENS = 16_000;
-// 任务级时长预算：早于 e2b 沙箱 58min 硬超时触发，留 3 分钟走 verify+publish 收尾。
-const TASK_TIME_BUDGET_MS = 55 * 60 * 1000;
+// 任务级时长预算：默认 3 小时，可经 AGENT_TASK_TIME_BUDGET_MINUTES 调整。
+// e2b 沙箱 TTL 由续期心跳滚动维持（不再是 58min 硬顶），此预算是任务自身
+// 的护栏：到点中止 Agent 但不丢弃产出——继续走 verify/publish 交付为 partial。
+const TASK_TIME_BUDGET_MS =
+  (Number(process.env.AGENT_TASK_TIME_BUDGET_MINUTES) || 180) * 60 * 1000;
 
 function phase(taskId: string, phase: string, label: string) {
   emit(taskId, "runner", { type: "phase.changed", phase, label });
@@ -99,7 +102,7 @@ async function runTask(taskId: string) {
   const armDeadline = () =>
     setTimeout(() => {
       timedOut = true;
-      phase(taskId, "agent", "已超过 55 分钟预算，中止 Agent 并收尾已有产出");
+      phase(taskId, "agent", `已超过 ${TASK_TIME_BUDGET_MS / 60000} 分钟预算，中止 Agent 并收尾已有产出`);
       abortController.abort();
     }, deadlineRemainingMs);
   let deadline = armDeadline();
