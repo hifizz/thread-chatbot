@@ -198,8 +198,11 @@ export async function installDevinHarness(
 }
 
 const E2B_WORKDIR = "/home/user/repo";
-// Hobby 层单会话上限 1 小时；留 2 分钟余量给 runner 侧的超时收尾。
+// Hobby 层单次 setTimeout 上限 1 小时；留 2 分钟余量给 runner 侧的超时收尾。
+// TTL 是滚动的——renew 心跳在任务存活期间持续续期，任务可超过 1 小时。
 const E2B_SANDBOX_TIMEOUT_MS = 58 * 60 * 1000;
+// 续期间隔：远小于 TTL，允许个别续期失败仍不触碰截止线。
+const E2B_RENEW_INTERVAL_MS = 30 * 60 * 1000;
 
 export async function createE2bEnvironment(input: {
   taskId: string;
@@ -216,16 +219,33 @@ export async function createE2bEnvironment(input: {
   // devin 在任务内现装（慢 ~12s，但无需预先构建模板）。
   const template = process.env.E2B_TEMPLATE?.trim() || "base";
   input.onPhase?.(template === "base" ? "创建 e2b 沙箱" : `创建 e2b 沙箱（模板 ${template}）`);
-  const sandbox = await Sandbox.create(template, { apiKey, timeoutMs: E2B_SANDBOX_TIMEOUT_MS });
+  const sandbox = await Sandbox.create(template, {
+    apiKey,
+    timeoutMs: E2B_SANDBOX_TIMEOUT_MS,
+    // 到点自动暂停（文件系统+内存快照）而不是销毁——续期心跳万一中断，
+    // 沙箱也只是 paused，可经 connect() 恢复，任务进度不丢。
+    lifecycle: { onTimeout: "pause" },
+  });
   const driver = new E2bDriver(sandbox, E2B_WORKDIR);
+
+  // 续期心跳：任务期间每 30 分钟把 TTL 续回 58 分钟，任务可超过单次上限。
+  // 单个续期失败容忍（间隔远小于 TTL）；任务结束时 release 会清掉定时器。
+  const renew = setInterval(() => {
+    void sandbox.setTimeout(E2B_SANDBOX_TIMEOUT_MS).catch(() => {});
+  }, E2B_RENEW_INTERVAL_MS);
+  renew.unref?.();
 
   input.onPhase?.("检出仓库");
   const clone = await driver.execRaw(
     `git clone ${shQuote(`https://x-access-token:${input.githubToken}@github.com/${input.repo}.git`)} ${shQuote(E2B_WORKDIR)}`,
     300_000
   );
-  if (clone.exitCode !== 0) {
+  const cleanup = async () => {
+    clearInterval(renew);
     await sandbox.kill().catch(() => {});
+  };
+  if (clone.exitCode !== 0) {
+    await cleanup();
     throw new Error(`git clone 失败: ${clone.stderr || clone.stdout}`);
   }
 
@@ -234,7 +254,7 @@ export async function createE2bEnvironment(input: {
       `git config user.email 'agent@thread-chat.demo' && git config user.name 'ThreadChat Agent'`
   );
   if (setup.exitCode !== 0) {
-    await sandbox.kill().catch(() => {});
+    await cleanup();
     throw new Error(`任务分支创建失败: ${setup.stderr || setup.stdout}`);
   }
 
@@ -242,9 +262,7 @@ export async function createE2bEnvironment(input: {
     sandboxId: sandbox.sandboxId,
     sandbox,
     driver,
-    release: async () => {
-      await sandbox.kill().catch(() => {});
-    },
+    release: cleanup,
   };
 }
 
