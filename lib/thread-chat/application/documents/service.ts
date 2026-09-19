@@ -3,19 +3,21 @@ import { findOwnedProject } from "../../persistence/project-repository"
 import type { ProjectDocumentsDTO } from "../../contracts/document"
 import { isActiveDocumentExecution } from "../../domain/documents/execution"
 import { lockDocumentExecution, countExecutionConflicts, hasDocumentReadReceipt, saveDocumentToolResult,
-  type DocumentReadReceipt, type DocumentUpdateReceipt } from "../../persistence/documents/commands"
+  type DocumentUpdateReceipt } from "../../persistence/documents/commands"
 import { lockDocument, appendDocumentRevision } from "../../persistence/documents/writes"
 import { documentWritesEnabled } from "./configuration"
 import { type ConversationTransaction, withConversationTransaction } from "../../persistence/transaction"
 import { db } from "@/lib/db"
 import { DOCUMENT_COMMAND, DOCUMENT_LIMITS } from "@/constants/project-documents"
-import { type DocumentExecution, type DocumentReadResult, type UpdateDocumentInput, type UpdateDocumentResult, updateDocumentInputSchema } from "../../contracts/document"
+import { type DocumentExecution, type UpdateDocumentInput, type UpdateDocumentResult, updateDocumentInputSchema } from "../../contracts/document"
 import { applyDocumentEdits } from "../../domain/documents/edit"
 import { artifactIdForTool } from "../../domain/tool-identity"
 import { executeIdempotentCommand } from "../../persistence/command-repository"
 import { documentForArtifact, findOwnedDocument, listOwnedDocuments, readDocumentRevision, listDocumentHistory } from "../../persistence/documents/queries"
 import { registerOwnedProjectDocuments } from "./register-existing"
 import { notFound } from "../errors"
+
+export { readProjectDocument } from "./drafts"
 
 export async function getProjectDocument(userId: string, documentId: string, revisionId?: string) {
   const doc = await findOwnedDocument(db, userId, documentId)
@@ -38,32 +40,6 @@ export async function findProjectDocuments(identity: DocumentExecution, input: {
   const candidates = await listOwnedDocuments(db, identity.userId, identity.projectId, documentId ?? undefined)
   const query = input.query?.trim().toLocaleLowerCase()
   return query ? candidates.filter((doc) => doc.title.toLocaleLowerCase().includes(query)) : candidates
-}
-
-export async function readProjectDocument(identity: DocumentExecution, input: { documentId: string; revisionId?: string }, toolCallId: string): Promise<DocumentReadResult> {
-  return withConversationTransaction(async (tx) => {
-    const execution = await lockDocumentExecution(tx, identity)
-    if (!execution) notFound()
-    const { message } = execution
-    if (!isActiveDocumentExecution(message))
-      throw new Error("EXECUTION_INACTIVE")
-    const doc = await findOwnedDocument(tx, identity.userId, input.documentId)
-    if (!doc?.currentRevisionId || doc.projectId !== identity.projectId) notFound()
-    const readId = artifactIdForTool(identity.messageId, `read:${toolCallId}`)
-    const receipt = await executeIdempotentCommand<DocumentReadReceipt>({ tx, userId: identity.userId, commandId: readId,
-      kind: DOCUMENT_COMMAND.read, scopeId: doc.id, payload: { ...input, identity }, execute: async () => {
-        const revision = await readDocumentRevision(tx, doc.id, input.revisionId ?? doc.currentRevisionId!)
-        if (!revision) notFound()
-        return { document: { id: doc.id, projectId: doc.projectId, currentRevisionId: doc.currentRevisionId!,
-          title: revision.title },
-          revision, readId, isCurrent: revision.id === doc.currentRevisionId,
-          executionId: identity.messageId }
-      } })
-    if (!receipt.replayed) await saveDocumentToolResult(tx, identity.messageId, {
-      type: "tool-readProjectDocument", toolCallId, state: "output-available", input, output: receipt.result,
-    })
-    return receipt.result
-  })
 }
 
 export async function updateProjectDocument(identity: DocumentExecution, raw: UpdateDocumentInput, toolCallId: string): Promise<UpdateDocumentResult> {
@@ -109,7 +85,9 @@ async function commitDocumentUpdate(tx: ConversationTransaction, identity: Docum
   const patch = applyDocumentEdits(base.content, input.edits)
   if (!patch.ok) return { status: "rejected", code: patch.code }
   if (!patch.changed) return { status: "unchanged", documentId: doc.id, revisionId: base.id }
-  return appendDocumentRevision(tx, identity, input, base, patch.content, toolCallId, commandId)
+  return appendDocumentRevision(tx, identity, { documentId: input.documentId, base,
+    content: patch.content, changeSummary: input.changeSummary, edits: input.edits,
+    sourceDraftId: null, toolCallId, commandId })
 }
 
 export async function getProjectDocuments(userId: string, projectId: string): Promise<ProjectDocumentsDTO> {

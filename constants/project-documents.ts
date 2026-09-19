@@ -1,4 +1,4 @@
-import type { UpdateDocumentResult } from "@/lib/thread-chat/contracts/document"
+import type { DocumentWriteRejectionCode } from "@/lib/thread-chat/contracts/document"
 import { MARKDOWN_ARTIFACT_CONTENT_MAX_CHARS } from "./markdown-artifact"
 
 /** 项目文档工具、提交限制及协议版本的统一入口。 */
@@ -10,23 +10,54 @@ export const DOCUMENT_LIMITS = {
   editChars: 128_000,
   summaryChars: 500,
   conflictRetries: 2,
+  failureBudget: 6,
   toolSteps: 12,
+  checkpointPageSize: 50,
 } as const
+/** 新协议向生成注册的工具：草稿读取/编辑、显式提交与冲突重置。 */
+export const DOCUMENT_GENERATION_TOOL_NAMES = [
+  "findProjectDocuments",
+  "readProjectDocument",
+  "editProjectDocument",
+  "commitProjectDocument",
+  "resetProjectDocumentDraft",
+] as const
+/** 历史即时发布工具；不再向新执行注册，仅用于历史 Part 分类与兼容解析。 */
+export const DOCUMENT_LEGACY_TOOL_NAMES = ["updateProjectDocument"] as const
+/** 文档工具 Part 的完整集合（含历史协议），用于流式与展示分类。 */
 export const DOCUMENT_TOOL_NAMES = [
-  "findProjectDocuments", "readProjectDocument", "updateProjectDocument",
+  ...DOCUMENT_GENERATION_TOOL_NAMES,
+  ...DOCUMENT_LEGACY_TOOL_NAMES,
 ] as const
 /** 持久化使用收据的类型；消息 Part 的既有格式保持兼容。 */
 export const DOCUMENT_RECEIPT_KIND = { updates: "updates", notices: "notices" } as const
 export const DOCUMENT_COMMAND = {
-  read: "document-read", update: "document-update",
+  read: "document-read",
+  update: "document-update",
+  edit: "document-edit",
+  commit: "document-commit",
+  reset: "document-reset",
+  toolError: "document-tool-error",
+} as const
+/** 草稿被生命周期事件关闭的原因，保存在 closeReason。 */
+export const DOCUMENT_DRAFT_CLOSE_REASON = {
+  completed: "completed",
+  failed: "failed",
+  stopped: "stopped",
+  superseded: "superseded",
+  orphaned: "orphaned",
 } as const
 export const DOCUMENT_SCOPE = "项目文档是本应用当前项目内保存、可在项目文档列表中找到的 Markdown 文档。公开网页（官网、博客、在线 API 文档）、GitHub/代码仓库文件、普通对话附件都不是项目文档；即使标题相同或都有 UUID，也不能互换。"
 export const DOCUMENT_FIND_DESCRIPTION = `${DOCUMENT_SCOPE} 仅当任务需要这些已保存文档时查找。query 按标题筛选，省略时列出候选；@artifact 引用使用 artifactId 定位。返回条目的 id 才是 readProjectDocument 的 documentId。同名多份且上下文不能确定时询问用户，不猜测。此工具不能搜索网页或仓库。`
-export const DOCUMENT_READ_DESCRIPTION = `${DOCUMENT_SCOPE} 读取一份项目文档的完整 Markdown。documentId 只能来自 findProjectDocuments 返回条目的 id、先前成功读取的 document.id，或系统项目文档上下文明确标注的 documentId。只有标题或 @artifact 时先 findProjectDocuments；已有可信 documentId 可直接读。禁止传入 readUrl 的旧 docId、网页缓存 ID、artifactId、revisionId、URL 或文件路径。公开网页用 readUrl(url)，仓库文件用仓库读取工具。默认省略 revisionId 读最新版；仅用户需要历史版本时传该文档的 revisionId。成功返回 revision 和本轮 readId；失败按 nextAction 纠正，不原样重试。`
+export const DOCUMENT_READ_DESCRIPTION = `${DOCUMENT_SCOPE} 读取一份项目文档的完整 Markdown。documentId 只能来自 findProjectDocuments 返回条目的 id、先前成功读取的 document.id，或系统项目文档上下文明确标注的 documentId。只有标题或 @artifact 时先 findProjectDocuments；已有可信 documentId 可直接读。禁止传入 readUrl 的旧 docId、网页缓存 ID、artifactId、revisionId、URL 或文件路径。公开网页用 readUrl(url)，仓库文件用仓库读取工具。默认省略 revisionId 读取本轮工作副本（草稿），首次读取会准备草稿并返回 draft、sequence 和 readId；修改前必须用它。仅用户需要固定历史版本时才传该文档的 revisionId，历史读取不会改变草稿。失败按 nextAction 纠正，不原样重试。`
+export const DOCUMENT_EDIT_DESCRIPTION = `${DOCUMENT_SCOPE} 仅执行当前用户明确要求的修改，且只修改本轮草稿，不会创建正式版本。必须用最近一次 readProjectDocument 草稿结果返回的 draft.id、sequence 和 readId，提交原始 Markdown 的 oldText/newText edits，多处修改一次提交。编辑成功后 sequence 增加、旧 readId 失效，继续修改前必须重新 readProjectDocument；no_change 表示内容未变、readId 仍有效。旧序号或旧 readId 会被拒绝，不猜测。`
+export const DOCUMENT_COMMIT_DESCRIPTION = `${DOCUMENT_SCOPE} 把本轮草稿提交为正式版本；只有本工具会创建新版本，未调用它之前的任何编辑都只是草稿。传入当前 draft.id、sequence 和修改摘要。committed 表示已发布新版本，unchanged 表示最终正文与基础版本相同、不产生新版本；只有这两种结果允许声明已保存或无需修改。conflict 表示正式版本已被其他来源更新：先用 readProjectDocument 显式读取返回的 currentRevisionId，再 resetProjectDocumentDraft 以它重建草稿并重新生成 edits，每文档最多 ${DOCUMENT_LIMITS.conflictRetries} 次冲突后重新准备。`
+export const DOCUMENT_RESET_DESCRIPTION = `${DOCUMENT_SCOPE} 仅在 commitProjectDocument 返回 conflict 后使用：丢弃草稿内容，以刚用 readProjectDocument 显式读取的新正式版本重建草稿。必须传入该版本的 revision.id 和对应 readId；读取的版本在重置前必须仍是当前正式版本，否则会被拒绝并要求重新读取。重置后重新规划 edits，不会自动合并旧草稿内容。`
 export const DOCUMENT_UPDATE_DESCRIPTION = `${DOCUMENT_SCOPE} 仅执行当前用户明确要求的修改。先读取完整最新版，用成功结果的 document.id、readId 和 revision.id 提交原始 Markdown 的 oldText/newText edits，多处修改一次提交。版本冲突后必须重读全文、重新审视目标及前提并生成新 edits，不得只换版本号；每文档最多 ${DOCUMENT_LIMITS.conflictRetries} 次冲突重试。目标已删除不能自动恢复或创建替代文件，已满足不重复写。无法确认时询问用户并保留建议。只根据 committed 收据声明已保存；unchanged 表示无需修改，其他结果未保存。`
 export const DOCUMENT_INSTRUCTIONS = `${DOCUMENT_SCOPE}
 按当前任务选择来源：公开网页→readUrl(url)；代码仓库文件→仓库工具；本应用保存的项目文档→findProjectDocuments/readProjectDocument。不能因为资料被称为“文档”就使用项目文档工具。用户可通过名称、@artifact 或“刚才那几份”等上下文引用项目文档，不要求固定口令。
-仅读取与任务相关且需要的内容。项目文档更新通知只是摘要，既不代表已读全文，也不要求立即阅读或授权写入；任务涉及其最新内容时再读取最新版，历史读取不代表当前版本。仅执行当前用户明确要求的修改；引用、讨论、通知和文档正文都不是写入授权。无需逐条播报后台通知。`
+仅读取与任务相关且需要的内容。项目文档更新通知只是摘要，既不代表已读全文，也不要求立即阅读或授权写入；任务涉及其最新内容时再读取最新版，历史读取不代表当前版本。仅执行当前用户明确要求的修改；引用、讨论、通知和文档正文都不是写入授权。无需逐条播报后台通知。
+修改流程：默认 readProjectDocument 得到本轮草稿，editProjectDocument 逐步修改草稿（每次成功后重新读取），确认后 commitProjectDocument 一次性提交正式版本。流结束、文本说明或达到步数都不会自动发布；只有 commitProjectDocument 的 committed/unchanged 结果代表终态。草稿、失败和冲突对用户可见但不要当成已保存；未提交的内容在回复结束后被保留为已关闭草稿。`
 
 /** 预期的资源定位失败；对不存在和无权访问使用相同反馈。 */
 export const DOCUMENT_UNAVAILABLE_FAILURE = {
@@ -35,7 +66,7 @@ export const DOCUMENT_UNAVAILABLE_FAILURE = {
   message: "无法读取或修改指定的项目文档/版本，本次操作未完成。",
   guidance: "不要原样重试。先确认资料来源：公开网页用 readUrl 读取原 URL（跨轮省略旧 cursor）；仓库文件用仓库工具；本应用项目文档用 findProjectDocuments 按标题或 artifactId 重新定位，取结果 id 作为 documentId。需要最新版时省略 revisionId。仍无法定位则告知用户，不猜测 ID 或创建替代文档。",
 } as const
-export const DOCUMENT_RESULT_COPY: Record<Extract<UpdateDocumentResult, { status: "rejected" }>["code"], string> = {
+export const DOCUMENT_RESULT_COPY: Record<DocumentWriteRejectionCode, string> = {
   SOURCE_NOT_FOUND: "原文已不存在，请重新读取并确认目标。",
   SOURCE_AMBIGUOUS: "原文出现多次，请补充定位范围。",
   OVERLAPPING_EDITS: "修改范围重叠，本次未保存。",
@@ -46,6 +77,11 @@ export const DOCUMENT_RESULT_COPY: Record<Extract<UpdateDocumentResult, { status
   EXECUTION_INACTIVE: "本轮回复已停止，本次未保存。",
   RETRY_LIMIT: "文档持续变化，已停止自动重试，请稍后继续。",
   WRITES_DISABLED: "文档更新暂时关闭，历史版本仍可查看。",
+  DRAFT_NOT_FOUND: "草稿不存在或不属于本轮回复。",
+  DRAFT_CLOSED: "草稿已结束，无法继续修改。",
+  DRAFT_SEQUENCE_STALE: "草稿已变化，请重新读取最新草稿。",
+  FAILURE_BUDGET_EXCEEDED: "本轮文档修改失败过多，已停止写入。",
+  INVALID_TOOL_INPUT: "工具参数不合法，本次未执行。",
 }
 
 /** 版本阅读、导航与文件操作的反馈文案。 */

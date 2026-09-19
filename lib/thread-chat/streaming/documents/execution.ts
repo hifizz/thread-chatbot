@@ -8,11 +8,12 @@ import type { DocumentToolFailure } from "../../contracts/document"
 export function createDocumentToolExecutor() {
   const failures = new Map<string, DocumentToolFailure>()
   const pending = new Map<string, Promise<void>>()
-  return async function run<T>(toolName: string, input: { documentId: string; revisionId?: string; expectedRevisionId?: string },
+  return async function run<T>(toolName: string, input: { documentId: string; revisionId?: string; expectedRevisionId?: string; draftId?: string },
     toolCallId: string, signal: AbortSignal | undefined, execute: () => Promise<T>): Promise<T | DocumentToolFailure> {
     return withDiagnosticContext({ toolName, toolCallId }, async () => {
-      // 只缓存 NOT_FOUND；定位由文档和版本决定，与补丁正文无关。
-      const key = JSON.stringify([toolName, input.documentId, input.revisionId ?? input.expectedRevisionId ?? null])
+      // 只缓存 NOT_FOUND；定位由文档和版本/草稿决定，与补丁正文无关。
+      const key = JSON.stringify([toolName, input.documentId,
+        input.revisionId ?? input.expectedRevisionId ?? input.draftId ?? null])
       while (pending.has(key)) await pending.get(key)
       signal?.throwIfAborted()
       const previous = failures.get(key)

@@ -1,4 +1,18 @@
-import type { DocumentUpdateNotices, ProjectDocumentUpdates, DocumentReadResult, DocumentDTO, UpdateDocumentInput, UpdateDocumentResult, DocumentToolFailure } from "./document"
+import type {
+  CommitDocumentInput,
+  CommitDocumentResult,
+  DocumentDTO,
+  DocumentReadResult,
+  DocumentToolFailure,
+  DocumentUpdateNotices,
+  EditDocumentInput,
+  EditDocumentResult,
+  ProjectDocumentUpdates,
+  ResetDocumentDraftInput,
+  ResetDocumentDraftResult,
+  UpdateDocumentInput,
+  UpdateDocumentResult,
+} from "./document"
 import type { ArtifactReferenceData } from "./artifact-reference"
 import type { UIMessage, UIMessageChunk } from "ai"
 import type {
@@ -39,6 +53,10 @@ export type WebSearchOutput = {
 export type ThreadChatTools = {
   findProjectDocuments: { input: { query?: string; artifactId?: string }; output: DocumentDTO[] }
   readProjectDocument: { input: { documentId: string; revisionId?: string }; output: DocumentReadResult | DocumentToolFailure }
+  editProjectDocument: { input: EditDocumentInput; output: EditDocumentResult | DocumentToolFailure }
+  commitProjectDocument: { input: CommitDocumentInput; output: CommitDocumentResult | DocumentToolFailure }
+  resetProjectDocumentDraft: { input: ResetDocumentDraftInput; output: ResetDocumentDraftResult | DocumentToolFailure }
+  /** 历史即时协议；新执行不再注册，Part 仅用于恢复与展示。 */
   updateProjectDocument: { input: UpdateDocumentInput; output: UpdateDocumentResult | DocumentToolFailure }
   createMarkdownArtifact: {
     input: MarkdownArtifactInput

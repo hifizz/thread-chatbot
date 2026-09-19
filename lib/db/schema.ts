@@ -22,7 +22,13 @@ import {
   PROJECT_TARGET_MAX_CHARS,
 } from "@/constants/project-workspace"
 import { user } from "./auth-schema"
-import type { MarkdownEdit, StoredDocumentContextReceipt } from "@/lib/thread-chat/contracts/document"
+import type {
+  DocumentCheckpointKind,
+  DocumentDraftStatus,
+  DocumentFinalReceipt,
+  MarkdownEdit,
+  StoredDocumentContextReceipt,
+} from "@/lib/thread-chat/contracts/document"
 import type { TextAnchor } from "@/lib/thread-chat/domain/text-anchor"
 import type { ThreadChatUIMessage } from "@/lib/thread-chat/contracts/ui-message"
 import type {
@@ -420,6 +426,7 @@ export const documentRevisions = dbSchema.table("document_revisions", {
   commandId: text("command_id"),
   executionId: text("execution_id").notNull().references(() => messages.id),
   toolCallId: text("tool_call_id"),
+  sourceDraftId: text("source_draft_id"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table): PgTableExtraConfigValue[] => [
   foreignKey({ name: "document_revisions_project_fk", columns: [table.documentId, table.projectId],
@@ -428,10 +435,74 @@ export const documentRevisions = dbSchema.table("document_revisions", {
     foreignColumns: [artifacts.id, artifacts.projectId, artifacts.sourceMessageId] }),
   uniqueIndex("document_revisions_number_uq").on(table.documentId, table.revisionNumber),
   uniqueIndex("document_revisions_artifact_uq").on(table.artifactId),
+  uniqueIndex("document_revisions_source_draft_uq").on(table.sourceDraftId),
   unique("document_revisions_document_id_uq").on(table.documentId, table.id),
   foreignKey({ name: "document_revisions_parent_fk", columns: [table.documentId, table.parentRevisionId],
     foreignColumns: [table.documentId, table.id] }),
+  // 历史行保持 null；删除草稿时仅解除溯源关联，不反向删除正式版本。
+  foreignKey({ name: "document_revisions_source_draft_fk", columns: [table.documentId, table.sourceDraftId],
+    foreignColumns: [documentDrafts.documentId, documentDrafts.id] }).onDelete("set null"),
   check("document_revisions_number_positive", sql`${table.revisionNumber} >= 1`),
+])
+
+/** 同一 assistant 执行、同一文档的持久化工作副本；只有显式 commit 才产生正式版本。 */
+export const documentDrafts = dbSchema.table("document_drafts", {
+  id: text("id").primaryKey(),
+  projectId: text("project_id").notNull(),
+  messageId: text("message_id").notNull(),
+  documentId: text("document_id").notNull(),
+  baseRevisionId: text("base_revision_id").notNull(),
+  content: text("content").notNull(),
+  sequence: integer("sequence").notNull().default(0),
+  status: text("status").$type<DocumentDraftStatus>().notNull().default("editing"),
+  committedRevisionId: text("committed_revision_id"),
+  finalReceipt: jsonb("final_receipt").$type<DocumentFinalReceipt>(),
+  closeReason: text("close_reason"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table): PgTableExtraConfigValue[] => [
+  unique("document_drafts_message_document_uq").on(table.messageId, table.documentId),
+  unique("document_drafts_document_id_uq").on(table.documentId, table.id),
+  index("document_drafts_message_idx").on(table.messageId),
+  index("document_drafts_document_idx").on(table.documentId),
+  foreignKey({ name: "document_drafts_document_fk", columns: [table.documentId, table.projectId],
+    foreignColumns: [documents.id, documents.projectId] }).onDelete("cascade"),
+  foreignKey({ name: "document_drafts_message_fk", columns: [table.projectId, table.messageId],
+    foreignColumns: [messages.projectId, messages.id] }).onDelete("cascade"),
+  foreignKey({ name: "document_drafts_base_revision_fk", columns: [table.documentId, table.baseRevisionId],
+    foreignColumns: [documentRevisions.documentId, documentRevisions.id] }).onDelete("cascade"),
+  foreignKey({ name: "document_drafts_committed_revision_fk", columns: [table.documentId, table.committedRevisionId],
+    foreignColumns: [documentRevisions.documentId, documentRevisions.id] }).onDelete("cascade"),
+  check("document_drafts_status_allowed",
+    sql`${table.status} in ('editing','committed','unchanged','abandoned')`),
+  check("document_drafts_sequence_nonneg", sql`${table.sequence} >= 0`),
+  check("document_drafts_editing_shape",
+    sql`(${table.status} = 'editing') = (${table.committedRevisionId} is null and ${table.finalReceipt} is null and ${table.closeReason} is null)`),
+  check("document_drafts_committed_shape",
+    sql`(${table.status} = 'committed') = (${table.committedRevisionId} is not null)`),
+])
+
+/** 草稿只追加的编辑/重置审计检查点；sequence 与所属草稿严格单调对齐。 */
+export const documentCheckpoints = dbSchema.table("document_checkpoints", {
+  id: text("id").primaryKey(),
+  documentId: text("document_id").notNull(),
+  draftId: text("draft_id").notNull(),
+  sequence: integer("sequence").notNull(),
+  kind: text("kind").$type<DocumentCheckpointKind>().notNull(),
+  baseRevisionId: text("base_revision_id").notNull(),
+  toolCallId: text("tool_call_id").notNull(),
+  edits: jsonb("edits").$type<MarkdownEdit[]>().notNull().default([]),
+  content: text("content").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table): PgTableExtraConfigValue[] => [
+  unique("document_checkpoints_draft_sequence_uq").on(table.draftId, table.sequence),
+  index("document_checkpoints_draft_idx").on(table.draftId),
+  foreignKey({ name: "document_checkpoints_draft_fk", columns: [table.documentId, table.draftId],
+    foreignColumns: [documentDrafts.documentId, documentDrafts.id] }).onDelete("cascade"),
+  foreignKey({ name: "document_checkpoints_base_revision_fk", columns: [table.documentId, table.baseRevisionId],
+    foreignColumns: [documentRevisions.documentId, documentRevisions.id] }).onDelete("cascade"),
+  check("document_checkpoints_kind_allowed", sql`${table.kind} in ('edit','reset')`),
+  check("document_checkpoints_sequence_positive", sql`${table.sequence} >= 1`),
 ])
 
 /** v1 创建/写命令的幂等收据；result 是提交后的权威 DTO。 */
