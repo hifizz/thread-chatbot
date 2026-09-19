@@ -6,6 +6,7 @@ import { canRetryLatestAssistant } from "@/lib/thread-chat/domain/timeline"
 import {
   assertAllowedGenerationSettings,
   assertAllowedModel,
+  reservePaidGeneration,
   touchProjectAndThread,
 } from "@/lib/thread-chat/application/command-utils"
 import { notFound, stateConflict } from "@/lib/thread-chat/application/errors"
@@ -80,6 +81,12 @@ export function retryMessage(
             startedAt: now,
           })
           .returning()
+        await reservePaidGeneration(tx, {
+          userId,
+          generationId: replacement.id,
+          modelId: command.modelId,
+          generationSettings: command.generationSettings,
+        })
         const [superseded] = await tx
           .update(messages)
           .set({ supersededAt: now, updatedAt: now })

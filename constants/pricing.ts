@@ -43,6 +43,13 @@ export type ModelCost = {
   outputPerMillion: number
 }
 
+export class ModelPricingUnavailableError extends Error {
+  constructor(readonly modelId: string) {
+    super(`MODEL_PRICING_UNAVAILABLE:${modelId}`)
+    this.name = "ModelPricingUnavailableError"
+  }
+}
+
 /**
  * Coding Plan 是订阅套餐，没有逐 token 的实际账单。MVP 先以 ¥10/¥40（输入/输出，
  * 每百万 token）作为内部保守估值，避免新增模型因缺失定价被当成免费。
@@ -160,19 +167,36 @@ export function usdToMicros(usd: number): number {
   return Math.ceil(toMicros(usd, "USD"))
 }
 
-/** 供应商成本（微元）。找不到定价的模型按 0 处理（等价免费，需在注册表里避免）。 */
+/** 返回经过验证的模型成本；付费模型缺价不能被解释为免费。 */
+export function requireModelCost(model: string): ModelCost {
+  const cost = isChatModelId(model) ? MODEL_COST[model] : undefined
+  if (!cost) throw new ModelPricingUnavailableError(model)
+  return cost
+}
+
+/** 供应商成本（微元）。找不到定价时抛错，调用方必须在供应商调用前处理。 */
 export function costMicros(
   model: string,
   inputTokens: number,
   outputTokens: number
 ): number {
-  const cost = isChatModelId(model) ? MODEL_COST[model] : undefined
-  if (!cost) return 0
+  if (
+    !Number.isSafeInteger(inputTokens) ||
+    !Number.isSafeInteger(outputTokens) ||
+    inputTokens < 0 ||
+    outputTokens < 0
+  ) {
+    throw new RangeError("Token 用量必须是非负安全整数")
+  }
+  const cost = requireModelCost(model)
   const native =
     (inputTokens * cost.inputPerMillion +
       outputTokens * cost.outputPerMillion) /
     1_000_000
-  return Math.ceil(toMicros(native, cost.currency))
+  const micros = Math.ceil(toMicros(native, cost.currency))
+  if (!Number.isSafeInteger(micros))
+    throw new RangeError("模型成本超出安全整数范围")
+  return micros
 }
 
 /** 由成本换算售价（微元），保证利润率 ≥ PROFIT_MARGIN，向上取整。 */

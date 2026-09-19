@@ -4,7 +4,7 @@ import { nextCookies } from "better-auth/next-js"
 import { captcha } from "better-auth/plugins"
 import { db } from "@/lib/db"
 import { user, session, account, verification } from "@/lib/db/schema"
-import { ensureUserCredits } from "@/lib/billing/credits"
+import { grantWelcomeCreditsOnce } from "@/lib/billing/ledger"
 import { isEmailConfigured, sendEmail } from "@/lib/email/client"
 import { verificationEmail, resetPasswordEmail } from "@/lib/email/templates"
 import { getGoogleAuthConfig } from "@/lib/auth/social"
@@ -63,7 +63,7 @@ export const auth = betterAuth({
     },
     // 关键防薅：初始额度改到「邮箱验证通过后」才发放，抬高白嫖门槛。
     afterEmailVerification: async (verifiedUser) => {
-      await ensureUserCredits(verifiedUser.id)
+      await grantWelcomeCreditsOnce(verifiedUser.id)
     },
   },
   databaseHooks: {
@@ -74,9 +74,9 @@ export const auth = betterAuth({
           // - 邮箱/密码：启用邮箱验证时，创建时 emailVerified=false，等 afterEmailVerification 再发；
           //   未启用邮箱验证则「注册即赠额」。
           // - 社交登录（Google）：邮箱已由提供方验证（创建时 emailVerified=true），不会走
-          //   afterEmailVerification，故在此按已验证发放。ensureUserCredits 幂等，双路径不会重复发。
+          //   afterEmailVerification，故在此按已验证发放。账本幂等键保证双路径不重复发。
           if (!emailReady || createdUser.emailVerified) {
-            await ensureUserCredits(createdUser.id)
+            await grantWelcomeCreditsOnce(createdUser.id)
           }
         },
       },

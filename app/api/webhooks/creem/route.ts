@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto"
-import { and, eq, sql } from "drizzle-orm"
+import { and, eq } from "drizzle-orm"
 import { db } from "@/lib/db"
-import { payments, subscriptions, userCredits } from "@/lib/db/schema"
+import { payments, subscriptions } from "@/lib/db/schema"
 import {
   verifyWebhookSignature,
   parseWebhookEvent,
@@ -12,6 +12,7 @@ import {
   readSubscription,
 } from "@/lib/payments/creem"
 import { recordCreemTopup } from "@/lib/billing/credits"
+import { appendLedgerEntryOnce } from "@/lib/billing/ledger"
 import { getTopupPack } from "@/constants/creem"
 
 // Creem webhook：签名校验 → 分发事件。必须读原始请求体做 HMAC 校验。
@@ -115,13 +116,14 @@ export async function POST(req: Request) {
               creditMicros: payments.creditMicros,
             })
           if (row) {
-            await tx
-              .update(userCredits)
-              .set({
-                balanceMicros: sql`${userCredits.balanceMicros} - ${row.creditMicros}`,
-                updatedAt: new Date(),
-              })
-              .where(eq(userCredits.userId, row.userId))
+            await appendLedgerEntryOnce(tx, {
+              userId: row.userId,
+              kind: "charge",
+              amountMicros: -row.creditMicros,
+              idempotencyKey: `creem-refund-v1:${orderId}`,
+              referenceId: orderId,
+              reason: "Creem 订单退款扣回",
+            })
           }
         })
         break
