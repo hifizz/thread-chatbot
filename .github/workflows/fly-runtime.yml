@@ -1,0 +1,119 @@
+name: Fly Runtime
+
+# PR #169 的运行时契约验证：drain 状态机、环境白名单、多实例生成 lease、
+# 部署文件静态检查与 Docker 镜像可构建性。不部署、不触碰任何真实 Fly 资源。
+
+on:
+  pull_request:
+    paths:
+      - "Dockerfile"
+      - ".dockerignore"
+      - "fly.toml"
+      - "app/healthz/**"
+      - "app/readyz/**"
+      - "app/api/internal/**"
+      - "constants/runtime.ts"
+      - "constants/generation.ts"
+      - "constants/thread-chat-stream.ts"
+      - "lib/runtime/**"
+      - "lib/thread-chat/streaming/**"
+      - "lib/thread-chat/server/**"
+      - "lib/db/schema.ts"
+      - "e2e/runtime/**"
+      - "e2e/thread-chat/generation-ownership-db.test.mjs"
+      - "scripts/fly-*.mjs"
+      - ".github/workflows/fly-runtime.yml"
+      - "package.json"
+      - "pnpm-lock.yaml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  runtime-contracts:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
+      DIRECT_URL: postgres://postgres:postgres@localhost:5432/postgres
+      BETTER_AUTH_SECRET: fly-runtime-ci-secret-at-least-32-characters
+      AI_TELEMETRY_ENABLED: "false"
+      AI_LANGFUSE_ENABLED: "false"
+      AI_DEVTOOLS_ENABLED: "false"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Targeted ESLint
+        run: >-
+          pnpm exec eslint
+          app/healthz/route.ts
+          app/readyz/route.ts
+          app/api/internal/drain/route.ts
+          constants/runtime.ts
+          constants/generation.ts
+          constants/thread-chat-stream.ts
+          lib/runtime/env.ts
+          lib/runtime/instance.ts
+          lib/runtime/drain.ts
+          lib/thread-chat/streaming/generation-ownership.ts
+          lib/thread-chat/streaming/run-generation.ts
+          lib/thread-chat/streaming/runtime.ts
+          lib/thread-chat/streaming/session-store.ts
+          lib/thread-chat/server/handlers.ts
+          lib/thread-chat/contracts/errors.ts
+          lib/db/schema.ts
+          instrumentation.ts
+          next.config.ts
+
+      - name: Drain controller and env whitelist
+        run: node --import tsx e2e/runtime/drain-env.test.mjs
+
+      - name: Prepare isolated test database
+        run: pnpm db:test:reset && pnpm db:test:push
+
+      - name: Generation ownership lease
+        run: node --import tsx e2e/thread-chat/generation-ownership-db.test.mjs
+
+      - name: Generation lifecycle regression
+        run: node --import tsx e2e/thread-chat/normalized-generation-db.test.mjs
+
+      - name: fly.toml parses
+        run: |
+          node -e 'const fs=require("fs");const t=fs.readFileSync("fly.toml","utf8");if(!/auto_stop_machines\s*=\s*"off"/.test(t))throw new Error("auto_stop_machines 必须为 off");if(!/path\s*=\s*"\/readyz"/.test(t)||!/path\s*=\s*"\/healthz"/.test(t))throw new Error("缺少 health check");console.log("fly.toml ok")'
+
+      - name: Deploy scripts syntax
+        run: node --check scripts/fly-drain.mjs && node --check scripts/fly-migrate.mjs
+
+  docker-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Docker build produces the release image
+        run: docker build -t thread-chat-fly-ci .

@@ -31,6 +31,10 @@ export function proxy(request: NextRequest, event: NextFetchEvent) {
     "/terms",
     "/privacy",
     "/refund",
+    // 平台健康检查（Fly service/machine check）：无凭证、只读、不含敏感信息，
+    // 必须公开可达，否则实例永远无法通过 readiness。
+    "/healthz",
+    "/readyz",
   ])
   const isLocalGate3Harness =
     process.env.NODE_ENV === "development" &&

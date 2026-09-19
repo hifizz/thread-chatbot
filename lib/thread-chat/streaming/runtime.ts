@@ -1,14 +1,20 @@
-import { eq } from "drizzle-orm"
+import { and, eq, isNull, lt, or } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { messages } from "@/lib/db/schema"
 import { getSessionStore } from "@/lib/thread-chat/streaming/session-store"
+import { heartbeatStaleBefore } from "@/lib/thread-chat/streaming/generation-ownership"
 import { TRACE_NAMES } from "@/constants/observability"
+import { THREAD_CHAT_ORPHAN_SWEEP_INTERVAL_MS } from "@/constants/thread-chat-stream"
 import { resolveObservabilityConfig } from "@/lib/observability/config"
 import { assistantMessageTraceId } from "@/lib/observability/identity"
 import { runAgentTrace } from "@/lib/observability/trace"
 
-async function sweepInterruptedGenerations(): Promise<number> {
-  const now = new Date()
+/**
+ * 孤儿生成清扫：只处理属主心跳已过期、或从未被认领且停留过久的 generating 行。
+ * 多实例下绝不能按「本进程刚重启」推断他人生成已死——活实例的心跳必须让行免于清扫。
+ */
+async function sweepInterruptedGenerations(now: Date = new Date()): Promise<number> {
+  const staleBefore = heartbeatStaleBefore(now)
   const rows = await db
     .update(messages)
     .set({
@@ -19,7 +25,18 @@ async function sweepInterruptedGenerations(): Promise<number> {
       finishedAt: now,
       updatedAt: now,
     })
-    .where(eq(messages.status, "generating"))
+    .where(
+      and(
+        eq(messages.status, "generating"),
+        or(
+          lt(messages.generationHeartbeatAt, staleBefore),
+          and(
+            isNull(messages.generationHeartbeatAt),
+            lt(messages.updatedAt, staleBefore)
+          )
+        )
+      )
+    )
     .returning({
       id: messages.id,
       projectId: messages.projectId,
@@ -68,8 +85,10 @@ async function sweepInterruptedGenerations(): Promise<number> {
 }
 
 const RUNTIME_PROMISE_SYMBOL = Symbol.for("thread-chat.v1.runtime-init")
+const SWEEP_TIMER_SYMBOL = Symbol.for("thread-chat.v1.orphan-sweep-timer")
 type RuntimeGlobal = typeof globalThis & {
   [RUNTIME_PROMISE_SYMBOL]?: Promise<void>
+  [SWEEP_TIMER_SYMBOL]?: ReturnType<typeof setInterval>
 }
 
 export function ensureThreadChatRuntimeInitialized(): Promise<void> {
@@ -77,6 +96,16 @@ export function ensureThreadChatRuntimeInitialized(): Promise<void> {
   scope[RUNTIME_PROMISE_SYMBOL] ??= (async () => {
     getSessionStore()
     await sweepInterruptedGenerations()
+    // 周期性清扫：捕获「属主实例崩溃但本进程未重启」的孤儿生成。
+    // 谓词只看心跳过期，绝不会误杀其他活实例的工作。
+    if (!scope[SWEEP_TIMER_SYMBOL]) {
+      scope[SWEEP_TIMER_SYMBOL] = setInterval(() => {
+        void sweepInterruptedGenerations().catch((error) =>
+          console.warn("[thread-chat] 周期孤儿清扫失败:", error)
+        )
+      }, THREAD_CHAT_ORPHAN_SWEEP_INTERVAL_MS)
+      scope[SWEEP_TIMER_SYMBOL].unref?.()
+    }
   })()
   return scope[RUNTIME_PROMISE_SYMBOL]
 }

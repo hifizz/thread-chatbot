@@ -18,6 +18,7 @@ export const GENERATION_CANCEL_REASONS = {
   evaluationTimeout: "evaluation-timeout",
   supersededByEdit: "superseded-by-edit",
   discarded: "discarded",
+  deployDrain: "deploy-drain",
 } as const
 
 export const GENERATION_BILLING_STATUSES = [
